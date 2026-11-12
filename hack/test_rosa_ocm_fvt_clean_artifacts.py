@@ -37,6 +37,10 @@ FALLBACK_CASES = {
     "mktemp-symlink": [0],
     "mktemp-blocked": list(range(FALLBACK_CANDIDATES)),
 }
+# A candidate the step finds already taken by a directory the fixture does not own.
+OCCUPIED_DIR_CASE = "mktemp-occupied-dir"
+# Prefix of the marker file a fixture-created directory carries as its proof.
+MARKER = ".fixture-owned-"
 
 
 def step_script_name():
@@ -139,13 +143,34 @@ def fallback_candidates(pid):
     return [Path(f"/tmp/ocm-fvt-clean.{pid}.{index}") for index in range(FALLBACK_CANDIDATES)]
 
 
+def own(base, path, kind):
+    """Add a /tmp entry to the ledger of things this fixture run created itself.
+
+    The ledger is the only authority the fixture's cleanup has: an entry is written
+    the moment the fixture plants a symlink or the step's `mkdir` succeeds, carrying a
+    proof that only that creation could leave. Nothing else may be removed, so a path
+    that merely looks like a candidate is never touched.
+    """
+    # Stat identity was measured to be insufficient here: on the overlayfs this suite
+    # runs on, a directory deleted and recreated at the same path came back with the
+    # same inode and the same st_ctime_ns. So each entry carries a proof that creation
+    # itself leaves behind - a marker file written inside a new directory, and the
+    # unique target of a planted symlink - and cleanup demands that proof back.
+    if kind == "directory":
+        proof = MARKER + os.urandom(8).hex()
+        os.close(os.open(path / proof, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
+    else:
+        proof = os.readlink(path)
+    with (base / "owned.jsonl").open("a", encoding="utf-8") as ledger:
+        ledger.write(json.dumps({"path": str(path), "kind": kind, "proof": proof}) + "\n")
+
+
 def record_fallback_candidates(base, occupied):
     """Record the step's pid and pre-create the named candidates as symlinks.
 
     The step is about to choose a name from the predictable `/tmp/ocm-fvt-clean.<pid>.<n>`
     family, and this mock runs as its descendant, so the fixture can occupy exactly the
-    candidates the step will try before it tries them. The pid is recorded even when
-    nothing is planted: it is what scopes the fixture's own cleanup to its own paths.
+    candidates the step will try before it tries them.
     """
     pid = step_pid()
     victim = base / "victim"
@@ -156,14 +181,47 @@ def record_fallback_candidates(base, occupied):
         path = candidates[index]
         if not path.exists() and not path.is_symlink():
             path.symlink_to(victim, target_is_directory=True)
+            own(base, path, "symlink")
             planted.append(str(path))
     (base / "fallback.json").write_text(json.dumps({"pid": pid, "planted": planted}),
                                         encoding="utf-8")
 
 
+def occupy_candidate_directory(base):
+    """Leave a real directory on the step's first candidate, owned by nobody's ledger.
+
+    This is what an unrelated process - or an earlier run - leaves in /tmp. The fixture
+    deliberately does not record it, so cleanup has no claim on it.
+    """
+    pid = step_pid()
+    path = fallback_candidates(pid)[0]
+    path.mkdir()
+    (path / "keep.txt").write_text("keep\n", encoding="utf-8")
+    (base / "fallback.json").write_text(
+        json.dumps({"pid": pid, "planted": [], "squatted": str(path)}), encoding="utf-8")
+
+
+def mock_mkdir(arguments, base):
+    """Run the real mkdir and record the /tmp directories it actually created.
+
+    `mkdir` without `-p` creates the directory or fails, so a zero exit is proof that
+    this step created that path rather than inheriting it. A pre-existing candidate
+    makes mkdir fail, so it never enters the ledger and the fixture leaves it alone.
+    """
+    completed = subprocess.run(["/usr/bin/mkdir", *arguments], check=False)
+    target = Path(arguments[-1])
+    if completed.returncode == 0 and target.parent == Path("/tmp") \
+            and target.name.startswith("ocm-fvt-clean."):
+        own(base, target, "directory")
+    return completed.returncode
+
+
 def mock_mktemp(arguments, base, case):
     """Keep the step's private fallback directory inside the fixture."""
     if arguments[:1] == ["-d"] and arguments[1].startswith("/tmp/ocm-fvt-clean."):
+        if case == OCCUPIED_DIR_CASE:
+            occupy_candidate_directory(base)
+            return 97
         if case in FALLBACK_CASES:
             record_fallback_candidates(base, FALLBACK_CASES[case])
             return 97
@@ -203,6 +261,8 @@ def mock_command(command, arguments):
     case = os.environ["FIXTURE_CASE"]
     if command == "mktemp":
         return mock_mktemp(arguments, base, case)
+    if command == "mkdir":
+        return mock_mkdir(arguments, base)
     if command in ("cat", "env"):
         if ((command == "cat" and arguments[0].startswith("/usr/local/cs-qe-credentials/"))
                 or (command == "env" and arguments[0] == "-i")):
@@ -242,7 +302,6 @@ def censor_errors(root):
 class CleanFixture(unittest.TestCase):
     def setUp(self):
         self.calls = []
-        self.fallback_seen = {}
         self.base = Path(tempfile.mkdtemp())
         # Cleanups run last in, first out: restore modes before removing the tree.
         self.addCleanup(shutil.rmtree, self.base)
@@ -258,7 +317,7 @@ class CleanFixture(unittest.TestCase):
         self.script = self.base / SCRIPT_NAME
         shutil.copyfile(CLEAN / SCRIPT_NAME, self.script)
         self.write_clean_state()
-        for command in ("podman", "cat", "env", "python3", "mktemp"):
+        for command in ("podman", "cat", "env", "python3", "mktemp", "mkdir"):
             executable = self.bin / command
             executable.write_text(
                 f'#!/bin/bash\nexec "{sys.executable}" "{Path(__file__).resolve()}" '
@@ -346,39 +405,63 @@ class CleanFixture(unittest.TestCase):
                     path.chmod(0o700)
 
     def remove_fallback_directories(self):
-        """Drop the /tmp entries this test planted or made its own step create.
+        """Drop exactly the /tmp entries this fixture run created, and nothing else.
 
-        Scoped by name to the candidates of this test's own step pid, never by diffing
-        `/tmp`: a concurrent run of this suite, or a real step on the same host, must
-        not lose its `/tmp/ocm-fvt-clean.*` directory to this fixture. Within those
-        names, an entry is removed only when it is still the exact object observed when
-        the step exited (`st_dev`/`st_ino`), which keeps a recycled pid from pointing
-        this cleanup at a later process's directory. Symlinks are unlinked only when the
-        fixture planted them, and a directory only when the fixture user owns it.
+        The ledger written at creation time is the only authority: the fixture plants a
+        symlink, or the step's `mkdir` returns zero, and that entry is recorded with
+        its proof. Cleanup removes an entry only when the object still at
+        that path still carries the proof that creation left behind. So a candidate
+        that merely matches the naming, a
+        pre-existing directory the step skipped, a path that appeared later, and a
+        replaced entry are all left untouched, and an absent or empty ledger removes
+        nothing at all. Names are never used to decide a deletion, `lstat` keeps this
+        off any symlink target, and no path comes from the step's output.
         """
-        record = self.base / "fallback.json"
-        if not record.exists():
-            return
-        fallback = json.loads(record.read_text(encoding="utf-8"))
-        planted = set(fallback["planted"])
-        for path in fallback_candidates(fallback["pid"]):
+        for kind, path, proof in self.owned_entries():
             try:
                 info = path.lstat()
             except OSError:
                 continue
-            # Before the step exits there is nothing recorded yet, and the name and
-            # ownership checks below stand alone; afterwards identity is required too.
-            identity = (info.st_dev, info.st_ino)
-            if self.fallback_seen and self.fallback_seen.get(str(path)) != identity:
-                continue
-            if stat.S_ISLNK(info.st_mode):
-                if str(path) in planted:
+            if kind == "symlink":
+                if stat.S_ISLNK(info.st_mode) and os.readlink(path) == proof:
                     path.unlink()
                 continue
-            if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid():
+            if not stat.S_ISDIR(info.st_mode):
+                continue
+            try:
+                marker = (path / proof).lstat()
+            except OSError:
+                continue
+            # lstat, not is_file(): a marker swapped for a symlink to some other file
+            # would otherwise pass for the proof this directory is the fixture's.
+            if not stat.S_ISREG(marker.st_mode):
                 continue
             self.restore_modes(path)
             shutil.rmtree(path, ignore_errors=True)
+
+    def owned_entries(self):
+        """Read the creation ledger, dropping any record that is not usable as proof.
+
+        A missing ledger, an empty one, and a line that is not a well-formed record all
+        yield nothing to delete, so damage to the ledger costs leftovers in /tmp rather
+        than somebody else's directory. A directory's proof must be a plain marker name
+        this fixture could have generated, so a record can never point the check at a
+        path of its own choosing.
+        """
+        ledger = self.base / "owned.jsonl"
+        if not ledger.exists():
+            return []
+        usable = []
+        for line in ledger.read_text(encoding="utf-8").splitlines():
+            try:
+                entry = json.loads(line)
+                kind, path, proof = entry["kind"], entry["path"], entry["proof"]
+            except (ValueError, TypeError, KeyError):
+                continue
+            if kind == "directory" and (os.sep in proof or not proof.startswith(MARKER)):
+                continue
+            usable.append((kind, Path(path), proof))
+        return usable
 
     def run_with_planted_fallbacks(self, case, exit_code):
         """Run a case whose `mktemp -d` fails, with the step's /tmp fallback candidates
@@ -387,13 +470,6 @@ class CleanFixture(unittest.TestCase):
         self.addCleanup(self.remove_fallback_directories)
         result = self.run_step(case, exit_code=exit_code, helper="none")
         fallback = json.loads((self.base / "fallback.json").read_text(encoding="utf-8"))
-        # Pin what survived the step, so cleanup can only ever remove these objects.
-        for path in fallback_candidates(fallback["pid"]):
-            try:
-                info = path.lstat()
-            except OSError:
-                continue
-            self.fallback_seen[str(path)] = (info.st_dev, info.st_ino)
         return result, fallback
 
 
@@ -516,28 +592,6 @@ class CleanSafetyTests(CleanFixture):
         self.assertNotIn(PUBLISHED, self.entries())
         self.assert_collector_owns_artifacts()
 
-    def test_fallback_cleanup_spares_entries_this_test_did_not_create(self):
-        """The fixture's /tmp cleanup is scoped to its own step's candidate names."""
-        result, fallback = self.run_with_planted_fallbacks("mktemp-symlink", 4)
-        self.assertIn(" falls back to ", result.stdout)
-        # What an unrelated process, or a concurrent run of this suite, owns in /tmp.
-        unrelated = Path(tempfile.mkdtemp(prefix="ocm-fvt-clean.unrelated-", dir="/tmp"))
-        self.addCleanup(shutil.rmtree, unrelated, True)
-        (unrelated / "keep.txt").write_text("keep\n", encoding="utf-8")
-        # Candidate-shaped, but for a pid no live process can hold, so a real
-        # concurrent run of this suite can never collide with the name.
-        concurrent = Path(f"/tmp/ocm-fvt-clean.{fallback['pid'] + 10 ** 9}.0")
-        concurrent.mkdir()
-        self.addCleanup(shutil.rmtree, concurrent, True)
-        (concurrent / "keep.txt").write_text("keep\n", encoding="utf-8")
-
-        self.remove_fallback_directories()
-
-        self.assertEqual((unrelated / "keep.txt").read_text(encoding="utf-8"), "keep\n")
-        self.assertEqual((concurrent / "keep.txt").read_text(encoding="utf-8"), "keep\n")
-        # The fixture's own planted candidate is cleaned up.
-        self.assertFalse(Path(fallback["planted"][0]).is_symlink(), fallback["planted"])
-
     def test_every_fallback_taken_runs_cleanup_without_an_output_mount(self):
         result, fallback = self.run_with_planted_fallbacks("mktemp-blocked", 6)
         self.assertEqual(len(fallback["planted"]), 5)
@@ -583,6 +637,124 @@ class CleanSafetyTests(CleanFixture):
         result = self.run_step(exit_code=3)
         self.assertIn("WARNING: failed to publish", result.stdout)
         self.assertEqual(self.entries(self.artifacts / PUBLISHED), ["kept.txt"])
+
+
+class FallbackCleanupTests(CleanFixture):
+    """What the fixture itself is allowed to delete from the shared /tmp."""
+
+    def owned_directory(self, index):
+        """A /tmp candidate-shaped directory this fixture creates and records."""
+        path = Path(f"/tmp/ocm-fvt-clean.{os.getpid()}.{index}")
+        path.mkdir()
+        self.addCleanup(shutil.rmtree, path, True)
+        own(self.base, path, "directory")
+        return path
+
+    def test_fallback_cleanup_spares_entries_this_test_did_not_create(self):
+        """The fixture's /tmp cleanup is scoped to its own step's candidate names."""
+        result, fallback = self.run_with_planted_fallbacks("mktemp-symlink", 4)
+        self.assertIn(" falls back to ", result.stdout)
+        # What an unrelated process, or a concurrent run of this suite, owns in /tmp.
+        unrelated = Path(tempfile.mkdtemp(prefix="ocm-fvt-clean.unrelated-", dir="/tmp"))
+        self.addCleanup(shutil.rmtree, unrelated, True)
+        (unrelated / "keep.txt").write_text("keep\n", encoding="utf-8")
+        # Candidate-shaped, but for a pid no live process can hold, so a real
+        # concurrent run of this suite can never collide with the name.
+        concurrent = Path(f"/tmp/ocm-fvt-clean.{fallback['pid'] + 10 ** 9}.0")
+        concurrent.mkdir()
+        self.addCleanup(shutil.rmtree, concurrent, True)
+        (concurrent / "keep.txt").write_text("keep\n", encoding="utf-8")
+
+        self.remove_fallback_directories()
+
+        self.assertEqual((unrelated / "keep.txt").read_text(encoding="utf-8"), "keep\n")
+        self.assertEqual((concurrent / "keep.txt").read_text(encoding="utf-8"), "keep\n")
+        # The fixture's own planted candidate is cleaned up.
+        self.assertFalse(Path(fallback["planted"][0]).is_symlink(), fallback["planted"])
+
+    def test_fallback_cleanup_leaves_a_candidate_directory_it_did_not_create(self):
+        """A pre-existing candidate is skipped by the step and kept by the fixture."""
+        result, fallback = self.run_with_planted_fallbacks(OCCUPIED_DIR_CASE, 4)
+        squatted = Path(fallback["squatted"])
+        self.addCleanup(shutil.rmtree, squatted, True)
+        used = next(line.rsplit(" falls back to ", 1)[1].strip()
+                    for line in result.stdout.splitlines() if " falls back to " in line)
+        # The step refused the occupied directory, exactly as it refuses a symlink.
+        self.assertEqual(used, f"/tmp/ocm-fvt-clean.{fallback['pid']}.1")
+        # The ledger is not empty - the step's own directory was recorded and removed -
+        # so keeping this one is a decision, not an early return.
+        self.assertTrue((self.base / "owned.jsonl").read_text(encoding="utf-8").strip())
+        self.remove_fallback_directories()
+        self.assertEqual((squatted / "keep.txt").read_text(encoding="utf-8"), "keep\n")
+
+    def test_fallback_cleanup_leaves_a_recorded_path_that_was_replaced(self):
+        """Identity by stat is not enough here, so the proof has to be inside the entry.
+
+        On overlayfs a directory deleted and recreated at the same path returns with the
+        same inode and the same st_ctime_ns, so only the marker left at creation tells
+        this fixture's directory apart from somebody else's.
+        """
+        recorded = Path(f"/tmp/ocm-fvt-clean.{os.getpid()}.2")
+        recorded.mkdir()
+        self.addCleanup(shutil.rmtree, recorded, True)
+        own(self.base, recorded, "directory")
+        shutil.rmtree(recorded)
+        recorded.mkdir()  # same path, somebody else's directory now
+        (recorded / "keep.txt").write_text("keep\n", encoding="utf-8")
+        self.remove_fallback_directories()
+        self.assertEqual((recorded / "keep.txt").read_text(encoding="utf-8"), "keep\n")
+
+    def test_recorded_directory_still_present_is_removed(self):
+        """The cleanup must still do its job: a created directory never escapes it."""
+        path = self.owned_directory(1)
+        (path / "scratch.txt").write_text("scratch\n", encoding="utf-8")
+        self.remove_fallback_directories()
+        self.assertFalse(path.exists(), path)
+
+    def test_recorded_directory_whose_marker_was_replaced_is_kept(self):
+        path = self.owned_directory(3)
+        proof = self.owned_entries()[0][2]
+        (path / proof).unlink()
+        (path / proof).symlink_to(self.base / "elsewhere")
+        (path / "keep.txt").write_text("keep\n", encoding="utf-8")
+        self.remove_fallback_directories()
+        self.assertEqual((path / "keep.txt").read_text(encoding="utf-8"), "keep\n")
+
+    def test_damaged_ledger_records_are_ignored_without_stopping_cleanup(self):
+        path = self.owned_directory(4)
+        ledger = self.base / "owned.jsonl"
+        ledger.write_text("not json\n" + json.dumps({"kind": "directory"}) + "\n"
+                          + json.dumps({"kind": "directory", "path": str(path),
+                                        "proof": "../escape"}) + "\n"
+                          + ledger.read_text(encoding="utf-8"), encoding="utf-8")
+        self.remove_fallback_directories()
+        self.assertFalse(path.exists(), path)
+
+    def test_fallback_cleanup_without_a_creation_ledger_removes_nothing(self):
+        """No record of creating anything means no deletion at all."""
+        candidate = Path(f"/tmp/ocm-fvt-clean.{os.getpid()}.0")
+        candidate.mkdir()
+        self.addCleanup(shutil.rmtree, candidate, True)
+        (candidate / "keep.txt").write_text("keep\n", encoding="utf-8")
+        self.assertFalse((self.base / "owned.jsonl").exists())
+        self.remove_fallback_directories()
+        self.assertEqual((candidate / "keep.txt").read_text(encoding="utf-8"), "keep\n")
+
+    def test_planted_entries_are_cleaned_when_the_test_body_fails(self):
+        """Cleanup is registered before the run, so a failing assertion still clears /tmp."""
+        record = {}
+
+        class FailingRun(CleanFixture):
+            def runTest(self):  # pylint: disable=invalid-name  # unittest's own name
+                record["planted"] = self.run_with_planted_fallbacks("mktemp-symlink", 4)[1]
+                self.fail("simulated assertion failure after the step ran")
+
+        outcome = unittest.TestResult()
+        FailingRun().run(outcome)
+        self.assertEqual(len(outcome.failures), 1, outcome.errors)
+        self.assertTrue(record["planted"]["planted"])
+        for path in record["planted"]["planted"]:
+            self.assertFalse(Path(path).is_symlink(), path)
 
 
 class HelperDestinationTests(unittest.TestCase):
