@@ -79,8 +79,6 @@ else
 fi
 echo "$(date) Fixed NodePort for lease ${MGMT_CLUSTER_LEASE}: ${FIXED_NODEPORT}"
 
-sleep 10 
-
 # Render the manifests to a file so we can patch before applying.
 HC_MANIFEST="/tmp/hcp-kubevirt-manifests.yaml"
 hcp create cluster kubevirt \
