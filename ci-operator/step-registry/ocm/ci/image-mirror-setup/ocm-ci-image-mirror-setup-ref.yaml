@@ -1,10 +1,10 @@
 ref:
-  as: ocm-ci-image-mirror
+  as: ocm-ci-image-mirror-setup
   from_image:
     name: builder
     namespace: stolostron
     tag: go1.25-linux
-  commands: ocm-ci-image-mirror-commands.sh
+  commands: ocm-ci-image-mirror-setup-commands.sh
   credentials:
   - mount_path: /secrets/acm-cicd-osci-push
     group: acm-cicd-osci-push
@@ -67,17 +67,18 @@ ref:
     default: ''
     documentation: |-
       The repository name of the destination image reference. If blank, the
-      COMPONENT_NAME file will be used.
+      COMPONENT_NAME file will be used. The resolved value is written to
+      ${SHARED_DIR}/IMAGE_REPO for later steps.
   - name: IMAGE_TAG
     default: ''
     documentation: |-
       The tag for the destination image reference. If blank, the tag for
       a presubmit will be <version>-PR<pull_num>-<commit_sha> and for a
-      postsubmit will be <version>-<commit_sha>.
+      postsubmit will be <version>-<commit_sha>. The resolved value is
+      written to ${SHARED_DIR}/IMAGE_TAG for later steps.
   resources:
     requests:
       cpu: 100m
       memory: 100Mi
   documentation: |-
-    This workflow mirrors an image from the CI Registry to a given
-    image ref.
+    This step resolves the image reference to mirror for ACM/MCE.
