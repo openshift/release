@@ -57,10 +57,44 @@ ref:
 
     An event carrying any field outside that set is dropped whole rather
     than filtered, and the counts of each rejection reason are reported
-    alongside the events. The run's cluster identifiers are read from
-    SHARED_DIR/cluster-id or SHARED_DIR/ocm-fvt-cluster-ids only to
-    select this job's events out of a shared stream; they are not
-    written to the artifact. When no identifier is available, or the
-    query fails, the artifact records that status explicitly rather than
-    an empty event list, so that absence is never read as evidence that
-    a resync did not run.
+    alongside the events.
+
+    Each collected event carries only an operation
+    (source_secret_write, lease_delete, sync_identity_provider_write,
+    syncset_write), an outcome (succeeded, deleted, not_found,
+    forbidden, conflict, failed), the resync flow that executed, the
+    flow toggle state, a UTC timestamp, the UTC timestamp the resync
+    call started at, the conflict-retry ordinal, an object generation
+    where one applies, and the service build the operation ran as.
+
+    The invocation stamp and the retry ordinal together keep two calls,
+    and the retries inside one call, from collapsing into each other:
+    every call restarts the ordinal at 1, and the event timestamp alone
+    cannot separate calls that overlap within a second.
+
+    The toggle state is reported as unavailable with a bounded reason
+    when the build carries no flow-selecting toggle. That is a statement
+    about what can be observed, not a claim that a toggle was disabled.
+
+    Events are tagged with the test phase they fall in, using bounded
+    phase windows the test step hands over in
+    SHARED_DIR/classic-idp-phase-windows (a phase name and two UTC
+    timestamps per line, nothing else). An event outside every window is
+    tagged outside_known_phase, and when no handoff is present the phase
+    is reported unavailable rather than guessed. This is what makes an
+    event attributable to the import under test rather than to any other
+    identity-provider write in the same job.
+
+    The run's cluster identifiers are read from SHARED_DIR/cluster-id or
+    SHARED_DIR/ocm-fvt-cluster-ids only to scope the query to this job's
+    events; they are matched against the log line's own context envelope,
+    which the parser then discards whole. No identifier is written to the
+    artifact, and the query response and selectors stay in a scratch
+    directory outside ARTIFACT_DIR that is removed on every exit path.
+
+    The collection status is always explicit, so absence is never read as
+    evidence that a resync did not run: collected, no_events_in_window,
+    truncated (a result set that filled the query limit, so the list may
+    be incomplete), partial (at least one selector query failed),
+    query_failed, parse_failed, token_unavailable, or
+    selector_unavailable.
