@@ -50,9 +50,10 @@ ref:
     alongside the events.
 
     Each collected event carries only an operation
-    (source_secret_write, lease_delete, sync_identity_provider_write,
-    syncset_write), an outcome (succeeded, deleted, not_found,
-    forbidden, conflict, failed), the resync flow that executed, the
+    (resync_attempt, source_secret_write, lease_delete,
+    sync_identity_provider_write, syncset_write), an outcome
+    (started, succeeded, deleted, not_found, forbidden, conflict,
+    failed), the resync flow that executed, the
     flow toggle state, a UTC timestamp, the UTC timestamp the resync
     call started at, the conflict-retry ordinal, an object generation
     where one applies, and the service build the operation ran as.
@@ -64,6 +65,18 @@ ref:
     all be decimal, and a hexadecimal shape alone does not establish git
     provenance. An unrecognised build shape is counted and its value is
     not written.
+
+    A resync reports resync_attempt/started before anything can fail,
+    so a resync that died before its first write is distinguishable
+    from no resync having been requested at all. That event is emitted
+    before a flow is chosen and reports not_yet_selected rather than
+    claiming one.
+
+    When a job collected events for more than one cluster, each event
+    also carries cluster_group: the ordinal of the query its line came
+    from, so writes against different clusters stay distinguishable.
+    It is a position in this report, not an identifier, and it is
+    omitted when there is only one group.
 
     The invocation stamp and the retry ordinal together keep two calls,
     and the retries inside one call, from collapsing into each other:
