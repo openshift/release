@@ -43,7 +43,9 @@ ref:
       DEGRADED still classifies as churn.
     - cluster-api-unreachable: 5 consecutive failures of the in-loop
       `oc get mcp` poll (failures of other oc calls do not count).
-    - Unknown timeout: none of the above.
+    - UPDATING-oscillating: updating, neither the updated nor the ready
+      count progressing, and the pool not fully updated.
+    - UNKNOWN: none of the above.
     On wait-path failures (deadline, degraded, not-converging, churn,
     api-unreachable, in-loop health gate) a bounded evidence bundle (machines,
     machinesets, policies, kubeletconfigs, MCPs, nodes) is collected to
@@ -60,15 +62,13 @@ ref:
     2 (Invalid step input); environmental harness failures record
     trap_selftest=warn and continue. The first Degraded sighting and the final
     classification emit every non-paused MCP condition (type, status, reason,
-    message) verbatim into the build log, and the first degraded condition
-    verbatim into the JUnit failure body, so the
+    message) verbatim into the build log, and the latest (final-state where
+    available) degraded condition verbatim into the JUnit failure body, so the
     decisive evidence (e.g. an ENOSPC writing the internal registry
     pull-secret) no longer exists only in must-gather. The exit trap preserves
     the step's exit code (set-once; SIGTERM/SIGINT record 143) and the xtrace
     bundle is truncated then scrubbed before upload - bounded so the whole
-    failure path fits the 5m termination grace. A phase-0 offline self-test
-    pins the progress-predicate behavior on fixtures extracted from real
-    runs and fails the step (exit 2) if a refactor changes its semantics.
+    failure path fits the 5m termination grace.
     Every failure-path oc call is bounded (health gate and final
     classification: 30s request timeout with a 45s process timeout;
     diagnostic calls: 10s request and process timeouts; evidence-bundle
