@@ -17,6 +17,15 @@
 # Errexit is ON (set -e): every failure path routes through the EXIT trap,
 # which emits the terminal line and forces exit 0 - an unhandled command
 # failure degrades to outcome=error, never a red job.
+#
+# Outcome vocabulary (design doc section 5): wrapper-level faults are
+# outcome=error. A failure of the analysis machinery on an admitted
+# analyze path (CLI non-zero after the retry budget, empty analysis
+# block) is outcome=analysis_failed: the analyzed build's own state
+# stays in gate=analyze:*, and the step marker stays green BY DESIGN
+# (exit 0; a failed post step would fail the lane), so the distinct
+# outcome is what makes that masked-green shape legible from public
+# artifacts (rehearsal 2119808664779886592, INTEROP-9648).
 
 set -euxo pipefail
 shopt -s inherit_errexit
@@ -559,7 +568,7 @@ attempt_loop() {
                 _OUTCOME="success"
                 return 0
             fi
-            _OUTCOME="error"; _GATE="empty_analysis_block"
+            _OUTCOME="analysis_failed"; _GATE="empty_analysis_block"
             return 0
         fi
         if [ "${rc}" -eq 124 ] || [ "${rc}" -eq 137 ]; then
@@ -598,7 +607,11 @@ attempt_loop() {
     fi
     printf 'OPP-PROW-ANALYZER v=1 stage=note what=cli_failed classification=%s detail=%s\n' \
         "${classification}" "${_CLI_DETAIL}"
-    _OUTCOME="error"
+    # Not outcome=error: the analysis machinery failed on an admitted
+    # analyze path (the analyzed build's redness is gate=analyze:*), and
+    # the step marker is green by design - the distinct outcome keeps
+    # the masked-green shape attributable from the terminal line alone.
+    _OUTCOME="analysis_failed"
 }
 attempt_loop
 if [ "${_SSL_CERT_FILE_WAS_SET}" -eq 1 ]; then
