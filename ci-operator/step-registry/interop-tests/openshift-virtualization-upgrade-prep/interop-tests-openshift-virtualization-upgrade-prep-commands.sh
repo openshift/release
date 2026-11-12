@@ -199,14 +199,16 @@ Cnv__WaitRhelBootImportCronsUpToDate() {
 # Cnv__RedactUrlCredentials: Strip URL userinfo and credential query parameters
 # from stdin. Resource names and other query parameters stay. GNU sed; the cli
 # image provides it. '#' is the delimiter because the pattern contains '|'.
-# The value match stops before a double quote so a credential at the end of a
-# JSON string does not eat the closer.
+# Userinfo stops at '/' so a digest reference (image@sha256:...) is kept, and
+# the user:password form consumes a password that itself contains '@'.
+# The scheme match is case-insensitive. The value match stops before a double
+# quote or backslash so a credential at the end of a JSON string does not eat
+# the closer.
 # Twin: RedactUrlCredentials in
 # interop-tests-openshift-virtualization-upgrade-tests-commands.sh.
-# The DataSource jq walk in Cnv__DumpBootImportCronFailureDiagnostics repeats
-# this alternation. Update all three when the credential names change.
+# Update both when the credential names change.
 Cnv__RedactUrlCredentials() {
-    sed -E 's#(https?://)[^@[:space:]]*@#\1REDACTED@#g; s#([?&]([^=[:space:]]*[-_])?(token|password|passwd|secret|api_key|apikey|key|signature|sig)=)[^&[:space:]"]*#\1REDACTED#gI'
+    sed -E 's#(https?://)[^/?[:space:]@"\\]*:[^/[:space:]"\\]*@#\1REDACTED@#gI; s#(https?://)[^/?[:space:]@"\\]*@#\1REDACTED@#gI; s#([?&]([^=&[:space:]"\\]*[-_])?(token|password|passwd|secret|api_key|apikey|key|signature|sig|credential|security-token)=)[^&[:space:]"\\]*#\1REDACTED#gI'
 }
 
 # Set by Cnv__DumpCnvOnFailureDiagnostics so Cnv__OnPrepExit skips a second
@@ -218,8 +220,9 @@ typeset -i _cnvDiagCollected=0
 # Artifacts keep name plus status and conditions, including free-text messages
 # so resource names in those messages remain. Messages pass through
 # Cnv__RedactUrlCredentials. VM and VMI queries stay in the boot-image
-# namespace and openshift-cnv. oc stderr goes to a sibling .oc-err.txt so a
-# failed get cannot corrupt the JSON. Writes artifacts to $ARTIFACT_DIR.
+# namespace and openshift-cnv. The tests twin lists those cluster-wide; this
+# step runs before pytest creates VMs. oc stderr goes to a sibling .oc-err.txt
+# so a failed get cannot corrupt the JSON. Writes artifacts to $ARTIFACT_DIR.
 # All commands are best-effort. Sets _cnvDiagCollected so the EXIT trap does
 # not re-run this collector after Cnv__DumpBootImportCronFailureDiagnostics.
 # Twin: DumpCnvOnFailureDiagnostics in
@@ -394,13 +397,9 @@ Cnv__DumpBootImportCronFailureDiagnostics() {
         | jq '[.items[]? | {
             name: .metadata.name,
             namespace: .metadata.namespace,
-            # Same credential names as Cnv__RedactUrlCredentials. The sed pass
-            # below repeats this. Update both, and RedactUrlCredentials in the
-            # upgrade-tests step, when the alternation changes.
-            sourceRef: (.spec.source | walk(if type == "string" then
-                gsub("https?://[^@[:space:]]+@"; "https://REDACTED@")
-                | gsub("(?i)(?<cred>[?&]([^=[:space:]]*[-_])?(token|password|passwd|secret|api_key|apikey|key|signature|sig)=)[^&[:space:]]+"; "\(.cred)REDACTED")
-              else . end)),
+            # Full source object. Cnv__RedactUrlCredentials on this JSON stream
+            # strips URL userinfo and credential query parameters.
+            sourceRef: .spec.source,
             conditions: [(.status.conditions // [])[] | {type, status, reason, message}]
           }]' \
         | Cnv__RedactUrlCredentials \
@@ -967,7 +966,8 @@ Cnv__OnPrepExit() {
         exit 0
     fi
     oc get storagecluster,cephcluster -n openshift-storage --request-timeout="${requestTimeout}" -o yaml \
-        > "${ARTIFACT_DIR}/odf-state-on-failure.yaml" 2>&1 || true
+        > "${ARTIFACT_DIR}/odf-state-on-failure.yaml" \
+        2>>"${ARTIFACT_DIR}/odf-state-on-failure.oc-err.txt" || true
     # Boot-image, CNV, and ODF namespaces. A cluster-wide list is not required
     # to see the PVCs this step waits on.
     {
@@ -977,7 +977,8 @@ Cnv__OnPrepExit() {
     } > "${ARTIFACT_DIR}/pvcs-on-failure.txt" \
         2>>"${ARTIFACT_DIR}/pvcs-on-failure.oc-err.txt" || true
     oc get subscription.operators.coreos.com,installplan,csv -n openshift-cnv --request-timeout="${requestTimeout}" -o yaml \
-        > "${ARTIFACT_DIR}/cnv-olm-state-on-failure.yaml" 2>&1 || true
+        > "${ARTIFACT_DIR}/cnv-olm-state-on-failure.yaml" \
+        2>>"${ARTIFACT_DIR}/cnv-olm-state-on-failure.oc-err.txt" || true
     # Boot-import failures already ran this via Cnv__DumpBootImportCronFailureDiagnostics.
     if (( !_cnvDiagCollected )); then
         Cnv__DumpCnvOnFailureDiagnostics
