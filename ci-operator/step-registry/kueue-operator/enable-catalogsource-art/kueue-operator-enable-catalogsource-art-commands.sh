@@ -124,11 +124,24 @@ function resolve_index_image () {
     echo "Resolved ${ref} -> ${MULTISTAGE_PARAM_OVERRIDE_KUEUE_INDEX_IMAGE}"
   fi
   echo "${MULTISTAGE_PARAM_OVERRIDE_KUEUE_INDEX_IMAGE}" > "${SHARED_DIR}/kueue_index_image"
+
+  # Record what this run tested (resolved digest + the reference it was
+  # resolved from) directly in the job artifacts, mirroring the quay-gather
+  # convention, so every run self-documents which ART build was under test.
+  # Best-effort: never fails the step over bookkeeping.
+  if [[ -d "${ARTIFACT_DIR:-}" ]]; then
+    jq -n \
+      --arg requested "$(<"${SHARED_DIR}/kueue_index_image_requested")" \
+      --arg resolved "${MULTISTAGE_PARAM_OVERRIDE_KUEUE_INDEX_IMAGE}" \
+      '{requested: $requested, resolved: $resolved}' \
+      > "${ARTIFACT_DIR}/tested-images.json" 2>/dev/null || true
+  fi
 }
 
 #"redhat-operators" is the official catalog source for released builds
 if [ "$KUEUE_OPERATOR_SOURCE" == "redhat-operators" ]; then
   echo "Installing Kueue from released build"
+  printf '{"source": "redhat-operators"}\n' > "${ARTIFACT_DIR:-/tmp}/tested-images.json" 2>/dev/null || true
 else #Install Kueue operator with the ART pre-release FBC image
   resolve_index_image
   echo "Installing Kueue from ART FBC image: ${MULTISTAGE_PARAM_OVERRIDE_KUEUE_INDEX_IMAGE}"

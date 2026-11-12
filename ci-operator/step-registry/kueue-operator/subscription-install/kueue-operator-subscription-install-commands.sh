@@ -54,6 +54,23 @@ for _ in {1..90}; do
     if [[ -n "${CSV}" ]]; then
         if [[ "$(oc -n "${OO_INSTALL_NAMESPACE}" get csv "${CSV}" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
             echo "ClusterServiceVersion \"${CSV}\" ready"
+
+            # Export the must-gather image pinned in the CSV's relatedImages so
+            # the post chain gathers diagnostics with the image matching the
+            # tested build (consumed by `make run-must` in the kueue-operator
+            # repo; Konflux-based jobs never set it and keep their resolution).
+            # The ref is registry.redhat.io/kueue/kueue-must-gather-rhel9@sha256:...
+            # and is pulled on-cluster through the stage IDMS applied by
+            # kueue-operator-enable-catalogsource-art.
+            MG=$(oc -n "${OO_INSTALL_NAMESPACE}" get csv "${CSV}" \
+                -o jsonpath='{.spec.relatedImages[?(@.name=="must-gather")].image}')
+            if [[ -n "${MG}" ]]; then
+                echo "export KUEUE_MUST_GATHER_IMAGE=${MG}" >> "${SHARED_DIR}/env"
+                echo "Exported KUEUE_MUST_GATHER_IMAGE=${MG}"
+            else
+                echo "WARNING: no must-gather entry in relatedImages of ${CSV}; the post chain will fall back to Konflux resolution" >&2
+            fi
+
             exit 0
         fi
     fi
