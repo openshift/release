@@ -92,6 +92,13 @@ export ROSA_TA_AUTH=enabled
 export ROSA_TA_OCM_BASE_URL="${OCM_BASE_URL}"
 export ROSA_TA_BACKPLANE_URL="${BACKPLANE_URL}"
 export ROSA_TA_JWK_CERT_URL="${JWK_CERT_URL}"
+# Scopes for the tokens the server obtains for OCM and backplane. Exported
+# only when set, so an empty value leaves the SDK's own "openid" default in
+# place rather than overriding it with nothing.
+if [[ -n "${OCM_SCOPES}" ]]; then
+	export ROSA_TA_OCM_SCOPES="${OCM_SCOPES}"
+	log "Requesting scopes ${OCM_SCOPES} for the server's own tokens"
+fi
 # No default and no permissive mode: the server refuses to start without it,
 # and the only correct value is where the cluster under test actually lives.
 export ROSA_TA_AWS_ALLOWED_REGIONS="${CLUSTER_REGION}"

@@ -56,10 +56,19 @@ ref:
   - name: SSO_SCOPE
     default: ""
     documentation: |-
-      Scope requested with the client-credentials grant. Empty, and sent only
-      when set: the service account's token already carries the email and
-      preferred_username claims OCM and RTA read, so asking for a scope would
-      narrow what is returned rather than widen it.
+      Scope requested for the caller's token, with the client-credentials
+      grant. Empty, and sent only when set: that token is presented to the
+      trusted-actions API, which validates its signature and reads the email
+      and preferred_username claims the account already carries.
+  - name: OCM_SCOPES
+    default: "api.ocm"
+    documentation: |-
+      Scopes the server requests for its own OCM and backplane tokens, passed
+      through as ROSA_TA_OCM_SCOPES. Comma-separated, and it replaces the
+      SDK's "openid" default rather than adding to it, so list "openid" too
+      if it is needed. Unlike the caller's token above, these are the tokens
+      that reach AWS STS by way of backplane's cloud-credential flow, where
+      the audience claim is checked. Set empty to keep the SDK default.
   - name: JWK_CERT_URL
     default: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/certs"
     documentation: |-
