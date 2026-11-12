@@ -9,7 +9,7 @@
 # Emits a stage-tagged versioned result line (exactly one stage=terminal);
 # emits NO JUnit ever. Shell tracing is OFF for the whole script; no env
 # dumps; the webhook credential is read from its mounted file by the
-# embedded delivery program only — never argv, never export.
+# embedded delivery program only: never argv, never export.
 #
 # The JUnit parser below is GENERATED from sub-projects/lib-opp-interop/src/opp_interop/junit.py by
 # embed.py between the sentinels; regenerate, never hand-edit. The
@@ -28,7 +28,7 @@ if shopt -q patsub_replacement 2>/dev/null; then
 fi
 # errexit adopted with a companion audit (openshift/release#88057
 # precedent, 2026-11-07): every tolerable failure is explicitly guarded
-# — mktemp falls back, rm -f is || true, the two program dispatches are
+# as follows: mktemp falls back, rm -f is || true, the two program dispatches are
 # || guarded with _REASON degradation, the emit printf sites are ||
 # true (closed stdout must not break the exits-0 contract), and
 # emit_terminal tolerates an unset _SENT_FILE so an early abort still
@@ -63,7 +63,7 @@ SLACK_REPORTER_WEBHOOK_FILE="${SLACK_REPORTER_WEBHOOK_FILE:-/tmp/secrets/opp-dis
 # Runtime override is a TEST SEAM only: SLACK_REPORTER_ROLE_TABLE_OVERRIDE
 # is honored solely with SLACK_REPORTER_TEST_SEAM=1 and never when
 # JOB_TYPE=periodic. A job-name miss renders every dir unrecognized
-# (UNVERIFIED, reason role_table_miss:<job>) — never green.
+# (UNVERIFIED, reason role_table_miss:<job>), never green.
 # ---- BEGIN GENERATED: role_table ----
 OPP_SLACK_REPORTER_ROLE_TABLE='{"periodic-ci-RedHatQE-interop-testing-master-ocp-4.22-lpMainline-lp-interop--opp-cr--full-stack--aws":{"acm-fetch-managed-clusters":"test-best-effort","acm-fetch-operator-versions":"post-phase","acm-inspector":"post-phase","acm-mch":"post-phase","acm-opp-app":"test-best-effort","acm-policies-openshift-plus":"post-phase","acm-policies-openshift-plus-setup":"post-phase","acm-tests-clc-destroy":"post-phase","acm-tests-clc-smoke":"test-best-effort","firewatch-report-issues":"post-phase","install-operators":"post-phase","interop-opp-disk-diag":"post-phase","interop-opp-kubelet-config":"post-phase","interop-opp-odf-health":"test-authoritative","interop-opp-skip-ratio-gate":"post-phase","interop-opp-slack-reporter":"own","interop-opp-wait-for-api":"post-phase","interop-opp-wait-mcp":"test-authoritative","interop-tests-ocs-tests":"test-best-effort","interop-tests-opp-quay-smoke":"test-best-effort","ipi-conf":"post-phase","ipi-conf-aws":"post-phase","ipi-conf-aws-custom-az":"post-phase","ipi-conf-aws-rootvolume":"post-phase","ipi-conf-telemetry":"post-phase","ipi-deprovision-deprovision":"post-phase","ipi-install-hosted-loki":"post-phase","ipi-install-install":"post-phase","ipi-install-monitoringpvc":"post-phase","ipi-install-rbac":"post-phase","ipi-install-times-collection":"post-phase","mpiit-data-router-reporter":"post-phase","multiarch-validate-nodes":"post-phase","nodes-readiness":"post-phase","openshift-cluster-bot-rbac":"post-phase","openshift-tests-extension-admission-crd-install":"post-phase","stackrox-opp-readiness":"test-best-effort","stackrox-opp-smoke":"test-best-effort"},"periodic-ci-RedHatQE-interop-testing-master-ocp-5.0-lpMainline-lp-interop--opp-cr--full-stack--aws":{"acm-fetch-managed-clusters":"test-best-effort","acm-fetch-operator-versions":"post-phase","acm-inspector":"post-phase","acm-mch":"post-phase","acm-opp-app":"test-best-effort","acm-policies-openshift-plus":"post-phase","acm-policies-openshift-plus-setup":"post-phase","acm-tests-alc":"post-phase","acm-tests-clc-create":"post-phase","acm-tests-clc-destroy":"post-phase","acm-tests-clc-smoke":"test-best-effort","acm-tests-grc":"post-phase","firewatch-report-issues":"post-phase","install-operators":"post-phase","interop-opp-odf-health":"test-authoritative","interop-opp-skip-ratio-gate":"post-phase","interop-opp-slack-reporter":"own","interop-opp-wait-mcp":"test-authoritative","interop-tests-opp-quay-smoke":"test-best-effort","ipi-conf":"post-phase","ipi-conf-aws":"post-phase","ipi-conf-aws-custom-az":"post-phase","ipi-conf-telemetry":"post-phase","ipi-deprovision-deprovision":"post-phase","ipi-install-hosted-loki":"post-phase","ipi-install-install":"post-phase","ipi-install-monitoringpvc":"post-phase","ipi-install-rbac":"post-phase","ipi-install-times-collection":"post-phase","mpiit-data-router-reporter":"post-phase","multiarch-validate-nodes":"post-phase","nodes-readiness":"post-phase","openshift-cluster-bot-rbac":"post-phase","openshift-tests-extension-admission-crd-install":"post-phase","stackrox-opp-readiness":"test-best-effort","stackrox-opp-smoke":"test-best-effort"},"periodic-ci-RedHatQE-interop-testing-master-ocp-5.0-lpMainline-lp-interop--opp-full-stack--fips--aws":{"acm-fetch-managed-clusters":"test-best-effort","acm-fetch-operator-versions":"post-phase","acm-inspector":"post-phase","acm-mch":"post-phase","acm-opp-app":"test-best-effort","acm-policies-openshift-plus":"post-phase","acm-policies-openshift-plus-setup":"post-phase","acm-tests-alc":"post-phase","acm-tests-clc-create":"post-phase","acm-tests-clc-destroy":"post-phase","acm-tests-clc-smoke":"test-best-effort","acm-tests-grc":"post-phase","firewatch-report-issues":"post-phase","install-operators":"post-phase","interop-opp-odf-health":"test-authoritative","interop-opp-slack-reporter":"own","interop-opp-wait-mcp":"test-authoritative","interop-tests-opp-quay-smoke":"test-best-effort","ipi-conf":"post-phase","ipi-conf-aws":"post-phase","ipi-conf-aws-custom-az":"post-phase","ipi-conf-telemetry":"post-phase","ipi-deprovision-deprovision":"post-phase","ipi-install-hosted-loki":"post-phase","ipi-install-install":"post-phase","ipi-install-monitoringpvc":"post-phase","ipi-install-rbac":"post-phase","ipi-install-times-collection":"post-phase","multiarch-validate-nodes":"post-phase","nodes-readiness":"post-phase","openshift-cluster-bot-rbac":"post-phase","openshift-tests-extension-admission-crd-install":"post-phase","stackrox-opp-readiness":"test-best-effort","stackrox-opp-smoke":"test-best-effort"},"periodic-ci-RedHatQE-interop-testing-master-ocp-5.1-lpMainline-lp-interop--opp-cr--full-stack--aws":{"acm-fetch-managed-clusters":"test-best-effort","acm-fetch-operator-versions":"post-phase","acm-inspector":"post-phase","acm-mch":"post-phase","acm-opp-app":"test-best-effort","acm-policies-openshift-plus":"post-phase","acm-policies-openshift-plus-setup":"post-phase","acm-tests-alc":"post-phase","acm-tests-clc-create":"post-phase","acm-tests-clc-destroy":"post-phase","acm-tests-clc-smoke":"test-best-effort","acm-tests-grc":"post-phase","firewatch-report-issues":"post-phase","install-operators":"post-phase","interop-opp-skip-ratio-gate":"post-phase","interop-opp-slack-reporter":"own","interop-opp-wait-mcp":"test-authoritative","interop-tests-opp-quay-smoke":"test-best-effort","ipi-conf":"post-phase","ipi-conf-aws":"post-phase","ipi-conf-aws-custom-az":"post-phase","ipi-conf-telemetry":"post-phase","ipi-deprovision-deprovision":"post-phase","ipi-install-hosted-loki":"post-phase","ipi-install-install":"post-phase","ipi-install-monitoringpvc":"post-phase","ipi-install-rbac":"post-phase","ipi-install-times-collection":"post-phase","mpiit-data-router-reporter":"post-phase","multiarch-validate-nodes":"post-phase","nodes-readiness":"post-phase","openshift-cluster-bot-rbac":"post-phase","openshift-tests-extension-admission-crd-install":"post-phase","stackrox-opp-readiness":"test-best-effort","stackrox-opp-smoke":"test-best-effort"},"periodic-ci-RedHatQE-interop-testing-master-ocp-5.1-lpMainline-lp-interop--opp-full-stack--fips--aws":{"acm-fetch-managed-clusters":"test-best-effort","acm-fetch-operator-versions":"post-phase","acm-inspector":"post-phase","acm-mch":"post-phase","acm-opp-app":"test-best-effort","acm-policies-openshift-plus":"post-phase","acm-policies-openshift-plus-setup":"post-phase","acm-tests-alc":"post-phase","acm-tests-clc-create":"post-phase","acm-tests-clc-destroy":"post-phase","acm-tests-clc-smoke":"test-best-effort","acm-tests-grc":"post-phase","firewatch-report-issues":"post-phase","install-operators":"post-phase","interop-opp-slack-reporter":"own","interop-opp-wait-mcp":"test-authoritative","interop-tests-opp-quay-smoke":"test-best-effort","ipi-conf":"post-phase","ipi-conf-aws":"post-phase","ipi-conf-aws-custom-az":"post-phase","ipi-conf-telemetry":"post-phase","ipi-deprovision-deprovision":"post-phase","ipi-install-hosted-loki":"post-phase","ipi-install-install":"post-phase","ipi-install-monitoringpvc":"post-phase","ipi-install-rbac":"post-phase","ipi-install-times-collection":"post-phase","multiarch-validate-nodes":"post-phase","nodes-readiness":"post-phase","openshift-cluster-bot-rbac":"post-phase","openshift-tests-extension-admission-crd-install":"post-phase","stackrox-opp-readiness":"test-best-effort","stackrox-opp-smoke":"test-best-effort"}}'
 # ---- END GENERATED: role_table ----
@@ -80,7 +80,7 @@ emit_skeleton() {
 emit_terminal() {
     # Exactly one terminal line is ever emitted (design doc section 10):
     # either the embedded program emits it (and touches the sent file) or
-    # this fallback does — never both.
+    # this fallback does: never both.
     if [ "${_TERMINAL_EMITTED}" -eq 1 ] || [ -e "${_SENT_FILE:-}" ]; then
         return 0
     fi
@@ -101,7 +101,7 @@ trap on_exit EXIT
 
 # The sent file coordinates single emission across bash and the embedded
 # python programs (mktemp dir per invocation; the marker file itself is
-# created ONLY at emission time — never at setup).
+# created ONLY at emission time, never at setup).
 _SENT_DIR="$(mktemp -d)" 2>/dev/null || _SENT_DIR="/tmp/opp-slack-reporter-$$"
 mkdir -p "${_SENT_DIR}"
 _SENT_FILE="${_SENT_DIR}/sent"
@@ -666,7 +666,7 @@ LAUNCH_HOST = "reportportal-lp-interop.apps.dno.ocp-hub.prod.psi.redhat.com"
 _launch_candidate_re = re.compile(r"https://\S*reportportal\S*/launch\S*", re.IGNORECASE)
 _launch_shape_re = re.compile(r"/ui/#([A-Za-z0-9][A-Za-z0-9_-]{0,63})/launches/all/(\d{1,12})$")
 #: sentence punctuation commonly follows a URL pasted into a log line;
-#: trimmed before the shape match — everything the URL is rebuilt from
+#: trimmed before the shape match; everything the URL is rebuilt from
 #: (host, key, id) is still pinned and validated
 _trailing_punct_re = re.compile(r"[.,;:!\"')\]]+$")
 _secret_run_re = re.compile(r"[A-Za-z0-9]{32,}")
@@ -761,7 +761,7 @@ def harvest_enrichment(
 
 # ------------------------------------------------------ classification
 def classify(evidence: Evidence, roles: dict[str, str]) -> tuple[str, list[str], dict[str, int]]:
-    """(state, reasons, tallies) — residual default UNVERIFIED, never PASS."""
+    """(state, reasons, tallies): residual default UNVERIFIED, never PASS."""
     markers = evidence["markers"]
 
     def failed(m: Marker | None) -> bool:
@@ -919,7 +919,7 @@ _SAFE_CHAR = re.compile(r'[^A-Za-z0-9._=-]')
 
 def esc(value):
     """Escape helper for EVERY interpolated value (design doc section 10):
-    allow [A-Za-z0-9._=-]; %xx-encode everything else — no CR/LF, no
+    allow [A-Za-z0-9._=-]; %xx-encode everything else, leaving no CR/LF, no
     forged fields, one line."""
     out = []
     for ch in str(value):
@@ -949,7 +949,7 @@ def emit_terminal_line(state, test, tallies, delivered, http, reasons):
 
 # ------------------------------------------------------ role table
 def resolve_role_table():
-    """(table, sha256, source, failure) — failure is None or (state, reason)."""
+    """(table, sha256, source, failure); failure is None or (state, reason)."""
     import hashlib
     override = os.environ.get('SLACK_REPORTER_ROLE_TABLE_OVERRIDE', '')
     table_text = ROLE_TABLE_TEXT
@@ -1153,7 +1153,7 @@ RESPONSE_CAP = 4096
 #: asserted non-empty and fixture-matched by the matrix)
 ACCEPT_SET = ('ok',)
 REHEARSAL_TEXT = ('[interop-opp-slack-reporter] rehearsal verification '
-                  'post — please disregard')
+                  'post, please disregard')
 
 _SAFE_CHAR = re.compile(r'[^A-Za-z0-9._=-]')
 _SECRET_SHAPED = re.compile(
@@ -1252,7 +1252,7 @@ def validate_url(url):
     """Full sibling predicate; returns None or a config_invalid reason.
 
     Under SLACK_REPORTER_TEST_SEAM=1 (test-only; the shipped ref.yaml
-    never sets it — leak-scan asserted) a loopback http URL is accepted
+    never sets it, leak-scan asserted) a loopback http URL is accepted
     so the matrix can exercise the real posting path against the
     standin sink. The production predicate is unconditional."""
     if not isinstance(url, str) or not url:
@@ -1320,7 +1320,7 @@ def post(url, body):
     """(delivered, http_code, outcome, diagnostics) per the retry policy:
     retry only on 429/5xx (<=1 retry, numeric Retry-After clamped,
     HTTP-date => configured backoff); transport exceptions are terminal
-    delivery_unknown — never retried."""
+    delivery_unknown, never retried."""
     attempts = 0
     while attempts < MAX_ATTEMPTS:
         attempts += 1
@@ -1351,7 +1351,7 @@ def post(url, body):
             if sanitized in ACCEPT_SET:
                 return '1', str(status), 'delivered', {
                     'attempts': attempts, 'body_len': len(data)}
-            #: response content is never copied into the receipt —
+            #: response content is never copied into the receipt;
             #: status, length, and the fixed sink_error category only
             #: (CodeRabbit No-Sensitive-Data-In-Logs, 2026-11-04)
             return '0', str(status), 'sink_error', {
@@ -1386,7 +1386,7 @@ def idempotency_key_path():
 
 
 def write_dump(report, text):
-    """Content allowlist: composed text, tallies, markers, reasons —
+    """Content allowlist: composed text, tallies, markers, reasons;
     never the URL, the secret, or raw response bytes."""
     dump = os.environ.get('SLACK_REPORTER_DUMP_FILE', '')
     if not dump:
@@ -1520,7 +1520,7 @@ main() {
             run_embedded_python --marker-selfcheck "$@"
             ;;
         *)
-            # job-type guard (production only; DRY_RUN is exempt — its
+            # job-type guard (production only; DRY_RUN is exempt, its
             # sole purpose is the probe)
             if [ "${SLACK_REPORTER_DRY_RUN:-0}" != "1" ] \
                     && [ "${JOB_TYPE:-}" != "periodic" ]; then
