@@ -9,7 +9,7 @@ ref:
     requests:
       cpu: 100m
       memory: 200Mi
-  timeout: 5m0s
+  timeout: 10m0s
   grace_period: 30s
   credentials:
   - collection: rosa-e2e
@@ -34,3 +34,33 @@ ref:
     UCT*/UNT*, nodepool NT*) that help diagnose cluster provisioning
     and day-2 operation failures. Requires RHOBS OIDC credentials
     and a start timestamp from rosa-e2e-record-start-time pre-step.
+
+    Additionally collects Classic identity-provider resync events,
+    tagged "[ROSA CLASSIC IDP]", into
+    ARTIFACT_DIR/classic-idp-resync-events.json. These are handled on
+    a separate path from the lifecycle report above: the query response
+    is reduced to an allowlisted schema before anything is written, and
+    the raw response is never placed in ARTIFACT_DIR.
+
+    Each collected event carries only an operation
+    (source_secret_write, lease_delete, sync_identity_provider_write,
+    syncset_write), an outcome (succeeded, deleted, not_found,
+    forbidden, conflict, failed), a UTC timestamp, an object generation
+    where one applies, and the service build the operation ran as. The
+    build is reported with a shape: a value that is lowercase
+    hexadecimal but entirely decimal digits is labelled
+    ambiguous_numeric_or_git_object_name, because an all-decimal value cannot be
+    told apart from a git object name whose digits happen to all be
+    decimal, and a hexadecimal shape alone does not establish git
+    provenance. An unrecognised build shape is counted
+    and its value is not written.
+
+    An event carrying any field outside that set is dropped whole rather
+    than filtered, and the counts of each rejection reason are reported
+    alongside the events. The run's cluster identifiers are read from
+    SHARED_DIR/cluster-id or SHARED_DIR/ocm-fvt-cluster-ids only to
+    select this job's events out of a shared stream; they are not
+    written to the artifact. When no identifier is available, or the
+    query fails, the artifact records that status explicitly rather than
+    an empty event list, so that absence is never read as evidence that
+    a resync did not run.
