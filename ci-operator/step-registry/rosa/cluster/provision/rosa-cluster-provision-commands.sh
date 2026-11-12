@@ -415,7 +415,9 @@ log "Choosing openshift version ${OPENSHIFT_VERSION}"
 # invalid tags so that CLI usage doesn't fail later.
 # The [ and ] characters are considered invalid tags, which are
 # used by CI accounts like "renovate[bot]".
-TAG_Author=$(echo "${JOB_SPEC}" | jq -r '.refs.pulls[].author // empty' | tr -d '[]' || true)
+# Batch jobs carry several pulls; join their authors so the value stays
+# on one line, as a newline would split the eval'd rosa create command.
+TAG_Author=$(echo "${JOB_SPEC}" | jq -r '[.refs.pulls[].author // empty] | join("_")' | tr -d '[]' || true)
 if [[ -z "$TAG_Author" ]]; then
   TAG_Author=$(echo "${JOB_SPEC}" | jq -r '(.extra_refs // [])[] | .repo + "-" + .base_ref' | head -1 || true)
 fi
