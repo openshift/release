@@ -455,11 +455,12 @@ events = []
 # Each document is one selector's response, so its ordinal separates events belonging to
 # different clusters in a job that ran more than one. It is an opaque position, not an
 # identifier, and it is only published when there is more than one group to tell apart.
-groups = 0
+# The raw ordinal is renumbered after parsing so that documents which yielded no events -
+# an empty response, or one that was not a JSON object at all - leave no gap and cannot
+# make a single-cluster run look like a multi-cluster one.
 for group, telemetry in enumerate(documents(merged_path)):
     if not isinstance(telemetry, dict):
         continue
-    groups = max(groups, group + 1)
     data = telemetry.get("data")
     streams = (data.get("result") if isinstance(data, dict) else None) or []
     for stream in streams:
@@ -546,7 +547,9 @@ for group, telemetry in enumerate(documents(merged_path)):
                 reduced["generation"] = generation
             events.append(reduced)
 
-# De-duplicate: the same line can be returned by more than one selector query.
+# De-duplicate. Each query filters on one cluster id and the selectors are unique, so a line
+# belongs to exactly one group; the group ordinal is therefore safe to include in the key,
+# and what this collapses is a line repeated within one response.
 seen, unique = set(), []
 for event in events:
     key = tuple(sorted(event.items()))
@@ -554,9 +557,13 @@ for event in events:
         continue
     seen.add(key)
     unique.append(event)
-if groups < 2:
-    for recorded in unique:
+observed = sorted({recorded["cluster_group"] for recorded in unique})
+dense = {raw: index for index, raw in enumerate(observed)}
+for recorded in unique:
+    if len(observed) < 2:
         recorded.pop("cluster_group", None)
+    else:
+        recorded["cluster_group"] = dense[recorded["cluster_group"]]
 unique.sort(key=lambda e: (e.get("cluster_group", 0), e["invocation"], e["time"], e["attempt"]))
 
 if truncated:
