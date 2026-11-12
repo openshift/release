@@ -25,8 +25,12 @@ shopt -s inherit_errexit
 #   rollout measured ~21 min << 5400s budget).
 #
 # Budget arithmetic (must hold; step timeout 6300s, grace_period 5m0s):
+#   phase 0 (predicate + trap self-test, before the wait): <= 270s
+#     (<= 90s to reach the child's poll loop, <= 180s child deadline when
+#     the TERM lands late enough that the child self-terminates)
 #   self-terminating path: settle 90 + max wait 5400 + collection <= 120
-#     + health gate <= 60  =>  <= 5670s, leaving >= 630s headroom
+#     + health gate <= 60  =>  <= 5670s
+#   both added: <= 5940s, leaving >= 360s headroom (>= the 300s grace)
 #   step-timeout path: only 300s remain between SIGTERM and SIGKILL, so the
 #     failure-path collector is watchdog-bounded (timeout 120) and the xtrace
 #     copy is truncated (tail -c 5M) before scrubbing.
