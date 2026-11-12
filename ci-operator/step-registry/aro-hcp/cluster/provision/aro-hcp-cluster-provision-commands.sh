@@ -523,7 +523,9 @@ record_timer "control_plane_install_start" "${CONTROL_PLANE_INSTALL_START}"
 log_step "Submitting the ARO HCP create request."
 CREATE_TAG_ARGS=()
 if [[ -n "${CONTROL_PLANE_EXACT_VERSION}" ]]; then
-  CREATE_TAG_ARGS+=(--tags "aro-hcp.experimental.cluster.control-plane-exact-version=${CONTROL_PLANE_EXACT_VERSION}")
+  # Azure CLI's AAZ parser treats dots in --tags keys as nested fields unless
+  # the key is quoted as a literal shorthand property name.
+  CREATE_TAG_ARGS+=(--tags "'aro-hcp.experimental.cluster.control-plane-exact-version'=${CONTROL_PLANE_EXACT_VERSION}")
 fi
 az aro hcp cluster create \
   --name "${CLUSTER_NAME}" \
