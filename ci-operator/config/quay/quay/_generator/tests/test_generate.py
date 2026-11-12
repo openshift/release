@@ -293,7 +293,13 @@ def test_kind_settings_presubmit_leaves_unset_trigger_fields_absent() -> None:
         _phase0_cell(test="api-test", kind="presubmit", cron=None, as_name=None),
     )
     test = presubmit["tests"][0]
-    for field_name in ("always_run", "optional", "run_if_changed", "skip_if_only_changed"):
+    for field_name in (
+        "always_run",
+        "optional",
+        "run_if_changed",
+        "skip_if_only_changed",
+        "pipeline_run_if_changed",
+    ):
         assert field_name not in test
 
 
@@ -1285,6 +1291,21 @@ def test_presubmit_rejects_always_run_true_with_filter() -> None:
     )
     with pytest.raises(ValueError, match="cannot be combined"):
         expand_cells(matrix)
+
+
+def test_kind_settings_presubmit_copies_pipeline_run_if_changed() -> None:
+    presubmit = apply_kind_settings(
+        {"tests": [{"steps": {}}]},
+        _phase0_cell(
+            test="api-test",
+            kind="presubmit",
+            cron=None,
+            as_name=None,
+            always_run=False,
+            pipeline_run_if_changed="^requirements\\.txt$",
+        ),
+    )
+    assert presubmit["tests"][0]["pipeline_run_if_changed"] == "^requirements\\.txt$"
 
 
 def test_layout_must_be_variant_or_base() -> None:

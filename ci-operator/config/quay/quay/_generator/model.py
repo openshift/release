@@ -84,6 +84,7 @@ class Cell:
     optional: bool | None = None
     run_if_changed: str | None = None
     skip_if_only_changed: str | None = None
+    pipeline_run_if_changed: str | None = None
     fips: bool = False
     sts: bool = False
     storage_override: str | None = None
