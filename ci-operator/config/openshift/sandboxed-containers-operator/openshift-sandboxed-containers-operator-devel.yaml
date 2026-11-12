@@ -43,6 +43,21 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: verify
+  commands: |
+    # The go.mod replace directives point into the cloud-api-adaptor submodule.
+    git submodule update --init --recursive
+    # The golang build-root image exports VERSION (the Go toolchain version);
+    # the Makefile assigns VERSION with ?=, so the environment would win over
+    # the project's own version and break `make bundle`. Unset it so the
+    # Makefile value is used.
+    unset VERSION
+    # api/v1/zz_generated.deepcopy.go is gitignored, so api/v1 does not compile
+    # on a clean checkout until it is generated; vet would fail before the
+    # verify scripts get a chance to run make generate.
+    make generate verify
+  container:
+    from: src
 - as: sandboxed-containers-operator-e2e
   optional: true
   steps:
