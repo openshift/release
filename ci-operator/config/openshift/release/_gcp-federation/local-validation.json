@@ -1,70 +1,102 @@
 {
-  "recorded_at": "2026-11-04T16:48:16.990844-05:00",
-  "release_base": "54f77b37a45c6b59384ef34cd36e071675c4149d",
-  "ci_tools_validator_revision": "7ceb50c7fbabac6f662df079308ce5353656a08d",
-  "python_runtime_tested": "3.12, linux/amd64, network disabled",
-  "unit_test_methods": 9,
-  "unit_subcases": 38,
-  "local_amd64_image_id": "sha256:c8c82897acdab730e5daaf8345f639f5b9548b5119a66432fbe5af3a3f97133c",
-  "ubi_manifest_digest": "sha256:19e1e927138b40454858f297884c2c4e2f13f5ba95b3f55faea174d3cbb57067",
+  "recorded_on": "2026-11-12",
+  "configuration": "Profile-free AWS STS authentication; no pilot Boskos lease or cluster profile.",
+  "required_ci_tools_change": {
+    "commit": "8c1fe452",
+    "branch": "https://github.com/richardsonnick/ci-tools/tree/gcp-federation-without-profile",
+    "status": "Must be reviewed, merged and deployed before release config checks and live rehearsals can use steps.aws_sts."
+  },
   "passed": [
-    "offline diagnostic tests",
-    "audience included in AWS signed headers",
-    "SDK credential cloning and fresh supplier generations",
-    "pinned image build and pip check",
-    "ci-operator config validation for openshift/release",
-    "cluster profile normalization",
-    "GSM schema validation with ci-tools API",
-    "Boskos regeneration",
-    "Prow job generation",
-    "existing jobs/profiles/bundles/leases preservation checks",
-    "Prow/Boskos regeneration reproducibility"
+    "8 offline diagnostic test methods with pinned Python dependencies",
+    "CI configuration validation for openshift/release using supporting ci-tools build",
+    "Prow jobs regenerated using supporting ci-tools build",
+    "1224 race-enabled tests in affected ci-tools packages",
+    "Profile-free STS pod fixture and no-lease regression test",
+    "Merged Secret sync configuration preserved unchanged"
   ],
   "not_run": [
-    "live CI diagnostic",
-    "live token exchange",
-    "live authorization denial",
-    "live credential renewal",
-    "full secret-bootstrap live-store validation"
+    "Live AWS to GCP authentication",
+    "Live authorization and renewal checks",
+    "Successful rehearsal using deployed profile-free AWS STS support"
   ],
   "limitations": [
-    "local ARM image SIGILL importing Google auth; CI is explicitly amd64",
-    "service-account self-admin grant retained pending team review",
-    "source profile must be seeded/deployed by maintainers before jobs run"
+    "Current deployed ci-tools does not yet support steps.aws_sts; keep PR as draft.",
+    "Full ci-tools linter unavailable because Podman is not running.",
+    "Existing service-account self-admin grant remains pending team review."
   ],
   "source_sha256": {
-    "diagnostic.py": "51526c6e4ecd08de90bdaa846beee6dfad19a0a82761905ef702322f2938a35f",
-    "test_diagnostic.py": "c4112b199aee98e9d2bedd3d93c2eacd9f2be0e8927abdf8d32885b8f693e763",
+    "diagnostic.py": "9af2e381eb7f9fb0b6ab66120c417a4963888c3c08f8d02d1ed7f4c3130f37d4",
+    "test_diagnostic.py": "6c95f35d75e3144e0b123573c83528c445b27f2491df9fa92f1d4306d222c0d7",
     "requirements.txt": "b96c3c36687891b1ba451d8ce697f5efac08bd78dcb3ed67c2de8e987327f70b"
   },
-  "ci_config_rechecked_on": "2026-11-05",
-  "ci_config_release_base": "5d7a6ddfcf8b95c50880fe1c89fee31dc64e03a0",
-  "ci_config_notes": [
-    "Three optional, manually triggered build07 jobs; existing jobs unchanged.",
-    "Offline tests use a separate variant with no cluster-profile dependency.",
-    "Live jobs retain the default intranet network restriction.",
-    "Rehearsal 2118350214824726528 failed before tests because the root Dockerfile was absent from main.",
-    "Root now uses an inline pinned base image; test-bin installs dependencies from merged PR source into a virtual environment.",
-    "Rehearsal 2118353549430624256 built root but failed cloning source because /go was not writable; inline root now prepares /go for user 1001 and group 0.",
-    "Live rehearsal 2118445297293070336 failed building its graph: cluster profiles imply a release:latest dependency. Live config now declares a 4.20 candidate release, matching an existing release-repo convention; no installer is run."
-  ],
-  "corrected_environment_validation": {
-    "date": "2026-11-05",
-    "image_id": "sha256:473856aba9c08bbb5ac1ad783b8c5aa8c64c3ef301735e6e712ac89467c8b7ad",
-    "platform": "linux/amd64",
-    "result": "Non-root user 1001 created /go/src checkout path and git was available; pip check passed; user 12345:0 created a directory under /go and all 8 methods / 37 subcases passed with runtime networking disabled.",
-    "scope": "Local reproduction of checkout permissions and test environment, not a successful CI rehearsal."
-  },
-  "review_validation": {
-    "date": "2026-11-05",
-    "result": "9 methods / 38 cases passed on host and in pinned amd64 environment as non-root user with runtime networking disabled; all 30 functions documented.",
-    "coverage": "Token generation sequence 1/1/2, constant-time comparisons after initial token, identity/token values excluded from captured logs.",
-    "coderabbit_cli": "Not installed; external pre-merge checks not rerun locally."
-  },
-  "graph_validation": {
-    "date": "2026-11-05",
-    "ci_tools_revision": "7ceb50c7fbabac6f662df079308ce5353656a08d",
-    "result": "Constructed and topologically sorted actual ci-tools graphs for both live jobs and the offline job. Removing the new release reproduces missing dependencies for both live jobs.",
-    "isolation": "Kubernetes transport rejects all network requests; no steps executed and no cloud credentials used."
+  "historical_validation_before_profile_removal": {
+    "recorded_at": "2026-11-04T16:48:16.990844-05:00",
+    "release_base": "54f77b37a45c6b59384ef34cd36e071675c4149d",
+    "ci_tools_validator_revision": "7ceb50c7fbabac6f662df079308ce5353656a08d",
+    "python_runtime_tested": "3.12, linux/amd64, network disabled",
+    "unit_test_methods": 9,
+    "unit_subcases": 38,
+    "local_amd64_image_id": "sha256:c8c82897acdab730e5daaf8345f639f5b9548b5119a66432fbe5af3a3f97133c",
+    "ubi_manifest_digest": "sha256:19e1e927138b40454858f297884c2c4e2f13f5ba95b3f55faea174d3cbb57067",
+    "passed": [
+      "offline diagnostic tests",
+      "audience included in AWS signed headers",
+      "SDK credential cloning and fresh supplier generations",
+      "pinned image build and pip check",
+      "ci-operator config validation for openshift/release",
+      "cluster profile normalization",
+      "GSM schema validation with ci-tools API",
+      "Boskos regeneration",
+      "Prow job generation",
+      "existing jobs/profiles/bundles/leases preservation checks",
+      "Prow/Boskos regeneration reproducibility"
+    ],
+    "not_run": [
+      "live CI diagnostic",
+      "live token exchange",
+      "live authorization denial",
+      "live credential renewal",
+      "full secret-bootstrap live-store validation"
+    ],
+    "limitations": [
+      "local ARM image SIGILL importing Google auth; CI is explicitly amd64",
+      "service-account self-admin grant retained pending team review",
+      "source profile must be seeded/deployed by maintainers before jobs run"
+    ],
+    "source_sha256": {
+      "diagnostic.py": "51526c6e4ecd08de90bdaa846beee6dfad19a0a82761905ef702322f2938a35f",
+      "test_diagnostic.py": "c4112b199aee98e9d2bedd3d93c2eacd9f2be0e8927abdf8d32885b8f693e763",
+      "requirements.txt": "b96c3c36687891b1ba451d8ce697f5efac08bd78dcb3ed67c2de8e987327f70b"
+    },
+    "ci_config_rechecked_on": "2026-11-05",
+    "ci_config_release_base": "5d7a6ddfcf8b95c50880fe1c89fee31dc64e03a0",
+    "ci_config_notes": [
+      "Three optional, manually triggered build07 jobs; existing jobs unchanged.",
+      "Offline tests use a separate variant with no cluster-profile dependency.",
+      "Live jobs retain the default intranet network restriction.",
+      "Rehearsal 2118350214824726528 failed before tests because the root Dockerfile was absent from main.",
+      "Root now uses an inline pinned base image; test-bin installs dependencies from merged PR source into a virtual environment.",
+      "Rehearsal 2118353549430624256 built root but failed cloning source because /go was not writable; inline root now prepares /go for user 1001 and group 0.",
+      "Live rehearsal 2118445297293070336 failed building its graph: cluster profiles imply a release:latest dependency. Live config now declares a 4.20 candidate release, matching an existing release-repo convention; no installer is run."
+    ],
+    "corrected_environment_validation": {
+      "date": "2026-11-05",
+      "image_id": "sha256:473856aba9c08bbb5ac1ad783b8c5aa8c64c3ef301735e6e712ac89467c8b7ad",
+      "platform": "linux/amd64",
+      "result": "Non-root user 1001 created /go/src checkout path and git was available; pip check passed; user 12345:0 created a directory under /go and all 8 methods / 37 subcases passed with runtime networking disabled.",
+      "scope": "Local reproduction of checkout permissions and test environment, not a successful CI rehearsal."
+    },
+    "review_validation": {
+      "date": "2026-11-05",
+      "result": "9 methods / 38 cases passed on host and in pinned amd64 environment as non-root user with runtime networking disabled; all 30 functions documented.",
+      "coverage": "Token generation sequence 1/1/2, constant-time comparisons after initial token, identity/token values excluded from captured logs.",
+      "coderabbit_cli": "Not installed; external pre-merge checks not rerun locally."
+    },
+    "graph_validation": {
+      "date": "2026-11-05",
+      "ci_tools_revision": "7ceb50c7fbabac6f662df079308ce5353656a08d",
+      "result": "Constructed and topologically sorted actual ci-tools graphs for both live jobs and the offline job. Removing the new release reproduces missing dependencies for both live jobs.",
+      "isolation": "Kubernetes transport rejects all network requests; no steps executed and no cloud credentials used."
+    }
   }
 }

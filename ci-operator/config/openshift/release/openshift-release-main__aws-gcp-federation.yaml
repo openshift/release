@@ -5,11 +5,6 @@ build_root:
       USER 0
       RUN install -d -o 1001 -g 0 -m 0775 /go
       USER 1001
-releases:
-  latest:
-    release:
-      channel: candidate
-      version: "4.20"
 resources:
   '*':
     requests:
@@ -26,7 +21,10 @@ tests:
   optional: true
   restrict_network_access: true
   steps:
-    cluster_profile: gcp-aws-federation-pilot
+    aws_sts:
+      home_role_arn: arn:aws:iam::891612575819:role/ci-step-runner
+      hub_role_arn: arn:aws:iam::320297955214:role/ci-step-runner-hub
+      target_role_arn: arn:aws:iam::320297955214:role/ci-step-runner-gcp-broker
     node_architecture: amd64
     test:
     - as: check-federation
@@ -48,7 +46,10 @@ tests:
   optional: true
   restrict_network_access: true
   steps:
-    cluster_profile: gcp-aws-federation-pilot
+    aws_sts:
+      home_role_arn: arn:aws:iam::891612575819:role/ci-step-runner
+      hub_role_arn: arn:aws:iam::320297955214:role/ci-step-runner-hub
+      target_role_arn: arn:aws:iam::320297955214:role/ci-step-runner-gcp-broker
     node_architecture: amd64
     test:
     - as: check-renewal

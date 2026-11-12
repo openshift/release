@@ -77,21 +77,6 @@ class DiagnosticTests(unittest.TestCase):
                     else:
                         diagnostic.validate_aws_config(path, token)
 
-    def test_validate_profile(self):
-        """Accept role identifiers only and reject stored credential files."""
-        cases = [("roles only", None, False), ("GCP key", "gce.json", True), ("AWS key", ".awscred", True)]
-        for name, extra, failure in cases:
-            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
-                path = Path(directory)
-                (path / "hub_role_arn").write_text(diagnostic.HUB_ARN)
-                (path / "target_role_arn").write_text(diagnostic.BROKER_ARN)
-                if extra:
-                    (path / extra).write_text("unexpected")
-                if failure:
-                    with self.assertRaises(diagnostic.DiagnosticError):
-                        diagnostic.validate_profile(path)
-                else:
-                    diagnostic.validate_profile(path)
 
     def test_validate_claims(self):
         """Check expected routing claims and reject mismatched token metadata."""
@@ -206,8 +191,7 @@ class DiagnosticTests(unittest.TestCase):
         http.get.side_effect = response
         output = io.StringIO()
         with contextlib.ExitStack() as stack:
-            stack.enter_context(patch.dict(diagnostic.os.environ, {"CLUSTER_PROFILE_DIR": "/unused"}))
-            for name in ["validate_profile", "validate_aws_config", "validate_claims",
+            for name in ["validate_aws_config", "validate_claims",
                          "isolate_environment", "check_provider_rejection"]:
                 stack.enter_context(patch.object(diagnostic, name))
             stack.enter_context(patch.object(diagnostic, "TOKEN_PATH", token_file))

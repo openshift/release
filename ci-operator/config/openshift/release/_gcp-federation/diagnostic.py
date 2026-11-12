@@ -71,17 +71,6 @@ def validate_aws_config(path, token_path=TOKEN_PATH):
         raise DiagnosticError("projected AWS token is missing")
 
 
-def validate_profile(path):
-    """Reject profile files other than the two role identifiers."""
-    fields = {p.name for p in path.iterdir() if not p.name.startswith("..")}
-    if fields != {"hub_role_arn", "target_role_arn"}:
-        raise DiagnosticError("cluster profile contains unexpected fields")
-    if (path / "hub_role_arn").read_text().strip() != HUB_ARN:
-        raise DiagnosticError("profile hub ARN differs")
-    if (path / "target_role_arn").read_text().strip() != BROKER_ARN:
-        raise DiagnosticError("profile broker ARN differs")
-
-
 def validate_claims(claims):
     """Check token routing metadata; AWS performs the actual signature verification."""
     audiences = claims.get("aud", [])
@@ -227,7 +216,6 @@ def require_denied(response):
 
 def run(duration):
     """Run positive, provider rejection, storage denial and optional renewal checks."""
-    validate_profile(Path(os.environ["CLUSTER_PROFILE_DIR"]))
     validate_aws_config(CONFIG_PATH)
     payload = TOKEN_PATH.read_text().split(".")[1]
     claims = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
