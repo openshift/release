@@ -87,7 +87,36 @@ img_uid="$(podman run --rm --entrypoint id "${OCMCI_IMAGE}" -u 2>/dev/null || tr
 img_uid="${img_uid:-998}"
 echo "justClean container uid=${img_uid}"
 
-ocm_fvt_output="${ARTIFACT_DIR}/ocm-fvt-clean-results"
+# The podman output tree is written by the image user (ci-user), not by this
+# step's user. Exposing it directly under ARTIFACT_DIR makes the Prow sidecar
+# censor fail on every container-owned directory it cannot write into
+# ("could not create temporary file for censoring .../tmp-censor..."), so the
+# raw tree is staged privately next to ARTIFACT_DIR and collector-owned copies
+# are published afterwards by the helper installed by rosa-e2e-ocm-fvt-prepare.
+ocm_fvt_helpers="${SHARED_DIR}/ocm-fvt-artifacts.py"
+ocm_fvt_workdir=""
+if [[ -f "${ocm_fvt_helpers}" && ! -L "${ocm_fvt_helpers}" ]]; then
+  if ! ocm_fvt_workdir="$(python3 "${ocm_fvt_helpers}" stage "${ARTIFACT_DIR}" 2>/dev/null)" ||
+     [[ ! -d "${ocm_fvt_workdir}" ]]; then
+    ocm_fvt_workdir=""
+    echo "WARNING: failed to stage private ocm-fvt clean output; results stay unpublished"
+  fi
+else
+  echo "WARNING: ocm-fvt artifact helpers were not prepared; results stay unpublished"
+fi
+
+# Cleanup itself must still run when artifacts cannot be published: a private
+# fallback keeps the container output out of ARTIFACT_DIR either way, and never
+# aborts the step before justClean has had a chance to delete the cluster.
+if [[ -n "${ocm_fvt_workdir}" ]]; then
+  publish_clean_results=true
+else
+  publish_clean_results=false
+  ocm_fvt_workdir="$(mktemp -d /tmp/ocm-fvt-clean.XXXXXX 2>/dev/null)" ||
+    ocm_fvt_workdir="/tmp/ocm-fvt-clean.$$"
+fi
+
+ocm_fvt_output="${ocm_fvt_workdir}/output"
 mkdir -p "${ocm_fvt_output}"
 # Do NOT use sticky 1777: sticky on the output dir blocks container ci-user from
 # removing host-owned profile dirs (unlinkat cluster.ini -> permission denied).
@@ -126,12 +155,29 @@ if [[ "${OCM_FVT_GCP_CREDS:-false}" == "true" ]]; then
 fi
 
 echo "Running ocmtest justClean for job ${job_name}"
+clean_exit_code=0
 [[ $- == *x* ]] && WAS_TRACING_RUN=true || WAS_TRACING_RUN=false
 set +x
 podman run \
   "${podman_args[@]}" \
   "${OCMCI_IMAGE}" \
-  ocmtest test --service "${OCM_FVT_SERVICE:-cms}" --job "${job_name}" --justClean
+  ocmtest test --service "${OCM_FVT_SERVICE:-cms}" --job "${job_name}" --justClean || clean_exit_code=$?
 $WAS_TRACING_RUN && set -x
 
-echo "ocm-fvt clean finished"
+if [[ "${clean_exit_code}" -eq 0 ]]; then
+  echo "ocm-fvt clean finished"
+else
+  echo "ocm-fvt clean failed (exit ${clean_exit_code})" >&2
+fi
+
+# Publish regardless of the cleanup result: a failed justClean is exactly when
+# its reports matter. Publication never overrides the cleanup exit status, and
+# a failed publication leaves the raw output private rather than exposing it.
+if [[ "${publish_clean_results}" == "true" ]]; then
+  if ! python3 "${ocm_fvt_helpers}" publish \
+    "${ocm_fvt_output}" "${ARTIFACT_DIR}" ocm-fvt-clean-results 2>/dev/null; then
+    echo "WARNING: failed to publish ocm-fvt clean artifacts; raw output remains private"
+  fi
+fi
+
+exit "${clean_exit_code}"
