@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Save and disable tracing before reading service-principal credentials.
+if [[ $- == *x* ]]; then
+    WAS_TRACING=true
+else
+    WAS_TRACING=false
+fi
+set +x
+
 # --- Azure login (reused from ipi-azure-post pattern) ---
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
@@ -36,12 +44,18 @@ else
     az cloud set --name AzureCloud
 fi
 
-# Disable tracing due to password handling
-[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
-set +x
-az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+if az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none; then
+    unset AZURE_AUTH_CLIENT_SECRET
+else
+    login_rc=$?
+    unset AZURE_AUTH_CLIENT_SECRET AZURE_AUTH_CLIENT_ID AZURE_AUTH_TENANT_ID AZURE_AUTH_SUBSCRIPTION_ID
+    exit "${login_rc}"
+fi
 az account set --subscription "${AZURE_AUTH_SUBSCRIPTION_ID}"
-$WAS_TRACING && set -x
+unset AZURE_AUTH_CLIENT_ID AZURE_AUTH_TENANT_ID AZURE_AUTH_SUBSCRIPTION_ID
+if [[ "${WAS_TRACING}" == true ]]; then
+    set -x
+fi
 
 # --- Load cluster metadata ---
 METADATA="${SHARED_DIR}/metadata.json"
@@ -58,16 +72,38 @@ SUMMARY_FILE="${ARTIFACT_DIR}/azure-cluster-describe.log"
 echo "Describing all resources in resource group: ${RESOURCE_GROUP}"
 
 # --- Dump raw JSON via Resource Graph ---
-az graph query -q "
+if ! az graph query -q "
     Resources
     | where resourceGroup =~ '${RESOURCE_GROUP}'
     | project name, type, location, tags, properties
     | order by type asc, name asc
-" --first 1000 -o json 2>/dev/null | jq '
-    del(.data[].properties.osProfile.linuxConfiguration.ssh)
-    | del(.data[].properties.osProfile.adminPassword)
-    | del(.data[].properties.osProfile.secrets)
-' > "${JSON_FILE}" || echo "{}" > "${JSON_FILE}"
+" --first 1000 -o json | jq '
+    # Remove credential and bootstrap-data fields before writing the inventory.
+    .data |= map(del(
+        .properties.osProfile.adminPassword,
+        .properties.osProfile.customData,
+        .properties.osProfile.secrets,
+        .properties.osProfile.linuxConfiguration.ssh,
+        .properties.osProfile.windowsConfiguration.additionalUnattendContent,
+        .properties.userData,
+        .properties.protectedSettings,
+        .properties.protectedSettingsFromKeyVault,
+        .properties.extensions[]?.properties.protectedSettings,
+        .properties.extensions[]?.properties.protectedSettingsFromKeyVault,
+        .properties.virtualMachineProfile.osProfile.adminPassword,
+        .properties.virtualMachineProfile.osProfile.customData,
+        .properties.virtualMachineProfile.osProfile.secrets,
+        .properties.virtualMachineProfile.osProfile.linuxConfiguration.ssh,
+        .properties.virtualMachineProfile.osProfile.windowsConfiguration.additionalUnattendContent,
+        .properties.virtualMachineProfile.userData,
+        .properties.virtualMachineProfile.extensionProfile.extensions[]?.properties.protectedSettings,
+        .properties.virtualMachineProfile.extensionProfile.extensions[]?.properties.protectedSettingsFromKeyVault
+    ))
+' > "${JSON_FILE}"; then
+    echo "Failed to query or redact Azure resource inventory" >&2
+    echo "{}" > "${JSON_FILE}"
+    exit 1
+fi
 
 echo "Raw JSON written to ${JSON_FILE}"
 
