@@ -1,0 +1,25 @@
+ref:
+  as: rosa-e2e-validate-shared-vpc-teardown
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: rosa-e2e-validate-shared-vpc-teardown-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: REGION
+    default: ""
+    documentation: Cloud region for the shared account resources. Falls back to LEASED_RESOURCE if empty.
+  documentation: |-
+    Post-teardown orphan gate for the shared VPC row of the ROSAENG-308
+    provision x validate matrix (ROSAENG-63353, ROSAENG-61409). Runs last in
+    the post phase, after rosa-cluster-deprovision and
+    aws-deprovision-route53-private-hosted-zone: reads the shared-account
+    resource references written during provisioning (${SHARED_DIR}/hosted_zone_id,
+    ${SHARED_DIR}/hosted_zone_role_arn, ${SHARED_DIR}/shared_install_policy_arn)
+    and verifies against ${CLUSTER_PROFILE_DIR}/.awscred_shared_account that the
+    private hosted zone, the shared VPC role and the shared VPC policy are all
+    deleted. Not best-effort: an orphaned resource fails the job so the leak is
+    noticed and cleaned up. Clusters provisioned without a shared VPC write none
+    of the input files and the step exits successfully without doing anything.
