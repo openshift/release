@@ -134,6 +134,28 @@ function wait_until() {
   return 1
 }
 
+# Dump the cluster state needed to diagnose an OLM resolution stall, where a
+# CatalogSource reports READY and its gRPC endpoint then refuses connections.
+# Catalog pod age and restart counts show whether the pod was replaced; node and
+# MachineConfigPool state shows whether a rollout drained it; the catalog-operator
+# log shows what the resolver itself hit.
+function dump_olm_diagnostics() {
+  echo ">>> CatalogSources in openshift-marketplace:" >&2
+  oc get catalogsource -n openshift-marketplace -o wide || true
+  oc get catalogsource -n openshift-marketplace -o yaml || true
+  echo ">>> Catalog pods in openshift-marketplace:" >&2
+  oc get pods -n openshift-marketplace -o wide || true
+  oc describe pods -n openshift-marketplace -l olm.catalogSource | tail -120 || true
+  echo ">>> Recent events in openshift-marketplace:" >&2
+  oc get events -n openshift-marketplace --sort-by=.lastTimestamp | tail -50 || true
+  echo ">>> MachineConfigPools:" >&2
+  oc get mcp || true
+  echo ">>> Nodes:" >&2
+  oc get nodes || true
+  echo ">>> OLM catalog-operator log:" >&2
+  oc logs -n openshift-operator-lifecycle-manager deploy/catalog-operator --tail=200 || true
+}
+
 # Fetch trustee helm charts (from git repository)
 function fetch_trustee_charts() {
   local charts_dir="${SCRATCH}/charts"
@@ -312,12 +334,7 @@ function wait_for_operator() {
 
     if ! wait_until "Trustee CatalogSource ${actual_catalog_name} READY" 600 5 \
       "[[ \"\$(oc get catalogsource -n openshift-marketplace '${actual_catalog_name}' -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null)\" == \"READY\" ]]"; then
-      echo ">>> All CatalogSources in openshift-marketplace:" >&2
-      oc get catalogsource -n openshift-marketplace || true
-      echo ">>> Details of ${actual_catalog_name}:" >&2
-      oc get catalogsource -n openshift-marketplace "${actual_catalog_name}" -o yaml || true
-      oc get pods -n openshift-marketplace -l olm.catalogSource="${actual_catalog_name}" || true
-      oc describe pods -n openshift-marketplace -l olm.catalogSource="${actual_catalog_name}" | tail -50 || true
+      dump_olm_diagnostics
       return 1
     fi
   else
@@ -330,6 +347,7 @@ function wait_for_operator() {
     "installplan_ref=\$(oc get subscription -n '${TRUSTEE_NAMESPACE}' trustee-operator -o jsonpath='{.status.installplan.name}' 2>/dev/null); [[ -n \"\${installplan_ref}\" ]]"; then
     echo ">>> ERROR: Subscription has no InstallPlan reference" >&2
     oc get subscription -n "${TRUSTEE_NAMESPACE}" trustee-operator -o yaml || true
+    dump_olm_diagnostics
     return 1
   fi
 
