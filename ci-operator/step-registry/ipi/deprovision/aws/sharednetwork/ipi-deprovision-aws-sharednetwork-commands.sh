@@ -7,7 +7,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 
 function delete_stack() {
   local stack_name

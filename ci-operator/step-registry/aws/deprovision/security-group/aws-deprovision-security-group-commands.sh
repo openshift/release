@@ -13,7 +13,7 @@ if [[ ! -f ${SHARED_DIR}/security_groups_ids ]]; then
     exit 0
 fi
 
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 
 for sg_id in $(cat ${SHARED_DIR}/security_groups_ids); do
     echo "Deleting sg - ${sg_id}... "
