@@ -27,7 +27,11 @@ images:
       # guard, so a successful build is guaranteed to be the right architecture.
       FROM quay.io/rh-ee-skaufman/ovs-doca-el10-vendor:latest AS rpms
 
-      FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-10
+      # --platform forces the arm64 variant of the (multi-arch) base and runs the
+      # RUN steps under emulation on the x86_64 build farm; the aarch64-only
+      # vendor rpms act as the arch guard -- if emulation is unavailable the
+      # build fails fast with 'exec format error' instead of a wrong-arch image.
+      FROM --platform=linux/arm64 registry.ci.openshift.org/rhcos-devel/rhel-coreos-10
       COPY --from=rpms /rpms /tmp/rpms
 
       # All packages come from the vendored set: the OVS-DOCA 3.5 stack (Red Hat
