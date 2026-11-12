@@ -738,8 +738,13 @@ function legacyize_vsphere_cloud_provider_config() {
 
   local infra_manifest="${dir}/manifests/cluster-infrastructure-02-config.yml"
   local ccm_manifest="${dir}/manifests/cloud-provider-config.yaml"
-  local metadata_json="${dir}/metadata.json"
 
+  # infraID comes from the Infrastructure manifest's own
+  # status.infrastructureName rather than metadata.json: metadata.json is not
+  # written to disk until `create ignition-configs`/`create cluster` runs, so
+  # reading it here (right after `create manifests`) would either read a
+  # stale file or, under `set -o errexit`, silently kill the whole script
+  # when it doesn't exist yet.
   local server datacenter datastore_path datastore folder resource_pool port infra_id
   server=$(/tmp/yq r "${infra_manifest}" "spec.platformSpec.vsphere.vcenters[0].server")
   datacenter=$(/tmp/yq r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.datacenter")
@@ -747,8 +752,8 @@ function legacyize_vsphere_cloud_provider_config() {
   folder=$(/tmp/yq r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.folder")
   resource_pool=$(/tmp/yq r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.resourcePool")
   port=$(/tmp/yq r "${infra_manifest}" "spec.platformSpec.vsphere.vcenters[0].port")
-  infra_id=$(jq -r '.infraID // empty' "${metadata_json}" 2>/dev/null)
-  for v in server datacenter datastore_path folder resource_pool port; do
+  infra_id=$(/tmp/yq r "${infra_manifest}" "status.infrastructureName")
+  for v in server datacenter datastore_path folder resource_pool port infra_id; do
     [[ "${!v}" == "null" ]] && eval "${v}=\"\""
   done
   datastore="${datastore_path##*/}"
@@ -763,7 +768,7 @@ function legacyize_vsphere_cloud_provider_config() {
     if [[ -n "${infra_id}" ]]; then
       folder="/${datacenter}/vm/${infra_id}"
     else
-      echo "WARNING: no topology.folder resolved and no infraID available in ${metadata_json}; omitting 'folder' from the legacy [Workspace] section" >&2
+      echo "WARNING: no topology.folder resolved and no status.infrastructureName available; omitting 'folder' from the legacy [Workspace] section" >&2
     fi
   fi
 

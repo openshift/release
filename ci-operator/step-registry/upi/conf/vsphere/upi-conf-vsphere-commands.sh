@@ -437,16 +437,20 @@ if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
   infra_manifest="manifests/cluster-infrastructure-02-config.yml"
   ccm_manifest="manifests/cloud-provider-config.yaml"
 
-  metadata_json="metadata.json"
-
+  # infraID comes from the Infrastructure manifest's own
+  # status.infrastructureName rather than metadata.json: metadata.json is not
+  # written to disk until `create ignition-configs` runs, so reading it here
+  # (right after `create manifests`) would either read a stale file or,
+  # under `set -o errexit`, silently kill the whole script when it doesn't
+  # exist yet.
   vsphere_fd_server=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.vcenters[0].server")
   vsphere_fd_datacenter=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.datacenter")
   vsphere_fd_datastore_path=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.datastore")
   vsphere_fd_folder=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.folder")
   vsphere_fd_resource_pool=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.resourcePool")
   vsphere_fd_port=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.vcenters[0].port")
-  vsphere_infra_id=$(jq -r '.infraID // empty' "${metadata_json}" 2>/dev/null)
-  for v in vsphere_fd_server vsphere_fd_datacenter vsphere_fd_datastore_path vsphere_fd_folder vsphere_fd_resource_pool vsphere_fd_port; do
+  vsphere_infra_id=$(yq-go r "${infra_manifest}" "status.infrastructureName")
+  for v in vsphere_fd_server vsphere_fd_datacenter vsphere_fd_datastore_path vsphere_fd_folder vsphere_fd_resource_pool vsphere_fd_port vsphere_infra_id; do
     [[ "${!v}" == "null" ]] && eval "${v}=\"\""
   done
   vsphere_fd_datastore="${vsphere_fd_datastore_path##*/}"
@@ -461,7 +465,7 @@ if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
     if [[ -n "${vsphere_infra_id}" ]]; then
       vsphere_fd_folder="/${vsphere_fd_datacenter}/vm/${vsphere_infra_id}"
     else
-      echo "WARNING: no topology.folder resolved and no infraID available in ${metadata_json}; omitting 'folder' from the legacy [Workspace] section" >&2
+      echo "WARNING: no topology.folder resolved and no status.infrastructureName available; omitting 'folder' from the legacy [Workspace] section" >&2
     fi
   fi
 
