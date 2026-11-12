@@ -47,6 +47,9 @@ images:
   - context_dir: .
     dockerfile_path: ./dashboard-operator/Dockerfile
     to: odh-dashboard-operator-image
+  - context_dir: .
+    dockerfile_path: ./packages/ai-safety/Dockerfile.workspace
+    to: odh-mod-arch-ai-safety-image
 promotion:
   to:
   - namespace: opendatahub-io
@@ -299,6 +302,23 @@ tests:
       SOURCE_IMAGE_REF: odh-dashboard-operator-image
     env:
       IMAGE_REPO: odh-dashboard-operator
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-ai-safety-pr-image-mirror
+  run_if_changed: ^packages/ai-safety/
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-ai-safety-image
+    env:
+      IMAGE_REPO: odh-mod-arch-ai-safety
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-mod-arch-ai-safety-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-mod-arch-ai-safety-image
+    env:
+      IMAGE_REPO: odh-mod-arch-ai-safety
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
