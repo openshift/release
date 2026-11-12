@@ -410,13 +410,13 @@ function ValidateHubHealth () {
 
     # Topology tolerance (INTEROP-9683 class): the stolostron policy-collection
     # lanes install ACM 2.17.z via OLM subscription without a MultiClusterHub
-    # CR — the MCH is the hub resource of the MCH-managed topology, and the
+    # CR: the MCH is the hub resource of the MCH-managed topology, and the
     # product deliberately does not create one under MCE/operator management.
     # Failing the lane for its absence asks upstream to place a resource this
     # topology never provisions. Classify the topology explicitly
     # (not-provisioned) and skip only the MCH wait: the policy-propagator and
     # managed-cluster checks below still run, so the hub is still validated.
-    # Never a silent skip — the classification is echoed and recorded in the
+    # Never a silent skip: the classification is echoed and recorded in the
     # upgrade summary artifact.
 
     # Capture oc stderr so a failed query cannot pass for an unprovisioned
@@ -439,7 +439,7 @@ function ValidateHubHealth () {
 
     if [[ -z "${mchNames}" ]]; then
         MCH_TOPOLOGY="not-provisioned (MCE/operator-managed ACM topology)"
-        echo "  MultiClusterHub: ${MCH_TOPOLOGY} — skipping the MCH Running wait; validating the hub via the policy propagator and managed clusters"
+        echo "  MultiClusterHub: ${MCH_TOPOLOGY} (skipping the MCH Running wait; validating the hub via the policy propagator and managed clusters)"
     else
         MCH_TOPOLOGY="MCH Running"
         typeset mchStatus
