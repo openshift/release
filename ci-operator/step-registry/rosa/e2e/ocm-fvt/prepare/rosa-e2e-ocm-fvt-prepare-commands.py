@@ -17,11 +17,13 @@ import tempfile
 # fixed set of reason categories - never artifact content.
 AUDIT_NAME = "ocm-fvt-artifact-audit.json"
 AUDIT_SCHEMA = 1
-# Worst case about 160 KiB: AUDIT_MAX_ENTRIES publication records and
-# AUDIT_MAX_HANDOFF inventory records, each holding a bounded rendered name,
-# plus a small fixed object. Both lists are sorted before they are capped, so
-# which records survive a cap is reproducible rather than readdir order.
+# Worst case about 160 KiB: AUDIT_MAX_ENTRIES publication records,
+# AUDIT_MAX_HANDOFF inventory records and at most AUDIT_MAX_FAILED records for
+# entries publication refused, each holding a bounded rendered name, plus a
+# small fixed object. The first two lists are sorted before they are capped,
+# so which records survive a cap is reproducible rather than readdir order.
 AUDIT_MAX_ENTRIES = 512
+AUDIT_MAX_FAILED = 8
 AUDIT_MAX_HANDOFF = 128
 AUDIT_MAX_SCAN = 8192
 AUDIT_MAX_PATH = 160
@@ -95,11 +97,25 @@ def private_record(budget, parents, rule):
     """Count one private-state exclusion against its directory and rule.
 
     Counting rather than listing keeps the entry's own name out of the
-    manifest, and bounds these records to one per rule per directory.
+    manifest, and bounds these records to one per rule per directory. The key
+    is the directory's own identity, never its rendered form: rendering caps
+    the path, and a cap applied to a directory deep enough to reach it would
+    otherwise collapse distinct rules onto one key and drop the rule with the
+    truncated tail. The rule travels in its own field for the same reason.
     """
     counted = budget["private"]
-    path = audit_path(parents + (rule,))
-    counted[path] = counted.get(path, 0) + 1
+    key = (parents, rule)
+    counted[key] = counted.get(key, 0) + 1
+
+
+def private_rendered(counted):
+    """Render private-state counts, folding directories that render alike."""
+    folded = {}
+    for (parents, rule), count in counted.items():
+        key = (audit_path(parents) or ".", rule)
+        folded[key] = folded.get(key, 0) + count
+    return [{"path": path, "disposition": "excluded", "reason": "private-state",
+             "rule": rule, "count": count} for (path, rule), count in folded.items()]
 
 
 def audit_record(budget, parts, disposition, **fields):
@@ -109,6 +125,20 @@ def audit_record(budget, parts, disposition, **fields):
     entries, so the list this appends to is bounded by that same limit.
     """
     budget["audit"].append(dict(fields, path=audit_path(parts), disposition=disposition))
+
+
+def failed_record(budget, parts, reason):
+    """Record the entry publication refused, then let the caller raise.
+
+    Kept apart from the ordinary records because this one must survive: the
+    ordinary list is capped, and the entry that stopped publication is the
+    least useful record to lose. The list is bounded on its own, and holds a
+    rendered path and a fixed reason - never the refusal's message.
+    """
+    failures = budget["failed"]
+    if len(failures) < AUDIT_MAX_FAILED:
+        failures.append({"path": audit_path(parts) or ".", "disposition": "failed",
+                         "reason": reason})
 
 
 def audit_state(parent, name):
@@ -162,18 +192,24 @@ def audit_handoff(artifacts):
 
 def audit_write(artifacts, budget, outcome):
     """Write the publication manifest; auditing never fails or masks the step."""
-    counted = [{"path": path, "disposition": "excluded", "reason": "private-state",
-                "count": count} for path, count in budget["private"].items()]
-    records = sorted(budget["audit"] + counted,
-                     key=lambda record: (record["path"], json.dumps(record, sort_keys=True)))
+    def ordering(record):
+        return record["path"], json.dumps(record, sort_keys=True)
+
+    records = sorted(budget["audit"] + private_rendered(budget["private"]), key=ordering)
     kept = records[:AUDIT_MAX_ENTRIES]
+    dropped = len(records) - len(kept)
+    # The refused entry is appended after the cap rather than competing for a
+    # place under it: it is the one record a reader needs when publication
+    # stopped, and AUDIT_MAX_FAILED keeps the addition bounded. It is counted
+    # out of records_dropped, which reports only what the cap discarded.
+    kept = sorted(kept + budget["failed"], key=ordering)
     manifest = {
         "schema": AUDIT_SCHEMA,
         "publication": dict(outcome, destination=PUBLISHED_DIR),
         "limits": {
             "entries_left": budget["entries_left"],
             "bytes_left": budget["bytes_left"],
-            "records_dropped": len(records) - len(kept),
+            "records_dropped": dropped,
         },
         "expected_report": audit_expected_report(artifacts, budget),
         "handoff": audit_handoff(artifacts),
@@ -294,18 +330,57 @@ def handle_metadata(arguments):
         artifact.write("\n")
 
 
+def publish_file(source, destination, budget, name, located):
+    """Copy one regular file, recording what the copy did or why it stopped."""
+    try:
+        descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=source)
+    except PermissionError:
+        budget["excluded"] = True
+        audit_record(budget, located, "excluded", reason="unreadable")
+        return
+    with os.fdopen(descriptor, "rb") as original:
+        opened = os.fstat(original.fileno())
+        if not stat.S_ISREG(opened.st_mode):
+            failed_record(budget, located, "type-changed")
+            raise PublishLimit("type-changed", "Artifact changed type")
+        if opened.st_size > budget["bytes_left"]:
+            failed_record(budget, located, "size-limit")
+            raise PublishLimit("size-limit", "Artifact size limit exceeded")
+        target = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                         0o600, dir_fd=destination)
+        copied = 0
+        with os.fdopen(target, "wb") as artifact:
+            while True:
+                chunk = original.read(min(1024 * 1024, budget["bytes_left"] + 1))
+                if not chunk:
+                    break
+                budget["bytes_left"] -= len(chunk)
+                if budget["bytes_left"] < 0:
+                    failed_record(budget, located, "size-limit")
+                    raise PublishLimit("size-limit", "Artifact size limit exceeded")
+                copied += len(chunk)
+                artifact.write(chunk)
+        if name == RESULT_REPORT:
+            # Counted here, from the real name: the rendered paths in the
+            # manifest are capped and may be truncated.
+            budget["reports"] += 1
+        audit_record(budget, located, "published", size=copied)
+
+
 def publish(source, destination, budget, depth=0, parents=()):
     """Copy bounded regular diagnostics without following links or sharing ownership."""
     directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     if depth > 16:
+        failed_record(budget, parents, "depth-limit")
         raise PublishLimit("depth-limit", "Artifact nesting limit exceeded")
     with os.scandir(source) as entries:
         for entry in entries:
             budget["entries_left"] -= 1
-            if budget["entries_left"] < 0:
-                raise PublishLimit("entry-limit", "Artifact entry limit exceeded")
             name = entry.name
             located = parents + (name,)
+            if budget["entries_left"] < 0:
+                failed_record(budget, located, "entry-limit")
+                raise PublishLimit("entry-limit", "Artifact entry limit exceeded")
             rule = private_state(name)
             if rule is not None:
                 private_record(budget, parents, rule)
@@ -329,36 +404,7 @@ def publish(source, destination, budget, depth=0, parents=()):
                 finally:
                     os.close(child)
             elif stat.S_ISREG(info.st_mode):
-                try:
-                    descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=source)
-                except PermissionError:
-                    budget["excluded"] = True
-                    audit_record(budget, located, "excluded", reason="unreadable")
-                    continue
-                with os.fdopen(descriptor, "rb") as original:
-                    opened = os.fstat(original.fileno())
-                    if not stat.S_ISREG(opened.st_mode):
-                        raise PublishLimit("type-changed", "Artifact changed type")
-                    if opened.st_size > budget["bytes_left"]:
-                        raise PublishLimit("size-limit", "Artifact size limit exceeded")
-                    target = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
-                                     0o600, dir_fd=destination)
-                    copied = 0
-                    with os.fdopen(target, "wb") as artifact:
-                        while True:
-                            chunk = original.read(min(1024 * 1024, budget["bytes_left"] + 1))
-                            if not chunk:
-                                break
-                            budget["bytes_left"] -= len(chunk)
-                            if budget["bytes_left"] < 0:
-                                raise PublishLimit("size-limit", "Artifact size limit exceeded")
-                            copied += len(chunk)
-                            artifact.write(chunk)
-                    if name == RESULT_REPORT:
-                        # Counted here, from the real name: the rendered paths
-                        # in the manifest are capped and may be truncated.
-                        budget["reports"] += 1
-                    audit_record(budget, located, "published", size=copied)
+                publish_file(source, destination, budget, name, located)
             else:
                 budget["excluded"] = True
                 audit_record(budget, located, "excluded", reason="irregular")
@@ -368,7 +414,7 @@ def handle_publish(arguments):
     """Run the publish phase of artifact handling."""
     directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     budget = {"entries_left": 8192, "bytes_left": 256 * 1024 * 1024, "excluded": False,
-              "audit": [], "private": {}, "reports": 0}
+              "audit": [], "private": {}, "failed": [], "reports": 0}
     # Pessimistic until the publication tree is in place, so an unwinding this
     # function does not model - a signal, an interpreter error - cannot leave a
     # manifest claiming a publication that never completed.

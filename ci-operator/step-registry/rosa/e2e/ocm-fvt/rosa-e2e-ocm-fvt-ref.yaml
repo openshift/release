@@ -136,8 +136,15 @@ ref:
     .datainfo, cluster.ini, kubeconfig and *.kubeconfig are held back exactly
     because they are named after cluster state, and they are the one group
     that never becomes a published object, so they are recorded as a count per
-    directory against the rule that matched - datainfo, cluster-ini,
-    kubeconfig or kubeconfig-named - and never by their own names.
+    directory, carrying the rule that matched - datainfo, cluster-ini,
+    kubeconfig or kubeconfig-named - in its own rule field, and never their
+    own names.
+
+    When publication refuses an entry it records that entry with disposition
+    failed and the same fixed reason the run reports, so the manifest names
+    which artifact stopped it rather than only that something did. Those
+    records are kept outside the entry cap, since they are the ones a reader
+    needs most when publication did not finish.
 
     Uploaded artifacts are pattern-scanned after upload as well, and a whole
     matching object is then replaced with a short notice, which makes a report
