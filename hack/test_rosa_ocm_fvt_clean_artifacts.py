@@ -29,6 +29,14 @@ HELPER = STEP / "prepare/rosa-e2e-ocm-fvt-prepare-commands.py"
 SECRET = "FIXTURE_SECRET_DO_NOT_PRINT"
 PUBLISHED = "ocm-fvt-clean-results"
 MOUNT = ":/ocm-backend-tests/output"
+# The step tries /tmp/ocm-fvt-clean.<pid>.0 through .4 when mktemp is unavailable.
+FALLBACK_CANDIDATES = 5
+# Which of the step's fallback candidates each case occupies before it runs.
+FALLBACK_CASES = {
+    "mktemp-failure": [],
+    "mktemp-symlink": [0],
+    "mktemp-blocked": list(range(FALLBACK_CANDIDATES)),
+}
 
 
 def step_script_name():
@@ -126,19 +134,26 @@ def step_pid():
     return found
 
 
-def plant_fallback_symlinks(base, candidates):
-    """Pre-create the step's fallback paths as symlinks, as a /tmp squatter would.
+def fallback_candidates(pid):
+    """Exactly the /tmp paths the step may create for a script running as `pid`."""
+    return [Path(f"/tmp/ocm-fvt-clean.{pid}.{index}") for index in range(FALLBACK_CANDIDATES)]
+
+
+def record_fallback_candidates(base, occupied):
+    """Record the step's pid and pre-create the named candidates as symlinks.
 
     The step is about to choose a name from the predictable `/tmp/ocm-fvt-clean.<pid>.<n>`
     family, and this mock runs as its descendant, so the fixture can occupy exactly the
-    candidates the step will try before it tries them.
+    candidates the step will try before it tries them. The pid is recorded even when
+    nothing is planted: it is what scopes the fixture's own cleanup to its own paths.
     """
     pid = step_pid()
     victim = base / "victim"
     victim.mkdir(exist_ok=True)
+    candidates = fallback_candidates(pid)
     planted = []
-    for attempt in candidates:
-        path = Path(f"/tmp/ocm-fvt-clean.{pid}.{attempt}")
+    for index in occupied:
+        path = candidates[index]
         if not path.exists() and not path.is_symlink():
             path.symlink_to(victim, target_is_directory=True)
             planted.append(str(path))
@@ -149,13 +164,8 @@ def plant_fallback_symlinks(base, candidates):
 def mock_mktemp(arguments, base, case):
     """Keep the step's private fallback directory inside the fixture."""
     if arguments[:1] == ["-d"] and arguments[1].startswith("/tmp/ocm-fvt-clean."):
-        if case == "mktemp-symlink":
-            plant_fallback_symlinks(base, [0])
-            return 97
-        if case == "mktemp-blocked":
-            plant_fallback_symlinks(base, range(5))
-            return 97
-        if case == "mktemp-failure":
+        if case in FALLBACK_CASES:
+            record_fallback_candidates(base, FALLBACK_CASES[case])
             return 97
         fallback = base / "fallback"
         fallback.mkdir(exist_ok=True)
@@ -232,6 +242,7 @@ def censor_errors(root):
 class CleanFixture(unittest.TestCase):
     def setUp(self):
         self.calls = []
+        self.fallback_seen = {}
         self.base = Path(tempfile.mkdtemp())
         # Cleanups run last in, first out: restore modes before removing the tree.
         self.addCleanup(shutil.rmtree, self.base)
@@ -334,22 +345,56 @@ class CleanFixture(unittest.TestCase):
                 if not path.is_symlink():
                     path.chmod(0o700)
 
-    def remove_fallback_directories(self, existing):
-        """Drop any /tmp fallback the step or the fixture created around a run."""
-        for path in set(Path("/tmp").glob("ocm-fvt-clean.*")) - existing:
-            if path.is_symlink():
-                path.unlink()
+    def remove_fallback_directories(self):
+        """Drop the /tmp entries this test planted or made its own step create.
+
+        Scoped by name to the candidates of this test's own step pid, never by diffing
+        `/tmp`: a concurrent run of this suite, or a real step on the same host, must
+        not lose its `/tmp/ocm-fvt-clean.*` directory to this fixture. Within those
+        names, an entry is removed only when it is still the exact object observed when
+        the step exited (`st_dev`/`st_ino`), which keeps a recycled pid from pointing
+        this cleanup at a later process's directory. Symlinks are unlinked only when the
+        fixture planted them, and a directory only when the fixture user owns it.
+        """
+        record = self.base / "fallback.json"
+        if not record.exists():
+            return
+        fallback = json.loads(record.read_text(encoding="utf-8"))
+        planted = set(fallback["planted"])
+        for path in fallback_candidates(fallback["pid"]):
+            try:
+                info = path.lstat()
+            except OSError:
+                continue
+            # Before the step exits there is nothing recorded yet, and the name and
+            # ownership checks below stand alone; afterwards identity is required too.
+            identity = (info.st_dev, info.st_ino)
+            if self.fallback_seen and self.fallback_seen.get(str(path)) != identity:
+                continue
+            if stat.S_ISLNK(info.st_mode):
+                if str(path) in planted:
+                    path.unlink()
+                continue
+            if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid():
                 continue
             self.restore_modes(path)
             shutil.rmtree(path, ignore_errors=True)
 
     def run_with_planted_fallbacks(self, case, exit_code):
-        """Run the step with its /tmp fallback candidates already taken by symlinks."""
-        existing = set(Path("/tmp").glob("ocm-fvt-clean.*"))
-        self.addCleanup(self.remove_fallback_directories, existing)
+        """Run a case whose `mktemp -d` fails, with the step's /tmp fallback candidates
+        occupied by symlinks beforehand when the case asks for it."""
+        # Registered before the run so a failing run or assertion still cleans up.
+        self.addCleanup(self.remove_fallback_directories)
         result = self.run_step(case, exit_code=exit_code, helper="none")
-        planted = json.loads((self.base / "fallback.json").read_text(encoding="utf-8"))
-        return result, planted
+        fallback = json.loads((self.base / "fallback.json").read_text(encoding="utf-8"))
+        # Pin what survived the step, so cleanup can only ever remove these objects.
+        for path in fallback_candidates(fallback["pid"]):
+            try:
+                info = path.lstat()
+            except OSError:
+                continue
+            self.fallback_seen[str(path)] = (info.st_dev, info.st_ino)
+        return result, fallback
 
 
 class CleanPublicationTests(CleanFixture):
@@ -451,9 +496,7 @@ class CleanSafetyTests(CleanFixture):
         self.assertNotIn(PUBLISHED, self.entries())
 
     def test_unavailable_mktemp_still_runs_cleanup_and_preserves_status(self):
-        existing = set(Path("/tmp").glob("ocm-fvt-clean.*"))
-        self.addCleanup(self.remove_fallback_directories, existing)
-        result = self.run_step("mktemp-failure", exit_code=4, helper="none")
+        result, _ = self.run_with_planted_fallbacks("mktemp-failure", 4)
         self.assertIn("were not prepared", result.stdout)
         self.assertNotIn(PUBLISHED, self.entries())
         self.assert_collector_owns_artifacts()
@@ -472,6 +515,28 @@ class CleanSafetyTests(CleanFixture):
         self.assertFalse(Path(used).exists(), used)
         self.assertNotIn(PUBLISHED, self.entries())
         self.assert_collector_owns_artifacts()
+
+    def test_fallback_cleanup_spares_entries_this_test_did_not_create(self):
+        """The fixture's /tmp cleanup is scoped to its own step's candidate names."""
+        result, fallback = self.run_with_planted_fallbacks("mktemp-symlink", 4)
+        self.assertIn(" falls back to ", result.stdout)
+        # What an unrelated process, or a concurrent run of this suite, owns in /tmp.
+        unrelated = Path(tempfile.mkdtemp(prefix="ocm-fvt-clean.unrelated-", dir="/tmp"))
+        self.addCleanup(shutil.rmtree, unrelated, True)
+        (unrelated / "keep.txt").write_text("keep\n", encoding="utf-8")
+        # Candidate-shaped, but for a pid no live process can hold, so a real
+        # concurrent run of this suite can never collide with the name.
+        concurrent = Path(f"/tmp/ocm-fvt-clean.{fallback['pid'] + 10 ** 9}.0")
+        concurrent.mkdir()
+        self.addCleanup(shutil.rmtree, concurrent, True)
+        (concurrent / "keep.txt").write_text("keep\n", encoding="utf-8")
+
+        self.remove_fallback_directories()
+
+        self.assertEqual((unrelated / "keep.txt").read_text(encoding="utf-8"), "keep\n")
+        self.assertEqual((concurrent / "keep.txt").read_text(encoding="utf-8"), "keep\n")
+        # The fixture's own planted candidate is cleaned up.
+        self.assertFalse(Path(fallback["planted"][0]).is_symlink(), fallback["planted"])
 
     def test_every_fallback_taken_runs_cleanup_without_an_output_mount(self):
         result, fallback = self.run_with_planted_fallbacks("mktemp-blocked", 6)
