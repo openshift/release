@@ -41,6 +41,8 @@ FALLBACK_CASES = {
 OCCUPIED_DIR_CASE = "mktemp-occupied-dir"
 # Prefix of the marker file a fixture-created directory carries as its proof.
 MARKER = ".fixture-owned-"
+# Prefix of the token an intentionally unrecorded occupied candidate carries.
+SQUATTED = ".fixture-squatted-"
 
 
 def step_script_name():
@@ -197,8 +199,14 @@ def occupy_candidate_directory(base):
     path = fallback_candidates(pid)[0]
     path.mkdir()
     (path / "keep.txt").write_text("keep\n", encoding="utf-8")
+    # This one is deliberately kept out of the creation ledger - the test needs the
+    # cleanup to have no claim on it - so it gets its own token instead, and the
+    # fixture removes it on that token alone once the case is over.
+    token = SQUATTED + os.urandom(8).hex()
+    os.close(os.open(path / token, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600))
     (base / "fallback.json").write_text(
-        json.dumps({"pid": pid, "planted": [], "squatted": str(path)}), encoding="utf-8")
+        json.dumps({"pid": pid, "planted": [], "squatted": str(path),
+                    "squatted_proof": token}), encoding="utf-8")
 
 
 def mock_mkdir(arguments, base):
@@ -455,19 +463,62 @@ class CleanFixture(unittest.TestCase):
         for line in ledger.read_text(encoding="utf-8").splitlines():
             try:
                 entry = json.loads(line)
-                kind, path, proof = entry["kind"], entry["path"], entry["proof"]
-            except (ValueError, TypeError, KeyError):
+            except ValueError:
+                continue
+            if not isinstance(entry, dict):
+                continue
+            kind, path, proof = entry.get("kind"), entry.get("path"), entry.get("proof")
+            # Every field is checked for the type it has to have before it is used, so
+            # one damaged record cannot abort the pass and strand the valid ones after it.
+            if kind not in ("directory", "symlink"):
+                continue
+            if not isinstance(path, str) or not path:
+                continue
+            if not isinstance(proof, str) or not proof:
                 continue
             if kind == "directory" and (os.sep in proof or not proof.startswith(MARKER)):
                 continue
             usable.append((kind, Path(path), proof))
         return usable
 
+    def remove_squatted_directory(self):
+        """Remove the unrecorded candidate a case left on the step's first choice.
+
+        That directory is deliberately outside the creation ledger - the point of the
+        case is that cleanup has no claim on it - so it is removed on its own token
+        instead, and only when the token is still a regular file inside it. Reading the
+        record lazily lets this be registered before the run, so the directory does not
+        outlive a run that raises.
+        """
+        record = self.base / "fallback.json"
+        if not record.exists():
+            return
+        try:
+            fallback = json.loads(record.read_text(encoding="utf-8"))
+        except ValueError:
+            return
+        if not isinstance(fallback, dict):
+            return
+        path, proof = fallback.get("squatted"), fallback.get("squatted_proof")
+        if not isinstance(path, str) or not isinstance(proof, str) \
+                or not proof.startswith(SQUATTED) or os.sep in proof:
+            return
+        path = Path(path)
+        try:
+            if not stat.S_ISDIR(path.lstat().st_mode) \
+                    or not stat.S_ISREG((path / proof).lstat().st_mode):
+                return
+        except OSError:
+            return
+        self.restore_modes(path)
+        shutil.rmtree(path, ignore_errors=True)
+
     def run_with_planted_fallbacks(self, case, exit_code):
         """Run a case whose `mktemp -d` fails, with the step's /tmp fallback candidates
         occupied by symlinks beforehand when the case asks for it."""
-        # Registered before the run so a failing run or assertion still cleans up.
+        # Both registered before the run so a failing run or assertion still cleans up.
         self.addCleanup(self.remove_fallback_directories)
+        self.addCleanup(self.remove_squatted_directory)
         result = self.run_step(case, exit_code=exit_code, helper="none")
         fallback = json.loads((self.base / "fallback.json").read_text(encoding="utf-8"))
         return result, fallback
@@ -676,7 +727,6 @@ class FallbackCleanupTests(CleanFixture):
         """A pre-existing candidate is skipped by the step and kept by the fixture."""
         result, fallback = self.run_with_planted_fallbacks(OCCUPIED_DIR_CASE, 4)
         squatted = Path(fallback["squatted"])
-        self.addCleanup(shutil.rmtree, squatted, True)
         used = next(line.rsplit(" falls back to ", 1)[1].strip()
                     for line in result.stdout.splitlines() if " falls back to " in line)
         # The step refused the occupied directory, exactly as it refuses a symlink.
@@ -703,6 +753,47 @@ class FallbackCleanupTests(CleanFixture):
         (recorded / "keep.txt").write_text("keep\n", encoding="utf-8")
         self.remove_fallback_directories()
         self.assertEqual((recorded / "keep.txt").read_text(encoding="utf-8"), "keep\n")
+
+    def test_occupied_candidate_is_removed_even_when_the_run_raises(self):
+        """The unrecorded sentinel must not outlive a run that fails before any assert."""
+        seen = {}
+
+        class RaisingRun(CleanFixture):
+            def run_step(self, *arguments, **keywords):
+                super().run_step(*arguments, **keywords)
+                seen["squatted"] = json.loads(
+                    (self.base / "fallback.json").read_text(encoding="utf-8"))["squatted"]
+                raise AssertionError("simulated failure inside run_step")
+
+            def runTest(self):  # pylint: disable=invalid-name  # unittest's own name
+                self.run_with_planted_fallbacks(OCCUPIED_DIR_CASE, 4)
+
+        outcome = unittest.TestResult()
+        RaisingRun().run(outcome)
+        self.assertEqual(len(outcome.failures) + len(outcome.errors), 1)
+        self.addCleanup(shutil.rmtree, Path(seen["squatted"]), True)
+        self.assertFalse(Path(seen["squatted"]).exists(), seen)
+
+    def test_ledger_records_with_wrong_field_types_are_skipped(self):
+        """A damaged record is dropped; the valid records after it are still honoured."""
+        path = self.owned_directory(5)
+        valid = (self.base / "owned.jsonl").read_text(encoding="utf-8")
+        damaged = [
+            {"kind": "directory", "path": "/tmp/x", "proof": None},
+            {"kind": "directory", "path": "/tmp/x", "proof": ["list"]},
+            {"kind": "directory", "path": "/tmp/x", "proof": {"an": "object"}},
+            {"kind": "directory", "path": "/tmp/x", "proof": 5},
+            {"kind": "directory", "path": 123, "proof": MARKER + "abc"},
+            {"kind": "directory", "path": "", "proof": MARKER + "abc"},
+            {"kind": "fifo", "path": "/tmp/x", "proof": MARKER + "abc"},
+            {"kind": None, "path": "/tmp/x", "proof": MARKER + "abc"},
+        ]
+        (self.base / "owned.jsonl").write_text(
+            "[\"not a record\"]\n" + "null\n"
+            + "".join(json.dumps(entry) + "\n" for entry in damaged) + valid,
+            encoding="utf-8")
+        self.remove_fallback_directories()
+        self.assertFalse(path.exists(), path)
 
     def test_recorded_directory_still_present_is_removed(self):
         """The cleanup must still do its job: a created directory never escapes it."""
