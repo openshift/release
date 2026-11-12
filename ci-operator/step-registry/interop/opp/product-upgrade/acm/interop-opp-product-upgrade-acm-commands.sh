@@ -439,7 +439,7 @@ function ValidateHubHealth () {
 
     if [[ -z "${mchNames}" ]]; then
         MCH_TOPOLOGY="not-provisioned (MCE/operator-managed ACM topology)"
-        echo "  MultiClusterHub: ${MCH_TOPOLOGY} (skipping the MCH Running wait; validating the hub via the policy propagator and managed clusters)"
+        echo "  MultiClusterHub: ${MCH_TOPOLOGY} (skipping the MCH Running wait; the governance framework is not deployed in this topology)"
     else
         MCH_TOPOLOGY="MCH Running"
         typeset mchStatus
@@ -466,25 +466,35 @@ function ValidateHubHealth () {
         fi
     fi
 
-    echo "  Checking policy propagator..."
-    typeset propagatorReady=""
-    typeset -i propTimeout=300
-    typeset -i propStart
-    propStart="$(date +%s)"
-    while (( $(date +%s) - propStart < propTimeout )); do
-        propagatorReady="$(oc get pods -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-            -l name=governance-policy-propagator \
-            -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' \
-            || true)"
-        if [[ "${propagatorReady}" == "True" ]]; then
-            break
+    # The governance-policy-propagator is deployed by the ACM hub CRs
+    # (MultiClusterHub/MCE). On lanes that install ACM as a bare operator
+    # subscription (no hub CR), the propagator never exists, so the wait
+    # is scoped to the MCH topology; the operator-managed topology is
+    # validated by the CSV Succeeded check above and the managed-cluster
+    # report below.
+    if [[ -z "${mchNames}" ]]; then
+        echo "  Policy propagator: skipped (not deployed in the operator-managed topology)"
+    else
+        echo "  Checking policy propagator..."
+        typeset propagatorReady=""
+        typeset -i propTimeout=300
+        typeset -i propStart
+        propStart="$(date +%s)"
+        while (( $(date +%s) - propStart < propTimeout )); do
+            propagatorReady="$(oc get pods -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+                -l name=governance-policy-propagator \
+                -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' \
+                || true)"
+            if [[ "${propagatorReady}" == "True" ]]; then
+                break
+            fi
+            sleep 15
+        done
+        echo "  Policy propagator ready: ${propagatorReady}"
+        if [[ "${propagatorReady}" != "True" ]]; then
+            echo >&2 "ERROR: Policy propagator not ready after ${propTimeout}s"
+            return 1
         fi
-        sleep 15
-    done
-    echo "  Policy propagator ready: ${propagatorReady}"
-    if [[ "${propagatorReady}" != "True" ]]; then
-        echo >&2 "ERROR: Policy propagator not ready after ${propTimeout}s"
-        return 1
     fi
 
     echo "  Checking managed clusters..."
@@ -771,14 +781,19 @@ function Main () {
         echo "${_acm_upgrade_output}"
     fi
 
-    if ! _acm_upgrade_output="$(ValidateHubHealth 2>&1)"; then
-        echo "${_acm_upgrade_output}"
-        if echo "${_acm_upgrade_output}" | grep -q "cannot unmarshal string into Go struct"; then
+    # Run ValidateHubHealth with output redirection instead of command
+    # substitution: the function then runs in the current shell, so the
+    # MCH_TOPOLOGY assignment survives for the summary below, and the
+    # validation log is preserved as an artifact.
+    typeset _hub_health_log="${ARTIFACT_DIR}/hub-health-validation.log"
+    if ! ValidateHubHealth >"${_hub_health_log}" 2>&1; then
+        cat "${_hub_health_log}"
+        if grep -q "cannot unmarshal string into Go struct" "${_hub_health_log}"; then
             # Known-issue skip: ACM-45920
             # Added: 2026-09-21
             # Review-by: 2026-12-21 (or when ACM-45920 is resolved)
             # Owner: OPP-interop team
-            _detect_known_issue "${_acm_upgrade_output}" "ACM-45920" \
+            _detect_known_issue "$(cat "${_hub_health_log}")" "ACM-45920" \
                 "YAML unmarshal error on OCP 5.0 — ACM team fix in progress"
         else
             _JUNIT_KIND="hub-health-failure"
@@ -787,7 +802,7 @@ function Main () {
             return 1
         fi
     else
-        echo "${_acm_upgrade_output}"
+        cat "${_hub_health_log}"
     fi
 
     {
