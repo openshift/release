@@ -833,13 +833,11 @@ else:
     print('STABLE|all non-paused MCPs healthy|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|0|' + ';'.join(sorted(gen_parts)))
 " 2>/dev/null)" || statusLine="UNSTABLE|python parse error|0|0|0|0|"
 
-    typeset statusKey="${statusLine%%|*}"
     # statusLine = KEY|detail|ready|updated|machine|degraded|genPrint
+    typeset statusKey="" statusDetail=""
     typeset -i totalReady=0 totalUpdated=0 totalMachine=0 anyDegraded=0
-    typeset _detail="" _degField="" genPrint=""
-    IFS='|' read -r _statusKeyField _detail totalReady totalUpdated totalMachine _degField genPrint <<< "${statusLine}"
-    statusKey="${_statusKeyField}"
-    typeset statusDetail="${_detail}"
+    typeset _degField="" genPrint=""
+    IFS='|' read -r statusKey statusDetail totalReady totalUpdated totalMachine _degField genPrint <<< "${statusLine}"
     [[ "${totalReady}" =~ ^[0-9]+$ ]] || totalReady=0
     [[ "${totalUpdated}" =~ ^[0-9]+$ ]] || totalUpdated=0
     [[ "${totalMachine}" =~ ^[0-9]+$ ]] || totalMachine=0
