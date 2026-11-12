@@ -86,6 +86,7 @@ JOB_KEYS = {
     "optional",
     "run_if_changed",
     "skip_if_only_changed",
+    "pipeline_run_if_changed",
     "fips",
     "storage",
     "upgrade_from",
@@ -95,7 +96,13 @@ JOB_KEYS = {
     "variant",
 }
 ALLOWED_ARCHES = {"amd64", "arm64", "s390x"}
-TRIGGER_FIELDS = ("always_run", "optional", "run_if_changed", "skip_if_only_changed")
+TRIGGER_FIELDS = (
+    "always_run",
+    "optional",
+    "run_if_changed",
+    "skip_if_only_changed",
+    "pipeline_run_if_changed",
+)
 # Every downstream (redhat-*) periodic posts its failures to the team channel,
 # where the chai-bot mention asks the bot for a first triage.
 DOWNSTREAM_REPORTER_CONFIG = {
@@ -420,6 +427,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             optional = _job_bool_field(job, "optional", where)
             run_if_changed = _job_str_field(job, "run_if_changed", where)
             skip_if_only_changed = _job_str_field(job, "skip_if_only_changed", where)
+            pipeline_run_if_changed = _job_str_field(job, "pipeline_run_if_changed", where)
             fips = _job_bool_field(job, "fips", where) or False
             sts = _job_bool_field(job, "sts", where)
             if sts is not None and not ({"aws", "aws-metal"} & set(clouds)):
@@ -435,7 +443,13 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                     name
                     for name, value in zip(
                         TRIGGER_FIELDS,
-                        (always_run, optional, run_if_changed, skip_if_only_changed),
+                        (
+                            always_run,
+                            optional,
+                            run_if_changed,
+                            skip_if_only_changed,
+                            pipeline_run_if_changed,
+                        ),
                     )
                     if value is not None
                 ]
@@ -533,6 +547,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         optional=optional,
                         run_if_changed=run_if_changed,
                         skip_if_only_changed=skip_if_only_changed,
+                        pipeline_run_if_changed=pipeline_run_if_changed,
                         fips=fips,
                         sts=cloud in ("aws", "aws-metal") and sts is not False,
                         storage_override=storage,

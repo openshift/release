@@ -283,7 +283,22 @@ quay:
       QUAY_OPERATOR_SOURCE: fbc-operator-catalog
     jobs:
       - kind: presubmit
-        clouds: [aws, gcp, azure]
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
+        always_run: false
+        optional: true
+      # The pipeline controller (core-services/pipeline-controller/config.yaml)
+      # runs gcp-gcs on `/pipeline remaining` when a PR changes Python dependency pins.
+      - kind: presubmit
+        clouds: [gcp]
+        ocp: ["4.22"]
+        test: e2e-install
+        always_run: false
+        optional: true
+        pipeline_run_if_changed: '^(?:requirements(?:-build)?\.txt|constraints\.txt|pyproject\.toml)$'
+      - kind: presubmit
+        clouds: [azure]
         ocp: ["4.22"]
         test: e2e-install
         always_run: false
