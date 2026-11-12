@@ -1351,35 +1351,6 @@ tests:
           cpu: 100m
     workflow: rosa-aws-sts-hcp
 - always_run: false
-  as: e2e-hypershift-ocp4-cis
-  optional: true
-  steps:
-    cluster_profile: aws-stackrox
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-        export PROFILE=cis
-        export PRODUCT=ocp4
-        export CONTENT_DIRECTORY=$PWD
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e; make install-jq
-        PATH=$PATH:/tmp/bin go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -platform=hypershift -bypass-remediations=true -content-directory=$CONTENT_DIRECTORY
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      grace_period: 10m0s
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-      timeout: 5h0m0s
-    workflow: hypershift-aws-conformance
-- always_run: false
   as: e2e-hypershift-ocp4-cis-node
   optional: true
   steps:
@@ -1390,35 +1361,6 @@ tests:
       commands: |
         export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
         export PROFILE=cis-node
-        export PRODUCT=ocp4
-        export CONTENT_DIRECTORY=$PWD
-        export component=ocp4-content-ds
-        export ROOT_DIR=$PWD
-        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
-        pushd ocp4e2e; make install-jq
-        PATH=$PATH:/tmp/bin go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE" -platform=hypershift -bypass-remediations=true -content-directory=$CONTENT_DIRECTORY
-      dependencies:
-      - env: CONTENT_IMAGE
-        name: ocp4-content-ds
-      from: src
-      grace_period: 10m0s
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-      timeout: 5h0m0s
-    workflow: hypershift-aws-conformance
-- always_run: false
-  as: e2e-hypershift-ocp4-pci-dss
-  optional: true
-  steps:
-    cluster_profile: aws-stackrox
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-        export PROFILE=pci-dss
         export PRODUCT=ocp4
         export CONTENT_DIRECTORY=$PWD
         export component=ocp4-content-ds
