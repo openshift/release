@@ -245,12 +245,15 @@ function IsMcpProgressing () {
     typeset -i notReadyStreak=0
     for (( i = len - 1; i >= 0; --i )); do
         # The streak is the PINNED-UPDATED cycling mode (MCP_PINNED_
-        # UPDATED_POLLS): updated pinned at machineCount, ready oscillating
-        # below it, no Degraded - run 2's mode (all machines updated, the
-        # pool never went ready). Degraded polls are SKIPPED (not counted,
-        # not terminating); a poll with updated below machineCount
-        # TERMINATES the streak (a still-updating rollout is a different
-        # failure mode, not cycling).
+        # UPDATED_POLLS): the totals are cluster-wide sums over the non-paused
+        # pools, so the streak means "every reported machine is updated and
+        # the cluster is still not fully ready". A poll where any machine is
+        # not updated TERMINATES the streak (a still-updating rollout is a
+        # different failure mode, not cycling). Ready oscillating below
+        # machineCount with all machines updated is run 2's mode. Degraded
+        # polls are SKIPPED (not counted, not terminating) so a transient
+        # Degraded blip does not reset the cycling counter that run 2's
+        # evidence pinned.
         if (( degradedHistory[i] )); then
             continue
         fi
