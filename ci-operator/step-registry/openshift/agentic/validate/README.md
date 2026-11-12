@@ -26,7 +26,7 @@ it explicitly and wait for the build to finish:
 oc --context=app.ci -n ci start-build agentic-validation --follow --wait
 ```
 
-The BuildConfig installs Python 3.12, bash and Git on the existing nested-podman
+The BuildConfig installs Python 3.12, bash, Git and diffutils on the existing nested-podman
 image and copies `oc` from the CLI image. It copies only the production helpers.
 The command container runs by the immutable local image ID resolved by its
 supervisor.
@@ -39,8 +39,10 @@ supervisor.
    `https://redhat.atlassian.net`. Validation instructions and acceptance criteria
    are read from that text. A retrieval failure is recorded and PR fallback is
    attempted; an overall deadline remains fatal.
-3. `generate_plan` asks the model for focused checks, attaches trusted source
-   metadata, validates every check, and computes the plan hash.
+3. `generate_plan` requests schema-constrained JSON for focused checks, attaches
+   trusted source metadata, validates every check, and computes the plan hash.
+   Ready plans rejected by validation receive at most two correction attempts.
+   Plans declaring unresolved gaps remain fatal and are not forced into readiness.
 4. `write_plan` writes `validation.json`, `validation.md` and public source
    references to SHARED_DIR and the artifact directory. Private source bodies and
    unchecked model-supplied gaps are not published.
@@ -103,6 +105,12 @@ execution agent has at most 40 model turns by default. Requests reject redirects
 and non-HTTPS endpoints. Native Chat Completions function tools are required for
 execution; a text-only answer cannot pass.
 
+Preparation requires `json_schema` response formatting. Execution requests required
+native function calls, binds check-ID enums to the captured plan, and exposes result
+recording only after command evidence exists. The sandbox checks for `oc` and `diff`
+and creates `/work/evidence` for command scratch files; report evidence is still
+captured separately by the supervisor.
+
 ## Cluster and credential boundaries
 
 Generated commands run in a networkless, read-only nested container with dropped
@@ -112,43 +120,38 @@ retains model and registry credentials; preparation alone receives Jira credenti
 Registry authentication is passed explicitly to payload inspection and image pulls.
 The broker permits CONNECT only to the assigned API's pre-resolved addresses.
 
-The broker does not isolate workloads created through the cluster API. Before
-adding a component job, provide and verify infrastructure-level egress restrictions
-that also cover privileged and host-networked workloads. Ordinary IPI provisioning
-and namespace NetworkPolicies do not establish that boundary. No component
-validation job is enabled by this change. Keep normal gathering/destruction post
-steps in the eventual workflow.
+The broker does not isolate workloads created through the cluster API. Those
+workloads retain the assigned cluster's network access and API permissions.
+The optional AWS consumer uses ordinary IPI networking; it does not establish
+infrastructure-level egress isolation for privileged or host-networked workloads.
 
 ## Verification
 
-The manual, optional jobs in
+The manual, optional `aws-ipi` job in
 `ci-operator/config/openshift/release/openshift-release-main__agentic-rehearsal.yaml`
-exercise the runner while this PR is under review:
+installs an OpenShift 5.1 nightly on AWS with `ipi-aws` and the
+`openshift-org-aws` cluster profile. After installation it runs the actual
+`openshift-agentic-prepare-validation` and `openshift-agentic-validate` references.
+Execution uses the installed cluster's kubeconfig and verifies the deployed
+`haproxy-router` payload digest. The inherited `ipi-aws` post chain gathers and
+destroys the cluster, including when validation fails.
 
-- `agentic-prepare` uses the preparation reference with the rehearsal's real
-  `JOB_SPEC`. Temporarily put a Jira key in the release PR's title before starting
-  it, then inspect `sources.json` and `validation.md` to confirm that the issue was
-  retrieved and its requirements were preserved. Restore the title after source
-  capture. The runner generates the Markdown from the issue; it does not download
-  an existing `validation.md` attachment.
-- `agentic-observed-pass` and `agentic-observed-fail` exercise the production
-  execution loop and sandbox with the live model and controlled file values.
-  They bypass PR planning and deployment verification. The failing case must
-  publish `overall=fail` and exit nonzero, so its Prow rehearsal is expected to
-  fail. These fixtures do not demonstrate product behavior on an OpenShift cluster.
+Temporarily put a suitable cluster issue's Jira key in the release PR title and
+trigger `/pj-rehearse pull-ci-openshift-release-main-agentic-rehearsal-aws-ipi`.
+Inspect `sources.json`, `validation.md`, deployment verification, command evidence,
+`report.md`, results and JUnit. Restore the title after source capture. The runner
+generates Markdown from the issue description; it does not download an existing
+`validation.md` attachment. This release job tests the selected nightly's behavior;
+it does not build a product component from the release repository's PR diff.
 
-Trigger these jobs with `/pj-rehearse` on the release PR. The rehearsal image is
-built separately from the branch and must be available as
-`ci/agentic-validation-rehearsal-88469:ca-trust` before the jobs start. Retain reports,
-command evidence and job links, then remove the temporary configuration and image
-resources before merge. No permanent rehearsal jobs are required by the component.
+The runner must first be published as
+`quay.io/openshift/ci:ci_agentic-validation_latest`, the image behind the
+`ci/agentic-validation:latest` alias. Publishing an app.ci-local image stream alone
+is insufficient. The consumer requires `intranet` and `nested-podman` capabilities
+and runs on build03. Corporate endpoint reachability and CA trust must both be
+present; certificate verification remains enabled.
 
-These jobs require the `intranet` capability and are pinned to build03 while
-under review. Corporate endpoint reachability and CA trust must both be present;
-a missing issuer certificate is a runner failure, never a reason to disable TLS
-verification.
-
-The corporate model's basic completion and tool protocol have been checked live.
-Plan quality, production image publication and a known-broken/fixed scenario on
-isolated disposable clusters still require a live rehearsal. Local fixtures
-establish runner behavior, not product correctness or model quality.
+Live corporate-model probes verified schema-constrained planning from Jira and
+real-container pass/fail observations with retained evidence. Plan quality and
+complete acceptance-criterion coverage still need review; these probes are not a
+known-broken/fixed demonstration on an OpenShift cluster.
