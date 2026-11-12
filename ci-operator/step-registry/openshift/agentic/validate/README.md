@@ -58,7 +58,8 @@ Empty plans, ambiguous scope and incomplete issue coverage stop preparation.
 
 1. `load_plan` checks the hash, rendered Markdown and job revision.
 2. `prepare_cluster` flattens the target kubeconfig and verifies that a ready
-   container runs the tested payload component digest.
+   container runs the tested payload component digest. Execution receives those
+   verified namespace, Pod and container identities as discovery context.
 3. `Execution.run_command` runs a bounded command in the sandbox and records its
    sanitized output. `Execution.record_result` accepts one immutable outcome per
    check and verifies that its referenced evidence exists and belongs to it.

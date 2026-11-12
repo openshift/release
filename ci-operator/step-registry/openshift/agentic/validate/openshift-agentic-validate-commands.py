@@ -1056,6 +1056,11 @@ class Execution:
     def run(self, model):
         messages = [{"role": "system", "content": EXECUTE_PROMPT},
                     {"role": "user", "content": plan_markdown(self.plan)}]
+        deployment = self.artifacts / "deployment.json"
+        if deployment.is_file():
+            messages.append({"role": "user", "content": json.dumps({
+                "verified_deployment": json.loads(deployment.read_text(encoding="utf-8")),
+            })})
         for _ in range(integer("VALIDATION_MAX_TURNS", 40, 100)):
             message = model.complete(messages, self.available_tools())
             messages.append(message)
