@@ -955,6 +955,15 @@ trap 'prepare_next_steps' EXIT TERM INT
 
 export INSTALLER_BINARY="openshift-install"
 echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+# A prior step may hand over a dynamically-built custom payload (whose address
+# is only known at runtime, e.g. a job-namespace registry path) by writing its
+# pullspec to ${SHARED_DIR}/custom-release-image. The file is only honored when
+# the static CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE env is unset, so
+# existing behavior is unchanged.
+if [[ -z "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" && -f "${SHARED_DIR}/custom-release-image" ]]; then
+  CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(cat "${SHARED_DIR}/custom-release-image")"
+  echo "Using custom payload from ${SHARED_DIR}/custom-release-image: ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+fi
 if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
   CUSTOM_PAYLOAD_DIGEST=$(oc adm release info "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --output=jsonpath="{.digest}")
   CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"@"$CUSTOM_PAYLOAD_DIGEST"

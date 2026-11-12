@@ -1,0 +1,38 @@
+ref:
+  as: ovs-doca-build-release-image
+  from: cli
+  commands: ovs-doca-build-release-image-commands.sh
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: OVS_DOCA_LAYERED_IMAGE
+    default: "doca-rhcos-10"
+    documentation: |-
+      Name of the image target (and thus the imagestream in the job namespace)
+      holding the DOCA-layered RHCOS image built by this job's images phase.
+  - name: OVS_DOCA_RELEASE_IS
+    default: "ovs-doca-release"
+    documentation: |-
+      Name for the imagestream that will hold the rebuilt release payload.
+  dependencies:
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  documentation: |-
+    Rebuilds the release payload with the DOCA-layered RHCOS image as
+    rhel-coreos, enabling day-0 installation of the DOCA layer on
+    architectures where include_built_images is unavailable (arm64 candidate
+    payloads have no integration stream).
+
+    Resolves the layered image from the job's imagestream (named after the
+    image target, OVS_DOCA_LAYERED_IMAGE), assembles a new payload from the
+    current release image with `oc adm release new ... rhel-coreos=<layered>`,
+    pushes it to an imagestream in the job namespace (the same registry the
+    default payload lives in), and writes the digest-pinned pullspec to
+    ${SHARED_DIR}/custom-release-image.
+
+    The ipi-install step picks the file up and installs the cluster from the
+    rebuilt payload, so nodes boot the DOCA layer from the first boot. Must
+    run before ipi-install in the pre chain.

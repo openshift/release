@@ -1,0 +1,66 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: e2e-aws-arm-rhcos10-check
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OCP_ARCH: arm64
+      OS_IMAGE_STREAM: rhel-10
+    test:
+    - as: verify-rhcos10-arm
+      cli: latest
+      commands: |
+        # Step 1 of the ovs-doca el10/arm plan: prove the cluster itself.
+        # Verify every node booted the requested combination: arm64
+        # architecture and RHCOS 10 (via the osImageStream: rhel-10
+        # install-config parameter consumed by ipi-conf as OS_IMAGE_STREAM).
+        # Counts only -- node names are never printed
+        # (No-Sensitive-Data-In-Logs). All oc calls are wrapped in timeout so
+        # a hung API connection can never wedge the whole job (prow's default
+        # timeout is 24h).
+        set -o pipefail
+        echo "Node arch | osImage (counts):"
+        timeout 300 oc get nodes -o jsonpath='{range .items[*]}{.status.nodeInfo.architecture}{" | "}{.status.nodeInfo.osImage}{"\n"}{end}' | sort | uniq -c
+        BAD=$(timeout 300 oc get nodes -o jsonpath='{range .items[*]}{.status.nodeInfo.architecture}{": "}{.status.nodeInfo.osImage}{"\n"}{end}' | grep -vcE '^arm64: Red Hat Enterprise Linux CoreOS 10' || true)
+        if [ "${BAD}" -eq 0 ]; then
+          echo "PASS: all nodes are arm64 running RHCOS 10"
+        else
+          echo "FAIL: ${BAD} node(s) not arm64/RHCOS 10 -- see breakdown above"
+          exit 1
+        fi
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: 4.22-arm-rhcos10
