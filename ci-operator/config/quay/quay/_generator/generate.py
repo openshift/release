@@ -56,6 +56,7 @@ JOBS_DIR = GENERATOR_DIR.parents[3] / "jobs" / "quay" / "quay"
 README = "ci-operator/config/quay/quay/_generator/README.md"
 SOURCES = ("nightly", "stable")
 OCP_CHANNELS = ("stable", "candidate")
+UPGRADE_TESTS = ("upgrade", "upgrade-legacy")
 CRON_ALIASES = {
     "daily": "@daily",
     "nightly": "@daily",
@@ -81,6 +82,7 @@ JOB_KEYS = {
     "fips",
     "storage",
     "upgrade_from",
+    "upgrade_source_catalog_pullspec",
     "ocp_channel",
     "sts",
     "database",
@@ -326,6 +328,15 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
     org, repo = _parse_github_repo(str(defaults.get("repo") or "quay/quay"))
     default_arch = str(defaults.get("arch") or "amd64")
     image_source = str(defaults.get("image_source") or "build")
+    rehearsal_catalog_pins = defaults.get("rehearsal_catalog_pins") or {}
+    if not isinstance(rehearsal_catalog_pins, dict) or not all(
+        isinstance(ocp, str)
+        and re.fullmatch(r"\d+\.\d+", ocp)
+        and isinstance(pullspec, str)
+        and re.match(r"^[^\s@]+@sha256:[a-f0-9]{64}$", pullspec)
+        for ocp, pullspec in rehearsal_catalog_pins.items()
+    ):
+        raise ValueError("global_defaults.rehearsal_catalog_pins must map OCP versions to image@sha256 pullspecs")
 
     cells: list[Cell] = []
     for release_index, release in enumerate(_quay_releases(matrix)):
@@ -442,33 +453,46 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             job_env = copy.deepcopy(_as_mapping(job.get("env"), f"{where}.env"))
             merged_env = {**branch_env, **job_env}
             upgrade_from = _job_str_field(job, "upgrade_from", where)
+            upgrade_source_catalog_pullspec = _job_str_field(job, "upgrade_source_catalog_pullspec", where)
             ocp_channel = _job_str_field(job, "ocp_channel", where)
-            if test == "upgrade":
+            if test in UPGRADE_TESTS:
                 if ocp_channel is not None and ocp_channel not in OCP_CHANNELS:
                     raise ValueError(f"{where} ocp_channel must be one of {OCP_CHANNELS}, got {ocp_channel!r}")
                 if not upgrade_from:
-                    raise ValueError(f"{where} test 'upgrade' requires upgrade_from (the n-1 version)")
+                    raise ValueError(f"{where} test {test!r} requires upgrade_from (the n-1 version)")
                 if not re.match(r"^\d+\.\d+$", upgrade_from):
                     raise ValueError(f"{where} upgrade_from must look like 'X.Y', got {upgrade_from!r}")
                 if quay_version is None:
                     raise ValueError(
-                        f"{where} test 'upgrade' requires a quay_version-bearing branch; "
+                        f"{where} test {test!r} requires a quay_version-bearing branch; "
                         f"branch {branch!r} has none"
                     )
                 # upgrade.yaml.j2 renders no FIPS cluster, so the flag would be silently dropped.
                 if fips:
-                    raise ValueError(f"{where}.fips is not supported for test: upgrade")
+                    raise ValueError(f"{where}.fips is not supported for test: {test}")
                 if any(cloud != "aws" for cloud in clouds) or storage not in (None, "s3"):
                     raise ValueError(
-                        f"{where} test 'upgrade' supports only aws with s3 storage, "
+                        f"{where} test {test!r} supports only aws with s3 storage, "
                         f"got clouds {clouds!r}, storage {storage!r}"
                     )
+                if upgrade_source_catalog_pullspec is not None:
+                    if test != "upgrade-legacy":
+                        raise ValueError(f"{where}.upgrade_source_catalog_pullspec is only valid for test: upgrade-legacy")
+                    if not re.match(r"^[^\s@]+@sha256:[a-f0-9]{64}$", upgrade_source_catalog_pullspec):
+                        raise ValueError(f"{where}.upgrade_source_catalog_pullspec must be an image@sha256 pullspec")
             elif upgrade_from is not None:
-                raise ValueError(f"{where} upgrade_from is only valid for test: upgrade")
+                raise ValueError(f"{where} upgrade_from is only valid for test: upgrade or upgrade-legacy")
+            elif upgrade_source_catalog_pullspec is not None:
+                raise ValueError(f"{where} upgrade_source_catalog_pullspec is only valid for test: upgrade-legacy")
             elif ocp_channel is not None:
-                raise ValueError(f"{where} ocp_channel is only valid for test: upgrade")
+                raise ValueError(f"{where} ocp_channel is only valid for test: upgrade or upgrade-legacy")
             as_name = _job_as_name(job, where)
             for ocp, cloud, job_arch in itertools.product(ocps, clouds, arches):
+                if test == "upgrade-legacy" and ocp not in rehearsal_catalog_pins:
+                    raise ValueError(
+                        f"{where} test 'upgrade-legacy' requires "
+                        f"global_defaults.rehearsal_catalog_pins[{ocp!r}]"
+                    )
                 if database and cloud not in DATABASE_BY_CLOUD:
                     raise ValueError(
                         f"{where}.database: true is not supported for cloud {cloud!r}; "
@@ -487,6 +511,10 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         source=source,
                         arch=job_arch,
                         image_source=image_source,
+                        fbc_catalog_pullspec=(
+                            rehearsal_catalog_pins.get(ocp) if quay_version is not None else None
+                        ),
+                        upgrade_source_catalog_pullspec=upgrade_source_catalog_pullspec,
                         env=copy.deepcopy(merged_env),
                         as_name=as_name,
                         kind=kind,
@@ -503,6 +531,14 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         ocp_channel=ocp_channel or "stable",
                     )
                 )
+    unused_pins = sorted(
+        set(rehearsal_catalog_pins) - {cell.ocp_version for cell in cells if cell.quay_version is not None}
+    )
+    if unused_pins:
+        raise ValueError(
+            "global_defaults.rehearsal_catalog_pins contains OCP versions not used by "
+            f"the versioned Quay matrix: {', '.join(unused_pins)}"
+        )
     return cells
 
 
@@ -566,6 +602,13 @@ def build_config(cell: Cell, templates_dir: Path) -> YamlMap:
     layers = [render_template(env, base_template, context)]
     if cell.kind == "periodic":
         layers.append(render_template(env, f"sources/{cell.source}.yaml.j2", context))
+    elif cell.kind == "presubmit":
+        # Presubmits have no `source` field, but version-bearing release
+        # branches still require an ART FBC fallback. A final catalog-pin layer
+        # may replace this floating tag with an immutable catalog image.
+        catalog_template = f"{template_root}catalog.yaml.j2"
+        if (templates_dir / catalog_template).exists():
+            layers.append(render_template(env, catalog_template, context))
     layers.append(render_template(env, cloud_template, context))
     if cell.arch != "amd64":
         layers.append(render_template(env, f"arches/{cell.arch}.yaml.j2", context))
@@ -576,6 +619,11 @@ def build_config(cell: Cell, templates_dir: Path) -> YamlMap:
         # Presubmit test layer is a delta on top of the shared periodic test
         # layer, not a byte-identical fork that would need editing twice.
         layers.append(render_template(env, presubmit_test_template, context))
+    catalog_pin_template = "catalog-pin.yaml.j2"
+    if cell.fbc_catalog_pullspec is not None and (templates_dir / catalog_pin_template).exists():
+        # This is intentionally last: it overrides the periodic source layer's
+        # floating ART tag and the stable source's production catalog selection.
+        layers.append(render_template(env, catalog_pin_template, context))
     config: YamlMap = {}
     for layer in layers:
         config = deep_merge(config, layer)

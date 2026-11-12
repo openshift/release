@@ -1,0 +1,43 @@
+{#
+  Legacy Quay (pre-3.16) upgrade lane.  Its Cypress/API consumers live in the
+  shared quay-test-console image, so it deliberately does not build or consume
+  the Playwright runner which only exists on newer Quay branches.
+
+  quay-deploy-aws-s3 installs the n-1 Subscription in quay-enterprise.  The
+  following install-source ref runs in its "already installed" mode to record
+  and verify that actual source CSV/channel identity before the channel move.
+#}
+tests:
+- timeout: 6h0m0s
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      QUAY_UPGRADE_TARGET_CHANNEL: "{{ operator_channel }}"
+      QUAY_UPGRADE_SOURCE_CHANNEL: "stable-{{ upgrade_from }}"
+      QUAY_UPGRADE_QUAY_NAMESPACE: quay-enterprise
+      QUAY_UPGRADE_QUAY_REGISTRY: quay
+      QUAY_UPGRADE_OPERATOR_NAMESPACE: quay-enterprise
+      QUAY_UPGRADE_SOURCE_CATALOG_NAME: fbc-operator-catalog
+      QUAY_UPGRADE_SOURCE_ALREADY_INSTALLED: "true"
+      QUAY_UPGRADE_LEGACY_CYPRESS_STRICT: "true"
+      QUAY_VERSION: "{{ quay_version }}"
+      QUAY_OPERATOR_CHANNEL: "stable-{{ upgrade_from }}"
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
+      # Both the state adapter and the post-upgrade legacy functional/API
+      # suites create their own short-lived users.  Keep those users confined
+      # to the dedicated test namespace and never emit their passwords.
+      QUAY_EXTRA_CONFIG: |
+        SUPER_USERS:
+          - quayapici
+          - quaye2eci
+    test:
+    - ref: merge-stage-registry-credentials
+    - ref: quay-enable-catalogsource-art
+    - ref: quay-deploy-aws-s3
+    - ref: quay-operator-upgrade-install-source
+    - ref: quay-operator-upgrade-prepare-e2e
+    - ref: quay-operator-upgrade-legacy-state
+    - ref: quay-operator-upgrade-channel
+    - ref: quay-operator-upgrade-legacy-state-verify
+    - ref: quay-test-e2e-legacy
+    - ref: quay-test-api-legacy

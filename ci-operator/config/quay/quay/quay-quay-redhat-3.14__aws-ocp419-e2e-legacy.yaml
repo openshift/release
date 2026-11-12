@@ -32,12 +32,13 @@ tests:
     env:
       BASE_DOMAIN: quayqe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
+      MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc@sha256:f28ac68a8857eefe1e45a5f677a8f0ef9ad6f33739cba5dbbc0595f5bbc67d35
       QUAY_EXTRA_CONFIG: |
         SUPER_USERS:
           - quayapici
           - quaye2eci
       QUAY_OPERATOR_CHANNEL: stable-3.14
-      QUAY_OPERATOR_SOURCE: redhat-operators
+      QUAY_OPERATOR_SOURCE: fbc-operator-catalog
       QUAY_VERSION: "3.14"
     post:
     - ref: quay-gather-jaeger-traces
@@ -47,6 +48,7 @@ tests:
     pre:
     - chain: ipi-aws-pre-manual-oidc-sts
     test:
+    - ref: merge-stage-registry-credentials
     - ref: quay-enable-catalogsource-art
     - ref: quay-deploy-aws-s3
     - ref: quay-test-e2e-legacy

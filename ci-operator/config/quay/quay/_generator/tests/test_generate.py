@@ -156,6 +156,47 @@ def test_aws_sts_skips_included_manifest_extract_before_ocp_414(
     assert rendered["tests"][0]["steps"]["env"].get("EXTRACT_MANIFEST_INCLUDED") == expected
 
 
+def test_playwright_ref_mode_uses_step_defaults_and_keeps_full_test_steps() -> None:
+    """The matrix must not force strict ref resolution or remove Playwright phases."""
+    results, _retired = generate_all()
+    upgrade_chains = {
+        "quay-operator-upgrade-seed",
+        "quay-operator-upgrade-verify",
+        "quay-operator-upgrade-functional",
+    }
+
+    checked_installs = 0
+    checked_upgrades = 0
+    for group, _filename, config in results:
+        for cell, test in zip(group, config["tests"], strict=True):
+            if cell.test not in {"e2e-install", "upgrade"}:
+                continue
+            steps = test["steps"]
+            assert "PLAYWRIGHT_REF_MODE" not in steps["env"]
+            refs = {step.get("ref") or step.get("chain") for step in steps["test"]}
+            if cell.test == "e2e-install":
+                assert "quay-test-e2e" in refs
+                checked_installs += 1
+            else:
+                assert upgrade_chains <= refs
+                checked_upgrades += 1
+
+    assert checked_installs > 0
+    assert checked_upgrades > 0
+
+
+@pytest.mark.parametrize(
+    ("ocp_version", "sts", "expected"),
+    [("4.12", True, "false"), ("4.13", True, "false"), ("4.14", True, None), ("4.13", False, None)],
+)
+def test_aws_sts_skips_included_manifest_extract_before_ocp_414(
+    ocp_version: str, sts: bool, expected: str | None
+) -> None:
+    env = jinja_env(GENERATOR_DIR / "templates")
+    rendered = render_template(env, "clouds/aws.yaml.j2", _phase0_cell(ocp_version=ocp_version, sts=sts).context())
+    assert rendered["tests"][0]["steps"]["env"].get("EXTRACT_MANIFEST_INCLUDED") == expected
+
+
 def test_presubmit_test_layer_inherits_periodic_defaults() -> None:
     presubmit_cell = _phase0_cell(
         branch="master",
@@ -188,6 +229,24 @@ def test_presubmit_test_layer_inherits_periodic_defaults() -> None:
     periodic_refs = [step["ref"] for step in periodic_config["tests"][0]["steps"]["test"]]
     expected_refs = periodic_refs[:-1] + ["quay-deploy-custom-image"] + periodic_refs[-1:]
     assert presubmit_refs == expected_refs
+
+
+def test_presubmit_upgrade_wires_the_real_playwright_repository() -> None:
+    cell = _phase0_cell(
+        branch="redhat-3.17",
+        quay_version="3.17",
+        kind="presubmit",
+        cron=None,
+        test="upgrade",
+        upgrade_from="3.16",
+        always_run=False,
+        optional=True,
+    )
+    config = build_config(cell, GENERATOR_DIR / "templates")
+    env = config["tests"][0]["steps"]["env"]
+    assert env["PLAYWRIGHT_GIT_REPO"] == "https://github.com/quay/quay.git"
+    assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == "redhat-3.16"
+    assert env["PLAYWRIGHT_N_GIT_BRANCH"] == "redhat-3.17"
 
 
 def test_kind_settings_periodic_passes_through_resolved_cron() -> None:
@@ -650,8 +709,9 @@ def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
     # quay-test-api-legacy and quay-test-e2e-legacy create these users; superuser specs that sign in as them need them.
     assert steps["env"]["QUAY_EXTRA_CONFIG"].split() == ["SUPER_USERS:", "-", "quayapici", "-", "quaye2eci"]
     assert steps["env"]["QUAY_OPERATOR_CHANNEL"] == "stable-3.15"
-    assert steps["env"]["QUAY_OPERATOR_SOURCE"] == "redhat-operators"
+    assert steps["env"]["QUAY_OPERATOR_SOURCE"] == "fbc-operator-catalog"
     assert [step["ref"] for step in steps["test"]] == [
+        "merge-stage-registry-credentials",
         "quay-enable-catalogsource-art",
         "quay-deploy-aws-s3",
         "quay-test-e2e-legacy",
@@ -659,6 +719,71 @@ def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
     ]
     post = [step.get("ref") or step.get("chain") for step in steps["post"]]
     assert post == ["quay-gather-jaeger-traces", "quay-gather", "quay-deprovision", "ipi-aws-post-manual-oidc-sts"]
+
+
+def test_legacy_upgrade_cells_are_exact_and_strict() -> None:
+    """Only the five approved OCP 4.22 n-1 edges use the legacy adapter."""
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    expected = {
+        "quay-quay-redhat-3.9__aws-ocp422-s3-upgrade-legacy.yaml": ("3.8", "3.9"),
+        "quay-quay-redhat-3.10__aws-ocp422-s3-upgrade-legacy.yaml": ("3.9", "3.10"),
+        "quay-quay-redhat-3.12__aws-ocp422-s3-upgrade-legacy.yaml": ("3.11", "3.12"),
+        "quay-quay-redhat-3.14__aws-ocp422-s3-upgrade-legacy.yaml": ("3.13", "3.14"),
+        "quay-quay-redhat-3.15__aws-ocp422-s3-upgrade-legacy.yaml": ("3.14", "3.15"),
+    }
+    cells = [cell for cell in expand_cells(yaml.safe_load((GENERATOR_DIR / "matrix.yaml.in").read_text())) if cell.test == "upgrade-legacy"]
+    assert {(cell.upgrade_from, cell.quay_version, cell.ocp_version) for cell in cells} == {
+        (source, target, "4.22") for source, target in expected.values()
+    }
+    for filename, (source, target) in expected.items():
+        config = by_name[filename]
+        assert "images" not in config
+        (test,) = config["tests"]
+        assert test["as"] == f"from-{source.replace('.', '')}"
+        assert "cron" not in test
+        assert test["always_run"] is False and test["optional"] is True
+        env = test["steps"]["env"]
+        source_catalog = env["MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"]
+        if source == "3.11":
+            assert source_catalog.endswith("sha256:e9a7f5414a727fbaf73721ddcb1d7b337c1fc95be681093da534f257c054010c")
+        else:
+            assert source_catalog.endswith("sha256:fcebc181f4a760e98981aeb47dc596f601f7582b630c12e8827a8500b086171a")
+        assert env["QUAY_UPGRADE_SOURCE_CATALOG_IMAGE"] == source_catalog
+        assert env["QUAY_UPGRADE_TARGET_CATALOG_IMAGE"].endswith(
+            "sha256:fcebc181f4a760e98981aeb47dc596f601f7582b630c12e8827a8500b086171a"
+        )
+        assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == f"stable-{source}"
+        assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == f"stable-{target}"
+        assert env["QUAY_UPGRADE_LEGACY_CYPRESS_STRICT"] == "true"
+        assert env["QUAY_UPGRADE_SOURCE_ALREADY_INSTALLED"] == "true"
+        assert env["QUAY_UPGRADE_OPERATOR_NAMESPACE"] == "quay-enterprise"
+        assert [step.get("ref") or step.get("chain") for step in test["steps"]["test"]] == [
+            "merge-stage-registry-credentials",
+            "quay-enable-catalogsource-art",
+            "quay-deploy-aws-s3",
+            "quay-operator-upgrade-install-source",
+            "quay-operator-upgrade-prepare-e2e",
+            "quay-operator-upgrade-legacy-state",
+            "quay-operator-upgrade-channel",
+            "quay-operator-upgrade-legacy-state-verify",
+            "quay-test-e2e-legacy",
+            "quay-test-api-legacy",
+        ]
+
+
+@pytest.mark.parametrize(
+    "job",
+    [
+        {"kind": "presubmit", "clouds": ["gcp"], "ocp": ["4.22"], "test": "upgrade-legacy", "upgrade_from": "3.8"},
+        {"kind": "presubmit", "clouds": ["aws"], "ocp": ["4.22"], "test": "upgrade-legacy", "upgrade_from": "3-8"},
+        {"kind": "presubmit", "clouds": ["aws"], "ocp": ["4.22"], "test": "upgrade", "upgrade_from": "3.8", "upgrade_source_catalog_pullspec": "quay.io/example/catalog@sha256:e9a7f5414a727fbaf73721ddcb1d7b337c1fc95be681093da534f257c054010c"},
+        {"kind": "presubmit", "clouds": ["aws"], "ocp": ["4.22"], "test": "upgrade-legacy", "upgrade_from": "3.8", "upgrade_source_catalog_pullspec": "quay.io/example/catalog:latest"},
+    ],
+)
+def test_legacy_upgrade_rejects_invalid_source_or_platform(job: dict[str, Any]) -> None:
+    with pytest.raises(ValueError):
+        expand_cells(_matrix_with_job(job))
 
 
 @pytest.mark.parametrize(("quay", "ocp"), [("3.14", "4.19"), ("3.12", "4.17"), ("3.10", "4.15"), ("3.9", "4.14")])
@@ -674,7 +799,146 @@ def test_e2e_legacy_eus_streams(quay: str, ocp: str) -> None:
     env = test["steps"]["env"]
     assert env["QUAY_VERSION"] == quay
     assert env["QUAY_OPERATOR_CHANNEL"] == f"stable-{quay}"
-    assert env["QUAY_OPERATOR_SOURCE"] == "redhat-operators"
+    assert env["QUAY_OPERATOR_SOURCE"] == "fbc-operator-catalog"
+
+
+def test_comprehensive_matrix_is_complete_and_rehearsal_only() -> None:
+    """The expanded grid must not add a recurring cost beyond pre-existing lanes."""
+    matrix = yaml.safe_load((GENERATOR_DIR / "matrix.yaml.in").read_text())
+    cells = expand_cells(matrix)
+    quay_versions = {f"3.{minor}" for minor in range(9, 19)}
+    ocp_versions = {f"4.{minor}" for minor in range(12, 23)}
+
+    installs = [
+        cell
+        for cell in cells
+        if cell.quay_version in quay_versions and cell.ocp_version in ocp_versions
+        and cell.test in {"e2e-install", "e2e-legacy"}
+        and cell.cloud == "aws" and cell.storage == "s3" and cell.arch == "amd64"
+        and not cell.database and not cell.fips
+    ]
+    assert len(installs) == 110
+    assert {(cell.quay_version, cell.ocp_version) for cell in installs} == {
+        (quay, ocp) for quay in quay_versions for ocp in ocp_versions
+    }
+
+    upgrades = [
+        cell
+        for cell in cells
+        if cell.test == "upgrade" and cell.quay_version in {"3.17", "3.18"}
+        and cell.ocp_version in ocp_versions and cell.cloud == "aws" and cell.storage == "s3"
+    ]
+    assert len(upgrades) == 22
+    assert {(cell.upgrade_from, cell.quay_version, cell.ocp_version) for cell in upgrades} == {
+        (source, target, ocp)
+        for source, target in (("3.16", "3.17"), ("3.17", "3.18"))
+        for ocp in ocp_versions
+    }
+
+    added = [cell for cell in installs + upgrades if cell.kind == "presubmit"]
+    assert len(added) == 121
+    assert all(cell.always_run is False and cell.optional is True for cell in added)
+    assert all(cell.cron is None and cell.source is None for cell in added)
+
+    # Only the eleven historically scheduled cells remain periodic: nine
+    # install cells and two upgrades. No historical-grid row gained a cron.
+    periodic = [cell for cell in installs + upgrades if cell.kind == "periodic"]
+    assert len(periodic) == 11
+
+
+def test_every_versioned_install_uses_its_matching_operator_channel() -> None:
+    """Versioned install cells must override the deploy step's stable-3.16 default."""
+    matrix = yaml.safe_load((GENERATOR_DIR / "matrix.yaml.in").read_text())
+    cells = expand_cells(matrix)
+    expected_quay_versions = {f"3.{minor}" for minor in range(9, 19)}
+    expected_ocp_versions = {f"4.{minor}" for minor in range(12, 23)}
+    results, _retired = generate_all()
+
+    checked = 0
+    for group, _filename, config in results:
+        for cell, test in zip(group, config["tests"], strict=True):
+            if (
+                cell.quay_version not in expected_quay_versions
+                or cell.ocp_version not in expected_ocp_versions
+                or cell.test not in {"e2e-install", "e2e-legacy"}
+                or cell.cloud != "aws"
+                or cell.storage != "s3"
+                or cell.arch != "amd64"
+                or cell.database
+                or cell.fips
+            ):
+                continue
+            env = test["steps"]["env"]
+            assert env["QUAY_OPERATOR_CHANNEL"] == f"stable-{cell.quay_version}"
+            checked += 1
+    assert checked == 110
+
+
+def test_rehearsal_presubmit_uses_art_fbc_and_keeps_legacy_stage_auth() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+
+    legacy = by_name["quay-quay-redhat-3.15__aws-ocp412-e2e-legacy.yaml"]["tests"][0]
+    assert "cron" not in legacy
+    assert legacy["always_run"] is False and legacy["optional"] is True
+    legacy_env = legacy["steps"]["env"]
+    assert legacy_env["QUAY_OPERATOR_SOURCE"] == "fbc-operator-catalog"
+    assert legacy_env["MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"] == (
+        "quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc@"
+        "sha256:bc19b867a77b3044ff99087e7c3b71840a347cb9aa077ed1467ea8e8516c88d3"
+    )
+    assert legacy_env["QUAY_INDEX_IMAGE_TAG"] == "quay-3.15__v4.12__quay-rhel9-operator"
+    assert [step["ref"] for step in legacy["steps"]["test"][:2]] == [
+        "merge-stage-registry-credentials",
+        "quay-enable-catalogsource-art",
+    ]
+
+    upgrade = by_name["quay-quay-redhat-3.18__aws-ocp412-s3-upgrade.yaml"]["tests"][0]
+    assert "cron" not in upgrade
+    assert upgrade["always_run"] is False and upgrade["optional"] is True
+    upgrade_env = upgrade["steps"]["env"]
+    assert upgrade_env["QUAY_OPERATOR_SOURCE"] == "fbc-operator-catalog"
+    assert upgrade_env["MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"] == (
+        "quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc@"
+        "sha256:bc19b867a77b3044ff99087e7c3b71840a347cb9aa077ed1467ea8e8516c88d3"
+    )
+    assert upgrade_env["QUAY_UPGRADE_SOURCE_CATALOG_IMAGE"] == upgrade_env[
+        "MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"
+    ]
+    assert upgrade_env["QUAY_UPGRADE_TARGET_CATALOG_IMAGE"] == upgrade_env[
+        "MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"
+    ]
+    assert upgrade_env["QUAY_INDEX_IMAGE_TAG"] == "quay-3.18__v4.12__quay-rhel9-operator"
+    assert upgrade_env["QUAY_UPGRADE_SOURCE_CHANNEL"] == "stable-3.17"
+    assert upgrade_env["QUAY_UPGRADE_TARGET_CHANNEL"] == "stable-3.18"
+
+
+def test_rehearsal_catalog_pins_cover_every_canonical_cell() -> None:
+    matrix = yaml.safe_load((GENERATOR_DIR / "matrix.yaml.in").read_text())
+    pins = matrix["global_defaults"]["rehearsal_catalog_pins"]
+    expected_ocps = {f"4.{minor}" for minor in range(12, 23)}
+    assert set(pins) == expected_ocps
+    assert all(value.startswith("quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc@sha256:") for value in pins.values())
+
+    results, _retired = generate_all()
+    for group, _filename, config in results:
+        cell = group[0]
+        if cell.quay_version is None or cell.ocp_version not in pins:
+            continue
+        for test in config["tests"]:
+            env = test["steps"]["env"]
+            assert env["MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"] == (
+                cell.upgrade_source_catalog_pullspec or pins[cell.ocp_version]
+            )
+            assert {
+                key for key in env if key.startswith("MULTISTAGE_PARAM_OVERRIDE_")
+            } == {"MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"}
+            assert env["QUAY_OPERATOR_SOURCE"] == "fbc-operator-catalog"
+            if cell.test in {"upgrade", "upgrade-legacy"}:
+                assert env["QUAY_UPGRADE_SOURCE_CATALOG_IMAGE"] == (
+                    cell.upgrade_source_catalog_pullspec or pins[cell.ocp_version]
+                )
+                assert env["QUAY_UPGRADE_TARGET_CATALOG_IMAGE"] == pins[cell.ocp_version]
 
 
 def test_master_presubmit_expands_all_clouds() -> None:
@@ -1088,6 +1352,44 @@ def _matrix_with_job(
         "global_defaults": {"image_source": "build", "arch": "amd64", "repo": "quay/quay"},
         "quay": [release],
     }
+
+
+@pytest.mark.parametrize("pin_version", ["4.12 ", "v4.12", "4", "4.12.1"])
+def test_rehearsal_catalog_pin_keys_must_be_ocp_versions(pin_version: str) -> None:
+    matrix = _matrix_with_job(
+        {"cron": "daily", "source": "nightly", "clouds": ["aws"], "ocp": ["4.22"], "test": "e2e-install"}
+    )
+    matrix["global_defaults"]["rehearsal_catalog_pins"] = {
+        pin_version: "quay.io/example/catalog@sha256:" + "a" * 64
+    }
+    with pytest.raises(ValueError, match="must map OCP versions"):
+        expand_cells(matrix)
+
+
+def test_rehearsal_catalog_pin_keys_must_be_used_by_versioned_matrix() -> None:
+    matrix = _matrix_with_job(
+        {"cron": "daily", "source": "nightly", "clouds": ["aws"], "ocp": ["4.22"], "test": "e2e-install"}
+    )
+    matrix["global_defaults"]["rehearsal_catalog_pins"] = {
+        "4.99": "quay.io/example/catalog@sha256:" + "a" * 64
+    }
+    with pytest.raises(ValueError, match="not used by the versioned Quay matrix: 4.99"):
+        expand_cells(matrix)
+
+
+def test_legacy_upgrade_requires_its_rehearsal_catalog_pin() -> None:
+    matrix = _matrix_with_job(
+        {
+            "kind": "presubmit",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "upgrade-legacy",
+            "upgrade_from": "3.11",
+            "upgrade_source_catalog_pullspec": "quay.io/example/catalog@sha256:" + "a" * 64,
+        }
+    )
+    with pytest.raises(ValueError, match="rehearsal_catalog_pins\\['4.22'\\]"):
+        expand_cells(matrix)
 
 
 def test_kind_must_be_periodic_or_presubmit() -> None:

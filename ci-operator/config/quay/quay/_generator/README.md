@@ -101,6 +101,19 @@ channels, branches and the test name (`from-317`) are derived:
       - {cron: weekly, source: nightly, clouds: [aws], ocp: ["4.22"], test: upgrade, upgrade_from: "3.17"}
 ```
 
+**Add a legacy operator upgrade lane.** `upgrade-legacy` is for targets before
+3.16, where the shared `ci/quay-test-console` image provides the supported
+Cypress/API consumers rather than the Playwright runner. It is AWS/S3 only and
+presubmit-only. The legacy adapter records source Subscription/CSV identity,
+seeds an organization, private repository plus image tag, robot, team, member,
+and permission, verifies all of it after the channel move, and removes the
+organization only after verification succeeds. Set the catalog pin explicitly
+in the matrix; never substitute a source catalog merely to enable an edge.
+When the target OCP catalog cannot install the source channel, an approved
+legacy row may set `upgrade_source_catalog_pullspec` to a separate immutable
+`image@sha256` pullspec. It is used for the initial CatalogSource and source
+installation only; the normal OCP catalog pin remains the upgrade target.
+
 **Add a quay-operator Chainsaw job.** One row plus its
 `quay-quay-operator-{branch}__aws-ocp{ocp_nodot}-e2e-chainsaw.yaml` line in
 `managed_files.active`:
@@ -148,6 +161,7 @@ Top level:
 | `global_defaults.repo` | `org/repo` for filenames and metadata (`quay/quay`). A test in `REPO_BY_TEST` (`model.py`) writes to its own repo instead: `e2e-chainsaw` -> `quay/quay-operator`. |
 | `global_defaults.arch` | Default cluster arch (`amd64`). |
 | `global_defaults.image_source` | Reserved (`build`); no template reads it yet. |
+| `global_defaults.rehearsal_catalog_pins` | Optional OCP-version to immutable ART catalog pullspec mapping. When present for a version-bearing Quay cell, it sets `MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE`, forces the ART CatalogSource, and supplies both upgrade catalog images. |
 | `managed_files.active` | Every file the matrix must generate, exactly. |
 | `managed_files.retired` | Files the generator no longer owns; `--check` fails while any still exists. |
 | `managed_files.hand_maintained` | Hand-written configs in this directory, each mapped to the `as` of its tests. Prefer a matrix row; add an entry only for a config the generator cannot produce. |
@@ -165,11 +179,11 @@ Per job, `quay[].jobs[]`:
 
 | Field | Meaning |
 | --- | --- |
-| `test` | `e2e-install` (Playwright e2e, `quay/quay`), `upgrade` (operator channel upgrade, `quay/quay`) or `e2e-chainsaw` (operator Chainsaw suites, `quay/quay-operator`, periodic only). Picks `templates/tests/{test}.yaml.j2`. |
+| `test` | `e2e-install` (Playwright e2e, `quay/quay`), `upgrade` (modern operator channel upgrade), `upgrade-legacy` (Cypress/API state-preserving operator upgrade for Quay < 3.16), or `e2e-chainsaw` (operator Chainsaw suites, periodic only). Picks `templates/tests/{test}.yaml.j2`. |
 | `kind` | `periodic` (default) or `presubmit` (renders `templates/presubmit/` where present). |
 | `cron` | Periodic only, required: `daily` or `nightly` (both `@daily`), `weekly` (`@weekly`), or a raw 5-field cron used verbatim. Changes timing only, never the test name. |
-| `source` | Periodic only, required: `nightly` (ART FBC catalog, `QUAY_INDEX_IMAGE_REPO`; `e2e-install` and `upgrade` also set `PLAYWRIGHT_REF_MODE: strict`) or `stable` (`redhat-operators`). |
-| `clouds` | `aws`, `aws-metal`, `gcp`, `azure`, `libvirt`. |
+| `source` | Periodic only, required: `nightly` (ART FBC catalog, `QUAY_INDEX_IMAGE_REPO`) or `stable` (`redhat-operators`). Playwright e2e and upgrade steps use their documented `derived` ref-resolution default unless a cell supplies an explicit override. |
+| `clouds` | `aws`, `aws-metal`, `gcp`, `azure`, `libvirt`, `baremetal`. |
 | `ocp` | OCP versions, as strings (`"4.22"`). |
 | `arches` | `amd64`, `arm64`, `s390x`; defaults to `[global_defaults.arch]`. |
 | `as` | Test name. Default `{cloud}-{storage}-{source}` (periodic) or `{cloud}-{storage}` (presubmit). Two rows in one file with the same name fail with `duplicate as`; set `as` on one of them. |
@@ -179,8 +193,8 @@ Per job, `quay[].jobs[]`:
 | `sts` | Default `true`, `aws` and `aws-metal` cells only. Installs with CCO Manual mode and STS (`ipi-aws-pre-manual-oidc-sts` / `ipi-aws-post-manual-oidc-sts`). Quay's own S3 storage still uses static keys. |
 | `database` | `true` provisions a managed Postgres (`DATABASE_BY_CLOUD` in `model.py`: AWS RDS, Azure Postgres) and removes it in `post`. Not on `aws-metal`, `gcp`, or `libvirt`. Adds the DB kind to the name (`aws-s3-rds-nightly`). |
 | `storage` | Override the cloud's default storage. Besides that default, only `odf`, only on `aws`. `e2e-chainsaw` always uses `odf`. |
-| `upgrade_from` | Required for `upgrade`, invalid elsewhere: the previous Quay `X.Y`. Derives both channels, both branches and the name `from-<XY>`. |
-| `ocp_channel` | `upgrade` only: `stable` (default) or `candidate`, for an OCP minor without a stable channel yet. |
+| `upgrade_from` | Required for `upgrade` and `upgrade-legacy`, invalid elsewhere: the previous Quay `X.Y`. Derives both channels and the name `from-<XY>`. |
+| `ocp_channel` | `upgrade` and `upgrade-legacy` only: `stable` (default) or `candidate`, for an OCP minor without a stable channel yet. |
 
 ### File naming
 
@@ -216,6 +230,15 @@ fields (`test`, `source`, `arch`, `layout`, `storage`, `fips`, `sts`,
 
 - **`e2e-install`, `upgrade`**: `QUAY_EXTRA_CONFIG` is defined once, in
   `templates/tests/_e2e-install.defaults.j2`, and shared by both.
+- **`upgrade-legacy`**: uses stable OCP and the immutable rehearsal catalog pin,
+  but intentionally builds no Playwright image. Its Cypress state refs default
+  strict mode off for compatibility; the generated upgrade lane explicitly
+  sets strict mode true, requiring a nonzero JUnit count and a zero Cypress
+  exit code. Its standalone no-network runtime contract wrappers live under
+  `tests/runtime-contracts/`, outside the step registry so they cannot be parsed
+  as CI refs. Cypress console and JUnit text are redacted; screenshots and videos
+  are removed rather than treated as safely redactable. Existing `e2e-legacy`
+  install lanes are unchanged.
   `FEATURE_ROBOT_API_TOKENS` is added for Quay 5.0 and later.
 - **`upgrade`**: installs a released OCP (`releases.latest` is a stable
   `release`, not the nightly payload) and moves the Subscription channel itself,
