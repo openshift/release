@@ -4,27 +4,6 @@ workflow:
     pre:
     - chain: ipi-aws-pre
     - chain: storage-conf-csi-aws-fsx-ontap
-    - as: csi-device-volume-exporter-check
-      commands: |
-        #!/bin/bash
-        # TODO: remove this step when nightlies contain implementation of the feature
-        set -euo pipefail
-        if test -f "${SHARED_DIR}/proxy-conf.sh"; then
-          # shellcheck disable=SC1090
-          source "${SHARED_DIR}/proxy-conf.sh"
-        fi
-        NAMESPACE=openshift-cluster-storage-operator
-        echo "Checking that DaemonSet ${NAMESPACE}/volume-condition-exporter exists"
-        oc get daemonset volume-device-exporter -n "${NAMESPACE}" && exit 0
-        oc get daemonset csi-volume-device-exporter -n "${NAMESPACE}" && exit 0
-
-        echo "Neither DaemonSet ${NAMESPACE}/volume-device-exporter nor ${NAMESPACE}/csi-volume-device-exporter exists"
-        exit 1
-      from: cli
-      resources:
-        requests:
-          cpu: 10m
-          memory: 100Mi
     test:
     - ref: openshift-e2e-test
     post:
