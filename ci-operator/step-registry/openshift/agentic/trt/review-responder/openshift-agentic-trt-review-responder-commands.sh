@@ -201,7 +201,9 @@ DISALLOWED_TOOLS=(
 
 append_pipeline_constraints() {
     cat >> "$1" <<'EOF'
-- Do not modify CI configuration or generated files.
+- Modify only task-relevant authoritative sources, including instruction or guidance source files when they govern the requested behavior. Do not modify unrelated CI configuration.
+- If an authoritative-source change affects generated artifacts, run the repository's documented generator and commit its output with the source change.
+- Never edit generated artifacts directly or bypass generation or validation checks.
 - Do NOT create new PRs.
 - Do not check out or pull the PR branch — you are already on it.
 - Do not git push. Commit locally only — the pipeline pushes after you finish.
