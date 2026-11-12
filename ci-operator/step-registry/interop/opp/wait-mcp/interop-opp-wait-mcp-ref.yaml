@@ -24,8 +24,9 @@ ref:
     monotonically, or the ready count is recovering with bounded
     regression - never while any pool is Degraded, and never once the
     pool has failed to converge for MCP_PINNED_UPDATED_POLLS consecutive
-    polls without Degraded (sustained cycling). The trend window resets
-    on MachineConfig generation change (render churn).
+    polls with machines updated and not ready (sustained cycling; a
+    Degraded poll is neither counted nor resets the streak). The trend
+    window resets on MachineConfig generation change (render churn).
 
     On MCP timeout, classifies the failure mode with fixed
     FAILURE_CLASS tokens:
@@ -84,7 +85,7 @@ ref:
     documentation: Maximum ready-count regression tolerated within a progress window (bounded dips from rolling reboots)
     name: MCP_MAX_UNAVAILABLE
   - default: "120"
-    documentation: Consecutive not-ready polls, with updated machines pinned at machineCount and no Degraded, after which the rollout is considered cycling (updated but never ready) and the step fails fast as mcp-rollout-not-converging (the phase-0 self-test pins the predicate at the reviewed defaults, so tuning this env is safe)
+    documentation: Consecutive not-ready polls, with updated machines pinned at machineCount, after which the rollout is considered cycling (updated but never ready) and the step fails fast as mcp-rollout-not-converging; a Degraded poll is neither counted nor resets the streak (the phase-0 self-test pins the predicate at the reviewed defaults, so tuning this env is safe)
     name: MCP_PINNED_UPDATED_POLLS
   - default: "5"
     documentation: MachineConfig generation changes (render churn) at which the timeout classifies as mcp-render-churn
