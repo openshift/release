@@ -46,29 +46,31 @@ for inventory in bastion hypervisor; do
   cp "${SHARED_DIR}/${inventory}" "${INVENTORY_PATH}/host_vars/${inventory}"
 done
 
-# The MNO playbook also supports SNO. Its masters group must describe the spoke,
-# not the hub master0 saved in SHARED_DIR. Use the same BMC credentials that the
-# previous SNO playbook read from the bastion's inventory.
-INVENTORY_FILE="${INVENTORY_PATH}/arm-ibx.yaml"
+# build-inventory.py discovers master-spoke; Ansible loads its variables from this file.
+SPOKE_HOST_VARS="${INVENTORY_PATH}/host_vars/master-spoke"
 umask 077
-: > "${INVENTORY_FILE}"
-chmod 600 "${INVENTORY_FILE}"
-trap 'rm -f "${INVENTORY_FILE}"' EXIT
+: > "${SPOKE_HOST_VARS}"
+chmod 600 "${SPOKE_HOST_VARS}"
+trap 'rm -f "${SPOKE_HOST_VARS}"' EXIT
 cd /eco-ci-cd
-ansible-inventory -i ./inventories/ocp-deployment/build-inventory.py --host bastion |
-  python3 -c '
+
+if [[ "${ARM_IBX_DEPLOY_ROLE}" == "seed" ]]; then
+  for field in hostname bmc_user bmc_password; do
+    value=$(cat "/var/host_variables/${CLUSTER_NAME}/spoke-master0/${field}")
+    printf "%s: '%s'\n" "${field}" "${value//\'/\'\'}"
+  done > "${SPOKE_HOST_VARS}"
+else
+  # The target still uses the BMC credentials from its bastion inventory.
+  ansible-inventory -i ./inventories/ocp-deployment/build-inventory.py --host bastion |
+    python3 -c '
 import json
 import sys
 
 bastion = json.load(sys.stdin)
-spoke = {"hostname": sys.argv[1],
-         "bmc_user": bastion["bmc_user"], "bmc_password": bastion["bmc_password"]}
-json.dump({"all": {"children": {
-    "bastions": {"hosts": {"bastion": {}}},
-    "vm_hosts": {"children": {"hypervisors": {"hosts": {"hypervisor": {}}}}},
-    "nodes": {"children": {"masters": {"hosts": {"arm-ibx-spoke": spoke}}}},
-}}}, sys.stdout)
-' "${SPOKE_NAME}" > "${INVENTORY_FILE}"
+json.dump({"hostname": sys.argv[1],
+           "bmc_user": bastion["bmc_user"], "bmc_password": bastion["bmc_password"]}, sys.stdout)
+' "${SPOKE_NAME}" > "${SPOKE_HOST_VARS}"
+fi
 
 KUBECONFIG_PATH="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
@@ -78,7 +80,7 @@ echo "ZTP clusters path: ${ZTP_CLUSTERS_PATH}"
 echo "ZTP policies path: ${ZTP_POLICIES_PATH}"
 
 ansible-playbook ./playbooks/ran/deploy-spoke-ztp-mno.yaml \
-  -i "${INVENTORY_FILE}" \
+  -i ./inventories/ocp-deployment/build-inventory.py \
   --extra-vars "kubeconfig=${KUBECONFIG_PATH} \
     spoke_cluster=${SPOKE_NAME} \
     ocp_version=${VERSION} \
