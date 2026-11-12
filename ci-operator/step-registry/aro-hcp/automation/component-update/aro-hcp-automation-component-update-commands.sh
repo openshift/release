@@ -64,7 +64,8 @@ notify() {
   }
 
   # Security: Use silent curl to prevent webhook URL exposure in logs
-  if ! curl -f -s -X POST -H 'Content-type: application/json' \
+  # Timeouts bound a stalled webhook so cleanup cannot hang until the job timeout.
+  if ! curl -f -s --connect-timeout 10 --max-time 30 -X POST -H 'Content-type: application/json' \
     --data "{\"text\":\"${*}\"}" "${webhook_url}" 2>/dev/null; then
     error "slack: failed to send Slack notification"
   fi
@@ -235,8 +236,10 @@ SLEEP_TIME=10  # Start with 10 seconds
 for ((i=1; i<=PR_CHECK_MAX_ATTEMPTS; i++)); do
   debug "github: attempting to find PR (attempt ${i} of ${PR_CHECK_MAX_ATTEMPTS})"
 
-  PR_URL=$(curl -s "https://api.github.com/repos/${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}/pulls?state=open&per_page=100" 2>/dev/null | \
-    jq -r ".[] | select(.title == \"${GITHUB_PR_TITLE}\") | .html_url" | head -1)
+  # Treat a failed poll (transport error or bad JSON) as an unsuccessful
+  # attempt instead of letting errexit fail the job; the retry loop masks it.
+  PR_URL=$( { curl -s --connect-timeout 10 --max-time 30 "https://api.github.com/repos/${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}/pulls?state=open&per_page=100" 2>/dev/null || true; } | \
+    jq -r ".[] | select(.title == \"${GITHUB_PR_TITLE}\") | .html_url" 2>/dev/null | head -1 || true)
 
   if [[ -n "${PR_URL}" ]]; then
     info "github: PR found at ${PR_URL}"
