@@ -62,15 +62,27 @@ function write_quay_install_junit() {
 }
 
 function save_cos_terraform_state() {
-  [[ -d /tmp/QUAY_IBMCLOUD_COS ]] || return 0
   (
-    cd /tmp/QUAY_IBMCLOUD_COS || exit 0
-    [[ -n "${QUAY_COS_BUCKET:-}" ]] && printf '%s' "${QUAY_COS_BUCKET}" > "${SHARED_DIR}/QUAY_IBMCLOUD_COS_BUCKET"
-    [[ -n "${COS_INSTANCE_NAME:-}" ]] && printf '%s' "${COS_INSTANCE_NAME}" > "${SHARED_DIR}/QUAY_IBMCLOUD_COS_INSTANCE"
-    [[ -n "${COS_REGION:-}" ]] && printf '%s' "${COS_REGION}" > "${SHARED_DIR}/QUAY_IBMCLOUD_COS_REGION"
-    tar -czf terraform.tgz --exclude=".terraform" --exclude="terraform.tgz" -- * &&
-      cp terraform.tgz "${SHARED_DIR}/terraform.tgz"
-  ) || true
+    cd /tmp/QUAY_IBMCLOUD_COS || exit 1
+    if [[ -n "${QUAY_COS_BUCKET:-}" ]]; then
+      printf '%s' "${QUAY_COS_BUCKET}" > "${SHARED_DIR}/QUAY_IBMCLOUD_COS_BUCKET" || exit 1
+    fi
+    if [[ -n "${COS_INSTANCE_NAME:-}" ]]; then
+      printf '%s' "${COS_INSTANCE_NAME}" > "${SHARED_DIR}/QUAY_IBMCLOUD_COS_INSTANCE" || exit 1
+    fi
+    if [[ -n "${COS_REGION:-}" ]]; then
+      printf '%s' "${COS_REGION}" > "${SHARED_DIR}/QUAY_IBMCLOUD_COS_REGION" || exit 1
+    fi
+    local archive_tmp
+    archive_tmp="$(mktemp "${SHARED_DIR}/terraform.tgz.XXXXXX")" || exit 1
+    # Publish only a complete archive, preserving the previous copy on failure.
+    if tar -czf "${archive_tmp}" --exclude=".terraform" --exclude="terraform.tgz" -- * &&
+      mv -f "${archive_tmp}" "${SHARED_DIR}/terraform.tgz"; then
+      exit 0
+    fi
+    rm -f "${archive_tmp}" || true
+    exit 1
+  )
 }
 
 function run_cos_terraform() {
@@ -96,7 +108,9 @@ function on_interrupt() {
 # shellcheck disable=SC2329
 function on_exit() {
   local ec=$?
-  save_cos_terraform_state
+  if [[ -d /tmp/QUAY_IBMCLOUD_COS ]]; then
+    save_cos_terraform_state || echo "WARNING: could not save COS Terraform state during exit" >&2
+  fi
   if [ "${MAP_TESTS}" = "true" ]; then
     LP_IO__ET_PPP__NEW_TS_NAME="${DR__RP__CR_COMP_NAME}--%s" \
       ExitTrap--PostProcessPrep junit--quay-tests__deploy-quay-ibmcloud-cos__quay-tests-deploy-quay-ibmcloud-cos.xml || true
@@ -157,10 +171,6 @@ function print_failing_pod_logs() {
   done < <(oc get pods -n "${ns}" --no-headers 2>/dev/null || true)
 }
 
-QUAY_USERNAME=$(cat /var/run/quay-qe-quay-secret/username)
-QUAY_PASSWORD=$(cat /var/run/quay-qe-quay-secret/password)
-QUAY_EMAIL=$(cat /var/run/quay-qe-quay-secret/email)
-
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
 QUAY_OPERATOR_SOURCE="$QUAY_OPERATOR_SOURCE"
 
@@ -176,7 +186,7 @@ fi
 IBMCLOUD_API_KEY=$(cat "${IBMCLOUD_API_KEY_FILE}")
 export IBMCLOUD_API_KEY
 
-COS_REGION="${IBMCLOUD_COS_REGION}"
+COS_REGION="${IBMCLOUD_COS_REGION:-${LEASED_RESOURCE}}"
 
 # COS bucket names are globally unique. Include CI identity plus randomness.
 function new_cos_bucket_name() {
@@ -289,14 +299,16 @@ for _ in 1 2 3 4 5; do
   run_cos_terraform destroy -auto-approve || true
 done
 
-save_cos_terraform_state
+if ! save_cos_terraform_state; then
+  echo "ERROR: could not save COS Terraform state" >&2
+  exit 1
+fi
 
 if [[ "${tf_apply_rc}" -ne 0 ]]; then
   echo "terraform apply failed with exit code ${tf_apply_rc}" >&2
   exit "${tf_apply_rc}"
 fi
 
-# Disable tracing for sensitive credential handling
 COS_ACCESS_KEY=$(terraform output -raw cos_access_key)
 COS_SECRET_KEY=$(terraform output -raw cos_secret_key)
 COS_ENDPOINT=$(terraform output -raw cos_endpoint)
@@ -393,7 +405,6 @@ FEATURE_EXTENDED_REPOSITORY_NAMES: true
 FEATURE_QUOTA_MANAGEMENT: true
 FEATURE_AUTO_PRUNE: true
 FEATURE_PROXY_CACHE: true
-FEATURE_USER_INITIALIZE: true
 PERMANENTLY_DELETE_TAGS: true
 RESET_CHILD_MANIFEST_EXPIRATION: true
 FEATURE_PROXY_STORAGE: true
@@ -401,8 +412,6 @@ FEATURE_SUPERUSER_CONFIGDUMP: true
 FEATURE_UI_V2: true
 FEATURE_SUPERUSERS_FULL_ACCESS: true
 FEATURE_UI_MODELCARD: true
-SUPER_USERS:
-  - quay
 USERFILES_LOCATION: default
 USERFILES_PATH: userfiles/
 DISTRIBUTED_STORAGE_DEFAULT_LOCATIONS:
@@ -596,37 +605,7 @@ for i in $(seq 1 90); do
     echo "Quay is ready (after $((i * 10))s)" >&2
     oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
-    quay_route=$(oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}') || true
-    quay_ca_bundle="$(mktemp)"
-    if [[ -s /etc/pki/tls/certs/ca-bundle.crt ]]; then
-      cat /etc/pki/tls/certs/ca-bundle.crt > "${quay_ca_bundle}"
-    fi
-    if [[ -s "${SHARED_DIR}/ssl.cert" ]]; then
-      cat "${SHARED_DIR}/ssl.cert" >> "${quay_ca_bundle}"
-    else
-      ingress_cert_secret=$(oc -n openshift-ingress-operator get ingresscontroller default \
-        -o jsonpath='{.spec.defaultCertificate.name}' 2>/dev/null || true)
-      ingress_cert_secret="${ingress_cert_secret:-router-certs-default}"
-      oc -n openshift-ingress get secret "${ingress_cert_secret}" \
-        -o jsonpath='{.data.tls\.crt}' | base64 --decode >> "${quay_ca_bundle}"
-    fi
-    initialize_payload="$(mktemp)"
-    chmod 600 "${initialize_payload}"
-    jq -n --arg username "${QUAY_USERNAME}" --arg password "${QUAY_PASSWORD}" \
-      --arg email "${QUAY_EMAIL}" \
-      '{username: $username, password: $password, email: $email, access_token: true}' \
-      > "${initialize_payload}"
-    if ! curl --fail --silent --show-error --cacert "${quay_ca_bundle}" \
-      -X POST "${quay_route}/api/v1/user/initialize" \
-      --header 'Content-Type: application/json' --data-binary "@${initialize_payload}" \
-      | jq -er '.access_token | select(type == "string" and length > 0)' \
-          > "${SHARED_DIR}/quay_oauth2_token"; then
-      echo "Failed to initialize the Quay user or obtain an access token" >&2
-      exit 1
-    fi
     QL_INSTALL_STATUS="passed"
-    chmod 600 "${SHARED_DIR}/quay_oauth2_token"
-    rm -f "${initialize_payload}" "${quay_ca_bundle}"
     archive_pod_info
     exit 0
   fi
