@@ -596,6 +596,10 @@ function WaitMigrationSucceeded () {
 
     deadline=$((SECONDS + $(ParseOcWaitDurationSeconds "${MTV_MIGRATION_TIMEOUT}")))
 
+    # Fail fast if ApplyMigration never created the CR (avoids hours of NotFound polls).
+    # Explicit return: JStep runs this on the LHS of || so errexit is disabled in the body.
+    HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_PROVIDER_NAMESPACE}" -o name >/dev/null || return 1
+
     while (( SECONDS < deadline )); do
         succeededStatus="$(HubOc get "migration/${MTV_MIGRATION_NAME}" -n "${MTV_PROVIDER_NAMESPACE}" \
             -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].status}' || true)"
@@ -739,19 +743,31 @@ function VerifyAllVmsSsh () {
     (( failed == 0 ))
 }
 
-# JStep — run a function, append PASS/FAIL record to junitFile, propagate exit code.
+# JStep — run a function, append PASS/FAIL record to junitFile.
+# On failure, exit the enclosing subshell (do not return): with an ERR trap set,
+# a non-zero return from a function does not reliably stop later steps under set -e,
+# which previously let WaitMigrationSucceeded spin for hours after ApplyPlan failed.
+# Use --allow-fail to record FAIL and return without aborting (SSH probe only).
 function JStep () {
+    typeset isFailAllowed=false
+    if [[ "${1:-}" == '--allow-fail' ]]; then
+        isFailAllowed=true
+        shift
+    fi
     typeset name="${1:?}"; shift
     typeset -i t0=$SECONDS rc=0
     "$@" || rc=$?
     typeset -i elapsed=$(( SECONDS - t0 ))
     if (( rc == 0 )); then
         printf 'PASS\t%s\t%d\t\n' "${name}" "${elapsed}" >> "${junitFile}"
-    else
-        printf 'FAIL\t%s\t%d\tFailed (rc=%d); see diagnostics in mtv-live-migration%s-diagnostics/\n' \
-            "${name}" "${elapsed}" "${rc}" "${migrationSuffix}" >> "${junitFile}"
+        return 0
     fi
-    return "${rc}"
+    printf 'FAIL\t%s\t%d\tFailed (rc=%d); see diagnostics in mtv-live-migration%s-diagnostics/\n' \
+        "${name}" "${elapsed}" "${rc}" "${migrationSuffix}" >> "${junitFile}"
+    if [[ "${isFailAllowed}" == 'true' ]]; then
+        return "${rc}"
+    fi
+    exit "${rc}"
 }
 
 # XmlEscape — replace XML special characters for attribute/text values.
@@ -837,8 +853,8 @@ typeset -i cclmStepRc=0
     JStep "Verification: Source VMIM Not Failed"         VerifySourceVmimNotFailed
 
     # SSH port probe is best-effort: failure is recorded in JUnit but does not
-    # block overall migration success (|| true prevents ERR trap from firing).
-    JStep "Verification: VM SSH Port Probe" VerifyAllVmsSsh || true
+    # block overall migration success (--allow-fail keeps JStep from exiting).
+    JStep --allow-fail "Verification: VM SSH Port Probe" VerifyAllVmsSsh
 
     if [[ -n "${ARTIFACT_DIR}" ]]; then
         mkdir -p "${ARTIFACT_DIR}"
