@@ -5,8 +5,9 @@
 # provisions a bare VM, so we install the VM tools here, then run run_remote.sh in remote mode.
 set -euo pipefail
 
-# CI_IMAGE / FRR_IMAGE / NODE_EXPORTER_IMAGE / EE_BASE_IMAGE / APPLIANCE_BASE_IMAGE come from the
-# ref env (public defaults, overridden by the base_images dependencies); passed through below.
+# CI_IMAGE / FRR_IMAGE / NODE_EXPORTER_IMAGE / EE_BASE_IMAGE / APPLIANCE_BASE_IMAGE / EGA_SCENARIO /
+# EGA_TOPOLOGY come from the ref env (public defaults, overridden by dependencies or the test
+# definition); passed through below.
 
 # Target VM from the provisioning chain.
 remote="$(cat "${SHARED_DIR}/ssh_user")@$(cat "${SHARED_DIR}/public_address")"
@@ -30,4 +31,6 @@ exec env \
 	NODE_EXPORTER_IMAGE="${NODE_EXPORTER_IMAGE}" \
 	EE_BASE_IMAGE="${EE_BASE_IMAGE}" \
 	APPLIANCE_BASE_IMAGE="${APPLIANCE_BASE_IMAGE}" \
+	EGA_SCENARIO="${EGA_SCENARIO}" \
+	EGA_TOPOLOGY="${EGA_TOPOLOGY}" \
 	bash /src/test/e2e/run_remote.sh
