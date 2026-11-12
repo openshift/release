@@ -75,7 +75,7 @@ new file (`...__aws-ocp423-e2e-install.yaml`):
         ocp: ["4.22", "4.23"]
 ```
 
-**Add a cloud.** Extend `clouds` (`aws`, `gcp`, `azure`, `libvirt`, `baremetal`). Each cloud
+**Add a cloud.** Extend `clouds` (`aws`, `aws-metal`, `gcp`, `azure`, `libvirt`). Each cloud
 gets its own file and its default storage (`STORAGE_BY_CLOUD` in `model.py`).
 
 **Add a stable-catalog job next to a nightly one.** `source` is not part of the
@@ -165,26 +165,28 @@ Per job, `quay[].jobs[]`:
 
 | Field | Meaning |
 | --- | --- |
-| `test` | `e2e-install` (Playwright e2e, `quay/quay`), `upgrade` (operator channel upgrade, `quay/quay`) or `e2e-chainsaw` (operator Chainsaw suites, `quay/quay-operator`, periodic only). Picks `templates/tests/{test}.yaml.j2`. |
+| `test` | `e2e-install` (Playwright e2e, `quay/quay`), `upgrade` (operator channel upgrade, `quay/quay`), `e2e-chainsaw` (operator Chainsaw suites, `quay/quay-operator`, periodic only) or `standalone-ha` (Quay HA on RHEL VMs, no cluster, periodic on `aws` only). Picks `templates/tests/{test}.yaml.j2`; a test listed in `SCENARIO_AS_BY_TEST` (`model.py`, with its default `as`) renders `templates/scenarios/{test}.yaml.j2` instead. |
 | `kind` | `periodic` (default) or `presubmit` (renders `templates/presubmit/` where present). |
 | `cron` | Periodic only, required: `daily` or `nightly` (both `@daily`), `weekly` (`@weekly`), or a raw 5-field cron used verbatim. Changes timing only, never the test name. |
-| `source` | Periodic only, required: `nightly` (ART FBC catalog, `QUAY_INDEX_IMAGE_REPO`; `e2e-install` and `upgrade` also set `PLAYWRIGHT_REF_MODE: strict`) or `stable` (`redhat-operators`). |
-| `clouds` | `aws`, `gcp`, `azure`, `libvirt`, `baremetal`. |
+| `source` | Periodic only, required except for `standalone-ha`, which rejects it: `nightly` (ART FBC catalog, `QUAY_INDEX_IMAGE_REPO`; `e2e-install` and `upgrade` also set `PLAYWRIGHT_REF_MODE: strict`) or `stable` (`redhat-operators`). |
+| `clouds` | `aws`, `aws-metal`, `gcp`, `azure`, `libvirt`. |
 | `ocp` | OCP versions, as strings (`"4.22"`). |
 | `arches` | `amd64`, `arm64`, `s390x`; defaults to `[global_defaults.arch]`. |
-| `as` | Test name. Default `{cloud}-{storage}-{source}` (periodic) or `{cloud}-{storage}` (presubmit). Two rows in one file with the same name fail with `duplicate as`; set `as` on one of them. |
+| `variant` | `layout: variant` only: replaces the derived variant in the filename and job names (`aws-standalone-ha`). Lowercase words joined by `-`. |
+| `as` | Test name. Default `{cloud}-{storage}-{source}` (periodic), `{cloud}-{storage}` (presubmit), or `e2e` for `standalone-ha`. Two rows in one file with the same name fail with `duplicate as`; set `as` on one of them. |
 | `env` | Job env; overrides branch env key by key. |
 | `always_run`, `optional`, `run_if_changed`, `skip_if_only_changed` | Presubmit only, copied onto the test. `run_if_changed` and `skip_if_only_changed` exclude each other; `always_run: true` excludes both. |
 | `fips` | Periodic only. FIPS cluster, `fips-check-fips-or-die` first, `FEATURE_FIPS: true`, Mailpit off (so `@feature:MAILING` specs skip). Adds `-fips` to the name. Not with `upgrade` or `e2e-chainsaw`. |
-| `sts` | Default `true`, `aws` cells only. Installs with CCO Manual mode and STS (`ipi-aws-pre-manual-oidc-sts` / `ipi-aws-post-manual-oidc-sts`). Quay's own S3 storage still uses static keys. |
-| `database` | `true` provisions a managed Postgres (`DATABASE_BY_CLOUD` in `model.py`: AWS RDS, Azure Postgres) and removes it in `post`. Not on `gcp`, `libvirt`, or `baremetal`. Adds the DB kind to the name (`aws-s3-rds-nightly`). |
+| `sts` | Default `true`, `aws` and `aws-metal` cells only. Installs with CCO Manual mode and STS (`ipi-aws-pre-manual-oidc-sts` / `ipi-aws-post-manual-oidc-sts`). Quay's own S3 storage still uses static keys. |
+| `database` | `true` provisions a managed Postgres (`DATABASE_BY_CLOUD` in `model.py`: AWS RDS, Azure Postgres) and removes it in `post`. Not on `aws-metal`, `gcp`, or `libvirt`. Adds the DB kind to the name (`aws-s3-rds-nightly`). |
 | `storage` | Override the cloud's default storage. Besides that default, only `odf`, only on `aws`. `e2e-chainsaw` always uses `odf`. |
 | `upgrade_from` | Required for `upgrade`, invalid elsewhere: the previous Quay `X.Y`. Derives both channels, both branches and the name `from-<XY>`. |
 | `ocp_channel` | `upgrade` only: `stable` (default) or `candidate`, for an OCP minor without a stable channel yet. |
 
 ### File naming
 
-- `layout: variant`: `{org}-{repo}-{branch}__{cloud}-ocp{ocp_nodot}-{test}.yaml`.
+- `layout: variant`: `{org}-{repo}-{branch}__{cloud}-ocp{ocp_nodot}-{test}.yaml`,
+  or `{org}-{repo}-{branch}__{variant}.yaml` when the job sets `variant:`.
   A non-`amd64` arch goes into the variant: `{cloud}-{arch}-ocp{ocp_nodot}-{test}`.
   `upgrade` files carry the storage too: `aws-ocp422-s3-upgrade`.
 - `layout: base`: `{org}-{repo}-{branch}.yaml`, or `{org}-{repo}-{branch}__{arch}.yaml`
@@ -195,7 +197,8 @@ Per job, `quay[].jobs[]`:
 
 ### Layer order
 
-Each cell deep-merges these layers; later layers win:
+A test listed in `SCENARIO_AS_BY_TEST` (`model.py`) renders
+`templates/scenarios/{test}.yaml.j2` alone, then steps 7 and 8. Every other cell deep-merges these layers; later layers win:
 
 1. `templates/base.yaml.j2` (presubmit: `templates/presubmit/base.yaml.j2`;
    a repo with `templates/repos/{repo}/base.yaml.j2` uses that instead)
@@ -225,23 +228,19 @@ fields (`test`, `source`, `arch`, `layout`, `storage`, `fips`, `sts`,
   `quay-test-chainsaw` with `CHAINSAW_SUITE: all` (e2e, then destructive) under
   a 4h timeout. Uses `templates/repos/quay-operator/base.yaml.j2` and the
   `aws-quay-qe` cluster profile.
+- **`standalone-ha`**: runs workflow `quay-standalone-aws-ha` (three RHEL 9
+  Quay nodes behind an NLB, Redis, Multi-AZ RDS, S3, and Clair on nodes 1 and 2
+  behind an internal NLB; smoke with a Clair scan, node and scanner failover,
+  then the full Playwright suite) under an 8h timeout. Builds only
+  `quay-playwright-runner`; `ocp` picks the step images, and the deploy step
+  resolves the ART nightly Quay and Clair images. Takes no `source`, `storage`, `fips`, `database`, `sts` or `arches`.
 - **`storage: odf`**: inserts `quay-install-odf-operator` and deploys with
   `quay-deploy-odf`; the operator manages object storage, and
   `quay-deprovision` skips bucket teardown.
 - **`libvirt` / `s390x`**: S3 storage; the `s390x` cell installs through the
   IBM Z libvirt workflow (`quay-tests-libvirt-s390x`).
-- **`baremetal`**: S3 storage with external AWS credentials from the `quay-tests`
-  vault (no cluster-profile bucket); installs through the Equinix
-  `baremetalds-e2e-ovn-dualstack` workflow instead of an `ipi-*` installer.
-  The dev-scripts cluster has no default StorageClass, so
-  `templates/clouds/baremetal.yaml.j2` installs LVMS (`lvms-catalogsource` →
-  operator → `LVMCluster` on the extra disks) and sets `lvms-vg1` as the
-  default before the Quay deploy, and sizes the worker VMs within the
-  `equinix-ocp-metal` host budget (2× Xeon Silver 4210, 40 threads / 128 GiB)
-  -- oversized workers get the VM OOM-killed mid-run. The Quay and Mailpit
-  routes are only reachable through the bastion proxy
-  (`baremetalds-devscripts-proxy` writes `proxy-conf.sh`), which the test step
-  accounts for.
+- **`aws-metal`**: S3 storage and the standard AWS IPI workflow with physical
+  `c5.metal` workers. Control-plane nodes remain regular virtual machines.
 - **`arches`**: `releases.latest` stays `amd64` for build tooling; the arch
   layer adds the test cluster's release. A non-`amd64` `layout: base` file
   never promotes.

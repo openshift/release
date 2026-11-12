@@ -17,6 +17,19 @@ echo "=== TRT Review Responder ==="
 }
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/trt-telemetry.sh"
+
+# No worker has run yet, but still discard the private temporary handoff on
+# early setup exits. on_exit takes over this cleanup once polling is ready.
+review_prompt_cleanup() {
+    local rc=$?
+    rm -f "${SESSION_PROMPT_FILE}" \
+        || echo "WARNING: failed to remove private prompt temporary file" >&2
+    return "${rc}"
+}
+trap review_prompt_cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
+
 # Prior steps (jira-solver) can already have burned the 1h token TTL.
 refresh_github_tokens || { echo "ERROR: Failed to refresh GitHub App tokens"; exit 1; }
 configure_github_git_credentials
@@ -116,9 +129,14 @@ on_exit() {
         [[ "${rc}" -ne 0 ]] && REVIEW_EXIT="${rc}"
         write_review_metrics || echo "WARNING: failed to write review metrics"
     fi
+    # write_review_metrics normally consumes and removes this file. Retain a
+    # final fallback for abrupt metrics failures after a worker captured it.
+    rm -f "${SESSION_PROMPT_FILE}" \
+        || echo "WARNING: failed to remove private prompt temporary file" >&2
     if declare -F copy_artifacts >/dev/null; then
-        copy_artifacts
+        copy_artifacts || echo "WARNING: failed to copy review artifacts" >&2
     fi
+    return "${rc}"
 }
 trap on_exit EXIT
 trap 'exit 143' TERM
@@ -183,7 +201,9 @@ DISALLOWED_TOOLS=(
 
 append_pipeline_constraints() {
     cat >> "$1" <<'EOF'
-- Do not modify CI configuration or generated files.
+- Modify only task-relevant authoritative sources, including instruction or guidance source files when they govern the requested behavior. Do not modify unrelated CI configuration.
+- If an authoritative-source change affects generated artifacts, run the repository's documented generator and commit its output with the source change.
+- Never edit generated artifacts directly or bypass generation or validation checks.
 - Do NOT create new PRs.
 - Do not check out or pull the PR branch — you are already on it.
 - Do not git push. Commit locally only — the pipeline pushes after you finish.
@@ -799,7 +819,12 @@ Your GitHub login is ${BOT_LOGIN}." \
         fi
 
         if [[ "${workers_succeeded}" != "true" ]]; then
-            echo "WARNING: at least one worker failed; leaving the branch unpushed."
+            echo "WARNING: at least one worker failed; resetting the unpushed round."
+            if ! git reset --hard "${EXPECTED_REMOTE_HEAD}" || \
+               ! git clean -fd -e artifacts/; then
+                echo "ERROR: unable to reset the failed worker round; stopping safely."
+                exit "${REVIEW_EXIT}"
+            fi
         elif push_current_branch; then
             if [[ "${ci_worker_succeeded}" == "true" ]]; then
                 ci_evaluated=true

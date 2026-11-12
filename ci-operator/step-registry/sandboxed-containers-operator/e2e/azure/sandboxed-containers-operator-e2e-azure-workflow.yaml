@@ -3,7 +3,6 @@ workflow:
   steps:
     allow_best_effort_post_steps: true
     env:
-      SLEEP_DURATION: 3h
       MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
       MUST_GATHER_TIMEOUT: "35m"
       ENABLE_MUST_GATHER: "true"
@@ -13,11 +12,11 @@ workflow:
     - chain: sandboxed-containers-operator-pre
     post:
     - chain: sandboxed-containers-operator-testsuites
-    - ref: cucushift-installer-wait
+    - ref: sandboxed-containers-operator-gather-must-gather
+    - ref: sandboxed-containers-operator-post-wait
       timeout: 12h10m0s
       best_effort: true
       optional_on_success: true
-    - ref: sandboxed-containers-operator-gather-must-gather
     - chain: ipi-azure-post
     test:
     - chain: sandboxed-containers-operator-test

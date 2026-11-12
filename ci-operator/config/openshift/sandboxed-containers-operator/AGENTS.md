@@ -141,7 +141,7 @@ activation a single-line diff.
 |-----|-------|-----|-----|
 | `*-kata` | ✅ active | — | — |
 | `*-peerpods` | ✅ active | ✅ active | disabled (placeholder) |
-| `*-coco` | disabled (placeholder) | — | disabled (placeholder) |
+| `*-coco` | disabled (placeholder) | disabled (4.22 placeholder) | disabled (placeholder) |
 
 Update this table whenever a job type is activated or disabled.
 

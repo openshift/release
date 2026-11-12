@@ -8,10 +8,6 @@ name. One should copy those into per-variant workflow and send a PR, keep
 updating the ``KATA_RPM_VERSIONS`` and running the jobs via `/pj-rehearse`. The
 usual changes to those files are::
 
-    base_images:
-      tests-private:
-        # Always use the latest provided by "skopeo list-tags docker://registry.ci.openshift.org/ci/tests-private"
-        tag: "4.22"
     releases:
       latest:
         release:
@@ -28,7 +24,7 @@ usual changes to those files are::
           # version is installed
           KATA_RPM_VERSION: 3.31.0-2.rhaos4.19.el9
           # Add sleep here if you need to do manual testing
-          # connect to cluster and delete the cucushift-installer-wait pod when done
+          # connect to cluster and delete the sandboxed-containers-operator-post-wait pod when done
           SLEEP_DURATION: "0"
     zz_generated_metadata:
       # Set a sensible variant name like "downstream-1.9-release-4.18" or so

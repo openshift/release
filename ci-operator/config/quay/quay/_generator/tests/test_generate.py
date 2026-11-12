@@ -144,6 +144,18 @@ def test_e2e_install_template_inverts_full_default_filter() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("ocp_version", "sts", "expected"),
+    [("4.12", True, "false"), ("4.13", True, "false"), ("4.14", True, None), ("4.13", False, None)],
+)
+def test_aws_sts_skips_included_manifest_extract_before_ocp_414(
+    ocp_version: str, sts: bool, expected: str | None
+) -> None:
+    env = jinja_env(GENERATOR_DIR / "templates")
+    rendered = render_template(env, "clouds/aws.yaml.j2", _phase0_cell(ocp_version=ocp_version, sts=sts).context())
+    assert rendered["tests"][0]["steps"]["env"].get("EXTRACT_MANIFEST_INCLUDED") == expected
+
+
 def test_presubmit_test_layer_inherits_periodic_defaults() -> None:
     presubmit_cell = _phase0_cell(
         branch="master",
@@ -368,6 +380,31 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     post_refs = [step.get("ref") or step.get("chain") for step in test["steps"]["post"]]
     assert post_refs[-1] == "upi-libvirt-cleanup-post"
     assert "ipi-aws-post" not in post_refs
+
+
+def test_redhat_50_aws_metal_cell() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    filename = "quay-quay-redhat-5.0__aws-metal-ocp50-e2e-install.yaml"
+    assert filename in by_name
+    config = by_name[filename]
+    test = config["tests"][0]
+    # Naming derives from the cloud key: variant and as carry the aws-metal token.
+    assert test["as"] == "aws-metal-s3-nightly"
+    assert test["cron"] == "@weekly"
+    steps = test["steps"]
+    assert steps["cluster_profile"] == "aws-quay-qe"
+    assert steps["workflow"] == "ipi-aws"
+    # The only metal-specific input: full physical hosts as workers.
+    assert steps["env"]["COMPUTE_NODE_TYPE"] == "c5.metal"
+    assert steps["env"]["BASE_DOMAIN"] == "quayqe.devcluster.openshift.com"
+    # Like every other ipi-aws cell in this fleet, the lane installs via STS.
+    assert steps["pre"][0] == {"chain": "ipi-aws-pre-manual-oidc-sts"}
+    assert {"chain": "ipi-aws-post-manual-oidc-sts"} in steps["post"]
+    test_refs = [step["ref"] for step in steps["test"] if "ref" in step]
+    assert "quay-deploy-aws-s3" in test_refs
+    # No Equinix machinery on this lane.
+    assert "dev-scripts" not in config.get("base_images", {})
 
 
 def test_upgrade_requires_upgrade_from() -> None:

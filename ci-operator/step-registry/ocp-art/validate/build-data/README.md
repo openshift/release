@@ -1,6 +1,6 @@
 # Build-data validation
 
-The optional ACM/MCE presubmits follow the existing `art-konflux-delivery-repo-check`
+The required ACM/MCE presubmits follow the existing `art-konflux-delivery-repo-check`
 configuration pattern:
 
 ```text
@@ -16,8 +16,9 @@ The first pass covers every existing ACM and MCE release branch:
 - ACM: `2.11`, `2.13`, `2.14`, `2.15`, `2.16`, `2.17`, `5.0`, `5.1`.
 - MCE: `2.6`, `2.8`, `2.9`, `2.10`, `2.11`, `2.17`, `5.0`, `5.1`.
 
-All 16 jobs remain optional while baseline findings are corrected. Each additional
-branch needs its own CI configuration referencing the same workflow. New y-streams
+All 16 jobs are required for PRs that change metadata matched by `run_if_changed`.
+Validation failures block merging. Each additional branch needs its own CI
+configuration referencing the same workflow. New y-streams
 are not automatically onboarded to the job. A `__periodics.yaml` variant is only
 needed for scheduled runs. Tide merge policy and branch protection are separate.
 
@@ -27,18 +28,19 @@ The validator reuses OCP YAML/schema, release, and basic member/stream validatio
 and adds the ticket's ownership, delivery-name, source-branch and Dockerfile checks:
 
 - Owners must be nonempty, and image `name` must match a delivery repository name.
-- The configured public upstream must have a usable target/fallback branch.
-- The explicit Dockerfile, or `Dockerfile` by default, must exist in that source.
-- Delivery repositories, bundle repositories and image components must be present
-  in both stage and prod RPAs.
+- Both the declared midstream (`content.source.git.url`) and public upstream
+  (`content.source.git.web`) must have a usable target/fallback branch.
+- The explicit Dockerfile, or `Dockerfile` by default, and any configured manifests
+  directory must exist in both sources.
+- In both stage and prod RPAs, image delivery repositories must be mapped under the
+  expected image component, and any bundle repository under its expected bundle component.
 
-The RPA presence contract comes from the existing
-[OCP delivery-repos step](https://github.com/openshift/release/blob/38a9915664e8c834b568f855e7e30072ad71b210/ci-operator/step-registry/ocp-art/validate/delivery-repos/ocp-art-validate-delivery-repos-commands.sh).
-Repository and component presence are independent; a separate bundle component
-is not required. Disabled and non-release images are excluded from RPA checks.
-Disabled images are skipped; WIP findings are nonblocking. No additional
-builder/dependent cycle policy is introduced. Parent `from.member` cycles and
-self-references are rejected, matching Doozer's existing ancestry validation.
+These source and component-specific RPA checks are implemented in
+[art-tools #3919](https://github.com/openshift-eng/art-tools/pull/3919).
+Disabled and non-release images are excluded from RPA checks. Disabled images
+are skipped; WIP findings are nonblocking. No additional builder/dependent cycle
+policy is introduced. Parent `from.member` cycles and self-references are
+rejected, matching Doozer's existing ancestry validation.
 
 ## Runtime inputs
 
@@ -60,17 +62,25 @@ pull authentication. No image layers are pulled. Missing catalogs and inability
 to verify access are distinct failures; `--schema-only` skips registry checks.
 Rehearsal must confirm the shared bundle is available and grants catalog access.
 
-Public source branches and files are checked anonymously using GitHub web URLs,
-following the existing OCP validator. No GitHub token or GitHub credential is required.
-`public_upstreams` selects the public source instead of its private mirror, with
-repo-specific mappings and public branch overrides respected. Without a mapping,
-the declared source is checked; inaccessible sources remain errors. Private mirrors
-are not checked separately by this token-free presubmit.
+GitHub source checks use the existing private Git cloner credential from
+`test-platform-infra/openshift-ci-robot/private-git-cloner`, mounted as
+`/etc/github-private/oauth` and passed with `--github-token-file`. This follows
+the credential declaration used by the `app-sre/infra` validation steps. The
+validator uses the GitHub API to check branches, files and directories without
+cloning private sources or downloading their contents into job artifacts.
+Rehearsal must confirm credential availability and access to the private midstreams.
+
+The validator checks the declared midstream independently of its public upstream.
+An explicit `git.web` selects the public repository; when absent, the most
+specific `public_upstreams` mapping supplies it. Public branch overrides apply
+only to the public source. Missing or inaccessible sources remain errors.
 
 Use `owner:ref` to fetch from a fork; an unqualified branch, tag or commit uses
-`openshift-eng/art-tools`. Merge the art-tools validator PR before merging release
-or rehearsing with the `main` default. Subsequent runs pick up art-tools main
-updates. OCP job migration is separate work.
+`openshift-eng/art-tools`. Merge this credential wiring before art-tools #3919,
+because subsequent runs fetch art-tools `main` and its new checks require private
+source access. To rehearse the new checks before that PR merges, set
+`ART_TOOLS_REF` to `ashwindasr:codex/ART-24206-validate-sources-and-rpa-mappings`.
+OCP job migration is separate work.
 
 ## Local testing
 
@@ -88,6 +98,7 @@ For source and RPA checks, replace `--schema-only` with:
 ```text
 --rpa-root /absolute/path/to/konflux-release-data/config
 --application acm-5-0
+--github-token-file /path/to/read-only-github-token
 ```
 
 After changing branch configs, run `make ci-operator-config jobs` and

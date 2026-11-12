@@ -26,20 +26,26 @@ if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_CLAUDE_MODEL:-}" ]]; then
 fi
 
 # --- Load JIRA credentials (read + write) ---
-# Mounted from the openshift-qse-bot-managers test-credentials secret. The
-# ai-helpers skill uses JIRA_USERNAME/JIRA_API_TOKEN both to look up existing
-# bugs and to write as the openshift-qse-bot-managers service account (append
-# triage links, comment, file new bugs).
-# Disable tracing so the token is never echoed into the CI logs.
+# Mounted from the openshift-qse-jira-sa test-credentials secret: an
+# OAuth 2.0 client credential of the service account. The ai-helpers scripts
+# exchange JIRA_CLIENT_ID/JIRA_CLIENT_SECRET for short-lived access tokens
+# themselves and call https://api.atlassian.com/ex/jira/${JIRA_CLOUD_ID}, both
+# to look up existing bugs and to write as the service account (append triage
+# links, comment, file new bugs).
+# Disable tracing so the secret is never echoed into the CI logs.
 set +x
-if [[ -f "${JIRA_EMAIL_PATH:-}" && -f "${JIRA_PAT_PATH:-}" ]]; then
-    export JIRA_USERNAME JIRA_API_TOKEN JIRA_URL
-    JIRA_USERNAME="$(cat "${JIRA_EMAIL_PATH}")"
-    JIRA_API_TOKEN="$(cat "${JIRA_PAT_PATH}")"
+if [[ -f "${JIRA_CLIENT_ID_PATH:-}" && -f "${JIRA_CLIENT_SECRET_PATH:-}" ]]; then
+    export JIRA_CLIENT_ID JIRA_CLIENT_SECRET JIRA_CLOUD_ID JIRA_URL
+    JIRA_CLIENT_ID="$(cat "${JIRA_CLIENT_ID_PATH}")"
+    JIRA_CLIENT_SECRET="$(cat "${JIRA_CLIENT_SECRET_PATH}")"
     JIRA_URL="${JIRA_URL:-https://redhat.atlassian.net}"
-    echo "JIRA credentials loaded (read + write)."
+    if [[ -z "${JIRA_CLIENT_ID}" || -z "${JIRA_CLIENT_SECRET}" ]]; then
+        echo "ERROR: JIRA service-account credentials are empty (JIRA_CLIENT_ID_PATH/JIRA_CLIENT_SECRET_PATH)."
+        exit 1
+    fi
+    echo "JIRA service-account credentials loaded (read + write)."
 else
-    echo "Warning: JIRA credentials not found (JIRA_EMAIL_PATH/JIRA_PAT_PATH); JIRA lookups will be skipped."
+    echo "Warning: JIRA credentials not found (JIRA_CLIENT_ID_PATH/JIRA_CLIENT_SECRET_PATH); JIRA lookups will be skipped."
 fi
 
 # --- Load DPCR (Sippy) bearer token for triage-record writes ---
@@ -101,9 +107,22 @@ else
     COMPONENTS_CLAUSE="components: ${TRIAGE_COMPONENTS}"
 fi
 
+# In existing-only mode the skill never files new JIRA issues. The prompts
+# below authorize bug filing, so the mode is restated after them as an
+# explicit override rather than left to the flag alone.
+EXISTING_ONLY_CLAUSE=""
+EXISTING_ONLY_OVERRIDE=""
+if [[ "${TRIAGE_EXISTING_ONLY,,}" == "true" ]]; then
+    EXISTING_ONLY_CLAUSE=", run in --existing-only mode"
+    EXISTING_ONLY_OVERRIDE="
+
+**EXISTING-ONLY MODE**: this run uses the skill's --existing-only mode, which overrides every authorization above to file new JIRA issues. Do NOT create any new JIRA issue. The only writes allowed are the ones the skill's 'Existing-only mode' section permits for a verified match to an existing issue: extending a triage or creating one for that existing issue, ci:add-jira-triage-link, and a comment on that issue using the skill's jira-comment.md template. Every bucket that would need a new bug goes into the report under 'Proposed new bugs (not filed)' and its regressions stay untriaged."
+fi
+
 echo "Starting claude bulk-triage-regressions run"
 echo "View: ${TRIAGE_VIEW}"
 echo "Components: ${TRIAGE_COMPONENTS_DISPLAY}"
+echo "Existing-only: ${TRIAGE_EXISTING_ONLY}"
 echo "Model: ${CLAUDE_MODEL}"
 
 # Install gcloud CLI for GCS artifact access (no root required)
@@ -184,11 +203,14 @@ SYSTEM_PROMPT="You are a diligent senior OpenShift release engineer on Component
 
 **CRITICAL**: You have many ci skills at your disposal. You MUST load the relevant skills using the Skill tool BEFORE you begin any work. Do NOT improvise or guess. This applies equally to subagents: instruct every subagent to review its available skills and load the appropriate ones before beginning its investigation.
 
-**WRITE SCOPE — READ CAREFULLY**: You have write credentials for both Sippy and JIRA. Sippy: a DPCR bearer token is in the environment variable \$DPCR_TOKEN — you ARE authorized to create and update Component Readiness triage records (via the ci:triage-regression skill — pass it as --token \"\$DPCR_TOKEN\") and to run the authenticated reevaluate symptom probe in dry-run (detection) mode; use \$DPCR_TOKEN directly rather than running 'oc login'. JIRA: you act as the openshift-qse-bot-managers service account (\$JIRA_USERNAME / \$JIRA_API_TOKEN) and ARE authorized to file new bugs (/jira:create bug against the OWNING component, label component-regression), comment on existing issues, and run ci:add-jira-triage-link after each triage. Every JIRA issue or comment you create MUST end with the AI-attribution footer as its own visually marked block (an ADF rule followed by a note panel containing 'AI-generated content: filed by AI as part of Component Readiness triage duty. Please verify before acting on it.'); after add-jira-triage-link runs, verify that footer is still the final block. You are NOT authorized to: transition, resolve, or close JIRA issues; set release blockers; or create/modify Sippy labels or symptoms — capture each of those as a recommendation in the report. Do NOT post anything to Slack or anywhere else."
+**WRITE SCOPE — READ CAREFULLY**: You have write credentials for both Sippy and JIRA. Sippy: a DPCR bearer token is in the environment variable \$DPCR_TOKEN — you ARE authorized to create and update Component Readiness triage records (via the ci:triage-regression skill — pass it as --token \"\$DPCR_TOKEN\") and to run the authenticated reevaluate symptom probe in dry-run (detection) mode; use \$DPCR_TOKEN directly rather than running 'oc login'. JIRA: you act as the openshift-qse JIRA service account, authenticated with an OAuth client credential (\$JIRA_CLIENT_ID / \$JIRA_CLIENT_SECRET / \$JIRA_CLOUD_ID) that the ai-helpers scripts pick up from the environment. Basic auth and direct REST calls to redhat.atlassian.net do NOT work with it: verify access with 'python3 /opt/ai-helpers/plugins/ci/scripts/jira_auth.py check' and send any direct JIRA REST call through 'python3 /opt/ai-helpers/plugins/ci/scripts/jira_auth.py request <METHOD> /rest/api/3/... [--data-file body.json]'. You ARE authorized to file new bugs (/jira:create bug against the OWNING component, label component-regression), comment on existing issues, and run ci:add-jira-triage-link after each triage. Every JIRA issue or comment you create MUST end with the AI-attribution footer as its own visually marked block (an ADF rule followed by a note panel containing 'AI-generated content: filed by AI as part of Component Readiness triage duty. Please verify before acting on it.'); after add-jira-triage-link runs, verify that footer is still the final block. You are NOT authorized to: transition, resolve, or close JIRA issues; set release blockers; or create/modify Sippy labels or symptoms — capture each of those as a recommendation in the report. Do NOT post anything to Slack or anywhere else."
 
-PROMPT="Load and follow the ci:bulk-triage-regressions skill for view '${TRIAGE_VIEW}' covering ${COMPONENTS_CLAUSE}. Execute Phases 1-5 fully. You ARE authorized to create or extend Sippy triage records (use \$DPCR_TOKEN), to file new JIRA bugs against the owning component for buckets with no existing bug, to comment on existing bugs, and to append the Component Readiness triage link to each bug (ci:add-jira-triage-link) — every JIRA issue or comment you create must carry the AI-attribution footer. Record a recommendation in the report instead of performing the action for: release blockers, new Sippy symptoms/labels, and any JIRA transition/resolve/close (these need human confirmation).
+PROMPT="Load and follow the ci:bulk-triage-regressions skill for view '${TRIAGE_VIEW}' covering ${COMPONENTS_CLAUSE}${EXISTING_ONLY_CLAUSE}. Execute Phases 1-5 fully. You ARE authorized to create or extend Sippy triage records (use \$DPCR_TOKEN), to file new JIRA bugs against the owning component for buckets with no existing bug, to comment on existing bugs, and to append the Component Readiness triage link to each bug (ci:add-jira-triage-link) — every JIRA issue or comment you create must carry the AI-attribution footer. Record a recommendation in the report instead of performing the action for: release blockers, new Sippy symptoms/labels, and any JIRA transition/resolve/close (these need human confirmation).
 
 Write the complete duty report as GitHub-flavored markdown to ${WORKDIR}/${REPORT_FILE}. The report must contain: the untriaged-regression inventory table, the bucket list with member regression IDs and evidence (error signatures, failure stage, representative run links, suspect PRs), the recommended disposition per bucket (extend triage <id> / link to <JIRA> / file new bug against <component> with a draft summary), deliberately-untriaged leftovers with reasons, and cross-cutting observations. Every claim must cite artifact paths or run URLs."
+
+SYSTEM_PROMPT+="${EXISTING_ONLY_OVERRIDE}"
+PROMPT+="${EXISTING_ONLY_OVERRIDE}"
 
 PHASE_ANALYSIS_START=$(date +%s)
 CLAUDE_EXIT=0

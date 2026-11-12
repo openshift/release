@@ -9,7 +9,6 @@ workflow:
       CUSTOM_AZURE_REGION: eastus
       COMPUTE_NODE_REPLICAS: "1"
       OPERATORS_TO_MIRROR: "sandboxed-containers-operator"
-      SLEEP_DURATION: 3h
       MUST_GATHER_IMAGE: "registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest"
       MUST_GATHER_TIMEOUT: "35m"
       ENABLE_MUST_GATHER: "false"
@@ -36,11 +35,11 @@ workflow:
     - chain: sandboxed-containers-operator-test
     post:
     - chain: sandboxed-containers-operator-testsuites
-    - ref: cucushift-installer-wait
+    - ref: sandboxed-containers-operator-gather-must-gather
+    - ref: sandboxed-containers-operator-post-wait
       timeout: 12h10m0s
       best_effort: true
       optional_on_success: true
-    - ref: sandboxed-containers-operator-gather-must-gather
     - ref: sandboxed-containers-operator-deprovision-isolation-common-acr-endpoint
       best_effort: true
     - chain: cucushift-installer-rehearse-azure-ipi-disconnected-deprovision

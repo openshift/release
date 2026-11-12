@@ -30,9 +30,8 @@ eval "$(
 # shellcheck disable=SC2329
 # RunPostProcessPrep merges the jUnit XML under ARTIFACT_DIR, archives the originals,
 # and copies the merged file to SHARED_DIR. When MAP_TESTS=true, the merged suite
-# name is "<LP_IO__CR_COMP_PREFIX>--<original pytest suite>". %s is replaced with
-# the suite name already in the jUnit file. The prefix defaults to
-# lp-interop--CNV--ACM+Virt. The merge itself always runs.
+# name is "<LP_QE__CR__TS_NAME__PFX__CNV>--<original pytest suite>". %s is replaced with
+# the suite name already in the jUnit file. The merge itself always runs.
 # The library call is a plain statement, not `helper || rc=$?`. The helper ends with
 # `true`, and a command on the left of `||` has errexit suppressed for its whole body,
 # so a failed merge or copy would be reported as success. HandleExit turns errexit off
@@ -41,7 +40,7 @@ RunPostProcessPrep() {
     typeset newTsName=''
     typeset -i ppRC=0
     if [[ "${MAP_TESTS}" == 'true' ]]; then
-        newTsName="${LP_IO__CR_COMP_PREFIX}--%s"
+        newTsName="${LP_QE__CR__TS_NAME__PFX__CNV:+${LP_QE__CR__TS_NAME__PFX__CNV}--}%s"
     fi
     LP_IO__ET_PPP__NEW_TS_NAME="${newTsName}" \
         ExitTrap--PostProcessPrep "${mergedJunitFN}"

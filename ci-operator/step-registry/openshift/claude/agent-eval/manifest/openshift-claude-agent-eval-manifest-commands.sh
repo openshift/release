@@ -9,10 +9,9 @@ cat > "${runner_dir}/eval_plan.py" <<'PYTHON_SOURCE_0'
 
 from dataclasses import dataclass
 import hashlib
-import os
 from pathlib import Path
 import re
-import subprocess
+from typing import Optional
 
 
 class EvalError(Exception):
@@ -39,6 +38,10 @@ class EvalPlan:  # pylint: disable=too-many-instance-attributes
     cases: tuple = ()
     config_chain: tuple = ()
     eval_name: str = ""
+    # Preflight-resolved identity the post-run check compares the run against;
+    # never re-read from the eval YAML after the orchestrator has run.
+    skill: Optional[str] = None
+    dataset_path: Optional[str] = None
 
     @property
     def artifact_name(self):
@@ -88,27 +91,408 @@ def repo_directory(repo, value, field):
     if not path.is_relative_to(repo) or not path.is_dir():
         raise EvalError(f"{field} must reference an existing directory inside the repository: {value}")
     return path
-
-
-def changed_files(repo, base_sha):
-    if not re.fullmatch(r"[0-9a-fA-F]{7,64}", base_sha):
-        raise EvalError("changed-file selection requires PULL_BASE_SHA containing a Git commit SHA")
-    try:
-        root = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=repo,
-                              check=True, capture_output=True, text=True).stdout.strip()
-        if Path(root).resolve() != repo:
-            raise EvalError("EVAL_WORKDIR must be the root of the PR Git checkout")
-        # --no-renames includes both old and new paths, so a move out of a
-        # triggered directory still selects its eval. -z preserves odd filenames.
-        diff = subprocess.run(
-            ["git", "diff", "--name-only", "-z", "--no-renames", f"{base_sha}...HEAD", "--"],
-            cwd=repo, check=True, capture_output=True).stdout
-    except subprocess.CalledProcessError as error:
-        raise EvalError("cannot compute PR changes; ensure the checkout includes PULL_BASE_SHA "
-                        "and its merge base (a diff failure is not a no-op)") from error
-    return [os.fsdecode(path) for path in diff.split(b"\0") if path]
 PYTHON_SOURCE_0
-cat > "${runner_dir}/eval_config.py" <<'PYTHON_SOURCE_1'
+cat > "${runner_dir}/eval_changes.py" <<'PYTHON_SOURCE_1'
+"""PR changed files from Prow's JOB_SPEC and the GitHub pull request files API.
+
+The step image needs no Git history: the job's refs name the repository and
+pull request heads Prow tested, and GitHub lists each pull request's files.
+The API client takes an injectable opener so tests never touch the network.
+"""
+
+from dataclasses import dataclass
+import http.client
+import json
+import re
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+try:
+    from .eval_plan import EvalError
+except ImportError:
+    from eval_plan import EvalError
+
+
+API_URL = "https://api.github.com"
+PER_PAGE = 100  # The maximum page size of the pull request files endpoint.
+# GET /repos/{owner}/{repo}/pulls/{number}/files "includes a maximum of 3000 files":
+# https://docs.github.com/en/rest/pulls/pulls#list-pull-requests-files
+FILE_LIST_CAP = 3000
+REQUEST_TIMEOUT = 30
+MAX_ATTEMPTS = 4
+MAX_RETRY_WAIT = 120  # Never sleep longer than this for one retry.
+SELECTION_TIMEOUT = 600
+JOB_TYPES = ("presubmit", "batch")
+OWNER = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,98}[A-Za-z0-9])?")
+REPOSITORY = re.compile(r"[A-Za-z0-9._-]{1,100}")
+SHA = re.compile(r"[0-9a-fA-F]{40}")
+NEXT_LINK = re.compile(r'<([^>]+)>\s*;\s*rel="?next"?')
+
+
+@dataclass(frozen=True)
+class Pull:
+    number: int
+    sha: str
+
+
+@dataclass(frozen=True)
+class ChangeTarget:
+    """The repository checked out for the job and the pull requests merged into it."""
+
+    org: str
+    repo: str
+    base_ref: str
+    pulls: tuple
+    job_refs: str  # org/repo#number of JOB_SPEC refs, for diagnostics.
+    from_extra_refs: bool
+
+    @property
+    def name(self):
+        return f"{self.org}/{self.repo}"
+
+
+def _refs_label(refs):
+    pulls = refs.get("pulls") if isinstance(refs.get("pulls"), list) else []
+    numbers = ",".join(f"#{pull.get('number')}" for pull in pulls if isinstance(pull, dict))
+    return f"{refs.get('org')}/{refs.get('repo')}{numbers}"
+
+
+def _pulls(refs, label):
+    pulls = refs.get("pulls", [])
+    if pulls is None:
+        pulls = []
+    if not isinstance(pulls, list):
+        raise EvalError(f"JOB_SPEC {label}.pulls must be a list")
+    parsed = []
+    for index, pull in enumerate(pulls):
+        field = f"JOB_SPEC {label}.pulls[{index}]"
+        if not isinstance(pull, dict):
+            raise EvalError(f"{field} must be a mapping")
+        number, sha = pull.get("number"), pull.get("sha")
+        if not isinstance(number, int) or isinstance(number, bool) or number <= 0:
+            raise EvalError(f"{field}.number must be a positive integer: {number!r}")
+        if not isinstance(sha, str) or not SHA.fullmatch(sha):
+            raise EvalError(f"{field}.sha must be the 40-character commit SHA Prow tested: {sha!r}")
+        parsed.append(Pull(number, sha.lower()))
+    return tuple(parsed)
+
+
+def parse_job_spec(raw, job_type):
+    """Return the repository and pull requests whose changes select evals.
+
+    The target is the ref checked out as the working directory, as Prow
+    decides it: the first ref with workdir: true, otherwise refs. A pj-rehearse
+    rehearsal of a consumer job has refs naming the openshift/release PR and
+    the consumer as a workdir extra_ref without pulls; it has no PR diff for
+    the consumer, and the openshift/release PR's files are never used.
+    """
+    if job_type not in JOB_TYPES:
+        raise EvalError(f"changed-file selection supports JOB_TYPE {' or '.join(JOB_TYPES)}, not {job_type!r}")
+    if not isinstance(raw, str) or not raw.strip():
+        raise EvalError("changed-file selection requires Prow's JOB_SPEC environment variable")
+    try:
+        spec = json.loads(raw)
+    except ValueError as error:
+        raise EvalError(f"JOB_SPEC is not valid JSON: {error}") from error
+    if not isinstance(spec, dict):
+        raise EvalError("JOB_SPEC must be a JSON object")
+    if spec.get("type") != job_type:
+        raise EvalError(f"JOB_SPEC type {spec.get('type')!r} does not match JOB_TYPE {job_type!r}")
+    refs, extra_refs = spec.get("refs"), spec.get("extra_refs")
+    extra_refs = [] if extra_refs is None else extra_refs
+    if not isinstance(refs, dict):
+        raise EvalError(f"JOB_SPEC of a {job_type} job must contain refs")
+    if not isinstance(extra_refs, list) or not all(isinstance(ref, dict) for ref in extra_refs):
+        raise EvalError("JOB_SPEC extra_refs must be a list of mappings")
+    labels = ["refs", *(f"extra_refs[{index}]" for index in range(len(extra_refs)))]
+    index = next((i for i, ref in enumerate([refs, *extra_refs]) if ref.get("workdir") is True), 0)
+    target, label = [refs, *extra_refs][index], labels[index]
+    org, repo = target.get("org"), target.get("repo")
+    if not isinstance(org, str) or not OWNER.fullmatch(org):
+        raise EvalError(f"JOB_SPEC {label}.org is not a GitHub owner name: {org!r}")
+    if not isinstance(repo, str) or not REPOSITORY.fullmatch(repo) or repo in (".", ".."):
+        raise EvalError(f"JOB_SPEC {label}.repo is not a GitHub repository name: {repo!r}")
+    pulls = _pulls(target, label)
+    if index == 0:  # Prow's own refs: a presubmit has one pull, a batch at least one.
+        if job_type == "presubmit" and len(pulls) != 1:
+            raise EvalError(f"JOB_SPEC refs of a presubmit job must contain exactly one pull, found {len(pulls)}")
+        if job_type == "batch" and not pulls:
+            raise EvalError("JOB_SPEC refs of a batch job must contain at least one pull")
+    base_ref = target.get("base_ref") if isinstance(target.get("base_ref"), str) else ""
+    return ChangeTarget(org, repo, base_ref, pulls, _refs_label(refs), index != 0)
+
+
+def seconds_after(value, since):
+    """Seconds from since until the numeric header value; one minute if unusable."""
+    try:
+        return max(0.0, float(value) - since)
+    except (TypeError, ValueError):
+        return 60.0
+
+
+def safe_origin(parts):
+    """Name a URL in diagnostics by scheme and host only.
+
+    Userinfo, path, query, and fragment can carry credentials or tokens, so
+    a rejected URL is never logged raw.
+    """
+    try:
+        port = f":{parts.port}" if parts.port is not None else ""
+    except ValueError:
+        port = ":<invalid port>"
+    return f"{parts.scheme or '<no scheme>'}://{parts.hostname or '<unknown host>'}{port}"
+
+
+class SameOriginRedirects(urllib.request.HTTPRedirectHandler):
+    """Follow redirects only within the API origin, so the token never leaves it.
+
+    urllib copies request headers, including Authorization, to the redirect
+    target. A redirect to another host, or from HTTPS to HTTP, is refused
+    before any request is sent to it.
+    """
+
+    def __init__(self, origin):
+        super().__init__()
+        self.origin = origin
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # pylint: disable=too-many-arguments,too-many-positional-arguments
+        target = urllib.parse.urlsplit(urllib.parse.urljoin(req.full_url, newurl))
+        if (target.scheme, target.netloc) != (self.origin.scheme, self.origin.netloc):
+            fp.close()
+            raise EvalError(f"GitHub API redirected (HTTP {code}) to {safe_origin(target)}; refusing to send "
+                            f"credentials outside {safe_origin(self.origin)}")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def next_link(header):
+    match = NEXT_LINK.search(header or "")
+    return match.group(1) if match else None
+
+
+class GitHubAPI:  # pylint: disable=too-many-instance-attributes
+    """A minimal GitHub REST client: JSON GETs, bounded retries, and pagination."""
+
+    def __init__(self, token="", *, base_url=API_URL, opener=None, sleep=time.sleep,  # pylint: disable=too-many-arguments
+                 clock=time.monotonic, now=time.time, deadline=None):
+        self.token = token
+        self.base_url = base_url.rstrip("/")
+        self.opener = opener
+        self.sleep, self.clock, self.now = sleep, clock, now
+        self.deadline = deadline if deadline is not None else clock() + SELECTION_TIMEOUT
+
+    @classmethod
+    def from_env(cls, env):
+        """Authenticate with the step's mounted token file when present."""
+        token = ""
+        path = env.get("GITHUB_TOKEN_PATH")
+        if path:
+            try:
+                with open(path, encoding="utf-8") as stream:
+                    token = stream.read().strip()
+            except FileNotFoundError:
+                token = ""
+            except OSError as error:
+                raise EvalError(f"cannot read the GitHub token at GITHUB_TOKEN_PATH: {type(error).__name__}") from error
+        if not token:
+            print("WARNING: no GitHub token at GITHUB_TOKEN_PATH; the pull request API is used "
+                  "unauthenticated (public repositories only, low shared rate limit).", flush=True)
+        return cls(token)
+
+    def headers(self):
+        headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
+                   "User-Agent": "openshift-release-manifest-eval-runner"}
+        if self.token:
+            headers["Authorization"] = f"Bearer {self.token}"
+        return headers
+
+    def url(self, path, params=None):
+        query = f"?{urllib.parse.urlencode(params)}" if params else ""
+        return f"{self.base_url}{path}{query}"
+
+    def same_origin(self, url):
+        mine, theirs = urllib.parse.urlsplit(self.base_url), urllib.parse.urlsplit(url)
+        return (mine.scheme, mine.netloc) == (theirs.scheme, theirs.netloc)
+
+    def retry_wait(self, error, attempt):
+        """Seconds to wait before retrying an HTTP error, or None not to retry.
+
+        Follows https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api.
+        """
+        headers = error.headers if error.headers is not None else {}
+        if error.code in (500, 502, 503, 504):
+            wait = 2.0 ** attempt
+        elif error.code not in (403, 429):
+            wait = None
+        elif headers.get("retry-after") is not None:
+            wait = seconds_after(headers.get("retry-after"), 0.0)
+        elif headers.get("x-ratelimit-remaining") == "0":
+            wait = seconds_after(headers.get("x-ratelimit-reset"), self.now()) + 1
+        elif error.code == 429 or "rate limit" in getattr(error, "github_message", "").lower():
+            # A 429 is always a rate limit; a 403 only when GitHub says so. Without
+            # headers, GitHub says to wait at least a minute, backing off exponentially.
+            wait = 60.0 * 2 ** (attempt - 1)
+        else:
+            wait = None
+        return wait
+
+    def describe(self, error, url):
+        path = urllib.parse.urlsplit(url).path
+        detail = getattr(error, "github_message", "")
+        detail = f": {detail}" if detail else ""
+        if error.code == 404:
+            return (f"GitHub API {path} returned HTTP 404{detail}. GitHub answers 404 for a private repository "
+                    "the caller cannot read: ensure the token at GITHUB_TOKEN_PATH can read this repository's "
+                    "pull requests (a failed lookup is not a no-op)")
+        if error.code == 401:
+            return (f"GitHub API {path} rejected the token from GITHUB_TOKEN_PATH (HTTP 401){detail}; "
+                    "a failed lookup is not a no-op")
+        return f"GitHub API {path} failed with HTTP {error.code}{detail}"
+
+    def wait_or_fail(self, wait, attempt, message):
+        if wait is None:
+            raise EvalError(message)
+        if attempt >= MAX_ATTEMPTS:
+            raise EvalError(f"{message} (gave up after {attempt} attempts)")
+        if wait > MAX_RETRY_WAIT or self.clock() + wait > self.deadline:
+            raise EvalError(f"{message} (retry would wait {wait:.0f} seconds, beyond the selection time limit)")
+        print(f"WARNING: {message}; retrying in {wait:.0f} seconds ({attempt}/{MAX_ATTEMPTS})", flush=True)
+        self.sleep(wait)
+
+    def default_open(self, request, timeout):
+        """Open with urllib, following redirects only within the API origin."""
+        director = urllib.request.build_opener(SameOriginRedirects(urllib.parse.urlsplit(self.base_url)))
+        return director.open(request, timeout=timeout)
+
+    def get_url(self, url):
+        """GET one JSON document; return it with the response headers."""
+        opener = self.opener or self.default_open
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            timeout = max(1.0, min(REQUEST_TIMEOUT, self.deadline - self.clock()))
+            request = urllib.request.Request(url, headers=self.headers())
+            try:
+                with opener(request, timeout=timeout) as response:
+                    body = response.read()
+                    headers = response.headers
+            except urllib.error.HTTPError as error:
+                try:
+                    message = json.loads(error.read() or b"{}").get("message", "")
+                except (ValueError, AttributeError, OSError, http.client.HTTPException):
+                    message = ""
+                error.github_message = message if isinstance(message, str) else ""
+                self.wait_or_fail(self.retry_wait(error, attempt), attempt, self.describe(error, url))
+                continue
+            except (urllib.error.URLError, OSError, http.client.HTTPException) as error:
+                # HTTPException covers a body cut short (IncompleteRead): retry, then fail closed.
+                path = urllib.parse.urlsplit(url).path
+                self.wait_or_fail(2.0 ** attempt, attempt,
+                                  f"GitHub API {path} request failed: {type(error).__name__}: {error}")
+                continue
+            try:
+                return json.loads(body), headers
+            except ValueError as error:
+                raise EvalError(f"GitHub API {urllib.parse.urlsplit(url).path} returned invalid JSON") from error
+        raise AssertionError("unreachable")  # pragma: no cover
+
+    def get(self, path, params=None):
+        return self.get_url(self.url(path, params))[0]
+
+    def pages(self, path, params, limit):
+        """Yield each page of a paginated list, following Link rel="next"."""
+        url = self.url(path, params)
+        for _ in range(limit):
+            document, headers = self.get_url(url)
+            yield document
+            url = next_link(headers.get("Link") if headers is not None else None)
+            if url is None:
+                return
+            if not self.same_origin(url):
+                raise EvalError(f"GitHub API {path} pagination link points to {safe_origin(urllib.parse.urlsplit(url))}, "
+                                f"outside {safe_origin(urllib.parse.urlsplit(self.base_url))}; refusing to follow it")
+        raise EvalError(f"GitHub API {path} returned more than {limit} pages")
+
+
+def repository_path(value, field):
+    """GitHub file names are repository-relative; Git allows newlines but not '..'."""
+    if (not isinstance(value, str) or not value or "\0" in value or value.startswith("/")
+            or any(part in ("", ".", "..") for part in value.split("/"))):
+        raise EvalError(f"GitHub returned an invalid repository path for {field}: {value!r}")
+    return value
+
+
+def check_head(api, target, pull):
+    """Fail unless the PR still has the head and base Prow tested; return changed_files.
+
+    The base branch is compared only when JOB_SPEC names one (refs.base_ref).
+    """
+    document = api.get(f"/repos/{target.org}/{target.repo}/pulls/{pull.number}")
+    head = document.get("head") if isinstance(document, dict) else None
+    sha = head.get("sha") if isinstance(head, dict) else None
+    if not isinstance(sha, str) or sha.lower() != pull.sha:
+        raise EvalError(f"{target.name}#{pull.number} head is {sha!r}, but this job tested {pull.sha}; "
+                        "the pull request changed after the job started, so its file list does not "
+                        "describe the tested commit (rerun the job)")
+    count = document.get("changed_files")
+    if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+        raise EvalError(f"GitHub returned no usable changed_files for {target.name}#{pull.number}: {count!r}")
+    if target.base_ref:
+        base = document.get("base")
+        ref = base.get("ref") if isinstance(base, dict) else None
+        if ref != target.base_ref:
+            raise EvalError(f"{target.name}#{pull.number} targets base branch {ref!r}, but this job tested it "
+                            f"against {target.base_ref!r}; the pull request was retargeted after the job started, "
+                            "so its file list does not describe the tested merge (rerun the job)")
+    return count
+
+
+def pull_files(api, target, pull):
+    """Return a pull request's changed paths, as git diff --name-only --no-renames would.
+
+    Renames contribute the old and new paths; deletions count. The listing is
+    rejected unless it is complete and the head and base did not change while
+    reading it.
+    """
+    label = f"{target.name}#{pull.number}"
+    expected = check_head(api, target, pull)
+    if expected > FILE_LIST_CAP:
+        raise EvalError(f"{label} changes {expected} files, more than the {FILE_LIST_CAP} GitHub lists for "
+                        "a pull request; changed-file selection cannot see them all")
+    entries = []
+    path = f"/repos/{target.org}/{target.repo}/pulls/{pull.number}/files"
+    for page in api.pages(path, {"per_page": PER_PAGE}, FILE_LIST_CAP // PER_PAGE + 1):
+        if not isinstance(page, list) or not all(isinstance(entry, dict) for entry in page):
+            raise EvalError(f"GitHub API {path} did not return a list of files")
+        entries.extend(page)
+    if len(entries) != expected:
+        raise EvalError(f"GitHub listed {len(entries)} files for {label}, but the pull request reports "
+                        f"changed_files={expected}; refusing an incomplete file list")
+    check_head(api, target, pull)  # The head and base must not change while the pages are read.
+    paths = []
+    for entry in entries:
+        paths.append(repository_path(entry.get("filename"), f"{label} filename"))
+        if entry.get("status") == "renamed":
+            paths.append(repository_path(entry.get("previous_filename"), f"{label} previous_filename"))
+    return paths
+
+
+def changed_files(env, api=None):
+    """Return the union of paths changed by every pull request the job tested."""
+    target = parse_job_spec(env.get("JOB_SPEC", ""), env.get("JOB_TYPE") or "presubmit")
+    if not target.pulls:
+        print(f"NO-PR: the checkout under test is {target.name}@{target.base_ref or '<unknown>'} from "
+              f"JOB_SPEC extra_refs without a pull request (job refs: {target.job_refs}, e.g. a pj-rehearse "
+              "rehearsal); it has no PR diff, so no evaluations are selected", flush=True)
+        return []
+    api = api if api is not None else GitHubAPI.from_env(env)
+    files = {}
+    for pull in target.pulls:
+        paths = pull_files(api, target, pull)
+        print(f"CHANGES {target.name}#{pull.number} at {pull.sha[:12]}: {len(paths)} path(s)", flush=True)
+        files.update(dict.fromkeys(paths))
+    return list(files)
+PYTHON_SOURCE_1
+cat > "${runner_dir}/eval_config.py" <<'PYTHON_SOURCE_2'
 #!/usr/bin/env python3
 """Resolve eval configuration and the harness revision through the harness's own APIs."""
 
@@ -134,36 +518,28 @@ HARNESS_URL = "https://github.com/fullsend-ai/agent-eval-harness.git"
 # needs no token; GITHUB_TOKEN is attached when the environment provides one
 # only to lift shared-IP rate limits.
 HARNESS_LATEST_RELEASE = "https://api.github.com/repos/fullsend-ai/agent-eval-harness/releases/latest"
-# Set to an exact release tag or full commit SHA to stop following the latest
-# release, e.g. to bisect a harness regression; empty or unset means latest.
+# Set to an exact release tag to stop following the latest release, e.g. to
+# bisect a harness regression; empty or unset means latest.
 REVISION_OVERRIDE = "EVAL_HARNESS_REVISION"
 RELEASE_TAG = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?")
-COMMIT_SHA = re.compile(r"[0-9a-fA-F]{40}")
-RESULT_SCHEMA_VERSION = 2
-
-
-def is_commit_sha(revision):
-    """True when the revision is a full commit SHA rather than a release tag."""
-    return bool(COMMIT_SHA.fullmatch(revision))
+RESULT_SCHEMA_VERSION = 3
 
 
 def validate_harness_revision(revision):
-    """Accept only a release tag or a full commit SHA, never a moving branch.
+    """Accept only a release tag, never a moving branch or a bare commit.
 
-    The value reaches Git refspecs and rev-parse arguments, so anything that
-    is not exactly one of those two shapes is rejected outright.
+    The value reaches git clone --branch and rev-parse arguments, so anything
+    that is not exactly a release tag is rejected outright.
     """
-    if COMMIT_SHA.fullmatch(revision):
-        return revision.lower()
     if RELEASE_TAG.fullmatch(revision):
         return revision
-    raise EvalError(f"harness revision must be a release tag like v1.62.0 or a full "
-                    f"commit SHA, never a branch: {revision!r}")
+    raise EvalError(f"harness revision must be a release tag like v1.62.0, "
+                    f"never a branch or commit SHA: {revision!r}")
 
 
 def expected_commit_ref(revision):
-    """The ref naming the pinned commit: the tag's commit, or the SHA itself."""
-    return revision.lower() if is_commit_sha(revision) else f"refs/tags/{revision}^{{commit}}"
+    """The ref naming the pinned commit: the release tag's commit."""
+    return f"refs/tags/{revision}^{{commit}}"
 
 
 def latest_release_tag(document):
@@ -194,7 +570,7 @@ def resolve_latest_release(env, timeout):
 def resolve_harness_revision(env, timeout):
     """Return the revision this run uses and where it came from.
 
-    REVISION_OVERRIDE pins an exact tag or commit SHA when set (bisecting a
+    REVISION_OVERRIDE pins an exact release tag when set (bisecting a
     harness regression); otherwise the latest published release is resolved,
     so the step never runs the moving main branch, which may be broken.
     """
@@ -205,7 +581,7 @@ def resolve_harness_revision(env, timeout):
 
 
 @dataclass(frozen=True)
-class ResolvedConfig:
+class ResolvedConfig:  # pylint: disable=too-many-instance-attributes
     """The minimal resolved runner settings and structured harness config."""
 
     config: str
@@ -214,6 +590,7 @@ class ResolvedConfig:
     settings: dict
     dataset_path: Optional[str]
     config_chain: tuple
+    skill: Optional[str]
     harness_config: object
 
     def as_dict(self):
@@ -226,6 +603,7 @@ class ResolvedConfig:
             "settings": self.settings,
             "dataset_path": self.dataset_path,
             "config_chain": list(self.config_chain),
+            "skill": self.skill,
         }
 
 
@@ -286,6 +664,24 @@ def _normalize_chain(repo, config_path, chain):
     return tuple(normalized)
 
 
+def _resolve_skill(identity, harness_config):
+    """The skill the harness records as run_result.json eval_params.skill.
+
+    That is the value without a --skill override; None for prompt and
+    multi-step configs, which run no single skill.
+    """
+    resolver = getattr(harness_config, "resolve_skill", None)
+    if not callable(resolver):
+        raise EvalError(f"{identity}: pinned harness EvalConfig is missing resolve_skill()")
+    try:
+        skill = resolver()
+    except Exception as error:
+        raise EvalError(f"{identity}: harness resolve_skill() failed: {type(error).__name__}: {error}") from error
+    if skill is not None and (not isinstance(skill, str) or not skill.strip()):
+        raise EvalError(f"{identity}: harness resolve_skill() must return a nonempty string or None")
+    return skill
+
+
 def resolve_config(harness, repo, config):
     """Resolve and validate one original config path using the harness APIs."""
     repo = Path(repo).resolve()
@@ -333,6 +729,7 @@ def resolve_config(harness, repo, config):
         raise EvalError(f"{identity}: harness eval_name() failed: {type(error).__name__}: {error}") from error
     eval_name = validate_eval_name(eval_name, f"{identity}: harness eval_name()")
     config_chain = _normalize_chain(repo, config_path, chain)
+    skill = _resolve_skill(identity, harness_config)
 
     dataset = getattr(harness_config, "dataset", None)
     dataset_value = getattr(dataset, "path", None)
@@ -350,7 +747,7 @@ def resolve_config(harness, repo, config):
             raise EvalError(f"{identity}: harness could not resolve dataset.path: {error}") from error
 
     resolved = ResolvedConfig(identity, model, eval_name, {"thresholds": thresholds},
-                              dataset_path, config_chain, harness_config)
+                              dataset_path, config_chain, skill, harness_config)
     try:
         encoded = json.dumps(resolved.as_dict(), ensure_ascii=False, allow_nan=False)
         if json.loads(encoded) != resolved.as_dict():
@@ -363,7 +760,8 @@ def resolve_config(harness, repo, config):
 def validate_resolution_result(document, repo, config, eval_cases_dir=""):
     """Validate the child's result file before it enters an eval plan."""
     if not isinstance(document, dict) or set(document) != {
-            "schema_version", "config", "model", "eval_name", "settings", "dataset_path", "config_chain"}:
+            "schema_version", "config", "model", "eval_name", "settings", "dataset_path", "config_chain",
+            "skill"}:
         raise EvalError("config resolver returned an incompatible result schema")
     version = document["schema_version"]
     if not isinstance(version, int) or isinstance(version, bool) or version != RESULT_SCHEMA_VERSION:
@@ -402,8 +800,11 @@ def validate_resolution_result(document, repo, config, eval_cases_dir=""):
         if resolved_dataset != cases_path:
             raise EvalError(f"{config}: eval_cases_dir must point to the same directory "
                             "as the harness-resolved dataset.path")
+    skill = document["skill"]
+    if skill is not None and (not isinstance(skill, str) or not skill.strip()):
+        raise EvalError("config resolver returned an invalid skill")
     return {"model": model, "eval_name": eval_name, "settings": {"thresholds": thresholds},
-            "dataset_path": dataset_path, "config_chain": tuple(chain)}
+            "dataset_path": dataset_path, "config_chain": tuple(chain), "skill": skill}
 
 
 def _write_result(destination, document):
@@ -435,8 +836,8 @@ def main(argv=None):
 
 if __name__ == "__main__":
     sys.exit(main())
-PYTHON_SOURCE_1
-cat > "${runner_dir}/manifest_runner.py" <<'PYTHON_SOURCE_2'
+PYTHON_SOURCE_2
+cat > "${runner_dir}/manifest_runner.py" <<'PYTHON_SOURCE_3'
 #!/usr/bin/env python3
 """Run PR evaluations selected by the repository's manifest.
 
@@ -462,15 +863,17 @@ import yaml
 
 try:  # Package imports for repository tooling; direct imports for the CI bundle.
     from .eval_report import render_report
-    from .eval_config import (HARNESS_URL, expected_commit_ref, is_commit_sha,
-                              resolve_harness_revision, validate_resolution_result)
-    from .eval_plan import EvalError, EvalPlan, artifact_name, changed_files, relative_path, repo_directory, repo_file
+    from .eval_config import (HARNESS_URL, expected_commit_ref, resolve_harness_revision,
+                              validate_resolution_result)
+    from .eval_changes import changed_files
+    from .eval_plan import EvalError, EvalPlan, artifact_name, relative_path, repo_directory, repo_file
     from .eval_plan import validate_thresholds
 except ImportError:
     from eval_report import render_report
-    from eval_config import (HARNESS_URL, expected_commit_ref, is_commit_sha,
-                             resolve_harness_revision, validate_resolution_result)
-    from eval_plan import EvalError, EvalPlan, artifact_name, changed_files, relative_path, repo_directory, repo_file
+    from eval_config import (HARNESS_URL, expected_commit_ref, resolve_harness_revision,
+                             validate_resolution_result)
+    from eval_changes import changed_files
+    from eval_plan import EvalError, EvalPlan, artifact_name, relative_path, repo_directory, repo_file
     from eval_plan import validate_thresholds
 
 
@@ -758,6 +1161,100 @@ def verify_result(directory, settings):
             raise EvalError(f"missing thresholded judge in summary: {judge}")
 
 
+def planned_cases(plan):
+    """Return the case IDs the harness must execute for this plan.
+
+    Mirrors agent-eval-harness skills/eval-run/scripts/workspace.py (v1.62.3,
+    lines 70-83): every immediate subdirectory of the resolved dataset.path is
+    a case, ``sorted(d for d in cases_dir.iterdir() if d.is_dir())``, so
+    dot-directories and links to directories count and files do not. A
+    nonempty --cases keeps matching names and silently drops unknown IDs; the
+    runner passes only IDs it selected, so that request is the expected set.
+    Called after setup and before the orchestrator starts, so the orchestrator
+    cannot change the expectation by adding or removing case directories.
+    """
+    if plan.cases:
+        return frozenset(plan.cases)
+    if not plan.dataset_path:
+        raise EvalError("dataset.path is unset, so the full-dataset case set cannot be "
+                        "verified; set dataset.path in the eval YAML")
+    try:
+        found = frozenset(path.name for path in Path(plan.dataset_path).iterdir() if path.is_dir())
+    except OSError as error:
+        raise EvalError(f"cannot list dataset.path {plan.dataset_path}: {error}") from error
+    if not found:  # An empty expectation would let an empty per_case pass vacuously.
+        raise EvalError(f"dataset.path {plan.dataset_path} contains no case directories")
+    return found
+
+
+def normalize_recorded_path(repo, item):
+    """Normalize a recorded config_chain entry the way preflight normalized its chain.
+
+    The harness records entries relative to its working directory, or absolute
+    outside it (agent_eval/config.py project_relative); the orchestrator starts
+    in the repository root, so relative entries are resolved from there.
+    """
+    path = Path(item)
+    path = (path if path.is_absolute() else repo / path).resolve()
+    return path.relative_to(repo).as_posix() if path.is_relative_to(repo) else str(path)
+
+
+def _compare_cases(source, executed, expected):
+    if not isinstance(executed, dict) or not all(isinstance(case, str) for case in executed):
+        raise EvalError(f"{source} is missing or is not a mapping of case IDs")
+    missing, unexpected = sorted(expected - executed.keys()), sorted(executed.keys() - expected)
+    if missing or unexpected:
+        raise EvalError(f"{source} does not match the planned cases: missing {missing}, "
+                        f"unexpected {unexpected}; the orchestrator must pass exactly the planned "
+                        "--cases (none for a full-dataset run) and let every case finish")
+
+
+def verify_run_identity(directory, plan, expected_cases, repo):
+    """Require the run to be exactly the config, model, skill, and cases planned.
+
+    The orchestrator can improvise: evaluate an edited copy of the YAML, drop
+    --cases, or stop early. The pinned harness records what it ran in
+    run_result.json (execute.py _build_eval_params and the case-mode
+    aggregate); every field it writes in case mode is required, so a missing
+    field is a contract break that fails the eval rather than passing it.
+    """
+    try:
+        result = json.loads((directory / "run_result.json").read_text(encoding="utf-8"))
+        summary = yaml.safe_load((directory / "summary.yaml").read_text(encoding="utf-8"))
+    except (OSError, ValueError, yaml.YAMLError) as error:
+        raise EvalError(f"missing or invalid harness results: {error}") from error
+    params = result.get("eval_params") if isinstance(result, dict) else None
+    if not isinstance(params, dict):
+        raise EvalError("run_result.json has no eval_params mapping; cannot confirm what the harness ran")
+    modes = (result.get("execution_mode"), params.get("execution_mode"))
+    if modes != ("case", "case"):
+        raise EvalError(f"harness recorded execution_mode {modes[0]!r} (eval_params: {modes[1]!r}); "
+                        "manifest evals are verified only in case mode, which records per-case results")
+
+    chain = params.get("config_chain")
+    if not isinstance(chain, list) or not chain or not all(isinstance(item, str) and item for item in chain):
+        raise EvalError("run_result.json eval_params.config_chain is missing or invalid; "
+                        "cannot confirm which config the harness evaluated")
+    executed_chain = [normalize_recorded_path(repo.resolve(), item) for item in chain]
+    if executed_chain != list(plan.config_chain):
+        raise EvalError(f"harness evaluated config chain {executed_chain}, but the runner planned "
+                        f"{list(plan.config_chain)}; the orchestrator must run the original --config "
+                        "from the repository root, not a copied or edited file")
+    if result.get("model") != plan.model:
+        raise EvalError(f"harness ran model {result.get('model')!r}, but the runner planned "
+                        f"{plan.model!r} from models.skill; the orchestrator must pass --model unchanged")
+    # The harness records eval_params.skill whenever one resolves (execute.py
+    # _build_eval_params); absent means None, which only prompt or multi-step
+    # configs expect.
+    if params.get("skill") != plan.skill:
+        raise EvalError(f"harness ran skill {params.get('skill')!r}, but the runner planned "
+                        f"{plan.skill!r}; the orchestrator must not pass a different --skill")
+
+    _compare_cases("run_result.json per_case", result.get("per_case"), expected_cases)
+    if isinstance(summary, dict) and "per_case" in summary:
+        _compare_cases("summary.yaml per_case", summary["per_case"], expected_cases)
+
+
 def archive(directory, artifacts):
     destination = artifacts / "eval-run.tar"
     temporary = destination.with_suffix(".tmp")
@@ -909,13 +1406,6 @@ def remaining(deadline):
     return deadline - time.monotonic()
 
 
-def harness_fetch_targets(revision):
-    """Map a resolved revision to its fetch refspec and checkout target."""
-    if is_commit_sha(revision):  # a bisect pin, fetched as one exact commit
-        return revision, "FETCH_HEAD"
-    return f"refs/tags/{revision}:refs/tags/{revision}", f"refs/tags/{revision}"
-
-
 def verified_revisions(verified):
     """Split captured rev-parse output into (named commit, checked-out HEAD)."""
     lines = [line.strip() for line in verified.strip().splitlines()]
@@ -923,7 +1413,7 @@ def verified_revisions(verified):
 
 
 def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
-    """Resolve the harness revision, fetch exactly it, and verify the checkout."""
+    """Resolve the harness release tag, clone exactly it, and verify the checkout."""
     harness = Path(temporary) / "plugin"
     install_log = runner_artifacts / "harness-install.log"
     left = remaining(deadline)
@@ -931,45 +1421,39 @@ def prepare_harness(repo, env, runner_artifacts, temporary, deadline):
         raise EvalError("step time limit reached while resolving the harness revision")
     revision, source = resolve_harness_revision(env, min(30, left))
     install_log.write_text(f"Expected harness revision: {revision} ({source})\n", encoding="utf-8")
-    fetch_spec, checkout_ref = harness_fetch_targets(revision)
-    steps = (
-        (["git", "init", "--quiet", str(harness)], 60, "initialize the harness checkout"),
-        (["git", "-C", str(harness), "remote", "add", "origin", HARNESS_URL],
-         60, "configure the harness remote"),
-        (["git", "-C", str(harness), "fetch", "--no-tags", "--depth", "1", "origin", fetch_spec],
-         300, "fetch the resolved harness revision"),
-        (["git", "-C", str(harness), "checkout", "--quiet", "--detach", checkout_ref],
-         60, "check out the resolved harness revision"),
-    )
-    for args, timeout, action in steps:
-        left = remaining(deadline)
-        if left <= 0:
-            raise EvalError("step time limit reached during harness preparation; see runner/harness-install.log")
+    # A release tag clones directly, detached at the tag's commit.
+    args = ["git", "-c", "advice.detachedHead=false", "clone", "--quiet", "--depth", "1",
+            "--branch", revision, HARNESS_URL, str(harness)]
+    action = "clone the resolved harness release"
+    left = remaining(deadline)
+    if left <= 0:
+        raise EvalError("step time limit reached during harness preparation; see runner/harness-install.log")
+    with install_log.open("ab") as output:
+        output.write(("$ " + shlex.join(args) + "\n").encode())
+    try:
+        status = command(args, repo, env, install_log, min(300, left), append=True)
+    except subprocess.TimeoutExpired as error:
         with install_log.open("ab") as output:
-            output.write(("$ " + shlex.join(args) + "\n").encode())
-        try:
-            status = command(args, repo, env, install_log, min(timeout, left), append=True)
-        except subprocess.TimeoutExpired as error:
-            with install_log.open("ab") as output:
-                output.write(f"ERROR: {action} timed out after {error.timeout} seconds\n".encode())
-            raise EvalError(f"cannot {action}: step time limit reached; see runner/harness-install.log") from error
-        except OSError as error:
-            with install_log.open("ab") as output:
-                output.write(f"{type(error).__name__}: {error}\n".encode())
-            raise EvalError(f"cannot {action}; see runner/harness-install.log") from error
-        if status:
-            with install_log.open("ab") as output:
-                output.write(f"ERROR: {action} exited with status {status}\n".encode())
-            raise EvalError(f"cannot {action} (exit {status}); see runner/harness-install.log")
+            output.write(f"ERROR: {action} timed out after {error.timeout} seconds\n".encode())
+        raise EvalError(f"cannot {action}: step time limit reached; see runner/harness-install.log") from error
+    except OSError as error:
+        with install_log.open("ab") as output:
+            output.write(f"{type(error).__name__}: {error}\n".encode())
+        raise EvalError(f"cannot {action}; see runner/harness-install.log") from error
+    if status:
+        with install_log.open("ab") as output:
+            output.write(f"ERROR: {action} exited with status {status}\n".encode())
+        raise EvalError(f"cannot {action} (exit {status}); see runner/harness-install.log")
 
     left = remaining(deadline)
     if left <= 0:
         raise EvalError("step time limit reached while verifying the harness; see runner/harness-install.log")
     try:
-        # rev-parse prints one line per argument: the commit the resolved
-        # revision names, then the checked-out HEAD. Requiring both to be
-        # the same commit verifies the checkout; the resolved SHA is logged
-        # so a run stays traceable to an exact commit even if a tag moves.
+        # rev-parse prints one line per argument: the commit the release tag
+        # names, then the checked-out HEAD. Requiring both to be the same
+        # commit verifies the checkout (--branch also accepts a branch name);
+        # the resolved SHA is logged so a run stays traceable to an exact
+        # commit even if a tag moves.
         status, verified = command(["git", "-C", str(harness), "rev-parse",
                                     expected_commit_ref(revision), "HEAD"],
                                    repo, env, install_log, min(30, left),
@@ -1018,7 +1502,8 @@ def preflight_evals(repo, entries, files, artifacts, harness, temporary, env,  #
             cases = select_cases(repo, entry, files, resolved["config_chain"]) or ()
             plans.append(EvalPlan(entry.config, resolved["settings"], resolved["model"],
                                   entry.parallelism, entry.max_turns, entry.setup_script,
-                                  tuple(cases), resolved["config_chain"], resolved["eval_name"]))
+                                  tuple(cases), resolved["config_chain"], resolved["eval_name"],
+                                  skill=resolved["skill"], dataset_path=resolved["dataset_path"]))
         except Exception as error:  # pylint: disable=broad-exception-caught
             message = f"{entry.config}: {type(error).__name__}: {error}"
             record.update(status="failed", failure=message)
@@ -1099,6 +1584,7 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
                         run_env["EVAL_SNAPSHOT_DIR"] = snapshot
                     if remaining(deadline) <= 0:
                         raise EvalError("step time limit reached during setup")
+                    expected_cases = planned_cases(plan)
                     invoked = True
                     status = command(["claude", "--model", env.get("CLAUDE_MODEL", "claude-opus-4-6"),
                                       "--plugin-dir", str(harness), "--allowedTools",
@@ -1110,6 +1596,7 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
                         raise EvalError(f"Claude orchestrator failed (exit {status}); see {stream_log.name}")
                     directory = run_directory(runs, run_id, plan.eval_name)
                     verify_result(directory, plan.settings)
+                    verify_run_identity(directory, plan, expected_cases, repo)
                     if remaining(deadline) <= 0:
                         raise EvalError("step time limit reached before regression scoring")
                     # Score the verified physical run through the same harness
@@ -1178,16 +1665,21 @@ def interrupted(signum, _frame):
     raise Interrupted(f"interrupted by signal {signum}")
 
 
-def select_manifest_entries(repo, env):
-    """Validate manifest and diff inputs, then select only explicit triggers."""
+def select_manifest_entries(repo, env, *, github=None):
+    """Validate manifest and PR change inputs, then select only explicit triggers.
+
+    Changed files come from Prow's JOB_SPEC and the GitHub pull request files
+    API, never from Git history in the checkout; github injects the API client.
+    """
     if env.get("EVAL_DISCOVER") or env.get("EVAL_CONFIG", "eval.yaml") not in ("", "eval.yaml"):
         raise EvalError("the manifest workflow does not accept EVAL_DISCOVER or explicit EVAL_CONFIG")
     if env.get("EVAL_EXTRA_ARGS"):
         raise EvalError("EVAL_EXTRA_ARGS is not supported in manifest mode; settings belong in the manifest/eval YAML")
-    if env.get("JOB_TYPE", "presubmit") != "presubmit":
-        raise EvalError("manifest mode currently supports PR runs only (periodic/manual are follow-on work)")
+    if env.get("JOB_TYPE", "presubmit") not in ("presubmit", "batch"):
+        raise EvalError("manifest mode currently supports PR runs only: presubmit and batch jobs "
+                        "(periodic/manual are follow-on work)")
     entries = load_manifest(repo)
-    files = changed_files(repo, env.get("PULL_BASE_SHA", "")) if any(e.run == "pr" for e in entries) else []
+    files = changed_files(env, github) if any(e.run == "pr" for e in entries) else []
     return select_evals(entries, files), files
 
 
@@ -1217,8 +1709,8 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-PYTHON_SOURCE_2
-cat > "${runner_dir}/eval_metrics.py" <<'PYTHON_SOURCE_3'
+PYTHON_SOURCE_3
+cat > "${runner_dir}/eval_metrics.py" <<'PYTHON_SOURCE_4'
 #!/usr/bin/env python3
 """AutoDL accounting ported from the legacy eval step, without a Bash bridge."""
 
@@ -1544,8 +2036,8 @@ def main(args):  # pylint: disable=too-many-statements
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-PYTHON_SOURCE_3
-cat > "${runner_dir}/eval_report.py" <<'PYTHON_SOURCE_4'
+PYTHON_SOURCE_4
+cat > "${runner_dir}/eval_report.py" <<'PYTHON_SOURCE_5'
 #!/usr/bin/env python3
 """Render evals-summary.json as self-contained HTML without model calls.
 
@@ -1666,8 +2158,8 @@ def main():
 
 if __name__ == "__main__":
     main()
-PYTHON_SOURCE_4
-cat > "${runner_dir}/eval_regression.py" <<'PYTHON_SOURCE_5'
+PYTHON_SOURCE_5
+cat > "${runner_dir}/eval_regression.py" <<'PYTHON_SOURCE_6'
 #!/usr/bin/env python3
 """Apply the runner's preflight thresholds to the run directory it already verified."""
 
@@ -1738,8 +2230,8 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-PYTHON_SOURCE_5
-cat > "${runner_dir}/eval-report.html" <<'PYTHON_SOURCE_6'
+PYTHON_SOURCE_6
+cat > "${runner_dir}/eval-report.html" <<'PYTHON_SOURCE_7'
 <!doctype html>
 <html lang="en">
 <head>
@@ -1788,8 +2280,8 @@ $body
 $artifact_links
 </body>
 </html>
-PYTHON_SOURCE_6
-cat > "${runner_dir}/eval-report.css" <<'PYTHON_SOURCE_7'
+PYTHON_SOURCE_7
+cat > "${runner_dir}/eval-report.css" <<'PYTHON_SOURCE_8'
 /* Colors, typography, chips, cards, and theme control adapted from
  * opendatahub-io/agent-eval-harness, Apache-2.0 (see repository LICENSE).
  * skills/eval-run/scripts/report.py at 3c4165bbfdd4a20f4472eec9c1c85e62f5167fba.
@@ -1920,7 +2412,7 @@ a:hover { text-decoration: underline; }
 .report-note { color: var(--text-muted); font-size: .9em; }
 @media (max-width: 600px) { body { padding: 1em; } .section { padding: 1em; } .eval-heading { flex-direction: column; gap: .5em; } }
 @media print { #theme-toggle { display: none; } .section { break-inside: avoid; } }
-PYTHON_SOURCE_7
+PYTHON_SOURCE_8
 
 # Forward termination so Python can stop its children and preserve artifacts
 # before the temporary source files are removed.
