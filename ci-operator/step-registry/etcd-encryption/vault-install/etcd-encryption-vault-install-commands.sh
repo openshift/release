@@ -1166,6 +1166,10 @@ EOF
 EOF
 )"
   else
+    # Keep ha.apiAddr even in standalone: the Vault chart sets VAULT_API_ADDR
+    # from server.ha.apiAddr and otherwise falls back to https://$(POD_IP):8200,
+    # which is an invalid URL on IPv6 (needs brackets). Service DNS works for
+    # both stacks; metal ipv6 jobs use this path (HA is forced off on metal).
     mode_block="$(cat <<EOF
   standalone:
     enabled: true
@@ -1178,6 +1182,8 @@ EOF
       storage "file" {
         path = "/vault/data"
       }
+  ha:
+    apiAddr: ${vault_api_addr}
 EOF
 )"
   fi
