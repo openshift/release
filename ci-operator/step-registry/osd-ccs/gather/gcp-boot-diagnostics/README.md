@@ -8,10 +8,9 @@ cluster, and leave no guest-level evidence before the post phase deletes the
 cluster. This step records a bounded, allow-listed summary of what the
 instances reported on their serial console while they still exist.
 
-Run the offline regression tests from the repository root:
+Lint the delivered script from the repository root:
 
 ```sh
-make test-osd-ccs-gcp-boot-diagnostics
 shellcheck ci-operator/step-registry/osd-ccs/gather/gcp-boot-diagnostics/*commands.sh
 ```
 
@@ -57,8 +56,14 @@ cluster is still reported ready.
 
 ## Scope and identity
 
-The cluster name is read only from `SHARED_DIR/cluster-name`, which
-`osd-ccs-cluster-provision-gcp` writes before every one of its failure exits.
+The cluster name is read only from `SHARED_DIR/cluster-name`.
+`osd-ccs-cluster-provision-gcp` writes that file only once `ocm create cluster`
+has returned successfully; because that script runs under `set -o errexit`, any
+earlier failure exits before the write and leaves the file absent. The file is
+therefore present for the case this step exists to observe, a cluster that was
+created but never became ready, and absent when provisioning failed before the
+cluster existed at all, where there is nothing to collect.
+
 A missing, symlinked, multi-valued or malformed value fails closed with an
 `identity_*` outcome. There is no project-wide scan, no fallback discovery and
 no caller-supplied project or instance input; the project id comes from the

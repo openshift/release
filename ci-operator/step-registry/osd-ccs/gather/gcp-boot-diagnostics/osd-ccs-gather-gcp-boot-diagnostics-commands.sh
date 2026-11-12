@@ -42,17 +42,48 @@ fi
 umask 0077
 
 # The scratch directory must never live under a directory that is published or
-# handed to another step, whatever TMPDIR happens to say.
-SCRATCH_BASE="${TMPDIR:-/tmp}"
-case "${SCRATCH_BASE}/" in
-  "${ARTIFACT_DIR}"/* | "${SHARED_DIR:-/nonexistent}"/*) SCRATCH_BASE="/tmp" ;;
-esac
+# handed to another step, whatever TMPDIR happens to say. Comparing the strings
+# is not enough: a symlinked or relative TMPDIR can resolve into one of them.
+# Canonicalise every path first, and decide before anything is created.
+canonicalise() {
+  realpath -m -- "$1" 2>/dev/null || readlink -m -- "$1" 2>/dev/null || true
+}
+
+SCRATCH_BASE="$(canonicalise "${TMPDIR:-/tmp}")"
+ARTIFACT_CANON="$(canonicalise "${ARTIFACT_DIR}")"
+SHARED_CANON="$(canonicalise "${SHARED_DIR:-}")"
+
+if [[ -z "${SCRATCH_BASE}" || -z "${ARTIFACT_CANON}" ]]; then
+  # Without canonical paths the candidate cannot be shown to be safe.
+  SCRATCH_BASE="/tmp"
+else
+  case "${SCRATCH_BASE}/" in
+    "${ARTIFACT_CANON}"/*) SCRATCH_BASE="/tmp" ;;
+  esac
+  if [[ -n "${SHARED_CANON}" ]]; then
+    case "${SCRATCH_BASE}/" in
+      "${SHARED_CANON}"/*) SCRATCH_BASE="/tmp" ;;
+    esac
+  fi
+fi
 
 SCRATCH="$(mktemp -d "${SCRATCH_BASE}/gcp-boot-diag.XXXXXX" 2>/dev/null)" || SCRATCH=""
 if [[ -z "${SCRATCH}" || ! -d "${SCRATCH}" ]]; then
   printf '{"schema":1,"collector":"incomplete","reason":"scratch_unavailable"}\n' \
     > "${OUTPUT_DIR}/collection-outcome.json"
   log "unable to create private scratch directory; nothing collected."
+  exit 0
+fi
+
+# Re-check the directory that actually got created, so the invariant holds even
+# if the base was changed underneath us.
+SCRATCH_CANON="$(canonicalise "${SCRATCH}")"
+if [[ -z "${SCRATCH_CANON}" ]] || { [[ -n "${ARTIFACT_CANON}" ]] && [[ "${SCRATCH_CANON}/" == "${ARTIFACT_CANON}"/* ]]; } \
+   || { [[ -n "${SHARED_CANON}" ]] && [[ "${SCRATCH_CANON}/" == "${SHARED_CANON}"/* ]]; }; then
+  rm -rf "${SCRATCH}" 2>/dev/null || true
+  printf '{"schema":1,"collector":"incomplete","reason":"scratch_unavailable"}\n' \
+    > "${OUTPUT_DIR}/collection-outcome.json"
+  log "refusing to stage collected data under a published directory."
   exit 0
 fi
 chmod 0700 "${SCRATCH}"
@@ -362,7 +393,9 @@ def bounded_lines(handle, meter):
             if skipping:
                 skipping = False
                 continue
-            yield line
+            # The cap applies whether or not the line happened to be
+            # newline-terminated; content past it is never scanned.
+            yield line[:MAX_LINE_CHARS]
         if len(pending) > MAX_LINE_CHARS:
             if not skipping:
                 yield pending[:MAX_LINE_CHARS]
@@ -420,43 +453,48 @@ def summarize(path, oversized):
 
 
 def collect(instances, project_id):
+    """Read each in-scope instance.
+
+    A Failure raised here means the overall budget ran out before every
+    instance was attempted. It propagates, so the sweep is not reported as
+    complete, while the records gathered so far are kept. An ordinary
+    per-instance timeout is a status on that instance and does not propagate.
+    """
     examined = 0
-    for index, (name, zone, state) in enumerate(instances):
-        sink = SCRATCH / "serial-{0}.log".format(index)
-        try:
+    try:
+        for index, (name, zone, state) in enumerate(instances):
+            sink = SCRATCH / "serial-{0}.log".format(index)
             status = gcloud([
                 "compute", "instances", "get-serial-port-output",
                 "--project", project_id, "--zone", zone, name,
             ], sink)
-        except Failure as error:
-            OUTCOME["instances"].append({"index": index, "collection": str(error)})
-            break
-        # Instance names, zones and project ids are deliberately absent here.
-        record = {
-            "index": index,
-            "collection": status,
-            "instance_state": state if state in (
-                "PROVISIONING", "STAGING", "RUNNING", "STOPPING", "TERMINATED",
-                "SUSPENDED", "REPAIRING") else "unknown",
-        }
-        if status == "ok":
+            # Instance names, zones and project ids are deliberately absent here.
+            record = {
+                "index": index,
+                "collection": status,
+                "instance_state": state if state in (
+                    "PROVISIONING", "STAGING", "RUNNING", "STOPPING",
+                    "TERMINATED", "SUSPENDED", "REPAIRING") else "unknown",
+            }
+            if status == "ok":
+                try:
+                    size = sink.stat().st_size
+                except OSError:
+                    size = 0
+                oversized = size > MAX_OUTPUT_BYTES
+                record["bytes_truncated"] = oversized
+                if size == 0:
+                    record["collection"] = "no_signal"
+                else:
+                    record["signals"] = summarize(sink, oversized)
+                examined += 1
             try:
-                size = sink.stat().st_size
+                sink.unlink()
             except OSError:
-                size = 0
-            oversized = size > MAX_OUTPUT_BYTES
-            record["bytes_truncated"] = oversized
-            if size == 0:
-                record["collection"] = "no_signal"
-            else:
-                record["signals"] = summarize(sink, oversized)
-            examined += 1
-        try:
-            sink.unlink()
-        except OSError:
-            pass
-        OUTCOME["instances"].append(record)
-    OUTCOME["instances_examined"] = examined
+                pass
+            OUTCOME["instances"].append(record)
+    finally:
+        OUTCOME["instances_examined"] = examined
 
 
 try:
