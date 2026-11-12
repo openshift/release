@@ -150,7 +150,7 @@ validate_and_set_defaults() {
     fi
 
     # Must-gather image to use for collecting debug information
-    MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest}"
+    MUST_GATHER_IMAGE="${MUST_GATHER_IMAGE:-quay.io/redhat-user-workloads/ose-osc-tenant/osc-must-gather:latest}"
 
     # Only collect must-gather on test failure
     MUST_GATHER_ON_FAILURE_ONLY="${MUST_GATHER_ON_FAILURE_ONLY:-true}"
@@ -206,7 +206,7 @@ show_usage() {
     echo "  KATA_RPM_VERSION               - Kata RPM version (default: 3.17.0-3.rhaos4.19.el9)"
     echo "  SLEEP_DURATION                 - Sleep duration after tests (default: 0h)"
     echo "  ENABLE_MUST_GATHER             - Enable must-gather: true or false (default: true)"
-    echo "  MUST_GATHER_IMAGE              - Must-gather image (default: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest)"
+    echo "  MUST_GATHER_IMAGE              - Must-gather image (default: quay.io/redhat-user-workloads/ose-osc-tenant/osc-must-gather:latest)"
     echo "  MUST_GATHER_ON_FAILURE_ONLY    - Must-gather on failure only: true or false (default: true)"
     echo "  AWS_REGION_OVERRIDE            - AWS region (default: us-east-2)"
     echo "  CUSTOM_AZURE_REGION            - Azure region (default: eastus)"
