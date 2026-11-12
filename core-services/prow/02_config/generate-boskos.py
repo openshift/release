@@ -5,6 +5,10 @@ import json
 import yaml
 
 CONFIG = {
+    # One authentication-only pilot at a time, without consuming installation quota.
+    'gcp-aws-federation-pilot-quota-slice': {
+        'gcp-aws-federation-pilot': 1,
+    },
     'ibmcloud-perfscale-jp-quota-slice': {
         'jp-osa': 10,
     },
