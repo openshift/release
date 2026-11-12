@@ -32,7 +32,38 @@ if [[ ! -s "${CLEAN_TAR}" && ! -s "${CLUSTER_ID_FILE}" ]]; then
 fi
 
 podman_env_file="$(mktemp)"
-trap 'rm -f "${podman_env_file}"' EXIT
+ocm_fvt_workdir=""
+
+# The raw container output is private to this step and should not outlive it. Every
+# exit path tries to remove it, after publication has already copied the collector-owned
+# results into ARTIFACT_DIR, so the published copies are never touched. The removal is
+# best effort rather than guaranteed: see the note on ownership below.
+#
+# Every command here is guarded, and the handler returns success: under errexit a
+# failing command inside an EXIT trap both skips the rest of the handler and replaces
+# the script's exit status, which must stay the one justClean returned.
+# shellcheck disable=SC2317  # the body runs from the EXIT trap installed below
+cleanup_ocm_fvt_clean() {
+  rm -f "${podman_env_file}" 2>/dev/null || true
+  # Only ever a directory this step created: the helper's staging directory
+  # (.ocm-fvt-*) or a /tmp fallback (ocm-fvt-clean.*). The name check keeps a helper
+  # that ever returned something else - ARTIFACT_DIR above all - out of the rm below.
+  local workdir="${ocm_fvt_workdir:-}"
+  if [[ -n "${workdir}" && ! -L "${workdir}" && -d "${workdir}" ]] &&
+     [[ "${workdir##*/}" == .ocm-fvt-* || "${workdir##*/}" == ocm-fvt-clean.* ]]; then
+    # The container leaves read-only result directories behind, so restore the owner
+    # write bit first. Both steps are best effort, and neither is allowed to fail the
+    # step: when the chown above did not apply, the tree still belongs to the container
+    # user, an unprivileged step user can remove none of it, and the whole staging
+    # directory survives here - private, mode 0700 and outside ARTIFACT_DIR - until the
+    # pod's storage is discarded with the pod.
+    chmod -R u+rwX -- "${workdir}" 2>/dev/null || true
+    rm -rf -- "${workdir}" 2>/dev/null || true
+  fi
+  return 0
+}
+
+trap cleanup_ocm_fvt_clean EXIT
 
 {
   echo "HOME=/home/ci-user"
@@ -94,7 +125,6 @@ echo "justClean container uid=${img_uid}"
 # raw tree is staged privately next to ARTIFACT_DIR and collector-owned copies
 # are published afterwards by the helper installed by rosa-e2e-ocm-fvt-prepare.
 ocm_fvt_helpers="${SHARED_DIR}/ocm-fvt-artifacts.py"
-ocm_fvt_workdir=""
 if [[ -f "${ocm_fvt_helpers}" && ! -L "${ocm_fvt_helpers}" ]]; then
   if ! ocm_fvt_workdir="$(python3 "${ocm_fvt_helpers}" stage "${ARTIFACT_DIR}" 2>/dev/null)" ||
      [[ ! -d "${ocm_fvt_workdir}" ]]; then
@@ -112,28 +142,62 @@ if [[ -n "${ocm_fvt_workdir}" ]]; then
   publish_clean_results=true
 else
   publish_clean_results=false
-  ocm_fvt_workdir="$(mktemp -d /tmp/ocm-fvt-clean.XXXXXX 2>/dev/null)" ||
-    ocm_fvt_workdir="/tmp/ocm-fvt-clean.$$"
+  # mktemp -d creates the directory itself, so it cannot be redirected. When it is
+  # unavailable, fall back to `mkdir` *without* -p: plain mkdir creates the path or
+  # fails, and never accepts one that already exists, including an existing symlink.
+  # A /tmp entry planted ahead of this step can therefore cost it the fallback, but
+  # can never make it chmod 0777, extract the clean-state tarball into, or bind-mount
+  # a directory of someone else's choosing. Exhausting every candidate costs the output
+  # mount: justClean still runs rather than the step aborting, but without the restored
+  # cluster.ini it cannot delete the cluster, so that outcome is reported as an error.
+  if ! ocm_fvt_workdir="$(mktemp -d /tmp/ocm-fvt-clean.XXXXXX 2>/dev/null)"; then
+    ocm_fvt_workdir=""
+    for attempt in 0 1 2 3 4; do
+      if mkdir -m 0700 "/tmp/ocm-fvt-clean.$$.${attempt}" 2>/dev/null; then
+        ocm_fvt_workdir="/tmp/ocm-fvt-clean.$$.${attempt}"
+        echo "WARNING: mktemp unavailable; private clean output falls back to ${ocm_fvt_workdir}"
+        break
+      fi
+    done
+    if [[ -z "${ocm_fvt_workdir}" ]]; then
+      echo "ERROR: no private fallback directory could be created; running justClean without an output mount" >&2
+    fi
+  fi
 fi
 
-ocm_fvt_output="${ocm_fvt_workdir}/output"
-mkdir -p "${ocm_fvt_output}"
-# Do NOT use sticky 1777: sticky on the output dir blocks container ci-user from
-# removing host-owned profile dirs (unlinkat cluster.ini -> permission denied).
-chmod 0777 "${ocm_fvt_output}"
+ocm_fvt_output=""
+if [[ -n "${ocm_fvt_workdir}" ]]; then
+  if mkdir "${ocm_fvt_workdir}/output" 2>/dev/null; then
+    ocm_fvt_output="${ocm_fvt_workdir}/output"
+    # Do NOT use sticky 1777: sticky on the output dir blocks container ci-user from
+    # removing host-owned profile dirs (unlinkat cluster.ini -> permission denied).
+    chmod 0777 "${ocm_fvt_output}"
+  else
+    echo "ERROR: could not create the private output directory; running justClean without an output mount" >&2
+    publish_clean_results=false
+  fi
+fi
 
 if [[ -s "${CLEAN_TAR}" ]]; then
-  echo "Restoring clean state from ${CLEAN_TAR}"
-  # Drop archived ownership/mode from the test-step podman tree.
-  tar --no-same-owner --no-same-permissions -xzf "${CLEAN_TAR}" -C "${ocm_fvt_output}"
-  # Match image user so RemoveAll can unlink; a+rwX covers userns remap fallbacks.
-  if chown -R "${img_uid}:${img_uid}" "${ocm_fvt_output}" 2>/dev/null; then
-    echo "chown -R ${img_uid}:${img_uid} ${ocm_fvt_output}"
+  if [[ -n "${ocm_fvt_output}" ]]; then
+    echo "Restoring clean state from ${CLEAN_TAR}"
+    # Drop archived ownership/mode from the test-step podman tree. A truncated or
+    # corrupt tarball must not abort the step under errexit before justClean has run;
+    # the extraction failure is reported and justClean is left to do what it can.
+    if ! tar --no-same-owner --no-same-permissions -xzf "${CLEAN_TAR}" -C "${ocm_fvt_output}"; then
+      echo "ERROR: ${CLEAN_TAR} could not be extracted; justClean may no-op without cluster.ini" >&2
+    fi
+    # Match image user so RemoveAll can unlink; a+rwX covers userns remap fallbacks.
+    if chown -R "${img_uid}:${img_uid}" "${ocm_fvt_output}" 2>/dev/null; then
+      echo "chown -R ${img_uid}:${img_uid} ${ocm_fvt_output}"
+    else
+      echo "WARNING: chown to ${img_uid} failed (need root?); relying on a+rwX"
+    fi
+    chmod -R a+rwX "${ocm_fvt_output}" 2>/dev/null || true
+    chmod 0777 "${ocm_fvt_output}"
   else
-    echo "WARNING: chown to ${img_uid} failed (need root?); relying on a+rwX"
+    echo "WARNING: no private output mount; justClean runs without the restored cluster.ini"
   fi
-  chmod -R a+rwX "${ocm_fvt_output}" 2>/dev/null || true
-  chmod 0777 "${ocm_fvt_output}"
   # Keep a copy under this step's artifacts for post-mortem (SHARED_DIR is not uploaded).
   cp -f "${CLEAN_TAR}" "${ARTIFACT_DIR}/ocm-fvt-clean-state.tgz" 2>/dev/null || true
 else
@@ -144,9 +208,13 @@ podman_args=(
   --authfile /usr/local/cs-qe-credentials/.dockerconfigjson
   --env-file "${podman_env_file}"
   "-v" "/usr/local/cs-qe-credentials:/credentials:ro,z"
-  "-v" "${ocm_fvt_output}:/ocm-backend-tests/output:z"
   --rm
 )
+
+# Only a directory this step created itself is ever mounted into the container.
+if [[ -n "${ocm_fvt_output}" ]]; then
+  podman_args+=("-v" "${ocm_fvt_output}:/ocm-backend-tests/output:z")
+fi
 
 if [[ "${OCM_FVT_GCP_CREDS:-false}" == "true" ]]; then
   podman_args+=(
