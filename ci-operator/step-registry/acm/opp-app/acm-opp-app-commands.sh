@@ -335,6 +335,15 @@ elif ! grep -qi quayintegration <<< "${apiOutput}"; then
         testFailureMsg["${test}"]="QuayIntegration CRD not available - Quay Bridge Operator not installed"
     done
 
+    # INTEROP-9700: the skip marks above reach JUnit through the exit trap,
+    # but on a lane that requires Quay an absent CRD is exactly the
+    # skip-only case this gate exists to catch, so fail closed here rather
+    # than exiting green before the end-of-script check runs.
+    if [[ "${QUAY_EXPECTATION:-}" == "required" ]]; then
+        echo "ERROR: QuayIntegration CRD not available with QUAY_EXPECTATION=required; failing the step." >&2
+        exit 1
+    fi
+
     exit 0
 fi
 
