@@ -728,8 +728,8 @@ printf 'user = "admin:%s"\n' "${_pwEsc}" > "${_curlCfg}"
 echo "[readiness] roxAdminPassword extracted successfully"
 
 # ---------------------------------------------------------------------------
-# Check: Central API health (authenticated v1/metadata; curl -sk — the
-# assertion case is named for its mode per D4)
+# Check: Central API health (authenticated v1/metadata; curl -sk, with
+# the assertion case named for its mode per D4)
 # ---------------------------------------------------------------------------
 function CheckCentralApi () {
     typeset httpCode=""
