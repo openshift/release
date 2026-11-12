@@ -14,12 +14,18 @@ ref:
   documentation: |-
     Post-teardown orphan gate for the shared VPC row of the ROSAENG-308
     provision x validate matrix (ROSAENG-63353, ROSAENG-61409). Runs last in
-    the post phase, after rosa-cluster-deprovision and
-    aws-deprovision-route53-private-hosted-zone: reads the shared-account
-    resource references written during provisioning (${SHARED_DIR}/hosted_zone_id,
-    ${SHARED_DIR}/hosted_zone_role_arn, ${SHARED_DIR}/shared_install_policy_arn)
-    and verifies against ${CLUSTER_PROFILE_DIR}/.awscred_shared_account that the
-    private hosted zone, the shared VPC role and the shared VPC policy are all
-    deleted. Not best-effort: an orphaned resource fails the job so the leak is
-    noticed and cleaned up. Clusters provisioned without a shared VPC write none
-    of the input files and the step exits successfully without doing anything.
+    the post phase, after rosa-cluster-deprovision,
+    aws-deprovision-route53-private-hosted-zone and
+    rosa-e2e-hcp-shared-vpc-cleanup: reads the shared-account resource
+    references written during provisioning (${SHARED_DIR}/hosted_zone_id,
+    ${SHARED_DIR}/hosted_zone_role_arn, ${SHARED_DIR}/shared_install_policy_arn,
+    and for HCP clusters ${SHARED_DIR}/vpc_endpoint_role_arn,
+    ${SHARED_DIR}/vpc_endpoint_policy_arn and
+    ${SHARED_DIR}/hcp_internal_communication_hosted_zone_id) and verifies
+    against ${CLUSTER_PROFILE_DIR}/.awscred_shared_account that the private
+    hosted zone, the shared VPC role, the shared VPC policy and, when present,
+    the HCP VPC endpoint role, VPC endpoint policy and internal communication
+    hosted zone are all deleted. Not best-effort: an orphaned resource fails
+    the job so the leak is noticed and cleaned up. Clusters provisioned
+    without a shared VPC write none of the input files and the step exits
+    successfully without doing anything.

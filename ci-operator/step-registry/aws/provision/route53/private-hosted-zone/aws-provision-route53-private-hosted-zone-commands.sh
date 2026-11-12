@@ -46,7 +46,11 @@ if [[ -e ${SHARED_DIR}/rosa_dns_domain ]]; then
   echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
   rosa_dns_domain=$(head -n 1 ${SHARED_DIR}/rosa_dns_domain)
-  ROUTE53_HOSTED_ZONE_NAME="${CLUSTER_NAME}.${rosa_dns_domain}"
+  PHZ_NAME_PREFIX="${PHZ_NAME_PREFIX:-}"
+  # Hosted Control Plane shared VPC clusters require the zone to be named
+  # rosa.<cluster-name>.<base-domain> (OCM validates the name against
+  # 'cluster_domain_prefix.base_domain'); PHZ_NAME_PREFIX is 'rosa.' there.
+  ROUTE53_HOSTED_ZONE_NAME="${PHZ_NAME_PREFIX}${CLUSTER_NAME}.${rosa_dns_domain}"
 else
   # For OCP clusters
   CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"

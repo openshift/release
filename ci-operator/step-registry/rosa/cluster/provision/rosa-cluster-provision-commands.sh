@@ -778,6 +778,24 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   record_cluster "aws.sts" "private_hosted_zone_id" ${SHARED_VPC_HOSTED_ZONE_ID}
   record_cluster "aws.sts" "private_hosted_zone_role_arn" ${SHARED_VPC_ROLE_ARN}
   record_cluster "dns" "base_domain" ${SHARED_VPC_BASE_DOMAIN}
+
+  # Hosted Control Plane shared VPC clusters additionally require the VPC
+  # endpoint role and the internal communication hosted zone (rosa create
+  # cluster fails flag validation without them). Both are prepared in the
+  # shared account by rosa-e2e-hcp-shared-vpc-prepare, which publishes
+  # vpc_endpoint_role_arn and hcp_internal_communication_hosted_zone_id.
+  if [[ "${HOSTED_CP}" == "true" ]]; then
+    if [[ ! -s "${SHARED_DIR}/vpc_endpoint_role_arn" || ! -s "${SHARED_DIR}/hcp_internal_communication_hosted_zone_id" ]]; then
+      echo "Error: ENABLE_SHARED_VPC with HOSTED_CP requires ${SHARED_DIR}/vpc_endpoint_role_arn and ${SHARED_DIR}/hcp_internal_communication_hosted_zone_id (created by rosa-e2e-hcp-shared-vpc-prepare), exiting."
+      exit 1
+    fi
+    VPC_ENDPOINT_ROLE_ARN=$(head -n 1 "${SHARED_DIR}/vpc_endpoint_role_arn")
+    HCP_INTERNAL_COMMUNICATION_HOSTED_ZONE_ID=$(head -n 1 "${SHARED_DIR}/hcp_internal_communication_hosted_zone_id")
+    # OCM requires the shared route53 and VPC endpoint roles as additional
+    # allowed principals on the Hosted Control Plane's VPC Endpoint Service.
+    SHARED_VPC_SWITCH="${SHARED_VPC_SWITCH} --vpc-endpoint-role-arn ${VPC_ENDPOINT_ROLE_ARN} --hcp-internal-communication-hosted-zone-id ${HCP_INTERNAL_COMMUNICATION_HOSTED_ZONE_ID} --additional-allowed-principals ${SHARED_VPC_ROLE_ARN},${VPC_ENDPOINT_ROLE_ARN}"
+    record_cluster "aws.sts" "vpc_endpoint_role_arn" ${VPC_ENDPOINT_ROLE_ARN}
+  fi
 fi
 
 DRY_RUN_SWITCH=""

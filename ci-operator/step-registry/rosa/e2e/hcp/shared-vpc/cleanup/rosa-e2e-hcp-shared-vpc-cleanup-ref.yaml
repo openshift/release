@@ -1,0 +1,23 @@
+ref:
+  as: rosa-e2e-hcp-shared-vpc-cleanup
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: rosa-e2e-hcp-shared-vpc-cleanup-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: REGION
+    default: ""
+    documentation: Cloud region for the shared-account resources. Falls back to LEASED_RESOURCE if empty.
+  documentation: |-
+    Best-effort post-phase cleanup for the HCP shared VPC resources created by
+    rosa-e2e-hcp-shared-vpc-prepare (ROSAENG-63353): deletes the internal
+    communication hosted zone, the VPC endpoint role and the VPC endpoint
+    policy in the shared account (${CLUSTER_PROFILE_DIR}/.awscred_shared_account),
+    and the assume-role permission policies in the cluster account. Run it
+    after rosa-cluster-deprovision; the non-best-effort orphan gate
+    rosa-e2e-validate-shared-vpc-teardown runs afterwards and fails the job if
+    anything survived. Exits successfully without doing anything when the
+    provisioning phase wrote no HCP shared VPC inputs to ${SHARED_DIR}.
