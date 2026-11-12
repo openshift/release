@@ -157,8 +157,10 @@ fi
 CLUSTER_NAME=""
 DOMAIN_PREFIX_SWITCH=""
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]] && [[ -e "${SHARED_DIR}/cluster-name" ]]; then
-  # For Shared VPC cluster, cluster name is determined in step aws-provision-route53-private-hosted-zone
-  #   as Private Hosted Zone needs to be ready before installing Shared VPC cluster
+  # For Shared VPC cluster, cluster name is determined in the shared VPC
+  #   provisioning steps (aws-provision-route53-private-hosted-zone or
+  #   rosa-e2e-hcp-shared-vpc-prepare), as the Private Hosted Zone needs to be
+  #   ready before installing a Shared VPC cluster
   CLUSTER_NAME=$(head -n 1 "${SHARED_DIR}/cluster-name")
 else
   CLUSTER_NAME=${CLUSTER_NAME:-$CLUSTER_PREFIX}

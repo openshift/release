@@ -11,11 +11,11 @@ log() {
 }
 
 # Post-teardown orphan gate for shared VPC clusters (ROSAENG-63353,
-# ROSAENG-61409): after rosa-cluster-deprovision,
-# rosa-e2e-hcp-shared-vpc-cleanup and aws-deprovision-route53-private-hosted-zone
-# have run, verify that nothing is left behind in the shared AWS account or the
-# cluster account. Not best-effort: an orphaned hosted zone, role or policy must
-# fail the job so it is cleaned up by hand and the leak is noticed.
+# ROSAENG-61409): after rosa-cluster-deprovision and
+# rosa-e2e-hcp-shared-vpc-cleanup have run, verify that nothing is left behind
+# in the shared AWS account or the cluster account. Not best-effort: an
+# orphaned hosted zone, role or policy must fail the job so it is cleaned up
+# by hand and the leak is noticed.
 
 HOSTED_ZONE_ID_FILE="${SHARED_DIR}/hosted_zone_id"
 ROLE_ARN_FILE="${SHARED_DIR}/hosted_zone_role_arn"

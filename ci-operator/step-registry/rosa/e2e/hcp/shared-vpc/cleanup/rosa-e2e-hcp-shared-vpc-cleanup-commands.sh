@@ -11,8 +11,9 @@ log() {
 }
 
 # Post-phase cleanup for the HCP shared VPC resources created by
-# rosa-e2e-hcp-shared-vpc-prepare (ROSAENG-63353): the internal communication
-# hosted zone, the VPC endpoint policy and role in the shared account, and the
+# rosa-e2e-hcp-shared-vpc-prepare (ROSAENG-63353): the ingress private hosted
+# zone, the shared route53 role and policy, the internal communication hosted
+# zone and the VPC endpoint role and policy in the shared account, and the
 # assume-role permission policies in the cluster account. Best-effort: the
 # non-best-effort orphan gate rosa-e2e-validate-shared-vpc-teardown runs after
 # this step and fails the job if anything survived.
@@ -23,8 +24,10 @@ VPC_ENDPOINT_ROLE_ARN="$(head -n 1 "${SHARED_DIR}/vpc_endpoint_role_arn" 2>/dev/
 VPC_ENDPOINT_POLICY_ARN="$(head -n 1 "${SHARED_DIR}/vpc_endpoint_policy_arn" 2>/dev/null || true)"
 INTERNAL_PHZ_ID="$(head -n 1 "${SHARED_DIR}/hcp_internal_communication_hosted_zone_id" 2>/dev/null || true)"
 ROUTE53_ROLE_ARN="$(head -n 1 "${SHARED_DIR}/hosted_zone_role_arn" 2>/dev/null || true)"
+HOSTED_ZONE_ID="$(head -n 1 "${SHARED_DIR}/hosted_zone_id" 2>/dev/null || true)"
+SHARED_POLICY_ARN="$(head -n 1 "${SHARED_DIR}/shared_install_policy_arn" 2>/dev/null || true)"
 
-if [[ -z "${VPC_ENDPOINT_ROLE_ARN}" && -z "${INTERNAL_PHZ_ID}" ]]; then
+if [[ -z "${VPC_ENDPOINT_ROLE_ARN}" && -z "${INTERNAL_PHZ_ID}" && -z "${HOSTED_ZONE_ID}" ]]; then
   log "No HCP shared VPC inputs in ${SHARED_DIR}; nothing to clean up"
   exit 0
 fi
@@ -78,9 +81,31 @@ if [[ ! -f "${SHARED_AWSCRED}" ]]; then
 fi
 export AWS_SHARED_CREDENTIALS_FILE="${SHARED_AWSCRED}"
 
+if [[ -n "${HOSTED_ZONE_ID}" ]]; then
+  log "Deleting ingress private hosted zone ${HOSTED_ZONE_ID}"
+  delete_hosted_zone "${HOSTED_ZONE_ID}"
+fi
+
 if [[ -n "${INTERNAL_PHZ_ID}" ]]; then
   log "Deleting internal communication hosted zone ${INTERNAL_PHZ_ID}"
   delete_hosted_zone "${INTERNAL_PHZ_ID}"
+fi
+
+if [[ -n "${ROUTE53_ROLE_ARN}" ]]; then
+  ROUTE53_ROLE_NAME="${ROUTE53_ROLE_ARN##*/}"
+  log "Deleting shared route53 role ${ROUTE53_ROLE_NAME}"
+  if [[ -n "${SHARED_POLICY_ARN}" ]]; then
+    aws iam detach-role-policy --role-name "${ROUTE53_ROLE_NAME}" \
+      --policy-arn "${SHARED_POLICY_ARN}" 2>/dev/null || true
+  fi
+  aws iam delete-role --role-name "${ROUTE53_ROLE_NAME}" 2>/dev/null \
+    || log "WARNING: failed to delete role ${ROUTE53_ROLE_NAME}"
+fi
+
+if [[ -n "${SHARED_POLICY_ARN}" ]]; then
+  log "Deleting shared route53 policy ${SHARED_POLICY_ARN}"
+  aws iam delete-policy --policy-arn "${SHARED_POLICY_ARN}" 2>/dev/null \
+    || log "WARNING: failed to delete policy ${SHARED_POLICY_ARN}"
 fi
 
 if [[ -n "${VPC_ENDPOINT_ROLE_ARN}" ]]; then
