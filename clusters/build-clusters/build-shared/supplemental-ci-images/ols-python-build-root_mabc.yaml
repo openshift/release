@@ -1,0 +1,29 @@
+apiVersion: ci.openshift.io/v1
+kind: MultiArchBuildConfig
+metadata:
+  name: ols-python-build-root
+  namespace: ci
+spec:
+  build_spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: ImageStreamTag
+        namespace: ci
+        name: ols-python-build-root:python-3.12
+    source:
+      dockerfile: |
+        FROM registry.access.redhat.com/ubi9/python-312
+        USER 0
+        RUN dnf install -y --nodocs make git curl findutils && dnf clean all
+        RUN pip install --no-cache-dir uv==0.9.24
+      type: Dockerfile
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: registry.access.redhat.com/ubi9/python-312
+        imageOptimizationPolicy: SkipLayers
+      type: Docker
+    successfulBuildsHistoryLimit: 1
