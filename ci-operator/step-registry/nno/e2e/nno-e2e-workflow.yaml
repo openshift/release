@@ -44,9 +44,13 @@ workflow:
             echo "Missing cluster-profile file nno-e2e-env"
             exit 1
           fi
+          requested_fallback="${NVIDIANETWORK_NNO_FALLBACK_CATALOGSOURCE_INDEX_IMAGE:-}"
           set -o allexport
           source "${e2e_env}"
           set +o allexport
+          if [[ -n "${requested_fallback}" ]]; then
+            export NVIDIANETWORK_NNO_FALLBACK_CATALOGSOURCE_INDEX_IMAGE="${requested_fallback}"
+          fi
           if [[ -n "${NNO_SUBSCRIPTION_CHANNEL:-}" ]]; then
             export NVIDIANETWORK_SUBSCRIPTION_CHANNEL="${NNO_SUBSCRIPTION_CHANNEL}"
             export NVIDIANETWORK_DEPLOY_FROM_BUNDLE=false
@@ -64,6 +68,8 @@ workflow:
         env:
           - name: DUMP_FAILED_TESTS
           - name: NNO_SUBSCRIPTION_CHANNEL
+          - name: NVIDIANETWORK_NNO_FALLBACK_CATALOGSOURCE_INDEX_IMAGE
+            default: ""
           - name: TEST_TRACE
           - name: VERBOSE_LEVEL
         from: nvidia-ci
@@ -83,6 +89,8 @@ workflow:
           make run-tests
         env:
           - name: DUMP_FAILED_TESTS
+          - name: NVIDIAGPU_GPU_FALLBACK_CATALOGSOURCE_INDEX_IMAGE
+            default: ""
           - name: TEST_TRACE
           - name: VERBOSE_LEVEL
         from: nvidia-ci
@@ -99,9 +107,13 @@ workflow:
             echo "Missing cluster-profile file nno-e2e-env"
             exit 1
           fi
+          requested_fallback="${NVIDIANETWORK_NNO_FALLBACK_CATALOGSOURCE_INDEX_IMAGE:-}"
           set -o allexport
           source "${e2e_env}"
           set +o allexport
+          if [[ -n "${requested_fallback}" ]]; then
+            export NVIDIANETWORK_NNO_FALLBACK_CATALOGSOURCE_INDEX_IMAGE="${requested_fallback}"
+          fi
           if [[ -n "${NNO_SUBSCRIPTION_CHANNEL:-}" ]]; then
             export NVIDIANETWORK_SUBSCRIPTION_CHANNEL="${NNO_SUBSCRIPTION_CHANNEL}"
             export NVIDIANETWORK_DEPLOY_FROM_BUNDLE=false
@@ -119,6 +131,8 @@ workflow:
         env:
           - name: DUMP_FAILED_TESTS
           - name: NNO_SUBSCRIPTION_CHANNEL
+          - name: NVIDIANETWORK_NNO_FALLBACK_CATALOGSOURCE_INDEX_IMAGE
+            default: ""
           - name: TEST_TRACE
           - name: VERBOSE_LEVEL
         from: nvidia-ci
@@ -138,10 +152,14 @@ workflow:
           profile="${CLUSTER_PROFILE_DIR}/nno-e2e-env"
           [[ -f "${profile}" ]] || { echo "Missing nno-e2e-env" >&2; exit 1; }
           requested_channel="${NNO_SUBSCRIPTION_CHANNEL:-}"
+          requested_fallback="${NVIDIANETWORK_NNO_FALLBACK_CATALOGSOURCE_INDEX_IMAGE:-}"
           set -a
           # shellcheck disable=SC1090
           source "${profile}"
           set +a
+          if [[ -n "${requested_fallback}" ]]; then
+            export NVIDIANETWORK_NNO_FALLBACK_CATALOGSOURCE_INDEX_IMAGE="${requested_fallback}"
+          fi
           if [[ -n "${requested_channel}" ]]; then
             export NVIDIANETWORK_SUBSCRIPTION_CHANNEL="${requested_channel}"
             export NVIDIANETWORK_DEPLOY_FROM_BUNDLE=false
@@ -177,6 +195,8 @@ workflow:
         env:
         - name: DUMP_FAILED_TESTS
         - name: NNO_SUBSCRIPTION_CHANNEL
+        - name: NVIDIANETWORK_NNO_FALLBACK_CATALOGSOURCE_INDEX_IMAGE
+          default: ""
         - name: TEST_TRACE
         - name: VERBOSE_LEVEL
         resources:
@@ -198,10 +218,14 @@ workflow:
           profile="${CLUSTER_PROFILE_DIR}/nno-e2e-env"
           [[ -f "${profile}" ]] || { echo "Missing nno-e2e-env" >&2; exit 1; }
           requested_channel="${NNO_SUBSCRIPTION_CHANNEL:-}"
+          requested_fallback="${NVIDIANETWORK_NNO_FALLBACK_CATALOGSOURCE_INDEX_IMAGE:-}"
           set -a
           # shellcheck disable=SC1090
           source "${profile}"
           set +a
+          if [[ -n "${requested_fallback}" ]]; then
+            export NVIDIANETWORK_NNO_FALLBACK_CATALOGSOURCE_INDEX_IMAGE="${requested_fallback}"
+          fi
           if [[ -n "${requested_channel}" ]]; then
             export NVIDIANETWORK_SUBSCRIPTION_CHANNEL="${requested_channel}"
             export NVIDIANETWORK_DEPLOY_FROM_BUNDLE=false
@@ -233,6 +257,8 @@ workflow:
         env:
           - name: DUMP_FAILED_TESTS
           - name: NNO_SUBSCRIPTION_CHANNEL
+          - name: NVIDIANETWORK_NNO_FALLBACK_CATALOGSOURCE_INDEX_IMAGE
+            default: ""
           - name: TEST_TRACE
           - name: VERBOSE_LEVEL
         from: nvidia-ci
