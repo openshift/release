@@ -7,6 +7,9 @@ images:
   items:
   - dockerfile_path: Dockerfile
     to: workload-availability-operator
+  - dockerfile_literal: |
+      FROM quay.io/medik8s/system-tests:wao
+    to: system-tests
 operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
@@ -38,24 +41,27 @@ tests:
       OO_INDEX: ci-index
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      E2E_SYSTEM_TESTS_DIR: /home/testuser
+      ECO_DUMP_FAILED_TESTS: "true"
+      ECO_TEST_FEATURES: nmo-operator
+      ECO_TEST_LABELS: "!component:olm"
+      ECO_TEST_VERBOSE: "true"
+      WORKLOAD_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
       OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: openshift-workload-availability
       OO_PACKAGE: workload-availability-operator
       OO_TARGET_NAMESPACES: '!all'
     test:
-    - as: verify-wao-nmo-install
+    - as: e2e-nmo
       cli: latest
       commands: |
-        set -o errexit -o nounset -o pipefail
-        oc wait --for=condition=Available \
-          deployment/workload-availability-operator-controller-manager \
-          -n openshift-workload-availability --timeout=10m
-        oc get csv -n openshift-workload-availability
-      from: cli
+        make e2e-tests
+      from: system-tests
       resources:
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: "2"
+          memory: 4Gi
+      timeout: 2h0m0s
     workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: wao
