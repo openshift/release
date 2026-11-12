@@ -157,47 +157,70 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
         "$(date -u +%FT%TZ)" "${p}"
     fi
   done
+fi
 
-  # Fetch the full policy list first — fail hard if oc cannot reach the cluster
-  typeset policyList=""
-  policyList="$(oc get policies -n policies -o name)" || {
-    printf '[%s] ERROR: failed to list policies in namespace "policies"\n' \
-      "$(date -u +%FT%TZ)" >&2
-    exit 1
-  }
-  # Filter out skipped policies (no-match is tolerated via || true)
-  typeset applyPolicies=""
-  applyPolicies="$(printf '%s\n' "${policyList}" | FilterSkippedPolicies)" || true
+# Wait for the (non-skipped) policies to become Compliant.  `oc wait --all`
+# (and the xargs variant) only considers policies that exist when it
+# starts, and the GitOps Subscription propagates the set progressively:
+# the first policies can appear and become compliant long before the rest
+# of the set is created, so a single wait can succeed on a partial set.
+# Re-run the compliance wait whenever new policies appeared during the
+# previous pass; succeed only after a pass completes with a stable policy
+# count.
+typeset -i policyCount=0
+typeset -i prevCount=-1
+while (( policyCount != prevCount )); do
+  prevCount="${policyCount}"
 
-  if [[ -n "${applyPolicies}" ]]; then
-    printf '[%s] Waiting for %d non-skipped polic(ies) to become Compliant…\n' \
-      "$(date -u +%FT%TZ)" "$(echo "${applyPolicies}" | wc -l)"
-    if ! echo "${applyPolicies}" |
-      xargs oc wait -n policies \
-        --for jsonpath='{.status.compliant}'=Compliant \
-        --timeout=40m; then
-      : "Non-skipped policies failed to become compliant:"
-      oc get policies -n policies --ignore-not-found | FilterSkippedPolicies
+  if (( ${#skipPoliciesArr[@]} > 0 )); then
+    # Fetch the full policy list first — fail hard if oc cannot reach the cluster
+    typeset policyList=""
+    policyList="$(oc get policies -n policies -o name)" || {
+      printf '[%s] ERROR: failed to list policies in namespace "policies"\n' \
+        "$(date -u +%FT%TZ)" >&2
+      exit 1
+    }
+    # Filter out skipped policies (no-match is tolerated via || true)
+    typeset applyPolicies=""
+    applyPolicies="$(printf '%s\n' "${policyList}" | FilterSkippedPolicies)" || true
+
+    if [[ -n "${applyPolicies}" ]]; then
+      printf '[%s] Waiting for %d non-skipped polic(ies) to become Compliant…\n' \
+        "$(date -u +%FT%TZ)" "$(echo "${applyPolicies}" | wc -l)"
+      if ! echo "${applyPolicies}" |
+        xargs oc wait -n policies \
+          --for jsonpath='{.status.compliant}'=Compliant \
+          --timeout=40m; then
+        : "Non-skipped policies failed to become compliant:"
+        oc get policies -n policies --ignore-not-found | FilterSkippedPolicies
+        oc get policies -n policies --ignore-not-found -o yaml
+        oc describe policies -n policies
+        exit 1
+      fi
+    else
+      printf '[%s] All policies are in the skip list — no policies to wait for\n' \
+        "$(date -u +%FT%TZ)"
+    fi
+  else
+    printf '[%s] No policies to skip — waiting for ALL policies to become Compliant…\n' \
+      "$(date -u +%FT%TZ)"
+    if ! oc wait policies --all -n policies \
+      --for jsonpath='{.status.compliant}'=Compliant \
+      --timeout=40m; then
+      : "Policies failed to become compliant:"
+      oc get policies -n policies --ignore-not-found
       oc get policies -n policies --ignore-not-found -o yaml
       oc describe policies -n policies
       exit 1
     fi
-  else
-    printf '[%s] All policies are in the skip list — no policies to wait for\n' \
-      "$(date -u +%FT%TZ)"
   fi
-else
-  printf '[%s] No policies to skip — waiting for ALL policies to become Compliant…\n' \
-    "$(date -u +%FT%TZ)"
-  if ! oc wait policies --all -n policies \
-    --for jsonpath='{.status.compliant}'=Compliant \
-    --timeout=40m; then
-    : "Policies failed to become compliant:"
-    oc get policies -n policies --ignore-not-found
-    oc get policies -n policies --ignore-not-found -o yaml
-    oc describe policies -n policies
-    exit 1
-  fi
-fi
+
+  # Count after the pass: if the query fails transiently, treat it as a
+  # changed set so the next pass re-runs the wait (and fails properly
+  # through the wait's diagnostics if the cluster API is really broken).
+  policyCount="$(( $(oc get policies -n policies -o json 2>/dev/null | jq '.items | length' || echo 0) ))"
+  printf '[%s] Compliance pass complete: %d policies in the set\n' \
+    "$(date -u +%FT%TZ)" "${policyCount}"
+done
 
 true

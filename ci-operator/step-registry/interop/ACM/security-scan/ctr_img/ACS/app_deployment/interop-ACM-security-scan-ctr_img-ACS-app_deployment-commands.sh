@@ -76,7 +76,7 @@ function RecordTestResult () {
 
 # Function to generate JUnit XML
 function GenerateJunitXml () {
-    typeset junitFile="${ARTIFACT_DIR}/junit_acm-opp-app.xml"
+    typeset junitFile="${ARTIFACT_DIR}/junit_interop-ACM-security-scan-ctr_img-ACS-app_deployment.xml"
     typeset -i totalDuration=0
     totalDuration=$(( $(date +%s) - startTime ))
 
@@ -104,7 +104,7 @@ function GenerateJunitXml () {
     cat > "${junitFile}" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="acm-opp-app" tests="${totalTests}" failures="${failedTests}" errors="0" skipped="${skippedTests}" time="${totalDuration}">
+  <testsuite name="interop-ACM-security-scan-ctr_img-ACS-app_deployment" tests="${totalTests}" failures="${failedTests}" errors="0" skipped="${skippedTests}" time="${totalDuration}">
 EOF
 
     # Generate XML for each test case
@@ -116,13 +116,13 @@ EOF
         if [ "${status}" = "failed" ]; then
             typeset escapedMsg=""
             escapedMsg=$(echo "${failureMsg}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
-            echo "    <testcase name=\"${test}\" classname=\"acm-opp-app\" time=\"${duration}\"><failure message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
+            echo "    <testcase name=\"${test}\" classname=\"interop-ACM-security-scan-ctr_img-ACS-app_deployment\" time=\"${duration}\"><failure message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
         elif [ "${status}" = "skipped" ]; then
             typeset escapedMsg=""
             escapedMsg=$(echo "${failureMsg}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
-            echo "    <testcase name=\"${test}\" classname=\"acm-opp-app\" time=\"${duration}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
+            echo "    <testcase name=\"${test}\" classname=\"interop-ACM-security-scan-ctr_img-ACS-app_deployment\" time=\"${duration}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
         else
-            echo "    <testcase name=\"${test}\" classname=\"acm-opp-app\" time=\"${duration}\"/>" >> "${junitFile}"
+            echo "    <testcase name=\"${test}\" classname=\"interop-ACM-security-scan-ctr_img-ACS-app_deployment\" time=\"${duration}\"/>" >> "${junitFile}"
         fi
     done
 
@@ -144,7 +144,7 @@ function RunTestCase1 () {
 
     # Download jq
     curl -fsSL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq || return 1
-    chmod +x /tmp/jq
+    chmod +x /tmp/jq || return 1
 
     # Clone and deploy
     git clone --depth 1 https://github.com/stolostron/policy-collection.git || return 1
@@ -156,7 +156,9 @@ function RunTestCase1 () {
     # Verify e2e-opp namespace was created
     oc get namespace e2e-opp || return 1
 
-    oc label managedcluster local-cluster oppapps=httpd-example --overwrite
+    # RunTestCase1 executes under an if condition, so errexit is suspended
+    # here: every failure must return explicitly.
+    oc label managedcluster local-cluster oppapps=httpd-example --overwrite || return 1
 
     # Check initial status
     oc get policies -n policies | sed -n '/example/p'
@@ -332,12 +334,30 @@ eval "$(
         https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
 )"
 
+# Post-process the JUnit XML for Component Readiness routing.  Guarded on
+# purpose: this runs from the EXIT trap, and an unloaded helper (download
+# failure) or a post-processing failure must not overwrite the script's
+# exit status (the unguarded call fails the trap with 127 and turns a
+# passing run into a failure).  The merged file name is passed explicitly:
+# the library default (jUnit.xml) is not picked up by the prow JUnit viewer
+# (lowercase junit prefix required) and collides with other steps in
+# shared storage.
+PostProcessJunit () {
+    if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
+        ExitTrap--PostProcessPrep junit--interop-ACM-security-scan-ctr_img-ACS-app_deployment.xml ||
+            : "WARNING: junit post-processing failed"
+    else
+        : "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping"
+    fi
+    true
+}
+
 # Set trap to generate JUnit XML and remap for Component Readiness
 # Integrates existing GenerateJunitXml function with ExitTrap library
 trap '{(
     GenerateJunitXml
     _propagate_junit
-    ExitTrap--PostProcessPrep
+    PostProcessJunit
     true
 )}' EXIT
 
