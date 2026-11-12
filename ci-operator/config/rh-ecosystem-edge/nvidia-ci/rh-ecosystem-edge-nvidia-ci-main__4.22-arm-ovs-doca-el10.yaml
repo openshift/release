@@ -30,34 +30,43 @@ images:
       FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-10
       COPY --from=rpms /rpms /tmp/rpms
 
-      # Red Hat partner channel: OVS-DOCA 3.5 (aarch64). gpgcheck=0 because the
-      # channel's published pubkey.gpg URL 404s (broken link, reported); the
-      # packages themselves are dual-signed (V6 ML-DSA-87 + V4 RSA).
+      # All packages come from the vendored set: the OVS-DOCA 3.5 stack (Red Hat
+      # partner channel bits, @partner-repos-nvidia-doca/ovs-doca-3.5 on
+      # packages.redhat.com) plus the RHEL 10.2-matched glue (unbound + minimal
+      # perl). The channel itself returns 401 from the CI build farm's egress
+      # range (works anonymously from elsewhere -- reported), and no other free
+      # source carries version-matched el10 packages, so the bits are vendored
+      # into the quay image. Upstream channel (for local builds / provenance /
+      # refreshing the vendor set):
+      #   https://packages.redhat.com/api/pulp-content/partner-repositories/@partner-repos-nvidia-doca/ovs-doca-3.5/custom-1-aarch64/
+      # (packages are dual-signed, V6 ML-DSA-87 + V4 RSA; gpgcheck=0 here because
+      # the channel's published pubkey.gpg URL 404s -- reported)
       RUN printf '%s\n' \
-        '[ovs-doca-35]' \
-        'name=Red Hat partner channel: OVS-DOCA 3.5' \
-        'baseurl=https://packages.redhat.com/api/pulp-content/partner-repositories/@partner-repos-nvidia-doca/ovs-doca-3.5/custom-1-aarch64/' \
+        '[ovs-doca-local]' \
+        'name=Vendored OVS-DOCA 3.5 stack (Red Hat partner channel bits)' \
+        'baseurl=file:///tmp/rpms' \
         'enabled=1' \
         'gpgcheck=0' \
-        > /etc/yum.repos.d/ovs-doca-35.repo
+        > /etc/yum.repos.d/ovs-doca-local.repo
 
       # /opt is a symlink to /var/opt on ostree; collectx installs need the target
       RUN mkdir -p /var/opt
 
       # libibverbs is part of the immutable base; replace with the DOCA-matched
-      # build from the channel (rdma-core is NOT in the base, installs as new)
-      RUN rpm-ostree override replace libibverbs --experimental --from repo='ovs-doca-35'
+      # build from the vendored set (rdma-core is NOT in the base, installs as new)
+      RUN rpm-ostree override replace libibverbs --experimental --from repo='ovs-doca-local'
 
       # Glue first (satisfy doca-openvswitch / infiniband-diags deps; the full
       # 'perl' meta drags ExtUtils-CBuilder -> gcc-c++ -> libstdc++ version hell,
       # so only the minimal interpreter set), then remove the stock FDP OVS, then
-      # the DOCA stack per the RHEL documentation.
-      RUN dnf -y --nogpgcheck --repofrompath=local,/tmp/rpms install \
+      # the DOCA stack per the RHEL documentation. Only the vendored repo and
+      # the base's installed set are consulted.
+      RUN dnf -y --nogpgcheck --disablerepo='*' --enablerepo='ovs-doca-local' install \
             unbound perl-interpreter perl-Getopt-Std && \
           dnf -y --nogpgcheck remove 'openvswitch[0-9]*' && \
-          dnf -y --nogpgcheck install doca-openvswitch mft rdma-core \
-              openvswitch-selinux-extra-policy libunwind && \
-          rm -rf /tmp/rpms /etc/yum.repos.d/ovs-doca-35.repo
+          dnf -y --nogpgcheck --disablerepo='*' --enablerepo='ovs-doca-local' install \
+            doca-openvswitch mft rdma-core openvswitch-selinux-extra-policy libunwind && \
+          rm -rf /tmp/rpms /etc/yum.repos.d/ovs-doca-local.repo
 
       # WORKAROUND 1 (verified on el10/3.5): collectx-clxapi installs into
       # /opt/mellanox/collectx, /opt -> /var/opt on ostree, and `ostree container
