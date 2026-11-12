@@ -60,6 +60,11 @@ inference. Each reference names the actual source URL and criterion or section.
 Use the linked issue key, or an empty issue string for PR-only checks. Give every
 check an issue-specific ID, requirement, prerequisites, concrete actions, expected
 observable result with a wait bound, and the evidence to retain.
+Preserve supplied reproduction procedures: name each input value, resource field,
+observation location and timeout instead of saying only "verify the requirement".
+Use PR procedures to make Jira requirements executable. The assigned release is
+already installed; a source change in this PR is not a prerequisite for observing
+its behavior. Do not assume the PR builds a product image.
 """
 
 PLAN_CHECK_FIELDS = {
@@ -112,6 +117,12 @@ run_command to collect observations, then read its response before recording a
 result. Evidence paths must be the evidence/*.txt paths returned by run_command;
 files created inside /work are not report evidence. Issue one function call per
 turn. Do not call record_result before observing the command output.
+Discover the component's actual namespaces, Pods, containers and configuration
+locations before testing. Never guess that a configuration ConfigMap exists.
+A NotFound response for a guessed resource is a discovery failure, not evidence
+that the product violates its requirement. Continue discovery and run the planned
+reproduction; if the required observation remains unavailable, record
+unable_to_verify. Retain only configuration sections relevant to the test.
 """
 
 
@@ -777,10 +788,15 @@ def public_sources(sources):
 
 def generate_plan(model, sources, context, secrets):
     """Generate and validate a revision-bound plan from captured source input."""
+    pr_context = dict(context)
+    diff = pr_context.pop("diff", "")
     messages = [
         {"role": "system", "content": PREPARE_PROMPT},
-        {"role": "user", "content": json.dumps({"pr": context})},
-        {"role": "user", "content": json.dumps({"sources": sources})},
+        {"role": "user", "content": json.dumps({"implementation_diff": diff})},
+        {"role": "user", "content": json.dumps({
+            "sources": sources,
+            "pr": pr_context,
+        })},
     ]
     for attempt in range(3):
         message = model.complete(messages)
