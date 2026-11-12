@@ -14,6 +14,7 @@ CNV_HYPERCONVERGED_NAME=kubevirt-hyperconverged
 CNV_INSTALL_NAMESPACE=openshift-cnv
 CNV_OPERATOR_CHANNEL="${CNV_OPERATOR_CHANNEL:-stable}"
 CNV_VERSION=${CNV_VERSION:?CNV_VERSION environment variable is required}
+readonly IS_MCP_SERVER_DEPLOY="${IS_MCP_SERVER_DEPLOY:-false}"
 # readonly CNV_MAJOR_MINOR=${CNV_VERSION%.*}
 # CNV_STARTING_CSV="kubevirt-hyperconverged-operator.v${CNV_VERSION}"
 
@@ -28,6 +29,11 @@ trap wait_for_manual_debug ERR
 create_cnv_catalog_source() {
   local catalog_source_name=${1}
   local catalog_image=${2}
+  if [[ ${IS_MCP_SERVER_DEPLOY} == "true" ]]; then
+    # MCP server evals need pull credentials for the IIB and mirrored bundles.
+    add_cnv_pull_secrets
+    oc wait mcp master worker --for=condition=Updated=True --timeout=20m
+  fi
   (tee "${ARTIFACT_DIR}/${catalog_source_name}.yaml" | oc apply -o yaml -f -) <<__EOF__
     apiVersion: operators.coreos.com/v1alpha1
     kind: CatalogSource
@@ -81,6 +87,34 @@ resolve_iib_from_map () {
       | jq --arg version "${CNV_VERSION}" -r '.[$version].index_image // empty') || true
     echo "${result}"
 }
+
+add_cnv_pull_secrets() (
+    local pull_secret_dir
+    pull_secret_dir=$(mktemp -d)
+    trap 'rm -rf "${pull_secret_dir}"' EXIT
+
+    [[ -s "${BREW_IMAGE_REGISTRY_TOKEN_PATH}" && -s "${KONFLUX_REGISTRY_TOKEN_PATH}" ]] || {
+        echo "Error: CNV registry pull token is missing or empty" >&2
+        return 1
+    }
+
+    oc extract secret/pull-secret -n openshift-config \
+      --keys=.dockerconfigjson --to="${pull_secret_dir}" --confirm
+
+    jq --arg brew_user "${BREW_IMAGE_REGISTRY_USERNAME}" \
+      --rawfile brew_token "${BREW_IMAGE_REGISTRY_TOKEN_PATH}" \
+      --arg konflux_user "${KONFLUX_REGISTRY_USERNAME}" \
+      --rawfile konflux_token "${KONFLUX_REGISTRY_TOKEN_PATH}" '
+        .auths["brew.registry.redhat.io"] =
+          {auth: ($brew_user + ":" + ($brew_token | rtrimstr("\n")) | @base64)}
+        | .auths["quay.io/openshift-virtualization/konflux-builds"] =
+          {auth: ($konflux_user + ":" + ($konflux_token | rtrimstr("\n")) | @base64)}
+      ' \
+      "${pull_secret_dir}/.dockerconfigjson" > "${pull_secret_dir}/.dockerconfigjson.new"
+
+    oc set data secret/pull-secret -n openshift-config \
+      --from-file=.dockerconfigjson="${pull_secret_dir}/.dockerconfigjson.new"
+)
 
 function apply_cnv_idms() {
     local cnv_version_dash="v${CNV_VERSION/./-}"
