@@ -550,6 +550,169 @@ then
 	exit 0
 fi
 
+# Override osImage with el9 kernel and replace CRI-O with custom build
+# that fixes continuous CNI STATUS polling (cri-o/cri-o#9855)
+echo "Applying el9 kernel override and custom CRI-O binary"
+
+# Step 1: Override osImage with el9 kernel on all node roles
+oc apply -f- <<EOF
+apiVersion: v1
+kind: List
+items:
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: worker
+    name: os-layer-custom-worker
+  spec:
+    osImageURL: quay.io/mcornea/rhel-coreos-10@sha256:214f79c33bd68cc670aad6935ce8456909f1248a86e77b87aa9a2691903bf878
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: master
+    name: os-layer-custom-master
+  spec:
+    osImageURL: quay.io/mcornea/rhel-coreos-10@sha256:214f79c33bd68cc670aad6935ce8456909f1248a86e77b87aa9a2691903bf878
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: infra
+    name: os-layer-custom-infra
+  spec:
+    osImageURL: quay.io/mcornea/rhel-coreos-10@sha256:214f79c33bd68cc670aad6935ce8456909f1248a86e77b87aa9a2691903bf878
+EOF
+
+# Step 2: Replace CRI-O binary with custom build (CNI STATUS polling fix)
+CRIO_BINARY_URL="https://files.cornea.dev/api/public/dl/oNFStN-z?inline=true"
+cat > /tmp/replace-crio.sh <<'SCRIPT'
+#!/bin/bash
+set -euo pipefail
+CRIO_PATH="/var/lib/crio-custom"
+if [[ ! -f "${CRIO_PATH}" ]]; then
+    url="https://files.cornea.dev/api/public/dl/oNFStN-z?inline=true"
+    curl -sL --retry 5 --retry-delay 3 -o "${CRIO_PATH}" "${url}"
+    chmod +x "${CRIO_PATH}"
+    chcon -t container_runtime_exec_t "${CRIO_PATH}"
+    ${CRIO_PATH} --version || { echo "Downloaded binary is not valid"; rm -f "${CRIO_PATH}"; exit 1; }
+fi
+mount --bind "${CRIO_PATH}" /usr/bin/crio
+SCRIPT
+ENCODED_SCRIPT=$(base64 -w 0 /tmp/replace-crio.sh)
+
+oc apply -f- <<EOF
+apiVersion: v1
+kind: List
+items:
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: worker
+    name: crio-replace-worker
+  spec:
+    config:
+      ignition:
+        version: 3.2.0
+      storage:
+        files:
+        - path: /usr/local/bin/replace-crio.sh
+          mode: 0755
+          overwrite: true
+          contents:
+            source: "data:text/plain;base64,${ENCODED_SCRIPT}"
+      systemd:
+        units:
+        - name: replace-crio.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Replace CRI-O binary with custom build
+            Before=crio.service
+            After=network-online.target
+            Wants=network-online.target
+            [Service]
+            Type=oneshot
+            ExecStart=/usr/local/bin/replace-crio.sh
+            RemainAfterExit=true
+            [Install]
+            WantedBy=multi-user.target
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: master
+    name: crio-replace-master
+  spec:
+    config:
+      ignition:
+        version: 3.2.0
+      storage:
+        files:
+        - path: /usr/local/bin/replace-crio.sh
+          mode: 0755
+          overwrite: true
+          contents:
+            source: "data:text/plain;base64,${ENCODED_SCRIPT}"
+      systemd:
+        units:
+        - name: replace-crio.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Replace CRI-O binary with custom build
+            Before=crio.service
+            After=network-online.target
+            Wants=network-online.target
+            [Service]
+            Type=oneshot
+            ExecStart=/usr/local/bin/replace-crio.sh
+            RemainAfterExit=true
+            [Install]
+            WantedBy=multi-user.target
+- apiVersion: machineconfiguration.openshift.io/v1
+  kind: MachineConfig
+  metadata:
+    labels:
+      machineconfiguration.openshift.io/role: infra
+    name: crio-replace-infra
+  spec:
+    config:
+      ignition:
+        version: 3.2.0
+      storage:
+        files:
+        - path: /usr/local/bin/replace-crio.sh
+          mode: 0755
+          overwrite: true
+          contents:
+            source: "data:text/plain;base64,${ENCODED_SCRIPT}"
+      systemd:
+        units:
+        - name: replace-crio.service
+          enabled: true
+          contents: |
+            [Unit]
+            Description=Replace CRI-O binary with custom build
+            Before=crio.service
+            After=network-online.target
+            Wants=network-online.target
+            [Service]
+            Type=oneshot
+            ExecStart=/usr/local/bin/replace-crio.sh
+            RemainAfterExit=true
+            [Install]
+            WantedBy=multi-user.target
+EOF
+
+# Wait for cluster to stabilize with both changes
+oc adm wait-for-stable-cluster --minimum-stable-period 5m
+
+echo "Verifying kernel and CRI-O versions:"
+oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.nodeInfo.kernelVersion}{"\t"}{.status.nodeInfo.containerRuntimeVersion}{"\n"}{end}'
+
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
