@@ -16,6 +16,7 @@ install -d -m 700 "${HOME}/.ssh"
 install -m 600 /dev/null "${HOME}/.ssh/id_rsa"
 base64 --decode < "${CLUSTER_PROFILE_DIR}/private-key" > "${HOME}/.ssh/id_rsa"
 printf '\n' >> "${HOME}/.ssh/id_rsa"
+install -m 600 "${CLUSTER_PROFILE_DIR}/known-hosts" "${HOME}/.ssh/known_hosts"
 cat > "${HOME}/.ssh/config" <<EOF
 Host ${REMOTE_HOST}
     IdentityFile ${HOME}/.ssh/id_rsa
@@ -24,8 +25,8 @@ Host ${REMOTE_HOST}
     ConnectTimeout 30
     ServerAliveInterval 15
     ServerAliveCountMax 3
-    StrictHostKeyChecking no
-    UserKnownHostsFile /dev/null
+    StrictHostKeyChecking yes
+    UserKnownHostsFile ${HOME}/.ssh/known_hosts
 EOF
 chmod 600 "${HOME}/.ssh/config"
 
