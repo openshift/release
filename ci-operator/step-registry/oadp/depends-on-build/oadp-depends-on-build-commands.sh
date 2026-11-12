@@ -333,8 +333,16 @@ while IFS= read -r line; do
     # branch, a namespace with no counterpart in the OADP repos' branch
     # scheme, so every dep would "mismatch" and the positive path could
     # never be rehearsed.
+    DEP_BASE_REF=""
+    # The dep PR's head commit, extracted from the same metadata fetch:
+    # pins the source URL below to an immutable revision so a push to
+    # the dep PR between this step's fetch and the e2e step's own
+    # tarball fetch can never mix revisions (manager image from the old
+    # head, test code from the new one). Initialized outside the guard
+    # below so a skipped guard (rehearsal) never sees a stale value from
+    # an earlier dependency in this loop.
+    DEP_HEAD_SHA=""
     if [[ -n "${PULL_BASE_REF:-}" && "${REPO_OWNER}/${REPO_NAME}" != "openshift/release" ]]; then
-        DEP_BASE_REF=""
         # Progress line before the fetch: the direct API path can fall back
         # to a one-shot pod, so this call is not always fast.
         echo "[$(date --utc +%FT%T.%3NZ)] Checking the base branch of ${DEP_REPO}#${DEP_PR} before fetching its source"
@@ -347,6 +355,11 @@ while IFS= read -r line; do
                 | grep -Po '"base": *\{[^{]*"ref": *"[^"]*"' \
                 | grep -Po '"ref": *"[^"]*"$' \
                 | sed -E 's/^"ref": *"//; s/"$//' || true)
+            # Same first-field shape for the head object's "sha".
+            DEP_HEAD_SHA=$(printf '%s' "${DEP_PR_JSON}" | tr -d '\n' \
+                | grep -Po '"head": *\{[^{]*"sha": *"[^"]*"' \
+                | grep -Po '"sha": *"[^"]*"$' \
+                | sed -E 's/^"sha": *"//; s/"$//' || true)
         fi
         if [[ -z "${DEP_BASE_REF}" ]]; then
             echo "[$(date --utc +%FT%T.%3NZ)] WARNING: could not determine the base branch of ${DEP_REPO}#${DEP_PR} -- branch-mismatch guard inconclusive, building this dependency as requested" >&2
@@ -363,7 +376,15 @@ while IFS= read -r line; do
     echo "[$(date --utc +%FT%T.%3NZ)] Fetching ${DEP_REPO}#${DEP_PR} once for $(printf '%s' "${MATCHED_CANDIDATES}" | grep -c .) matching candidate(s)"
     SRC_DIR=$(mktemp -d)
     TARBALL_FILE=$(mktemp)
+    # Immutable SHA archive when the head commit is known (guard metadata
+    # fetch), mutable PR-head URL otherwise (rehearsals skip the guard; a
+    # metadata-fetch failure falls back here too, accepting the small
+    # revision-mix race rather than failing the job over an optional pin).
     TARBALL_URL="https://github.com/${DEP_REPO}/archive/refs/pull/${DEP_PR}/head.tar.gz"
+    if [[ -n "${DEP_HEAD_SHA:-}" ]]; then
+        TARBALL_URL="https://github.com/${DEP_REPO}/archive/${DEP_HEAD_SHA}.tar.gz"
+        echo "[$(date --utc +%FT%T.%3NZ)] Pinning ${DEP_REPO}#${DEP_PR} source to its current head commit ${DEP_HEAD_SHA} (immutable archive) -- both the image build and the e2e step's TESTS_SOURCE fetch use exactly this revision even if the PR is pushed to mid-run"
+    fi
     # A Depends-On line explicitly requested this PR's source, so a failed
     # fetch fails the job LOUDLY (named repo/PR, retest hint, temp cleanup)
     # rather than degrading to this job's default pre-built images/tests:
