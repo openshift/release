@@ -1,0 +1,51 @@
+ref:
+  as: interop-opp-deploy-quay
+  commands: interop-opp-deploy-quay-commands.sh
+  documentation: |-
+    Deploys the Quay registry operator through OLM and provisions a working
+    registry for the OPP interop lanes: namespace local-quay, OperatorGroup,
+    Subscription on QUAY_OPERATOR_CHANNEL (default stable-3.17), the initial
+    config bundle Secret, a QuayRegistry with managed objectstorage and tls,
+    and the create-admin-user Job that initializes the Quay database and
+    creates the quayadmin/quaydevel/quay-pull-secret secrets plus the devel
+    organization and devel/example repository.
+
+    Every object is created only if absent (oc create, never apply): when the
+    ACM policy set (policy-install-quay, policy-config-quay) already owns the
+    install, the step adopts what it finds and never overwrites a live
+    operator policy. When operatorpolicy-quay-operator is Compliant, the
+    subscription channel matches, the CSV is Succeeded and the QuayRegistry is
+    Available, the step records workaround_removal_ready=true and exits 0
+    without installing (workaround self-disable).
+
+    Emits one JUnit testcase, lp-interop--OPP--quay-deploy, and a properties
+    file for the skip-ratio/evidence gates.
+  env:
+    - default: stable-3.17
+      documentation: OLM channel for the quay-operator subscription
+      name: QUAY_OPERATOR_CHANNEL
+    - default: local-quay
+      documentation: Namespace for the Quay operator and registry (must stay local-quay; the ported create-admin-user Job hardcodes it)
+      name: QUAY_NAMESPACE
+    - default: "300"
+      documentation: Seconds to wait for the Subscription to report status.currentCSV
+      name: QUAY_CSV_WAIT_TIMEOUT
+    - default: "600"
+      documentation: Seconds to wait for the quay-operator CSV to reach Succeeded
+      name: QUAY_INSTALL_TIMEOUT
+    - default: "600"
+      documentation: Seconds to wait for the QuayRegistry registry to report Available=True
+      name: QUAY_REGISTRY_TIMEOUT
+    - default: "420"
+      documentation: Seconds to wait for the create-admin-user Job to Complete
+      name: QUAY_ADMIN_JOB_TIMEOUT
+    - default: "0"
+      documentation: When 1, report observed object states and exit 0 without installing (detection only)
+      name: QUAY_REPORT_ONLY
+  from: cli
+  grace_period: 2m30s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 45m

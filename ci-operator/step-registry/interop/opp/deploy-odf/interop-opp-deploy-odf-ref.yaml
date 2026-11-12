@@ -2,23 +2,54 @@ ref:
   as: interop-opp-deploy-odf
   commands: interop-opp-deploy-odf-commands.sh
   documentation: |-
-    Deploys the OpenShift Data Foundation (ODF) operator via OLM subscription.
-    Creates the namespace, OperatorGroup, and Subscription, then waits for the
-    CSV to reach Succeeded phase.
+    Deploys OpenShift Data Foundation through OLM and provisions a usable
+    storage layer for the OPP interop lanes: namespace openshift-storage,
+    OperatorGroup openshift-storage-operatorgroup, Subscription on
+    ODF_OPERATOR_CHANNEL (default stable-4.22), the ocs-storagecluster
+    StorageCluster (one ocs-deviceset, replica 3, portable, 100Gi
+    ReadWriteOnce Block on gp3-csi), the noobaa-pv-backing-store BackingStore
+    on ocs-storagecluster-ceph-rbd and the noobaa-default-bucket-class
+    BucketClass.
+
+    Every object is created only if absent (oc create, never apply): when the
+    ACM policy set (policy-odf, policy-odf-cluster, policy-odf-noobaa) already
+    owns the install, the step adopts what it finds and never overwrites a
+    live operator policy. When operatorpolicy-odf-operator is Compliant, the
+    subscription channel matches, the CSV is Succeeded and the StorageCluster
+    is Ready, the step records workaround_removal_ready=true and exits 0
+    without installing (workaround self-disable).
+
+    Emits one JUnit testcase, lp-interop--OPP--odf-deploy, and a properties
+    file for the skip-ratio/evidence gates.
   env:
-    - default: stable-4.17
-      documentation: OLM channel for the ODF operator subscription
-      name: ODF_CHANNEL
-    - default: 15m
-      documentation: Timeout for the ODF operator CSV to reach Succeeded
-      name: ODF_INSTALL_TIMEOUT
+    - default: stable-4.22
+      documentation: OLM channel for the odf-operator subscription
+      name: ODF_OPERATOR_CHANNEL
     - default: openshift-storage
-      documentation: Namespace for the ODF operator
+      documentation: Namespace for the ODF operator and StorageCluster
       name: ODF_NAMESPACE
+    - default: "300"
+      documentation: Seconds to wait for the Subscription to report status.currentCSV
+      name: ODF_CSV_WAIT_TIMEOUT
+    - default: "600"
+      documentation: Seconds to wait for the odf-operator CSV to reach Succeeded
+      name: ODF_INSTALL_TIMEOUT
+    - default: "1800"
+      documentation: Seconds to wait for StorageCluster ocs-storagecluster to reach status.phase Ready
+      name: ODF_STORAGECLUSTER_TIMEOUT
+    - default: "600"
+      documentation: Seconds to wait for BackingStore noobaa-pv-backing-store to reach status.phase Ready
+      name: NOOBAA_BACKINGSTORE_TIMEOUT
+    - default: ""
+      documentation: StorageClass for the ocs-deviceset data PVs; empty means compute it (thin-csi-odf on VSphere, gp3-csi otherwise)
+      name: ODF_DEVICESET_STORAGECLASS
+    - default: "0"
+      documentation: When 1, report observed object states and exit 0 without installing (detection only)
+      name: ODF_REPORT_ONLY
   from: cli
-  grace_period: 1m
+  grace_period: 3m
   resources:
     requests:
       cpu: 100m
       memory: 100Mi
-  timeout: 20m
+  timeout: 70m
