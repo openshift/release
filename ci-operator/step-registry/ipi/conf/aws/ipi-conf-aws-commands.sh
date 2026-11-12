@@ -388,6 +388,11 @@ if [[ -n "${COMPUTE_MACHINE_MANAGEMENT}" ]]; then
   yq-v4 eval -i '.compute[0].management = env(COMPUTE_MACHINE_MANAGEMENT)' "${CONFIG}"
 fi
 
+if [[ -n "${COMPUTE_NESTED_VIRTUALIZATION}" ]]; then
+  echo "Setting compute nested virtualization: ${COMPUTE_NESTED_VIRTUALIZATION}"
+  yq-v4 eval -i '.compute[0].platform.aws.cpuOptions.nestedVirtualization = env(COMPUTE_NESTED_VIRTUALIZATION)' "${CONFIG}"
+fi
+
 
 if [[ ${AWS_METADATA_SERVICE_AUTH} =~ ^(Required|Optional)$ ]]; then
   echo "setting up metadata auth in install-config.yaml. Set metadata service auth to: ${AWS_METADATA_SERVICE_AUTH}"
