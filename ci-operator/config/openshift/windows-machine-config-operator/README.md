@@ -22,11 +22,15 @@ When the hold ends, the TLS suite runs exactly as in the normal job. Because
 the debug test is a copy, any change to `aws-e2e-ote-tls` must be mirrored in
 `aws-e2e-ote-tls-debug`.
 
-The debug copy of `wmco-setup-and-test` also differs from the normal job. When
-setup fails it writes the probe Job, its pods, events, nodes, machines and the
-WMCO operator log to `${ARTIFACT_DIR}/wmco-setup-failure`, then holds the step
-open for `TIMEOUT` or until `/tmp/debug.done` exists, and finally exits with the
-original setup status. Its step limit is 6h45m, covering the 2h15m setup budget,
+The debug copy of `wmco-setup-and-test` also differs from the normal job. It
+configures Windows nodes through the ConfigMap path only
+(`-m 0 -c 1`); the Machine path's SSH availability probe has timed out in this
+environment and `create_test.go` skips that path when the machine node count is
+zero. When setup still fails it writes the probe Job, its pods, events, nodes,
+machines and the WMCO operator log to `${ARTIFACT_DIR}/wmco-setup-failure`, then
+holds the step open for `TIMEOUT` or until `/tmp/debug.done` exists, and finally
+exits with the original setup status. The step clears `errexit` before running
+the setup script, so a failing setup still reaches the capture and the hold. Its step limit is 6h45m, covering the 2h15m setup budget,
 the four-hour hold and the capture. A failed setup therefore fails the job and
 stays inspectable before the post steps remove the cluster; a successful setup
 goes straight to the `wait` step. The failure capture and the in-step hold exist

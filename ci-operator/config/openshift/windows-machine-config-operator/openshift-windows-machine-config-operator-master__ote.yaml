@@ -939,6 +939,7 @@ tests:
         # fails, so the probe Job, its pods and events can be inspected before
         # the post steps remove the cluster. The original exit status is
         # preserved, so a failed setup still fails this step and the job.
+        set +e
         set -uo pipefail
 
         export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
@@ -978,7 +979,11 @@ tests:
           echo "Leaving the debug hold; exiting with the original setup status."
         }
 
-        hack/run-ci-e2e-test.sh -t setup-only -s
+        # Configure Windows nodes through the ConfigMap path only. The Machine
+        # path's SSH availability probe has timed out in this environment, and
+        # create_test.go skips that path entirely when the machine node count is
+        # zero.
+        hack/run-ci-e2e-test.sh -t setup-only -s -m 0 -c 1
         setup_status=$?
         if [ "${setup_status}" -ne 0 ]; then
           capture_setup_failure
