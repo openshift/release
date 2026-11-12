@@ -418,9 +418,25 @@ function ValidateHubHealth () {
     # managed-cluster checks below still run, so the hub is still validated.
     # Never a silent skip — the classification is echoed and recorded in the
     # upgrade summary artifact.
-    typeset mchNames
+
+    # Capture oc stderr so a failed query cannot pass for an unprovisioned
+    # topology. Only the server's resource-type-missing message classifies as
+    # not provisioned; auth and reachability errors fail closed below.
+    typeset mchNames mchStderr
+    typeset -i mchRc=0
+    mchStderr="$(mktemp)"
     mchNames="$(oc get multiclusterhub -A \
-        -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true)"
+        -o jsonpath='{.items[*].metadata.name}' 2>"${mchStderr}")" || mchRc=$?
+
+    if [[ ${mchRc} -ne 0 ]] \
+        && ! grep -qF "the server doesn't have a resource type" "${mchStderr}"; then
+        echo >&2 "ERROR: Failed to query multiclusterhub resources (oc exit ${mchRc}):"
+        sed 's/^/  /' "${mchStderr}" >&2
+        rm -f "${mchStderr}"
+        return 1
+    fi
+    rm -f "${mchStderr}"
+
     if [[ -z "${mchNames}" ]]; then
         MCH_TOPOLOGY="not-provisioned (MCE/operator-managed ACM topology)"
         echo "  MultiClusterHub: ${MCH_TOPOLOGY} — skipping the MCH Running wait; validating the hub via the policy propagator and managed clusters"
