@@ -43,10 +43,13 @@ ref:
       (`<RELATED_IMAGE_ENV_VAR_NAME> <pullspec>`) per matching line, for a
       later step to apply.
 
-      A PR with no matching Depends-On line is a total no-op: no file is
-      written, nothing downstream changes. Add more lines to test more
-      repos (or more images per repo) together in one job; this script
-      does not change.
+      A PR with no matching Depends-On line is a no-op as far as building
+      goes: no image is built and nothing downstream changes. (A body
+      carrying cherry-pick/backport wording is the one exception: the
+      original PR is fetched and any Depends-On lines it declared are
+      surfaced in the log and a diagnostic artifact, never resolved.) Add
+      more lines to test more repos (or more images per repo) together in
+      one job; this script does not change.
 
       The second field is normally a real `RELATED_IMAGE_*` env var name,
       but two sentinel values are special-cased:
@@ -102,9 +105,10 @@ ref:
     structured generically so any future job can declare more candidates
     without any change here.
     A dep PR based on a different branch than the job's own branch
-    (PULL_BASE_REF; the OADP repos share the oadp-dev + oadp-1.x scheme,
-    so the names compare directly) is never built: it is skipped with a
-    loud warning and a depends-on-branch-mismatch.txt artifact, and the
+    (PULL_BASE_REF; release branches share the oadp-1.x names and the
+    development-branch aliases oadp-dev/main/master are normalized before
+    comparing) is never built: it is skipped with a loud warning and a
+    depends-on-branch-mismatch.txt artifact, and the
     job proceeds against the released, pre-built dependency -- the
     combination that actually ships. Best-effort (an inconclusive
     metadata fetch builds the dep as before), and not applied to
