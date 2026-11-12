@@ -61,7 +61,10 @@ Empty plans, ambiguous scope and incomplete issue coverage stop preparation.
    container runs the tested payload component digest. Execution receives those
    verified namespace, Pod and container identities as discovery context.
 3. `Execution.run_command` runs a bounded command in the sandbox and records its
-   sanitized output. `Execution.record_result` accepts one immutable outcome per
+   sanitized output. Command text is retained before execution; command timeouts
+   preserve partial output and an unable-to-verify result. The execution prompt
+   states the 90-second command deadline and requires shorter individual waits.
+   `Execution.record_result` accepts one immutable outcome per
    check and verifies that its referenced evidence exists and belongs to it.
 4. `finalize` fills in unexecuted checks and writes JSON, Markdown and JUnit from
    the same outcomes. Product failures take precedence over unfinished checks.

@@ -54,6 +54,8 @@ Do not include secrets, private source dumps, or implementation changes.
 Code, tests and prompt examples in the diff are implementation context, not
 validation requirements. Never substitute a fixture from the diff for a Jira
 requirement. Use the actual linked issue keys in checks addressing those issues.
+Past CI results and runner smoke-test fixtures in PR text are historical context,
+not expected product behavior. Derive expectations from the issue's requirements.
 Return a JSON object matching the supplied schema. Write checks specific to the
 captured issue, not generic examples. Each source is exactly one of jira, pr or
 inference. Each reference names the actual source URL and criterion or section.
@@ -123,6 +125,9 @@ A NotFound response for a guessed resource is a discovery failure, not evidence
 that the product violates its requirement. Continue discovery and run the planned
 reproduction; if the required observation remains unavailable, record
 unable_to_verify. Retain only configuration sections relevant to the test.
+Each command has a hard 90-second deadline. Set oc --request-timeout=30s, keep
+individual waits below 60 seconds, and split longer polling across tool calls.
+Do not follow logs, open interactive sessions, or start indefinite commands.
 """
 
 
@@ -350,17 +355,21 @@ class Sandbox:
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                raise subprocess.TimeoutExpired("sandbox command", COMMAND_TIMEOUT_SECONDS)
+                raise subprocess.TimeoutExpired("sandbox command", COMMAND_TIMEOUT_SECONDS, output=bytes(output))
             readable, _, _ = select.select([process.stdout], [], [], remaining)
             if not readable:
-                raise subprocess.TimeoutExpired("sandbox command", COMMAND_TIMEOUT_SECONDS)
+                raise subprocess.TimeoutExpired("sandbox command", COMMAND_TIMEOUT_SECONDS, output=bytes(output))
             data = os.read(process.stdout.fileno(), MAX_COMMAND_OUTPUT_BYTES)
             if not data:
                 break
             output.extend(data)
             if len(output) > MAX_COMMAND_OUTPUT_BYTES:
                 raise SandboxError("sandbox output limit exceeded; observation incomplete")
-        status = process.wait(timeout=max(0.01, deadline - time.monotonic()))
+        try:
+            status = process.wait(timeout=max(0.01, deadline - time.monotonic()))
+        except subprocess.TimeoutExpired as error:
+            error.output = bytes(output)
+            raise
         return output.decode("utf-8", errors="replace"), status
 
     def run(self, text):
@@ -983,7 +992,20 @@ class Execution:
         self.command_number += 1
         check_id = args["check_id"]
         path = f"evidence/{self.command_number:04d}-{check_id}.txt"
-        output, status = self.sandbox.run(text)
+        atomic_write(self.artifacts / path, redact(f"$ {text}\n\nCommand started; observation incomplete.\n", self.secrets))
+        self.evidence[path] = check_id
+        try:
+            output, status = self.sandbox.run(text)
+        except (subprocess.SubprocessError, SandboxError, DeadlineExceeded, OSError) as error:
+            output = getattr(error, "output", None) or ""
+            if isinstance(output, bytes):
+                output = output.decode("utf-8", errors="replace")
+            reason = safe_error(error)
+            evidence = redact(f"$ {text}\n\n{output}\n\nObservation incomplete: {reason}\n", self.secrets)
+            atomic_write(self.artifacts / path, evidence)
+            self.record_result({"check_id": check_id, "outcome": "unable_to_verify",
+                                "observed": reason, "evidence": [path]})
+            raise
         output = redact(output, self.secrets)
         evidence = redact(f"$ {text}\n\n{output}\n\nExit status: {status}\n", self.secrets)
         atomic_write(self.artifacts / path, evidence)
