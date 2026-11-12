@@ -120,7 +120,10 @@ gh_api_get() {
     # $1: full https://api.github.com/... URL
     local URL="${1}" OUT
     OUT=$(mktemp)
-    if curl -sf --connect-timeout 10 --max-time 60 --retry 2 --retry-delay 5 "${CURL_HEADERS[@]}" "${URL}" -o "${OUT}" 2>/dev/null; then
+    # No --retry here: the pod fallback below is the retry, and it uses a
+    # different egress. Retrying a rate-limited direct call only stacks up
+    # to three 60s attempts before that fallback even starts.
+    if curl -sf --connect-timeout 10 --max-time 60 "${CURL_HEADERS[@]}" "${URL}" -o "${OUT}" 2>/dev/null; then
         cat "${OUT}"
         rm -f "${OUT}"
         return 0
@@ -137,6 +140,29 @@ gh_api_get() {
     fi
     rm -f "${OUT}"
     return 1
+}
+
+# Which channel a branch name denotes. The OADP repos do NOT all name their
+# development branch `oadp-dev` -- migtools/kubevirt-velero-plugin and
+# openshift/hypershift-oadp-plugin use `main`, and some repos still carry a
+# `master` -- so the development-channel names are normalized to one token
+# before a dep PR's base branch is compared with this job's PULL_BASE_REF.
+# Without this, a dep PR on one of those repos' development branch is
+# wrongly classified as unshippable in an `oadp-dev` job and silently
+# skipped. Release branches (oadp-1.x, release-4.x) have no aliases and
+# still compare by name.
+branch_channel() {
+    case "${1}" in
+        oadp-dev|main|master) printf 'dev' ;;
+        *) printf '%s' "${1}" ;;
+    esac
+}
+
+# JSON "body" value of a PR API response, still JSON-escaped. Only the body
+# field is ever scanned: the raw response also contains the title, where a
+# literal "Depends-On: <url>" example could false-match.
+extract_pr_body() {
+    printf '%s' "${1}" | grep -Po '"body": *"(\\.|[^"\\])*"' | head -1 | sed -E 's/^"body": *"//; s/"$//' || true
 }
 
 PR_JSON=""
@@ -176,18 +202,12 @@ fi
 # grep -P instead of pulling in a full JSON parser for one field -- this
 # image already assumes GNU coreutils (the `date --utc` calls throughout
 # this script are GNU-only too), and GNU grep's PCRE support is standard on
-# the RHEL/UBI base this image is built from.
-# GitHub's API returns pretty-printed JSON ("body": "..." with a space
-# after the colon), so the key match must tolerate that whitespace: a
-# '"body":"' pattern never matched the real payload, leaving the extraction
-# empty (and, under errexit+pipefail, failing the step via the grep no-match
-# exit code) even on a successful fetch.
-PR_BODY_ESCAPED=$(printf '%s' "${PR_JSON}" | grep -Po '"body": *"(\\.|[^"\\])*"' | head -1 || true)
-# sed, not a bash glob strip: the glob's ' *' means one literal space plus
-# wildcard, so it would miss a zero-space compact payload that the regex
-# above does match -- same regex semantics on both sides.
-PR_BODY_ESCAPED=$(printf '%s' "${PR_BODY_ESCAPED}" | sed -E 's/^"body": *"//')
-PR_BODY_ESCAPED="${PR_BODY_ESCAPED%\"}"
+# the RHEL/UBI base this image is built from. extract_pr_body (above) also
+# tolerates GitHub's pretty-printed '"body": "..."' whitespace and its sed
+# mirrors the regex, so a zero-space compact payload is handled the same
+# way; it is deliberately `|| true`-terminal because under errexit+pipefail
+# a grep no-match (e.g. a null body) would otherwise fail the step.
+PR_BODY_ESCAPED=$(extract_pr_body "${PR_JSON}")
 DEPENDS_ON_LINES=$(printf '%s' "${PR_BODY_ESCAPED}" | grep -oiE 'depends-on:[^"\\]*https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+' || true)
 
 if [[ -z "${DEPENDS_ON_LINES}" ]]; then
@@ -224,15 +244,17 @@ if [[ -z "${DEPENDS_ON_LINES}" ]]; then
             # Same escaped-body extraction as above (the title-vs-body
             # false-match avoidance applies to the original PR's response
             # too).
-            ORIG_BODY_ESCAPED=$(printf '%s' "${ORIG_PR_JSON}" | grep -Po '"body": *"(\\.|[^"\\])*"' | head -1 || true)
-            ORIG_BODY_ESCAPED=$(printf '%s' "${ORIG_BODY_ESCAPED}" | sed -E 's/^"body": *"//')
-            ORIG_BODY_ESCAPED="${ORIG_BODY_ESCAPED%\"}"
+            ORIG_BODY_ESCAPED=$(extract_pr_body "${ORIG_PR_JSON}")
             ORIG_DEPENDS_ON=$(printf '%s' "${ORIG_BODY_ESCAPED}" | grep -oiE 'depends-on:[^"\\]*https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+' || true)
             if [[ -n "${ORIG_DEPENDS_ON}" ]]; then
                 echo "[$(date --utc +%FT%T.%3NZ)] WARNING: this cherry-pick carries no Depends-On lines, but the original ${CHERRY_ORIG_REPO}#${CHERRY_ORIG_PR} declares:" >&2
                 printf '%s\n' "${ORIG_DEPENDS_ON}" | sed 's/^/  /' >&2
                 echo "[$(date --utc +%FT%T.%3NZ)] Re-add the line(s) to THIS PR's description and /test <job-name> to have them resolved here -- they are not resolved automatically" >&2
-                { echo "cherry-pick-of ${CHERRY_ORIG_REPO}#${CHERRY_ORIG_PR} declares Depends-On lines missing from this PR's body $(date --utc +%FT%T.%3NZ)"; printf '%s\n' "${ORIG_DEPENDS_ON}"; } >> "${ARTIFACT_DIR}/depends-on-cherrypick-original.txt"
+                # Diagnostic only: a failed artifact write must never fail the
+                # job (same "an optional check never turns the job red"
+                # contract as the rest of this step).
+                { echo "cherry-pick-of ${CHERRY_ORIG_REPO}#${CHERRY_ORIG_PR} declares Depends-On lines missing from this PR's body $(date --utc +%FT%T.%3NZ)"; printf '%s\n' "${ORIG_DEPENDS_ON}"; } >> "${ARTIFACT_DIR}/depends-on-cherrypick-original.txt" \
+                    || echo "[$(date --utc +%FT%T.%3NZ)] WARNING: could not write ${ARTIFACT_DIR}/depends-on-cherrypick-original.txt" >&2
             else
                 echo "[$(date --utc +%FT%T.%3NZ)] Original ${CHERRY_ORIG_REPO}#${CHERRY_ORIG_PR} declares no Depends-On lines either -- nothing was lost in the cherry-pick"
             fi
@@ -287,9 +309,12 @@ while IFS= read -r line; do
 
     # Branch-mismatch guard: never build a dependency whose PR is based on
     # a different branch than the one this job tests. All OADP-ecosystem
-    # repos share one branch scheme (oadp-dev + oadp-1.x), so the dep PR's
-    # base branch and this job's PULL_BASE_REF are directly comparable: an
-    # oadp-dev-based dep PR pulled into an oadp-1.6 job would build a
+    # repos use the same DEVELOPMENT-channel names modulo aliases (most:
+    # oadp-dev; migtools/kubevirt-velero-plugin and
+    # openshift/hypershift-oadp-plugin: main; some: master) and their
+    # release branches are the same oadp-1.x names, so the two base refs are
+    # comparable after branch_channel() normalizes the development aliases:
+    # an oadp-dev-based dep PR pulled into an oadp-1.6 job would build a
     # combination that can never ship (dev code inside a release bundle),
     # and the resulting verdict -- pass OR fail -- says nothing about
     # either branch. On mismatch the dep is SKIPPED: this job proceeds
@@ -310,6 +335,9 @@ while IFS= read -r line; do
     # never be rehearsed.
     if [[ -n "${PULL_BASE_REF:-}" && "${REPO_OWNER}/${REPO_NAME}" != "openshift/release" ]]; then
         DEP_BASE_REF=""
+        # Progress line before the fetch: the direct API path can fall back
+        # to a one-shot pod, so this call is not always fast.
+        echo "[$(date --utc +%FT%T.%3NZ)] Checking the base branch of ${DEP_REPO}#${DEP_PR} before fetching its source"
         if DEP_PR_JSON=$(gh_api_get "https://api.github.com/repos/${DEP_REPO}/pulls/${DEP_PR}"); then
             # The "base" object's "ref" field sits before its nested
             # user/repo objects in GitHub's payload, so grep -P over the
@@ -322,9 +350,11 @@ while IFS= read -r line; do
         fi
         if [[ -z "${DEP_BASE_REF}" ]]; then
             echo "[$(date --utc +%FT%T.%3NZ)] WARNING: could not determine the base branch of ${DEP_REPO}#${DEP_PR} -- branch-mismatch guard inconclusive, building this dependency as requested" >&2
-        elif [[ "${DEP_BASE_REF}" != "${PULL_BASE_REF}" ]]; then
+        elif [[ "$(branch_channel "${DEP_BASE_REF}")" != "$(branch_channel "${PULL_BASE_REF}")" ]]; then
             echo "[$(date --utc +%FT%T.%3NZ)] WARNING: ${DEP_REPO}#${DEP_PR} is based on branch '${DEP_BASE_REF}' but this job tests branch '${PULL_BASE_REF}' of ${REPO_OWNER}/${REPO_NAME} -- building it would test a combination that can never ship, so this dependency is SKIPPED and the job runs against the released ${DEP_REPO} instead; to actually test this dep here, point the Depends-On line at a PR based on '${PULL_BASE_REF}' (e.g. this change's cherry-pick)" >&2
-            echo "branch-mismatch ${DEP_REPO}#${DEP_PR} dep-base=${DEP_BASE_REF} job=${REPO_OWNER}/${REPO_NAME}@${PULL_BASE_REF} $(date --utc +%FT%T.%3NZ)" >> "${ARTIFACT_DIR}/depends-on-branch-mismatch.txt"
+            # Diagnostic only: a failed artifact write must never fail the job.
+            echo "branch-mismatch ${DEP_REPO}#${DEP_PR} dep-base=${DEP_BASE_REF} job=${REPO_OWNER}/${REPO_NAME}@${PULL_BASE_REF} $(date --utc +%FT%T.%3NZ)" >> "${ARTIFACT_DIR}/depends-on-branch-mismatch.txt" \
+                || echo "[$(date --utc +%FT%T.%3NZ)] WARNING: could not write ${ARTIFACT_DIR}/depends-on-branch-mismatch.txt" >&2
             MISMATCH_SKIPPED=true
             continue
         fi
