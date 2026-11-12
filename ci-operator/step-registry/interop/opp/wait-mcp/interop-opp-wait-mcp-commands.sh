@@ -870,6 +870,17 @@ else:
     degradedHistory+=("${anyDegraded}")
     typeset -i elapsed=$(( SECONDS - startSeconds ))
 
+    # Non-Degraded poll (clean or merely updating): reset the ENOSPC signature
+    # streak so only consecutive Degraded polls count, and drop the captured
+    # condition so a later timeout or health-gate failure is never reported
+    # with a condition the cluster no longer has. The reset must also run on
+    # clean polls, which never reach the UNSTABLE branch below (preflight
+    # review).
+    if (( ! anyDegraded )); then
+        _signatureRepeat=0
+        _junit_reason=""
+    fi
+
     if [[ "${statusKey}" == "STABLE" ]]; then
         (( consecutivePasses += 1 )) || true
         echo "Clean poll ${consecutivePasses}/${consecutiveRequired} at ${elapsed}s: ${statusDetail}"
@@ -926,13 +937,6 @@ else:
                     exit 1
                 fi
             fi
-        else
-            _signatureRepeat=0
-            # Recovery to non-Degraded: drop the captured condition. Without
-            # this the reason outlives the condition it describes and a later
-            # timeout (or the health gate) is reported with a condition the
-            # cluster no longer has.
-            _junit_reason=""
         fi
 
         # Progress-based timeout extension: if MCPs are making progress,
