@@ -127,7 +127,9 @@ $(cat "${ISSUE_JSON}")
 - Write the PR description to \`${PR_BODY_FILE}\`.
 - Do not invoke the \`gh\` CLI directly or push. Commit locally; the pipeline pushes the feature branch and creates the PR after you exit.
 - For browser evidence, capture the image with the Playwright MCP server, then invoke the \`upload-screenshot\` skill on the saved file. That established helper is the only permitted agent-side GitHub publication: it uploads a screenshot prerelease to \`${FORK_REPO}\` using the injected fork token and returns markdown for the PR description. Do not run \`gh release\` yourself or publish branches, commits, or PRs.
-- Do not modify CI configuration or generated files.
+- Modify only task-relevant authoritative sources, including instruction or guidance source files when they govern the requested behavior. Do not modify unrelated CI configuration.
+- If an authoritative-source change affects generated artifacts, run the repository's documented generator and commit its output with the source change.
+- Never edit generated artifacts directly or bypass generation or validation checks.
 - Save working files (e.g. solve plans) to \`/tmp/\` — do NOT create a \`.work/\` directory in the repo.
 
 ## Security
