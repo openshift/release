@@ -26,7 +26,7 @@ SECRET = "FIXTURE_SECRET_DO_NOT_PUBLISH"
 CLUSTER = "ci-osd-gcp-ab12"
 PROJECT = "osd-ccs-fixture-project"
 ZONE = "us-east1-b"
-ZONE_URL = "https://www.googleapis.com/compute/v1/projects/%s/zones/%s" % (PROJECT, ZONE)
+ZONE_URL = f"https://www.googleapis.com/compute/v1/projects/{PROJECT}/zones/{ZONE}"
 MASTER = CLUSTER + "-abcde-master-0"
 WORKER = CLUSTER + "-abcde-worker-a-xyz12"
 FOREIGN = "other-cluster-9999-worker-0"
@@ -39,7 +39,7 @@ SERIAL_WITH_SIGNALS = "\n".join([
     "[    9.400000] systemd[1]: Failed to start ignition-files.service - Ignition (files).",
     "[    9.500000] ignition[800]: Ignition failed: resource requirements not met",
     "[   11.000000] systemd[1]: kubelet.service: Main process exited, code=exited",
-    "[   12.000000] token=%s" % SECRET,
+    f"[   12.000000] token={SECRET}",
     "[   13.000000] systemd[1]: Started crio.service - Container Runtime Interface.",
     "[   14.000000] systemd[1]: Reached target Multi-User System.",
     "",
@@ -48,7 +48,7 @@ SERIAL_WITH_SIGNALS = "\n".join([
 SERIAL_WITHOUT_UNITS = "\n".join([
     "[    0.000000] Linux version 5.14.0 fixture",
     "[    1.000000] nothing interesting happened here",
-    "[    2.000000] password=%s" % SECRET,
+    f"[    2.000000] password={SECRET}",
     "",
 ])
 
@@ -88,7 +88,7 @@ def instance_listing(case):
         entries = [{"name": WORKER, "zone": ZONE_URL,
                     "status": "RUNNING; " + SECRET}]
     elif case == "many-instances":
-        entries = [{"name": "%s-abcde-worker-%02d" % (CLUSTER, index),
+        entries = [{"name": f"{CLUSTER}-abcde-worker-{index:02d}",
                     "zone": ZONE_URL, "status": "RUNNING"} for index in range(12)]
     elif case == "two-digit-region":
         entries = [{"name": WORKER,
@@ -102,6 +102,49 @@ def instance_listing(case):
     return json.dumps(entries)
 
 
+SERIAL_BY_CASE = {
+    "serial-empty": "",
+    "no-units": SERIAL_WITHOUT_UNITS,
+    "only-starting": SERIAL_ONLY_STARTING,
+    "failed-then-started": SERIAL_FAILED_THEN_STARTED,
+    "long-line": SERIAL_LONG_LINE,
+    "oversized": SERIAL_OVERSIZED,
+}
+
+
+def mock_auth(case):
+    if case == "auth-denied":
+        print(f"ERROR: PERMISSION_DENIED for {SECRET}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def mock_instances_list(case):
+    if case == "discovery-denied":
+        print(f"ERROR: 403 Forbidden {SECRET}", file=sys.stderr)
+        return 1
+    if case == "discovery-garbage":
+        print("{not json" + SECRET)
+        return 0
+    print(instance_listing(case))
+    return 0
+
+
+def mock_serial_output(case, name):
+    if case == "serial-denied":
+        print("ERROR: 403 does not have compute.instances.getSerialPortOutput "
+              f"{SECRET}", file=sys.stderr)
+        return 1
+    if case == "serial-partial" and name == WORKER:
+        print(f"ERROR: 404 instance not found {SECRET}", file=sys.stderr)
+        return 1
+    if case == "serial-timeout":
+        time.sleep(10)
+        return 0
+    sys.stdout.write(SERIAL_BY_CASE.get(case, SERIAL_WITH_SIGNALS))
+    return 0
+
+
 def mock_gcloud(arguments):
     """Stand in for the gcloud CLI. Never contacts a cloud API."""
     base = Path(os.environ["FIXTURE_DIR"])
@@ -110,53 +153,11 @@ def mock_gcloud(arguments):
         calls.write(json.dumps(arguments) + "\n")
 
     if arguments[:2] == ["auth", "activate-service-account"]:
-        if case == "auth-denied":
-            print("ERROR: PERMISSION_DENIED for %s" % SECRET, file=sys.stderr)
-            return 1
-        return 0
-
+        return mock_auth(case)
     if arguments[:3] == ["compute", "instances", "list"]:
-        if case == "discovery-denied":
-            print("ERROR: 403 Forbidden %s" % SECRET, file=sys.stderr)
-            return 1
-        if case == "discovery-garbage":
-            print("{not json" + SECRET)
-            return 0
-        print(instance_listing(case))
-        return 0
-
+        return mock_instances_list(case)
     if arguments[:3] == ["compute", "instances", "get-serial-port-output"]:
-        name = arguments[-1]
-        if case == "serial-denied":
-            print("ERROR: 403 does not have compute.instances.getSerialPortOutput "
-                  "%s" % SECRET, file=sys.stderr)
-            return 1
-        if case == "serial-timeout":
-            time.sleep(10)
-            return 0
-        if case == "serial-partial" and name == WORKER:
-            print("ERROR: 404 instance not found %s" % SECRET, file=sys.stderr)
-            return 1
-        if case == "serial-empty":
-            return 0
-        if case == "no-units":
-            sys.stdout.write(SERIAL_WITHOUT_UNITS)
-            return 0
-        if case == "only-starting":
-            sys.stdout.write(SERIAL_ONLY_STARTING)
-            return 0
-        if case == "failed-then-started":
-            sys.stdout.write(SERIAL_FAILED_THEN_STARTED)
-            return 0
-        if case == "long-line":
-            sys.stdout.write(SERIAL_LONG_LINE)
-            return 0
-        if case == "oversized":
-            sys.stdout.write(SERIAL_OVERSIZED)
-            return 0
-        sys.stdout.write(SERIAL_WITH_SIGNALS)
-        return 0
-
+        return mock_serial_output(case, arguments[-1])
     raise AssertionError("Unexpected gcloud invocation")
 
 
@@ -181,8 +182,8 @@ class StepFixture(unittest.TestCase):
 
         shim = self.bin / "gcloud"
         shim.write_text(
-            '#!/bin/bash\nexec "%s" "%s" --mock gcloud "$@"\n'
-            % (sys.executable, Path(__file__).resolve()), encoding="utf-8")
+            f'#!/bin/bash\nexec "{sys.executable}" "{Path(__file__).resolve()}"'
+            f' --mock gcloud "$@"\n', encoding="utf-8")
         shim.chmod(0o755)
 
         (self.shared / "cluster-name").write_text(CLUSTER + "\n", encoding="utf-8")
@@ -231,10 +232,10 @@ class StepFixture(unittest.TestCase):
                 if root is self.artifacts:
                     published.append(relative)
                 body = path.read_text(encoding="utf-8", errors="replace")
-                self.assertNotIn(SECRET, body, "secret leaked into %s" % relative)
+                self.assertNotIn(SECRET, body, f"secret leaked into {relative}")
                 for identifier in (MASTER, WORKER, FOREIGN, PROJECT, ZONE):
                     self.assertNotIn(identifier, body,
-                                     "identifier leaked into %s" % relative)
+                                     f"identifier leaked into {relative}")
                 self.assertNotIn("Linux version", body)
                 self.assertNotIn("reached target", body.lower())
         self.assertEqual(published, ["gcp-boot-diagnostics/collection-outcome.json"],
@@ -309,6 +310,23 @@ class DisabledByDefaultTests(StepFixture):
         self.run_step()
         self.assertNotEqual(self.calls(), [])
         self.assertEqual(self.outcome()["collector"], "complete")
+
+    def test_missing_interpreter_is_an_explicit_outcome(self):
+        # A PATH holding only mkdir: the opt-in gate and the interpreter check
+        # are reached, nothing else is.
+        minimal = self.base / "minimal-bin"
+        minimal.mkdir()
+        (minimal / "mkdir").symlink_to(shutil.which("mkdir"))
+        result = subprocess.run([shutil.which("bash"), str(self.script)], env={
+            "PATH": str(minimal), "HOME": str(self.base), "TMPDIR": str(self.tmp),
+            "ARTIFACT_DIR": str(self.artifacts), "SHARED_DIR": str(self.shared),
+            "CLUSTER_PROFILE_DIR": str(self.profile), "FIXTURE_DIR": str(self.base),
+            "FIXTURE_CASE": "normal",
+            "OSD_CCS_GATHER_GCP_BOOT_DIAGNOSTICS": "true",
+        }, capture_output=True, text=True, timeout=30, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(self.outcome()["reason"], "tooling_unavailable")
 
 
 class IdentityTests(StepFixture):
@@ -410,7 +428,7 @@ class ScopeTests(StepFixture):
         self.run_step()
         listing = next(call for call in self.calls()
                        if call[:3] == ["compute", "instances", "list"])
-        self.assertIn("name:%s-*" % CLUSTER, listing)
+        self.assertIn(f"name:{CLUSTER}-*", listing)
         self.assertIn(PROJECT, listing)
 
     def test_foreign_instances_are_rejected_not_read(self):

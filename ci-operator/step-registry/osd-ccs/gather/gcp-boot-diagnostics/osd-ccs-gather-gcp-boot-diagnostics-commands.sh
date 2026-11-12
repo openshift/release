@@ -24,6 +24,15 @@ if [[ "${OSD_CCS_GATHER_GCP_BOOT_DIAGNOSTICS:-false}" != "true" ]]; then
   exit 0
 fi
 
+# The collector is written in Python. Report its absence as a fixed outcome
+# rather than leaving the provisional document behind with a misleading reason.
+if ! command -v python3 >/dev/null 2>&1; then
+  printf '{"schema":1,"collector":"incomplete","reason":"tooling_unavailable"}\n' \
+    > "${OUTPUT_DIR}/collection-outcome.json"
+  log "python3 is not available in this image; nothing collected."
+  exit 0
+fi
+
 # ---- scratch state -----------------------------------------------------------
 #
 # Serial output is hostile input. It is only ever written to this private

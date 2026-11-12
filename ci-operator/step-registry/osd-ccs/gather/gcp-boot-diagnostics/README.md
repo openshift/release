@@ -39,6 +39,22 @@ switch is turned on for any job, two things need an authorized answer:
 No credential mount, role, binding or interactive access is added by this
 change, and none should be added to enable it.
 
+## Why the step still exits 0 on every path
+
+The workflow marks this step `best_effort`, but in ci-operator that flag is
+only honoured when the test also sets `allow_best_effort_post_steps`. The
+ref's `optional_on_success` is paired the same way with the test's
+`allow_skip_on_success`. The two OSD GCP jobs set neither, so both flags are
+inert for them today, exactly as they already are for the other post steps in
+this workflow.
+Cleanup does not depend on either: ci-operator clears its short-circuit flag
+before the post phase, so a failing post step does not stop the ones after it,
+and this step additionally exits 0 on every path. Deprovision runs regardless.
+
+Because `optional_on_success` is inert here, the step also runs on successful
+jobs. That is intentional: a worker can be created and never join while the
+cluster is still reported ready.
+
 ## Scope and identity
 
 The cluster name is read only from `SHARED_DIR/cluster-name`, which
@@ -80,9 +96,10 @@ so "nothing collected" is distinguishable from "nothing wrong".
 - `collector`: `disabled`, `complete` or `incomplete`.
 - `reason`: `opt_in_required`, `collected`, `no_instances_in_scope`, an
   `identity_*`, `credential_*`, `auth_*` or `discovery_*` value,
-  `budget_exhausted`, `scratch_unavailable`, `interrupted` or
-  `collector_error`. A provisional `interrupted` document is written before
-  any cloud read, so the outcome still exists if the step is killed.
+  `budget_exhausted`, `scratch_unavailable`, `interrupted`,
+  `tooling_unavailable` or `collector_error`. A provisional `interrupted`
+  document is written before any cloud read, so the outcome still exists if
+  the step is killed.
 - per instance `collection`: `ok`, `no_signal`, `timeout`, `unavailable`,
   `permission_denied`, `not_found`, `unauthenticated`, `quota_exceeded` or
   `error`.
