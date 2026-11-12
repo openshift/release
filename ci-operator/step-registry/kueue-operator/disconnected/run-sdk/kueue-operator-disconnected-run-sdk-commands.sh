@@ -1,13 +1,23 @@
 #!/usr/bin/env bash
 
 set -eEuo pipefail
-# On failure, dump the OLM state so a failing run can be triaged from the log.
+# EXPERIMENT: dump OLM + catalog-pod evidence and hold the cluster for live
+# debugging on failure (30 min). Experiment branch only — never merged.
 on_error() {
     trap - ERR
-    echo "=== FAILED at line $1 — dumping OLM state for diagnostics"
+    echo "=== FAILED at line $1 — dumping state for diagnostics"
     oc get catalogsource,subscription,operatorgroup,installplan -A 2>&1 | grep -i kueue || true
     oc get csv -A 2>&1 | grep -i kueue || true
     oc get pods -n openshift-marketplace 2>&1 | grep -i kueue || true
+    echo "=== catalog pod evidence (openshift-kueue-operator)"
+    oc get pods -n openshift-kueue-operator -o wide 2>&1 || true
+    oc describe pods -n openshift-kueue-operator 2>&1 | tail -120 || true
+    oc get events -n openshift-kueue-operator --sort-by=.lastTimestamp 2>&1 | tail -40 || true
+    echo "=== holding 30 min — release with: touch /tmp/kueue-run-sdk-debug-release"
+    local deadline=$(( $(date +%s) + 1800 ))
+    while [[ ! -f /tmp/kueue-run-sdk-debug-release && $(date +%s) -lt $deadline ]]; do
+        sleep 15
+    done
 }
 trap 'on_error $LINENO' ERR
 
@@ -63,7 +73,19 @@ echo 'Waiting for the MachineConfigPool to finish rollout...'
 oc wait mcp --all --for=condition=Updating --timeout=5m || true
 oc wait mcp --all --for=condition=Updated --timeout=20m
 
+# EXPERIMENT (§9b guard): the catalog pod below pulls its index image through
+# the node's mirror configuration, so require the mapping to be present in every
+# pool's rendered config instead of trusting the condition waits alone.
 mirror=${BUNDLE_IMAGE%%/*}
+for pool in $(oc get mcp -o name); do
+    rendered=$(oc get "$pool" -o jsonpath='{.status.configuration.name}')
+    if ! oc get machineconfig "$rendered" -o json | grep -q "$mirror"; then
+        echo "ERROR: mirror mapping for ${mirror} missing from ${pool} rendered config (${rendered})"
+        exit 1
+    fi
+done
+echo "Mirror mapping present in all pool rendered configs"
+
 # Image imports need mirror trust independently of the nodes.
 ca_config=$(oc get image.config.openshift.io cluster -o jsonpath='{.spec.additionalTrustedCA.name}')
 if [[ -z "$ca_config" ]]; then
@@ -84,50 +106,21 @@ oc secrets link default kueue-mirror-pull-secret --for=pull -n openshift-kueue-o
 # WORKING DIRECTORY; the step pod starts in the read-only artifacts dir.
 cd /tmp
 "${OPERATOR_SDK_BIN}" version
+# EXPERIMENT (OCPKUEUE-960 §8+§9a):
+# - no --security-context-config: the catalog pod runs as the image user, which
+#   can read the SDK's 0400 root-owned secret mounts (pull secret + CA), so the
+#   catalog-pod rewrite workaround is not needed
+# - no --skip-tls-verify: the in-pod bundle pull verifies the mirror registry
+#   against the mirror CA passed via --ca-secret-name
+oc create secret generic kueue-mirror-ca -n openshift-kueue-operator \
+    --from-file=cert.pem="${SHARED_DIR}/additional_trust_bundle" \
+    --dry-run=client -o yaml | oc apply -f -
 "${OPERATOR_SDK_BIN}" run bundle --timeout=15m -n openshift-kueue-operator \
-    --skip-tls-verify --security-context-config restricted --pull-secret-name=kueue-mirror-pull-secret \
+    --pull-secret-name=kueue-mirror-pull-secret --ca-secret-name=kueue-mirror-ca \
     --index-image="$mirror/operator-framework/opm:latest" \
     --decompression-image="$mirror/ubi9/ubi:9.4" "$BUNDLE_IMAGE" &
 sdk_pid=$!
 trap 'kill "$sdk_pid" 2>/dev/null || true' EXIT
-# SDK v1.39.2 mounts auth under /root with mode 0400, inaccessible
-# to restricted pods. Recreate its catalog pod with readable auth.
-pod=""
-for _ in $(seq 1 60); do
-    pod=$(oc get catalogsource kueue-operator-catalog -n openshift-kueue-operator \
-        -o jsonpath='{.metadata.annotations.operators\.operatorframework\.io/registry-pod-name}' 2>/dev/null) || true
-    if [[ -n "$pod" ]] && oc get pod "$pod" -n openshift-kueue-operator >/dev/null 2>&1; then break; fi
-    sleep 5
-done
-if [[ -z "$pod" ]]; then
-    echo "ERROR: operator-sdk did not create the catalog registry pod in time"
-    oc get catalogsource,subscription,pods -n openshift-kueue-operator 2>&1 || true
-    exit 1
-fi
-# Wait until SDK has finished creating and annotating the catalog
-# before replacing its pod, so it cannot overwrite the new address.
-for _ in $(seq 1 60); do
-    if oc get subscriptions -n openshift-kueue-operator -o json | \
-        jq -e 'any(.items[]; .spec.name == "kueue-operator")' >/dev/null; then break; fi
-    sleep 5
-done
-oc get subscriptions -n openshift-kueue-operator -o json | \
-    jq -e 'any(.items[]; .spec.name == "kueue-operator")' >/dev/null
-oc get pod "$pod" -n openshift-kueue-operator -o json | jq '
-    del(.status,.metadata.uid,.metadata.resourceVersion,.metadata.creationTimestamp,.metadata.managedFields) |
-    (.spec.volumes[] | select(.name=="kueue-mirror-pull-secret").secret.defaultMode)=292 |
-    (.spec.containers[].volumeMounts[] | select(.name=="kueue-mirror-pull-secret").mountPath)="/registry-auth" |
-    .spec.containers[0].env=[{"name":"HOME","value":"/registry-auth"},
-        {"name":"DOCKER_CONFIG","value":"/registry-auth/.docker"},
-        {"name":"REGISTRY_AUTH_FILE","value":"/registry-auth/.docker/config.json"}]
-' > /tmp/kueue-catalog-pod.json
-oc delete pod "$pod" -n openshift-kueue-operator --wait=true --timeout=1m
-oc create -f /tmp/kueue-catalog-pod.json
-oc wait pod "$pod" -n openshift-kueue-operator --for=condition=Ready --timeout=3m
-ip=$(oc get pod "$pod" -n openshift-kueue-operator -o jsonpath='{.status.podIP}')
-oc patch catalogsource kueue-operator-catalog -n openshift-kueue-operator \
-    --type=merge -p "{\"spec\":{\"address\":\"$ip:50051\"}}"
-# On failure, the ERR trap dumps the OLM state before exiting.
 wait "$sdk_pid"
 
 echo 'Waiting for the operator CSV to succeed...'
