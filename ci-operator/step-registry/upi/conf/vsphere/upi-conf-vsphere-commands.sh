@@ -437,31 +437,49 @@ if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
   infra_manifest="manifests/cluster-infrastructure-02-config.yml"
   ccm_manifest="manifests/cloud-provider-config.yaml"
 
+  metadata_json="metadata.json"
+
   vsphere_fd_server=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.vcenters[0].server")
   vsphere_fd_datacenter=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.datacenter")
   vsphere_fd_datastore_path=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.datastore")
   vsphere_fd_folder=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.folder")
-  [[ "${vsphere_fd_server}" == "null" ]] && vsphere_fd_server=""
-  [[ "${vsphere_fd_datacenter}" == "null" ]] && vsphere_fd_datacenter=""
-  [[ "${vsphere_fd_datastore_path}" == "null" ]] && vsphere_fd_datastore_path=""
-  [[ "${vsphere_fd_folder}" == "null" ]] && vsphere_fd_folder=""
+  vsphere_fd_resource_pool=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.resourcePool")
+  vsphere_fd_port=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.vcenters[0].port")
+  vsphere_infra_id=$(jq -r '.infraID // empty' "${metadata_json}" 2>/dev/null)
+  for v in vsphere_fd_server vsphere_fd_datacenter vsphere_fd_datastore_path vsphere_fd_folder vsphere_fd_resource_pool vsphere_fd_port; do
+    [[ "${!v}" == "null" ]] && eval "${v}=\"\""
+  done
   vsphere_fd_datastore="${vsphere_fd_datastore_path##*/}"
+  [[ "${vsphere_fd_port}" == "0" ]] && vsphere_fd_port=""
 
   if [[ -z "${vsphere_fd_server}" || -z "${vsphere_fd_datacenter}" || -z "${vsphere_fd_datastore}" ]]; then
     echo "ERROR: could not read vCenter server/datacenter/datastore from ${infra_manifest}; cannot build a legacy cloud-provider-config" >&2
     exit 1
   fi
 
+  if [[ -z "${vsphere_fd_folder}" ]]; then
+    if [[ -n "${vsphere_infra_id}" ]]; then
+      vsphere_fd_folder="/${vsphere_fd_datacenter}/vm/${vsphere_infra_id}"
+    else
+      echo "WARNING: no topology.folder resolved and no infraID available in ${metadata_json}; omitting 'folder' from the legacy [Workspace] section" >&2
+    fi
+  fi
+
   vsphere_cm_name=$(yq-go r "${ccm_manifest}" "metadata.name")
   vsphere_cm_namespace=$(yq-go r "${ccm_manifest}" "metadata.namespace")
 
-  vsphere_folder_line=""
-  if [[ -n "${vsphere_fd_folder}" ]]; then
-    vsphere_folder_line="    folder = \"${vsphere_fd_folder}\""
-  else
-    echo "WARNING: no topology.folder resolved for this failure domain; omitting 'folder' from the legacy [Workspace] section" >&2
-  fi
+  vsphere_port_line="" vsphere_folder_line="" vsphere_resource_pool_line=""
+  [[ -n "${vsphere_fd_port}" ]] && vsphere_port_line="    port = \"${vsphere_fd_port}\""$'\n'
+  [[ -n "${vsphere_fd_folder}" ]] && vsphere_folder_line="    folder = \"${vsphere_fd_folder}\""
+  [[ -n "${vsphere_fd_resource_pool}" ]] && vsphere_resource_pool_line="    resourcepool-path = \"${vsphere_fd_resource_pool}\""
 
+  # Mirrors openshift-installer's own CloudProviderConfigIni() in
+  # pkg/asset/manifests/vsphere/cloudproviderconfig.go -- dead code there
+  # (no caller in the installer outside its own tests, since no installer
+  # version in active use ever selects this format for a fresh install) but
+  # still the product's canonical legacy-INI shape, including its
+  # infraID-based default folder, so what this job manufactures matches as
+  # closely as possible what a real pre-4.13/UPI install would have produced.
   cat > "${ccm_manifest}" <<EOF
 apiVersion: v1
 kind: ConfigMap
@@ -475,14 +493,15 @@ data:
     secret-namespace = "kube-system"
     insecure-flag = "1"
 
+    [VirtualCenter "${vsphere_fd_server}"]
+${vsphere_port_line}    datacenters = "${vsphere_fd_datacenter}"
+
     [Workspace]
     server = "${vsphere_fd_server}"
     datacenter = "${vsphere_fd_datacenter}"
     default-datastore = "${vsphere_fd_datastore}"
 ${vsphere_folder_line}
-
-    [VirtualCenter "${vsphere_fd_server}"]
-    datacenters = "${vsphere_fd_datacenter}"
+${vsphere_resource_pool_line}
 EOF
 
   echo "$(date -u --rfc-3339=seconds) - stripping vcenters/failureDomains from the Infrastructure manifest"

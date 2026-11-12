@@ -738,35 +738,52 @@ function legacyize_vsphere_cloud_provider_config() {
 
   local infra_manifest="${dir}/manifests/cluster-infrastructure-02-config.yml"
   local ccm_manifest="${dir}/manifests/cloud-provider-config.yaml"
+  local metadata_json="${dir}/metadata.json"
 
-  local server datacenter datastore_path datastore folder
+  local server datacenter datastore_path datastore folder resource_pool port infra_id
   server=$(/tmp/yq r "${infra_manifest}" "spec.platformSpec.vsphere.vcenters[0].server")
   datacenter=$(/tmp/yq r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.datacenter")
   datastore_path=$(/tmp/yq r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.datastore")
   folder=$(/tmp/yq r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.folder")
-  [[ "${server}" == "null" ]] && server=""
-  [[ "${datacenter}" == "null" ]] && datacenter=""
-  [[ "${datastore_path}" == "null" ]] && datastore_path=""
-  [[ "${folder}" == "null" ]] && folder=""
+  resource_pool=$(/tmp/yq r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.resourcePool")
+  port=$(/tmp/yq r "${infra_manifest}" "spec.platformSpec.vsphere.vcenters[0].port")
+  infra_id=$(jq -r '.infraID // empty' "${metadata_json}" 2>/dev/null)
+  for v in server datacenter datastore_path folder resource_pool port; do
+    [[ "${!v}" == "null" ]] && eval "${v}=\"\""
+  done
   datastore="${datastore_path##*/}"
+  [[ "${port}" == "0" ]] && port=""
 
   if [[ -z "${server}" || -z "${datacenter}" || -z "${datastore}" ]]; then
     echo "ERROR: could not read vCenter server/datacenter/datastore from ${infra_manifest}; cannot build a legacy cloud-provider-config" >&2
     exit 1
   fi
 
+  if [[ -z "${folder}" ]]; then
+    if [[ -n "${infra_id}" ]]; then
+      folder="/${datacenter}/vm/${infra_id}"
+    else
+      echo "WARNING: no topology.folder resolved and no infraID available in ${metadata_json}; omitting 'folder' from the legacy [Workspace] section" >&2
+    fi
+  fi
+
   local cm_name cm_namespace
   cm_name=$(/tmp/yq r "${ccm_manifest}" "metadata.name")
   cm_namespace=$(/tmp/yq r "${ccm_manifest}" "metadata.namespace")
 
-  local folder_line=""
-  if [[ -n "${folder}" ]]; then
-    folder_line="    folder = \"${folder}\""
-  else
-    echo "WARNING: no topology.folder resolved for this failure domain; omitting 'folder' from the legacy [Workspace] section" >&2
-  fi
+  local port_line="" folder_line="" resource_pool_line=""
+  [[ -n "${port}" ]] && port_line="    port = \"${port}\""$'\n'
+  [[ -n "${folder}" ]] && folder_line="    folder = \"${folder}\""
+  [[ -n "${resource_pool}" ]] && resource_pool_line="    resourcepool-path = \"${resource_pool}\""
 
   echo "$(date -u --rfc-3339=seconds) - rewriting cloud-provider-config as legacy INI (SPLAT-3028)"
+  # Mirrors openshift-installer's own CloudProviderConfigIni() in
+  # pkg/asset/manifests/vsphere/cloudproviderconfig.go -- dead code there
+  # (no caller in the installer outside its own tests, since no installer
+  # version in active use ever selects this format for a fresh install) but
+  # still the product's canonical legacy-INI shape, including its
+  # infraID-based default folder, so what this job manufactures matches as
+  # closely as possible what a real pre-4.13/UPI install would have produced.
   cat > "${ccm_manifest}" <<EOF
 apiVersion: v1
 kind: ConfigMap
@@ -780,14 +797,15 @@ data:
     secret-namespace = "kube-system"
     insecure-flag = "1"
 
+    [VirtualCenter "${server}"]
+${port_line}    datacenters = "${datacenter}"
+
     [Workspace]
     server = "${server}"
     datacenter = "${datacenter}"
     default-datastore = "${datastore}"
 ${folder_line}
-
-    [VirtualCenter "${server}"]
-    datacenters = "${datacenter}"
+${resource_pool_line}
 EOF
 }
 
