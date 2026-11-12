@@ -138,12 +138,28 @@ export AZURE_SUBSCRIPTION_ID
 debug "azure: authentication configured successfully (credentials redacted)"
 
 # Component Updater: Build and run the component-updater tool.
-# The tool updates config/config.yaml and runs `make -C config materialize`
-# (including Helm fixtures) itself; a nonzero exit means nothing was written.
-info "component: discovering and applying version updates for ${COMPONENT}"
-if ! make component-updater-update COMPONENT="${COMPONENT}" > "${COMPONENT_UPDATER_OUTPUT}" 2>&1; then
+# - check: read-only discovery; the tool writes nothing, and the script stops
+#   here (no commit, no pull request) so the job can be validated safely.
+# - update: the tool edits config/config.yaml and runs `make -C config
+#   materialize` (including Helm fixtures) itself. If the tool fails after the
+#   source edit but before/during materialize, the script exits nonzero below
+#   without committing, so no pull request can result.
+readonly COMPONENT_UPDATER_MODE=${MODE:-check}
+if [[ "${COMPONENT_UPDATER_MODE}" != "check" && "${COMPONENT_UPDATER_MODE}" != "update" ]]; then
+  error "component: invalid MODE '${COMPONENT_UPDATER_MODE}'; expected 'check' or 'update'"
+fi
+
+info "component: discovering version updates for ${COMPONENT} (mode: ${COMPONENT_UPDATER_MODE})"
+if ! make "component-updater-${COMPONENT_UPDATER_MODE}" COMPONENT="${COMPONENT}" > "${COMPONENT_UPDATER_OUTPUT}" 2>&1; then
   cat "${COMPONENT_UPDATER_OUTPUT}"
   error "component: component-updater failed; see output above"
+fi
+
+# Check mode: report the discovery result and stop — no commit, no pull request.
+if [[ "${COMPONENT_UPDATER_MODE}" == "check" ]]; then
+  info "component: check mode — discovery result for ${COMPONENT}:"
+  cat "${COMPONENT_UPDATER_OUTPUT}"
+  exit 0
 fi
 
 # Check if there are any changes from component updates
