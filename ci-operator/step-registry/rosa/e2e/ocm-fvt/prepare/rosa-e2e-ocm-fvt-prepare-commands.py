@@ -36,6 +36,16 @@ AUDIT_UNSAFE = re.compile(r"[^0-9A-Za-z._-]")
 AUDIT_OPAQUE = re.compile(r"[0-9A-Za-z]{20,}")
 PUBLISHED_DIR = "ocm-fvt-results"
 RESULT_REPORT = "report.xml"
+# Entries publication deliberately keeps out of ARTIFACT_DIR, each with the
+# fixed classification it is recorded under. These are named after cluster
+# state - a cluster id, an IDP user - and they are the one group of names that
+# never becomes a published object, so recording them would be the manifest
+# disclosing a name for the first time. The rule that matched and a count per
+# directory say what was held back and why without naming anything.
+PRIVATE_STATE = {".datainfo": "datainfo", "cluster.ini": "cluster-ini",
+                 "kubeconfig": "kubeconfig"}
+PRIVATE_SUFFIX = ".kubeconfig"
+PRIVATE_SUFFIX_RULE = "kubeconfig-named"
 # Merged JUnit report that rosa-e2e-ocm-fvt copies into ARTIFACT_DIR before
 # publication runs, so the manifest can tell "never collected" from "collected
 # and later replaced".
@@ -70,6 +80,26 @@ def audit_path(parts):
     if len(rendered) > AUDIT_MAX_PATH:
         rendered = rendered[:AUDIT_MAX_PATH] + "~"
     return rendered
+
+
+def private_state(name):
+    """Return the fixed rule that keeps an entry private, or None."""
+    if name in PRIVATE_STATE:
+        return PRIVATE_STATE[name]
+    if name.endswith(PRIVATE_SUFFIX):
+        return PRIVATE_SUFFIX_RULE
+    return None
+
+
+def private_record(budget, parents, rule):
+    """Count one private-state exclusion against its directory and rule.
+
+    Counting rather than listing keeps the entry's own name out of the
+    manifest, and bounds these records to one per rule per directory.
+    """
+    counted = budget["private"]
+    path = audit_path(parents + (rule,))
+    counted[path] = counted.get(path, 0) + 1
 
 
 def audit_record(budget, parts, disposition, **fields):
@@ -132,7 +162,9 @@ def audit_handoff(artifacts):
 
 def audit_write(artifacts, budget, outcome):
     """Write the publication manifest; auditing never fails or masks the step."""
-    records = sorted(budget["audit"],
+    counted = [{"path": path, "disposition": "excluded", "reason": "private-state",
+                "count": count} for path, count in budget["private"].items()]
+    records = sorted(budget["audit"] + counted,
                      key=lambda record: (record["path"], json.dumps(record, sort_keys=True)))
     kept = records[:AUDIT_MAX_ENTRIES]
     manifest = {
@@ -274,8 +306,9 @@ def publish(source, destination, budget, depth=0, parents=()):
                 raise PublishLimit("entry-limit", "Artifact entry limit exceeded")
             name = entry.name
             located = parents + (name,)
-            if name in (".datainfo", "cluster.ini", "kubeconfig") or name.endswith(".kubeconfig"):
-                audit_record(budget, located, "excluded", reason="private-state")
+            rule = private_state(name)
+            if rule is not None:
+                private_record(budget, parents, rule)
                 continue
             info = os.stat(name, dir_fd=source, follow_symlinks=False)
             if stat.S_ISDIR(info.st_mode):
@@ -335,7 +368,7 @@ def handle_publish(arguments):
     """Run the publish phase of artifact handling."""
     directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     budget = {"entries_left": 8192, "bytes_left": 256 * 1024 * 1024, "excluded": False,
-              "audit": [], "reports": 0}
+              "audit": [], "private": {}, "reports": 0}
     # Pessimistic until the publication tree is in place, so an unwinding this
     # function does not model - a signal, an interpreter error - cannot leave a
     # manifest claiming a publication that never completed.

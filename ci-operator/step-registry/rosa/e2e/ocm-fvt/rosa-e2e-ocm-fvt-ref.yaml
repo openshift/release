@@ -123,21 +123,34 @@ ref:
     Run ocmtest in nested podman using the rosa-backend-tests image.
 
     Publication writes ocm-fvt-artifact-audit.json next to ocm-fvt-results.
-    It lists, per entry, what publication did: published (with the byte count
-    copied), excluded with a reason (private-state, unreadable, irregular) or
-    directory, plus whether the merged junit-ocm-fvt-report.xml reached
-    ARTIFACT_DIR and how many report.xml copies were published. It also
-    inventories ARTIFACT_DIR as the step hands it to the Prow sidecar, with a
+    It records only what this step did with each artifact before handing it
+    over: published, with the byte count copied; excluded, with a reason;
+    directory; whether the merged junit-ocm-fvt-report.xml reached
+    ARTIFACT_DIR and how many report.xml copies were published; and an
+    inventory of ARTIFACT_DIR as the step hands it to the Prow sidecar, with a
     byte count per file. Both lists are sorted and then capped, and the cap
     and the number of records dropped by it are reported alongside them.
+
+    Exclusion reasons are a fixed set. unreadable and irregular name the entry
+    concerned, because the name is the diagnostic. private-state does not:
+    .datainfo, cluster.ini, kubeconfig and *.kubeconfig are held back exactly
+    because they are named after cluster state, and they are the one group
+    that never becomes a published object, so they are recorded as a count per
+    directory against the rule that matched - datainfo, cluster-ini,
+    kubeconfig or kubeconfig-named - and never by their own names.
 
     Uploaded artifacts are pattern-scanned after upload as well, and a whole
     matching object is then replaced with a short notice, which makes a report
     that was never produced indistinguishable from one that was published and
     replaced. Comparing a byte count in the manifest with the object actually
-    served tells the two apart. The manifest holds names, byte counts and
-    fixed reason categories only: no artifact content and no file is ever
-    read, so it cannot reproduce anything either censoring layer removed. The
-    names themselves are rendered over a restricted character set, with
-    token-shaped runs reduced to their length, so that the manifest does not
-    become the artifact the scanner replaces.
+    served tells those two apart. It does not explain a removal: why an object
+    was replaced is decided after upload, outside this repository, and the
+    manifest claims nothing about it.
+
+    The manifest holds names, byte counts, errno integers and fixed reason
+    categories only. No file is read for it, no artifact content, secret
+    value, fragment or hash is emitted, and no exception text is copied, so it
+    cannot reproduce anything either censoring layer removed. The names it
+    does carry are rendered over a restricted character set with token-shaped
+    runs reduced to their length, so that the manifest does not become the
+    artifact the scanner replaces.
