@@ -5,9 +5,10 @@ rosa-e2e-collect-cs-telemetry step.
 The parser has to live inline in the step's commands script, because ci-operator runs that
 script on its own and does not mount this repository. So rather than testing a copy, these
 tests extract the parser from the shipped script and run it exactly as the step does, so a
-change to the script that breaks the contract fails here when they are run. No presubmit runs
-them today - the pylint job covers this directory but does not execute it - so run them
-yourself when touching either file.
+change to the script that breaks the contract fails here.
+
+The ci/prow/classic-idp-parser presubmit runs these on any change to this directory or to the
+step whose parser they extract; /test classic-idp-parser reruns it.
 
 Run with:
     make test-classic-idp-parser
