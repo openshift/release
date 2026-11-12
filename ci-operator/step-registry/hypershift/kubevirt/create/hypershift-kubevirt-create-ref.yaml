@@ -150,7 +150,9 @@ ref:
         the guest kubeconfig written by the preceding step; AgentConnected is reported
         alongside it so the log distinguishes "the guest never booted" from "the guest booted
         but never became a node". VMIs that are Running without a guest agent past the grace
-        period are re-rolled, and OVN DHCP options are reattached before each round because a
+        period are re-rolled at most once each; the grace period is measured from the Running
+        phase transition rather than creation, so a slow DataVolume clone is not charged to the
+        boot budget. OVN DHCP options are reattached before each round because a
         re-rolled VMI lands on a new logical switch port. On failure the step dumps
         capi-provider logs, KubevirtMachine conditions, VMI/DataVolume/PVC state, namespace
         events and the console log of every guest that did not boot. The previous in-guest

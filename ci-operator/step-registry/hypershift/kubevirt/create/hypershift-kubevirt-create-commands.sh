@@ -715,10 +715,27 @@ wait_for_localnet_multi_vmis_running() {
 # port, so its OVN DHCP options do not survive the re-roll. Only call this from
 # wait_for_localnet_multi_vmis_booted, which reattaches them at the top of the
 # next round; calling it anywhere else strands the guest without a lease.
+#
+# Two guards keep the recovery from causing the failure it exists to repair:
+#
+#   1. The grace period is measured from the Running transition, not from
+#      metadata.creationTimestamp. A VMI sits in Pending while its DataVolume
+#      clones the RHCOS image, and sibling VMIs created by the same NodePool
+#      contend for storage, so the last clone to finish can reach Running with
+#      a creation age already past the grace period. Charging the clone wait to
+#      the boot budget deletes a guest a minute or two into a healthy boot and
+#      restarts it from scratch, which is strictly slower than waiting.
+#
+#   2. Each VMI is re-rolled at most once. The ignition failure this recovers
+#      from is transient and clears on the first retry, so a machine that is
+#      still agent-less after one re-roll is slow rather than stuck. Deleting it
+#      again every round would guarantee it never finishes booting.
+declare -A LOCALNET_MULTI_REROLLED=()
+
 recover_stuck_localnet_multi_vmis() {
   local multi_ns="$1"
   local grace_seconds="${2:-600}"
-  local vmi phase agent created age now rerolled=0
+  local vmi phase agent started age now dv rerolled=0
 
   now=$(date -u +%s)
   for vmi in $(oc get vmi -n "${multi_ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || true); do
@@ -729,16 +746,37 @@ recover_stuck_localnet_multi_vmis() {
       -o jsonpath='{.status.conditions[?(@.type=="AgentConnected")].status}' 2>/dev/null || true)
     [[ "${agent}" == "True" ]] && continue
 
-    created=$(oc get vmi -n "${multi_ns}" "${vmi}" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || true)
-    [[ -z "${created}" ]] && continue
-    age=$(( now - $(date -u -d "${created}" +%s 2>/dev/null || echo "${now}") ))
+    # Prefer the Running phase transition; fall back through the Ready
+    # condition to creationTimestamp for KubeVirt builds that do not populate
+    # phaseTransitionTimestamps. Every fallback is >= the previous one in age,
+    # so a missing field can only make this re-roll later, never sooner.
+    started=$(oc get vmi -n "${multi_ns}" "${vmi}" \
+      -o jsonpath='{.status.phaseTransitionTimestamps[?(@.phase=="Running")].phaseTransitionTimestamp}' 2>/dev/null || true)
+    [[ -z "${started}" ]] && started=$(oc get vmi -n "${multi_ns}" "${vmi}" \
+      -o jsonpath='{.status.conditions[?(@.type=="Ready")].lastTransitionTime}' 2>/dev/null || true)
+    [[ -z "${started}" ]] && started=$(oc get vmi -n "${multi_ns}" "${vmi}" \
+      -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || true)
+    [[ -z "${started}" ]] && continue
+
+    age=$(( now - $(date -u -d "${started}" +%s 2>/dev/null || echo "${now}") ))
     if (( age < grace_seconds )); then
-      echo "  VMI ${vmi}: no guest agent yet, ${age}s old — still within the ${grace_seconds}s grace period"
+      # Surface the DataVolume phase so a slow clone is visible in the build log
+      # instead of having to be reconstructed from lease timestamps afterwards.
+      dv=$(oc get dv -n "${multi_ns}" "${vmi}" -o jsonpath='{.status.phase}' 2>/dev/null || true)
+      echo "  VMI ${vmi}: no guest agent yet, running ${age}s" \
+           "(DataVolume ${dv:-n/a}) — still within the ${grace_seconds}s grace period"
+      continue
+    fi
+
+    if [[ -n "${LOCALNET_MULTI_REROLLED[${vmi}]:-}" ]]; then
+      echo "  VMI ${vmi}: Running but no guest agent after ${age}s — already re-rolled once," \
+           "leaving it alone so the boot can finish"
       continue
     fi
 
     echo "  VMI ${vmi}: Running but no guest agent after ${age}s — re-rolling so ignition retries"
     oc delete vmi "${vmi}" -n "${multi_ns}" --wait=false >/dev/null 2>&1 || true
+    LOCALNET_MULTI_REROLLED[${vmi}]=1
     rerolled=$((rerolled + 1))
   done
 
