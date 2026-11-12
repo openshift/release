@@ -39,9 +39,6 @@ ref:
   - name: ZTP_GIT_REPO
     default: "https://gitlab.cee.redhat.com/telcov10n/ztp-site-configs-ci.git"
     documentation: GitLab repository containing the seed ClusterInstance and replacement preinstall template.
-  - name: ZTP_GIT_BRANCH
-    default: "main"
-    documentation: Git branch containing the seed manifests.
   credentials:
   - namespace: test-credentials
     name: telcov10n-ansible-group-all
@@ -49,10 +46,14 @@ ref:
   documentation: |-
     Prepare the former seed server as replacement hardware before IBBF.
     Restore seed inventory, verify and pin the existing seed image, prepare
-    ibi-preinstall.yml with a dedicated HTTP directory, and validate input,
+    the launcher via ibi-preinstall-stage.yml with phase prepare and a dedicated HTTP directory,
+    and validate the matching installer version, input,
     the installation disk WWN or NVMe EUI path, container DNS for the selected
     IP family, and HTTP access before releasing old seed resources.
     Delete the seed ClusterInstance normally and wait for hardware release.
-    Run preinstall on the seed bastion, collect reports, and preserve failure.
+    Select phase run in the same playbook on the seed bastion, collect reports even on
+    test failure, and preserve the launcher exit code and Report Portal paths.
+    Print the console after collection; Ansible reports progress during tests.
+    Preinstall inputs use the seed digest and Git commit recorded by mirroring.
     Use the original quay.io/ocp-edge-qe/eco-gotests:latest image, matching
     target preinstall. No service timeout or polling changes are applied.
