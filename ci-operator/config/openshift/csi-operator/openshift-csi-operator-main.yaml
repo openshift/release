@@ -221,6 +221,26 @@ tests:
     - ref: tls-scanner-run
     workflow: openshift-e2e-aws-csi
 - always_run: false
+  as: tls-groups-scanner-aws-ebs-fips
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EXPECTED_GROUPS: SecP384r1MLKEM1024
+      EXPECTED_GROUPS_MODE: exact
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-cluster-csi-drivers
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_GROUPS: SecP384r1MLKEM1024
+    test:
+    - ref: fips-check
+    - ref: tls-groups-configure
+    - ref: tls-scanner-run
+    workflow: openshift-e2e-aws-csi
+- always_run: false
   as: tls-scanner-aws-efs
   optional: true
   steps:
