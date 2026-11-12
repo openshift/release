@@ -28,7 +28,10 @@ log_step "Validating provisioning inputs."
 # ARO accepts the major.minor value in version.id, while nightly builds require
 # the exact multi-arch payload name in the experimental control-plane tag.
 CONTROL_PLANE_EXACT_VERSION=""
-if [[ "${ARO_HCP_OPENSHIFT_CHANNEL_GROUP:-stable}" == "nightly" ]]; then
+CONTROL_PLANE_CHANNEL_GROUP="${ARO_HCP_OPENSHIFT_CHANNEL_GROUP:-${OPENSHIFT_CHANNEL_GROUP:-nightly}}"
+NODEPOOL_CHANNEL_GROUP="${NODEPOOL_CHANNEL_GROUP:-${CONTROL_PLANE_CHANNEL_GROUP}}"
+NODEPOOL_VERSION="${NODEPOOL_VERSION:-}"
+if [[ "${CONTROL_PLANE_CHANNEL_GROUP}" == "nightly" ]]; then
   if [[ ! "${OPENSHIFT_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
     echo "OPENSHIFT_VERSION must be X.Y when using the nightly channel." >&2
     exit 1
@@ -48,6 +51,9 @@ if [[ "${ARO_HCP_OPENSHIFT_CHANNEL_GROUP:-stable}" == "nightly" ]]; then
     exit 1
   fi
   echo "Resolved latest accepted multi-arch nightly ${CONTROL_PLANE_EXACT_VERSION} for ARO HCP ${OPENSHIFT_VERSION}."
+fi
+if [[ "${NODEPOOL_CHANNEL_GROUP}" == "nightly" && -z "${NODEPOOL_VERSION}" ]]; then
+  NODEPOOL_VERSION="${CONTROL_PLANE_EXACT_VERSION}"
 fi
 
 if [[ ! "${REPLICAS}" =~ ^[1-9][0-9]*$ ]]; then
@@ -163,7 +169,7 @@ initialize_cluster_config() {
     --arg location "${REGION}" \
     --arg subscription_id "${SUBSCRIPTION_ID}" \
     --arg version "${OPENSHIFT_VERSION}" \
-    --arg channel_group "${ARO_HCP_OPENSHIFT_CHANNEL_GROUP:-stable}" \
+    --arg channel_group "${CONTROL_PLANE_CHANNEL_GROUP}" \
     --arg control_plane_exact_version "${CONTROL_PLANE_EXACT_VERSION}" \
     --arg replicas "${REPLICAS}" \
     --arg provision_shard_id "${ARO_HCP_PROVISION_SHARD_ID:-}" \
@@ -302,7 +308,10 @@ NODEPOOL_NAMES=${NODEPOOL_NAMES}
 KEYVAULT_NAME=${KEYVAULT_NAME}
 KMS_KEY_NAME=${KMS_KEY_NAME}
 CLUSTER_RESOURCE_ID=${CLUSTER_RESOURCE_ID}
-ARO_HCP_CONTROL_PLANE_EXACT_VERSION=${CONTROL_PLANE_EXACT_VERSION}
+CONTROL_PLANE_EXACT_VERSION=${CONTROL_PLANE_EXACT_VERSION}
+OPENSHIFT_CHANNEL_GROUP=${CONTROL_PLANE_CHANNEL_GROUP}
+NODEPOOL_CHANNEL_GROUP=${NODEPOOL_CHANNEL_GROUP}
+NODEPOOL_VERSION=${NODEPOOL_VERSION}
 EOF
   chmod 600 "${STATE_FILE}"
 }
@@ -532,7 +541,7 @@ az aro hcp cluster create \
   --resource-group "${CUSTOMER_RG_NAME}" \
   --location "${REGION}" \
   --version "${OPENSHIFT_VERSION}" \
-  --channel-group "${ARO_HCP_OPENSHIFT_CHANNEL_GROUP:-stable}" \
+  --channel-group "${CONTROL_PLANE_CHANNEL_GROUP}" \
   --subnet-id "${SUBNET_ID}" \
   --vnet-integration-subnet-id "${VNET_INTEGRATION_SUBNET_ID}" \
   --nsg "${NSG_ID}" \
@@ -791,7 +800,7 @@ record_timer "control_plane_install_seconds" "$((CONTROL_PLANE_READY - CONTROL_P
 # Resolve the newest enabled node-pool patch version after the HCP is ready.
 # The control plane accepts X.Y, but node pools require X.Y.Z.
 resolve_worker_nodepool_version() {
-  local cluster_version_json cluster_version_id cluster_major_minor cluster_channel_group available_versions_json
+  local cluster_version_json cluster_version_id cluster_major_minor available_versions_json
 
   cluster_version_json=$(az aro hcp cluster show \
     --name "${CLUSTER_NAME}" \
@@ -800,28 +809,44 @@ resolve_worker_nodepool_version() {
     --output json)
   cluster_version_id=$(jq -r '.id // empty' <<<"${cluster_version_json}")
   cluster_major_minor=$(awk -F. 'NF >= 2 { print $1 "." $2; exit }' <<<"${cluster_version_id}")
-  cluster_channel_group=$(jq -r '.channelGroup // "stable"' <<<"${cluster_version_json}")
   : "${cluster_major_minor:?The HCP did not report a valid major.minor version}"
 
-  # The current ARO CLI returns channel-group metadata with each version
-  # rather than accepting --channel-group on get-versions.
-  available_versions_json=$(az aro hcp get-versions \
-    --location "${REGION}" \
-    --node-pools \
-    --output json)
-  WORKER_NODEPOOL_VERSION=$(jq -r \
-    --arg channel_group "${cluster_channel_group}" \
-    --arg major_minor "${cluster_major_minor}" \
-    '[.[]
-     | {version: (.Name // .name // ""), channel_group: (.ChannelGroup // .channelGroup // .properties.channelGroup // "")}
-     | select(.channel_group == $channel_group)
-     | select(.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))
-     | select(.version | startswith($major_minor + "."))
-     | .version]
-     | sort_by(split(".") | map(tonumber))
-     | last // empty' <<<"${available_versions_json}")
-  WORKER_CHANNEL_GROUP="${cluster_channel_group}"
+  WORKER_CHANNEL_GROUP="${NODEPOOL_CHANNEL_GROUP}"
+  WORKER_NODEPOOL_VERSION="${NODEPOOL_VERSION}"
+  if [[ -z "${WORKER_NODEPOOL_VERSION}" ]]; then
+    # Nightly builds are not published to the node-pool update graph. Reuse
+    # the exact multi-arch payload selected for the control plane instead of
+    # looking it up through get-versions.
+    if [[ "${WORKER_CHANNEL_GROUP}" == "nightly" ]]; then
+      WORKER_NODEPOOL_VERSION="${CONTROL_PLANE_EXACT_VERSION}"
+    else
+      # The current ARO CLI returns channel-group metadata with each version
+      # rather than accepting --channel-group on get-versions.
+      available_versions_json=$(az aro hcp get-versions \
+        --location "${REGION}" \
+        --node-pools \
+        --output json)
+      WORKER_NODEPOOL_VERSION=$(jq -r \
+        --arg channel_group "${WORKER_CHANNEL_GROUP}" \
+        --arg major_minor "${cluster_major_minor}" \
+        '[.[]
+         | {version: (.Name // .name // ""), channel_group: (.ChannelGroup // .channelGroup // .properties.channelGroup // "")}
+         | select(.channel_group == $channel_group)
+         | select(.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))
+         | select(.version | startswith($major_minor + "."))
+         | .version]
+         | sort_by(split(".") | map(tonumber))
+         | last // empty' <<<"${available_versions_json}")
+    fi
+  fi
+  if [[ "${WORKER_CHANNEL_GROUP}" == "nightly" ]]; then
+    [[ "${WORKER_NODEPOOL_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-0\.nightly- ]] || {
+      echo "No exact nightly node-pool version was resolved for channel ${WORKER_CHANNEL_GROUP}." >&2
+      return 1
+    }
+  fi
   : "${WORKER_NODEPOOL_VERSION:?No enabled ${cluster_major_minor}.z node-pool version is available in ${REGION} for channel ${WORKER_CHANNEL_GROUP} }"
+  NODEPOOL_VERSION="${WORKER_NODEPOOL_VERSION}"
   metadata_tmp=$(mktemp "${CLUSTER_CONFIG_FILE}.XXXXXX")
   jq --arg raw_id "${cluster_version_id:-${OPENSHIFT_VERSION}}" --arg channel_group "${WORKER_CHANNEL_GROUP}" \
     '.version.raw_id = $raw_id | .version.channel_group = $channel_group | .version.major_version = ($raw_id | split(".") | .[0:2] | join("."))' \
@@ -831,6 +856,7 @@ resolve_worker_nodepool_version() {
 }
 
 resolve_worker_nodepool_version
+write_state
 
 # Submit one worker node-pool create request and record its install start time.
 # Readiness is handled by wait_for_nodepools so all zones can progress together.

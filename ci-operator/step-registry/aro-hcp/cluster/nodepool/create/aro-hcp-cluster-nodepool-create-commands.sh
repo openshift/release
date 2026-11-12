@@ -92,27 +92,36 @@ CLUSTER_VERSION_JSON=$(az aro hcp cluster show \
   --output json)
 CLUSTER_MAJOR_MINOR=$(jq -r '.id // empty' <<<"${CLUSTER_VERSION_JSON}" | awk -F. 'NF >= 2 { print $1 "." $2; exit }')
 CLUSTER_CHANNEL_GROUP=$(jq -r '.channelGroup // empty' <<<"${CLUSTER_VERSION_JSON}")
-MP_CHANNEL_GROUP="${MP_CHANNEL_GROUP:-${CLUSTER_CHANNEL_GROUP:-stable}}"
+MP_CHANNEL_GROUP="${MP_CHANNEL_GROUP:-${NODEPOOL_CHANNEL_GROUP:-${CLUSTER_CHANNEL_GROUP:-nightly}}}"
 : "${CLUSTER_MAJOR_MINOR:?The HCP did not report a valid major.minor version}"
 
-# The current ARO CLI returns channel-group metadata with each version rather
-# than accepting --channel-group on get-versions. Request node-pool versions
-# and filter the response here so the selected value is always X.Y.Z.
-AVAILABLE_VERSIONS_JSON=$(az aro hcp get-versions \
-  --location "${REGION}" \
-  --node-pools \
-  --output json)
-MP_OPENSHIFT_VERSION=$(jq -r \
-  --arg channel_group "${MP_CHANNEL_GROUP}" \
-  --arg major_minor "${CLUSTER_MAJOR_MINOR}" \
-  '[.[]
-   | {version: (.Name // .name // ""), channel_group: (.ChannelGroup // .channelGroup // .properties.channelGroup // "")}
-   | select(.channel_group == $channel_group)
-   | select(.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))
-   | select(.version | startswith($major_minor + "."))
-   | .version]
-   | sort_by(split(".") | map(tonumber))
-   | last // empty' <<<"${AVAILABLE_VERSIONS_JSON}")
+MP_OPENSHIFT_VERSION="${MP_OPENSHIFT_VERSION:-${NODEPOOL_VERSION:-${CONTROL_PLANE_EXACT_VERSION:-}}}"
+if [[ -z "${MP_OPENSHIFT_VERSION}" && "${MP_CHANNEL_GROUP}" != "nightly" ]]; then
+  # The current ARO CLI returns channel-group metadata with each version rather
+  # than accepting --channel-group on get-versions. Request node-pool versions
+  # and filter the response here so the selected value is always X.Y.Z.
+  AVAILABLE_VERSIONS_JSON=$(az aro hcp get-versions \
+    --location "${REGION}" \
+    --node-pools \
+    --output json)
+  MP_OPENSHIFT_VERSION=$(jq -r \
+    --arg channel_group "${MP_CHANNEL_GROUP}" \
+    --arg major_minor "${CLUSTER_MAJOR_MINOR}" \
+    '[.[]
+     | {version: (.Name // .name // ""), channel_group: (.ChannelGroup // .channelGroup // .properties.channelGroup // "")}
+     | select(.channel_group == $channel_group)
+     | select(.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))
+     | select(.version | startswith($major_minor + "."))
+     | .version]
+     | sort_by(split(".") | map(tonumber))
+     | last // empty' <<<"${AVAILABLE_VERSIONS_JSON}")
+fi
+if [[ "${MP_CHANNEL_GROUP}" == "nightly" ]]; then
+  [[ "${MP_OPENSHIFT_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-0\.nightly- ]] || {
+    echo "No exact nightly node-pool version was resolved for channel ${MP_CHANNEL_GROUP}." >&2
+    exit 1
+  }
+fi
 : "${MP_OPENSHIFT_VERSION:?No enabled ${CLUSTER_MAJOR_MINOR}.z node-pool version is available in ${REGION} for channel ${MP_CHANNEL_GROUP} }"
 echo "Using latest available node pool version ${MP_OPENSHIFT_VERSION} and channel group ${MP_CHANNEL_GROUP}."
 
