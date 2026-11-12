@@ -13,7 +13,6 @@ validate_inputs() {
   : "${VERSION:?VERSION is required}"
   : "${MIRROR_REGISTRY:?MIRROR_REGISTRY is required}"
   : "${ZTP_GIT_REPO:?ZTP_GIT_REPO is required}"
-  : "${ZTP_GIT_BRANCH:?ZTP_GIT_BRANCH is required}"
   : "${IBI_REPLACEMENT_HOST:?IBI_REPLACEMENT_HOST is required}"
   : "${IBI_REPLACEMENT_MAC:?IBI_REPLACEMENT_MAC is required}"
   : "${IBI_REPLACEMENT_IP:?IBI_REPLACEMENT_IP is required}"
@@ -27,7 +26,6 @@ validate_inputs() {
     "${IBI_REPLACEMENT_IP}")
   [[ "${MIRROR_REGISTRY}" =~ ^[a-zA-Z0-9.:-]+$ ]]
   [[ "${ZTP_GIT_REPO}" =~ ^https://[a-zA-Z0-9./:_-]+$ ]]
-  [[ "${ZTP_GIT_BRANCH}" =~ ^[a-zA-Z0-9._/-]+$ ]]
   [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]
   if [[ ! -s "${SHARED_DIR}/ibi-seed-version" ]]; then
     echo "Missing recorded seed version." >&2
@@ -62,6 +60,10 @@ create_work_directories() {
 configure_ssh() {
   cp /var/group_variables/common/all/ansible_ssh_private_key "${TEMP_DIR}/ssh-key"
   chmod 600 "${TEMP_DIR}/ssh-key"
+  export ANSIBLE_PRIVATE_KEY_FILE="${TEMP_DIR}/ssh-key"
+  export ANSIBLE_HOST_KEY_CHECKING=False
+  export ANSIBLE_SSH_RETRIES=3
+  export ANSIBLE_TIMEOUT=600
 
   BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
   BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
@@ -85,24 +87,6 @@ redact_bastion() {
     line="${line//${BASTION_IP}/<bastion>}"
     printf '%s\n' "${line}"
   done
-}
-
-verify_installer_version() {
-  local installer_output
-  local installer_version
-
-  echo "Checking the cached installer for OpenShift ${SEED_VERSION}."
-  if ! installer_output=$(ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" \
-    "/opt/cache/${SEED_VERSION}/openshift-install version" 2>&1); then
-    printf '%s\n' "${installer_output}" | redact_bastion >&2
-    return 1
-  fi
-
-  installer_version=$(printf '%s\n' "${installer_output}" | awk '$1 ~ /(^|\/)openshift-install$/ && NF == 2 { print $2 }')
-  if [[ "${installer_version}" != "${SEED_VERSION}" ]]; then
-    echo "Cached installer version '${installer_version}' does not match the recorded seed version '${SEED_VERSION}'." >&2
-    return 1
-  fi
 }
 
 verify_seed_image() {
@@ -132,7 +116,6 @@ jq -e --arg version "$3" '
 jq -er '.Digest' <<<"$metadata"
 REMOTE
   )
-  [[ "${digest}" =~ ^sha256:[a-f0-9]{64}$ ]]
   [[ "$digest" == "$SEED_DIGEST" ]]
 }
 
@@ -140,33 +123,17 @@ prepare_launcher() {
   local site_config_url="${ZTP_GIT_REPO%.git}/-/raw/${GIT_REVISION}/${VERSION}/${SEED_SPOKE_CLUSTER}/clusterinstance"
   cd /eco-ci-cd
 
-  ansible bastion -i "${INVENTORY_PATH}/build-inventory.py" \
-    --private-key "${TEMP_DIR}/ssh-key" \
-    --extra-vars "ibi_http_subdir=${HTTP_SUBDIR}" \
-    -m ansible.builtin.file \
-    -a '{"path":"{{ http_store_path | default(\"/opt/http_store/data\") }}/{{ ibi_http_subdir }}","state":"directory","mode":"0755"}' \
-    2>&1 | redact_bastion | tee "${REPORT_DIR}/http-setup.log"
-
-  ansible-playbook ./playbooks/ran/ibi-preinstall.yml \
+  ansible-playbook ./playbooks/ran/ibi-preinstall-stage.yml \
     -i "${INVENTORY_PATH}/build-inventory.py" \
-    --private-key "${TEMP_DIR}/ssh-key" \
-    --limit bastion --tags setup \
+    --limit bastion \
+    --extra-vars ibi_preinstall_phase=prepare \
     --extra-vars "ibi_hub_kubeconfig=${SEED_HUB_KUBECONFIG}" \
     --extra-vars "ibi_seed_image=${SEED_IMAGE}" \
     --extra-vars "ibi_seed_version=${SEED_VERSION}" \
     --extra-vars "ibi_preinstall_registry=${MIRROR_REGISTRY}" \
-    --extra-vars "ibi_cluster_instance_url=${site_config_url}/clusterinstance.yaml" \
-    --extra-vars "ibi_config_template_url=${site_config_url}/preinstall-test/image-based-installation-config.yaml" \
-    --extra-vars "ibi_openshift_install_path=/opt/cache/${SEED_VERSION}/openshift-install" \
+    --extra-vars "ibi_site_config_url=${site_config_url}" \
     --extra-vars "ibi_work_dir=${WORK_DIR} ibi_http_subdir=${HTTP_SUBDIR}" \
-    --extra-vars "eco_gotests_image=quay.io/ocp-edge-qe/eco-gotests:latest" \
-    --extra-vars '{
-      "ibi_ssh_private_key_path": "/home/telcov10n/.ssh/id_rsa",
-      "ibi_http_dir": "{{ http_store_path | default(\"/opt/http_store/data\") }}/{{ ibi_http_subdir }}",
-      "ibi_http_base_url": "http://{{ ansible_host }}:{{ share_http_iso_port }}/{{ ibi_http_subdir }}",
-      "ibi_test_timeout": "3h",
-      "ibi_skip_tls_verify": true
-    }' \
+    --extra-vars '{"ibi_skip_tls_verify":true}' \
     2>&1 | redact_bastion | tee "${REPORT_DIR}/setup.log"
 
   # Validate the fetched ClusterInstance before releasing seed hardware.
@@ -206,7 +173,6 @@ verify_http_and_dns() {
     address_lookup=ahostsv6
   fi
   ansible bastion -i "${INVENTORY_PATH}/build-inventory.py" \
-    --private-key "${TEMP_DIR}/ssh-key" \
     --extra-vars "ibi_http_subdir=${HTTP_SUBDIR} eco_gotests_image=quay.io/ocp-edge-qe/eco-gotests:latest" \
     --extra-vars "replacement_host=${IBI_REPLACEMENT_HOST} replacement_ip=${IBI_REPLACEMENT_IP}" \
     --extra-vars "replacement_address_lookup=${address_lookup}" \
@@ -227,7 +193,7 @@ if addresses != {expected}:
     raise SystemExit("Replacement DNS does not resolve only to the configured address")
 '"'"' {{ replacement_ip | quote }} "$resolved"
 content=$(curl --fail --silent --show-error --max-time 30 \
-  "http://{{ ansible_host }}:{{ share_http_iso_port }}/{{ ibi_http_subdir }}/.write-check")
+  "http://{{ ('[' ~ ansible_host ~ ']') if ':' in ansible_host else ansible_host }}:{{ share_http_iso_port }}/{{ ibi_http_subdir }}/.write-check")
 test "$content" = {{ ibi_http_subdir | quote }}
 ' 2>&1 | redact_bastion | tee "${REPORT_DIR}/preflight.log"
 }
@@ -292,16 +258,25 @@ REMOTE
 }
 
 run_preinstall() {
-  ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" \
-    "cd '${WORK_DIR}' && exec ./eco-gotests-ibi-preinstall-run.sh" \
-    2>&1 | redact_bastion | tee "${REPORT_DIR}/runner.log"
-}
+  local playbook_rc=0 console_rc=0 test_rc
+  local console_log="${REPORT_DIR}/report/console.log"
+  ansible-playbook ./playbooks/ran/ibi-preinstall-stage.yml \
+    -i "${INVENTORY_PATH}/build-inventory.py" --limit bastion \
+    --extra-vars ibi_preinstall_phase=run \
+    --extra-vars "ibi_work_dir=${WORK_DIR} ibi_report_dir=${REPORT_DIR}" \
+    2>&1 | redact_bastion | tee "${REPORT_DIR}/execution.log" || playbook_rc=$?
 
-collect_reports() {
-  scp -q -r "${SSH_OPTS[@]}" \
-    "${BASTION_USER}@${BASTION_IP}:${WORK_DIR}/report" \
-    "${REPORT_DIR}/" \
-    2>&1 | redact_bastion
+  # The playbook collects artifacts even on failure; retain the full console in Prow.
+  if [[ ! -f "$console_log" ]]; then console_log="${REPORT_DIR}/runner.log"; fi
+  if [[ -f "$console_log" ]]; then
+    redact_bastion < "$console_log" || console_rc=$?
+  fi
+  test -s "${REPORT_DIR}/execution-exit-code" || return 1
+  test_rc=$(<"${REPORT_DIR}/execution-exit-code")
+  [[ "$test_rc" =~ ^[0-9]+$ && "$test_rc" -le 255 ]] || return 1
+  if (( test_rc != 0 )); then return "$test_rc"; fi
+  if (( playbook_rc != 0 )); then return "$playbook_rc"; fi
+  return "$console_rc"
 }
 
 main() {
@@ -315,27 +290,12 @@ main() {
   restore_seed_inventory
   create_work_directories
   configure_ssh
-  verify_installer_version
   verify_seed_image
   prepare_launcher
   verify_http_and_dns
   release_seed_host
 
-  local run_rc=0
-  local copy_rc=0
-
-  run_preinstall || run_rc=$?
-  collect_reports || copy_rc=$?
-
-  # Preserve the execution failure after collecting reports.
-  if (( run_rc != 0 )); then
-    echo "IBI replacement preinstall failed; exit status: ${run_rc}."
-    return "${run_rc}"
-  fi
-  if (( copy_rc != 0 )); then
-    echo "IBI replacement preinstall reports could not be collected."
-    return "${copy_rc}"
-  fi
+  run_preinstall
 
   echo "IBI replacement preinstall execution and report collection completed."
 }
