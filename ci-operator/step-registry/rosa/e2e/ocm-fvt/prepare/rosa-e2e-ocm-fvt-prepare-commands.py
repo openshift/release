@@ -9,6 +9,155 @@ import stat
 import sys
 import tempfile
 
+# Publication audit manifest. Artifacts uploaded to GCS pass a post-upload
+# pattern scanner that replaces a whole matching object with a short notice, so
+# a published file and a file that was never produced can look identical after
+# the fact. The manifest is written next to the published tree and records what
+# publication did with every entry it saw, using only names, byte counts and a
+# fixed set of reason categories - never artifact content.
+AUDIT_NAME = "ocm-fvt-artifact-audit.json"
+AUDIT_SCHEMA = 1
+# Worst case about 160 KiB: AUDIT_MAX_ENTRIES publication records and
+# AUDIT_MAX_HANDOFF inventory records, each holding a bounded rendered name,
+# plus a small fixed object. Both lists are sorted before they are capped, so
+# which records survive a cap is reproducible rather than readdir order.
+AUDIT_MAX_ENTRIES = 512
+AUDIT_MAX_HANDOFF = 128
+AUDIT_MAX_SCAN = 8192
+AUDIT_MAX_PATH = 160
+AUDIT_MAX_COMPONENT = 96
+AUDIT_UNSAFE = re.compile(r"[^0-9A-Za-z._-]")
+# A file name is data produced by the test run, and the manifest is the one
+# object that aggregates every name in the step. A long unbroken alphanumeric
+# run is the shape of a token, a key id or a digest, so such a run is reduced
+# to its length instead of reproduced: the manifest must stay useless to a
+# reader looking for secrets, and must not become the object that the
+# post-upload scanner replaces.
+AUDIT_OPAQUE = re.compile(r"[0-9A-Za-z]{20,}")
+PUBLISHED_DIR = "ocm-fvt-results"
+RESULT_REPORT = "report.xml"
+# Merged JUnit report that rosa-e2e-ocm-fvt copies into ARTIFACT_DIR before
+# publication runs, so the manifest can tell "never collected" from "collected
+# and later replaced".
+MERGED_REPORT = "junit-ocm-fvt-report.xml"
+
+
+class PublishLimit(ValueError):
+    """A refused publication, carrying a fixed content-free reason category.
+
+    The category travels on the exception rather than being recovered from its
+    message: an OSError message carries a path, so no exception text is ever
+    copied into the manifest.
+    """
+
+    def __init__(self, reason, message):
+        super().__init__(message)
+        self.reason = reason
+
+
+def audit_component(name):
+    """Render one path component without reproducing token-shaped text."""
+    rendered = AUDIT_OPAQUE.sub(lambda run: f"_opaque{len(run.group())}_",
+                                AUDIT_UNSAFE.sub("_", name))
+    if len(rendered) > AUDIT_MAX_COMPONENT:
+        rendered = rendered[:AUDIT_MAX_COMPONENT] + "~"
+    return rendered
+
+
+def audit_path(parts):
+    """Render a traversal path over a conservative character set."""
+    rendered = "/".join(audit_component(part) for part in parts)
+    if len(rendered) > AUDIT_MAX_PATH:
+        rendered = rendered[:AUDIT_MAX_PATH] + "~"
+    return rendered
+
+
+def audit_record(budget, parts, disposition, **fields):
+    """Remember one disposition; the list is sorted and capped when written.
+
+    The traversal already refuses to walk more than budget["entries_left"]
+    entries, so the list this appends to is bounded by that same limit.
+    """
+    budget["audit"].append(dict(fields, path=audit_path(parts), disposition=disposition))
+
+
+def audit_state(parent, name):
+    """Classify one directory entry without following links."""
+    try:
+        info = os.stat(name, dir_fd=parent, follow_symlinks=False)
+    except FileNotFoundError:
+        return {"state": "missing"}
+    except OSError as error:
+        return {"state": "error", "errno": error.errno}
+    if stat.S_ISDIR(info.st_mode):
+        return {"state": "directory"}
+    if stat.S_ISREG(info.st_mode):
+        return {"state": "file", "size": info.st_size}
+    return {"state": "irregular"}
+
+
+def audit_expected_report(artifacts, budget):
+    """Describe the merged JUnit report as publication left it."""
+    return dict(audit_state(artifacts, MERGED_REPORT),
+                name=MERGED_REPORT, published_copies=budget["reports"])
+
+
+def audit_handoff(artifacts):
+    """Inventory the artifact directory as the step hands it to the sidecar.
+
+    Taken before the manifest itself is created, so the manifest is not among
+    the names listed. A name listed with a byte count that the uploaded object
+    no longer matches was removed or replaced after this step ended. A name
+    missing from a listing that reports no dropped records was never collected.
+    """
+    names = []
+    total = 0
+    try:
+        with os.scandir(artifacts) as entries:
+            for entry in entries:
+                total += 1
+                if len(names) < AUDIT_MAX_SCAN:
+                    names.append(entry.name)
+    except OSError as error:
+        return {"state": "error", "errno": error.errno, "entries": [], "records_dropped": total}
+    names.sort()
+    kept = names[:AUDIT_MAX_HANDOFF]
+    return {
+        "state": "listed",
+        "entries": [dict(audit_state(artifacts, name), name=audit_path((name,)))
+                    for name in kept],
+        "records_dropped": total - len(kept),
+    }
+
+
+def audit_write(artifacts, budget, outcome):
+    """Write the publication manifest; auditing never fails or masks the step."""
+    records = sorted(budget["audit"],
+                     key=lambda record: (record["path"], json.dumps(record, sort_keys=True)))
+    kept = records[:AUDIT_MAX_ENTRIES]
+    manifest = {
+        "schema": AUDIT_SCHEMA,
+        "publication": dict(outcome, destination=PUBLISHED_DIR),
+        "limits": {
+            "entries_left": budget["entries_left"],
+            "bytes_left": budget["bytes_left"],
+            "records_dropped": len(records) - len(kept),
+        },
+        "expected_report": audit_expected_report(artifacts, budget),
+        "handoff": audit_handoff(artifacts),
+        "entries": kept,
+    }
+    try:
+        descriptor = os.open(AUDIT_NAME, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                             0o644, dir_fd=artifacts)
+        with os.fdopen(descriptor, "w") as artifact:
+            json.dump(manifest, artifact, sort_keys=True)
+            artifact.write("\n")
+    except Exception:  # pylint: disable=broad-except
+        # This runs from a finally block: letting anything escape would replace
+        # the publication failure it is meant to describe.
+        print("WARNING: failed to write the ocm-fvt artifact audit manifest")
+
 
 def stage(arguments):
     """Run the stage phase of artifact handling."""
@@ -81,7 +230,7 @@ def handle_metadata(arguments):
                         break
                     if result_directory:
                         match = phase_report.fullmatch(entry.name)
-                        if entry.name == "report.xml":
+                        if entry.name == RESULT_REPORT:
                             label = "merged-xml"
                         elif match:
                             label = "-".join(match.groups())
@@ -113,18 +262,20 @@ def handle_metadata(arguments):
         artifact.write("\n")
 
 
-def publish(source, destination, budget, depth=0):
+def publish(source, destination, budget, depth=0, parents=()):
     """Copy bounded regular diagnostics without following links or sharing ownership."""
     directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
     if depth > 16:
-        raise ValueError("Artifact nesting limit exceeded")
+        raise PublishLimit("depth-limit", "Artifact nesting limit exceeded")
     with os.scandir(source) as entries:
         for entry in entries:
             budget["entries_left"] -= 1
             if budget["entries_left"] < 0:
-                raise ValueError("Artifact entry limit exceeded")
+                raise PublishLimit("entry-limit", "Artifact entry limit exceeded")
             name = entry.name
+            located = parents + (name,)
             if name in (".datainfo", "cluster.ini", "kubeconfig") or name.endswith(".kubeconfig"):
+                audit_record(budget, located, "excluded", reason="private-state")
                 continue
             info = os.stat(name, dir_fd=source, follow_symlinks=False)
             if stat.S_ISDIR(info.st_mode):
@@ -132,12 +283,14 @@ def publish(source, destination, budget, depth=0):
                     child = os.open(name, directory_flags, dir_fd=source)
                 except PermissionError:
                     budget["excluded"] = True
+                    audit_record(budget, located, "excluded", reason="unreadable")
                     continue
                 try:
                     os.mkdir(name, 0o700, dir_fd=destination)
                     target = os.open(name, directory_flags, dir_fd=destination)
+                    audit_record(budget, located, "directory")
                     try:
-                        publish(child, target, budget, depth + 1)
+                        publish(child, target, budget, depth + 1, located)
                     finally:
                         os.close(target)
                 finally:
@@ -147,15 +300,17 @@ def publish(source, destination, budget, depth=0):
                     descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=source)
                 except PermissionError:
                     budget["excluded"] = True
+                    audit_record(budget, located, "excluded", reason="unreadable")
                     continue
                 with os.fdopen(descriptor, "rb") as original:
                     opened = os.fstat(original.fileno())
                     if not stat.S_ISREG(opened.st_mode):
-                        raise ValueError("Artifact changed type")
+                        raise PublishLimit("type-changed", "Artifact changed type")
                     if opened.st_size > budget["bytes_left"]:
-                        raise ValueError("Artifact size limit exceeded")
+                        raise PublishLimit("size-limit", "Artifact size limit exceeded")
                     target = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
                                      0o600, dir_fd=destination)
+                    copied = 0
                     with os.fdopen(target, "wb") as artifact:
                         while True:
                             chunk = original.read(min(1024 * 1024, budget["bytes_left"] + 1))
@@ -163,41 +318,68 @@ def publish(source, destination, budget, depth=0):
                                 break
                             budget["bytes_left"] -= len(chunk)
                             if budget["bytes_left"] < 0:
-                                raise ValueError("Artifact size limit exceeded")
+                                raise PublishLimit("size-limit", "Artifact size limit exceeded")
+                            copied += len(chunk)
                             artifact.write(chunk)
+                    if name == RESULT_REPORT:
+                        # Counted here, from the real name: the rendered paths
+                        # in the manifest are capped and may be truncated.
+                        budget["reports"] += 1
+                    audit_record(budget, located, "published", size=copied)
             else:
                 budget["excluded"] = True
+                audit_record(budget, located, "excluded", reason="irregular")
 
 
 def handle_publish(arguments):
     """Run the publish phase of artifact handling."""
     directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
-    budget = {"entries_left": 8192, "bytes_left": 256 * 1024 * 1024, "excluded": False}
-    source = os.open(arguments[1], directory_flags)
+    budget = {"entries_left": 8192, "bytes_left": 256 * 1024 * 1024, "excluded": False,
+              "audit": [], "reports": 0}
+    # Pessimistic until the publication tree is in place, so an unwinding this
+    # function does not model - a signal, an interpreter error - cannot leave a
+    # manifest claiming a publication that never completed.
+    outcome = {"outcome": "aborted"}
+    # The artifact directory is opened first and the manifest is written from a
+    # finally block, so a publication that aborts half way - the case that is
+    # hardest to reconstruct afterwards - still leaves its own record behind.
+    artifacts = os.open(arguments[2], directory_flags)
     try:
-        holding = os.open("..", directory_flags, dir_fd=source)
         try:
-            os.mkdir("published", 0o700, dir_fd=holding)
-            destination = os.open("published", directory_flags, dir_fd=holding)
+            source = os.open(arguments[1], directory_flags)
             try:
-                os.fchmod(destination, 0o700)
-                publish(source, destination, budget)
-            finally:
-                os.close(destination)
-            artifacts = os.open(arguments[2], directory_flags)
-            try:
+                holding = os.open("..", directory_flags, dir_fd=source)
                 try:
-                    os.stat("ocm-fvt-results", dir_fd=artifacts, follow_symlinks=False)
-                except FileNotFoundError:
-                    os.rename("published", "ocm-fvt-results", src_dir_fd=holding, dst_dir_fd=artifacts)
-                else:
-                    raise FileExistsError("Artifact destination already exists")
+                    os.mkdir("published", 0o700, dir_fd=holding)
+                    destination = os.open("published", directory_flags, dir_fd=holding)
+                    try:
+                        os.fchmod(destination, 0o700)
+                        publish(source, destination, budget)
+                    finally:
+                        os.close(destination)
+                    try:
+                        os.stat(PUBLISHED_DIR, dir_fd=artifacts, follow_symlinks=False)
+                    except FileNotFoundError:
+                        os.rename("published", PUBLISHED_DIR,
+                                  src_dir_fd=holding, dst_dir_fd=artifacts)
+                    else:
+                        raise PublishLimit("destination-exists",
+                                           "Artifact destination already exists")
+                    outcome = {"outcome": "published"}
+                finally:
+                    os.close(holding)
             finally:
-                os.close(artifacts)
+                os.close(source)
+        except PublishLimit as error:
+            outcome = {"outcome": "failed", "reason": error.reason}
+            raise
+        except OSError as error:
+            outcome = {"outcome": "failed", "reason": "io-error", "errno": error.errno}
+            raise
         finally:
-            os.close(holding)
+            audit_write(artifacts, budget, outcome)
     finally:
-        os.close(source)
+        os.close(artifacts)
     if budget["excluded"]:
         print("WARNING: unreadable or non-regular ocm-fvt artifacts excluded from publication")
 
