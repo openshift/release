@@ -127,18 +127,24 @@ def audit_record(budget, parts, disposition, **fields):
     budget["audit"].append(dict(fields, path=audit_path(parts), disposition=disposition))
 
 
-def failed_record(budget, parts, reason):
+def failed_record(budget, parts, reason, rule=None):
     """Record the entry publication refused, then let the caller raise.
 
     Kept apart from the ordinary records because this one must survive: the
     ordinary list is capped, and the entry that stopped publication is the
     least useful record to lose. The list is bounded on its own, and holds a
     rendered path and a fixed reason - never the refusal's message.
+
+    A private-state refusal passes the entry's directory and the rule that
+    matched instead of the entry itself, so refusing one cannot disclose a
+    name that excluding it would have withheld.
     """
     failures = budget["failed"]
     if len(failures) < AUDIT_MAX_FAILED:
-        failures.append({"path": audit_path(parts) or ".", "disposition": "failed",
-                         "reason": reason})
+        record = {"path": audit_path(parts) or ".", "disposition": "failed", "reason": reason}
+        if rule is not None:
+            record["rule"] = rule
+        failures.append(record)
 
 
 def audit_state(parent, name):
@@ -378,10 +384,14 @@ def publish(source, destination, budget, depth=0, parents=()):
             budget["entries_left"] -= 1
             name = entry.name
             located = parents + (name,)
-            if budget["entries_left"] < 0:
-                failed_record(budget, located, "entry-limit")
-                raise PublishLimit("entry-limit", "Artifact entry limit exceeded")
+            # Classify before refusing. The entry that exhausts the budget is
+            # recorded, and a private-state entry must not be named just
+            # because it was the one the limit happened to land on: for those,
+            # the record carries the directory and the rule, like the counters.
             rule = private_state(name)
+            if budget["entries_left"] < 0:
+                failed_record(budget, parents if rule else located, "entry-limit", rule=rule)
+                raise PublishLimit("entry-limit", "Artifact entry limit exceeded")
             if rule is not None:
                 private_record(budget, parents, rule)
                 continue
