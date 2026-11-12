@@ -11,11 +11,11 @@ log() {
 }
 
 # Post-teardown orphan gate for shared VPC clusters (ROSAENG-63353,
-# ROSAENG-61409): after rosa-cluster-deprovision and
-# aws-deprovision-route53-private-hosted-zone have run, verify that nothing
-# is left behind in the shared AWS account. Not best-effort: an orphaned
-# hosted zone, role or policy must fail the job so it is cleaned up by hand
-# and the leak is noticed.
+# ROSAENG-61409): after rosa-cluster-deprovision,
+# rosa-e2e-hcp-shared-vpc-cleanup and aws-deprovision-route53-private-hosted-zone
+# have run, verify that nothing is left behind in the shared AWS account or the
+# cluster account. Not best-effort: an orphaned hosted zone, role or policy must
+# fail the job so it is cleaned up by hand and the leak is noticed.
 
 HOSTED_ZONE_ID_FILE="${SHARED_DIR}/hosted_zone_id"
 ROLE_ARN_FILE="${SHARED_DIR}/hosted_zone_role_arn"
@@ -43,35 +43,42 @@ export AWS_REGION="${REGION:-${LEASED_RESOURCE}}"
 
 ret=0
 
+# verify_absent <description> <not-found marker> <aws args...>
+# Only the service's specific not-found error proves deletion: any other AWS
+# CLI failure (auth, network, throttling) must fail verification instead of
+# reading as a PASS.
+verify_absent() {
+  local description="$1" not_found="$2"
+  shift 2
+  local out
+  if out="$(aws "$@" 2>&1)"; then
+    log "ERROR: ${description} still exists"
+    ret=$((ret+1))
+  elif grep -q "${not_found}" <<<"${out}"; then
+    log "PASS: ${description} deleted"
+  else
+    log "ERROR: could not verify ${description}: ${out}"
+    ret=$((ret+1))
+  fi
+}
+
 HOSTED_ZONE_ID="$(head -n 1 "${HOSTED_ZONE_ID_FILE}" 2>/dev/null || true)"
 if [[ -n "${HOSTED_ZONE_ID}" ]]; then
-  if aws route53 get-hosted-zone --id "${HOSTED_ZONE_ID}" >/dev/null 2>&1; then
-    log "ERROR: private hosted zone ${HOSTED_ZONE_ID} still exists in the shared account"
-    ret=$((ret+1))
-  else
-    log "PASS: private hosted zone ${HOSTED_ZONE_ID} deleted"
-  fi
+  verify_absent "private hosted zone ${HOSTED_ZONE_ID}" "NoSuchHostedZone" \
+    route53 get-hosted-zone --id "${HOSTED_ZONE_ID}"
 fi
 
 ROLE_ARN="$(head -n 1 "${ROLE_ARN_FILE}" 2>/dev/null || true)"
 if [[ -n "${ROLE_ARN}" ]]; then
   ROLE_NAME="${ROLE_ARN##*/}"
-  if aws iam get-role --role-name "${ROLE_NAME}" >/dev/null 2>&1; then
-    log "ERROR: shared VPC role ${ROLE_NAME} still exists in the shared account"
-    ret=$((ret+1))
-  else
-    log "PASS: shared VPC role ${ROLE_NAME} deleted"
-  fi
+  verify_absent "shared VPC role ${ROLE_NAME}" "NoSuchEntity" \
+    iam get-role --role-name "${ROLE_NAME}"
 fi
 
 POLICY_ARN="$(head -n 1 "${POLICY_ARN_FILE}" 2>/dev/null || true)"
 if [[ -n "${POLICY_ARN}" ]]; then
-  if aws iam get-policy --policy-arn "${POLICY_ARN}" >/dev/null 2>&1; then
-    log "ERROR: shared VPC policy still exists in the shared account"
-    ret=$((ret+1))
-  else
-    log "PASS: shared VPC policy deleted"
-  fi
+  verify_absent "shared VPC policy ${POLICY_ARN}" "NoSuchEntity" \
+    iam get-policy --policy-arn "${POLICY_ARN}"
 fi
 
 # HCP shared VPC resources (rosa-e2e-hcp-shared-vpc-prepare): the VPC endpoint
@@ -79,36 +86,46 @@ fi
 VPC_ENDPOINT_ROLE_ARN="$(head -n 1 "${VPC_ENDPOINT_ROLE_ARN_FILE}" 2>/dev/null || true)"
 if [[ -n "${VPC_ENDPOINT_ROLE_ARN}" ]]; then
   VPC_ENDPOINT_ROLE_NAME="${VPC_ENDPOINT_ROLE_ARN##*/}"
-  if aws iam get-role --role-name "${VPC_ENDPOINT_ROLE_NAME}" >/dev/null 2>&1; then
-    log "ERROR: VPC endpoint role ${VPC_ENDPOINT_ROLE_NAME} still exists in the shared account"
-    ret=$((ret+1))
-  else
-    log "PASS: VPC endpoint role ${VPC_ENDPOINT_ROLE_NAME} deleted"
-  fi
+  verify_absent "VPC endpoint role ${VPC_ENDPOINT_ROLE_NAME}" "NoSuchEntity" \
+    iam get-role --role-name "${VPC_ENDPOINT_ROLE_NAME}"
 fi
 
 VPC_ENDPOINT_POLICY_ARN="$(head -n 1 "${VPC_ENDPOINT_POLICY_ARN_FILE}" 2>/dev/null || true)"
 if [[ -n "${VPC_ENDPOINT_POLICY_ARN}" ]]; then
-  if aws iam get-policy --policy-arn "${VPC_ENDPOINT_POLICY_ARN}" >/dev/null 2>&1; then
-    log "ERROR: VPC endpoint policy still exists in the shared account"
-    ret=$((ret+1))
-  else
-    log "PASS: VPC endpoint policy deleted"
-  fi
+  verify_absent "VPC endpoint policy ${VPC_ENDPOINT_POLICY_ARN}" "NoSuchEntity" \
+    iam get-policy --policy-arn "${VPC_ENDPOINT_POLICY_ARN}"
 fi
 
 INTERNAL_PHZ_ID="$(head -n 1 "${INTERNAL_PHZ_ID_FILE}" 2>/dev/null || true)"
 if [[ -n "${INTERNAL_PHZ_ID}" ]]; then
-  if aws route53 get-hosted-zone --id "${INTERNAL_PHZ_ID}" >/dev/null 2>&1; then
-    log "ERROR: internal communication hosted zone ${INTERNAL_PHZ_ID} still exists in the shared account"
+  verify_absent "internal communication hosted zone ${INTERNAL_PHZ_ID}" "NoSuchHostedZone" \
+    route53 get-hosted-zone --id "${INTERNAL_PHZ_ID}"
+fi
+
+# Cluster-account assume-role policies (<shared-role-name>-assume-role, created
+# by rosa-e2e-hcp-shared-vpc-prepare and deleted best-effort by
+# rosa-e2e-hcp-shared-vpc-cleanup): they live in the cluster account, so verify
+# them with the main credentials before evaluating the result.
+CLUSTER_AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+if [[ -n "${ROLE_ARN}" || -n "${VPC_ENDPOINT_ROLE_ARN}" ]]; then
+  if [[ ! -f "${CLUSTER_AWSCRED}" ]]; then
+    log "ERROR: ${CLUSTER_AWSCRED} not found; cannot verify cluster-account assume-role policies"
     ret=$((ret+1))
   else
-    log "PASS: internal communication hosted zone ${INTERNAL_PHZ_ID} deleted"
+    export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_AWSCRED}"
+    CLUSTER_ACCOUNT_ID="$(aws sts get-caller-identity --output text | awk '{print $1}')"
+    for shared_role_arn in "${ROLE_ARN}" "${VPC_ENDPOINT_ROLE_ARN}"; do
+      [[ -z "${shared_role_arn}" ]] && continue
+      shared_role_name="${shared_role_arn##*/}"
+      assume_policy_arn="arn:aws:iam::${CLUSTER_ACCOUNT_ID}:policy/${shared_role_name}-assume-role"
+      verify_absent "cluster-account assume-role policy ${assume_policy_arn}" "NoSuchEntity" \
+        iam get-policy --policy-arn "${assume_policy_arn}"
+    done
   fi
 fi
 
 if [[ "${ret}" -ne 0 ]]; then
-  log "ERROR: ${ret} orphaned shared VPC resource(s) left in the shared account after teardown"
+  log "ERROR: ${ret} orphaned shared VPC resource(s) left behind after teardown"
   exit 1
 fi
-log "Shared VPC teardown verification complete: no orphaned resources in the shared account"
+log "Shared VPC teardown verification complete: no orphaned resources in the shared or cluster account"

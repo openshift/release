@@ -119,19 +119,21 @@ VPC_ENDPOINT_TRUST_POLICY="$(jq -c -n \
       }
     ]
   }')"
+VPC_ENDPOINT_ROLE_ARN="arn:aws:iam::${SHARED_ACCOUNT_ID}:role/${VPC_ENDPOINT_ROLE_NAME}"
 if ! aws iam get-role --role-name "${VPC_ENDPOINT_ROLE_NAME}" >/dev/null 2>&1; then
   aws iam create-role \
     --role-name "${VPC_ENDPOINT_ROLE_NAME}" \
     --assume-role-policy-document "${VPC_ENDPOINT_TRUST_POLICY}" >/dev/null
 fi
+# Publish the ARN as soon as the role exists so the best-effort cleanup step
+# can delete it if trust or policy configuration below fails.
+echo "${VPC_ENDPOINT_ROLE_ARN}" > "${SHARED_DIR}/vpc_endpoint_role_arn"
 aws iam update-assume-role-policy \
   --role-name "${VPC_ENDPOINT_ROLE_NAME}" \
   --policy-document "${VPC_ENDPOINT_TRUST_POLICY}"
 aws iam attach-role-policy \
   --role-name "${VPC_ENDPOINT_ROLE_NAME}" \
-  --policy-arn "${VPC_ENDPOINT_POLICY_ARN}" 2>/dev/null || true
-VPC_ENDPOINT_ROLE_ARN="arn:aws:iam::${SHARED_ACCOUNT_ID}:role/${VPC_ENDPOINT_ROLE_NAME}"
-echo "${VPC_ENDPOINT_ROLE_ARN}" > "${SHARED_DIR}/vpc_endpoint_role_arn"
+  --policy-arn "${VPC_ENDPOINT_POLICY_ARN}"
 log "VPC endpoint role: ${VPC_ENDPOINT_ROLE_ARN}"
 
 # Add the control-plane-operator role to the shared route53 role's trust
@@ -166,7 +168,7 @@ attach_assume_role_policy() {
   fi
   aws iam attach-role-policy \
     --role-name "${target_role_name}" \
-    --policy-arn "${policy_arn}" 2>/dev/null || true
+    --policy-arn "${policy_arn}"
 }
 
 for principal in "${INSTALLER_ROLE_ARN}" "${INGRESS_OPERATOR_ROLE_ARN}" "${CONTROL_PLANE_OPERATOR_ROLE_ARN}"; do
