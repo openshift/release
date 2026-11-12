@@ -82,7 +82,7 @@ if [[ -n "${SKIP_POLICIES:-}" ]]; then
   typeset _seenSkips='|'
   # `read` is line-oriented: splitting the whole value at once would keep
   # only the first line and silently drop every entry after the first
-  # newline — those policies would then be neither normalized nor given a
+  # newline; those policies would then be neither normalized nor given a
   # JUnit row, and would still be waited on.  Split per line instead, so
   # newline and comma are equivalent separators.
   typeset _skipLine=''
@@ -129,7 +129,7 @@ fi
 } > "${ARTIFACT_DIR}/skip-policies.txt"
 
 if (( ${#skipPoliciesArr[@]} > 0 )); then
-  # Fetch the full policy list once — fail hard if oc cannot reach the
+  # Fetch the full policy list once, and fail hard if oc cannot reach the
   # cluster (pre-existing semantics; a red step is the failure signal,
   # never a green artifact).  The fetch sits at the classification point
   # so "present" means "present when the compliance wait starts".
@@ -246,7 +246,7 @@ PY
         "$(date -u +%FT%TZ)" "${_n}" "${_f}"
     else
       rm -f "${_tmp}"
-      printf '[%s] WARNING: JUNIT CONTRACT VIOLATION — skip-visibility artifact failed verification; pre-seed retained\n' \
+      printf '[%s] WARNING: JUNIT CONTRACT VIOLATION: skip-visibility artifact failed verification; pre-seed retained\n' \
         "$(date -u +%FT%TZ)" >&2
     fi
     return 0
