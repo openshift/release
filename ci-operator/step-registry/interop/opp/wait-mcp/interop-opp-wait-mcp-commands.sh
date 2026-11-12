@@ -833,20 +833,24 @@ for mcp in data.get('items', []):
             or observed != generation):
         issues.append(f'{name}: Updating={updating} Updated={updated_cond} Degraded={degraded} ready={ready}/{total} updated={updated}/{total} unavailable={unavailable} gen={generation}/obs={observed}')
 if issues:
-    print('UNSTABLE|' + '; '.join(issues) + '|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|' + str(any_degraded) + '|' + ';'.join(sorted(gen_parts)))
+    print('UNSTABLE|' + '; '.join(issues).replace('|', '/') + '|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|' + str(any_degraded) + '|' + ';'.join(sorted(gen_parts)))
 else:
     print('STABLE|all non-paused MCPs healthy|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|0|' + ';'.join(sorted(gen_parts)))
 " 2>/dev/null)" || statusLine="UNSTABLE|python parse error|0|0|0|0|"
 
     # statusLine = KEY|detail|ready|updated|machine|degraded|genPrint
     typeset statusKey="" statusDetail=""
+    typeset _rReady="" _rUpdated="" _rMachine="" _degField="" genPrint=""
+    IFS='|' read -r statusKey statusDetail _rReady _rUpdated _rMachine _degField genPrint <<< "${statusLine}"
+    # Validate as plain strings first: a typeset -i target evaluates its input
+    # arithmetically during `read` (so "1+1" becomes 2, the digit check would
+    # pass afterwards, and a non-numeric word aborts the step with an unbound
+    # variable under set -u). Defaults are applied only after the check.
     typeset -i totalReady=0 totalUpdated=0 totalMachine=0 anyDegraded=0
-    typeset _degField="" genPrint=""
-    IFS='|' read -r statusKey statusDetail totalReady totalUpdated totalMachine _degField genPrint <<< "${statusLine}"
-    [[ "${totalReady}" =~ ^[0-9]+$ ]] || totalReady=0
-    [[ "${totalUpdated}" =~ ^[0-9]+$ ]] || totalUpdated=0
-    [[ "${totalMachine}" =~ ^[0-9]+$ ]] || totalMachine=0
-    [[ "${_degField}" =~ ^[0-9]+$ ]] && anyDegraded=$(( _degField ))
+    [[ "${_rReady}" =~ ^[0-9]{1,9}$ ]] && totalReady=$(( 10#${_rReady} ))
+    [[ "${_rUpdated}" =~ ^[0-9]{1,9}$ ]] && totalUpdated=$(( 10#${_rUpdated} ))
+    [[ "${_rMachine}" =~ ^[0-9]{1,9}$ ]] && totalMachine=$(( 10#${_rMachine} ))
+    [[ "${_degField}" =~ ^[01]$ ]] && anyDegraded=$(( _degField ))
     # Window reset on desired-config change (render churn); count churn runs.
     # genPrint is the sorted per-pool name=gen fingerprint: a replaced pool
     # changes it even when a numeric sum would not (preflight review).
