@@ -29,10 +29,15 @@ if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
   fi
   cluster_name=$(<"${SHARED_DIR}/cluster-name")
   release_image=$(oc -n local-cluster get hostedcluster "${cluster_name}" -o jsonpath='{.spec.release.image}')
+  base_domain=$(oc -n local-cluster get hostedcluster "${cluster_name}" -o jsonpath='{.spec.dns.baseDomain}')
   release_registry=${release_image%%/*}
   release_registry=${release_registry%%:*}
   if [[ "${release_image}" != */* || ! "${release_registry}" =~ ^[A-Za-z0-9.-]+$ ]]; then
     echo "The Nutanix HostedCluster release image has no valid registry host."
+    exit 1
+  fi
+  if [[ ! "${base_domain}" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]]; then
+    echo "The Nutanix HostedCluster has no valid base domain."
     exit 1
   fi
   routes_json=$(oc get routes -A -o json)
@@ -41,8 +46,9 @@ if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
     echo "No Assisted Service route was discovered; refusing to broaden the Squid ACL."
     exit 1
   fi
+  # The ingress canary and other guest Routes use the hosted apps domain through Squid.
   # Builds clone from GitHub and resolve Red Hat builder images; guest pods extract the release image from its registry and R2 blob storage.
-  hosts=$(printf '%s\n' "${hosts}" github.com "${release_registry}" .r2.cloudflarestorage.com registry.access.redhat.com registry.redhat.io brew.registry.redhat.io .quay.io quay-proxy.ci.openshift.org | sort -u)
+  hosts=$(printf '%s\n' "${hosts}" ".apps.${cluster_name}.${base_domain}" github.com "${release_registry}" .r2.cloudflarestorage.com registry.access.redhat.com registry.redhat.io brew.registry.redhat.io .quay.io quay-proxy.ci.openshift.org | sort -u)
 
   printf '%s\n' "${hosts}" > "${SHARED_DIR}/nutanix_squid_allowed_hosts"
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/nutanix_squid_allowed_hosts" "root@${IP}:/tmp/nutanix_squid_allowed_hosts"

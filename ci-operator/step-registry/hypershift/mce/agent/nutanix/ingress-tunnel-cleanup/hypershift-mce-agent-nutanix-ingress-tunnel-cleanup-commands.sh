@@ -10,8 +10,7 @@ identity_file="$SHARED_DIR/nutanix_ingress_tunnel_identity.json"
 ssh_config="$SHARED_DIR/nutanix_ingress_tunnel_ssh_config"
 cleanup_context_if_complete() {
   if [[ -e "$SHARED_DIR/nutanix_destroy_complete" && ! -e "$state_file" &&
-        ! -e "$identity_file" &&
-        ! -e "$SHARED_DIR/nutanix_worker_dns_state.json" ]]; then
+        ! -e "$identity_file" ]]; then
     rm -f "$SHARED_DIR/nutanix_context.sh" "$SHARED_DIR/nutanix_destroy_complete"
   fi
 }

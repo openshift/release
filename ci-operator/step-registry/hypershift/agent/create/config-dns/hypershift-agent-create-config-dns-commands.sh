@@ -22,8 +22,15 @@ INGRESS_VIP=192.168.111.30
 if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
   INGRESS_VIP=$(source "${SHARED_DIR}/nutanix_context.sh" && printf '%s' "${INGRESS_VIP:?}")
 fi
+if [[ -n "${HYPERSHIFT_BASE_DOMAIN:-}" &&
+      ( ! "$HYPERSHIFT_BASE_DOMAIN" =~ ^[a-zA-Z0-9.-]+$ ||
+        "$HYPERSHIFT_BASE_DOMAIN" == .* || "$HYPERSHIFT_BASE_DOMAIN" == *. ||
+        "$HYPERSHIFT_BASE_DOMAIN" == *..* ) ]]; then
+  echo "The HostedCluster base domain override is invalid."
+  exit 1
+fi
 
-ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${IP_STACK}" "${CLUSTER_NAME}" "${INGRESS_VIP}" << 'EOF' |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${IP_STACK}" "${CLUSTER_NAME}" "${INGRESS_VIP}" "${HYPERSHIFT_BASE_DOMAIN:-}" << 'EOF' |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -33,6 +40,7 @@ set +x
 IP_STACK="${1}"
 HOSTEDCLUSTER_NAME="${2}"
 INGRESS_VIP="${3}"
+BASEDOMAIN="${4}"
 
 WORKER_IPS=$(oc get node -lnode-role.kubernetes.io/worker="" -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
 WORKER_IPV4=""
@@ -44,7 +52,9 @@ for worker_ip in $WORKER_IPS; do
     WORKER_IPV4="$worker_ip"
   fi
 done
-BASEDOMAIN=$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")
+if [[ -z "$BASEDOMAIN" ]]; then
+  BASEDOMAIN=$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")
+fi
 
 if [[ $IP_STACK == "v4v6" ]]; then
   : "${WORKER_IPV4:?No IPv4 worker address found}"

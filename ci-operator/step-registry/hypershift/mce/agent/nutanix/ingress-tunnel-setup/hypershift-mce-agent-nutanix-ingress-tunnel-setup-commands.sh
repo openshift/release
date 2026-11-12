@@ -312,7 +312,6 @@ unset gateway_private
 cat > "$work_dir/gateway.env" <<EOF
 VIP=$INGRESS_VIP
 HOST_TUNNEL_IP=$host_tunnel_ip
-GATEWAY_TUNNEL_IP=$gateway_tunnel_ip
 WG_INTERFACE=$interface
 EOF
 cat > "$work_dir/gateway-firewall.sh" <<'GATEWAY'
@@ -334,24 +333,12 @@ if [[ ! "$worker_interface" =~ ^[a-zA-Z0-9_.-]+$ ||
   echo "Could not identify the gateway's worker NIC and source address for the VIP." >&2
   exit 1
 fi
-worker_subnet=$(ip -4 route show dev "$worker_interface" proto kernel scope link |
-  awk -v source="$worker_ip" '{for (i=1; i<NF; i++) if ($i == "src" && $(i+1) == source) {print $1; exit}}')
-if [[ ! "$worker_subnet" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/([1-9]|[12][0-9]|3[0-2])$ ]]; then
-  echo "Could not identify the gateway's worker subnet for DNS forwarding." >&2
-  exit 1
-fi
 sysctl -w net.ipv4.ip_forward=1 >/dev/null
 if nft list table ip hcp_nutanix_ingress_tunnel >/dev/null 2>&1; then
   nft delete table ip hcp_nutanix_ingress_tunnel
 fi
 nft -f - <<RULES
 table ip hcp_nutanix_ingress_tunnel {
-  chain prerouting {
-    type nat hook prerouting priority dstnat; policy accept;
-    # Workers query the gateway's subnet address; the DNS server listens only on the host's WireGuard address.
-    iifname "$worker_interface" ip saddr $worker_subnet ip daddr $worker_ip udp dport 53 counter dnat to $HOST_TUNNEL_IP
-    iifname "$worker_interface" ip saddr $worker_subnet ip daddr $worker_ip tcp dport 53 counter dnat to $HOST_TUNNEL_IP
-  }
   chain input {
     type filter hook input priority 0; policy drop;
     ct state established,related accept
@@ -362,18 +349,12 @@ table ip hcp_nutanix_ingress_tunnel {
   }
   chain forward {
     type filter hook forward priority 0; policy drop;
-    iifname "$worker_interface" oifname "$WG_INTERFACE" ip saddr $worker_subnet ip daddr $HOST_TUNNEL_IP/32 udp dport 53 counter accept
-    iifname "$worker_interface" oifname "$WG_INTERFACE" ip saddr $worker_subnet ip daddr $HOST_TUNNEL_IP/32 tcp dport 53 counter accept
-    iifname "$WG_INTERFACE" oifname "$worker_interface" ip saddr $HOST_TUNNEL_IP/32 ip daddr $worker_subnet udp sport 53 ct state established,related counter accept
-    iifname "$WG_INTERFACE" oifname "$worker_interface" ip saddr $HOST_TUNNEL_IP/32 ip daddr $worker_subnet tcp sport 53 ct state established,related counter accept
     iifname "$worker_interface" oifname "$WG_INTERFACE" ip saddr $VIP ip daddr $HOST_TUNNEL_IP/32 ct state established,related counter accept
     iifname "$WG_INTERFACE" oifname "$worker_interface" ip saddr $HOST_TUNNEL_IP/32 ip daddr $VIP tcp dport { 80, 443 } counter accept
   }
   chain postrouting {
     type nat hook postrouting priority srcnat; policy accept;
     # The host accepts only the gateway's tunnel IP as a WireGuard peer source.
-    iifname "$worker_interface" oifname "$WG_INTERFACE" ip saddr $worker_subnet ip daddr $HOST_TUNNEL_IP/32 udp dport 53 counter snat to $GATEWAY_TUNNEL_IP
-    iifname "$worker_interface" oifname "$WG_INTERFACE" ip saddr $worker_subnet ip daddr $HOST_TUNNEL_IP/32 tcp dport 53 counter snat to $GATEWAY_TUNNEL_IP
     iifname "$WG_INTERFACE" oifname "$worker_interface" ip saddr $HOST_TUNNEL_IP/32 ip daddr $VIP tcp dport { 80, 443 } counter snat to $worker_ip
   }
 }

@@ -48,7 +48,12 @@ if [[ -z ${AGENT_NAMESPACE} ]] ; then
 fi
 oc get ns "${AGENT_NAMESPACE}" || oc create namespace "${AGENT_NAMESPACE}"
 echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
-BASEDOMAIN=$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")
+BASEDOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")}
+if [[ ! "$BASEDOMAIN" =~ ^[a-zA-Z0-9.-]+$ || "$BASEDOMAIN" == .* ||
+      "$BASEDOMAIN" == *. || "$BASEDOMAIN" == *..* ]]; then
+  echo "The HostedCluster base domain is invalid."
+  exit 1
+fi
 echo "extract secret/pull-secret"
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 echo "check HYPERSHIFT_HC_RELEASE_IMAGE, if not set, use mgmt-cluster playload image"

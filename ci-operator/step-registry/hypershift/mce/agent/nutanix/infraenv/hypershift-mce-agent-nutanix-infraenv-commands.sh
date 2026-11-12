@@ -61,16 +61,6 @@ if [[ ! -s "${SHARED_DIR}/hostedcluster_no_proxy" ]]; then
 fi
 no_proxy=$(<"${SHARED_DIR}/hostedcluster_no_proxy")
 
-dns_state_file="${SHARED_DIR}/nutanix_worker_dns_state.json"
-if [[ ! -s "$dns_state_file" ]]; then
-  echo "The run-scoped worker DNS resolver must be ready before creating the InfraEnv."
-  exit 1
-fi
-if ! worker_dns_ip=$(jq -er --arg cluster "$CLUSTER_NAME" --arg lease "${NUTANIX_QUOTA_SLICE:-}" \
-  'select(.cluster == $cluster and .lease == $lease) | .advertisedIP' "$dns_state_file"); then
-  echo "The worker DNS state does not match this HostedCluster and Nutanix lease."
-  exit 1
-fi
 worker_macs_file="${SHARED_DIR}/nutanix_worker_macs.json"
 if [[ -e "$worker_macs_file" ]]; then
   echo "Worker MAC reservations already exist; clean up the previous setup before retrying."
@@ -119,13 +109,8 @@ spec:
       ipv4:
         enabled: true
         dhcp: true
-        auto-dns: false
       ipv6:
         enabled: false
-    dns-resolver:
-      config:
-        server:
-        - "${worker_dns_ip}"
 EOF
   oc create -f "${temp_dir}/nmstateconfig.yaml"
 done
