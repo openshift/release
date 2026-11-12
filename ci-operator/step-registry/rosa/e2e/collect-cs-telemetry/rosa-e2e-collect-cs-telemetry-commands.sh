@@ -51,21 +51,23 @@ echo "  Window: $(date -d "@$START_TIME" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || dat
 # ---------------------------------------------------------------------------
 
 CLASSIC_REPORT="${ARTIFACT_DIR}/classic-idp-resync-events.json"
+# The scratch directory holds the raw query response and the run's cluster identifiers, so it
+# must never be under ARTIFACT_DIR. Without one there is nowhere safe to put them and Classic
+# collection is skipped rather than degraded.
 CLASSIC_WORK="$(mktemp -d)" || CLASSIC_WORK=""
-if [[ -z "$CLASSIC_WORK" ]]; then
-  echo "WARNING: could not create a scratch directory for Classic IDP collection"
-  CLASSIC_WORK="${ARTIFACT_DIR}/.classic-idp-scratch"
-  mkdir -p "$CLASSIC_WORK"
-fi
-# The scratch directory holds the raw query response and the run's cluster identifiers. It is
-# removed on every exit path, including the early ones above, so neither reaches ARTIFACT_DIR.
-classic_cleanup() { rm -rf "${CLASSIC_WORK}"; }
-trap classic_cleanup EXIT
+classic_cleanup() { [[ -n "${CLASSIC_WORK}" ]] && rm -rf "${CLASSIC_WORK}"; }
+trap classic_cleanup EXIT INT TERM
 
 # Collect the run's cluster identifiers using the same SHARED_DIR convention as
 # rosa-e2e-gather-cluster-diagnostics. Used as a selector only.
-CLASSIC_SELECTORS="${CLASSIC_WORK}/selectors"
-: > "$CLASSIC_SELECTORS"
+CLASSIC_SKIP=false
+if [[ -z "$CLASSIC_WORK" ]]; then
+  echo "WARNING: no scratch directory; skipping Classic IDP collection"
+  CLASSIC_SKIP=true
+fi
+
+CLASSIC_SELECTORS="${CLASSIC_WORK:-/dev/null}/selectors"
+[[ "$CLASSIC_SKIP" == "true" ]] || : > "$CLASSIC_SELECTORS"
 
 # Bounded sanitized phase windows written by the test step, if it ran. Each line is an enum
 # and two timestamps, which is what lets an event be attributed to the import under test
@@ -77,10 +79,15 @@ if [[ ! -s "$CLASSIC_PHASES" ]]; then
 fi
 for candidate in "${SHARED_DIR}/cluster-id" "${SHARED_DIR}/ocm-fvt-cluster-ids"; do
   if [[ -s "$candidate" ]]; then
-    grep -oE '[A-Za-z0-9]+' < "$candidate" >> "$CLASSIC_SELECTORS" || true
+    # Only values shaped like a cluster id, and a bounded number of them: each one costs a
+    # query inside the step's timeout.
+    grep -oE '[a-z0-9]{20,40}' < "$candidate" >> "$CLASSIC_SELECTORS" || true
   fi
 done
-sort -u -o "$CLASSIC_SELECTORS" "$CLASSIC_SELECTORS"
+if [[ "$CLASSIC_SKIP" != "true" ]]; then
+  sort -u "$CLASSIC_SELECTORS" | head -8 > "${CLASSIC_WORK}/selectors.bounded" || true
+  mv "${CLASSIC_WORK}/selectors.bounded" "$CLASSIC_SELECTORS" || true
+fi
 
 classic_report_only() {
   python3 - "$CLASSIC_REPORT" "$1" "$START_TIME" "$END_TIME" <<'PYEOF'
@@ -247,7 +254,9 @@ echo "  Events collected: $EVENT_COUNT"
 echo "  Output: ${ARTIFACT_DIR}/cs-telemetry.log"
 fi
 
-if [[ ! -s "$CLASSIC_SELECTORS" ]]; then
+if [[ "$CLASSIC_SKIP" == "true" ]]; then
+  echo "  Classic IDP resync: skipped, no scratch directory"
+elif [[ ! -s "$CLASSIC_SELECTORS" ]]; then
   # No identifier to select on. Reported explicitly: an empty event list without
   # this status would read as "the resync did not happen".
   classic_report_only "selector_unavailable"
@@ -278,7 +287,7 @@ else
     printf '\n' >> "${CLASSIC_WORK}/merged.json"
     # A result set that exactly fills the limit may have been cut short; say so rather than
     # presenting a possibly partial list as the whole of it.
-    if [[ "$(python3 -c "
+    CLASSIC_SEEN="$(python3 -c "
 import json,sys
 try:
     d=json.load(open('${CLASSIC_WORK}/sel.json'))
@@ -286,7 +295,8 @@ try:
     print(sum(len(s.get('values') or []) for s in r if isinstance(s,dict)))
 except Exception:
     print(0)
-" 2>/dev/null)" -ge "$CLASSIC_LIMIT" ]]; then
+" 2>/dev/null)"
+    if [[ "$CLASSIC_SEEN" =~ ^[0-9]+$ ]] && (( CLASSIC_SEEN >= CLASSIC_LIMIT )); then
       CLASSIC_TRUNCATED=true
     fi
   done < "$CLASSIC_SELECTORS"
@@ -296,6 +306,8 @@ except Exception:
   else
     if ! python3 - "${CLASSIC_WORK}/merged.json" "$CLASSIC_PHASES" "$CLASSIC_REPORT" \
         "$START_TIME" "$END_TIME" "$CLASSIC_QUERY_OK" "$CLASSIC_TRUNCATED" <<'PYEOF'
+# classic-idp-resync-parser: hack/classic-idp-telemetry/classic_idp_parser_test.py locates
+# this block by the marker above; keep them in step.
 import json, re, sys
 from datetime import datetime, timezone
 
@@ -311,6 +323,9 @@ OUTCOMES = {"succeeded", "deleted", "not_found", "forbidden", "conflict", "faile
 FLOWS = {"secret_mapping"}
 TOGGLES = {"unavailable"}
 TOGGLE_REASONS = {"not_present_in_build"}
+# The handoff file is writable by any step in the job, so the published phase name is held to
+# the same closed set as every other published value rather than echoed through.
+PHASES = {"htpasswd_user_import", "idp_create", "idp_delete"}
 # The event carries no identifier at all. Any field outside this set is unexpected.
 PAYLOAD_FIELDS = {"schema", "op", "outcome", "flow", "toggle", "toggle_reason", "build",
                   "invocation", "time", "generation", "attempt"}
@@ -324,7 +339,8 @@ rejected = {k: 0 for k in ("unparsable_envelope", "unwrap_failed", "undecodable_
                            "unknown_schema", "unexpected_field", "unknown_op",
                            "unknown_outcome", "unknown_flow", "unknown_toggle",
                            "invalid_time", "out_of_window", "invalid_generation",
-                           "invalid_attempt", "oversize_line")}
+                           "invalid_attempt", "oversize_line", "unknown_phase",
+                           "malformed_document")}
 anomalies = {"build_not_recorded": 0}
 
 
@@ -343,7 +359,7 @@ def load_phases(path):
                 if len(parts) != 3:
                     continue
                 name, began, ended = parts
-                if not re.fullmatch(r"[a-z0-9_]{1,40}", name):
+                if name not in PHASES:
                     continue
                 try:
                     lo = datetime.strptime(began, STAMP).replace(tzinfo=timezone.utc)
@@ -362,10 +378,12 @@ def phase_of(windows, moment):
     attributable to the import under test rather than to any other write of the same job."""
     if not windows:
         return "phase_unavailable"
+    # The narrowest containing window wins, so a nested phase is not swallowed by an outer one.
+    best = None
     for lo, hi, name in windows:
-        if lo <= moment <= hi:
-            return name
-    return "outside_known_phase"
+        if lo <= moment <= hi and (best is None or (hi - lo) < best[0]):
+            best = (hi - lo, name)
+    return best[1] if best else "outside_known_phase"
 
 
 def unwrap(value):
@@ -419,7 +437,15 @@ def documents(path):
         try:
             document, index = decoder.raw_decode(text, index)
         except ValueError:
-            return
+            # One unreadable response must not discard the others: skip to the next line and
+            # keep going, and count it so the collection is reported partial rather than as a
+            # clean empty result.
+            rejected["malformed_document"] += 1
+            newline = text.find("\n", index)
+            if newline < 0:
+                return
+            index = newline + 1
+            continue
         yield document
 
 
@@ -525,7 +551,7 @@ unique.sort(key=lambda e: (e["invocation"], e["time"], e["attempt"]))
 
 if truncated:
     status = "truncated"
-elif not query_ok:
+elif not query_ok or rejected["malformed_document"]:
     status = "partial"
 elif unique:
     status = "collected"

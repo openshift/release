@@ -10,6 +10,8 @@ ref:
       cpu: 100m
       memory: 200Mi
   timeout: 10m0s
+  # Diagnostics only: a collection failure must never fail the job it is diagnosing.
+  best_effort: true
   grace_period: 30s
   credentials:
   - collection: rosa-e2e
@@ -42,18 +44,6 @@ ref:
     is reduced to an allowlisted schema before anything is written, and
     the raw response is never placed in ARTIFACT_DIR.
 
-    Each collected event carries only an operation
-    (source_secret_write, lease_delete, sync_identity_provider_write,
-    syncset_write), an outcome (succeeded, deleted, not_found,
-    forbidden, conflict, failed), a UTC timestamp, an object generation
-    where one applies, and the service build the operation ran as. The
-    build is reported with a shape: a value that is lowercase
-    hexadecimal but entirely decimal digits is labelled
-    ambiguous_numeric_or_git_object_name, because an all-decimal value cannot be
-    told apart from a git object name whose digits happen to all be
-    decimal, and a hexadecimal shape alone does not establish git
-    provenance. An unrecognised build shape is counted
-    and its value is not written.
 
     An event carrying any field outside that set is dropped whole rather
     than filtered, and the counts of each rejection reason are reported
@@ -66,6 +56,14 @@ ref:
     flow toggle state, a UTC timestamp, the UTC timestamp the resync
     call started at, the conflict-retry ordinal, an object generation
     where one applies, and the service build the operation ran as.
+
+    The build is reported with a shape: a value that is lowercase
+    hexadecimal but entirely decimal digits is labelled
+    ambiguous_numeric_or_git_object_name, because an all-decimal value
+    cannot be told apart from a git object name whose digits happen to
+    all be decimal, and a hexadecimal shape alone does not establish git
+    provenance. An unrecognised build shape is counted and its value is
+    not written.
 
     The invocation stamp and the retry ordinal together keep two calls,
     and the retries inside one call, from collapsing into each other:

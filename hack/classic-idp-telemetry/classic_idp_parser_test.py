@@ -20,10 +20,17 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
+# The helpers below take one keyword per event field on purpose: a test that builds an event
+# positionally would stop being readable the moment the schema grows.
+# pylint: disable=too-many-arguments,too-many-positional-arguments
+
 REPO = Path(__file__).resolve().parents[2]
 STEP = (REPO / "ci-operator/step-registry/rosa/e2e/collect-cs-telemetry"
         / "rosa-e2e-collect-cs-telemetry-commands.sh")
 
+# Identifies the parser block inside the step script, so adding another heredoc cannot
+# silently retarget this suite at the wrong one.
+PARSER_SENTINEL = "classic-idp-resync-parser"
 TAG = "[ROSA CLASSIC IDP]"
 SCHEMA = "rosa.classic.idp.resync/v1"
 CLUSTER = "2abcdefghijklmnopqrstuvwxyz0123"
@@ -49,9 +56,12 @@ START, END = _epoch(IN_WINDOW) - 600, _epoch(LATER) + 600
 def extract_parser(destination):
     """Pull the event parser out of the shipped step script."""
     body = STEP.read_text()
-    blocks = re.findall(r"<<'PYEOF'\n(.*?)\nPYEOF", body, re.S)
-    if not blocks:
-        raise AssertionError(f"no embedded python found in {STEP}")
+    blocks = [b for b in re.findall(r"<<'PYEOF'\n(.*?)\nPYEOF", body, re.S)
+              if PARSER_SENTINEL in b]
+    if len(blocks) != 1:
+        raise AssertionError(
+            f"expected exactly one block containing {PARSER_SENTINEL!r} in {STEP}, "
+            f"found {len(blocks)}")
     path = destination / "parser.py"
     path.write_text(blocks[-1])
     return path
@@ -80,10 +90,12 @@ def encoder_line(message, trailing=True):
     return prefix + message + (" user=sentinel-user@example.com" if trailing else "")
 
 
-class ParserCase(unittest.TestCase):
+class ParserCase(unittest.TestCase):  # pylint: disable=too-many-public-methods
     @classmethod
     def setUpClass(cls):
-        cls._work = tempfile.TemporaryDirectory()
+        # Kept open for the lifetime of the class and released in tearDownClass; a with
+        # block cannot span setUpClass/tearDownClass.
+        cls._work = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
         cls.parser = extract_parser(Path(cls._work.name))
 
     @classmethod
@@ -102,7 +114,7 @@ class ParserCase(unittest.TestCase):
         result = subprocess.run(
             [sys.executable, "-I", str(self.parser), str(merged), str(phase_file), str(out),
              str(start), str(end), query_ok, truncated],
-            capture_output=True, text=True)
+            capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         text = out.read_text()
         return json.loads(text), text
@@ -209,6 +221,43 @@ class ParserCase(unittest.TestCase):
         self.assertEqual(report["collection"]["phase_windows"], "unavailable")
         self.assertEqual(report["events"][0]["test_phase"], "phase_unavailable")
 
+    def test_phase_name_outside_the_closed_set_is_not_published(self):
+        # SHARED_DIR is writable by every step in the job, so a name the suite would never
+        # record must not be echoed into the artifact.
+        phases = [("sentinel_phase", "2026-11-11T07:10:39.000000Z",
+                   "2026-11-11T07:10:40.000000Z")]
+        report, text = self.run_parser([event()], phases=phases)
+        self.assertNotIn("sentinel_phase", text)
+        self.assertEqual(report["collection"]["phase_windows"], "unavailable")
+        self.assertEqual(report["events"][0]["test_phase"], "phase_unavailable")
+
+    def test_nested_windows_resolve_to_the_narrowest(self):
+        phases = [("idp_create", "2026-11-11T07:10:00.000000Z",
+                   "2026-11-11T07:11:00.000000Z"),
+                  ("htpasswd_user_import", "2026-11-11T07:10:30.000000Z",
+                   "2026-11-11T07:10:50.000000Z")]
+        report, _ = self.run_parser([event(time=IN_WINDOW)], phases=phases)
+        self.assertEqual(report["events"][0]["test_phase"], "htpasswd_user_import")
+
+    def test_one_malformed_document_does_not_discard_the_others(self):
+        good = {"data": {"result": [{"values": [["0", event()]]}]}}
+        work = Path(tempfile.mkdtemp(dir=self._work.name))
+        merged, phase_file, out = work / "merged.json", work / "phases", work / "report.json"
+        # A 200 with a non-JSON body for one selector, between two good responses.
+        merged.write_text(json.dumps(good) + "\nnot json at all\n" + json.dumps(good))
+        phase_file.write_text("")
+        result = subprocess.run(
+            [sys.executable, "-I", str(self.parser), str(merged), str(phase_file), str(out),
+             str(START), str(END), "true", "false"], capture_output=True, text=True,
+            check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(out.read_text())
+        # Both good documents survive (de-duplicated to one event) and the loss is reported
+        # rather than presented as a clean collection.
+        self.assertEqual(len(report["events"]), 1, report)
+        self.assertEqual(report["rejected"]["malformed_document"], 1)
+        self.assertEqual(report["collection"]["status"], "partial")
+
     def test_malformed_phase_lines_are_skipped(self):
         phases = [("not a phase name!", IN_WINDOW, LATER),
                   ("htpasswd_user_import", "bogus", LATER)]
@@ -266,7 +315,7 @@ class ParserCase(unittest.TestCase):
         result = subprocess.run(
             [sys.executable, "-I", str(self.parser), str(work / "absent.json"),
              str(work / "phases"), str(out), str(START), str(END), "true", "false"],
-            capture_output=True, text=True)
+            capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(out.read_text())["events"], [])
 
