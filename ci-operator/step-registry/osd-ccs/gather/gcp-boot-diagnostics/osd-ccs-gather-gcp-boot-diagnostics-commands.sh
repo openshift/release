@@ -468,6 +468,11 @@ def collect(instances, project_id):
                 "compute", "instances", "get-serial-port-output",
                 "--project", project_id, "--zone", zone, name,
             ], sink)
+            # The read was attempted and came back with a status, whatever it
+            # says. Count it here, before any parsing, so that a denied, timed
+            # out or unparseable read is still counted as examined and the
+            # count can never fall behind the records below.
+            examined += 1
             # Instance names, zones and project ids are deliberately absent here.
             record = {
                 "index": index,
@@ -487,7 +492,6 @@ def collect(instances, project_id):
                     record["collection"] = "no_signal"
                 else:
                     record["signals"] = summarize(sink, oversized)
-                examined += 1
             try:
                 sink.unlink()
             except OSError:
