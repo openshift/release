@@ -47,10 +47,55 @@ They are not globs or regular expressions. Include configs, cases, setup,
 and shared dependencies as appropriate. Include `evals.yaml` explicitly if
 manifest edits should trigger an eval; it has no implicit trigger behavior.
 
-The diff is `git diff --name-only -z --no-renames PULL_BASE_SHA...HEAD`.
-Renames include both paths; deletions count as changes. A missing base SHA
-or failed diff is an error. No match exits 0 with a zero-test JUnit file,
-without setup, harness installation, or Claude calls.
+Changed files come from Prow and GitHub, not from Git history in the
+checkout. Prow's `JOB_SPEC` names the repository and each pull request head
+the job tested (`refs.org`, `refs.repo`, `refs.pulls[].number/.sha`). For
+each pull request the runner reads `GET /repos/{owner}/{repo}/pulls/{number}`,
+fails unless its `head.sha` is the commit the job tested and, when `JOB_SPEC`
+names `refs.base_ref`, its `base.ref` is still that branch, then lists
+`GET /repos/{owner}/{repo}/pulls/{number}/files` (100 per page), the endpoint
+Prow's `run_if_changed` uses. Renames include both paths, as with
+`git diff --no-renames`; deletions count as changes; paths are relative to
+the repository root. GitHub lists at most 3,000 files per pull request: a
+larger pull request, or a listing shorter than the pull request's
+`changed_files`, is an error rather than a partial selection, and so is a
+head or base that changes while the files are read. A batch job selects from
+the union of every pull request's files.
+
+GitHub compares a pull request head with its merge base on the base branch,
+not with the merged checkout the job tests. The lists usually agree. GitHub
+may list more (e.g. a change the base branch already contains), which can
+run an extra eval. It can also miss a path: if the base branch renamed a file
+after the pull request branched and the pull request edits that file, GitHub
+lists the old path while the merged checkout changes the renamed one, so an
+eval triggered only by the new path is not selected. Rebasing the pull
+request onto the current base branch closes the gap. Conservative selection
+for base-side renames is not implemented.
+
+A missing or invalid `JOB_SPEC` or a failed lookup is an error, reported in
+JUnit before harness installation, setup, or Claude calls; rate-limited and
+transient failures are retried a bounded number of times. No match exits 0
+with a zero-test JUnit file, without setup, harness installation, or Claude
+calls.
+
+The API calls authenticate with the token at `GITHUB_TOKEN_PATH`; redirects
+are followed only within `https://api.github.com`, so the token is never sent
+to another host or over plain HTTP. GitHub
+answers 404 for a private repository the token cannot read, so a 404 fails
+with a message naming `GITHUB_TOKEN_PATH`: the token must be able to read the
+consumer repository's pull requests. Public repositories also work without a
+token, subject to a low shared rate limit.
+
+Rehearsals never diff the wrong repository. The changes considered are those
+of the ref Prow checks out as the working directory: the first `JOB_SPEC` ref
+with `workdir: true`, otherwise `refs`. A pj-rehearse rehearsal sets `refs` to
+the openshift/release pull request and adds the consumer repository as a
+`workdir` extra ref without pull requests, so it has no PR diff for the
+consumer: the runner logs `NO-PR` and selects nothing, exiting 0 with a
+zero-test JUnit file. The openshift/release pull request's files are never
+matched against the consumer's triggers. A green rehearsal therefore shows
+only that the step starts and selects; it does not run the harness. Hidden
+(private) jobs are never rehearsed.
 
 ### Changed-case selection
 
@@ -98,10 +143,18 @@ dataset remain harness-owned. In case mode, `execution.max_budget_usd` limits
 each case invocation, not total CI spend or judge/orchestrator calls.
 `CLAUDE_MODEL` chooses the outer orchestrator model.
 
-The manifest runner pins `agent-eval-harness` at
-`e4b0f24bdbaa33bb07e0d723dfd834e90b655b5f`. It fetches that exact commit,
-checks `git rev-parse HEAD`, and uses that checkout for configuration
-resolution, the Claude plugin, and regression scoring. The runner resolves
+The manifest runner resolves `agent-eval-harness` at job start: the latest
+published release from the public GitHub `releases/latest` API — never the
+moving `main` branch, which may be broken mid-development. The API call uses
+the mounted `GITHUB_TOKEN` when present, only to lift unauthenticated rate
+limits. `EVAL_HARNESS_REVISION` overrides the resolution with an exact release
+tag such as `v1.62.0`, e.g. to bisect a harness regression across releases;
+unset means latest. Branches and commit SHAs are rejected. The runner makes a
+shallow clone of exactly the resolved tag (`git clone --depth 1 --branch
+<tag>`), verifies the checkout is that tag's commit, and uses that checkout
+for configuration resolution, the Claude plugin, and regression scoring. The
+resolved tag and its commit SHA are recorded in `runner/harness-install.log`,
+so every run stays traceable to an exact commit. The runner resolves
 selected configs with the harness's `load_raw()` and `EvalConfig.from_yaml()`
 APIs, so `extends`, inherited values, list merging, and `!replace` follow the
 harness's rules. Resolution happens once, at preflight; the orchestrator runs
@@ -133,15 +186,19 @@ Existing jobs continue to use the unchanged `openshift-claude-agent-eval` workfl
 
 ## CI integration
 
-Select `workflow: openshift-claude-agent-eval-manifest`, supply its
-`claude-ai-helpers` image, and start the step in the PR checkout root, including
-`.git` and the base commit's history. An unset or empty `EVAL_WORKDIR` defaults
-to the current working directory; set it explicitly when the checkout is
-elsewhere. Relative overrides resolve from the starting directory. The runner
-does not search for another checkout or fall back to `/opt/ai-helpers`.
+Select `workflow: openshift-claude-agent-eval-manifest` and supply its
+`claude-ai-helpers` image with the consumer repository's files at
+`EVAL_WORKDIR`: the directory containing `evals.yaml` and the files it
+references. No Git metadata or history is required; changed files come from
+`JOB_SPEC` and the GitHub API, and Git is used only to clone the harness. An
+unset or empty `EVAL_WORKDIR` defaults to the current working directory; set
+it explicitly when the checkout is elsewhere. Relative overrides resolve from
+the starting directory. The runner does not search for another checkout or
+fall back to `/opt/ai-helpers`.
 No `EVAL_MANIFEST` flag is needed.
 
-This workflow supports presubmit jobs only. Prow job configuration controls
+This workflow supports presubmit jobs, including Tide batch runs of a required
+presubmit. Prow job configuration controls
 whether PR creation, new commits on an open PR, or a manual test request
 starts a job. Manually triggering a presubmit still uses `run: pr`; it does
 not require a manifest `run: manual` mode. Postsubmit and periodic jobs are
@@ -249,6 +306,11 @@ cloned harness's `detect_regressions()` rules; an eval YAML edited during the
 run cannot change its own verdict. Missing summaries or thresholded judges
 still fail the eval. If the step deadline passes before scoring, the eval
 fails as deadline-expired rather than as a scorer timeout.
+Before scoring, `run_result.json` must show that the harness ran exactly the
+preflight-resolved config chain, `models.skill` model, skill, and case set:
+the requested `--cases`, or every subdirectory of `dataset.path` for a full
+run. An edited copy of the config, missing or unexpected cases, a non-`case`
+execution mode, or any absent field fails the eval.
 Python emits AutoDL metrics for orchestrator and harness model usage;
 metrics failures remain warnings and do not replace the eval verdict.
 An unreadable, truncated, or non-mapping `run_result.json` and non-integer
@@ -275,7 +337,7 @@ therefore use omission rather than a nonnumeric `"unavailable"` value.
 
 ## Development and validation
 
-Edit `eval_config.py`, `manifest_runner.py`, `eval_plan.py`,
+Edit `eval_config.py`, `manifest_runner.py`, `eval_plan.py`, `eval_changes.py`,
 `eval_regression.py`, or `eval_metrics.py`, then run `sync_commands.py`.
 It packages these sources into the manifest step's
 commands script only; it does not read or write the existing workflow's
@@ -298,7 +360,13 @@ Container tests default to the promoted `claude-ai-helpers:latest` CI image;
 set `EVAL_TEST_IMAGE` to an immutable digest to reproduce a particular run.
 Set `CONTAINER_ENGINE=docker` to use Docker instead of Podman. The tests run
 with network disabled, fake Claude/harness executables, no mounted credentials,
-and real Git/Python; they make no model calls and need no fake GNU `timeout`.
+and real Python; they make no model calls and need no fake GNU `timeout`.
+The entry point runs from a workdir without `.git`. Its GitHub API calls are
+answered by `testing/fake_github.py`, which the test-only
+`testing/sitecustomize.py` routes urllib's `OpenerDirector.open` to when that
+directory is on `PYTHONPATH` and `EVAL_TEST_GITHUB_FIXTURE` names a fixture;
+the runner and its bundle contain no test hook. In-process tests inject the
+fake as the API client's opener.
 They cover the distributed manifest entry point, eval/case selection,
 per-eval setup, and failure reporting. These offline tests do not establish
 that the workflow works end to end in Prow with the real harness and models.
@@ -310,12 +378,14 @@ image currently uses Python 3.14 and unpinned pylint; older local versions
 may miss checks enforced by CI.
 
 The offline suite uses a fake harness API. Separately, run the contract suite
-against the exact pinned checkout to verify overlays with the real parser:
+against a real harness release checkout to verify overlays with the real
+parser:
 
 ```bash
 python3 hack/claude-agent-eval/real_harness_contract.py --harness-checkout /path/to/agent-eval-harness
 ```
 
 Run the contract suite with Python 3.11+ and the harness's core dependencies
-(PyYAML, Jinja2, and truststore). It checks the checkout SHA and makes no
-API/model calls. The default offline suite does not fetch the harness.
+(PyYAML, Jinja2, and truststore). It checks the checkout sits exactly at a
+release tag (or at `EVAL_HARNESS_REVISION` when set) and makes no API/model
+calls. The default offline suite does not fetch the harness.

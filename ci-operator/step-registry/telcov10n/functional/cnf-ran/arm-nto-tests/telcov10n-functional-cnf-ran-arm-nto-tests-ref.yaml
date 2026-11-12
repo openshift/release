@@ -1,0 +1,64 @@
+ref:
+  as: telcov10n-functional-cnf-ran-arm-nto-tests
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-arm-nto-tests-commands.sh
+  timeout: 10h
+  grace_period: 10s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: CLUSTER_NAME
+      default: "kni-qe-130"
+      documentation: Hub cluster name (where the spoke was deployed via ZTP)
+    - name: SPOKE_CLUSTER_NAME
+      default: "kni-qe-131"
+      documentation: Spoke cluster name (target of the NTO tests)
+    - name: NTO_GIT_URL
+      default: "https://github.com/openshift/cluster-node-tuning-operator.git"
+      documentation: URL of the NTO git repository
+  credentials:
+    ## Global Vars ##
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-all
+      mount_path: /var/group_variables/common/all
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-bastions
+      mount_path: /var/group_variables/common/bastions
+    # Group Vars should come from previous step in SHARED_DIR
+    ## Cluster Vars ##
+    # kni-qe-131
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-kni-qe-131-masters
+      mount_path: /var/group_variables/kni-qe-131/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-kni-qe-131-workers
+      mount_path: /var/group_variables/kni-qe-131/workers
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-kni-qe-131-nodes
+      mount_path: /var/group_variables/kni-qe-131/nodes
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-130-bastion
+      mount_path: /var/host_variables/kni-qe-130/bastion
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-131-master0
+      mount_path: /var/host_variables/kni-qe-131/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-131-master1
+      mount_path: /var/host_variables/kni-qe-131/master1
+    - namespace: test-credentials
+      name: telcov10n-ansible-kni-qe-131-master2
+      mount_path: /var/host_variables/kni-qe-131/master2
+    - namespace: test-credentials
+      name: telcov10n-ansible-hypervisors-helix118
+      mount_path: /var/host_variables/kni-qe-131/hypervisor
+  documentation: |-
+    Run the NTO (cluster-node-tuning-operator) functional tests against the ARM
+    MNO spoke cluster. Connects to the hub bastion, extracts the spoke
+    kubeconfig from the hub ACM clusterdeployment, clones the NTO repository
+    and runs the ginkgo performance-profile functests (tier-0). Test reports
+    (JUnit/HTML) are copied back to the step artifacts directory.

@@ -109,12 +109,44 @@ for feature in ${ECO_GOTESTS_FEATURES}; do
 done
 
 echo "Collect artifacts from bastion"
-ansible-playbook ./playbooks/collect-eco-gotests-artifacts.yaml \
-  -i ./inventories/ocp-deployment/build-inventory.py \
-  --extra-vars "eco_gotests_features='${ECO_GOTESTS_FEATURES}'" \
-  --extra-vars "artifact_dir=${ARTIFACT_DIR}" \
-  --extra-vars "bastion_junit_dir=${JUNIT_REPORT_DIR}" \
-  --extra-vars "hub_clusterconfigs_path=${HUB_CLUSTERCONFIGS_PATH}" \
-  -vv
+# Runs scripts/collect-eco-gotests-artifacts.py on the bastion (replaces the
+# collect-eco-gotests-artifacts.yaml playbook invocation): renames testsuites
+# to suite names, gathers JUnit XMLs to ${JUNIT_REPORT_DIR}, zips
+# k8sreporter output and prepares /tmp/test_reports for the report step.
+# Only the resulting artifacts are transferred to the CI pod via SCP.
+echo "Copy artifact collection script to bastion"
+scp "${SSH_OPTS[@]}" -i "${WORKDIR}/temp_ssh_key" \
+  "${ECO_CI_CD_DIR}/scripts/collect-eco-gotests-artifacts.py" \
+  "${BASTION_USER}@${BASTION_IP}:/tmp/collect-eco-gotests-artifacts.py"
+
+echo "Determine OCP version for the k8sreporter directory"
+# hub-deploy records the hub cluster version in SHARED_DIR earlier in the workflow.
+OCP_VERSION="$(cat "${SHARED_DIR}/cluster_version" 2>/dev/null || echo unknown)"
+K8S_REPORTER_DIR="/tmp/k8sreporter-${OCP_VERSION}"
+# Where the collector stages junit_eco_gotests_<suite>/ dirs, fetched below.
+BASTION_ARTIFACTS_DIR="/tmp/eco_gotests_artifacts"
+echo "Using k8sreporter directory: ${K8S_REPORTER_DIR}"
+
+echo "Run artifact collection on bastion"
+collect_rc=0
+ssh "${SSH_OPTS_KEEPALIVE[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${WORKDIR}/temp_ssh_key" \
+  "python3 /tmp/collect-eco-gotests-artifacts.py \
+     --suites '${ECO_GOTESTS_FEATURES}' \
+     --junit-dir '${JUNIT_REPORT_DIR}' \
+     --k8s-reporter-dir '${K8S_REPORTER_DIR}' \
+     --artifacts-dir '${BASTION_ARTIFACTS_DIR}'" || collect_rc=$?
+if [[ ${collect_rc} -ne 0 ]]; then
+  echo "ERROR: artifact collection failed on bastion (exit code ${collect_rc})"
+  step_failed=1
+fi
+
+echo "Fetch collected artifacts to CI pod"
+# The collector stages junit_eco_gotests_<suite>/ dirs on the bastion (every
+# XML from the suite's report dir, the renamed JUnit copy and the k8sreporter
+# zip), restoring the artifact layout of the former collect-artifacts playbook.
+mkdir -p "${ARTIFACT_DIR}"
+scp -r "${SSH_OPTS[@]}" -i "${WORKDIR}/temp_ssh_key" \
+  "${BASTION_USER}@${BASTION_IP}:${BASTION_ARTIFACTS_DIR}/junit_eco_gotests_*" "${ARTIFACT_DIR}/" \
+  || echo "No staged artifacts to fetch"
 
 exit "${step_failed}"

@@ -6,9 +6,11 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'setup_spoke_hub_connectivity' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
 apply_gangway_overrides
-setup_debug_on_fail
 
 main() {
+    # Install unified exit handler (handles CONTINUE_ON_FAIL and DEBUG_ON_FAIL)
+    setup_telco_kpis_exit_handler
+
     echo "Setting up spoke-hub connectivity: ${SPOKE_CLUSTER} -> ${HUB_CLUSTER}"
 
     setup_ansible_inventory "${SPOKE_CLUSTER}" "${HUB_CLUSTER}"

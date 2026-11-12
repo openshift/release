@@ -139,7 +139,7 @@ if [[ -n "${SIPPY_UNAVAILABLE}" ]]; then
     MESSAGE+="${NL}Sippy data unavailable for: ${SIPPY_UNAVAILABLE}."
 fi
 
-MESSAGE+="${NL}<${DASHBOARD_URL}|View Dashboard> | <${JOB_URL}|Prow Logs> | @edge-enablement-payload-manager"
+MESSAGE+="${NL}<${DASHBOARD_URL}|View Dashboard> | <${JOB_URL}|Prow Logs> | @openshift-edge-payload-manager"
 
 # ---------------------------------------------------------------------------
 # Send to Slack (or dry-run on PRs)

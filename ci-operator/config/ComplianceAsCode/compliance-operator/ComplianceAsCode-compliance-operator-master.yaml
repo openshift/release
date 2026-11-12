@@ -3,6 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   ocm-cli:
     name: ocm-cli
     namespace: ci
@@ -659,6 +663,28 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- always_run: false
+  as: e2e-hypershift
+  optional: true
+  run_if_changed: ^tests/e2e/hypershift/
+  steps:
+    cluster_profile: aws-stackrox
+    test:
+    - as: e2e-hypershift
+      cli: latest
+      commands: export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig && SKIP_MCP_SETUP=1
+        make e2e-hypershift
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      from: src
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 5h0m0s
+    workflow: hypershift-aws-conformance
 - always_run: false
   as: e2e-rosa
   optional: true

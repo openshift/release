@@ -230,9 +230,10 @@ Here is the list of workflows.
 
 The [sandboxed-containers-operator-e2e-azure](./e2e/azure/) workflow implements an entire e2e execution for testing OSC on Azure. It will deploy Openshift on Azure, evoke the [sandboxed-containers-operator-pre](#sandboxed-containers-operator-pre) chain for preparing the environment and finally execute the `test:` and `post:` phases.
 
-The `test:` phase only runs the `sandboxed-containers-operator-testsuites-gate` step
-(it no longer runs `openshift-extended-test`/OTP, so importing the `tests-private`
-image is not required for this workflow). The actual tests run in the `post:` phase
+The `test:` phase runs the shared `sandboxed-containers-operator-test` chain
+(sanity and testsuites-gate). It no longer runs `openshift-extended-test`/OTP,
+and the post-phase wait uses the `cli` image, so importing the `tests-private`
+image is not required for this workflow. The actual suites run in the `post:` phase
 via the `sandboxed-containers-operator-testsuites` chain — see
 [testsuites/README.md](./testsuites/README.md).
 
@@ -258,23 +259,28 @@ any ``test:``-phase step or on a ``TEST_SCENARIOS``/``TEST_FILTERS`` parameter
 * ``workflow-launch``
   * creates OCP cluster and installs OSC via the ``pre:`` chain
   * gives you KUBECONFIG via clusterbot
-  * allows extended reservation via ``SLEEP_DURATION`` timeout, but you have to delete ``launch-cucushift-installer-wait`` pod do return it!
+  * allows extended reservation via ``SLEEP_DURATION`` timeout, but you have to delete the ``launch-sandboxed-containers-operator-post-wait`` pod to return it!
 * ``workflow-test``
   * creates OCP cluster and installs OSC via the ``pre:`` chain
   * clusterbot will not send you KUBECONFIG, but you can obtain it from the build farm secrets
   * allows creating multiple OCP clusters concurrently
-  * allows extended reservation after the testing is done via ``SLEEP_DURATION`` timeout, but you have to delete ``launch-cucushift-installer-wait`` pod do return it!
+  * allows extended reservation after the testing is done via ``SLEEP_DURATION`` timeout, but you have to delete the ``launch-sandboxed-containers-operator-post-wait`` pod to return it!
   * additionally runs the ``post:``-phase ``sandboxed-containers-operator-testsuites``
     chain (see [testsuites/README.md](./testsuites/README.md)) — use the
     ``TESTS_<SUITE_NAME>_ENABLE`` parameters to opt a suite in
 
 **Please always return the clusters as soon as possible, they do not
 use spot-instances so they are costly. With ``SLEEP_DURATION=0``
-(by default) they will be torn down automatically after the testing,
+they will be torn down automatically after the testing,
 with ``SLEEP_DURATION!=0`` you have to wait for the
-``cucushift-installer-wait`` phase and manually delete the
-``launch-cucushift-installer-wait`` pod from the ``main build OCP``.
+``sandboxed-containers-operator-post-wait`` phase and manually delete the
+``launch-sandboxed-containers-operator-post-wait`` pod from the ``main build OCP``.
 The ``done`` command will not interrupt this step!**
+
+The wait step defaults to 0 hours; a job or clusterbot request can override
+it with ``SLEEP_DURATION``.
+These workflows collect must-gather artifacts before the wait and set a 12h10m
+timeout on the wait step.
 
 For azure you don't need to cleanup any extra resources created
 on the cluster, but **you have to cleanup any extra resources
@@ -305,10 +311,10 @@ Workflow overview:
                                                                +------------------------+
                      +----------------------------------+      | testsuites chain       |
                      | install-osc-operator              |  +-> | TESTS_<SUITE>_ENABLE   | -+
-+---------------+    | $ENABLEPEERPODS,$INSTALL_KATA_RPM |  |   +------------------------+  |   +--------------------------+     +-----------------+
-| provision OCP | -->| $KATA_RPM_VERSION,$WORKLOAD_      | -+                                +-> | cucushift-installer-wait | --> | deprovision OCP |
-+---------------+    | TO_TEST,$CATALOG_SOURCE_IMAGE,..  |  |      +------------------+      |   | $SLEEP_DURATION          |     +-----------------+
-                     +----------------------------------+  +----> | clusterbot sleep | -----+    +--------------------------+
++---------------+    | $ENABLEPEERPODS,$INSTALL_KATA_RPM |  |   +------------------------+  |   +-------------+     +---------------------------------------+     +-----------------+
+| provision OCP | -->| $KATA_RPM_VERSION,$WORKLOAD_      | -+                                +-> | must-gather | --> | sandboxed-containers-operator-post-wait | --> | deprovision OCP |
++---------------+    | TO_TEST,$CATALOG_SOURCE_IMAGE,..  |  |      +------------------+      |   +-------------+     | $SLEEP_DURATION                       |     +-----------------+
+                     +----------------------------------+  +----> | clusterbot sleep | -----+                       +---------------------------------------+
                                                                     +------------------+
                                                                      workflow-launch
 ```
@@ -322,8 +328,8 @@ replace the suffix `-azure` with `-aws` to do the same on `aws`:
   * kata - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=0s","KATA_RPM_BUILD_TASK=68341465","ENABLEPEERPODS=false","RUNTIMECLASS=kata","WORKLOAD_TO_TEST=kata"``
   * peer-pods - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=0s","KATA_RPM_BUILD_TASK=68341465","ENABLEPEERPODS=true","RUNTIMECLASS=kata-remote","WORKLOAD_TO_TEST=peer-pods"``
   * coco - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h","KATA_RPM_BUILD_TASK=68341465","ENABLEPEERPODS=true","RUNTIMECLASS=kata-remote","WORKLOAD_TO_TEST=coco"``
-* Get a cluster for ~8h - ``workflow-launch sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h"`` (clusterbot sends you ``KUBECONFIG`` directly; OSC is already installed via the ``pre:`` chain; you need to use ``done`` followed by deleting the ``launch-cucushift-installer-wait`` pod from the ``main build OCP`` to return it)
-* Get a cluster and also run the post-phase test suites for ~8h - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h","ENABLEPEERPODS=true","RUNTIMECLASS=kata-remote","WORKLOAD_TO_TEST=peer-pods","TESTS_OSC_ENABLE=true"`` (clusterbot will **not** notify you nor give you ``KUBECONFIG``, see below how to get access; after the testing you have to delete the ``launch-cucushift-installer-wait`` pod from the ``main build OCP`` to return it)
+* Get a cluster for ~8h - ``workflow-launch sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h"`` (clusterbot sends you ``KUBECONFIG`` directly; OSC is already installed via the ``pre:`` chain; you need to use ``done`` followed by deleting the ``launch-sandboxed-containers-operator-post-wait`` pod from the ``main build OCP`` to return it)
+* Get a cluster and also run the post-phase test suites for ~8h - ``workflow-test sandboxed-containers-operator-e2e-azure 4.18 "SLEEP_DURATION=8h","ENABLEPEERPODS=true","RUNTIMECLASS=kata-remote","WORKLOAD_TO_TEST=peer-pods","TESTS_OSC_ENABLE=true"`` (clusterbot will **not** notify you nor give you ``KUBECONFIG``, see below how to get access; after the testing you have to delete the ``launch-sandboxed-containers-operator-post-wait`` pod from the ``main build OCP`` to return it)
 
 ### AWS Cleanup
 
@@ -356,10 +362,10 @@ Out of the box you get 2.5h by clusterbot which can be returned
 earlier by ``done`` command, **but** if you needed more and specified
 ``SLEEP_DURATION`` parameter the ``done`` command **will not**
 return the cluster. You have to connect to the ``main build OCP``
-and delete the ``launch-cucushift-installer-wait`` pod
+and delete the ``launch-sandboxed-containers-operator-post-wait`` pod
 (if it doesn't exists the clusterbot one might be still
 running. Return via ``done`` first and wait for the
-``launch-cucushift-installer-wait`` one to appear and delete it. Note
+``launch-sandboxed-containers-operator-post-wait`` one to appear and delete it. Note
 deletion takes some time (unless you specify ``--now``).
 
 ### Using workflow-test cluster
@@ -383,7 +389,7 @@ and when the testing is over it will ``sleep XXXh`` afterwards.
 have to poll the job logs for that. To do so open the
 ``job started, you will be notified on completion``
 link by clusterbot and unwrap the ``Build Log``. Search
-for ``Running step launch-cucushift-installer-wait.`` line
+for ``Running step launch-sandboxed-containers-operator-post-wait.`` line
 in there. Once it shows there the cluster is ready and waiting
 for you for the specified amount of time.
 
@@ -410,19 +416,19 @@ the ``testing OCP`` — OSC is installed by the ``pre:`` chain before the
 
 To return this cluster you **can not** use the ``done`` clusterbot
 command (as a matter of fact you can actually request multiple OCPs).
-If you did not specified the ``SLEEP_DURATION`` then you can
-simply leave it and it'll return the cluster right after the
-testing (you can interrupt the testing early by destroying the
+If you set ``SLEEP_DURATION=0s`` then you can simply leave it and
+it'll return the cluster right after the testing (you can interrupt
+the testing early by destroying the
 currently-running post-phase test-suite pod, e.g.
 ``launch-sandboxed-containers-operator-testsuites-osc``, on the
 ``main build OCP``).
 If you specified the ``SLEEP_DURATION`` **you have to interrupt**
-the ``launch-cucushift-installer-wait`` pod, otherwise it will
+the ``launch-sandboxed-containers-operator-post-wait`` pod, otherwise it will
 sleep and hold the cluster for the whole ``SLEEP_DURATION`` period.
 Note there might be other pods as well based on the stage the
 workflow is in, I'd suggest not interrupting the ipi/provisioning/...
-stages but once your cluster reaches ``cucushift-installer-wait``
-stage you should delete the ``launch-cucushift-installer-wait``
+stages but once your cluster reaches ``sandboxed-containers-operator-post-wait``
+stage you should delete the ``launch-sandboxed-containers-operator-post-wait`` pod.
 
 An example for demonstration purposes:
 
@@ -456,21 +462,21 @@ launch-sandboxed-containers-operator-testsuites-osc           2/2     Running   
 release-images-latest                                         0/2     Completed   0          68m
 release-images-latest-cli                                     0/1     Completed   0          69m
 
-# Note there is no launch-cucushift-installer-wait pod running
+# Note there is no launch-sandboxed-containers-operator-post-wait pod running
 # because the workflow is still running the post-phase test-suite
 # chain (only shown here if a TESTS_<SUITE_NAME>_ENABLE was set to
-# "true" — otherwise the chain skips instantly and
-# launch-cucushift-installer-wait appears right away). To return the
+# "true" — otherwise the chain skips instantly). The must-gather step runs
+# before launch-sandboxed-containers-operator-post-wait. To return the
 # cluster early you have to first interrupt the running suite pod,
-# wait for launch-cucushift-installer-wait to appear, and delete it
+# wait for launch-sandboxed-containers-operator-post-wait to appear, and delete it
 # as well
 
 oc delete --now pods/launch-sandboxed-containers-operator-testsuites-osc
 oc get pods
 ...
-launch-cucushift-installer-wait                                2/2     Running     0          12s
+launch-sandboxed-containers-operator-post-wait                  2/2     Running     0          12s
 ...
-oc delete --now pods/launch-cucushift-installer-wait
+oc delete --now pods/launch-sandboxed-containers-operator-post-wait
 
 # new "Running" pods will appear to cleanup and return the cluster
 # DO NOT DELETE THEM!

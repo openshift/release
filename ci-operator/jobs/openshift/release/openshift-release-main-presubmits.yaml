@@ -1053,7 +1053,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20261104-091a7d737
+        image: us-docker.pkg.dev/k8s-infra-prow/images/checkconfig:v20261107-86b2c4908
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1144,6 +1144,7 @@ presubmits:
       - ./ci-operator/config
       - ./ci-operator/jobs
       - ./ci-operator/step-registry
+      - ./core-services/prow/_managed-repos.yaml
       - ./hack/validate-generated-config.sh
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1193,6 +1194,37 @@ presubmits:
           requests:
             cpu: 10m
     trigger: ((?m)^/test generated-dashboards,?(\s+|$))
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/gitops-applicationsets
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - ./clusters/gitops/apps
+      - ./hack/generators/gitops
+      - ./hack/validate-gitops-applicationsets.sh
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-main-gitops-applicationsets
+    rerun_command: /test gitops-applicationsets
+    run_if_changed: ^(clusters/gitops/apps/appset-.*\.yaml|hack/generators/gitops/.*|hack/validate-gitops-applicationsets\.sh)$
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-gitops-applicationsets.sh
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )gitops-applicationsets,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -2028,12 +2060,13 @@ presubmits:
     decoration_config:
       sparse_checkout_files:
       - ./ci-operator/step-registry
+      - ./hack
       - ./hack/validate-registry-commands.sh
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-main-step-registry-shellcheck
     rerun_command: /test step-registry-shellcheck
-    run_if_changed: ^ci-operator/step-registry/.*
+    run_if_changed: ^(ci-operator/step-registry/.*|hack/tests/github-downstream-sync-commands_test\.sh|hack/validate-registry-commands\.sh)$
     spec:
       containers:
       - args:

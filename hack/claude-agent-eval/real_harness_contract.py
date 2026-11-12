@@ -4,6 +4,8 @@
 import argparse
 import contextlib
 import io
+import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -13,9 +15,11 @@ from unittest import mock
 
 import yaml
 
-from eval_config import EvalError, HARNESS_REVISION, resolve_config  # pylint: disable=import-error
-from eval_plan import artifact_name  # pylint: disable=import-error
+from eval_config import (EvalError, REVISION_OVERRIDE, expected_commit_ref,  # pylint: disable=import-error
+                         resolve_config, validate_harness_revision)
+from eval_plan import EvalPlan, artifact_name  # pylint: disable=import-error
 import eval_regression  # pylint: disable=import-error
+from manifest_runner import normalize_recorded_path, planned_cases  # pylint: disable=import-error
 
 
 class RealHarnessContractTests(unittest.TestCase):
@@ -89,6 +93,64 @@ class RealHarnessContractTests(unittest.TestCase):
         self.assertEqual(resolved.settings["thresholds"]["quality"]["min_pass_rate"], 0.9)
         self.assertEqual(resolved.dataset_path, str((self.repo / "evals/cases").resolve()))
         self.assertEqual(resolved.config_chain, ("evals/plain.yaml",))
+
+    def harness_python(self, *args, code=None):
+        """Run the pinned harness's own scripts from the consumer root, as the skill does."""
+        command = [sys.executable, *(["-c", code] if code else args)]
+        result = subprocess.run(command, cwd=self.repo, check=False, capture_output=True,
+                                text=True, timeout=120)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return result.stdout
+
+    def test_run_result_records_the_identity_the_runner_verifies(self):
+        _, overlay = self.profile_chain()
+        overlay.write_text(overlay.read_text() + "execution: {skill: 'plugin:skill', arguments: x}\n",
+                           encoding="utf-8")
+        resolved = resolve_config(self.harness, self.repo, overlay)
+        self.assertEqual(resolved.skill, "plugin:skill")
+        scripts = self.harness / "skills/eval-run/scripts"
+        # The exact fields execute.py's _build_eval_params records for this config.
+        recorded = json.loads(self.harness_python(code=(
+            "import argparse, json, sys\n"
+            f"sys.path[:0] = [{str(scripts)!r}, {str(self.harness)!r}]\n"
+            "import execute\n"
+            "from agent_eval.config import EvalConfig\n"
+            "config = EvalConfig.from_yaml('evals/profiles/ci.yaml')\n"
+            "params = execute._build_eval_params(argparse.Namespace(skill=None, mlflow_experiment=None),\n"
+            "                                    config, 'x', 1.0, 10)\n"
+            "print(json.dumps(params))\n")))
+        self.assertEqual(recorded["execution_mode"], "case")
+        self.assertEqual(recorded["skill"], resolved.skill)
+        self.assertEqual([normalize_recorded_path(self.repo, item) for item in recorded["config_chain"]],
+                         list(resolved.config_chain))
+        # The case-mode aggregate carries the requested model and per-case results by case ID.
+        source = (scripts / "execute.py").read_text(encoding="utf-8")
+        for field in ('"model": model,', '"execution_mode": config.execution.mode,',
+                      '"eval_params": _with_runner_provenance(', '"per_case": case_results,'):
+            self.assertIn(field, source)
+
+    def test_planned_cases_match_the_harness_workspace_selection(self):
+        cases = self.repo / "evals/cases"
+        for case in ("case-a", "case-b", ".hidden"):
+            (cases / case).mkdir()
+            (cases / case / "input.yaml").write_text("input: x\n", encoding="utf-8")
+        (cases / "linked").symlink_to("case-a", target_is_directory=True)
+        (cases / "README.md").write_text("not a case\n", encoding="utf-8")
+        self.put_yaml("evals/plain.yaml", {
+            "execution": {"skill": "plugin:skill", "arguments": "x"},
+            "models": {"skill": "m"}, "dataset": {"path": "cases"}})
+        resolved = resolve_config(self.harness, self.repo, "evals/plain.yaml")
+        plan = EvalPlan("evals/plain.yaml", {}, "m", 1, 1, dataset_path=resolved.dataset_path)
+        workspace = Path(tempfile.gettempdir()) / "agent-eval"
+        script = str(self.harness / "skills/eval-run/scripts/workspace.py")
+        for requested, expected in ((("case-a", "unknown"), {"case-a"}), ((), planned_cases(plan))):
+            run_id = f"contract-{os.getpid()}-{len(requested)}"
+            self.addCleanup(subprocess.run, ["rm", "-rf", str(workspace / run_id)], check=False)
+            self.harness_python(script, "--config", "evals/plain.yaml", "--run-id", run_id,
+                                *(("--cases", *requested) if requested else ()))
+            order = yaml.safe_load((workspace / run_id / "case_order.yaml").read_text(encoding="utf-8"))
+            self.assertEqual({entry["case_id"] for entry in order}, expected)
+        self.assertEqual(planned_cases(plan), {"case-a", "case-b", ".hidden", "linked"})
 
     def test_eval_name_follows_the_harness_scorer_priority(self):
         self.put_yaml("evals/named.yaml", {
@@ -200,9 +262,12 @@ class RealHarnessContractTests(unittest.TestCase):
         )
 
         def score(config):
+            # The runner resolves thresholds once at preflight and hands the
+            # helper that result, so the orchestrator cannot lower them later.
+            thresholds = resolve_config(self.harness, self.repo, config).settings["thresholds"]
             arguments = [
-                "eval_regression.py", "--harness", str(self.harness), "--repo", str(self.repo),
-                "--config", str(config), "--run-dir", str(run_dir),
+                "eval_regression.py", "--harness", str(self.harness),
+                "--run-dir", str(run_dir), "--thresholds", json.dumps(thresholds),
             ]
             with mock.patch.object(sys, "argv", arguments), contextlib.redirect_stdout(io.StringIO()):
                 return eval_regression.main()
@@ -212,13 +277,28 @@ class RealHarnessContractTests(unittest.TestCase):
 
 
 def checked_harness(path):
-    result = subprocess.run(
-        ["git", "-C", str(path), "rev-parse", "HEAD"],
-        check=True, capture_output=True, text=True, timeout=10,
-    )
-    actual = result.stdout.strip()
-    if actual != HARNESS_REVISION:
-        raise ValueError(f"expected harness {HARNESS_REVISION}, got {actual or '<empty>'}")
+    """Require an exact harness revision: the override pin, or any release tag."""
+    revision = os.environ.get(REVISION_OVERRIDE, "").strip()
+    if revision:
+        revision = validate_harness_revision(revision)
+        result = subprocess.run(
+            ["git", "-C", str(path), "rev-parse", expected_commit_ref(revision), "HEAD"],
+            check=False, capture_output=True, text=True, timeout=10,
+        )
+        lines = result.stdout.split()
+        if result.returncode or len(lines) != 2:
+            detail = result.stderr.strip() or result.stdout.strip() or "<no output>"
+            raise ValueError(f"cannot resolve {revision} in {path}: {detail}")
+        if lines[0] != lines[1]:
+            raise ValueError(f"expected harness at {revision} ({lines[0]}), got {lines[1]}")
+    else:
+        described = subprocess.run(
+            ["git", "-C", str(path), "describe", "--tags", "--exact-match", "HEAD"],
+            check=False, capture_output=True, text=True, timeout=10,
+        )
+        if described.returncode or not described.stdout.strip():
+            raise ValueError(f"{path} is not checked out at an exact release tag; "
+                             "pass a release tag checkout, not a moving branch")
     if not (path / "agent_eval/config.py").is_file():
         raise ValueError(f"{path} does not contain agent_eval/config.py")
     return path

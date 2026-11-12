@@ -1,5 +1,9 @@
-"""Offline tests of manifest behavior and the actual Prow shell entry point."""
+"""Offline tests of manifest behavior and the actual Prow shell entry point."""  # pylint: disable=too-many-lines
 
+import atexit
+import copy
+import functools
+import hashlib
 import importlib.util
 import json
 import os
@@ -31,18 +35,39 @@ def load_sibling(name):
 
 
 load_sibling("eval_plan")
+changes = load_sibling("eval_changes")
 config_bridge = load_sibling("eval_config")
 report = load_sibling("eval_report")
 runner = load_sibling("manifest_runner")
 sync_commands = load_sibling("sync_commands")
+TESTING = Path(__file__).resolve().with_name("testing")
+_fake_spec = importlib.util.spec_from_file_location("fake_github", TESTING / "fake_github.py")
+assert _fake_spec and _fake_spec.loader
+fake_github = importlib.util.module_from_spec(_fake_spec)
+_fake_spec.loader.exec_module(fake_github)
+ORG, REPO, PULL = "openshift-eng", "example", 7
+GIT_STATUS = {"A": "added", "D": "removed", "M": "modified", "R": "renamed", "C": "copied", "T": "changed"}
+
+
+def isolated_git_env(env):
+    """Keep fixture Git off the host's config, e.g. a developer's commit signing or hooks.
+
+    GIT_CONFIG_GLOBAL replaces both ~/.gitconfig and $XDG_CONFIG_HOME/git/config.
+    """
+    env = {key: value for key, value in env.items() if not key.startswith("GIT_CONFIG")}
+    return {**env, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
 
 
 FAKE_GIT = r'''
 import os, pathlib, sys
 args = sys.argv[1:]
-if args[0] == "init":
+if "clone" in args:  # The runner's only clone is the harness release.
     with open(os.environ["CALLS"], "a") as out:
-        out.write('harness-init\n')
+        out.write('harness-clone\n')
+    status = int(os.environ.get("CLONE_EXIT", "0"))
+    if status:
+        print('fake harness clone failed', file=sys.stderr)
+        sys.exit(status)
     dest = pathlib.Path(args[-1])
     dest.mkdir(parents=True)
     if not os.environ.get("NO_CONFIG_API"):
@@ -52,21 +77,22 @@ if args[0] == "init":
         (package / "config.py").write_text("""from pathlib import Path
 import os, time
 class EvalConfig:
-    def __init__(self, path, raw):
+    def __init__(self, raw, chain):  # Paths resolve from the chain root, as in the harness.
         self.models = type('Models', (), {'skill': (raw.get('models') or {}).get('skill')})()
         self.thresholds = raw.get('thresholds', {})
         self.dataset = type('Dataset', (), {'path': (raw.get('dataset') or {}).get('path', '')})()
-        self.base = Path(path).resolve().parent
-        self.raw, self.stem = raw, Path(path).stem
+        self.base = Path(chain[0]).parent
+        self.raw, self.stem = raw, Path(chain[0]).stem
+    def resolve_skill(self):
+        return (self.raw.get('execution') or {}).get('skill') or self.raw.get('skill') or None
     def eval_name(self):  # Same priority as the harness: skill under test, then name, then stem.
-        return ((self.raw.get('execution') or {}).get('skill') or self.raw.get('skill')
-                or self.raw.get('name') or self.stem)
+        return self.resolve_skill() or self.raw.get('name') or self.stem
     def resolve_path(self, value):
         path = Path(value)
         return path if path.is_absolute() else self.base / path
     @classmethod
     def from_yaml(cls, path):
-        return cls(path, load_raw(path)[0])
+        return cls(*load_raw(path))
 def load_raw(path):
     import yaml
     time.sleep(float(os.environ.get('RESOLVER_SLEEP', '0')))
@@ -74,7 +100,10 @@ def load_raw(path):
     raw = yaml.safe_load(path.read_text()) or {}
     if not isinstance(raw, dict):
         raise ValueError('config must be a mapping')
-    return raw, [str(path)]
+    if 'extends' not in raw:
+        return raw, [str(path)]
+    merged, chain = load_raw(path.parent / raw.pop('extends'))
+    return {**merged, **raw}, [*chain, str(path)]
 """)
     script = dest / "skills/eval-run/scripts/score.py"
     script.parent.mkdir(parents=True)
@@ -87,25 +116,15 @@ def detect_regressions(judges, thresholds):
             for name, limit in thresholds.items()
             if judges[name]['pass_rate'] < limit['min_pass_rate']]
 """)
-    sys.exit(int(os.environ.get("INIT_EXIT", "0")))
-if args[0] == "-C" and args[2] == "remote":
-    with open(os.environ["CALLS"], "a") as out: out.write('harness-remote\n')
     sys.exit(0)
-if args[0] == "-C" and args[2] == "fetch":
-    with open(os.environ["CALLS"], "a") as out: out.write('harness-fetch\n')
-    status = int(os.environ.get("FETCH_EXIT", "0"))
-    if status: print('fake harness fetch failed', file=sys.stderr)
-    sys.exit(status)
-if args[0] == "-C" and args[2] == "checkout":
-    with open(os.environ["CALLS"], "a") as out: out.write('harness-checkout\n')
-    status = int(os.environ.get("CHECKOUT_EXIT", "0"))
-    if status: print('fake harness checkout failed', file=sys.stderr)
-    sys.exit(status)
 if args[0] == "-C" and args[2] == "rev-parse":
     with open(os.environ["CALLS"], "a") as out: out.write('harness-rev-parse\n')
-    print(os.environ["PINNED_REVISION"])
+    print(os.environ["EVAL_HARNESS_REVISION"], os.environ.get("PINNED_HEAD", os.environ["EVAL_HARNESS_REVISION"]), sep="\n")
     sys.exit(0)
-os.execv(os.environ["REAL_GIT"], [os.environ["REAL_GIT"], *sys.argv[1:]])
+# Changed files come from the GitHub API; the runner must not read the checkout's Git.
+with open(os.environ["CALLS"], "a") as out: out.write('unexpected-git ' + ' '.join(args) + '\n')
+print('fake git: unexpected call: ' + ' '.join(args), file=sys.stderr)
+sys.exit(97)
 '''
 
 FAKE_CLAUDE = r'''
@@ -128,22 +147,40 @@ with open(os.environ["CALLS"], "a") as out:
 run_id = flag("--run-id")
 root = pathlib.Path(os.environ.get("AGENT_EVAL_RUNS_DIR", "eval/runs"))
 behavior = json.loads(os.environ.get("BEHAVIORS", "{}" )).get(config, "pass")
-import yaml  # The harness names runs after EvalConfig.eval_name(); a guessed name is never scored.
+import functools, yaml
+from agent_eval.config import EvalConfig, load_raw  # The fake harness checkout on PYTHONPATH.
 raw = yaml.safe_load(pathlib.Path(config).read_text()) or {}
-eval_name = ((raw.get("execution") or {}).get("skill") or raw.get("skill") or raw.get("name")
-             or pathlib.Path(config).stem)
-run = root / ("config-name" if behavior == "wrong_name_only" else eval_name) / run_id
+harness_config = EvalConfig.from_yaml(config)  # Runs are named after its eval_name(), never a guess.
+chain = [os.path.relpath(p) for p in load_raw(config)[1]]  # Recorded relative to the harness's cwd.
+chain = {"substituted_config": [f"tmp/{pathlib.Path(config).stem}-fixed.yaml"],  # An edited copy (CI).
+         "extra_chain_file": ["evals/extra-base.yaml", *chain], "missing_chain_file": chain[1:],
+         "absolute_chain": [os.path.abspath(item) for item in chain]}.get(behavior, chain)
+case_ids = sorted(d.name for d in harness_config.resolve_path(harness_config.dataset.path).iterdir() if d.is_dir())
+# workspace.py's rule: a nonempty --cases keeps matching directories and silently drops unknown IDs.
+case_ids = [case for case in case_ids if not row["cases"] or behavior == "ignore_cases" or case in row["cases"]]
+case_ids = case_ids[:-1] if behavior == "stop_early" else case_ids
+skill = "other:skill" if behavior == "wrong_skill" else harness_config.resolve_skill()
+mode = "batch" if behavior == "batch_mode" else "case"  # Batch runs record no per-case results.
+eval_params = {"execution_mode": mode, "config_chain": chain, **({"skill": skill} if skill else {})}
+run_result = {"exit_code": 1 if behavior == "case_failure" else 0, "execution_mode": mode, "eval_params": eval_params,
+              "model": "other-model" if behavior == "wrong_model" else row["model"],
+              **({} if mode == "batch" else {"per_case": {case: {"exit_code": 0} for case in case_ids}})}
+if behavior.startswith("drop:"):
+    *parents, field = behavior[len("drop:"):].split(".")
+    del functools.reduce(dict.get, parents, run_result)[field]
+run = root / ("config-name" if behavior == "wrong_name_only" else harness_config.eval_name()) / run_id
 run.mkdir(parents=True)
 if behavior == "run_alias":
     alias = root / "config-name" / run_id
     alias.parent.mkdir(parents=True)
     alias.symlink_to(run, target_is_directory=True)
 if behavior != "missing_result":
-    (run / "run_result.json").write_text(json.dumps({"exit_code": 1 if behavior == "case_failure" else 0}))
+    (run / "run_result.json").write_text(json.dumps(run_result))
 if behavior == "tamper_thresholds": pathlib.Path(config).write_text(yaml.safe_dump({**raw, "thresholds": {"quality": {"min_pass_rate": 0.0}}}))
 if behavior != "missing_summary":
     rate = 0.0 if behavior in ("threshold_failure", "tamper_thresholds") else 1.0
-    (run / "summary.yaml").write_text('judges: {quality: {pass_rate: ' + str(rate) + '}}\n')
+    scored = case_ids + ["case-ghost"] if behavior == "summary_mismatch" else case_ids
+    (run / "summary.yaml").write_text(yaml.safe_dump({"judges": {"quality": {"pass_rate": rate}}, "per_case": dict.fromkeys(scored, {})}))
 if behavior == "removed_alias":
     alias = root / "config-name"
     alias.symlink_to(run.parent, target_is_directory=True)
@@ -163,27 +200,49 @@ sys.exit(9 if behavior == "process_failure" else 0)
 '''
 
 
-class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attributes
+class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attributes,too-many-public-methods
     commands = sync_commands.COMMANDS
+
+    @staticmethod
+    @functools.lru_cache(maxsize=None)
+    def base_repository():
+        """Build the committed base repository once; each test copies it.
+
+        Copying skips git init/config/add/commit per test, and every copy keeps
+        the same base SHA. Built on first use, so a Fixture constructed directly
+        gets it too.
+        """
+        template = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
+        atexit.register(template.cleanup)
+        builder = Fixture()  # Only the repository helpers are used.
+        builder.repo = Path(template.name).resolve() / "repo"
+        builder.repo.mkdir()
+        builder.real_git = shutil.which("git")
+        builder.git("init", "-q")
+        builder.git("config", "user.name", "Eval Test")
+        builder.git("config", "user.email", "eval-test@example.invalid")
+        builder.put("skills/foo/SKILL.md", "old skill")
+        builder.put("skills/foobar/SKILL.md", "other skill")
+        builder.put("docs/guide.md", "old docs")
+        entry = builder.make_entry("evals/eval-foo.yaml")
+        builder.write_manifest([entry])
+        builder.commit()
+        return builder.repo, builder.git("rev-parse", "HEAD").strip(), entry
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()  # pylint: disable=consider-using-with
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name).resolve()
+        # Fixture Git runs with this process's environment.
+        environ = mock.patch.dict(os.environ, isolated_git_env(os.environ), clear=True)
+        environ.start()
+        self.addCleanup(environ.stop)
         self.repo = self.root / "repo"
-        self.repo.mkdir()
+        base_repo, self.base, entry = self.base_repository()
+        shutil.copytree(base_repo, self.repo, symlinks=True)
+        self.entry = copy.deepcopy(entry)
         self.artifacts = self.root / "artifacts"
         self.real_git = shutil.which("git")
-        self.git("init", "-q")
-        self.git("config", "user.name", "Eval Test")
-        self.git("config", "user.email", "eval-test@example.invalid")
-        self.put("skills/foo/SKILL.md", "old skill")
-        self.put("skills/foobar/SKILL.md", "other skill")
-        self.put("docs/guide.md", "old docs")
-        self.entry = self.make_entry("evals/eval-foo.yaml")
-        self.write_manifest([self.entry])
-        self.commit()
-        self.base = self.git("rev-parse", "HEAD").strip()
         self.bin = self.root / "bin"
         self.bin.mkdir()
         for name, source in (("git", FAKE_GIT), ("claude", FAKE_CLAUDE)):
@@ -195,12 +254,17 @@ class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attribute
         self.put_executable("python3", f"import os, sys\nos.execv({sys.executable!r}, "
                             f"[{sys.executable!r}, *sys.argv[1:]])\n")
         self.calls_path = self.root / "calls"
+        self.github_log = self.root / "github-requests.jsonl"
         self.last_result = None
+        self.github_fixture_override = None
+        self.fake_api = None
+        self.github_responses = {}
         self.env = {
+            **isolated_git_env({}),
             "PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}",
-            "HOME": str(self.root), "REAL_GIT": self.real_git,
+            "HOME": str(self.root),
             "CALLS": str(self.calls_path),
-            "PINNED_REVISION": config_bridge.HARNESS_REVISION,
+            "EVAL_HARNESS_REVISION": "v1.0.0",
             "EVAL_WORKDIR": str(self.repo), "PULL_BASE_SHA": self.base,
             "ARTIFACT_DIR": str(self.artifacts), "JOB_TYPE": "presubmit",
             "EVAL_CONFIG": "eval.yaml", "EVAL_DISCOVER": "",
@@ -214,32 +278,6 @@ class Fixture(unittest.TestCase):  # pylint: disable=too-many-instance-attribute
         target.write_text(f"#!{sys.executable}\n" + source)
         target.chmod(0o755)
 
-    def make_fake_harness(self):
-        root = self.root / "standalone-harness"
-        package = root / "agent_eval"
-        package.mkdir(parents=True)
-        (package / "__init__.py").write_text("")
-        (package / "config.py").write_text("""from pathlib import Path
-from types import SimpleNamespace
-import yaml
-def load_raw(path):
-    path = Path(path).resolve()
-    return yaml.safe_load(path.read_text()) or {}, [str(path)]
-class EvalConfig:
-    @classmethod
-    def from_yaml(cls, path):
-        raw, _ = load_raw(path)
-        value = cls()
-        value.models = SimpleNamespace(skill=(raw.get('models') or {}).get('skill'))
-        value.thresholds = raw.get('thresholds', {})
-        value.dataset = SimpleNamespace(path=(raw.get('dataset') or {}).get('path', ''))
-        value.resolve_path = lambda path: Path(path)
-        value.eval_name = lambda: ((raw.get('execution') or {}).get('skill') or raw.get('skill')
-                                   or raw.get('name') or Path(path).stem)
-        return value
-""")
-        return root
-
     def put(self, path, text):
         target = self.repo / path
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -248,20 +286,35 @@ class EvalConfig:
 
     def git(self, *args):
         return subprocess.run([self.real_git, *args], cwd=self.repo, check=True,
-                              capture_output=True, text=True).stdout
+                              capture_output=True, text=True, env=isolated_git_env(os.environ)).stdout
 
     def commit(self):
         self.git("add", ".")
         self.git("commit", "-qm", "fixture")
 
     def make_entry(self, config, **settings):
+        stem = Path(config).stem  # Each eval gets a one-case dataset, as real evals have.
         self.put(config, yaml.safe_dump({
             "name": "example", "skill": "example:foo", "models": {"skill": "model-from-eval"},
             "execution": {"timeout": 17, "max_budget_usd": 0.25},
+            "dataset": {"path": f"cases/{stem}"},
             "thresholds": {"quality": {"min_pass_rate": 1.0}},
         }))
+        self.put((Path(config).parent / "cases" / stem / "case-001/input.yaml").as_posix(), "input: x\n")
         return {"config": config, "run": "pr", "parallelism": 5, "max_turns": 2500,
                 "triggers": ["skills/foo/"], **settings}
+
+    def enable_case_subsets(self):  # Changed case directories can then select a --cases subset.
+        self.entry["eval_cases_dir"] = "evals/cases/foo/"
+        self.entry["triggers"] += ["evals/cases/foo/", "evals/eval-foo.yaml", "evals.yaml"]
+        config = yaml.safe_load((self.repo / self.entry["config"]).read_text())
+        config["dataset"] = {"path": "cases/foo"}
+        self.put(self.entry["config"], yaml.safe_dump(config))
+        for case in ("case-001", "case-002", "case-003"):
+            self.put(f"evals/cases/foo/{case}/input.yaml", "input: original\n")
+        self.write_manifest([self.entry])
+        self.commit()
+        self.env["PULL_BASE_SHA"] = self.base = self.git("rev-parse", "HEAD").strip()
 
     def write_manifest(self, entries):
         self.put("evals.yaml", yaml.safe_dump({"evals": entries}))
@@ -270,10 +323,79 @@ class EvalConfig:
         self.put("skills/foo/SKILL.md", "new skill")
         self.commit()
 
+    def head(self):
+        return self.git("rev-parse", "HEAD").strip()
+
+    def pull_files(self, base):
+        """GitHub's file list for base...HEAD: what GET /pulls/{n}/files reports."""
+        if not base:
+            return []
+        fields = self.git("diff", "--name-status", "-z", "-M", f"{base}...HEAD", "--").split("\0")
+        files = []
+        while fields and fields[0]:
+            code = fields.pop(0)
+            entry = {"status": GIT_STATUS[code[0]]}
+            if code[0] in "RC":
+                entry["previous_filename"] = fields.pop(0)
+            entry["filename"] = fields.pop(0)
+            files.append(entry)
+        return files
+
+    def github_fixture(self, base):
+        if self.github_fixture_override is not None:
+            return self.github_fixture_override
+        return {"pulls": {f"{ORG}/{REPO}#{PULL}": {"head_sha": self.head(), "files": self.pull_files(base)}},
+                "responses": copy.deepcopy(self.github_responses)}
+
+    def job_spec(self, job_type="presubmit", pulls=None):
+        pulls = pulls if pulls is not None else [{"number": PULL, "sha": self.head(), "author": "dev"}]
+        return json.dumps({"type": job_type, "job": "pull-ci-openshift-eng-example-main-eval-runner",
+                           "buildid": "1", "prowjobid": "id",
+                           "refs": {"org": ORG, "repo": REPO, "base_ref": "main", "base_sha": self.env["PULL_BASE_SHA"],
+                                    "pulls": pulls}})
+
+    def prow_env(self, overrides=None):
+        """Prow's job environment for the current head; JOB_SPEC is generated unless given."""
+        env = {**self.env, **(overrides or {})}
+        if "JOB_SPEC" not in env:
+            env["JOB_SPEC"] = self.job_spec(env.get("JOB_TYPE") or "presubmit")
+        return env
+
+    def step_env(self, **overrides):
+        """The entry point's environment, with the fake GitHub API on PYTHONPATH."""
+        env = self.prow_env(overrides)
+        fixture = self.root / "github-fixture.json"
+        fixture.write_text(json.dumps(self.github_fixture(env.get("PULL_BASE_SHA", ""))))
+        return {**env, "EVAL_TEST_GITHUB_FIXTURE": str(fixture), "EVAL_TEST_GITHUB_LOG": str(self.github_log),
+                "PYTHONPATH": str(TESTING)}
+
+    def github(self, **kwargs):
+        """An API client reading the fixture through an injected fake opener."""
+        self.fake_api = fake_github.FakeGitHub(self.github_fixture(self.env.get("PULL_BASE_SHA", "")))
+        return changes.GitHubAPI("", opener=self.fake_api, sleep=lambda seconds: None, **kwargs)
+
+    def select_entries(self, **overrides):
+        return runner.select_manifest_entries(self.repo, self.prow_env(overrides), github=self.github())
+
+    def github_requests(self):
+        return ([json.loads(line) for line in self.github_log.read_text().splitlines()]
+                if self.github_log.exists() else [])
+
     def run_step(self, *, cwd=None, **overrides):
-        result = subprocess.run(["bash", str(self.commands)], cwd=cwd or self.root,
-                                env={**self.env, **overrides}, capture_output=True,
-                                text=True, timeout=20, check=False)
+        """Run the generated entry point with no .git in the workdir, as in Prow."""
+        env = self.step_env(**overrides)
+        hidden = self.root / "hidden.git"
+        git_dir = self.repo / ".git"
+        moved = git_dir.exists()
+        if moved:
+            git_dir.rename(hidden)
+        try:
+            result = subprocess.run(["bash", str(self.commands)], cwd=cwd or self.root,
+                                    env=env, capture_output=True,
+                                    text=True, timeout=20, check=False)
+        finally:
+            if moved:
+                hidden.rename(git_dir)
         self.last_result = result
         return result
 
@@ -326,7 +448,7 @@ class WorkdirTests(Fixture):
         self.assertEqual(self.junit().attrib["failures"], "1")
 
 
-class SelectionTests(Fixture):
+class SelectionTests(Fixture):  # pylint: disable=too-many-public-methods
     def test_no_match_has_no_clone_setup_or_claude_calls(self):
         setup = self.put("setup.sh", "touch should-not-exist\n")
         self.entry["setup_script"] = str(setup.relative_to(self.repo))
@@ -358,8 +480,8 @@ class SelectionTests(Fixture):
         self.assertEqual((self.repo / self.entry["config"]).read_bytes(), original)
         self.assertIn("regression", self.calls())
         install_log = (self.artifacts / "runner/harness-install.log").read_text()
-        self.assertIn(f"Expected harness revision: {config_bridge.HARNESS_REVISION}", install_log)
-        self.assertIn(f"Verified harness revision: {config_bridge.HARNESS_REVISION}", install_log)
+        self.assertIn(f"Expected harness revision: {self.env['EVAL_HARNESS_REVISION']}", install_log)
+        self.assertIn(f"Verified harness revision: {self.env['EVAL_HARNESS_REVISION']}", install_log)
         summary = json.loads((self.artifacts / "evals-summary.json").read_text())
         self.assertIn("config-resolution.log", summary["evals"][0]["artifacts"])
 
@@ -422,13 +544,158 @@ class SelectionTests(Fixture):
         self.assertEqual(self.run_step(PULL_BASE_SHA="").returncode, 0)
         self.assertEqual(self.calls(), [])
 
-    def test_bad_or_unavailable_base_sha_fails_without_model_calls(self):
-        for base in ("", "not-a-sha", "1" * 40):
-            with self.subTest(base=base):
-                result = self.run_step(PULL_BASE_SHA=base)
-                self.assertNotEqual(result.returncode, 0)
+    def test_missing_or_invalid_job_spec_fails_before_any_calls(self):
+        spec = json.loads(self.job_spec())
+        refs = spec["refs"]
+        for job_spec in ("", "not json", "[]", json.dumps({**spec, "type": "batch"}),
+                         json.dumps({**spec, "refs": None}), json.dumps({**spec, "refs": {**refs, "pulls": []}}),
+                         json.dumps({**spec, "refs": {**refs, "pulls": [{"number": PULL, "sha": "abc"}]}})):
+            with self.subTest(job_spec=job_spec[:40]):
+                self.calls_path.unlink(missing_ok=True)
+                result = self.run_step(JOB_SPEC=job_spec)
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("JOB_SPEC", result.stdout)
                 self.assertEqual(self.junit().attrib["failures"], "1")
                 self.assertEqual(self.calls(), [])
+
+    def test_unreadable_pull_request_is_an_error_before_harness_or_model_calls(self):
+        self.change_skill()
+        self.github_fixture_override = {"pulls": {}}  # GitHub hides private repositories behind 404.
+        result = self.run_step()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("HTTP 404", result.stdout)
+        self.assertIn("GITHUB_TOKEN_PATH", result.stdout)
+        self.assertIn("not a no-op", result.stdout)
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(self.junit().attrib["failures"], "1")
+
+    def test_moved_pull_request_head_is_an_error_before_harness_or_model_calls(self):
+        tested = self.head()
+        self.change_skill()  # GitHub now reports a newer head than the job tested.
+        result = self.run_step(JOB_SPEC=self.job_spec(pulls=[{"number": PULL, "sha": tested}]))
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("changed after the job started", result.stdout)
+        self.assertEqual(self.calls(), [])
+
+    def test_retargeted_pull_request_base_is_an_error_before_harness_or_model_calls(self):
+        self.change_skill()
+        fixture = self.github_fixture(self.base)  # Same head the job tested, new base branch.
+        fixture["pulls"][f"{ORG}/{REPO}#{PULL}"]["base_ref"] = "release-4.22"
+        self.github_fixture_override = fixture
+        result = self.run_step()
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("retargeted after the job started", result.stdout)
+        self.assertEqual(self.calls(), [])
+        failure = self.junit().find("testcase/failure").attrib["message"]
+        self.assertIn("retargeted after the job started", failure)
+
+    def test_rename_and_deletion_match_original_path(self):
+        self.git("mv", "skills/foo/SKILL.md", "docs/moved.md")
+        self.commit()
+        _, files = self.select_entries()  # A rename lists both paths, like --no-renames.
+        self.assertEqual(sorted(files), ["docs/moved.md", "skills/foo/SKILL.md"])
+        result = self.run_step()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MATCH evals/eval-foo.yaml: 'skills/foo/SKILL.md'", result.stdout)
+        shutil.rmtree(self.repo / "eval")  # Fake harness output is not part of the next commit.
+        self.env["PULL_BASE_SHA"] = self.base = self.head()
+        self.git("rm", "-q", "docs/moved.md")
+        self.commit()
+        self.assertEqual(self.select_entries()[1], ["docs/moved.md"])  # Deletions count.
+        self.entry["triggers"] = ["docs/moved.md"]
+        self.write_manifest([self.entry])
+        self.git("add", "evals.yaml")
+        self.git("commit", "-qm", "trigger on the deleted path")
+        self.calls_path.unlink(missing_ok=True)
+        result = self.run_step()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MATCH evals/eval-foo.yaml: 'docs/moved.md'", result.stdout)
+        self.assertEqual(len(self.claude_calls()), 1)
+
+    def test_paths_with_spaces_and_newlines_survive(self):
+        self.put("skills/foo/space and\nnewline.md", "test")
+        self.commit()
+        self.assertIn("skills/foo/space and\nnewline.md", self.select_entries()[1])
+
+    def test_entry_point_needs_no_git_metadata(self):
+        self.change_skill()
+        self.github_fixture_override = self.github_fixture(self.base)
+        job_spec = self.job_spec()
+        shutil.rmtree(self.repo / ".git")
+        result = self.run_step(JOB_SPEC=job_spec)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(len(self.claude_calls()), 1)
+        self.assertFalse(any(call.startswith("unexpected-git") for call in self.calls()))
+
+    def test_rehearsal_never_diffs_the_release_pull_request(self):
+        self.change_skill()
+        fixture = self.github_fixture(self.base)  # The release PR would match triggers if used.
+        fixture["pulls"]["openshift/release#88000"] = {
+            "head_sha": "a" * 40, "files": [{"filename": "skills/foo/SKILL.md", "status": "modified"}]}
+        self.github_fixture_override = fixture
+        job_spec = json.dumps({
+            "type": "presubmit", "job": "rehearse-88000-pull-ci-openshift-eng-example-main-eval-runner",
+            "refs": {"org": "openshift", "repo": "release", "base_ref": "main", "base_sha": "b" * 40,
+                     "pulls": [{"number": 88000, "sha": "a" * 40}]},
+            "extra_refs": [{"org": ORG, "repo": REPO, "base_ref": "main", "workdir": True}]})
+        result = self.run_step(JOB_SPEC=job_spec)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"NO-PR: the checkout under test is {ORG}/{REPO}@main", result.stdout)
+        self.assertIn("openshift/release#88000", result.stdout)
+        self.assertEqual(self.github_requests(), [])
+        self.assertEqual(self.calls(), [])
+        self.assertEqual(self.junit().attrib["tests"], "0")
+
+    def batch_fixture(self, second_head="c" * 40):
+        self.github_fixture_override = {"pulls": {
+            f"{ORG}/{REPO}#7": {"head_sha": "b" * 40, "files": [{"filename": "docs/guide.md", "status": "modified"}]},
+            f"{ORG}/{REPO}#8": {"head_sha": second_head,
+                                "files": [{"filename": "skills/foo/SKILL.md", "status": "modified"}]}}}
+        return self.job_spec("batch", [{"number": 7, "sha": "b" * 40}, {"number": 8, "sha": "c" * 40}])
+
+    def test_batch_selects_the_union_of_every_pull(self):
+        result = self.run_step(JOB_TYPE="batch", JOB_SPEC=self.batch_fixture())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("MATCH evals/eval-foo.yaml: 'skills/foo/SKILL.md'", result.stdout)
+        self.assertEqual(len(self.claude_calls()), 1)
+        listed = {request["url"].split("?")[0] for request in self.github_requests() if "/files" in request["url"]}
+        self.assertEqual(listed, {f"https://api.github.com/repos/{ORG}/{REPO}/pulls/{n}/files" for n in (7, 8)})
+
+    def test_batch_head_guard_applies_to_every_pull(self):
+        result = self.run_step(JOB_TYPE="batch", JOB_SPEC=self.batch_fixture(second_head="d" * 40))
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn(f"{ORG}/{REPO}#8 head is", result.stdout)
+        self.assertEqual(self.calls(), [])
+
+    def test_token_authenticates_api_calls_and_is_never_printed(self):
+        token = self.root / "github-token"
+        token.write_text("test-token-value\n")
+        self.put("docs/guide.md", "new docs")
+        self.commit()
+        result = self.run_step(GITHUB_TOKEN_PATH=str(token))
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        requests = self.github_requests()
+        self.assertTrue(requests)
+        self.assertEqual({(request["authorization"], request["authorization_sha256"]) for request in requests},
+                         {("Bearer <redacted>", hashlib.sha256(b"Bearer test-token-value").hexdigest())})
+        self.assertNotIn("test-token-value", self.github_log.read_text())
+        self.assertNotIn("test-token-value", result.stdout + result.stderr)
+        self.assertNotIn("test-token-value", (self.artifacts / "junit_claude-eval.xml").read_text())
+
+    def test_test_api_answers_the_harness_release_lookup(self):
+        self.change_skill()  # Unscripted, the test sitecustomize passes this URL through to urllib.
+        self.github_responses = {"/repos/fullsend-ai/agent-eval-harness/releases/latest": [
+            {"body": {"tag_name": "v1.0.0"}}]}
+        self.run_step(EVAL_HARNESS_REVISION="")
+        install_log = (self.artifacts / "runner/harness-install.log").read_text()
+        self.assertIn("Expected harness revision: v1.0.0 (latest release)", install_log)
+        self.assertIn("https://api.github.com/repos/fullsend-ai/agent-eval-harness/releases/latest",
+                      [request["url"] for request in self.github_requests()])
+
+    def test_manifest_without_pr_entries_makes_no_api_calls(self):
+        self.write_manifest([])
+        self.assertEqual(self.run_step(JOB_SPEC="").returncode, 0)
+        self.assertEqual(self.github_requests(), [])
 
     def test_manifest_edit_is_explicitly_triggered(self):
         self.entry["triggers"].append("evals.yaml")
@@ -437,23 +704,7 @@ class SelectionTests(Fixture):
         self.assertEqual(self.run_step().returncode, 0)
         self.assertEqual(len(self.claude_calls()), 1)
 
-    def test_rename_and_deletion_match_original_path(self):
-        self.git("mv", "skills/foo/SKILL.md", "docs/moved.md")
-        self.commit()
-        files = runner.changed_files(self.repo, self.base)
-        self.assertIn("skills/foo/SKILL.md", files)
-        self.assertIn("docs/moved.md", files)
-        self.assertEqual(len(runner.select_evals(runner.load_manifest(self.repo), files)), 1)
-        self.git("rm", "skills/foobar/SKILL.md")
-        self.commit()
-        self.assertIn("skills/foobar/SKILL.md", runner.changed_files(self.repo, self.base))
-
-    def test_diff_preserves_spaces_and_newlines(self):
-        self.put("skills/foo/space and\nnewline.md", "test")
-        self.commit()
-        self.assertIn("skills/foo/space and\nnewline.md", runner.changed_files(self.repo, self.base))
-
-    def test_missing_git_metadata_is_failure_not_noop(self):
+    def test_workdir_without_manifest_is_failure_not_noop(self):
         result = self.run_step(EVAL_WORKDIR=str(self.repo / "skills"))
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.calls(), [])
@@ -462,18 +713,7 @@ class SelectionTests(Fixture):
 class CaseSelectionTests(Fixture):
     def setUp(self):
         super().setUp()
-        self.entry["eval_cases_dir"] = "evals/cases/foo/"
-        self.entry["triggers"] += ["evals/cases/foo/", "evals/eval-foo.yaml", "evals.yaml"]
-        config = yaml.safe_load((self.repo / self.entry["config"]).read_text())
-        config["dataset"] = {"path": "cases/foo"}
-        self.put(self.entry["config"], yaml.safe_dump(config))
-        self.put("evals/cases/foo/case-001/input.yaml", "input: original\n")
-        self.put("evals/cases/foo/case-002/input.yaml", "input: original\n")
-        self.put("evals/cases/foo/case-003/input.yaml", "input: original\n")
-        self.write_manifest([self.entry])
-        self.commit()
-        self.base = self.git("rev-parse", "HEAD").strip()
-        self.env["PULL_BASE_SHA"] = self.base
+        self.enable_case_subsets()
 
     def test_sibling_trigger_path_does_not_expand_case_subset(self):
         self.entry["triggers"] = ["skills/foo", "evals/cases/foo"]
@@ -692,7 +932,7 @@ class ExecutionTests(Fixture):
         self.write_manifest([self.entry, other])
         self.change_skill()
         self.artifacts.mkdir()
-        entries, files = runner.select_manifest_entries(self.repo, self.env)
+        entries, files = self.select_entries()
         original_collect, original_archive = runner.collect_result, runner.archive
 
         def fail_collect(directory, artifacts):
@@ -769,7 +1009,7 @@ class ExecutionTests(Fixture):
         bundle_tmp.mkdir()
         self.change_skill()
         result = subprocess.run(["bash", str(standalone)], cwd=self.root,
-                                env={**self.env, "TMPDIR": str(bundle_tmp)},
+                                env={**self.step_env(), "TMPDIR": str(bundle_tmp)},
                                 capture_output=True, text=True, timeout=20, check=False)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertEqual(len(self.claude_calls()), 1)
@@ -780,7 +1020,7 @@ class ExecutionTests(Fixture):
         ready = self.root / "ready"
         bundle_tmp = self.root / "bundles"
         bundle_tmp.mkdir()
-        env = {**self.env, "WAIT_READY": str(ready), "TMPDIR": str(bundle_tmp)}
+        env = {**self.step_env(), "WAIT_READY": str(ready), "TMPDIR": str(bundle_tmp)}
         with subprocess.Popen(["bash", str(sync_commands.COMMANDS)], cwd=self.root,
                               env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                               text=True) as process:
@@ -883,7 +1123,7 @@ class ExecutionTests(Fixture):
         self.assertEqual(self.junit().attrib["failures"], "0")
 
     def test_missing_thresholded_judge_is_failure(self):
-        self.put(self.entry["config"], "models: {skill: model}\nthresholds: {missing: {min_mean: 1}}")
+        self.put(self.entry["config"], "models: {skill: model}\ndataset: {path: cases/eval-foo}\nthresholds: {missing: {min_mean: 1}}")
         self.change_skill()
         self.assertNotEqual(self.run_step().returncode, 0)
         self.assertIn("missing thresholded judge", self.last_result.stdout)
@@ -903,7 +1143,7 @@ class ExecutionTests(Fixture):
     def test_step_deadline_does_not_silently_drop_evals(self):
         self.artifacts.mkdir()
         self.change_skill()
-        entries, files = runner.select_manifest_entries(self.repo, self.env)
+        entries, files = self.select_entries()
         with mock.patch.object(runner, "STEP_TIMEOUT", -1), mock.patch.object(runner, "command", return_value=0):
             self.assertEqual(runner.run_evals(self.repo, entries, files, self.artifacts, self.env), 1)
         self.assertEqual(self.junit().attrib["failures"], "1")

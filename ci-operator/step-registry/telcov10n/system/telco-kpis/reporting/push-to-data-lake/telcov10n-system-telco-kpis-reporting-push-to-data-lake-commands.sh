@@ -67,18 +67,16 @@ main() {
     # Register artifact gathering handler (always runs, even on playbook failure)
     _gather_artifacts() {
         echo "Collecting artifacts..."
-        mkdir -p "${ARTIFACT_DIR}"
+        mkdir -p "${ARTIFACT_DIR}" "${SHARED_DIR}"
 
-        # Playbook writes spoke-specific filename, copy to generic name for downstream consumers
+        # The playbook writes a spoke-specific file into ARTIFACT_DIR, which
+        # Prow archives as-is. Publish it to SHARED_DIR under the same
+        # spoke-specific name so parallel spokes cannot overwrite each other.
         local spoke_result_file="${ARTIFACT_DIR:-/artifacts}/push-to-data-lake-result-for-${SPOKE_CLUSTER}.json"
+        local shared_result_file="${SHARED_DIR}/push-to-data-lake-result-for-${SPOKE_CLUSTER}.json"
         if [ -f "${spoke_result_file}" ]; then
-            # Copy to ARTIFACT_DIR as generic name (Prow collects this)
-            cp "${spoke_result_file}" "${ARTIFACT_DIR}/push-to-data-lake-result.json" || true
-
-            # Copy to SHARED_DIR as generic name (for downstream steps)
-            cp "${spoke_result_file}" "${SHARED_DIR}/push-to-data-lake-result.json" || true
-
-            echo "✓ Artifacts collected to ${ARTIFACT_DIR}/ and ${SHARED_DIR}/"
+            cp "${spoke_result_file}" "${shared_result_file}" || true
+            echo "✓ Result copied to ${shared_result_file}"
         else
             echo "WARNING: Result JSON not found at ${spoke_result_file}"
         fi
@@ -152,7 +150,7 @@ main() {
     # Parse and check results (artifacts already collected by cleanup handler)
     # Note: Search URL and error details are in the JSON artifact, not logged to avoid
     # exposing internal hostnames or sensitive payload data
-    RESULT_JSON="${ARTIFACT_DIR}/push-to-data-lake-result.json"
+    RESULT_JSON="${SHARED_DIR}/push-to-data-lake-result-for-${SPOKE_CLUSTER}.json"
     if [ ! -f "${RESULT_JSON}" ]; then
         echo "ERROR: Push result artifact not found; push status is unknown"
         [[ "${DATA_LAKE_DESTINATION}" == "splunk" ]] && return 1
@@ -161,10 +159,10 @@ main() {
 
         if [[ "${SUCCESS}" == "true" ]]; then
             echo "✓ Push to ${DATA_LAKE_DESTINATION} completed successfully"
-            echo "  (Search URL available in push-to-data-lake-result.json artifact)"
+            echo "  (Search URL available in push-to-data-lake-result-for-${SPOKE_CLUSTER}.json artifact)"
         else
             echo "WARNING: Push to ${DATA_LAKE_DESTINATION} was not successful"
-            echo "  (Error details available in push-to-data-lake-result.json artifact)"
+            echo "  (Error details available in push-to-data-lake-result-for-${SPOKE_CLUSTER}.json artifact)"
 
             # Only fail for Splunk, SumoLogic failure is expected (stub)
             if [[ "${DATA_LAKE_DESTINATION}" == "splunk" ]]; then

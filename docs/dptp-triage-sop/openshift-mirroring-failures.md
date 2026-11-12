@@ -6,7 +6,7 @@
 |-------|-------|
 | **Alert** | `openshift-mirroring-failures` |
 | **Cluster** | `app.ci` |
-| **Rules** | [`ci-alerts_prometheusrule.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — group `openshift-mirroring-failures` |
+| **Rules** | [`ci-alerts_prometheusrule.yaml`](../../clusters/core-ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — group `openshift-mirroring-failures` |
 | **Severity** | `critical` |
 
 This SOP covers the `openshift-mirroring-failures` alert on `app.ci`.

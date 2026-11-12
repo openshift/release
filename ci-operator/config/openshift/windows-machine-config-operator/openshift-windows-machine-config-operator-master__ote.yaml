@@ -5,7 +5,7 @@ images:
   items:
   - dockerfile_path: build/Dockerfile.ci
     to: windows-machine-config-operator-test
-  skip_if_only_changed: ^(?:ote|docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
+  skip_if_only_changed: ^(?:docs|\.github|\.tekton)/|\.md$|^(?:\.gitignore|renovate\.json|OWNERS|PROJECT|LICENSE|Containerfile|Containerfile.bundle)$
 releases:
   initial:
     integration:
@@ -36,6 +36,51 @@ resources:
       cpu: 100m
       memory: 10Gi
 tests:
+- always_run: false
+  as: vsphere-disconnected-e2e-ote
+  optional: true
+  pipeline_run_if_changed: ^ote/
+  steps:
+    cluster_profile: vsphere-dis-2
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      ENABLE_IDMS: "yes"
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      MIRROR_BIN: oc-mirror
+      PAUSE_IMAGE_ORG: test-org
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: ChkUpgrade\|ConnectedOnly\|Disruptive\|Serial\|\[node-proxy\]\|\[tls-adherence\]
+      TEST_SUITE: windows-machine-config-operator/smokerun
+    leases:
+    - env: VSPHERE_BASTION_LEASED_RESOURCE
+      resource_type: vsphere-connected-2-quota-slice
+    pre:
+    - chain: windows-e2e-ote-vsphere-disconnected-pre
+    test:
+    - ref: windows-e2e-operator-test-mirror-extension
+    - as: wmco-setup-and-test
+      cli: latest
+      commands: |
+        # Set up WMCO and two Windows nodes using the profile SSH key, without
+        # running the source e2e suite. Workflow post steps own cluster cleanup.
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        hack/run-ci-e2e-test.sh -t setup-only -s -m 2
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: windows-node-readiness
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: windows-e2e-operator-test-vsphere-disconnected
 - always_run: false
   as: aws-e2e-ote
   optional: true
@@ -77,16 +122,9 @@ tests:
   pipeline_run_if_changed: ^ote/
   steps:
     cluster_profile: openshift-org-aws
-    dependencies:
-      EXTENSION_IMAGE: windows-machine-config-operator-test
     env:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "3"
-      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
-      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
-      TEST_ARGS: --monitor=e2e-test-analyzer
-      TEST_SKIPS: \[node-proxy\]
-      TEST_SUITE: windows-machine-config-operator/all
     test:
     - as: enable-tls-adherence
       cli: latest
@@ -243,7 +281,7 @@ tests:
           latest_revision=${state_lines[0]:-}
           [[ "${latest_revision}" =~ ^[1-9][0-9]*$ ]] || return 1
 
-          if [[ "${baseline_is_noop}" != true ]] && (( latest_revision <= baseline_revision )); then
+          if (( latest_revision < baseline_revision )); then
             return 1
           fi
           revision_has_tls_adherence "${latest_revision}" || return 1
@@ -433,8 +471,33 @@ tests:
           cpu: 1000m
           memory: 400Mi
       timeout: 2h15m0s
-    - ref: openshift-tests-extension-setup-out-of-payload
-    - ref: openshift-e2e-test
+    - as: wmco-tls-adherence-tests
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        binary=/tmp/wmco-tests-ext
+        gunzip -c /usr/bin/wmco-tests-ext.gz > "${binary}"
+        chmod +x "${binary}"
+        tests=$("${binary}" list tests \
+          --suite windows-machine-config-operator/tls-adherence \
+          --output names)
+        printf '%s\n' "${tests}"
+        for test_id in 90117 90118 90119 90120; do
+          if ! grep -Fq -- "-${test_id}-" <<< "${tests}"; then
+            echo "ERROR: TLS adherence suite is missing OCP-${test_id}"
+            exit 1
+          fi
+        done
+        "${binary}" run-suite windows-machine-config-operator/tls-adherence \
+          --max-concurrency 1 \
+          --junit-path "${ARTIFACT_DIR}/junit_wmco_tls_adherence.xml"
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 4h30m0s
     workflow: ipi-aws-ovn-hybrid
 - always_run: false
   as: aws-upi-e2e-byoh-ote
