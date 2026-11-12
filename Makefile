@@ -174,13 +174,13 @@ new-repo:
 	$(MAKE) update
 
 .PHONY: test-tls-scanner
+test-tls-scanner:
+	python3 hack/test_tls_scanner.py
+
 .PHONY: test-classic-idp-parser
 test-classic-idp-parser:
 	python3 -m unittest discover -s hack/classic-idp-telemetry -p '*_test.py' -v
 	@echo "Classic IDP parser tests: PASS"
-
-test-tls-scanner:
-	python3 hack/test_tls_scanner.py
 
 # Use the same local config and registry validation as make jobs.
 validate-step-registry: ci-operator-checkconfig

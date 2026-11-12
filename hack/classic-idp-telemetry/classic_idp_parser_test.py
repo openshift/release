@@ -4,10 +4,13 @@ rosa-e2e-collect-cs-telemetry step.
 
 The parser has to live inline in the step's commands script, because ci-operator runs that
 script on its own and does not mount this repository. So rather than testing a copy, these
-tests extract the parser from the shipped script and run it exactly as the step does. A change
-to the script that breaks the contract fails here.
+tests extract the parser from the shipped script and run it exactly as the step does, so a
+change to the script that breaks the contract fails here when they are run. No presubmit runs
+them today - the pylint job covers this directory but does not execute it - so run them
+yourself when touching either file.
 
 Run with:
+    make test-classic-idp-parser
     python3 -m unittest discover -s hack/classic-idp-telemetry -p '*_test.py'
 """
 
@@ -305,6 +308,26 @@ class ParserCase(unittest.TestCase):  # pylint: disable=too-many-public-methods
     def test_single_group_omits_the_group_ordinal(self):
         report, _ = self.run_parser([event()])
         self.assertNotIn("cluster_group", report["events"][0])
+
+    def test_barren_documents_do_not_inflate_the_group_ordinal(self):
+        # A response that is not an object, and one that is valid but carried no events,
+        # must not make a one-cluster run look like a multi-cluster run with gaps.
+        for preceding in (None, {"data": {"result": []}}):
+            with self.subTest(preceding=str(preceding)):
+                report, _ = self.run_parser(
+                    [], documents=[preceding,
+                                   {"data": {"result": [{"values": [["0", event()]]}]}}])
+                self.assertEqual(len(report["events"]), 1, report)
+                self.assertNotIn("cluster_group", report["events"][0])
+
+    def test_group_ordinals_are_dense(self):
+        # Two real groups separated by a barren one are numbered 0 and 1, not 0 and 2.
+        report, _ = self.run_parser(
+            [], documents=[{"data": {"result": [{"values": [["0", event()]]}]}},
+                           {"data": {"result": []}},
+                           {"data": {"result": [{"values": [["0", event(time=LATER)]]}]}}])
+        self.assertEqual(len(report["events"]), 2, report)
+        self.assertEqual(sorted(e["cluster_group"] for e in report["events"]), [0, 1])
 
     def test_attempt_event_is_collected_and_claims_no_flow(self):
         report, _ = self.run_parser([event(op="resync_attempt", outcome="started",

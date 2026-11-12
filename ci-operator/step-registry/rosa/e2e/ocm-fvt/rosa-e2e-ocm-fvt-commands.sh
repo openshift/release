@@ -472,15 +472,21 @@ fi
 # file cannot put anything unexpected into SHARED_DIR for the post step to parse, and the
 # total is capped so a looping writer cannot fill the shared volume.
 classic_idp_windows="${SHARED_DIR}/classic-idp-phase-windows"
-while IFS= read -r -d '' windows; do
-  grep -hE '^[a-z0-9_]{1,40} [0-9T:.Z-]{20,32} [0-9T:.Z-]{20,32}$' "${windows}" \
-    >> "${classic_idp_windows}.raw" 2>/dev/null || true
-done < <(find "${ocm_fvt_output}" -type f -name 'classic-idp-phase-windows' -print0 2>/dev/null)
-if [[ -s "${classic_idp_windows}.raw" ]]; then
-  sort -u "${classic_idp_windows}.raw" | head -64 > "${classic_idp_windows}" || true
-  echo "Wrote SHARED_DIR/classic-idp-phase-windows ($(wc -l < "${classic_idp_windows}") window(s))"
+classic_idp_raw="$(mktemp)" || classic_idp_raw=""
+if [[ -n "${classic_idp_raw}" ]]; then
+  # Keep anything an earlier invocation of this step already published, so a second pass
+  # merges with it instead of replacing it.
+  [[ -s "${classic_idp_windows}" ]] && cat "${classic_idp_windows}" >> "${classic_idp_raw}"
+  while IFS= read -r -d '' windows; do
+    grep -hE '^[a-z0-9_]{1,40} [0-9T:.Z-]{20,32} [0-9T:.Z-]{20,32}$' "${windows}" \
+      >> "${classic_idp_raw}" 2>/dev/null || true
+  done < <(find "${ocm_fvt_output}" -type f -name 'classic-idp-phase-windows' -print0 2>/dev/null)
+  if [[ -s "${classic_idp_raw}" ]]; then
+    sort -u "${classic_idp_raw}" | head -64 > "${classic_idp_windows}" || true
+    echo "Wrote SHARED_DIR/classic-idp-phase-windows ($(wc -l < "${classic_idp_windows}") window(s))"
+  fi
+  rm -f "${classic_idp_raw}"
 fi
-rm -f "${classic_idp_windows}.raw"
 
 if [[ ! -s "${SHARED_DIR}/kubeconfig" ]]; then
   while IFS= read -r -d '' kc; do
