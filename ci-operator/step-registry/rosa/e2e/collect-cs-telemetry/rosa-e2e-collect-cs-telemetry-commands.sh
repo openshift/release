@@ -318,9 +318,10 @@ truncated = sys.argv[7] == "true"
 
 TAG = "[ROSA CLASSIC IDP]"
 EVENT_SCHEMA = "rosa.classic.idp.resync/v1"
-OPS = {"source_secret_write", "lease_delete", "sync_identity_provider_write", "syncset_write"}
-OUTCOMES = {"succeeded", "deleted", "not_found", "forbidden", "conflict", "failed"}
-FLOWS = {"secret_mapping"}
+OPS = {"source_secret_write", "lease_delete", "sync_identity_provider_write", "syncset_write",
+       "resync_attempt"}
+OUTCOMES = {"succeeded", "deleted", "not_found", "forbidden", "conflict", "failed", "started"}
+FLOWS = {"secret_mapping", "not_yet_selected"}
 TOGGLES = {"unavailable"}
 TOGGLE_REASONS = {"not_present_in_build"}
 # The handoff file is writable by any step in the job, so the published phase name is held to
@@ -451,9 +452,14 @@ def documents(path):
 
 phases = load_phases(phases_path)
 events = []
-for telemetry in documents(merged_path):
+# Each document is one selector's response, so its ordinal separates events belonging to
+# different clusters in a job that ran more than one. It is an opaque position, not an
+# identifier, and it is only published when there is more than one group to tell apart.
+groups = 0
+for group, telemetry in enumerate(documents(merged_path)):
     if not isinstance(telemetry, dict):
         continue
+    groups = max(groups, group + 1)
     data = telemetry.get("data")
     streams = (data.get("result") if isinstance(data, dict) else None) or []
     for stream in streams:
@@ -532,6 +538,7 @@ for telemetry in documents(merged_path):
                        "time": moment.strftime(STAMP),
                        "attempt": attempt,
                        "test_phase": phase_of(phases, moment),
+                       "cluster_group": group,
                        "build_shape": shape}
             if build is not None:
                 reduced["build"] = build
@@ -547,7 +554,10 @@ for event in events:
         continue
     seen.add(key)
     unique.append(event)
-unique.sort(key=lambda e: (e["invocation"], e["time"], e["attempt"]))
+if groups < 2:
+    for recorded in unique:
+        recorded.pop("cluster_group", None)
+unique.sort(key=lambda e: (e.get("cluster_group", 0), e["invocation"], e["time"], e["attempt"]))
 
 if truncated:
     status = "truncated"

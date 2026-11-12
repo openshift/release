@@ -252,9 +252,11 @@ class ParserCase(unittest.TestCase):  # pylint: disable=too-many-public-methods
             check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         report = json.loads(out.read_text())
-        # Both good documents survive (de-duplicated to one event) and the loss is reported
-        # rather than presented as a clean collection.
-        self.assertEqual(len(report["events"]), 1, report)
+        # Both good documents survive - they are separate selector groups, so their events
+        # stay distinguishable - and the loss is reported rather than presented as a clean
+        # collection.
+        self.assertEqual(len(report["events"]), 2, report)
+        self.assertEqual({e["cluster_group"] for e in report["events"]}, {0, 1})
         self.assertEqual(report["rejected"]["malformed_document"], 1)
         self.assertEqual(report["collection"]["status"], "partial")
 
@@ -282,12 +284,34 @@ class ParserCase(unittest.TestCase):  # pylint: disable=too-many-public-methods
         ])
         self.assertEqual([e["attempt"] for e in report["events"]], [1, 2])
 
-    def test_duplicate_lines_from_overlapping_selectors_are_collapsed(self):
+    def test_duplicate_lines_within_one_response_are_collapsed(self):
         line = event()
-        report, _ = self.run_parser(
+        report, _ = self.run_parser([line, line])
+        self.assertEqual(len(report["events"]), 1)
+
+    def test_separate_selector_groups_stay_distinguishable(self):
+        # Each query filters on one cluster id, so a line belongs to exactly one group. Two
+        # groups must not be merged, or a write against another cluster would be read as
+        # part of this one - and the group ordinal is a position, never an identifier.
+        line = event()
+        report, text = self.run_parser(
             [], documents=[{"data": {"result": [{"values": [["0", line]]}]}},
                            {"data": {"result": [{"values": [["0", line]]}]}}])
-        self.assertEqual(len(report["events"]), 1)
+        self.assertEqual(len(report["events"]), 2)
+        self.assertEqual({e["cluster_group"] for e in report["events"]}, {0, 1})
+        for sentinel in SENTINELS:
+            self.assertNotIn(sentinel, text)
+
+    def test_single_group_omits_the_group_ordinal(self):
+        report, _ = self.run_parser([event()])
+        self.assertNotIn("cluster_group", report["events"][0])
+
+    def test_attempt_event_is_collected_and_claims_no_flow(self):
+        report, _ = self.run_parser([event(op="resync_attempt", outcome="started",
+                                           flow="not_yet_selected")])
+        self.assertEqual(len(report["events"]), 1, report["rejected"])
+        self.assertEqual(report["events"][0]["op"], "resync_attempt")
+        self.assertEqual(report["events"][0]["flow"], "not_yet_selected")
 
     # ---- collection status ----------------------------------------------------------
     def test_status_distinguishes_empty_partial_and_truncated(self):
