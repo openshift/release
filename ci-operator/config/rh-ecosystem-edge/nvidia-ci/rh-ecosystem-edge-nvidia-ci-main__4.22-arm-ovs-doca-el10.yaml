@@ -1,0 +1,147 @@
+base_images:
+  rhel-coreos-10-base:
+    name: "4.22"
+    namespace: ocp
+    tag: rhel-coreos-10
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+  items:
+  - dockerfile_literal: |
+      # Day-0 DOCA layer for RHCOS 10 (aarch64): the OVS-DOCA 3.5 stack from the
+      # Red Hat partner channel, layered onto the same rhel-10 RHCOS image the
+      # payload provides, per the RHEL "Install OVS-DOCA on a host" documentation
+      # (minus the kernel modules: a container layer cannot install kernel-matched
+      # kmods, RHCOS owns the kernel, and the AWS cluster has no ConnectX NIC --
+      # the DOCA binary runs the plain kernel datapath, offload left off).
+      #
+      # Glue rpms (RHEL 10.2-matched): unbound + the minimal perl trio
+      # (perl-interpreter/perl-libs/perl-Getopt-Std), required by doca-openvswitch
+      # and infiniband-diags but present in neither the RHCOS base nor the
+      # partner channel. Vendored in a quay image, version-matched to the base --
+      # CentOS Stream 10 tracks RHEL 10.3+ and its perl/ncurses chain conflicts.
+      # The vendor image is deliberately aarch64-only: it doubles as an arch
+      # guard, so a successful build is guaranteed to be the right architecture.
+      FROM quay.io/rh-ee-skaufman/ovs-doca-el10-vendor:latest AS rpms
+
+      FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-10
+      COPY --from=rpms /rpms /tmp/rpms
+
+      # Red Hat partner channel: OVS-DOCA 3.5 (aarch64). gpgcheck=0 because the
+      # channel's published pubkey.gpg URL 404s (broken link, reported); the
+      # packages themselves are dual-signed (V6 ML-DSA-87 + V4 RSA).
+      RUN printf '%s\n' \
+        '[ovs-doca-35]' \
+        'name=Red Hat partner channel: OVS-DOCA 3.5' \
+        'baseurl=https://packages.redhat.com/api/pulp-content/partner-repositories/@partner-repos-nvidia-doca/ovs-doca-3.5/custom-1-aarch64/' \
+        'enabled=1' \
+        'gpgcheck=0' \
+        > /etc/yum.repos.d/ovs-doca-35.repo
+
+      # /opt is a symlink to /var/opt on ostree; collectx installs need the target
+      RUN mkdir -p /var/opt
+
+      # libibverbs is part of the immutable base; replace with the DOCA-matched
+      # build from the channel (rdma-core is NOT in the base, installs as new)
+      RUN rpm-ostree override replace libibverbs --experimental --from repo='ovs-doca-35'
+
+      # Glue first (satisfy doca-openvswitch / infiniband-diags deps; the full
+      # 'perl' meta drags ExtUtils-CBuilder -> gcc-c++ -> libstdc++ version hell,
+      # so only the minimal interpreter set), then remove the stock FDP OVS, then
+      # the DOCA stack per the RHEL documentation.
+      RUN dnf -y --nogpgcheck --repofrompath=local,/tmp/rpms install \
+            unbound perl-interpreter perl-Getopt-Std && \
+          dnf -y --nogpgcheck remove 'openvswitch[0-9]*' && \
+          dnf -y --nogpgcheck install doca-openvswitch mft rdma-core \
+              openvswitch-selinux-extra-policy libunwind && \
+          rm -rf /tmp/rpms /etc/yum.repos.d/ovs-doca-35.repo
+
+      # WORKAROUND 1 (verified on el10/3.5): collectx-clxapi installs into
+      # /opt/mellanox/collectx, /opt -> /var/opt on ostree, and `ostree container
+      # commit` discards /var (the commit tree carries only a skeleton /var).
+      # ovs-vswitchd links libclx_api.so.1 from there and ovsdb-server.service
+      # stamps ovs-version via `ovs-vswitchd --version` at every start. Stash a
+      # copy under /usr, which survives the commit.
+      RUN mkdir -p /usr/lib/doca-collectx-payload && \
+          cp -a /var/opt/mellanox /usr/lib/doca-collectx-payload/mellanox
+
+      # WORKAROUND 2 (verified on el10/3.5): restore via an ovsdb-server.service
+      # drop-in rather than tmpfiles -- a file-only restore cannot rebuild
+      # /etc/ld.so.cache (the library is found through /etc/ld.so.conf.d/, which
+      # survives the commit), and an ExecStartPre has no boot-ordering race. The
+      # restore is conditional, a no-op when /var/opt/mellanox is intact.
+      RUN mkdir -p /etc/systemd/system/ovsdb-server.service.d && \
+          printf '%s\n' \
+          '[Service]' \
+          "ExecStartPre=/bin/sh -c '[ -e /var/opt/mellanox/collectx/lib/libclx_api.so.1 ] || { mkdir -p /var/opt && cp -a /usr/lib/doca-collectx-payload/mellanox /var/opt/mellanox; }'" \
+          'ExecStartPre=/sbin/ldconfig' \
+          > /etc/systemd/system/ovsdb-server.service.d/10-doca-collectx-restore.conf
+
+      # WORKAROUND 3 (verified on el10/3.5): doca-openvswitch carries
+      # /var/log/openvswitch and /var/lib/openvswitch{,/pki} (including the
+      # .conf.db.~lock~ file) as rpm payload and ships no tmpfiles.d entry; the
+      # commit discards /var, so ovsdb-server would fail EACCES on first boot.
+      # Modes/owners are the package's own el10 values (note: /var/log is
+      # openvswitch:hugetlbfs on el10, unlike el9 where it was root:root).
+      RUN printf '%s\n' \
+        'd /run/openvswitch         0755 root        root      -' \
+        'd /var/log/openvswitch     0750 openvswitch hugetlbfs -' \
+        'd /var/lib/openvswitch     0750 openvswitch hugetlbfs -' \
+        'd /var/lib/openvswitch/pki 0750 openvswitch hugetlbfs -' \
+        > /usr/lib/tmpfiles.d/doca-openvswitch.conf
+
+      # Diagnostics: NEVRAs that reach the build log for triage
+      RUN rpm -qa | grep -iE "doca|openvswitch|mft|rdma-core|libibverbs|unbound|libunwind|perl-interpreter" | sort
+
+      RUN ostree container commit
+    inputs:
+      rhel-coreos-10-base:
+        as:
+        - registry.ci.openshift.org/rhcos-devel/rhel-coreos-10
+    to: doca-rhcos-10
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: e2e-aws-arm-doca-day0
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      FEATURE_SET: TechPreviewNoUpgrade
+      OCP_ARCH: arm64
+      OS_IMAGE_STREAM: rhel-10
+      OVS_DOCA_EXPECTED_BANNER: DOCA 3.5
+      OVS_DOCA_EXPECTED_RPM_VERSION: 3.5.0052-1.el10
+      OVS_DOCA_EXPECTED_SELINUX_POLICY: openvswitch-selinux-extra-policy-1.0-41.el10fdp.noarch
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - ref: ovs-doca-build-release-image
+    - chain: ipi-aws-pre
+    test:
+    - ref: ovs-doca-validate-node-package
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: 4.22-arm-ovs-doca-el10
