@@ -2,39 +2,42 @@
 set -euxo pipefail; shopt -s inherit_errexit
 
 cd /tmp/
-git clone https://github.com/stolostron/policy-collection.git
+git clone --depth 1 https://github.com/stolostron/policy-collection.git
 
 cd policy-collection/deploy/
 
-# If QUAY_OPERATOR_CHANNEL is set, patch the Quay operator subscription to pin the channel
-if [[ -n "${QUAY_OPERATOR_CHANNEL}" ]]; then
-  if [[ ! "${QUAY_OPERATOR_CHANNEL}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
-    echo "Invalid QUAY_OPERATOR_CHANNEL: ${QUAY_OPERATOR_CHANNEL}" >&2
+# Channel overrides are applied to the deployed OLM Subscription objects
+# in-cluster (see PinSubscriptionChannel below).  Patching the local clone
+# has no effect: deploy.sh creates a GitOps Subscription that syncs the
+# upstream repository content, so local edits never reach the cluster.
+for _channelVar in QUAY_OPERATOR_CHANNEL ODF_OPERATOR_CHANNEL; do
+  typeset _channelVal="${!_channelVar:-}"
+  if [[ -n "${_channelVal}" ]] && [[ ! "${_channelVal}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+    echo "Invalid ${_channelVar}: ${_channelVal}" >&2
     exit 1
   fi
-  typeset quayPolicyFile="../policygenerator/policy-sets/stable/openshift-plus/input-quay/policy-install-quay.yaml"
-  sed -i "/^    name: quay-operator$/a\\    channel: ${QUAY_OPERATOR_CHANNEL}" "${quayPolicyFile}"
-  grep -A5 'name: quay-operator' "${quayPolicyFile}"
-fi
+done
 
-# If ODF_OPERATOR_CHANNEL is set, patch the ODF operator subscription to pin the channel
-if [[ -n "${ODF_OPERATOR_CHANNEL}" ]]; then
-  if [[ ! "${ODF_OPERATOR_CHANNEL}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
-    echo "Invalid ODF_OPERATOR_CHANNEL: ${ODF_OPERATOR_CHANNEL}" >&2
-    exit 1
-  fi
-  typeset odfPolicyFile="../policygenerator/policy-sets/stable/openshift-plus/input-odf/policy-odf.yaml"
-  sed -i "/^    name: odf-operator$/a\\    channel: ${ODF_OPERATOR_CHANNEL}" "${odfPolicyFile}"
-  grep -A5 'name: odf-operator' "${odfPolicyFile}"
-fi
-
-# Remove the local-cluster exclusion from the clusters placement so
-# SecuredCluster policies can target local-cluster.  In OPP single-
-# cluster test environments local-cluster is the only managed cluster,
-# and the default NotIn rule prevents the SecuredCluster CR from being
-# created — causing stackrox-opp-readiness to timeout.
-sed -i '/local-cluster.*NotIn/d' \
-  ../policygenerator/policy-sets/stable/openshift-plus/input/clusters-placement.yaml
+# Pin an OLM Subscription channel in-cluster.  The subscription objects
+# are created by the openshift-plus policies (enforce, musthave
+# compliance): an in-cluster merge patch only adds spec.channel, which the
+# musthave check does not consider a violation, so the pin persists
+# without triggering policy remediation.
+PinSubscriptionChannel () {
+  typeset subNamespace="${1}" subName="${2}" channel="${3}"
+  typeset -i pinDeadline=$((SECONDS + 600))
+  until oc get subscription "${subName}" -n "${subNamespace}" >/dev/null 2>&1; do
+    ((SECONDS > pinDeadline)) && {
+      printf '%s\n' "Error: subscription ${subNamespace}/${subName} not found after 10 minutes; cannot pin channel ${channel}" >&2
+      return 1
+    }
+    sleep 5
+  done
+  oc patch subscription "${subName}" -n "${subNamespace}" --type merge \
+    -p "{\"spec\":{\"channel\":\"${channel}\"}}"
+  printf '[%s] Pinned subscription %s/%s to channel %s\n' \
+    "$(date -u +%FT%TZ)" "${subNamespace}" "${subName}" "${channel}"
+}
 
 echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
 
@@ -49,6 +52,33 @@ until (( $(oc get policies -n policies -o json 2>/dev/null | jq '.items | length
   }
   sleep 5
 done
+
+# Apply requested channel overrides to the deployed OLM subscriptions.
+[[ -n "${QUAY_OPERATOR_CHANNEL:-}" ]] && \
+  PinSubscriptionChannel local-quay quay-operator "${QUAY_OPERATOR_CHANNEL}"
+[[ -n "${ODF_OPERATOR_CHANNEL:-}" ]] && \
+  PinSubscriptionChannel openshift-storage odf-operator "${ODF_OPERATOR_CHANNEL}"
+
+# Remove the local-cluster exclusion from the clusters placement in-cluster
+# so SecuredCluster policies can target local-cluster.  In OPP single-cluster
+# test environments local-cluster is the only managed cluster, and the
+# default NotIn rule prevents the SecuredCluster CR from being created —
+# causing stackrox-opp-readiness to timeout.  Best effort: if the placement
+# shape differs or the appsub resync restores the predicate, behaviour falls
+# back to the upstream default.
+typeset -i placementDeadline=$((SECONDS + 300))
+until oc get placement placement-openshift-plus-clusters -n policies >/dev/null 2>&1; do
+  ((SECONDS > placementDeadline)) && {
+    printf '%s\n' "Warning: placement placement-openshift-plus-clusters not found after 5 minutes; skipping local-cluster predicate removal" >&2
+    break
+  }
+  sleep 5
+done
+if oc get placement placement-openshift-plus-clusters -n policies >/dev/null 2>&1; then
+  oc patch placement placement-openshift-plus-clusters -n policies --type json \
+    -p '[{"op":"test","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1/key","value":"local-cluster"},{"op":"remove","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1"}]' \
+    || printf '%s\n' "Warning: could not remove local-cluster NotIn predicate from placement (continuing with upstream default)" >&2
+fi
 
 # Wait for Quay registry to be ready (checks operator-deployed Quay)
 typeset -a quayNamespacesArr=(quay openshift-quay quay-enterprise local-quay)
@@ -94,20 +124,40 @@ fi
   done
 } > "${ARTIFACT_DIR}/skip-policies.txt"
 
+# Filter skipped policies by literal name match.  Policy names are matched
+# as fixed strings (not regexes) so a name containing regex metacharacters
+# cannot widen the match to unrelated policies.
+FilterSkippedPolicies () {
+  typeset line='' p='' skip=false
+  while IFS= read -r line; do
+    [[ -z "${line}" ]] && continue
+    skip=false
+    for p in "${skipPoliciesArr[@]}"; do
+      [[ "${line}" == */"${p}" ]] && { skip=true; break; }
+    done
+    [[ "${skip}" == false ]] && printf '%s\n' "${line}"
+  done
+}
+
 if (( ${#skipPoliciesArr[@]} > 0 )); then
   # Validate that skip-listed policies actually exist in the cluster
+  # (literal, per-line suffix match on the <resource>[.<group>]/<name> form)
+  PolicyExists () {
+    typeset policyName="${1}" line=''
+    while IFS= read -r line; do
+      [[ "${line}" == */"${policyName}" ]] && return 0
+    done
+    return 1
+  }
   typeset allPolicies=""
   allPolicies="$(oc get policies -n policies -o name 2>/dev/null)" || true
   for p in "${skipPoliciesArr[@]}"; do
-    if ! echo "${allPolicies}" | grep -q "/${p}$"; then
+    if ! PolicyExists "${p}" <<< "${allPolicies}"; then
       printf '[%s] WARNING: policy "%s" from SKIP_POLICIES not found in cluster (ignoring)\n' \
         "$(date -u +%FT%TZ)" "${p}"
     fi
   done
 
-  # Build a regex to filter out skipped policies
-  typeset skipRegex=""
-  skipRegex="$(IFS='|'; echo "${skipPoliciesArr[*]}")"
   # Fetch the full policy list first — fail hard if oc cannot reach the cluster
   typeset policyList=""
   policyList="$(oc get policies -n policies -o name)" || {
@@ -115,9 +165,9 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
       "$(date -u +%FT%TZ)" >&2
     exit 1
   }
-  # Filter out skipped policies (grep no-match is tolerated via || true)
+  # Filter out skipped policies (no-match is tolerated via || true)
   typeset applyPolicies=""
-  applyPolicies="$(printf '%s\n' "${policyList}" | grep -Ev "/(${skipRegex})$")" || true
+  applyPolicies="$(printf '%s\n' "${policyList}" | FilterSkippedPolicies)" || true
 
   if [[ -n "${applyPolicies}" ]]; then
     printf '[%s] Waiting for %d non-skipped polic(ies) to become Compliant…\n' \
@@ -127,7 +177,7 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
         --for jsonpath='{.status.compliant}'=Compliant \
         --timeout=40m; then
       : "Non-skipped policies failed to become compliant:"
-      oc get policies -n policies --ignore-not-found | grep -Ev "/(${skipRegex})$"
+      oc get policies -n policies --ignore-not-found | FilterSkippedPolicies
       oc get policies -n policies --ignore-not-found -o yaml
       oc describe policies -n policies
       exit 1

@@ -111,12 +111,15 @@ _propagate_junit () {
 }
 
 # Load ExitTrap library for JUnit XML post-processing at script level
-# (must be loaded before trap can fire to avoid secondary errors)
+# (must be loaded before trap can fire to avoid secondary errors).
+# The URL is pinned to a specific commit (instead of refs/heads/main) so a
+# push to the library's default branch cannot silently change what runs
+# in CI; bump the pin deliberately when picking up library changes.
 eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
-        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
 )"
 
 trap '_opp_cleanup; GenerateJunit; _propagate_junit; ExitTrap--PostProcessPrep' EXIT
@@ -149,8 +152,10 @@ print(len(json.load(sys.stdin).get('items',[])))
     QUAY_HOST="$(oc get quayregistry -n "${QUAY_NS}" "${QUAY_REGISTRY}" -o jsonpath='{.status.registryEndpoint}')"
     QUAY_HOST="${QUAY_HOST#https://}"
     if [[ -z "${QUAY_HOST}" ]]; then
-        echo "ERROR: Quay registry route not ready (empty host)" >&2
-        return 1
+        echo "ERROR: QuayRegistry ${QUAY_REGISTRY} exists but its registryEndpoint is empty (route not ready)" >&2
+        # rc 2: Quay is deployed but not usable — distinct from rc 1 (Quay
+        # not deployed), so the caller fails instead of reporting a skip.
+        return 2
     fi
     export QUAY_NS QUAY_REGISTRY QUAY_HOST
     true
@@ -423,7 +428,7 @@ function RegisterQuayInAcs () {
     set +x  # tracing off: credentials
 
     typeset response=''
-    if ! response=$(curl -sk --connect-timeout 15 --max-time 60 -u "admin:${acsPassword}" \
+    if ! response=$(curl -s "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 60 -u "admin:${acsPassword}" \
         "https://${acsHost}/v1/imageintegrations" 2>/dev/null); then
         echo "ERROR: Failed to query ACS image integrations" >&2
         "${xtraceOn}" && set -x
@@ -476,7 +481,7 @@ print(json.dumps(payload))
 " "${regUser}" "${regPass}")
 
     typeset regCode=""
-    regCode=$(curl -sk -o /dev/null -w '%{http_code}' \
+    regCode=$(curl -s "${acsTlsOpts[@]}" -o /dev/null -w '%{http_code}' \
         --connect-timeout 15 --max-time 60 \
         -X POST "https://${acsHost}/v1/imageintegrations" \
         -u "admin:${acsPassword}" \
@@ -507,7 +512,7 @@ print(json.dumps(payload))
 " "${imageName}")
 
     typeset scanCode=""
-    scanCode=$(curl -sk -o /dev/null -w '%{http_code}' \
+    scanCode=$(curl -s "${acsTlsOpts[@]}" -o /dev/null -w '%{http_code}' \
         --connect-timeout 15 --max-time 60 \
         -X POST "https://${acsHost}/v1/images/scan" \
         -u "admin:${acsPassword}" \
@@ -550,6 +555,24 @@ function RunAcsScan () {
 
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
 
+    # TLS verification for the ACS Central API: prefer the service CA
+    # bundle mounted in the pod (pattern from interop-opp-must-gather-acs);
+    # fall back to -k with a warning when the route certificate cannot be
+    # verified with it, so an unknown certificate does not hard-fail the
+    # test.  Declared here so the helper functions called below (dynamic
+    # scoping) share the same options.
+    typeset -a acsTlsOpts=( -k )
+    typeset saCaBundle='/var/run/secrets/kubernetes.io/serviceaccount/ca.crt'
+    if [[ -f "${saCaBundle}" ]]; then
+        typeset tlsProbe=''
+        tlsProbe="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 15 --max-time 30 --cacert "${saCaBundle}" "https://${acsHost}/v1/ping" 2>/dev/null)" || tlsProbe='000'
+        if [[ -n "${tlsProbe}" && "${tlsProbe}" != '000' ]]; then
+            acsTlsOpts=( --cacert "${saCaBundle}" )
+        else
+            echo "WARNING: ACS route certificate not verifiable with the service CA bundle; falling back to insecure TLS" >&2
+        fi
+    fi
+
     # Mask credentials: function call args expand in xtrace
     set +x 2>/dev/null
     if ! RegisterQuayInAcs "${acsHost}" "${acsPassword}"; then
@@ -571,7 +594,7 @@ function RunAcsScan () {
     while (( attempts < maxAttempts )); do
         typeset scanResult=''
         set +x
-        scanResult=$(curl -sk --connect-timeout 15 --max-time 30 -u "admin:${acsPassword}" \
+        scanResult=$(curl -s "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 30 -u "admin:${acsPassword}" \
             "https://${acsHost}/v1/images?query=Image:${pushTarget}" 2>/dev/null) || scanResult=""
         "${xtraceOn}" && set -x
 
@@ -615,7 +638,7 @@ function Main () {
         exit 0
     elif (( discoverRc != 0 )); then
         for t in "${allTests[@]}"; do
-            RecordResult "${t}" "failed" "QuayRegistry API query failed"
+            RecordResult "${t}" "failed" "Quay discovery failed (rc=${discoverRc})"
         done
         exit 1
     fi
