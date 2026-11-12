@@ -1,24 +1,13 @@
 #!/usr/bin/env bash
 
 set -eEuo pipefail
-# TEMPORARY rehearsal aid: on failure, hold this step (and the cluster) for
-# live debugging instead of exiting; remove before merge.
-hold_for_debug() {
-    trap - ERR
-    echo "=== FAILED at line $1 — holding the cluster for live debugging"
-    echo "=== release with: touch /tmp/kueue-run-sdk-debug-release"
-    local deadline=$(( $(date +%s) + 14400 ))
-    while [[ ! -f /tmp/kueue-run-sdk-debug-release && $(date +%s) -lt $deadline ]]; do
-        sleep 15
-    done
-}
+# On failure, dump the OLM state so a failing run can be triaged from the log.
 on_error() {
     trap - ERR
-    echo "=== dumping OLM state for diagnostics"
+    echo "=== FAILED at line $1 — dumping OLM state for diagnostics"
     oc get catalogsource,subscription,operatorgroup,installplan -A 2>&1 | grep -i kueue || true
     oc get csv -A 2>&1 | grep -i kueue || true
     oc get pods -n openshift-marketplace 2>&1 | grep -i kueue || true
-    hold_for_debug "$1"
 }
 trap 'on_error $LINENO' ERR
 
@@ -113,7 +102,6 @@ done
 if [[ -z "$pod" ]]; then
     echo "ERROR: operator-sdk did not create the catalog registry pod in time"
     oc get catalogsource,subscription,pods -n openshift-kueue-operator 2>&1 || true
-    hold_for_debug "$LINENO"
     exit 1
 fi
 # Wait until SDK has finished creating and annotating the catalog
@@ -139,7 +127,7 @@ oc wait pod "$pod" -n openshift-kueue-operator --for=condition=Ready --timeout=3
 ip=$(oc get pod "$pod" -n openshift-kueue-operator -o jsonpath='{.status.podIP}')
 oc patch catalogsource kueue-operator-catalog -n openshift-kueue-operator \
     --type=merge -p "{\"spec\":{\"address\":\"$ip:50051\"}}"
-# On failure, the ERR trap dumps OLM state and holds the cluster for debugging.
+# On failure, the ERR trap dumps the OLM state before exiting.
 wait "$sdk_pid"
 
 echo 'Waiting for the operator CSV to succeed...'

@@ -694,25 +694,13 @@ tests:
         for i in $(seq 1 20); do oc import-image cli:latest -n openshift --confirm && break; sleep 15; done
         oc get imagestreamtag cli:latest -n openshift
         export CONTAINER_IMAGE=image-registry.openshift-image-registry.svc:5000/openshift/cli:latest
-        # TEMPORARY rehearsal aid: hold the cluster for live debugging when e2e
-        # fails; remove before merge.
-        if ! make e2e-ci-test; then
-            echo "e2e FAILED — holding the cluster for live debugging"
-            echo "release with: touch /tmp/kueue-e2e-debug-release"
-            oc get kueue,clusterqueue,localqueue,workload -A 2>&1 || true
-            oc get pods -n openshift-kueue-operator 2>&1 || true
-            deadline=$(( $(date +%s) + 14400 ))
-            while [[ ! -f /tmp/kueue-e2e-debug-release && $(date +%s) -lt $deadline ]]; do
-                sleep 15
-            done
-            exit 1
-        fi
+        make e2e-ci-test
       from: kueue-operator-src
       resources:
         requests:
           cpu: 300m
           memory: 500Mi
-      timeout: 6h0m0s
+      timeout: 3h0m0s
     workflow: openshift-e2e-aws-disconnected
 - always_run: false
   as: test-e2e-dra-gpu-4-22
