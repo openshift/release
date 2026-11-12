@@ -114,6 +114,23 @@ Makefile default — kept explicit to document CI intent):
   the single source of truth.
 - `OO_*` / `BASE_DOMAIN`: install-flow variables, unchanged.
 
+ci-operator requires every test-level `steps.env` value to be **declared** by a step that
+consumes it (`checkconfig` fails otherwise with "overridden in [test/...] but not declared
+in any step"). The `OO_*`/`BASE_DOMAIN` values are declared by the workflow's registered
+steps; the six values above are consumed by our inline `make e2e-tests` command, so the
+`e2e-nmo` step declares them in its own `env:` list (bare names, same pattern as the NHC/NMO
+daily configs):
+
+```yaml
+      env:
+      - name: E2E_SYSTEM_TESTS_DIR
+      - name: ECO_DUMP_FAILED_TESTS
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: WORKLOAD_IMAGE
+```
+
 Step resources `cpu "2" / 4Gi`; `timeout: 2h0m0s` (the destructive specs drain and reboot
 nodes, ~5–15 min each, so the earlier 1h was tight). No cleanup/disable at the end: the
 cluster is deprovisioned by `ipi-aws-post`.
