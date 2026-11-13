@@ -1,0 +1,30 @@
+ref:
+  as: hypershift-mce-agent-nutanix-destroy
+  from_image:
+    namespace: ci
+    name: agent-qe-base
+    tag: latest
+  commands: hypershift-mce-agent-nutanix-destroy-commands.sh
+  credentials:
+  - collection: cluster-secrets-nutanix
+    group: nutanix-pc
+    mount_path: /var/run/vault/nutanix
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 45m0s
+  grace_period: 15m0s
+  env:
+  - name: AGENT_NAMESPACE
+    default: hypershift-agents
+    documentation: Agent namespace used by the HostedCluster.
+  - name: AGENT_QE_INFRA_ANSIBLE_DIR
+    default: "/ansible-files"
+    documentation: Path to agent-qe-infra/ansible-files; defaults to the same location used by the worker step.
+  documentation: >-
+    Deletes run-labeled Agents, InfraEnv, NMStateConfigs, and pull secret. Recovers exact
+    worker VM names from this run's MAC reservations and the discovery image name from
+    its InfraEnv when provisioning did not record their UUIDs, then verifies deletion.
+    Retains the private Nutanix context until gateway cleanup completes. CI-operator
+    releases the quota-slice lease when the workflow ends, even if cleanup fails.

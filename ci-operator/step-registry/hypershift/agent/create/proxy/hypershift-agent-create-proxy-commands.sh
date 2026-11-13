@@ -20,11 +20,48 @@ for portfile in "${SHARED_DIR}"/hosted_*_port; do
 done
 echo "Extra hosted cluster service ports for squid: ${EXTRA_PORTS}"
 
+NUTANIX_PROXY=false
+if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+  if [[ ! -s "${SHARED_DIR}/cluster-name" ]]; then
+    echo "The Nutanix HostedCluster name is missing."
+    exit 1
+  fi
+  cluster_name=$(<"${SHARED_DIR}/cluster-name")
+  release_image=$(oc -n local-cluster get hostedcluster "${cluster_name}" -o jsonpath='{.spec.release.image}')
+  base_domain=$(oc -n local-cluster get hostedcluster "${cluster_name}" -o jsonpath='{.spec.dns.baseDomain}')
+  release_registry=${release_image%%/*}
+  release_registry=${release_registry%%:*}
+  if [[ "${release_image}" != */* || ! "${release_registry}" =~ ^[A-Za-z0-9.-]+$ ]]; then
+    echo "The Nutanix HostedCluster release image has no valid registry host."
+    exit 1
+  fi
+  if [[ ! "${base_domain}" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*[A-Za-z0-9]$ ]]; then
+    echo "The Nutanix HostedCluster has no valid base domain."
+    exit 1
+  fi
+  routes_json=$(oc get routes -A -o json)
+  hosts=$(jq -r '.items[] | select(.metadata.namespace == "multicluster-engine" or .metadata.namespace == "openshift-multicluster-engine") | select((((.metadata.name // "") + " " + (.spec.to.name // "")) | test("assisted.*(service|image)|service.*assisted"; "i"))) | .spec.host // empty' <<<"${routes_json}" | sort -u)
+  if [[ -z "${hosts}" ]]; then
+    echo "No Assisted Service route was discovered; refusing to broaden the Squid ACL."
+    exit 1
+  fi
+  # The ingress canary and other guest Routes use the hosted apps domain through Squid.
+  # Builds clone from GitHub and resolve Red Hat builder images; guest pods extract the release image from its registry and R2 blob storage.
+  hosts=$(printf '%s\n' "${hosts}" ".apps.${cluster_name}.${base_domain}" github.com "${release_registry}" .r2.cloudflarestorage.com registry.access.redhat.com registry.redhat.io brew.registry.redhat.io .quay.io quay-proxy.ci.openshift.org | sort -u)
+
+  printf '%s\n' "${hosts}" > "${SHARED_DIR}/nutanix_squid_allowed_hosts"
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}/nutanix_squid_allowed_hosts" "root@${IP}:/tmp/nutanix_squid_allowed_hosts"
+  NUTANIX_PROXY=true
+fi
+
 # shellcheck disable=SC2087
-ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- ${EXTRA_PORTS} << 'EOF' |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${NUTANIX_PROXY}" ${EXTRA_PORTS} << 'EOF' |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 set -x
 
 # Collect extra ports passed as arguments
+NUTANIX_PROXY=$1
+shift
 EXTRA_PORTS=("$@")
 
 API_URL=$(yq -r ".clusters[0].cluster.server" nested_kubeconfig)
@@ -48,6 +85,33 @@ for port in "${EXTRA_PORTS[@]}"; do
     sed -i "s|^acl allowed_ssl_ports port.*|& $port|" $HOME/squid.conf
   fi
 done
+
+if [[ "${NUTANIX_PROXY}" == "true" ]]; then
+  if [[ ! -s /tmp/nutanix_squid_allowed_hosts ]]; then
+    echo "The Nutanix Squid destination list is missing."
+    exit 1
+  fi
+  while IFS= read -r host; do
+    [[ -n "${host}" ]] || continue
+    if [[ ! "${host}" =~ ^[A-Za-z0-9.-]+$ ]]; then
+      echo "Refusing invalid Squid destination ${host}"
+      exit 1
+    fi
+    if ! awk -v host="${host}" '
+      NR == 1 { for (i = 4; i <= NF; i++) if ($i == host) found = 1 }
+      END { exit !found }
+    ' "$HOME/squid.conf"; then
+      sed -i "1 s|$| ${host}|" "$HOME/squid.conf" || exit 1
+    fi
+  done < /tmp/nutanix_squid_allowed_hosts
+  rm -f /tmp/nutanix_squid_allowed_hosts
+  if ! grep -Fq 'acl s3_blob_storage dstdom_regex' "$HOME/squid.conf"; then
+    sed -i \
+      -e '/^http_access allow CONNECT cluster$/i acl s3_blob_storage dstdom_regex -i (^|\\.)s3([.-][a-z0-9-]+)*\\.amazonaws\\.com$' \
+      -e '/^http_access allow CONNECT cluster$/a http_access allow CONNECT s3_blob_storage' \
+      "$HOME/squid.conf"
+  fi
+fi
 cat $HOME/squid.conf
 
 sudo setenforce 0

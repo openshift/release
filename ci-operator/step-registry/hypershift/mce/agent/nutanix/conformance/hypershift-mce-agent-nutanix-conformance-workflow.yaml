@@ -1,0 +1,70 @@
+workflow:
+  as: hypershift-mce-agent-nutanix-conformance
+  documentation: |-
+    Runs HyperShift conformance against an Agent HostedCluster whose NodePool workers are
+    Nutanix VMs booted from the MCE InfraEnv discovery ISO. Nutanix VMs host guest workers and a lease-owned
+    ingress tunnel gateway. The ingress VIP is derived from the selected Nutanix subnet.
+    Run-owned public Route53 records resolve the hosted API and apps names to private addresses;
+    Nutanix workers use their subnet's DHCP-provided resolver.
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: equinix-ocp-hcp-nutanix
+    leases:
+    - env: NUTANIX_QUOTA_SLICE
+      resource_type: nutanix-quota-slice
+    pre:
+    - chain: baremetalds-ofcir-pre
+    - ref: enable-qe-catalogsource
+    - ref: deploy-konflux-operator
+    - chain: hypershift-mce-agent-lvm
+    - ref: hypershift-mce-install
+    - chain: hypershift-mce-agent-nutanix-create
+    test:
+    - chain: hypershift-conformance
+    post:
+    - ref: hypershift-mce-agent-info
+    - ref: hypershift-mce-agent-nutanix-info
+    - ref: mce-must-gather
+    - ref: gather-extra
+    - ref: gather-audit-logs
+    - ref: hypershift-mce-agent-nutanix-discard-agents
+    - chain: hypershift-mce-agent-destroy
+    - ref: hypershift-mce-agent-nutanix-destroy
+    - ref: hypershift-mce-agent-nutanix-ingress-tunnel-cleanup
+    - ref: hypershift-mce-agent-nutanix-dns-cleanup
+    - ref: baremetalds-devscripts-gather
+    - ref: ofcir-release
+    env:
+      # Nutanix workers cannot reach the private API VIPs directly, so the API pollers
+      # and MCE addon agents crash. This also excludes other legacy node invariants.
+      # https://redhat.atlassian.net/browse/OCPBUGS-138703
+      # https://redhat.atlassian.net/browse/ACM-50151
+      TEST_ARGS: --disable-monitor=apiserver-incluster-availability,legacy-node-invariants
+      # The node-labeling test cannot reach the hosted API directly from a Nutanix worker.
+      # https://redhat.atlassian.net/browse/OCPBUGS-138700
+      TEST_SKIPS: >-
+        etcd leader changes are not excessive\|
+        check registry.redhat.io is available and samples operator can import sample imagestreams\|
+        Prevent openshift node labeling on update by the node TestOpenshiftNodeLabeling
+      AGENT_NAMESPACE: hypershift-agents
+      KONFLUX_DEPLOY_OPERATORS: "true"
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_SUBSCRIPTION: "false"
+      KONFLUX_TARGET_OPERATORS: metallb
+      CLUSTERTYPE: host_384gb_el9
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
+      IP_STACK: v4
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_WORKERS=4
+        NETWORK_TYPE=OVNKubernetes
+        MASTER_MEMORY=32768
+        WORKER_MEMORY=32768
+        WORKER_VCPU=16
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
