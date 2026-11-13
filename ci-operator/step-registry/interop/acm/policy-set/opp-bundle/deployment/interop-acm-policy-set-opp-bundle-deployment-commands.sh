@@ -195,7 +195,15 @@ PinSubscriptionChannel () {
     "$(date -u +%FT%TZ)" "${subNamespace}" "${subName}" "${channel}"
 }
 
-echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
+# A nonzero deploy.sh status exits here under errexit, before the deployment
+# row is recorded, which would leave the JUnit trap reporting the check as
+# skipped with no failure row.  Record the failure, then exit as before.
+typeset -i deployStart=0
+deployStart=$(date +%s)
+if ! echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus; then
+  RecordResult "openshift-plus-policy-set-deployed" "failed" "deploy.sh returned a nonzero status; the openshift-plus policy set was not submitted" "$(( $(date +%s) - deployStart ))"
+  exit 1
+fi
 
 # openshift-plus generates ~25 policies; require 4+ before oc wait to avoid
 # racing the GitOps Subscription propagation (stolostron/policy-collection#174)
