@@ -23,6 +23,14 @@ ref:
     documentation: |-
       File holding the aro-hcp-robot GitHub App private key (PEM). Used to mint a
       short-lived installation token so a downstream step can post a PR comment.
+  - name: GITHUB_APP_TOKEN_PERMISSIONS
+    default: '["issues","pull_requests"]'
+    documentation: |-
+      JSON array of installation permission names the minted token requests.
+      The request is intersected with the write permissions the installation
+      already grants, so it can only narrow the token. The default keeps the
+      PR-comment behaviour; a branch-publishing consumer asks for
+      ["contents","pull_requests"].
   - name: GITHUB_REPO_OWNER
     default: "Azure"
     documentation: |-
@@ -37,4 +45,7 @@ ref:
       differ when pj-rehearse rehearses this job from openshift/release.
   documentation: |-
     Mint a short-lived aro-hcp-robot GitHub App installation token and write it to
-    ${SHARED_DIR}/github-token for a downstream step to post a PR comment.
+    ${SHARED_DIR}/github-token for a downstream step. The token is scoped to the
+    single repository named by GITHUB_REPO_OWNER/GITHUB_REPO_NAME and carries only
+    the write permissions requested by GITHUB_APP_TOKEN_PERMISSIONS that the
+    installation already grants.
