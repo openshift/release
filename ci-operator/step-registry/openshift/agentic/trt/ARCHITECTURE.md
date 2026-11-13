@@ -14,7 +14,8 @@ concerns and are intentionally outside this document.
 
 ```mermaid
 flowchart TD
-    O["External orchestration<br/>Jira key and optional model override"]
+    IR["Initial request<br/>Jira key and optional model override"]
+    FR["Later feedback signal<br/>actionable review or newly failing required CI"]
     SJ["Repository solve Prow job"]
     FJ["Repository follow-up Prow job"]
 
@@ -36,7 +37,7 @@ flowchart TD
         end
 
         subgraph Response["Shared review-responder"]
-            G{"Actionable work?"}
+            G{"Read-only gate:<br/>actionable work?"}
             RC["Review worker<br/>address actionable comments"]
             CI["CI worker<br/>triage required failures, fix PR-caused failures,<br/>rebase when requested, or request Prow retests"]
             P["Pipeline revalidates the PR head<br/>and updates only the configured fork branch"]
@@ -50,16 +51,15 @@ flowchart TD
     PR[("Upstream pull request")]
     D["Workflow complete"]
 
-    O -->|"initial work"| SJ --> I
-    O -->|"later feedback"| FJ --> F
+    IR --> SJ --> I
+    FR --> FJ --> F
     IMG -.->|"runtime"| I
     IMG -.->|"runtime"| F
     C --> PR
     C --> G
     H --> G
     P --> PR
-    PR -.->|"comments and checks"| G
-    PR -.->|"new signal after a run"| O
+    G -.->|"reads comments and checks"| PR
     M --> D
 ```
 
