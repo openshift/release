@@ -8,6 +8,26 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+# The oc shipped in the ocp/cli-jq step image may not support the TLS named
+# groups this step enforces on APIServer/cluster (e.g. SecP384r1MLKEM1024).
+# Once the Custom TLS security profile rolls out, clients that cannot
+# negotiate one of the configured groups are rejected by the API server with
+# "remote error: tls: handshake failure", which would leave this step unable
+# to wait for the cluster to stabilize or to verify the observed profile.
+# Extract the payload-matched oc (guaranteed to speak the groups shipped by
+# the payload under test) and prefer it for the rest of the step.
+if [[ -n "${RELEASE_IMAGE_LATEST:-}" && -n "${CLUSTER_PROFILE_DIR:-}" && -f "${CLUSTER_PROFILE_DIR}/pull-secret" ]]; then
+  payload_cli_dir=$(mktemp -d)
+  if oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${RELEASE_IMAGE_LATEST}" --command=oc --to="${payload_cli_dir}" && test -x "${payload_cli_dir}/oc"; then
+    export PATH="${payload_cli_dir}:${PATH}"
+    echo "Using payload-matched oc for this step: $(command -v oc)"
+  else
+    echo "WARN: could not extract oc from ${RELEASE_IMAGE_LATEST}; falling back to the step image oc, which may not negotiate the enforced TLS groups"
+  fi
+else
+  echo "WARN: RELEASE_IMAGE_LATEST or the cluster profile pull-secret is not available; falling back to the step image oc, which may not negotiate the enforced TLS groups"
+fi
+
 # Feature gate name in openshift/api (enhancement docs may still say TLSCurvePreferences).
 TLS_GROUPS_FEATURE_GATE="${TLS_GROUPS_FEATURE_GATE:-TLSGroupPreferences}"
 TLS_GROUPS_LIST="${TLS_GROUPS:-SecP384r1MLKEM1024}"
@@ -89,7 +109,7 @@ ensure_tls_groups_feature_gate() {
     ;;
   esac
 
-  oc adm wait-for-stable-cluster --timeout=3h
+  oc adm wait-for-stable-cluster --timeout=30m
   wait_feature_observed "${version}" "${TLS_GROUPS_FEATURE_GATE}"
 }
 
@@ -123,7 +143,7 @@ echo "Patching apiservers/cluster:"
 echo "${apiserver_patch}" | jq .
 oc patch apiservers/cluster --type=merge -p "${apiserver_patch}"
 
-oc adm wait-for-stable-cluster --timeout=3h
+oc adm wait-for-stable-cluster --timeout=30m
 
 observed_type=$(oc get apiserver/cluster -ojson | jq -r .spec.tlsSecurityProfile.type)
 observed_groups=$(oc get apiserver/cluster -ojson | jq -c '.spec.tlsSecurityProfile.custom.groups // []')
