@@ -1,0 +1,73 @@
+ref:
+  as: rosa-seaplane-e2e-env
+  from_image:
+    namespace: ci
+    name: rosa-regional-platform-ci
+    tag: latest
+  commands: rosa-seaplane-e2e-env-commands.sh
+  grace_period: 5m
+  timeout: 600s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - collection: cluster-secrets-rosa-regional-platform-int
+    group: ephemeral-creds
+    mount_path: /var/run/rosa-credentials
+  env:
+  - name: AWS_CONFIG_FILE
+    default: "/var/run/rosa-credentials/aws_config"
+    documentation: |-
+      Path to the AWS CLI config file with named profiles from the mounted
+      credential secret.
+  - name: AWS_REGION
+    default: "us-east-1"
+    documentation: |-
+      AWS region of the environment. Exported to e2e.env as
+      AWS_DEFAULT_REGION.
+  - name: ROSA_REGIONAL_PLATFORM_REF
+    default: ""
+    documentation: |-
+      Git ref of openshift-online/rosa-seaplane used to resolve suite pins
+      when the environment was not provisioned by this workflow (standing
+      int/stage environments, which supply neither rosa-seaplane-source.env
+      nor rosa-seaplane-sha in SHARED_DIR). REQUIRED for standing
+      environments: set it to the deployed commit SHA. When unset and no
+      shared file exists, the step fails rather than resolving pins from
+      an arbitrary ref.
+  - name: E2E_ENVIRONMENT
+    default: ""
+    documentation: |-
+      Restrict pin resolution to this rendered environment directory
+      (e.g. "integration", "stage"). When empty, all rendered
+      deploy/<env>/<region> directories are used and must agree on each
+      config pin value.
+  - name: E2E_REGION
+    default: ""
+    documentation: |-
+      Restrict pin resolution to this rendered region directory
+      (e.g. "us-east-1"). Used together with E2E_ENVIRONMENT.
+  - name: OCP_IMAGE
+    default: ""
+    documentation: |-
+      OCP release-image pullspec for suites that create HCP clusters.
+      When empty, the image resolved by rosa-seaplane-resolve-ocp-image
+      (SHARED_DIR/ocp-image) is used if present.
+  documentation: |-
+    Resolves the e2e environment into a plain KEY=value e2e.env written to
+    SHARED_DIR: the pinned commit of each suite repo (read from the pin
+    registry, ci/e2e-hooks/suite-repos.yaml, at the provisioned
+    rosa-seaplane commit — before CI overrides pins with ci-tags) and the
+    environment endpoints (BASE_URL, RHOBS and ZOA API URLs, cluster
+    prefix, region, OCP image). No secrets: AWS credentials stay in the
+    mounted secret.
+
+    Supports ephemeral environments (Terraform outputs in SHARED_DIR,
+    written by rosa-seaplane-provision) and standing int/stage
+    environments (creds files in the mounted secret).
+
+    Includes an environment readiness check that replaces the old
+    per-suite gating: the platform API must answer and, when customer
+    credentials are mounted, they must work. The step fails with
+    "environment not ready" so no suite starts on a broken environment.
