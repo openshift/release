@@ -76,7 +76,7 @@ function RecordTestResult () {
 
 # Function to generate JUnit XML
 function GenerateJunitXml () {
-    typeset junitFile="${ARTIFACT_DIR}/junit_interop-ACM-security-scan-ctr_img-ACS-app_deployment.xml"
+    typeset junitFile="${ARTIFACT_DIR}/junit_interop-acm-security-scan-ctr-img-acs-app-deployment.xml"
     typeset -i totalDuration=0
     totalDuration=$(( $(date +%s) - startTime ))
 
@@ -104,7 +104,7 @@ function GenerateJunitXml () {
     cat > "${junitFile}" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="interop-ACM-security-scan-ctr_img-ACS-app_deployment" tests="${totalTests}" failures="${failedTests}" errors="0" skipped="${skippedTests}" time="${totalDuration}">
+  <testsuite name="interop-acm-security-scan-ctr-img-acs-app-deployment" tests="${totalTests}" failures="${failedTests}" errors="0" skipped="${skippedTests}" time="${totalDuration}">
 EOF
 
     # Generate XML for each test case
@@ -116,13 +116,13 @@ EOF
         if [ "${status}" = "failed" ]; then
             typeset escapedMsg=""
             escapedMsg=$(echo "${failureMsg}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
-            echo "    <testcase name=\"${test}\" classname=\"interop-ACM-security-scan-ctr_img-ACS-app_deployment\" time=\"${duration}\"><failure message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
+            echo "    <testcase name=\"${test}\" classname=\"interop-acm-security-scan-ctr-img-acs-app-deployment\" time=\"${duration}\"><failure message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
         elif [ "${status}" = "skipped" ]; then
             typeset escapedMsg=""
             escapedMsg=$(echo "${failureMsg}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
-            echo "    <testcase name=\"${test}\" classname=\"interop-ACM-security-scan-ctr_img-ACS-app_deployment\" time=\"${duration}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
+            echo "    <testcase name=\"${test}\" classname=\"interop-acm-security-scan-ctr-img-acs-app-deployment\" time=\"${duration}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
         else
-            echo "    <testcase name=\"${test}\" classname=\"interop-ACM-security-scan-ctr_img-ACS-app_deployment\" time=\"${duration}\"/>" >> "${junitFile}"
+            echo "    <testcase name=\"${test}\" classname=\"interop-acm-security-scan-ctr-img-acs-app-deployment\" time=\"${duration}\"/>" >> "${junitFile}"
         fi
     done
 
@@ -352,7 +352,7 @@ eval "$(
 # shared storage.
 PostProcessJunit () {
     if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
-        ExitTrap--PostProcessPrep junit--interop-ACM-security-scan-ctr_img-ACS-app_deployment.xml ||
+        ExitTrap--PostProcessPrep junit--interop-acm-security-scan-ctr-img-acs-app-deployment.xml ||
             : "WARNING: junit post-processing failed"
     else
         : "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping"

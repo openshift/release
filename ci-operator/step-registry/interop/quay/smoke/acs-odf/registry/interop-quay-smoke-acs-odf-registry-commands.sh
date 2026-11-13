@@ -32,8 +32,8 @@ ARTIFACT_DIR="${ARTIFACT_DIR:=/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
 # Raw suite name and file name carry the step identity; ExitTrap
 # post-processing renames the suite (LP_IO__ET_PPP__NEW_TS_NAME) and
-# merges this file into junit--interop-Quay-smoke-ACS+ODF-registry.xml.
-typeset junitFile="${ARTIFACT_DIR}/junit_interop-quay-smoke-ACS+ODF-registry.xml"
+# merges this file into junit--interop-quay-smoke-acs-odf-registry.xml.
+typeset junitFile="${ARTIFACT_DIR}/junit_interop-quay-smoke-acs-odf-registry.xml"
 typeset imageTag=''
 imageTag="${BUILD_ID:-$(date +%s)}"
 # Ephemeral ACS admin password file: written once by RunAcsScan inside a
@@ -85,7 +85,7 @@ function GenerateJunit () {
     cat > "${junitFile}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="interop-Quay-smoke-ACS+ODF-registry" tests="${total}" failures="${failures}" errors="0" skipped="${skipped}" time="${elapsed}">
+  <testsuite name="interop-quay-smoke-acs-odf-registry" tests="${total}" failures="${failures}" errors="0" skipped="${skipped}" time="${elapsed}">
 EOF
 
     for t in "${allTests[@]}"; do
@@ -95,11 +95,11 @@ EOF
         escapedMsg="$(printf '%s' "${testFailureMsg[${t}]}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')"
 
         if [[ "${testStatus[${t}]}" == "failed" ]]; then
-            echo "    <testcase name=\"${escapedName}\" classname=\"interop-Quay-smoke-ACS+ODF-registry\" time=\"${testDuration[${t}]}\"><failure message=\"${escapedMsg}\"><![CDATA[${testFailureMsg[${t}]}]]></failure></testcase>" >> "${junitFile}"
+            echo "    <testcase name=\"${escapedName}\" classname=\"interop-quay-smoke-acs-odf-registry\" time=\"${testDuration[${t}]}\"><failure message=\"${escapedMsg}\"><![CDATA[${testFailureMsg[${t}]}]]></failure></testcase>" >> "${junitFile}"
         elif [[ "${testStatus[${t}]}" == "skipped" ]]; then
-            echo "    <testcase name=\"${escapedName}\" classname=\"interop-Quay-smoke-ACS+ODF-registry\" time=\"${testDuration[${t}]}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
+            echo "    <testcase name=\"${escapedName}\" classname=\"interop-quay-smoke-acs-odf-registry\" time=\"${testDuration[${t}]}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
         else
-            echo "    <testcase name=\"${escapedName}\" classname=\"interop-Quay-smoke-ACS+ODF-registry\" time=\"${testDuration[${t}]}\"/>" >> "${junitFile}"
+            echo "    <testcase name=\"${escapedName}\" classname=\"interop-quay-smoke-acs-odf-registry\" time=\"${testDuration[${t}]}\"/>" >> "${junitFile}"
         fi
     done
 
@@ -136,7 +136,7 @@ eval "$(
 # shared storage.
 PostProcessJunit () {
     if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
-        ExitTrap--PostProcessPrep junit--interop-Quay-smoke-ACS+ODF-registry.xml ||
+        ExitTrap--PostProcessPrep junit--interop-quay-smoke-acs-odf-registry.xml ||
             echo "WARNING: junit post-processing failed" >&2
     else
         echo "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping" >&2

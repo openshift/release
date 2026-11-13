@@ -4,35 +4,43 @@ This directory contains **true interop tests** that test interaction between 2 o
 
 ## Directory Structure
 
-Pattern: `step-registry/interop/<mainOperator>/<testFunctionalGroup1>[/.../<testFunctionalGroupN>]/<targetOperators>/<testName>`
+Pattern: `step-registry/interop/<main-operator>/<test-functional-group-1>[/.../<test-functional-group-n>]/<target-operators>/<test-name>`
+
+Every path component, at every level, is a lowercase RFC 1123 label: lowercase
+alphanumerics, with `-` as the only separator. No uppercase and no underscore
+or plus characters anywhere in a path, doubled or not.
+
+CI Operator joins the directory path with `/` replaced by `-` to form the step
+name, and that step name becomes the pod name verbatim. Only characters valid in
+a DNS-1123 subdomain (lowercase alphanumerics, `-`, `.`) survive, so `_` and `+`
+fail at pod creation.
 
 ```
 step-registry/interop/
- |- <mainOperator>/
-     |- <testFunctionalGroup1>/
+ |- <main-operator>/
+     |- <test-functional-group-1>/
         /                                   \
         |.                                  |
         | .                                 |
         |  .                                |
-        \    |- <testFunctionalGroupN>/     /
-                 |- <targetOperators>/
-                     |- <testName>/
+        \    |- <test-functional-group-n>/  /
+                 |- <target-operators>/
+                     |- <test-name>/
 ```
 
 ### Components:
 
-- **`<mainOperator>`**: The subject operator being tested (ACM, Quay, etc.)
-- **`<testFunctionalGroupN>`**: Functional area (policy-set, security-scan, deployment, smoke, etc.)
+- **`<main-operator>`**: The subject operator being tested (`acm`, `quay`, etc.)
+- **`<test-functional-group-n>`**: Functional area (`policy-set`, `security-scan`, `ctr-img`, `smoke`, etc.)
+  - Multi-word components are joined with `-`: `policy-set`, `opp-bundle`, `security-scan`, `ctr-img`, `app-deployment`
   - Can have multiple nested levels for grouping if needed
-- **`<targetOperators>`**: The target operators this test interacts with
+- **`<target-operators>`**: The target operators this test interacts with
   - Use descriptive names: `opp-bundle` for the full OpenShift Plus bundle
-  - Or explicit names like `ACS`, `ACS+ODF` for specific combinations
-- **`<testName>`**: Concise name describing the test action
-  - Avoid `-` in test names (CI Operator uses `-` to join path segments into the step name)
-  - Use `_` to separate words, `__` to separate functional components
-  - Pattern: `stub_component_1[__...[__stub_component_N]]`
+  - Or explicit names like `acs` for a single product, `acs-odf` for specific combinations
+  - Combined target operators are joined with `-`
+- **`<test-name>`**: Concise name describing the test action, words separated with `-`
   - Example: `deployment` = deploys and verifies the resource
-  - Example: `app_deployment` = deploys application
+  - Example: `app-deployment` = deploys application
   - Example: `registry` = tests registry functionality
 
 ## Pod Name Length Considerations
@@ -46,41 +54,41 @@ step-registry/interop/
 ### Best Practices:
 - Keep step names concise and DNS-1123 compliant
 - Don't repeat information already in the path
-- Use single underscores `_` to separate words in test names
-- Example: `ACM/policy-set/opp-bundle/deployment` ✅
-- Not: `ACM/policies/opp-bundle/policyset_deploy_compliance` ❌ (redundant, too long)
+- Use `-` to separate words in test names
+- Example: `acm/policy-set/opp-bundle/deployment` ✅
+- Not: `acm/policies/opp-bundle/policyset-deploy-compliance` ❌ (redundant, too long)
 
 ## Examples
 
 ### ACM Policy Set Deployment for OpenShift Plus Bundle
 ```
-interop/ACM/policy-set/opp-bundle/deployment/
+interop/acm/policy-set/opp-bundle/deployment/
 ```
-- **Main operator**: ACM
+- **Main operator**: acm
 - **Functional group**: policy-set
 - **Target operators**: opp-bundle (OpenShift Plus: ACM, ACS, ODF, Quay)
 - **Test name**: deployment
-- **Step name**: `interop-ACM-policy-set-opp-bundle-deployment`
+- **Step name**: `interop-acm-policy-set-opp-bundle-deployment`
 - **What it tests**: ACM deploys policy-set to OpenShift Plus bundle and verifies successful deployment
 
 ### ACM Security Scanning of Container Images with ACS
 ```
-interop/ACM/security-scan/ctr_img/ACS/app_deployment/
+interop/acm/security-scan/ctr-img/acs/app-deployment/
 ```
-- **Main operator**: ACM
-- **Functional group**: security-scan/ctr_img (container image security scanning)
-- **Target operator**: ACS (Advanced Cluster Security)
-- **Test name**: app_deployment
-- **Step name**: `interop-ACM-security-scan-ctr_img-ACS-app_deployment`
+- **Main operator**: acm
+- **Functional group**: security-scan/ctr-img (container image security scanning)
+- **Target operator**: acs (Advanced Cluster Security)
+- **Test name**: app-deployment
+- **Step name**: `interop-acm-security-scan-ctr-img-acs-app-deployment`
 - **What it tests**: ACM deploys application, ACS performs security scan on container images
 
 ### Quay Registry Smoke Test with ACS and ODF
 ```
-interop/Quay/smoke/ACS+ODF/registry/
+interop/quay/smoke/acs-odf/registry/
 ```
-- **Main operator**: Quay
+- **Main operator**: quay
 - **Functional group**: smoke
-- **Target operators**: ACS+ODF (ACS security + ODF storage)
+- **Target operators**: acs-odf (ACS security + ODF storage)
 - **Test name**: registry
-- **Step name**: `interop-Quay-smoke-ACS+ODF-registry`
+- **Step name**: `interop-quay-smoke-acs-odf-registry`
 - **What it tests**: Smoke test of Quay registry functionality (push/pull images, ODF storage integration, ACS security scanning)
