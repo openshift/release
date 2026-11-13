@@ -1,0 +1,407 @@
+#!/usr/bin/env bash
+
+# Never emit commands or credential-bearing arguments through shell tracing,
+# including when the caller invokes this script with `bash -x`.
+set +x
+set -o errexit
+set -o nounset
+set -o pipefail
+
+cleanup_children() {
+  local children
+  children=$(jobs -p) || true
+  if [[ -n "${children}" ]]; then
+    kill ${children} && wait
+  fi
+}
+trap 'cleanup_children; exit 1' TERM INT
+
+if [[ ! "${MP_REPLICAS}" =~ ^[1-9][0-9]*$ ]]; then
+  echo "MP_REPLICAS must be a positive integer." >&2
+  exit 1
+fi
+
+STATE_FILE="${SHARED_DIR}/aro-hcp.env"
+if [[ -s "${STATE_FILE}" ]]; then
+  # shellcheck disable=SC1090
+  source "${STATE_FILE}"
+fi
+CLUSTER_CONFIG_FILE="${SHARED_DIR}/cluster-config"
+SUBSCRIPTION_ID="${SUBSCRIPTION_ID:-${AZURE_SUBSCRIPTION_ID:-}}"
+
+: "${CLUSTER_NAME:?SHARED_DIR/aro-hcp.env must provide the cluster name}"
+: "${CUSTOMER_RG_NAME:?SHARED_DIR/aro-hcp.env must provide the resource group}"
+
+# Record a numeric timer for an additional node pool in cluster metadata.
+record_nodepool_timer() {
+  local nodepool="$1"
+  local key="$2"
+  local value="$3"
+  local tmp
+  if [[ ! -s "${CLUSTER_CONFIG_FILE}" ]] || ! jq empty "${CLUSTER_CONFIG_FILE}" >/dev/null 2>&1; then
+    jq -n '{provider: "azure", cluster: {}, timers: {}, nodepools: {}}' > "${CLUSTER_CONFIG_FILE}.tmp"
+    mv "${CLUSTER_CONFIG_FILE}.tmp" "${CLUSTER_CONFIG_FILE}"
+    chmod 600 "${CLUSTER_CONFIG_FILE}"
+  fi
+  tmp=$(mktemp "${CLUSTER_CONFIG_FILE}.XXXXXX")
+  jq --arg nodepool "${nodepool}" --arg key "${key}" --argjson value "${value}" \
+    '.nodepools[$nodepool][$key] = $value' "${CLUSTER_CONFIG_FILE}" > "${tmp}"
+  mv "${tmp}" "${CLUSTER_CONFIG_FILE}"
+}
+
+export AZURE_CONFIG_DIR="${SHARED_DIR}/azure-config-nodepool"
+mkdir -p "${AZURE_CONFIG_DIR}"
+umask 077
+
+SP_FILE="${CLUSTER_PROFILE_DIR}/osServicePrincipalHcp.json"
+if [[ ! -s "${SP_FILE}" ]]; then
+  echo "${SP_FILE} is missing; cannot authenticate for node-pool creation." >&2
+  exit 1
+fi
+
+AZURE_CLIENT_ID=$(jq -er '.clientId' "${SP_FILE}")
+AZURE_CLIENT_SECRET=$(jq -er '.clientSecret' "${SP_FILE}")
+AZURE_TENANT_ID=$(jq -er '.tenantId' "${SP_FILE}")
+
+set +x
+az login \
+  --service-principal \
+  --username "${AZURE_CLIENT_ID}" \
+  --password "${AZURE_CLIENT_SECRET}" \
+  --tenant "${AZURE_TENANT_ID}" \
+  --only-show-errors \
+  --output none
+unset AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_TENANT_ID
+
+if [[ -n "${SUBSCRIPTION_ID}" ]]; then
+  az account set --subscription "${SUBSCRIPTION_ID}"
+else
+  SUBSCRIPTION_ID=$(az account show --query id --output tsv)
+fi
+
+az extension add --name aro --upgrade --yes --only-show-errors
+az aro hcp -h >/dev/null
+
+# The HCP resource reports the control-plane minor version, while node pools
+# require a full X.Y.Z version. Resolve the newest enabled node-pool version
+# for the cluster's major/minor release and channel from the Azure RP.
+CLUSTER_VERSION_JSON=$(az aro hcp cluster show \
+  --name "${CLUSTER_NAME}" \
+  --resource-group "${CUSTOMER_RG_NAME}" \
+  --query properties.version \
+  --output json)
+CLUSTER_MAJOR_MINOR=$(jq -r '.id // empty' <<<"${CLUSTER_VERSION_JSON}" | awk -F. 'NF >= 2 { print $1 "." $2; exit }')
+CLUSTER_CHANNEL_GROUP=$(jq -r '.channelGroup // empty' <<<"${CLUSTER_VERSION_JSON}")
+MP_CHANNEL_GROUP="${MP_CHANNEL_GROUP:-${NODEPOOL_CHANNEL_GROUP:-${CLUSTER_CHANNEL_GROUP:-nightly}}}"
+: "${CLUSTER_MAJOR_MINOR:?The HCP did not report a valid major.minor version}"
+
+MP_OPENSHIFT_VERSION="${MP_OPENSHIFT_VERSION:-${NODEPOOL_VERSION:-${CONTROL_PLANE_EXACT_VERSION:-}}}"
+if [[ -z "${MP_OPENSHIFT_VERSION}" && "${MP_CHANNEL_GROUP}" != "nightly" ]]; then
+  # The current ARO CLI returns channel-group metadata with each version rather
+  # than accepting --channel-group on get-versions. Request node-pool versions
+  # and filter the response here so the selected value is always X.Y.Z.
+  AVAILABLE_VERSIONS_JSON=$(az aro hcp get-versions \
+    --location "${REGION}" \
+    --node-pools \
+    --output json)
+  MP_OPENSHIFT_VERSION=$(jq -r \
+    --arg channel_group "${MP_CHANNEL_GROUP}" \
+    --arg major_minor "${CLUSTER_MAJOR_MINOR}" \
+    '[.[]
+     | {version: (.Name // .name // ""), channel_group: (.ChannelGroup // .channelGroup // .properties.channelGroup // "")}
+     | select(.channel_group == $channel_group)
+     | select(.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))
+     | select(.version | startswith($major_minor + "."))
+     | .version]
+     | sort_by(split(".") | map(tonumber))
+     | last // empty' <<<"${AVAILABLE_VERSIONS_JSON}")
+fi
+if [[ "${MP_CHANNEL_GROUP}" == "nightly" ]]; then
+  [[ "${MP_OPENSHIFT_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+-0\.nightly- ]] || {
+    echo "No exact nightly node-pool version was resolved for channel ${MP_CHANNEL_GROUP}." >&2
+    exit 1
+  }
+fi
+: "${MP_OPENSHIFT_VERSION:?No enabled ${CLUSTER_MAJOR_MINOR}.z node-pool version is available in ${REGION} for channel ${MP_CHANNEL_GROUP} }"
+echo "Using latest available node pool version ${MP_OPENSHIFT_VERSION} and channel group ${MP_CHANNEL_GROUP}."
+
+# Convert a node-pool timeout value into seconds for polling.
+duration_to_seconds() {
+  local value="$1"
+  if [[ "${value}" =~ ^([0-9]+)s$ ]]; then
+    echo "${BASH_REMATCH[1]}"
+  elif [[ "${value}" =~ ^([0-9]+)m$ ]]; then
+    echo $((BASH_REMATCH[1] * 60))
+  elif [[ "${value}" =~ ^([0-9]+)h$ ]]; then
+    echo $((BASH_REMATCH[1] * 3600))
+  elif [[ "${value}" =~ ^[0-9]+$ ]]; then
+    echo "${value}"
+  else
+    echo "Unsupported duration: ${value}" >&2
+    return 1
+  fi
+}
+
+# The Azure CLI nodepool command declares --labels and --taints as list
+# arguments. Keep the step inputs in the familiar Kubernetes shorthand form,
+# but pass the CLI a JSON list. JSON values are also accepted so callers can
+# provide the native Azure CLI form directly.
+labels_to_json() {
+  local labels="$1"
+  if [[ "${labels}" == \[* ]]; then
+    printf '%s\n' "${labels}"
+    return
+  fi
+  jq -cn --arg labels "${labels}" '
+    ($labels
+      | gsub("[[:space:]]+"; ",")
+      | split(",")
+      | map(select(length > 0)
+          | split("=") as $parts
+          | {key: $parts[0], value: ($parts[1:] | join("="))}))
+  '
+}
+
+taints_to_json() {
+  local taints="$1"
+  if [[ "${taints}" == \[* ]]; then
+    printf '%s\n' "${taints}"
+    return
+  fi
+  jq -cn --arg taints "${taints}" '
+    ($taints
+      | gsub("[[:space:]]+"; ",")
+      | split(",")
+      | map(select(length > 0)
+          | capture("^(?<key>[^=:]+)(=(?<value>[^:]*))?:(?<effect>[^:]+)$")
+          | {key: .key, value: (.value // ""), effect: .effect}))
+  '
+}
+
+# Normalize a comma- or space-separated zone list and remove duplicates.
+normalize_zones() {
+  tr ', ' '\n' <<<"$1" | awk 'NF && !seen[$0]++' | sort -V
+}
+
+# Query Azure for zones where the requested VM SKU is available.
+discover_availability_zones() {
+  local sku_json
+  if ! sku_json=$(az vm list-skus \
+    --location "${REGION}" \
+    --resource-type virtualMachines \
+    --size "${MP_MACHINE_TYPE}" \
+    --zone \
+    --output json); then
+    echo "Unable to query VM SKU availability for ${MP_MACHINE_TYPE} in ${REGION}." >&2
+    return 1
+  fi
+
+  jq -r \
+    --arg location "${REGION}" \
+    --arg size "${MP_MACHINE_TYPE}" \
+    '[.[] | select(.name == $size) | .locationInfo[]? |
+      select((.location | ascii_downcase) == ($location | ascii_downcase)) |
+      .zones[]?] | unique | .[]' <<<"${sku_json}" | sort -V -u
+}
+
+# Select the configured or discovered zones for the additional node pool.
+select_availability_zones() {
+  local candidates
+  local -a candidates_array
+  if [[ "${MULTI_AZ:-false}" == "true" ]]; then
+    if [[ -n "${MP_ZONES:-}" ]]; then
+      candidates=$(normalize_zones "${MP_ZONES}")
+      echo "Using configured availability-zone override: $(tr '\n' ' ' <<<"${candidates}")" >&2
+    else
+      candidates=$(discover_availability_zones)
+      echo "Discovered availability zones for ${MP_MACHINE_TYPE} in ${REGION}: $(tr '\n' ' ' <<<"${candidates}")" >&2
+    fi
+
+    if [[ -z "${candidates}" ]]; then
+      echo "No availability zones are available for ${MP_MACHINE_TYPE} in ${REGION}." >&2
+      return 1
+    fi
+    if [[ ! "${ZONES_COUNT:-}" =~ ^[1-9][0-9]*$ ]]; then
+      echo "ZONES_COUNT must be a positive integer when MULTI_AZ=true." >&2
+      return 1
+    fi
+    mapfile -t candidates_array < <(head -n "${ZONES_COUNT}" <<<"${candidates}")
+    if (( ${#candidates_array[@]} != ZONES_COUNT )); then
+      echo "Requested ${ZONES_COUNT} zones, but only $(wc -l <<<"${candidates}" | xargs) are available." >&2
+      return 1
+    fi
+    printf '%s\n' "${candidates_array[@]}"
+    return 0
+  fi
+
+  if [[ -n "${MP_ZONE:-}" ]]; then
+    printf '%s\n' "${MP_ZONE}"
+  else
+    printf '\n'
+  fi
+}
+
+# Build the node-pool name, adding a zone suffix for multi-AZ pools.
+nodepool_name_for_zone() {
+  local zone="$1"
+  if [[ "${MULTI_AZ:-false}" != "true" ]]; then
+    printf '%s\n' "${MP_NAME}"
+  else
+    printf '%s-az%s\n' "${MP_NAME}" "${zone}"
+  fi
+}
+
+# Submit one node-pool create request. Readiness and timer completion are
+# handled after all zone-specific requests have been submitted.
+create_nodepool() {
+  local nodepool_name="$1"
+  local availability_zone="$2"
+  local -a nodepool_args
+
+  nodepool_args=(
+    --cluster-name "${CLUSTER_NAME}"
+    --name "${nodepool_name}"
+    --resource-group "${CUSTOMER_RG_NAME}"
+    --replicas "${MP_REPLICAS}"
+    --vm-size "${MP_MACHINE_TYPE}"
+    --version "${MP_OPENSHIFT_VERSION}"
+    --channel-group "${MP_CHANNEL_GROUP}"
+    --auto-repair "${MP_AUTO_REPAIR}"
+    --only-show-errors
+  )
+  if [[ -n "${MP_LABELS:-}" ]]; then
+    nodepool_args+=(--labels "$(labels_to_json "${MP_LABELS}")")
+  fi
+  if [[ -n "${MP_TAINTS:-}" ]]; then
+    nodepool_args+=(--taints "$(taints_to_json "${MP_TAINTS}")")
+  fi
+  if [[ -n "${availability_zone}" ]]; then
+    nodepool_args+=(--availability-zone "${availability_zone}")
+  fi
+  if [[ -n "${MP_SUBNET_ID:-}" ]]; then
+    nodepool_args+=(--subnet-id "${MP_SUBNET_ID}")
+  fi
+
+  echo "Creating ARO HCP node pool ${nodepool_name} on ${CLUSTER_NAME}${availability_zone:+ in availability zone ${availability_zone}}."
+  az aro hcp cluster nodepool create "${nodepool_args[@]}"
+}
+
+record_nodepool_ready() {
+  local nodepool_name="$1"
+  local nodepool_rp_ready="$2"
+  local nodepool_install_start="${NODEPOOL_INSTALL_STARTS[${nodepool_name}]}"
+  local availability_zone="${NODEPOOL_ZONES[${nodepool_name}]}"
+  local install_seconds=$((nodepool_rp_ready - nodepool_install_start))
+
+  record_nodepool_timer "${nodepool_name}" "rp_ready" "${nodepool_rp_ready}"
+  record_nodepool_timer "${nodepool_name}" "install_seconds" "${install_seconds}"
+
+  NODEPOOL_STATE_FILE="${SHARED_DIR}/aro-hcp-nodepool-${nodepool_name}.env"
+  cat >"${NODEPOOL_STATE_FILE}" <<EOF
+AZURE_SUBSCRIPTION_ID=${SUBSCRIPTION_ID}
+CLUSTER_NAME=${CLUSTER_NAME}
+CUSTOMER_RG_NAME=${CUSTOMER_RG_NAME}
+NODEPOOL_NAME=${nodepool_name}
+NODEPOOL_VERSION=${MP_OPENSHIFT_VERSION}
+NODEPOOL_VM_SIZE=${MP_MACHINE_TYPE}
+NODEPOOL_AVAILABILITY_ZONE=${availability_zone}
+NODEPOOL_INSTALL_START=${nodepool_install_start}
+NODEPOOL_RP_READY=${nodepool_rp_ready}
+NODEPOOL_INSTALL_SECONDS=${install_seconds}
+EOF
+  chmod 600 "${NODEPOOL_STATE_FILE}"
+  echo "ARO HCP node pool ${nodepool_name} is ready."
+}
+
+wait_for_nodepools() {
+  local timeout_seconds
+  timeout_seconds=$(duration_to_seconds "${MP_TIMEOUT}")
+  local deadline=$((SECONDS + timeout_seconds))
+  local remaining="$#"
+  local failed=0
+  local nodepool_name state current_time
+  local -A complete
+
+  for nodepool_name in "$@"; do
+    complete["${nodepool_name}"]=0
+  done
+
+  while (( remaining > 0 && SECONDS < deadline )); do
+    for nodepool_name in "$@"; do
+      [[ "${complete[${nodepool_name}]}" == "1" ]] && continue
+
+      state=$(az aro hcp cluster nodepool show \
+        --cluster-name "${CLUSTER_NAME}" \
+        --name "${nodepool_name}" \
+        --resource-group "${CUSTOMER_RG_NAME}" \
+        --query properties.provisioningState \
+        --output tsv 2>/dev/null || true)
+      echo "Node pool ${nodepool_name} provisioningState=${state:-NotFound}"
+      current_time=$(date +%s)
+      case "${state}" in
+        Succeeded)
+          record_nodepool_ready "${nodepool_name}" "${current_time}"
+          complete["${nodepool_name}"]=1
+          remaining=$((remaining - 1))
+          ;;
+        Failed|Canceled|Cancelled|Error)
+          echo "Node pool ${nodepool_name} failed with state ${state}." >&2
+          complete["${nodepool_name}"]=1
+          remaining=$((remaining - 1))
+          failed=1
+          ;;
+      esac
+    done
+    (( remaining == 0 )) || sleep 30
+  done
+
+  if (( remaining > 0 )); then
+    for nodepool_name in "$@"; do
+      [[ "${complete[${nodepool_name}]}" == "1" ]] && continue
+      echo "Timed out waiting for node pool ${nodepool_name}." >&2
+      failed=1
+    done
+  fi
+
+  return "${failed}"
+}
+
+if ! TARGET_ZONE_LIST=$(select_availability_zones); then
+  echo "Unable to select availability zones for the additional node pool(s)." >&2
+  exit 1
+fi
+if [[ -n "${TARGET_ZONE_LIST}" ]]; then
+  mapfile -t TARGET_ZONES < <(printf '%s\n' "${TARGET_ZONE_LIST}")
+else
+  TARGET_ZONES=("")
+fi
+
+printf '%s\n' "${TARGET_ZONES[@]}" >"${SHARED_DIR}/aro-hcp-nodepool-zones"
+printf '%s\n' "$(( ${#TARGET_ZONES[@]} * MP_REPLICAS ))" >"${SHARED_DIR}/aro-hcp-infra-replicas"
+
+declare -A NODEPOOL_INSTALL_STARTS NODEPOOL_ZONES
+NODEPOOL_NAMES=()
+NODEPOOL_CREATE_PIDS=()
+for availability_zone in "${TARGET_ZONES[@]}"; do
+  nodepool_name=$(nodepool_name_for_zone "${availability_zone}")
+  NODEPOOL_NAMES+=("${nodepool_name}")
+  NODEPOOL_ZONES["${nodepool_name}"]="${availability_zone}"
+  nodepool_install_start=$(date +%s)
+  NODEPOOL_INSTALL_STARTS["${nodepool_name}"]="${nodepool_install_start}"
+  record_nodepool_timer "${nodepool_name}" "install_start" "${nodepool_install_start}"
+  create_nodepool "${nodepool_name}" "${availability_zone}" &
+  NODEPOOL_CREATE_PIDS+=("$!")
+done
+
+nodepool_create_failed=0
+for pid in "${NODEPOOL_CREATE_PIDS[@]}"; do
+  if ! wait "${pid}"; then
+    nodepool_create_failed=1
+  fi
+done
+(( nodepool_create_failed == 0 )) || exit 1
+
+echo "Waiting for all ARO HCP node pools to become ready: ${NODEPOOL_NAMES[*]}."
+wait_for_nodepools "${NODEPOOL_NAMES[@]}"
+
+echo "ARO HCP node pool creation completed for ${#TARGET_ZONES[@]} availability zone(s)."

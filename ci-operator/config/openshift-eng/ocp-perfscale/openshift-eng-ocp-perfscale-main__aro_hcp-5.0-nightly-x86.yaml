@@ -1,0 +1,167 @@
+base_images:
+  aro-hcp-e2e-tools:
+    name: aro-hcp-e2e-tools
+    namespace: aro-hcp
+    tag: latest
+  rosa-aws-cli:
+    name: rosa-aws-cli
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: aro-hcp-control-plane-24nodes
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: azure-perfscale
+    env:
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --timeout=5h --ignore-health-check
+      COMPUTE_MACHINE_TYPE: Standard_D4s_v5
+      CRD_SCALE_EXTRA_FLAGS: --ignore-health-check
+      EXPECTED_WORKER_NODES: "24"
+      EXTRA_FLAGS: --ignore-health-check
+      INDEX_ENABLED: "true"
+      MP_LABELS: node-role.kubernetes.io/infra=
+      MP_MACHINE_TYPE: Standard_D4s_v5
+      MP_NAME: infra
+      MP_REPLICAS: "1"
+      MP_TAINTS: node-role.kubernetes.io/infra=:NoSchedule
+      MULTI_AZ: "true"
+      ND_CNI_EXTRA_FLAGS: --ignore-health-check
+      ND_EXTRA_FLAGS: --ignore-health-check
+      OPENSHIFT_VERSION: "5.0"
+      READY_WAIT_TIMEOUT: 90m
+      REGION: eastus2
+      REPLICAS: "24"
+      SKIP_CLUSTER_VERSION_CHECK: "true"
+      ZONES_COUNT: "3"
+    post:
+    - chain: aro-hcp-cluster-deprovision
+    pre:
+    - chain: aro-hcp-cluster-provision
+    - ref: aro-hcp-cluster-wait-ready
+    - ref: aro-hcp-cluster-nodepool-create
+    - chain: openshift-qe-hypershift-infra
+    - ref: aro-hcp-cluster-index
+    test:
+    - chain: openshift-qe-control-plane
+  timeout: 14h0m0s
+- as: aro-hcp-control-plane-6nodes
+  cron: 0 14 * * *
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: azure-perfscale
+    env:
+      CD_V2_EXTRA_FLAGS: --churn-duration=20m --timeout=5h --ignore-health-check
+      COMPUTE_MACHINE_TYPE: Standard_D4s_v5
+      CRD_SCALE_EXTRA_FLAGS: --ignore-health-check
+      EXPECTED_WORKER_NODES: "6"
+      EXTRA_FLAGS: --ignore-health-check
+      INDEX_ENABLED: "true"
+      MP_LABELS: node-role.kubernetes.io/infra=
+      MP_MACHINE_TYPE: Standard_D4s_v5
+      MP_NAME: infra
+      MP_REPLICAS: "1"
+      MP_TAINTS: node-role.kubernetes.io/infra=:NoSchedule
+      MULTI_AZ: "true"
+      ND_CNI_EXTRA_FLAGS: --ignore-health-check
+      ND_EXTRA_FLAGS: --ignore-health-check
+      OPENSHIFT_VERSION: "5.0"
+      READY_WAIT_TIMEOUT: 90m
+      REGION: eastus2
+      REPLICAS: "6"
+      SKIP_CLUSTER_VERSION_CHECK: "true"
+      ZONES_COUNT: "3"
+    post:
+    - chain: aro-hcp-cluster-deprovision
+    pre:
+    - chain: aro-hcp-cluster-provision
+    - ref: aro-hcp-cluster-wait-ready
+    - ref: aro-hcp-cluster-nodepool-create
+    - chain: openshift-qe-hypershift-infra
+    - ref: aro-hcp-cluster-index
+    test:
+    - chain: openshift-qe-control-plane
+  timeout: 14h0m0s
+- always_run: false
+  as: data-path-9nodes
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: azure-perfscale
+    env:
+      COMPUTE_MACHINE_TYPE: Standard_D4s_v5
+      CONFIG: config/standard-classic-rosa.yml
+      EXPECTED_WORKER_NODES: "9"
+      INDEX_ENABLED: "true"
+      MP_LABELS: node-role.kubernetes.io/infra=
+      MP_MACHINE_TYPE: Standard_D4s_v5
+      MP_NAME: infra
+      MP_REPLICAS: "1"
+      MP_TAINTS: node-role.kubernetes.io/infra=:NoSchedule
+      MULTI_AZ: "false"
+      OPENSHIFT_VERSION: "5.0"
+      READY_WAIT_TIMEOUT: 90m
+      REGION: eastus2
+      REPLICAS: "9"
+      SKIP_CLUSTER_VERSION_CHECK: "true"
+    post:
+    - chain: aro-hcp-cluster-deprovision
+    pre:
+    - chain: aro-hcp-cluster-provision
+    - ref: aro-hcp-cluster-wait-ready
+    - ref: aro-hcp-cluster-nodepool-create
+    - chain: openshift-qe-hypershift-infra
+    - ref: openshift-qe-perfscale-azu-data-path-nsg
+    - ref: aro-hcp-cluster-index
+    test:
+    - chain: openshift-qe-data-path-tests
+  timeout: 14h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: ocp-perfscale
+  variant: aro_hcp-5.0-nightly-x86

@@ -1,0 +1,36 @@
+ref:
+  as: aro-hcp-cluster-external-auth
+  from: aro-hcp-e2e-tools
+  commands: aro-hcp-cluster-external-auth-commands.sh
+  grace_period: 10m
+  timeout: 120m
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+  env:
+  - name: ARO_HCP_CLUSTER_NAME
+    default: ""
+    documentation: Optional ARO HCP cluster name. When empty, read it from SHARED_DIR.
+  - name: ARO_HCP_CUSTOMER_RG_NAME
+    default: ""
+    documentation: Optional customer resource group. When empty, read it from SHARED_DIR.
+  - name: EXTERNAL_AUTH_NAME
+    default: ""
+    documentation: ExternalAuth and Entra application name. When empty, use the cluster name; it must be no more than 15 characters.
+  - name: EXTERNAL_AUTH_ISSUER_URL
+    default: ""
+    documentation: Optional Entra OIDC issuer URL. When empty, derive the tenant v2.0 issuer from the Azure service-principal profile.
+  - name: AZURE_AD_GROUP_NAME
+    default: aro-hcp-perfscale
+    documentation: Entra group granted cluster-admin access through the guest external-auth configuration.
+  - name: EXTERNAL_AUTH_TIMEOUT
+    default: 90m
+    documentation: Maximum time to wait for the ARO console URL.
+  documentation: |-
+    Configure ARO HCP external authentication as a reusable post-provision step.
+    The step creates the Entra application and secret, deploys the ARO HCP
+    ExternalAuth child resource with Bicep, creates the guest client-secret
+    Secret, and grants the configured Entra group cluster-admin access. It
+    consumes the cluster name, resource group, and kubeconfig from SHARED_DIR
+    when they are not supplied explicitly.

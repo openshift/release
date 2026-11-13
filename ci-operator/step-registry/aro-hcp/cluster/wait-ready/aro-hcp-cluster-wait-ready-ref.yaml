@@ -1,0 +1,28 @@
+ref:
+  as: aro-hcp-cluster-wait-ready
+  from: aro-hcp-e2e-tools
+  commands: aro-hcp-cluster-wait-ready-commands.sh
+  grace_period: 10m
+  timeout: 120m
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+  env:
+  - name: READY_WAIT_TIMEOUT
+    default: 90m
+    documentation: Maximum time to wait for Azure RP and guest-cluster readiness.
+  - name: EXPECTED_WORKER_NODES
+    default: ""
+    documentation: Optional worker-node count override. When empty, sum replicas from all Azure node pools.
+  - name: SKIP_CLUSTER_VERSION_CHECK
+    default: "false"
+    documentation: Skip ClusterVersion Available/Progressing/Degraded gating when set to true.
+  documentation: |-
+    Wait for an RP-backed ARO HCP cluster to be fully usable. The step checks
+    the HCP provisioning state, every node-pool provisioning state, guest API
+    access, ClusterVersion, ClusterOperators, all guest pods, and schedulable
+    worker nodes. It records control-plane and node-pool ready timestamps in
+    SHARED_DIR/cluster-config for the post-install index step. Control-plane
+    transition durations are stored under timers.install using the ROSA
+    state names (pending, waiting, installing, and updating when observed).
