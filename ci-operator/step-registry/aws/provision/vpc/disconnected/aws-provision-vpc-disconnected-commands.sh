@@ -635,11 +635,14 @@ echo '{}' > ${vpc_info_json}
 # vpc_id
 cat <<< "$(jq --arg v $VpcId '.vpc_id = $v' ${vpc_info_json})" > ${vpc_info_json}
 
-# IPv4 and IPv6 CIDR blocks
+# IPv4 CIDR — always written so the from-disk isolation step can scope its
+# firewall exemption to the actual VPC CIDR rather than falling back to /8.
+VpcIpv4CidrBlock=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="Ipv4CidrBlock") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")
+cat <<< "$(jq --arg v $VpcIpv4CidrBlock '.vpc_ipv4_cidr = $v' ${vpc_info_json})" > ${vpc_info_json}
+
+# IPv6 CIDR — only present for dual-stack runs
 if is_dualstack; then
-  VpcIpv4CidrBlock=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="Ipv4CidrBlock") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")
   VpcIpv6CidrBlock=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="Ipv6CidrBlock") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")
-  cat <<< "$(jq --arg v $VpcIpv4CidrBlock '.vpc_ipv4_cidr = $v' ${vpc_info_json})" > ${vpc_info_json}
   cat <<< "$(jq --arg v $VpcIpv6CidrBlock '.vpc_ipv6_cidr = $v' ${vpc_info_json})" > ${vpc_info_json}
 fi
 
