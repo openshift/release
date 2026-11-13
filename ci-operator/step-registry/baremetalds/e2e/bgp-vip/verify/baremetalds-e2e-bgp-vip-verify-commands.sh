@@ -5,11 +5,17 @@ set -o pipefail
 
 echo "************ baremetalds bgp-vip verify command ************"
 
-# Fetch packet basic configuration
+# Fetch packet basic configuration; this also makes sure the step's random
+# UID has a passwd entry, which ssh needs.
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/ds-vars.conf"
 
-ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << 'EOF'
+# Part 1: the bash checks, run on the hypervisor. A failure here is recorded
+# but does not stop part 2, so the origin tests always report.
+verify_rc=0
+ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << 'EOF' || verify_rc=$?
 #!/bin/bash
 set -o nounset
 set -o errexit
@@ -230,3 +236,75 @@ if [[ "${FAILURES}" -ne 0 ]]; then
 fi
 echo "BGP VIP verification passed"
 EOF
+
+# Part 2: the openshift/origin [OCPFeatureGate:BGPBasedVIPManagement] suites.
+
+# For disconnected or otherwise unreachable environments the API server is
+# reached through the proxy the setup step left behind.
+# xtrace is off here (part 1's set -x runs on the hypervisor); keep it off
+# while sourcing so a proxy password can never be echoed.
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    set +x
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+# The suites only select origin's own tests, so skip extracting the other
+# payload test binaries.
+export OPENSHIFT_SKIP_EXTERNAL_TESTS=true
+
+# The tests SSH to the hypervisor, which runs the bgp-tor FRR container, the
+# same way baremetalds-e2e-test passes it to the two-node fencing tests.
+HYPERVISOR_SSH_KEY="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+if [[ -f "${CLUSTER_PROFILE_DIR}/equinix-ssh-key" ]]; then
+    HYPERVISOR_SSH_KEY="${CLUSTER_PROFILE_DIR}/equinix-ssh-key"
+fi
+HYPERVISOR_JSON="{\"hypervisorIP\":\"${IP}\",\"sshUser\":\"root\",\"privateKeyPath\":\"${HYPERVISOR_SSH_KEY}\"}"
+# The hypervisor config has no port field; hand a non-default one to ssh.
+if [[ "${PORT}" != "22" ]]; then
+    mkdir -p "${HOME}/.ssh"
+    printf 'Host %s\n  Port %s\n' "${IP}" "${PORT}" >> "${HOME}/.ssh/config"
+fi
+
+if [[ "${DS_IP_STACK}" == "v6" || "${DS_IP_STACK}" == "v6v4" ]]; then
+    TEST_PROVIDER='{"type":"baremetal","disconnected":true}'
+else
+    TEST_PROVIDER='{"type":"baremetal"}'
+fi
+
+DISABLE_MONITOR_ARGS=()
+if [[ -n "${BGP_VIP_ORIGIN_DISABLED_MONITORS}" ]]; then
+    DISABLE_MONITOR_ARGS=(--disable-monitor "${BGP_VIP_ORIGIN_DISABLED_MONITORS}")
+fi
+
+available_suites="$(openshift-tests list suites 2>/dev/null || true)"
+
+origin_rc=0
+for suite in ${BGP_VIP_ORIGIN_SUITES}; do
+    if ! grep -Fxq "${suite}" <<<"${available_suites}"; then
+        echo "openshift-tests in this payload does not ship suite ${suite} (openshift/origin#31893 not in the payload yet); skipping it"
+        continue
+    fi
+    out="${ARTIFACT_DIR}/$(tr '/' '_' <<<"${suite}")"
+    mkdir -p "${out}"
+    echo "$(date) - running ${suite}"
+    set -x
+    openshift-tests run "${suite}" \
+        --provider "${TEST_PROVIDER}" \
+        --with-hypervisor-json "${HYPERVISOR_JSON}" \
+        "${DISABLE_MONITOR_ARGS[@]}" \
+        -o "${out}/e2e.log" \
+        --junit-dir "${out}/junit" || origin_rc=1
+    set +x
+done
+
+if [[ "${verify_rc}" -ne 0 ]]; then
+    echo "BGP VIP verification checks failed (exit ${verify_rc})"
+fi
+if [[ "${origin_rc}" -ne 0 ]]; then
+    echo "BGP VIP origin suites failed"
+fi
+if [[ "${verify_rc}" -ne 0 || "${origin_rc}" -ne 0 ]]; then
+    exit 1
+fi
