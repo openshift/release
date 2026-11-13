@@ -231,6 +231,21 @@ $WAS_TRACING && set -x
 - Keep the tracing-disabled scope minimal (only around sensitive operations)
 - Use `${SHARED_DIR}` for sharing data between steps instead of echoing to logs
 
+### Credentials and Image Trust in Step Registry Refs
+A step runs its commands script from this repository, inside the image that `from:` names. Any process in that pod can read every path in `credentials:`. The trust level of the image, not the content of the script, decides who can read the credential.
+
+**A ref that declares `credentials:` must set `from:` to an image that is not built from `src`.**
+In a presubmit, `src` is the pull request author's code. An image built `from: src` runs code that the author controls. This also applies to an image built from an image that is built from `src`. Script logic cannot prevent the read. Guards, repository-name checks and early exits all run inside that image.
+- Resolve `from:` through the `images:` graph of every config that uses the ref. An image name that reads like a tool image can still be built from `src`.
+- Use a promoted image through a `base_images:` entry, or another image that no pull request can change.
+
+**Use a long-lived credential only to mint a short-lived, narrowly scoped one.**
+Mint it in the most trusted context available.
+- Scope the short-lived credential to the smallest set of permissions and target resources that the task needs.
+- Never let a pull-request-controlled step reach the long-lived credential. A private key, a service principal secret or a static token has no expiry and no scope. Theft of one of these is not recoverable. Theft of a scoped token that expires is recoverable.
+- Split the work when a step must run pull request code. The untrusted step writes data to `${SHARED_DIR}`. A separate trusted step reads that data and performs the privileged action.
+- Treat data that crosses this boundary as hostile input. Take the target repository and the pull request number from Prow variables, not from the file. Pass file content as a parameter, for example with `jq --arg`. Do not put it in a command string.
+
 ## OpenShift Release Versioning
 
 ### Release Branches

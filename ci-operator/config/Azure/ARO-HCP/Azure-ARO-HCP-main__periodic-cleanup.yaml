@@ -1,10 +1,18 @@
 base_images:
+  aro-hcp-auth-tools:
+    name: aro-hcp-e2e-tools
+    namespace: aro-hcp
+    tag: latest
   aro-hcp-e2e-tests:
     name: aro-hcp-e2e-tests
     namespace: aro-hcp
     tag: latest
   aro-hcp-e2e-tools:
     name: aro-hcp-e2e-tools
+    namespace: aro-hcp
+    tag: latest
+  aro-hcp-grafana-tools:
+    name: aro-hcp-grafana-tools
     namespace: aro-hcp
     tag: latest
 resources:
@@ -239,6 +247,19 @@ tests:
       VAULT_SECRET_PROFILE: prod-rh
     test:
     - ref: aro-hcp-deprovision-expired-resource-groups
+- as: delete-expired-grafana-pr-previews
+  cron: 35 1,13 * * *
+  reporter_config:
+    channel: '#aro-hcp-failures-dev'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    test:
+    - ref: aro-hcp-github-app-auth
+    - ref: aro-hcp-grafana-preview-cleanup
 - as: sweeper-rg-ordered
   cron: 5 */4 * * *
   reporter_config:

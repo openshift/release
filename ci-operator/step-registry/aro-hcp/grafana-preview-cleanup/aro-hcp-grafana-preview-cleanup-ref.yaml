@@ -1,0 +1,48 @@
+ref:
+  as: aro-hcp-grafana-preview-cleanup
+  from: aro-hcp-grafana-tools
+  commands: aro-hcp-grafana-preview-cleanup-commands.sh
+  timeout: 30m0s
+  grace_period: 30s
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  credentials:
+    - collection: hcm-aro
+      group: aro-hcp-dev
+      mount_path: /var/run/aro-hcp-dev
+  env:
+  - name: VAULT_SECRET_PROFILE
+    default: "dev"
+    documentation: Selects which environment's cluster secrets to use.
+  - name: DEPLOY_ENV
+    default: "ci00"
+    documentation: The ARO HCP deploy environment to resolve Grafana config from.
+  - name: LOCATION
+    default: "westus3"
+    documentation: Azure region to use when resolving Grafana config.
+  - name: GITHUB_REPO_OWNER
+    default: "Azure"
+    documentation: |-
+      Owner of the repository the token is scoped to. Kept apart from Prow's
+      REPO_OWNER, which names the repository whose PR started the job. The two
+      differ when pj-rehearse rehearses this job from openshift/release.
+  - name: GITHUB_REPO_NAME
+    default: "ARO-HCP"
+    documentation: |-
+      Name of the repository the token is scoped to. Kept apart from Prow's
+      REPO_NAME, which names the repository whose PR started the job. The two
+      differ when pj-rehearse rehearses this job from openshift/release.
+  - name: PREVIEW_TTL_HOURS
+    default: "168"
+    documentation: |-
+      Number of hours a preview folder may survive after its pull request stops existing.
+  - name: DRY_RUN
+    default: "false"
+    documentation: Set to "true" to report the deletions without performing them.
+  documentation: |-
+    Delete stale Grafana PR preview folders from the dev Grafana instance. Normally, a
+    folder is deleted when its pull request is closed or merged, but this step is used
+    as a backup to prune dashboard folders and delete dashboard preview comments that
+    may have gotten missed.
