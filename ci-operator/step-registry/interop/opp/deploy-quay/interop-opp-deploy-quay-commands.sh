@@ -760,7 +760,9 @@ echo ">>> QuayRegistry registry Available"
 # --- create-admin-user machinery: SA/Role/RoleBinding (policy-install-quay)
 #     and the Job (policy-config-quay) that initializes the Quay DB and creates
 #     the quayadmin / quaydevel / quay-pull-secret secrets, org devel and repo
-#     devel/example. The Job body is ported verbatim from the policy.
+#     devel/example. Ported with two reviewed deviations: QUAY_USER_EMAIL is
+#     defined (upstream leaves it undefined) and user/initialize uses curl -fsSLk
+#     with an explicit failure exit (upstream uses curl -k -s without -f).
 #     The Job is first-run-only by construction (its own guard exits 1 when
 #     the quaydevel secret already exists), so: all three secrets present =>
 #     adopt and skip; otherwise delete any stale Job and re-create it.
@@ -921,6 +923,7 @@ spec:
               QUAY_HOST=$(oc get route -n $QUAY_NAMESPACE registry-quay -o jsonpath='{.spec.host}')
               QUAY_ORG=devel
               QUAY_ORG_EMAIL=devel@myorg.com
+              QUAY_USER_EMAIL=devel-user@myorg.com
               QUAY_REPO=example
               if [ $? -ne 0 ]; then
                 echo "Quay route does not exist yet, please wait and try again."
@@ -934,7 +937,12 @@ spec:
 
               ADMINPASS=`head -c 8 /dev/urandom | base64 | sed 's/=//'`
               BASE64AUTH=`echo -n $QUAY_USER:$QUAY_PASSWORD | base64 -w0`
-              RESULT=$(curl -X POST -k -s https://$QUAY_HOST/api/v1/user/initialize --header 'Content-Type: application/json' --data "{ \"username\": \"quayadmin\", \"password\":\"${ADMINPASS}\", \"email\": \"quayadmin@example.com\", \"access_token\": true}")
+              RESULT=$(curl -fsSLk -X POST https://$QUAY_HOST/api/v1/user/initialize --header 'Content-Type: application/json' --data "{ \"username\": \"quayadmin\", \"password\":\"${ADMINPASS}\", \"email\": \"quayadmin@example.com\", \"access_token\": true}")
+              CURL_RC=$?
+              if [ $CURL_RC -ne 0 ]; then
+                echo "Quay user initialization call failed (curl rc=${CURL_RC}); no secrets created." 1>&2
+                exit 1
+              fi
               echo "$RESULT" | grep -q "non-empty database"
               if [ $? -eq 0 ]; then
                 echo "Quay user configuration failed, the database has been initialized."
