@@ -481,12 +481,13 @@ set -o pipefail
 
 echo "--- Installing system packages ---"
 # iproute: ip/bridge for FRR setup scripts
+# make: build kube-burner-ocp from source in e2e-benchmarking run.sh
 # tar: extract kube-burner-ocp binary in e2e-benchmarking run.sh
 # util-linux: uuidgen used by run.sh when UUID is not preset
 # jq, wget, git: cluster/FRR tooling and repo clone on bastion
 # python3: e2e-benchmarking utils/index.sh (metadata indexing helpers)
 # curl: AL2023 ships curl-minimal (provides /usr/bin/curl); do not install full curl.
-for pkg in iproute jq wget git tar util-linux python3; do
+for pkg in iproute jq wget git make tar util-linux python3; do
   rpm -q "${pkg}" &>/dev/null || dnf install -y "${pkg}"
 done
 if ! command -v curl &>/dev/null; then
