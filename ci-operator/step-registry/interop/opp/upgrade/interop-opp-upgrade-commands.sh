@@ -67,9 +67,9 @@ typeset isForceUpdate="false"
 # 2118373032635404288 and 2118380423871467520; pinned witnesses
 # 2116725542353899520 installer-3 x3, 2116930868332204032 installer-4).
 #
-# The exclusion is keyed to the CVO artifacts' structural naming — a numeric
+# The exclusion is keyed to the CVO artifacts' structural naming - a numeric
 # batch id, an optional -retry-N, and the node hostname (installer-N
-# [-retry-N]-ip-<host>) — NOT to the bare installer-/bootstrap- prefix: a
+# [-retry-N]-ip-<host>) - NOT to the bare installer-/bootstrap- prefix: a
 # genuinely failing OPP pod that merely starts with those words (e.g.
 # installer-quay-helper) must stay visible to readiness (CodeRabbit review
 # of this PR). Bootstrap pods follow the same tightened shape when they
@@ -561,7 +561,7 @@ function ValidateOppOperators () {
 }
 
 function Main () {
-    echo ">>> PHASE: phase 0 — offline predicate self-test"
+    echo ">>> PHASE: phase 0 - offline predicate self-test"
     PredicateSelfTest
 
     if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
