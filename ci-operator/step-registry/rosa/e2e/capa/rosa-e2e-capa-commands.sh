@@ -46,14 +46,40 @@ if [[ -f "requirements.yml" ]]; then
   ansible-galaxy install -r requirements.yml
 fi
 
+# Download a pinned tool to ${dest}. On failure, delete the partial file, log
+# bounded numeric diagnostics and return curl's own exit code so the caller
+# fails exactly as it did before these diagnostics existed.
+# Only the HTTP status, curl exit code, redirect count, elapsed seconds and the
+# URL without its query string are logged. Headers, response bodies, verbose
+# traces, the effective URL and the environment are deliberately never captured:
+# any of them can carry signed query parameters, proxy settings or credentials.
+# curl's own error text is suppressed (-s without -S) for the same reason.
+# Callers must pass a URL that is safe to log.
+download_pinned_tool() {
+  local url="$1" dest="$2" max_time="$3"
+  local metrics http_status redirects elapsed rc=0
+
+  metrics=$(curl -fsL --connect-timeout 30 --max-time "${max_time}" --retry 3 \
+    --write-out '%{http_code} %{num_redirects} %{time_total}' \
+    "${url}" -o "${dest}") || rc=$?
+
+  if [[ ${rc} -ne 0 ]]; then
+    read -r http_status redirects elapsed <<<"${metrics}"
+    rm -f "${dest}" || true
+    echo "ERROR: download failed for ${url%%\?*}" >&2
+    echo "ERROR: curl_exit=${rc} http_status=${http_status:-000} redirects=${redirects:-0} elapsed_seconds=${elapsed:-0}" >&2
+    return "${rc}"
+  fi
+}
+
 # Install jq
 if ! command -v jq &>/dev/null; then
   echo "Installing jq..."
   JQ_SHA256="5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5"
   mkdir -p /tmp/bin
-  curl -fsSL --connect-timeout 30 --max-time 60 --retry 3 \
-    "https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64" -o /tmp/bin/jq
+  download_pinned_tool "https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64" "/tmp/bin/jq" 60
   echo "${JQ_SHA256}  /tmp/bin/jq" | sha256sum --check --status || {
+    rm -f /tmp/bin/jq
     echo "ERROR: jq checksum verification failed" >&2
     exit 1
   }
@@ -70,9 +96,9 @@ if ! command -v helm &>/dev/null; then
   HELM_VERSION="3.17.3"
   HELM_SHA256="ee88b3c851ae6466a3de507f7be73fe94d54cbf2987cbaa3d1a3832ea331f2cd"
   HELM_ARCHIVE="helm-v${HELM_VERSION}-linux-amd64.tar.gz"
-  curl -fsSL --connect-timeout 30 --max-time 120 --retry 3 \
-    "https://get.helm.sh/${HELM_ARCHIVE}" -o "/tmp/${HELM_ARCHIVE}"
+  download_pinned_tool "https://get.helm.sh/${HELM_ARCHIVE}" "/tmp/${HELM_ARCHIVE}" 120
   echo "${HELM_SHA256}  /tmp/${HELM_ARCHIVE}" | sha256sum --check --status || {
+    rm -f "/tmp/${HELM_ARCHIVE}"
     echo "ERROR: helm checksum verification failed" >&2
     exit 1
   }
