@@ -2,7 +2,7 @@ ref:
   as: p2p-mtv-execute-hub-spoke-migration
   from: cli
   commands: p2p-mtv-execute-hub-spoke-migration-commands.sh
-  timeout: 6h0m0s
+  timeout: 45m0s
   grace_period: 15m0s
   resources:
     requests:
@@ -12,9 +12,9 @@ ref:
     Execute bi-directional MTV cross-cluster live migration (CCLM) between the ACM hub cluster
     and a spoke cluster, with migration orchestrated by ACM-managed MTV on the hub.
 
-    Timeout budget: a stuck migration fails within MTV_HS_MIGRATION_TIMEOUT (2h) per direction — not at the
-    step ceiling. The 6h step timeout is the backstop for unexpected failures outside all per-op timed paths.
-    Tighten MTV_HS_MIGRATION_TIMEOUT if rehearsal data confirms faster typical run times.
+    Timeout budget: a stuck migration fails within MTV_HS_MIGRATION_TIMEOUT (15m) per direction — not at the
+    step ceiling. The 45m step timeout covers both directions plus preflights. Recent hub-spoke runs finish
+    both directions in 6–12 minutes.
 
     The hub cluster is simultaneously:
       - The MTV management plane: Plans and Migrations are created here (KUBECONFIG).
@@ -191,8 +191,8 @@ ref:
     default: "15m"
     documentation: Timeout for Provider/Map/Plan Ready waits.
   - name: MTV_HS_MIGRATION_TIMEOUT
-    default: "2h"
-    documentation: Max duration to wait for each Migration Succeeded (applied per direction).
+    default: "15m"
+    documentation: Max duration to wait for each Migration Succeeded (applied per direction). Two directions run one after the other, so 15m each stays inside the 45m step timeout.
   - name: MTV_HS_MIGRATION_POLL_INTERVAL_SECONDS
     default: "30"
     documentation: Sleep between Migration status polls.
