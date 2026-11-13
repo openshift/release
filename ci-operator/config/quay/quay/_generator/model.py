@@ -87,6 +87,7 @@ class Cell:
     pipeline_run_if_changed: str | None = None
     fips: bool = False
     sts: bool = False
+    dualstack: bool = False
     storage_override: str | None = None
     database: bool = False
     # The n-1 Quay version for the upgrade lane (e.g. "3.17"). The target version,
@@ -204,15 +205,17 @@ class Cell:
             return SCENARIO_AS_BY_TEST[self.test]
         # No arch suffix: a non-amd64 arch is already in the variant, which
         # Prow puts ahead of `as` in the job name. database: true inserts the
-        # cloud DB kind (rds/postgres) before source; fips still suffixes.
-        # Filename/variant are unchanged, so sibling rows share one file.
+        # cloud DB kind (rds/postgres) before source; fips and dualstack still
+        # suffix. Filename/variant are unchanged, so sibling rows share one file.
         parts = [self.cloud, self.storage]
         if self.database:
             parts.append(self.database_kind)
         if self.kind == "periodic":
             parts.append(str(self.source))
         base = "-".join(parts)
-        return f"{base}-fips" if self.fips else base
+        if self.fips:
+            base = f"{base}-fips"
+        return f"{base}-dualstack" if self.dualstack else base
 
     @property
     def filename(self) -> str:
@@ -250,6 +253,7 @@ class Cell:
             "fips": self.fips,
             "sts": self.sts,
             "ocp_channel": self.ocp_channel,
+            "dualstack": self.dualstack,
         }
         if self.quay_version is not None:
             ctx["quay_version"] = self.quay_version

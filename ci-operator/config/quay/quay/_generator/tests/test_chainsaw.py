@@ -88,6 +88,11 @@ def test_chainsaw_rejects_fips() -> None:
         expand_cells(_matrix(fips=True))
 
 
+def test_chainsaw_rejects_dualstack() -> None:
+    with pytest.raises(ValueError, match="dualstack is not supported for test e2e-chainsaw"):
+        expand_cells(_matrix(dualstack=True))
+
+
 def test_check_finds_retired_file_in_sibling_dir_without_active_cell(tmp_path: Path) -> None:
     out = tmp_path / "quay"
     out.mkdir()
