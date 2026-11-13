@@ -173,6 +173,10 @@ new-repo:
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -it -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_repo-init_latest --release-repo /release
 	$(MAKE) update
 
+.PHONY: test-deterministic-lb-eip
+test-deterministic-lb-eip:
+	bash hack/test-deterministic-lb-eip.sh
+
 .PHONY: test-tls-scanner
 test-tls-scanner:
 	python3 hack/test_tls_scanner.py
