@@ -338,12 +338,16 @@ function CreateTestOrg () {
     [[ "${-}" == *x* ]] && xtraceOn=true
     set +x
 
+    # The signin session (cookie jar plus CSRF token) is what authenticates
+    # the organization request below, so both outlive the block that creates
+    # them and are removed at the single exit of this function.
+    typeset cookieFile='/tmp/quay-cookies.txt'
+    typeset csrf=''
+
     if [[ -z "${QUAY_TOKEN}" && -n "${QUAY_PASSWORD}" ]]; then
-        # Password-only auth: exchange the password for an API token via
-        # the signin endpoint.  The payload is piped in via stdin so the
+        # Password-only auth: exchange the password for a session via the
+        # signin endpoint.  The payload is piped in via stdin so the
         # password is never part of the curl argv.
-        typeset cookieFile='/tmp/quay-cookies.txt'
-        typeset csrf=''
         csrf="$(curl -fsSLk --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/csrf_token" -c "${cookieFile}" | \
             python3 -c "import sys,json; print(json.load(sys.stdin).get('csrf_token',''))" 2>/dev/null)" || csrf=""
 
@@ -361,23 +365,43 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
                 -H "X-CSRF-Token: ${csrf}" \
                 -b "${cookieFile}" -c "${cookieFile}" \
                 -d @-)" || signinResult=""
+            # /api/v1/signin answers {"success": true} and sets the session
+            # cookie; it does not return a token.  Read the success flag too,
+            # and keep the cookie jar for the organization request.
             QUAY_TOKEN="$(printf '%s' "${signinResult}" | \
                 python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null)" || QUAY_TOKEN=""
             export QUAY_TOKEN
+            typeset signinOk=''
+            signinOk="$(printf '%s' "${signinResult}" | \
+                python3 -c "import sys,json; print(json.load(sys.stdin).get('success',''))" 2>/dev/null)" || signinOk=""
+            if [[ "${signinOk}" != "True" ]]; then
+                echo "WARNING: Quay signin did not report success; the organization request has no session to use" >&2
+            fi
         fi
-        rm -f "${cookieFile}"
     fi
 
     if [[ -z "${QUAY_TOKEN}" ]]; then
         echo "WARNING: No Quay token available; org creation may fail" >&2
     fi
 
-    # The bearer token is handed to curl through a process-substitution
-    # config, so it never appears in the curl argv.
-    curl -fsSLk --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/organization/" \
-        --config <(printf 'header = "Authorization: Bearer %s"\n' "${QUAY_TOKEN}") \
-        -H "Content-Type: application/json" \
-        -d '{"name":"interop-smoke-test","email":"interop-test@example.com"}' || true
+    typeset -a orgPayloadOpts=( -H "Content-Type: application/json"
+        -d '{"name":"interop-smoke-test","email":"interop-test@example.com"}' )
+    if [[ -z "${QUAY_TOKEN}" && -f "${cookieFile}" && -n "${csrf}" ]]; then
+        # Password-only signin produced a session, not a token: send the
+        # session cookie and its CSRF token, otherwise this request goes out
+        # with an empty bearer header and the push below has no organization.
+        curl -fsSLk --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/organization/" \
+            -b "${cookieFile}" \
+            -H "X-CSRF-Token: ${csrf}" \
+            "${orgPayloadOpts[@]}" || true
+    else
+        # The bearer token is handed to curl through a process-substitution
+        # config, so it never appears in the curl argv.
+        curl -fsSLk --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/organization/" \
+            --config <(printf 'header = "Authorization: Bearer %s"\n' "${QUAY_TOKEN}") \
+            "${orgPayloadOpts[@]}" || true
+    fi
+    rm -f "${cookieFile}"
 
     "${xtraceOn}" && set -x
     true
@@ -425,11 +449,18 @@ function RunPushPull () {
         return 1
     fi
 
-    if ! skopeo inspect --tls-verify=false \
-        --authfile="${authFile}" \
-        "docker://${pushTarget}"; then
+    # A pull has to read the layers, not only the manifest and config:
+    # `skopeo inspect` stops at the manifest, so a registry that serves
+    # manifests but cannot return a layer blob from object storage would
+    # still pass.  Copy the image into a local dir transport instead.
+    typeset pullDir='/tmp/quay-pull-verify'
+    rm -rf "${pullDir}"
+    if ! skopeo copy --src-tls-verify=false \
+        --src-authfile="${authFile}" \
+        "docker://${pushTarget}" \
+        "dir:${pullDir}"; then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "Image not pullable from Quay after push" "${elapsed}"
+        RecordResult "${testName}" "failed" "Image layers not pullable from Quay after push" "${elapsed}"
         return 1
     fi
 
@@ -481,9 +512,6 @@ for item in data.get('items', []):
     if any(o.get('kind') == 'QuayRegistry' for o in owners) or registry in name:
         print(name)
         sys.exit(0)
-if data.get('items'):
-    print(data['items'][0]['metadata']['name'])
-    sys.exit(0)
 sys.exit(1)
 " 2>&1) || obcPickRc=$?
 
@@ -634,12 +662,12 @@ print(json.dumps(payload))
 ")
 
       typeset regCode=""
-      regCode=$(curl -s "${acsTlsOpts[@]}" -o /dev/null -w '%{http_code}' \
+      regCode=$(printf '%s' "${regPayload}" | curl -s "${acsTlsOpts[@]}" -o /dev/null -w '%{http_code}' \
           --connect-timeout 15 --max-time 60 \
           -X POST "https://${acsHost}/v1/imageintegrations" \
           --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
           -H "Content-Type: application/json" \
-          -d "${regPayload}" 2>/dev/null) || regCode="000"
+          -d @- 2>/dev/null) || regCode="000"
       if [[ "${regCode}" != 2* ]]; then
           echo "ERROR: Failed to register Quay in ACS (HTTP ${regCode})" >&2
           exit 1
@@ -842,7 +870,13 @@ function Main () {
         done
         exit 1
     fi
-    PreflightCheck || { echo "FATAL: Quay not reachable; skipping all tests" >&2; exit 1; }
+    if ! PreflightCheck; then
+        echo "FATAL: Quay not reachable; skipping all tests" >&2
+        RecordResult "${testNamePushPull}" "failed" "Quay registry discovery endpoint not reachable"
+        RecordResult "${testNameOdf}" "skipped" "Skipped: Quay preflight (discovery endpoint) failed"
+        RecordResult "${testNameAcs}" "skipped" "Skipped: Quay preflight (discovery endpoint) failed"
+        exit 1
+    fi
     CreateTestOrg
 
     typeset -i status=0 pushPassed=0
