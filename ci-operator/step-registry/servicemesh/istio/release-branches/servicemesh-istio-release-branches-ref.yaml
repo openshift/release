@@ -13,14 +13,27 @@ ref:
   timeout: 1h0m0s
   grace_period: 1m0s
   documentation: |-
-    Create missing release-X.Y.Z branches in openshift-service-mesh/istio at the
-    exact commit tagged X.Y.Z upstream in istio/istio (Z > 0), excluding later
-    release-X.Y commits. Supported minor versions are read from
-    ci-operator/config/openshift-service-mesh/supported-istio-versions.txt on the default branch of
-    openshift/release. Each must have an existing midstream release-X.Y branch.
-    Process only the latest stable patch tag per supported release line; never
-    backfill older patches. Existing z-stream branches
-    are never changed. Verify that each upstream tag commit is an ancestor of
-    the y-stream tip before branching; otherwise open a GitHub issue (deduplicated
-    against open issues) and fail. The bot token needs contents and issues write
-    permissions in openshift-service-mesh/istio. Requires git, gh, and jq.
+    Create missing release-X.Y.Z branches in openshift-service-mesh/istio for the
+    latest stable upstream istio/istio patch tag X.Y.Z (Z > 0) of each supported
+    minor version, read from
+    ci-operator/config/openshift-service-mesh/supported-istio-versions.txt on the
+    default branch of openshift/release. Older patches are never backfilled.
+
+    The branch point is the merge-base of the tag and upstream release-X.Y: the
+    tagged commit itself, or for security releases tagged on a side branch, the
+    commit that side branch was cut from. The z-stream branch is created at the
+    last first-parent commit of midstream release-X.Y that does not contain the
+    first upstream commit after the branch point, so it keeps every midstream
+    change made before then and nothing after. Branches are only created once the
+    y-stream sync has merged the branch point.
+
+    When that commit does not already contain the tag, the automator from
+    maistra/test-infra opens a PR merging the tag into the new branch, after
+    verifying that the merge shares exactly the branch point with upstream
+    release-X.Y. Conflicts are reported in a draft PR and never resolved
+    automatically. Later runs retry the merge for an existing z-stream branch
+    that does not contain its tag yet; branches that do are never changed.
+
+    The bot token needs contents, issues, and pull-request write permissions in
+    openshift-service-mesh/istio and must be able to fork it. Requires git, gh,
+    jq, and pr-creator.
