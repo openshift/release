@@ -61,9 +61,12 @@ for _ in {1..90}; do
             # repo; Konflux-based jobs never set it and keep their resolution).
             # The ref is registry.redhat.io/kueue/kueue-must-gather-rhel9@sha256:...
             # and is pulled on-cluster through the stage IDMS applied by
-            # kueue-operator-enable-catalogsource-art.
-            MG=$(oc -n "${OO_INSTALL_NAMESPACE}" get csv "${CSV}" \
-                -o jsonpath='{.spec.relatedImages[?(@.name=="must-gather")].image}')
+            # kueue-operator-enable-catalogsource-art. Matched by image, not by
+            # name: the relatedImages key changed between CSV versions
+            # ("must-gather" up to 1.5.0, "kueue-must-gather-rhel9" from 1.5.1).
+            MG=$(oc -n "${OO_INSTALL_NAMESPACE}" get csv "${CSV}" -o json \
+                | jq -r '.spec.relatedImages[]? | select(.image | test("must-gather")) | .image' \
+                | head -1)
             if [[ -n "${MG}" ]]; then
                 echo "export KUEUE_MUST_GATHER_IMAGE=${MG}" >> "${SHARED_DIR}/env"
                 echo "Exported KUEUE_MUST_GATHER_IMAGE=${MG}"
