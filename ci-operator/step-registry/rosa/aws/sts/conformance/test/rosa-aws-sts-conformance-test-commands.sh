@@ -35,6 +35,8 @@ if [[ -n "${TEST_SKIPS:-}" ]]; then
 fi
 
 set +e
+rm -f "${SHARED_DIR}/conformance-end"
+date -u +%s > "${SHARED_DIR}/conformance-start"
 set -x
 openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
     --provider "${TEST_PROVIDER}" \
@@ -43,6 +45,7 @@ openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
 
 exit_code=${PIPESTATUS[0]}
 set +x
+date -u +%s > "${SHARED_DIR}/conformance-end"
 set -e
 
 if [[ "${SKIP_MONITOR_TEST:-}" == "true" ]] && [[ ${exit_code} -ne 0 ]]; then
