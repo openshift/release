@@ -233,6 +233,36 @@ tests:
   - collection: rosa-clusters-service
     group: rosa-clusters-service-sandbox
     mount_path: /usr/local/rosa-clusters-service-sandbox
+- as: pr-check-database
+  capabilities:
+  - nested-podman
+  cluster: build05
+  commands: |
+    set -x
+    export HOME=$(mktemp -d)
+    PODMAN_PID=""
+    cleanup() {
+        if [[ -n "$PODMAN_PID" ]]; then
+            kill "$PODMAN_PID" 2>/dev/null || true
+            wait "$PODMAN_PID" 2>/dev/null || true
+        fi
+    }
+    trap cleanup EXIT
+
+    podman system service --time=0 &
+    PODMAN_PID=$!
+
+    SOCKET_PATH=$(podman info --format '{{.Host.RemoteSocket.Path}}')
+    for i in $(seq 1 30); do
+        [ -S "$SOCKET_PATH" ] && break
+        sleep 1
+    done
+    export DOCKER_HOST="unix://${SOCKET_PATH}"
+
+    make database_test_container
+  container:
+    from: golang-plus
+  nested_podman: true
 - as: go-unit-publish-coverage
   commands: |
     set -x
