@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 
-echo "Installing from initial release ${RELEASE_IMAGE_LATEST}"
+echo "Installing from initial release ${RELEASE_IMAGE_LATEST} "
 
 openshift-install version
 
