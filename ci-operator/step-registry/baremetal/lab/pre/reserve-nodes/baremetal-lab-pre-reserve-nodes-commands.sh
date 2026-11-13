@@ -44,8 +44,18 @@ echo "JOB_URL=${JOB_URL}" >> /tmp/prow.env
 echo "Copying the env to the bastion host"
 scp "${SSHOPTS[@]}" /tmp/prow.env "root@${AUX_HOST}:/tmp/${CLUSTER_NAME}.prow.env"
 
+# this IF covers arm64 jobs and other vendors like ampere, supermicro or hpe arm64 nodes
 if [ -z "${VENDOR}" ]; then
   VENDOR="any"
+fi
+
+# this IF covers amd64 jobs, cant use `any` here otherwise hpe nodes might be selected
+if [ "${gnu_arch}" == "x86_64" ]; then
+  if [ "${JOB_NAME}" == "*-ove-*" ]; then
+    VENDOR="hpe"
+  else
+    VENDOR="dell"
+  fi
 fi
 
 echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
