@@ -74,31 +74,37 @@ oc wait mcp --all --for=condition=Updating --timeout=5m || true
 oc wait mcp --all --for=condition=Updated --timeout=20m
 
 # §9b: the catalog pod below pulls its index image through the node mirror
-# configuration, so require the mapping in every pool's rendered MachineConfig
-# rather than trusting the condition waits alone (a single Updated wait can
-# accept the stale Updated=True from install time). MachineConfig file contents
-# are base64 data URLs, so decode before matching. Expected within seconds; the
-# wait runs up to 20m so a propagation stall stays debuggable.
+# configuration, so require the mapping in the MachineConfig the pool actually
+# applies (`*-generated-registries`), rather than trusting the condition waits
+# alone — a single Updated wait can accept the stale Updated=True from install
+# time. Note the encoding differs: source MachineConfigs store file contents as
+# base64 data URLs, rendered ones as percent-encoded ones, so read the source MC.
 mirror=${BUNDLE_IMAGE%%/*}
+mirror_in_pool() {
+    local mc
+    mc=$(oc get "$1" -o jsonpath='{.status.configuration.source[*].name}' |
+        tr ' ' '\n' | grep -m1 'generated-registries$') || return 1
+    oc get machineconfig "$mc" -o json |
+        jq -r '.spec.config.storage.files[]?.contents.source // empty' |
+        sed -n 's/.*;base64,//p' |
+        while IFS= read -r line; do printf '%s' "$line" | base64 -d 2>/dev/null; echo; done |
+        grep -qF "$mirror"
+}
 all_pools_have_mirror() {
     for pool in $(oc get mcp -o name); do
-        oc get machineconfig "$(oc get "$pool" -o jsonpath='{.status.configuration.name}')" -o json |
-            jq -r '.spec.config.storage.files[]?.contents.source // empty' |
-            sed -n 's/.*;base64,//p' |
-            while IFS= read -r line; do printf '%s' "$line" | base64 -d 2>/dev/null; echo; done |
-            grep -qF "$mirror" || return 1
+        mirror_in_pool "$pool" || return 1
     done
 }
 deadline=$(( $(date +%s) + 1200 ))
 until all_pools_have_mirror; do
     if [ "$(date +%s)" -ge "$deadline" ]; then
-        echo "ERROR: mirror mapping for ${mirror} missing from a rendered config after 20m"
+        echo "ERROR: mirror mapping for ${mirror} missing from a pool applied config after 20m"
         exit 1
     fi
-    echo "waiting for mirror mapping in rendered configs ($(date -u +%H:%M:%SZ))..."
+    echo "waiting for mirror mapping in pool applied configs ($(date -u +%H:%M:%SZ))..."
     sleep 60
 done
-echo "Mirror mapping present in all pool rendered configs"
+echo "Mirror mapping present in all pool applied configs"
 
 # Image imports need mirror trust independently of the nodes.
 ca_config=$(oc get image.config.openshift.io cluster -o jsonpath='{.spec.additionalTrustedCA.name}')
