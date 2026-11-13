@@ -155,7 +155,7 @@ parse_result() {
     local jenkins_build
     status=$(jq -r '.status // "unknown"' "${result_file}")
     duration=$(jq -r '.duration // "unknown"' "${result_file}")
-    jenkins_build=$(jq -r '.jenkinsBuild // "unknown"' "${result_file}")
+    jenkins_build=$(jq -r '.jenkins_build // "unknown"' "${result_file}")
 
     log "========================================"
     log "GovCloud Test Results"
