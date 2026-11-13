@@ -10,7 +10,31 @@ chain:
     - ref: ipi-install-install
     - ref: ipi-install-vsphere-registry
     - ref: windows-e2e-operator-test-mirror-images
-    - ref: set-sample-operator-disconnected 
+    - ref: mirror-images-trust-registry-ca
+    # A disconnected cluster cannot pull the default OperatorHub catalogs from
+    # registry.redhat.io. Leaving them enabled makes OLM resolution fail for every
+    # namespace, so the WMCO catalog never produces an install plan.
+    - as: disable-default-operatorhub-sources
+      from: cli
+      commands: |-
+        set -euo pipefail
+        if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        oc patch OperatorHub cluster --type json \
+          -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+        for source in redhat-operators certified-operators community-operators redhat-marketplace; do
+          catalog=$(oc get catalogsource "${source}" -n openshift-marketplace --ignore-not-found -o name)
+          if [[ -n "${catalog}" ]]; then
+            oc wait --for=delete "${catalog}" -n openshift-marketplace --timeout=5m
+          fi
+        done
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 25m0s
+      grace_period: 5m0s
   env:
     - name: REGISTER_MIRROR_REGISTRY_DNS 
       default: "yes"
