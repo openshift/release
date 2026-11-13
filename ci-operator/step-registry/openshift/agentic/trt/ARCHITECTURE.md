@@ -165,8 +165,11 @@ once a PR exists, Chai completes tracking when that PR is merged or closed.
 - The target repository controls its development environment and setup script;
   the common workflow controls issue ingestion, agent invocation, publication,
   and telemetry.
-- Solve workers cannot push or create PRs. Review/CI workers may interact with
-  the existing PR as required by their task, but pipeline code performs git
+- Solve workers are instructed not to push or create PRs, and harness deny
+  rules block common direct publication commands; these are policy and tool
+  controls, not a security sandbox. Pipeline code validates and publishes the
+  solution branch and creates the PR. Review/CI workers may interact with the
+  existing PR as required by their task, but pipeline code performs later git
   pushes after verifying the destination and current PR head.
 - Normal branch writes go only to the configured fork. The upstream repository
   receives the pull request, review replies, PR-description maintenance, and
