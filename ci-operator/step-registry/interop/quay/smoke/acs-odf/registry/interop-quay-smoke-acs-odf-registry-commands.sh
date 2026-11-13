@@ -313,7 +313,14 @@ function GetQuayAuth () {
 }
 
 function PreflightCheck () {
-    if ! curl -fsSLk --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/api/v1/discovery" | grep -qi "quay"; then
+    # Capture the body first, then grep: grep -q closes the pipe on the
+    # first match while curl (streaming, --max-time 30) can still be
+    # writing, so a direct `curl | grep -q` can fail the pipeline on
+    # SIGPIPE under pipefail even when the endpoint answered (the
+    # INTEROP-9670 hazard class, fixed repo-wide for `jq | head`).
+    typeset probe=''
+    if ! probe="$(curl -fsSLk --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/api/v1/discovery")" \
+        || ! grep -qi "quay" <<< "${probe}"; then
         echo "ERROR: Quay registry endpoint not reachable" >&2
         return 1
     fi
