@@ -142,11 +142,14 @@ fi
 
 # check if FIPS enabled
 fips_enabled=false
-node_name=$(oc get node -l node-role.kubernetes.io/master= --no-headers | awk '$2=="Ready" {print $1; exit}')
+echo "getting master node list"
+nodes=$(oc get node -l node-role.kubernetes.io/master= --no-headers)
+node_name=$(echo "$nodes" | awk '$2=="Ready" {print $1; exit}')
 if [[ -z "$node_name" ]]; then
   echo "ERROR: No Ready master node found"
   exit 1
 fi
+echo "checking FIPS status on a master node"
 fips_flag=$(oc debug node/$node_name -- chroot /host cat /proc/sys/crypto/fips_enabled 2>&1)
 fips_value=$(echo "$fips_flag" | grep -oE '^[01]$')
 if [[ $fips_value == "1" ]]; then
