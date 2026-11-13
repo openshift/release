@@ -26,14 +26,20 @@ metadata:
   name: openshift-cluster-csi-drivers
 EOF
 
-cat > "${SHARED_DIR}/manifest_0001-nutanix-csi-ntnx-pc-secret.yaml" << EOF
-apiVersion: v1
-kind: Secret
+cat > "${SHARED_DIR}/manifest_0001-nutanix-csi-operator-beta-catalog-source.yaml" << EOF
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
 metadata:
-  name: ntnx-pc-secret
-  namespace: openshift-cluster-csi-drivers
-stringData:
-  key: ${NUTANIX_HOST}:${NUTANIX_PORT}:${NUTANIX_USERNAME}:${NUTANIX_PASSWORD}
+  name: nutanix-csi-operator-beta
+  namespace: openshift-marketplace
+spec:
+  displayName: Nutanix Beta
+  publisher: Nutanix-dev
+  sourceType: grpc
+  image: quay.io/ntnx-csi/nutanix-csi-operator-catalog:latest
+  updateStrategy:
+    registryPoll:
+      interval: 5m
 EOF
 
 cat > "${SHARED_DIR}/manifest_0002-nutanix-csi-ntnx-secret.yaml" << EOF
@@ -64,10 +70,10 @@ metadata:
   name: nutanixcsioperator
   namespace: openshift-cluster-csi-drivers
 spec:
-  channel: stable-3.x
+  channel: stable
   name: nutanixcsioperator
   installPlanApproval: Automatic
-  source: certified-operators
+  source: nutanix-csi-operator-beta
   sourceNamespace: openshift-marketplace
 EOF
 
@@ -78,8 +84,12 @@ metadata:
   name: nutanixcsistorage
   namespace: openshift-cluster-csi-drivers
 spec:
-  ntnxInitConfigMap:
-    usePC: true
+  namespace: openshift-cluster-csi-drivers
+  tolerations:
+    - key: "node-role.kubernetes.io/infra"
+      operator: "Exists"
+      value: ""
+      effect: "NoSchedule"
 EOF
 
 cat > "${SHARED_DIR}/manifest_0006-nutanix-csi-storage-class.yaml" << EOF
@@ -97,8 +107,6 @@ parameters:
   csi.storage.k8s.io/node-publish-secret-namespace: openshift-cluster-csi-drivers
   csi.storage.k8s.io/controller-expand-secret-name: ntnx-secret
   csi.storage.k8s.io/controller-expand-secret-namespace: openshift-cluster-csi-drivers
-  csi.storage.k8s.io/controller-publish-secret-name: ntnx-secret
-  csi.storage.k8s.io/controller-publish-secret-namespace: openshift-cluster-csi-drivers
   csi.storage.k8s.io/fstype: ext4
   storageContainer: ${PE_STORAGE_CONTAINER}
   storageType: NutanixVolumes
@@ -107,19 +115,7 @@ reclaimPolicy: Delete
 EOF
 
 oc apply -f "${SHARED_DIR}/manifest_0000-nutanix-csi-openshift-cluster-csi-drivers-namespace.yaml"
-
-# The Nutanix CSI operator deployment references an image pull secret named
-# "regcred". Without it, kubelet emits repeated FailedToRetrieveImagePullSecret
-# events that trip the pathological-events monitor. Mirror the cluster global
-# pull secret into "regcred" so the reference resolves. Piped directly to avoid
-# writing the credential to disk or the log.
-oc create secret generic regcred \
-  --type=kubernetes.io/dockerconfigjson \
-  --from-file=.dockerconfigjson=<(oc get secret/pull-secret -n openshift-config -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d) \
-  -n openshift-cluster-csi-drivers \
-  --dry-run=client -o yaml | oc apply -f -
-
-oc apply -f "${SHARED_DIR}/manifest_0001-nutanix-csi-ntnx-pc-secret.yaml"
+oc apply -f "${SHARED_DIR}/manifest_0001-nutanix-csi-operator-beta-catalog-source.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0002-nutanix-csi-ntnx-secret.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0003-nutanix-csi-operator-group.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0004-nutanix-csi-subscription.yaml"
