@@ -39,7 +39,7 @@ _on_exit() {
     if [[ ${rc} -eq 0 ]]; then
         _junit_write pass "cluster API reachable"
     else
-        _junit_write fail "cluster API not reachable after ${API_WAIT_RETRIES} attempt(s)"
+        _junit_write fail "cluster API not reachable after ${API_WAIT_RETRIES:-unknown} attempt(s)"
     fi
     return 0
 }
