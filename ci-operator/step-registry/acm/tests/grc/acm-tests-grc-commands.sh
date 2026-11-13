@@ -438,19 +438,25 @@ for item in d.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${_OPP_EVIDENCE_DIR}/06-placementdecisions-post.json" 2>&1
 
-    # JUnit rows for both checks (INTEROP-9711 done-when evidence).
+    # JUnit rows for the checks (INTEROP-9711 done-when evidence).
     typeset -i _opp_inv_ok=0
     if [[ "${_OPP_POLICY_COUNT}" -gt 0 ]]; then
         _opp_inv_ok=1
     fi
-    typeset -i _opp_failures=$(( (1 - _opp_inv_ok) + (1 - _opp_sel) ))
+    typeset -i _opp_base_ok="${_OPP_BASELINE_OK}"
+    typeset -i _opp_failures=$(( (1 - _opp_inv_ok) + (1 - _opp_sel) + (1 - _opp_base_ok) ))
     _opp_junit="${ARTIFACT_DIR}/junit_grc_placement_restore.xml"
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"grc-placement-restore\" tests=\"2\" failures=\"${_opp_failures}\">"
+        echo "<testsuite name=\"grc-placement-restore\" tests=\"3\" failures=\"${_opp_failures}\">"
         echo "  <testcase classname=\"grc-placement-restore\" name=\"operatorpolicy-inventory-nonempty\">"
         if [[ "${_opp_inv_ok}" -ne 1 ]]; then
             echo "    <failure message=\"$(_opp_xesc "operatorpolicy inventory at pre-GRC capture: ${_OPP_POLICY_COUNT} objects")\"></failure>"
+        fi
+        echo "  </testcase>"
+        echo "  <testcase classname=\"grc-placement-restore\" name=\"label-baseline-readable\">"
+        if [[ "${_opp_base_ok}" -ne 1 ]]; then
+            echo "    <failure message=\"$(_opp_xesc "pre-suite local-cluster label snapshot unreadable; the label restore was skipped")\"></failure>"
         fi
         echo "  </testcase>"
         echo "  <testcase classname=\"grc-placement-restore\" name=\"placement-selects-local-cluster\">"
