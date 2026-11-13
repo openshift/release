@@ -1388,6 +1388,29 @@ EOF
     if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
       legacyize_vsphere_cloud_provider_config "${dir}"
       strip_vsphere_failure_domains "${dir}"
+
+      # The ControlPlaneMachineSet manifest is generated straight from
+      # install-config.yaml's named failure domain (e.g. "funny-solomon"),
+      # independently of the Infrastructure manifest strip_vsphere_failure_domains
+      # just edited. Left in place, its spec.template...failureDomains.vsphere[0].name
+      # keeps pointing at a failure domain that no longer exists once
+      # Infrastructure's list is empty, so the control-plane-machine-set
+      # controller's InjectFailureDomain lookup
+      # (openshift/cluster-control-plane-machine-set-operator, vsphere.go
+      # getFailureDomainFromInfrastructure) fails on every reconcile with
+      # "unknown failure domain: failure domain is not defined in the
+      # infrastructure resource", and the control-plane-machine-set
+      # ClusterOperator never reports Available, blocking cluster
+      # initialization (SPLAT-3028). Removing the manifest avoids the
+      # ControlPlaneMachineSet ever being created: with no object to
+      # reconcile, that operator's controller takes an explicit early path
+      # (controller.go, "set the cluster operator to available if it doesn't
+      # exist") and reports healthy unconditionally. upi-conf-vsphere-commands.sh
+      # already removes this same manifest (for its own, unrelated reason:
+      # UPI doesn't use machine-api-managed control plane at all), so this
+      # trades away the same CPMS-managed control-plane repair/rotation
+      # capability that UPI's simulation already does without.
+      rm -f "${dir}/openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml"
     fi
     ;;
 esac

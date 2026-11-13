@@ -87,6 +87,17 @@ ref:
       that ConfigMap has already consumed the installer's native YAML (a
       byte-for-byte mismatch between that render and the in-cluster one
       otherwise permanently degrades the machine-config ClusterOperator).
+      Also removes the generated ControlPlaneMachineSet manifest, which is
+      built straight from install-config.yaml's named failure domain
+      independently of the Infrastructure manifest: left in place, it keeps
+      referencing a failure domain name the now-empty Infrastructure list no
+      longer defines, which permanently fails the control-plane-machine-set
+      controller's reconcile and keeps that ClusterOperator from ever
+      reporting Available (removing the manifest entirely avoids the
+      ControlPlaneMachineSet ever being created, which that operator treats
+      as a healthy, available state) -- the same manifest
+      upi-conf-vsphere-commands.sh already removes for its own, unrelated
+      reason.
       This simulates a cluster installed without vSphere failure domain
       information (e.g. pre-4.13 or UPI installs that never populate it, a
       state the installer never backfills on upgrade; SPLAT-3028) in a form
