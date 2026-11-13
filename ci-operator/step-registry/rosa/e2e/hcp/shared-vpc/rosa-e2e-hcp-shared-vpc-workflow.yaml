@@ -22,7 +22,10 @@ workflow:
       # back to LABEL_FILTER). Pin the platform plane to its area selection.
       PLATFORM_LABEL_FILTER: "Area:ManagementPlane"
     pre:
-    - ref: rosa-cluster-dnsdomain-create
+    # HCP-architecture domain (--hosted-cp): rosa-cluster-dnsdomain-create
+    # claims a classic-architecture domain (s1.devshift.org) that rosa create
+    # cluster rejects for HCP clusters.
+    - ref: rosa-e2e-hcp-shared-vpc-dnsdomain-create
     - ref: aws-provision-vpc-shared
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
     - chain: rosa-sts-oidc-config-create
@@ -85,7 +88,8 @@ workflow:
   documentation: |-
     The shared VPC row of the ROSAENG-308 provision x validate matrix
     (ROSAENG-63353): the rosa-CLI head provisions an HCP cluster in a shared
-    VPC - rosa-cluster-dnsdomain-create claims a customer-managed base domain
+    VPC - rosa-e2e-hcp-shared-vpc-dnsdomain-create claims a customer-managed
+    HCP-architecture base domain
     and rosa-e2e-hcp-shared-vpc-prepare creates every shared-account resource
     rosa create cluster needs: the ingress private hosted zone (named
     rosa.<cluster>.<base-domain>, which OCM validates the HCP cluster domain
