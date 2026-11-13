@@ -534,7 +534,7 @@ TestQuayPull() {
 
     if [[ -z "${quayRoute}" ]]; then
         # Distinguish "no QuayRegistry CR deployed on this lane" (operator-
-        # only install: nothing to pull — skip) from "registry deployed but
+        # only install: nothing to pull - skip) from "registry deployed but
         # route missing" (genuine failure) (INTEROP-9670).
         typeset -i qrCount=0
         if ! qrCount="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json 2>"${_opp_smoke_tmp}/qr.err" | jq '.items | length')"; then
