@@ -25,6 +25,10 @@ _propagate_junit () {
 #      - Queries ACS API for httpd-example image
 #      - Validates image appears in ACS with CVE scanning results
 #      - Only runs if Case 1 passes
+#      - Skipped (not failed) when no SecuredCluster exists anywhere on
+#        the cluster: without a secured cluster ACS cannot scan images, so
+#        the case would otherwise burn its retry budget and fail with a
+#        generic message
 #
 # Test Reporting:
 #   - Results are recorded in JUnit XML format
@@ -244,13 +248,43 @@ function RunTestCase2 () {
     : "====== Test Case 2: Test ACS Integration ======"
     : "NOTE: Waiting for ACS to scan the httpd-example image built in Test Case 1."
 
-    # Fetch ACS credentials - disable xtrace for secret handling
+    # Pre-flight: a SecuredCluster is what registers and scans images with
+    # ACS Central. When none exists the image can never appear, so the
+    # retries below cannot succeed; skip the case with a named reason
+    # instead of failing after 300s of dead retries. Return 2 = skip.
+    typeset scOutput=""
+    typeset -i scRc=0
+    scOutput=$(oc get securedclusters.platform.stackrox.io --all-namespaces -o name) || scRc=$?
+    if (( scRc != 0 )); then
+        : "WARNING: oc get securedclusters failed (rc=${scRc}) - cannot determine SecuredCluster presence"
+        _acs_fail_reason="oc get securedclusters failed (rc=${scRc}) - cannot determine SecuredCluster presence"
+        return 1
+    elif [[ -z "${scOutput}" ]]; then
+        : "No SecuredCluster CR found in any namespace - ACS integration unavailable, skipping test case"
+        _acs_skip_reason="No SecuredCluster deployed; ACS image scanning unavailable"
+        return 2
+    fi
+
+    # Fetch ACS credentials - disable xtrace for secret handling. The
+    # emptiness check stays inside the untraced block as well: bash prints the
+    # expanded arguments of a test under `set -x`, so `[[ -z "${acsPassword}" ]]`
+    # would write the password to the build log. Tracing is restored on both
+    # the success and the credential-missing path.
     typeset acsPassword=""
     typeset acsHost=""
+    typeset -i acsCredsMissing=0
     set +x
     acsPassword=$(oc get secret -n stackrox central-htpasswd -o json | /tmp/jq -r '.data.password' | base64 -d)
     acsHost=$(oc get secret -n stackrox sensor-tls -o json | /tmp/jq -r '.data."acs-host"' | base64 -d)
+    if [[ -z "${acsPassword}" ]] || [[ -z "${acsHost}" ]]; then
+        acsCredsMissing=1
+    fi
     set -x
+    if (( acsCredsMissing )); then
+        : "ERROR: ACS credentials unavailable - central-htpasswd or sensor-tls secret missing in namespace stackrox"
+        _acs_fail_reason="ACS credentials unavailable: central-htpasswd/sensor-tls secret not found in namespace stackrox"
+        return 1
+    fi
 
     # Query ACS for httpd-example image
     typeset jqFilter='.images[] | select(.name | contains("httpd-example"))'
@@ -380,18 +414,27 @@ if RunTestCase1; then
     RecordTestResult "deploy-opp-application" "passed" "" "${case1Duration}"
     : "Test Case 1 (Deploy OPP Application) Result: PASSED"
 
-    # Run Test Case 2 (ACS Integration)
+    # Run Test Case 2 (ACS Integration). A skip is distinguished from a
+    # failure by the _acs_skip_reason side-channel (reset just below,
+    # before the call); the return code is not captured.
     typeset -i case2Start=0
     case2Start=$(date +%s)
+    _acs_skip_reason=""
+    _acs_fail_reason=""
     if RunTestCase2; then
         typeset -i case2Duration=0
         case2Duration=$(( $(date +%s) - case2Start ))
         RecordTestResult "test-acs-integration" "passed" "" "${case2Duration}"
         : "Test Case 2 (Test ACS Integration) Result: PASSED"
+    elif [[ -n "${_acs_skip_reason}" ]]; then
+        typeset -i case2Duration=0
+        case2Duration=$(( $(date +%s) - case2Start ))
+        RecordTestResult "test-acs-integration" "skipped" "${_acs_skip_reason}" "${case2Duration}"
+        : "Test Case 2 (Test ACS Integration) Result: SKIPPED (${_acs_skip_reason})"
     else
         typeset -i case2Duration=0
         case2Duration=$(( $(date +%s) - case2Start ))
-        RecordTestResult "test-acs-integration" "failed" "ACS integration test failed" "${case2Duration}"
+        RecordTestResult "test-acs-integration" "failed" "${_acs_fail_reason:-ACS integration test failed}" "${case2Duration}"
         : "Test Case 2 (Test ACS Integration) Result: FAILED"
     fi
 else
