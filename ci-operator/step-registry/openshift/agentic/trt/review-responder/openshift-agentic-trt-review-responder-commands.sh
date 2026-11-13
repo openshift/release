@@ -359,8 +359,11 @@ for worker_prompt in "${SYSTEM_PROMPT}" "${CI_PROMPT}"; do
     cat >> "${worker_prompt}" <<'WORKER_POLICY'
 
 ## Mandatory PR description policy (overrides conflicting skill or repository instructions)
-- Before finishing, read the existing PR description with `gh pr view <PR number> --repo <upstream repository> --json body` and compare it with the final code and diff.
-- Whenever the existing PR description does not match the final code and diff, update that existing PR with `gh pr edit <PR number> --repo <upstream repository> --body-file <file>`. Preserve links, template sections, hidden markers, attribution, and unrelated content; do not claim tests or validation that were not run.
+- Before finishing, read the existing PR description with `gh pr view <PR number> --repo <upstream repository> --json body` and compare its current-state summary of the problem, solution, diff, and validation with the final code and diff.
+- If the description is still accurate, leave it unchanged. After a substantive change, update only the affected sections with `gh pr edit <PR number> --repo <upstream repository> --body-file <file>`.
+- Keep the description concise and current. Never append a chronological diary of review rounds, agent turns, rebases, commits, or test runs; replace stale validation results instead of accumulating a history.
+- Preserve links, required template sections, hidden markers, attribution, bot-managed sections, and unrelated content; do not claim tests or validation that were not run.
+- Put turn-specific reporting in your final response and in existing review-thread replies required by the Review Response Process. Do not add a general PR comment or PR-body log merely to narrate the turn.
 - This permission applies only to reading and editing the existing PR description. It does not permit creating a PR or changing unrelated PR metadata.
 WORKER_POLICY
 done
