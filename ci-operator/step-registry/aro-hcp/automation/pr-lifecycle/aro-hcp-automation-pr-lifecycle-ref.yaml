@@ -1,0 +1,52 @@
+ref:
+  as: aro-hcp-automation-pr-lifecycle
+  from: commenter
+  commands: aro-hcp-automation-pr-lifecycle-commands.sh
+  grace_period: 5m0s
+  timeout: 15m0s
+  env:
+  - name: GITHUB_APP_ID_PATH
+    default: /var/run/aro-hcp-robot/appid
+    documentation: |-
+      The path to the GitHub App ID file of the ARO-HCP robot.
+  - name: GITHUB_APP_KEY_PATH
+    default: /var/run/aro-hcp-robot/cert
+    documentation: |-
+      The path to the GitHub App private key PEM file of the ARO-HCP robot.
+  - name: GITHUB_REPO_ORG
+    default: Azure
+    documentation: |-
+      The organization of the GitHub repository.
+  - name: GITHUB_REPO_NAME
+    default: ARO-HCP
+    documentation: |-
+      The name of the GitHub repository.
+  - name: LIFECYCLE_MODE
+    default: ""
+    documentation: |-
+      The lifecycle action to run: stale, rotten or close.
+  - name: LIFECYCLE_DRY_RUN
+    default: "false"
+    documentation: |-
+      When true, matching pull requests are only logged and no comment is
+      posted. Defaults to false, so scheduled runs act on the matches.
+  - name: LIFECYCLE_CEILING
+    default: "30"
+    documentation: |-
+      The maximum number of pull requests to act on in a single run.
+  - name: VERBOSITY
+    default: "0"
+    documentation: |-
+      The debug level. 0 for no debug, 1 for debug.
+  credentials:
+  - mount_path: /var/run/aro-hcp-robot
+    group: aro-hcp-robot
+    collection: hcm-aro
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Runs the Prow commenter against pull requests of Azure/ARO-HCP to mark them stale,
+    rotten and eventually close them. The lifecycle labels are applied by the Prow
+    lifecycle plugin, which is already enabled for the repository.
