@@ -149,10 +149,22 @@ function RunTestCase1 () {
     cd policy-collection/deploy/ || return 1
     echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp || return 1
 
-    sleep 60
-
-    # Verify e2e-opp namespace was created
-    oc get namespace e2e-opp || return 1
+    # The e2e-opp namespace and the httpd-example buildconfig are created
+    # by policy remediation, which can lag well past a minute on loaded
+    # clusters (observed: policies still Pending after the previous fixed
+    # 60s sleep, so the build trigger hit a missing buildconfig). Wait for
+    # both within one bounded budget instead of racing a fixed sleep.
+    typeset -i remediationDeadline=$(( $(date +%s) + 600 ))
+    # Best Practices: oc wait --for=create for a not-yet-created object
+    # (an existence poll with sleep is the fixed-sleep violation). Both
+    # waits below charge the one shared deadline.
+    typeset -i _waitBudget=$(( remediationDeadline - $(date +%s) ))
+    if ! oc wait namespace/e2e-opp --for=create --timeout="${_waitBudget}s"; then
+        : "ERROR: e2e-opp namespace was not created within 10m of deploy"
+        : "=== Policy Status ==="
+        oc get policies -n policies | sed -n '/example/p' || true
+        return 1
+    fi
 
     oc label managedcluster local-cluster oppapps=httpd-example --overwrite
 
@@ -161,6 +173,16 @@ function RunTestCase1 () {
     oc get build -n e2e-opp || true
     oc get po -n e2e-opp || true
     oc get deployment -n e2e-opp || true
+
+    # Wait for the buildconfig policy to remediate before triggering a
+    # build; oc start-build fails when the buildconfig does not exist yet.
+    _waitBudget=$(( remediationDeadline - $(date +%s) ))
+    if (( _waitBudget <= 0 )) || ! oc wait buildconfig/httpd-example -n e2e-opp --for=create --timeout="${_waitBudget}s"; then
+        : "ERROR: buildconfig httpd-example was not created within 10m of deploy"
+        : "=== Policy Status ==="
+        oc get policies -n policies | sed -n '/example/p' || true
+        return 1
+    fi
 
     # Trigger build if needed
     typeset latestBuildName=""
