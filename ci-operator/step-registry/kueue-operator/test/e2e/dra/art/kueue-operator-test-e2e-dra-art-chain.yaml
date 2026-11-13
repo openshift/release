@@ -1,0 +1,36 @@
+chain:
+  as: kueue-operator-test-e2e-dra-art
+  steps:
+  - ref: kueue-operator-test-e2e-dra-enable-feature-gate
+  - ref: nvidia-nfd-operator-install
+  - ref: nvidia-gpu-operator-install
+  - ref: kueue-operator-test-e2e-dra-disable-device-plugin
+  - ref: nvidia-dra-driver-install
+  - ref: cert-manager-install-operator
+  - ref: merge-stage-registry-credentials
+  - ref: kueue-operator-enable-catalogsource-art
+  - ref: kueue-operator-subscription-install
+  - ref: jobset-install-operator
+  - ref: leader-worker-set-install-operator
+  - as: e2e-kueue-dra
+    cli: latest
+    env:
+    - name: CONTAINER_IMAGE
+      default: ""
+    commands: |
+      if test -f "${SHARED_DIR}/env"; then source "${SHARED_DIR}/env"; fi
+      echo "Running DRA e2e tests with CONTAINER_IMAGE=${CONTAINER_IMAGE:-}"
+      make e2e-ci-test-dra
+    from: kueue-operator-src
+    resources:
+      requests:
+        cpu: "4"
+        memory: 4Gi
+  documentation: |-
+    This chain runs the DRA e2e test suite for the Kueue operator against the ART
+    pre-release FBC. It deploys NVIDIA GPU Operator, NFD, and DRA driver as
+    prerequisites, then installs the operator by OLM from an ART-built FBC
+    CatalogSource with pre-release digests mirrored from registry.stage.redhat.io,
+    instead of the Konflux-built images used by kueue-operator-test-e2e-dra, and
+    runs the Kueue DRA-specific tests that validate structured parameters quota
+    accounting with NVIDIA GPU DeviceClasses.
