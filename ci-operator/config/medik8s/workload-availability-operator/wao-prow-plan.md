@@ -69,7 +69,7 @@ test:
   cli: latest
   commands: |
     make e2e-tests
-  from: system-tests
+  from: src
   resources:
     requests:
       cpu: "2"
@@ -92,20 +92,17 @@ What `make e2e-tests` does in CI (clone runner, the default):
 3. Runs `make run-tests` (ginkgo via rhwa-system-tests' `scripts/test-runner.sh`) from the
    rhwa-system-tests source. `GOCACHE` falls back to `/tmp` when `HOME` is unwritable.
 
-The step container (`from: system-tests`, the `dockerfile_literal` passthrough of
-`quay.io/medik8s/system-tests:wao`) is built from the rhwa-system-tests `wao` branch by that
-repo's CI and carries **both the toolchain** (go, make, git, Go module cache) **and the test
-source** under `/home/testuser`. CI points the make target at that baked-in source with
-`E2E_SYSTEM_TESTS_DIR: /home/testuser`, so no github clone happens in prow — the same
-`cd /home/testuser && make run-tests` the original inline step did, now reached through the
-repo's make target. Locally the same variable accepts any checkout; unset, the target clones
-branch `wao` into a tmp dir instead.
+The step container is `from: src` — the build root (`konveyor/builder:ubi9-v1.27`), the
+standard image for `make`-driven test steps. It has go, make and git, runs with the repo
+mounted as the working directory, and `make e2e-tests` uses its **clone runner**: it clones
+`openshift/rhwa-system-tests` branch `wao` into a tmp dir inside the step container and runs
+`make run-tests` there — the same in-job clone the NMO daily uses, reached through the repo's
+make target. ci-operator sets `KUBECONFIG` for test steps, and `cli: latest` provides `oc`
+for the pre-flight.
 
 Environment (job-level `steps.env`, injected into the step container; every value matches the
 Makefile default — kept explicit to document CI intent):
 
-- `E2E_SYSTEM_TESTS_DIR: /home/testuser` — run the image's baked-in test source instead of
-  cloning branch `wao` (no github dependency in prow; suite version = image build).
 - `ECO_TEST_FEATURES: nmo-operator`
 - `ECO_TEST_LABELS: "!component:olm"` — all specs, destructive included
 - `ECO_TEST_VERBOSE` / `ECO_DUMP_FAILED_TESTS: "true"`
@@ -117,13 +114,12 @@ Makefile default — kept explicit to document CI intent):
 ci-operator requires every test-level `steps.env` value to be **declared** by a step that
 consumes it (`checkconfig` fails otherwise with "overridden in [test/...] but not declared
 in any step"). The `OO_*`/`BASE_DOMAIN` values are declared by the workflow's registered
-steps; the six values above are consumed by our inline `make e2e-tests` command, so the
+steps; the five values above are consumed by our inline `make e2e-tests` command, so the
 `e2e-nmo` step declares them in its own `env:` list (bare names, same pattern as the NHC/NMO
 daily configs):
 
 ```yaml
       env:
-      - name: E2E_SYSTEM_TESTS_DIR
       - name: ECO_DUMP_FAILED_TESTS
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
@@ -165,15 +161,15 @@ The same make target runs locally; `KUBECONFIG` is required on every invocation:
 - **Both features in one job**: the lifecycle suite's BeforeAll requires every operand
   Disabled; would need careful sequencing (disable NMO again between steps). Deferred.
 - **`make e2e-ci-test` as the prow command**: the image runner shells out to
-  `CONTAINER_TOOL`, which the prow step container does not have — and it would nest the
-  system-tests image inside itself, since the step already runs `from: system-tests`. Prow
-  uses the baked-in source via `E2E_SYSTEM_TESTS_DIR` instead; `e2e-ci-test` stays the local
-  reproduction of the prow environment.
-- **Cloning rhwa-system-tests in prow** (the make target's default): works — git and egress
-  are available in the step container (verified) — but adds a github dependency and a
-  ~2–3 min clone of the vendored repo for no benefit, since the image already carries the
-  `wao`-branch source. Superseded by `E2E_SYSTEM_TESTS_DIR: /home/testuser`; the clone
-  remains the local default.
+  `CONTAINER_TOOL`, which prow step containers do not have. `e2e-ci-test` stays the local
+  reproduction of the CI image environment.
+- **`from: system-tests` (the prebuilt quay.io/medik8s/system-tests:wao step image)**: tried
+  in the first rehearse (PR 88743); the step failed with `make: stat: Makefile: Permission
+  denied` — that image runs as the non-root `testuser`, which cannot read the repo ci-operator
+  clones and mounts as the step working directory. Replaced by `from: src` (build root),
+  the standard image for make-driven steps. The quay image remains the local
+  `e2e-ci-test` runner, where the kubeconfig and source are mounted with matching
+  permissions.
 - **Inline enable/wait commands in the config** (the original Goal 2 sketch): superseded by
   `make e2e-tests` — one command in the config, one code path shared with developers.
 

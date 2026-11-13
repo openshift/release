@@ -7,9 +7,6 @@ images:
   items:
   - dockerfile_path: Dockerfile
     to: workload-availability-operator
-  - dockerfile_literal: |
-      FROM quay.io/medik8s/system-tests:wao
-    to: system-tests
 operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
@@ -41,7 +38,6 @@ tests:
       OO_INDEX: ci-index
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
-      E2E_SYSTEM_TESTS_DIR: /home/testuser
       ECO_DUMP_FAILED_TESTS: "true"
       ECO_TEST_FEATURES: nmo-operator
       ECO_TEST_LABELS: '!component:olm'
@@ -57,13 +53,12 @@ tests:
       commands: |
         make e2e-tests
       env:
-      - name: E2E_SYSTEM_TESTS_DIR
       - name: ECO_DUMP_FAILED_TESTS
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
       - name: ECO_TEST_VERBOSE
       - name: WORKLOAD_IMAGE
-      from: system-tests
+      from: src
       resources:
         requests:
           cpu: "2"
