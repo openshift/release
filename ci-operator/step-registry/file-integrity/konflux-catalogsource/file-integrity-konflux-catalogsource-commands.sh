@@ -69,6 +69,9 @@ spec:
   - mirrors:
     - quay.io/redhat-user-workloads/ocp-isc-tenant/openshift-selinuxd-rhel9-container-${TEST_TYPE}
     source: registry.redhat.io/compliance/openshift-selinuxd-rhel9
+  - mirrors:
+    - quay.io/redhat-user-workloads/ocp-isc-tenant/openshift-selinuxd-rhel10-container-${TEST_TYPE}
+    source: registry.redhat.io/compliance/openshift-selinuxd-rhel10
 EOF
     echo "!!! fail to create the ICSP"
     return 1
@@ -79,23 +82,34 @@ EOF
 }
 
 check_mcp_status() {
-  machineCount=$(oc get mcp worker -o=jsonpath='{.status.machineCount}')
-  COUNTER=0
-  while [ $COUNTER -lt 1200 ]; do
-    sleep 20
-    COUNTER=$(expr $COUNTER + 20)
-    echo "waiting ${COUNTER}s"
-    updatedMachineCount=$(oc get mcp worker -o=jsonpath='{.status.updatedMachineCount}')
-    if [[ ${updatedMachineCount} = "${machineCount}" ]]; then
-      echo "MCP updated successfully"
-      break
+  # Wait on every MachineConfigPool, not just "worker". On compact/converged
+  # baremetal profiles (e.g. the "f14" LVMS jobs) control-plane nodes are
+  # schedulable and run operator workloads too, so a DaemonSet pod can land
+  # on a master node and start pulling images before that node's kubelet has
+  # picked up the registries.conf change from the ICSP/IDMS we just applied,
+  # causing a "manifest unknown" ImagePullBackOff that's specific to whichever
+  # node races ahead.
+  local pools
+  pools=$(oc get mcp -o jsonpath='{.items[*].metadata.name}')
+  for pool in ${pools}; do
+    machineCount=$(oc get mcp "${pool}" -o=jsonpath='{.status.machineCount}')
+    COUNTER=0
+    while [ $COUNTER -lt 1200 ]; do
+      sleep 20
+      COUNTER=$(expr $COUNTER + 20)
+      echo "waiting ${COUNTER}s for mcp/${pool}"
+      updatedMachineCount=$(oc get mcp "${pool}" -o=jsonpath='{.status.updatedMachineCount}')
+      if [[ ${updatedMachineCount} = "${machineCount}" ]]; then
+        echo "MCP ${pool} updated successfully"
+        break
+      fi
+    done
+    if [[ ${updatedMachineCount} != "${machineCount}" ]]; then
+      run "oc get mcp,node"
+      run "oc get mcp ${pool} -o yaml"
+      return 1
     fi
   done
-  if [[ ${updatedMachineCount} != "${machineCount}" ]]; then
-    run "oc get mcp,node"
-    run "oc get mcp worker -o yaml"
-    return 1
-  fi
 }
 
 create_catalog_sources() {
