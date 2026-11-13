@@ -679,6 +679,28 @@ BUNDLEEOF
   rm -f "${_bundle_tmp}"
 fi
 
+# --- Wait for the QuayRegistry CRD to report Established=True BEFORE the first
+#     QuayRegistry call. The CRD object is stored when the CSV installs it, but
+#     the API serves it only once Established=True; a create against an
+#     unserved CRD fails and the get fallback fails too, so the create would
+#     exit quay-registry-error. Check the condition, not .metadata.name (which
+#     is readable as soon as the object exists). ---
+_crd_want=$(( $(date +%s) + 60 ))
+_poll_deadline=$(_clamp_deadline "${_crd_want}")
+if _poll_jsonpath customresourcedefinitions quayregistries.quay.redhat.com "" '{range .status.conditions[*]}{.type}={.status}{"\n"}{end}' '@contains:Established=True' '' "quayregistry CRD"; then
+  _prop "quayregistry_crd" "Established"
+else
+  _prc=$?
+  if (( _prc == 2 )); then
+    _classify "quay-registry-query-failed" "3 consecutive CRD queries failed (API/RBAC error, not absence)"
+  else
+    _classify "quay-registry-crd-missing" "CRD quayregistries.quay.redhat.com not Established within 60s of CSV Succeeded"
+  fi
+  echo "ERROR: ${_class_detail}"
+  _dump_diagnostics
+  exit 1
+fi
+
 # --- QuayRegistry registry (components objectstorage+tls managed, config
 #     bundle wired) ---
 if oc get quayregistries.quay.redhat.com registry -n "${QUAY_NAMESPACE}" >/dev/null 2>&1; then
@@ -712,24 +734,7 @@ EOF
   fi
 fi
 
-# --- Wait for QuayRegistry Available=True (the CRD lands with the CSV, so a
-#     short bounded poll absorbs the establishment race before the status
-#     wait). ---
-_crd_want=$(( $(date +%s) + 60 ))
-_poll_deadline=$(_clamp_deadline "${_crd_want}")
-if _poll_jsonpath customresourcedefinitions quayregistries.quay.redhat.com "" '{.metadata.name}' quayregistries.quay.redhat.com '' "quayregistry CRD"; then
-  :
-else
-  _prc=$?
-  if (( _prc == 2 )); then
-    _classify "quay-registry-query-failed" "3 consecutive CRD queries failed (API/RBAC error, not absence)"
-  else
-    _classify "quay-registry-crd-missing" "CRD quayregistries.quay.redhat.com not established within 60s of CSV Succeeded"
-  fi
-  echo "ERROR: ${_class_detail}"
-  _dump_diagnostics
-  exit 1
-fi
+# --- Wait for QuayRegistry Available=True ---
 echo ">>> PHASE: waiting for QuayRegistry registry Available (timeout: ${QUAY_REGISTRY_TIMEOUT}s)"
 _reg_want=$(( $(date +%s) + QUAY_REGISTRY_TIMEOUT ))
 _poll_deadline=$(_clamp_deadline "${_reg_want}")
