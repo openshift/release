@@ -1,6 +1,5 @@
 #!/bin/bash
 
-set -x
 set -e
 set -o pipefail
 
@@ -24,16 +23,14 @@ oc patch ingresscontroller -n openshift-ingress-operator default \
   --type=json \
     -p '[{ "op": "add", "path": "/spec/routeAdmission", "value": {"wildcardPolicy": "WildcardsAllowed"}}]'
 
-set +x
 # Extract the management cluster pull secret for use when provisioning the hosted cluster
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 cp /tmp/.dockerconfigjson /tmp/pull-secret
 PULL_SECRET_FILE=/tmp/pull-secret
-set -x
 
 # Hosted cluster identity and namespace — derived from the MetalLB IPAddressPool range
 POOL_RANGE=$(oc get ipaddresspool -n metallb-system -o jsonpath='{.items[0].spec.addresses[0]}' 2>/dev/null || true)
-echo "$(date) MetalLB IPAddressPool range: ${POOL_RANGE}"
+echo "$(date) Read MetalLB IPAddressPool range"
 
 if [[ "${POOL_RANGE}" == 192.168.1.* ]]; then
   HC_NAME=hcpmulti-oz-ci-0
@@ -44,13 +41,12 @@ elif [[ "${POOL_RANGE}" == 192.168.3.* ]]; then
   HC_NS=hcpmulti-oz-ci-1-ns
   MGMT_CLUSTER_LEASE=0-1
 else
-  echo "$(date) ERROR: Unrecognised IPAddressPool range '${POOL_RANGE}', expected 192.168.1.x or 192.168.3.x"
+  echo "$(date) ERROR: Unrecognised IPAddressPool range, expected 192.168.1.x or 192.168.3.x"
   exit 1
 fi
 
 echo "$(date) Using HC_NAME=${HC_NAME}, HC_NS=${HC_NS}"
 MGMT_HOST_IP=10.0.1.12
-echo "$(date) LPAR host IP: ${MGMT_HOST_IP}"
 
 # --- Derive the fixed NodePort from the lease ---
 # The LPAR haproxy.cfg has static frontend entries pre-configured:
@@ -181,7 +177,7 @@ CLSTR_NAME=$(oc --kubeconfig "${VIRT_KC}" config view -o jsonpath='{.clusters[0]
 oc --kubeconfig "${VIRT_KC}" config set-cluster "${CLSTR_NAME}" \
   --server="https://${MGMT_HOST_IP}:${NODEPORT}" \
   --insecure-skip-tls-verify=true
-echo "$(date) Patched nested_kubeconfig server → https://${MGMT_HOST_IP}:${NODEPORT}"
+echo "$(date) Patched nested_kubeconfig server to the LPAR host IP and fixed NodePort"
 
 echo "$(date) Nodepool status........"
 oc get np -A || true
@@ -200,7 +196,7 @@ wait_for_nodes() {
     echo "$(date) Ready nodes: ${READY_NODES}/${REQUIRED_NODES}"
     if [[ ${READY_NODES} -ge ${REQUIRED_NODES} ]]; then
       echo "$(date) ${REQUIRED_NODES} nodes are Ready"
-      oc get no --kubeconfig "${VIRT_KC}" -o wide --request-timeout=300s -v6
+      oc get no --kubeconfig "${VIRT_KC}" -o wide --request-timeout=300s
       return 0
     fi
 
@@ -295,13 +291,13 @@ if [[ -z "${LB_IP}" || "${LB_IP}" == "<pending>" ]]; then
   oc get svc test-apps -n "${HC_NS}-${HC_NAME}" -o yaml || true
   exit 1
 fi
-echo "$(date) test-apps EXTERNAL-IP: ${LB_IP}"
+echo "$(date) test-apps EXTERNAL-IP assigned"
 
 APPS_DOMAIN="apps.${HC_NAME}.phc-cicd.cis.ibm.net"
 CANARY_URL="https://canary-openshift-ingress-canary.${APPS_DOMAIN}"
 CP_NS="${HC_NS}-${HC_NAME}"
 
-echo "$(date) Setting ingress-operator NO_PROXY so canary bypasses konnectivity for ${APPS_DOMAIN}"
+echo "$(date) Setting ingress-operator NO_PROXY so canary bypasses konnectivity"
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 oc set env deploy/ingress-operator -n "${CP_NS}" -c ingress-operator \
   "NO_PROXY=kube-apiserver,${LB_IP},.${APPS_DOMAIN},phc-cicd.cis.ibm.net,127.0.0.1,localhost"
@@ -314,9 +310,8 @@ echo "$(date) HostedCluster pausedUntil=$(oc get hostedcluster "${HC_NAME}" -n "
 # Confirm NO_PROXY still contains the LB IP after pause (CPO must not have wiped it)
 NOPROXY_CUR=$(oc get deploy ingress-operator -n "${CP_NS}" \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="ingress-operator")].env[?(@.name=="NO_PROXY")].value}')
-echo "$(date) ingress-operator NO_PROXY=${NOPROXY_CUR}"
 if [[ "${NOPROXY_CUR}" != *"${LB_IP}"* ]]; then
-  echo "$(date) WARNING: NO_PROXY missing ${LB_IP} after pause; re-applying"
+  echo "$(date) WARNING: ingress-operator NO_PROXY missing the LB IP after pause; re-applying"
   oc set env deploy/ingress-operator -n "${CP_NS}" -c ingress-operator \
     "NO_PROXY=kube-apiserver,${LB_IP},.${APPS_DOMAIN},phc-cicd.cis.ibm.net,127.0.0.1,localhost"
 fi
@@ -324,8 +319,9 @@ fi
 oc rollout status deploy/ingress-operator -n "${CP_NS}" --timeout=120s
 
 echo "$(date) Verifying canary URL from ingress-operator (should bypass konnectivity via NO_PROXY)"
-oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
-  curl -vk --connect-timeout 10 "${CANARY_URL}" || true
+CANARY_HTTP_CODE=$(oc exec -n "${CP_NS}" deploy/ingress-operator -c ingress-operator -- \
+  curl -sk --connect-timeout 10 -o /dev/null -w '%{http_code}' "${CANARY_URL}" 2>/dev/null || true)
+echo "$(date) Canary URL HTTP status: ${CANARY_HTTP_CODE:-none}"
 
 echo "$(date) Waiting for CanaryChecksSucceeding on default IngressController"
 CANARY_WAIT=300
