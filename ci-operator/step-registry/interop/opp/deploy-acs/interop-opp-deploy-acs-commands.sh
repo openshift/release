@@ -46,6 +46,30 @@ exec {_xtrace_fd}>"${_xtrace_log}"
 BASH_XTRACEFD=${_xtrace_fd}
 set -x
 
+# --- API-response trace suspension: set -x prints EXPANDED arguments, and
+#     ${_xtrace_log} is copied into artifacts on nonzero exit, so every
+#     API-controlled value handed to printf/echo lands in the trace verbatim.
+#     The sed scrub in _opp_cleanup is a credential filter, not a redaction
+#     boundary for API text: _api_quiet/_api_loud bracket each block that
+#     expands an API response body.
+_api_trace_on=0
+_api_quiet_depth=0
+_api_quiet() {
+  _api_quiet_depth=$(( _api_quiet_depth + 1 ))
+  if [[ $- == *x* ]]; then
+    _api_trace_on=1
+    set +x
+  fi
+  return 0
+}
+_api_loud() {
+  if (( _api_quiet_depth > 0 )); then
+    _api_quiet_depth=$(( _api_quiet_depth - 1 ))
+    if (( _api_quiet_depth == 0 )) && (( _api_trace_on )); then set -x; fi
+  fi
+  return 0
+}
+
 # shellcheck disable=SC2154
 # Once-flagged like _junit_emit: a TERM/INT trap runs _on_exit -> exit,
 # which fires the EXIT trap -> _on_exit again; without this guard the
@@ -54,7 +78,9 @@ _cleanup_done=0
 _opp_cleanup() {
   # Save xtrace log with credentials scrubbed when the step exits non-zero.
   # Takes the recorded exit status explicitly: $? here is unreliable (callers
-  # run other commands first).
+  # run other commands first). Scope: this is a CREDENTIAL filter only. It
+  # does not make the trace a safe channel for API-controlled text, which is
+  # why API-response handling runs under _api_quiet instead.
   local _exit_code="${1:-0}"
   (( _cleanup_done )) && return 0
   _cleanup_done=1
@@ -104,6 +130,21 @@ _classify() {
     _class="${1}"
     _class_detail="${2}"
   fi
+}
+
+# _api_err_class <text> - collapse an oc error to a fixed token. The raw text
+# is API/RBAC controlled and would otherwise reach the step log, the xtrace
+# log, and the JUnit detail verbatim.
+_api_err_class() {
+  case "$1" in
+    "")                                                            echo "empty" ;;
+    *[Uu]nauthorized*|*"must be logged in"*)                       echo "unauthorized" ;;
+    *[Ff]orbidden*|*"cannot get"*|*"cannot list"*|*"cannot create"*) echo "forbidden" ;;
+    *"not found"*|*NotFound*)                                      echo "not-found" ;;
+    *[Tt]imeout*|*"unable to return a response"*)                  echo "timeout" ;;
+    *"no such host"*|*"connection refused"*|*"connect: "*|*EOF*)   echo "transport-error" ;;
+    *)                                                             echo "other" ;;
+  esac
 }
 
 # _junit_seed — write the default-FAILING case before any work, atomically.
@@ -230,17 +271,28 @@ _clamp_deadline() {
   if (( $1 > _cap )); then printf '%s' "${_cap}"; else printf '%s' "$1"; fi
 }
 
-# --- Diagnostics: bounded (last 50 events, <=256KiB/object, <=2MiB total) ---
+# --- Diagnostics: bounded (last 50 events, <=256KiB, allowlisted fields) ---
+# Only classification-shaped fields are printed. Status bodies and event
+# messages are API-controlled text: they stay out of the step log and so out
+# of the trace copied into artifacts. Sizes are capped as before.
 _dump_diagnostics() {
-  echo ">>> DIAG: Subscription (OLM, fully-qualified):"
-  oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o yaml 2>&1 | head -c 262144 || true
-  echo
-  echo ">>> DIAG: events in ${ACS_NAMESPACE} (last 50):"
-  oc get events -n "${ACS_NAMESPACE}" --sort-by='.lastTimestamp' 2>&1 | tail -50 || true
-  echo ">>> DIAG: events in openshift-marketplace (last 50):"
-  oc get events -n openshift-marketplace --sort-by='.lastTimestamp' 2>&1 | tail -50 || true
-  echo ">>> DIAG: CSVs in ${ACS_NAMESPACE}:"
-  oc get csv -n "${ACS_NAMESPACE}" 2>&1 | head -50 || true
+  _api_quiet
+  echo ">>> DIAG: Subscription rhacs-operator in ${ACS_NAMESPACE} (allowlisted fields):"
+  oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
+    -o jsonpath='{.metadata.name} channel={.spec.channel} currentCSV={.status.currentCSV} installedCSV={.status.installedCSV}{"\n"}' 2>&1 | head -c 262144 || true
+  echo ">>> DIAG: Subscription conditions (type/status/reason only):"
+  oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
+    -o jsonpath='{range .status.conditions[*]}  {.type}={.status} reason={.reason}{"\n"}{end}' 2>&1 | head -50 || true
+  echo ">>> DIAG: events in ${ACS_NAMESPACE} (last 50, no messages):"
+  oc get events -n "${ACS_NAMESPACE}" --sort-by='.lastTimestamp' \
+    -o jsonpath='{range .items[*]}{.lastTimestamp} {.type} {.reason} {.involvedObject.kind}/{.involvedObject.name} x{.count}{"\n"}{end}' 2>&1 | tail -50 || true
+  echo ">>> DIAG: events in openshift-marketplace (last 50, no messages):"
+  oc get events -n openshift-marketplace --sort-by='.lastTimestamp' \
+    -o jsonpath='{range .items[*]}{.lastTimestamp} {.type} {.reason} {.involvedObject.kind}/{.involvedObject.name} x{.count}{"\n"}{end}' 2>&1 | tail -50 || true
+  echo ">>> DIAG: CSVs in ${ACS_NAMESPACE} (name/phase only):"
+  oc get csv -n "${ACS_NAMESPACE}" \
+    -o jsonpath='{range .items[*]}  {.metadata.name} {.status.phase}{"\n"}{end}' 2>&1 | head -50 || true
+  _api_loud
 }
 
 echo ">>> PHASE: initialization"
@@ -323,6 +375,7 @@ if [[ "${ACS_REPORT_ONLY}" == "1" ]]; then
   # check so the full property set is recorded even when an OperatorPolicy
   # owns the install. Subscription presence is queried independently of
   # spec.channel (OLM permits an omitted channel).
+  _api_quiet
   _subname=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.name}' 2>/dev/null) || _subname=""
   _sub=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null) || _sub=""
   _csvp=$(oc get csv -n "${ACS_NAMESPACE}" -l "operators.coreos.com/rhacs-operator.${ACS_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _csvp=""
@@ -333,12 +386,14 @@ if [[ "${ACS_REPORT_ONLY}" == "1" ]]; then
   _prop "csv_phase" "${_csvp:-absent}"
   _prop "packagemanifest" "${_pm:-absent}"
   echo ">>> REPORT_ONLY: subscription=${_sub:-absent} csv=${_csvp:-absent} packagemanifest=$([[ -n "${_pm}" ]] && echo present || echo absent)"
+  _api_loud
   exit 0
 fi
 
 # --- Self-disable: if the OperatorPolicy already owns a healthy install,
 #     the workaround is redundant — report and exit 0 without installing.
 if oc get crd operatorpolicies.policy.open-cluster-management.io >/dev/null 2>&1; then
+  _api_quiet
   _op_status=$(oc get operatorpolicy -A -o json 2>/dev/null) || _op_status=""
   if [[ -n "${_op_status}" ]]; then
     _self_disable=$(printf '%s' "${_op_status}" | python3 -c '
@@ -378,6 +433,7 @@ except Exception:
       _prop "channel_self_disable_withheld" "${_policy_ch}!=${ACS_CHANNEL}"
     fi
   fi
+  _api_loud
 fi
 _prop "workaround_removal_ready" "false"
 
@@ -386,6 +442,7 @@ _prop "workaround_removal_ready" "false"
 #     error is NEVER classified as catalog-missing.
 _precondition_ok=false
 _pm_raw=""
+_api_quiet
 for _attempt in 1 2 3; do
   if _pm_raw=$(oc get packagemanifest rhacs-operator -n openshift-marketplace -o json 2>&1); then
     _precondition_ok=true
@@ -397,11 +454,11 @@ for _attempt in 1 2 3; do
     exit 1
   fi
   _backoff=$(( _attempt == 1 ? 5 : _attempt == 2 ? 15 : 30 ))
-  echo ">>> precondition query failed (attempt ${_attempt}/3), retrying in ${_backoff}s: $(echo "${_pm_raw}" | head -1)"
+  echo ">>> precondition query failed (attempt ${_attempt}/3), retrying in ${_backoff}s: $(_api_err_class "${_pm_raw}")"
   sleep "${_backoff}"
 done
 if [[ "${_precondition_ok}" != "true" ]]; then
-  _classify "acs-catalog-query-failed" "packagemanifest query errored after 3 attempts (non-reverting class): $(echo "${_pm_raw}" | head -1)"
+  _classify "acs-catalog-query-failed" "packagemanifest query errored after 3 attempts (non-reverting class: $(_api_err_class "${_pm_raw}"))"
   echo "ERROR: ${_class_detail}"
   exit 1
 fi
@@ -417,7 +474,7 @@ except Exception:
     print("error")
 ' "${ACS_CHANNEL}" 2>/dev/null || echo "error")
 if [[ "${_channel_ok}" == absent* ]]; then
-  _classify "acs-catalog-missing" "channel '${ACS_CHANNEL}' not listed for rhacs-operator (${_channel_ok#absent })"
+  _classify "acs-catalog-missing" "channel '${ACS_CHANNEL}' not listed for rhacs-operator ($(printf '%s' "${_channel_ok#absent }" | head -c 160))"
   echo "ERROR: ${_class_detail}"
   exit 1
 fi
@@ -427,6 +484,7 @@ if [[ "${_channel_ok}" == "error" ]]; then
   exit 1
 fi
 echo ">>> precondition: rhacs-operator present; channel ${ACS_CHANNEL} head: ${_channel_ok#ok }"
+_api_loud
 
 
 
@@ -543,9 +601,11 @@ while [[ -z "${csvName}" ]]; do
     if [[ -z "${csvName}" ]]; then
         # Periodic condition diagnostics every 30s of elapsed time.
         if (( csv_now >= csv_diag_at )); then
+            _api_quiet
             echo ">>> CSV poll: waited ${csv_elapsed}/${ACS_CSV_WAIT_TIMEOUT}s — Subscription conditions:"
             oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
-                -o jsonpath='{range .status.conditions[*]}  {.type}={.status} reason={.reason} msg={.message}{"\n"}{end}' 2>/dev/null || true
+                -o jsonpath='{range .status.conditions[*]}  {.type}={.status} reason={.reason}{"\n"}{end}' 2>/dev/null || true
+            _api_loud
             csv_diag_at=$(( $(date +%s) + 30 ))
         fi
         # Never sleep past the deadline.
@@ -557,6 +617,7 @@ done
 
 if [[ -z "${csvName}" ]]; then
     # Classify from Subscription conditions before defaulting to timeout.
+    _api_quiet
     _cond=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
         -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason} {end}' 2>/dev/null) || _cond=""
     case "${_cond}" in
@@ -564,8 +625,9 @@ if [[ -z "${csvName}" ]]; then
       *ConstraintsNotSatisfiable*)    _classify "acs-subscription-unsatisfiable" "Subscription condition ConstraintsNotSatisfiable" ;;
       *InstallPlanMissing*)           _classify "acs-installplan-missing" "Subscription condition InstallPlanMissing" ;;
       *InstallPlanFailed*)            _classify "acs-installplan-failed" "Subscription condition InstallPlanFailed" ;;
-      *)                              _classify "acs-csv-timeout" "no currentCSV after ${ACS_CSV_WAIT_TIMEOUT}s (conditions: ${_cond:-none})" ;;
+      *)                              _classify "acs-csv-timeout" "no currentCSV after ${ACS_CSV_WAIT_TIMEOUT}s (no classified condition; see DIAG)" ;;
     esac
+    _api_loud
     echo "ERROR: ${_class_detail}"
     _dump_diagnostics
     exit 1
@@ -589,6 +651,7 @@ install_deadline=$(_clamp_deadline "${_install_want}")
 if (( install_deadline < _install_want )); then
   echo ">>> NOTE: CSV-Succeeded wait clamped to $(( install_deadline - $(date +%s) ))s (requested ${ACS_INSTALL_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
 fi
+_api_quiet
 while :; do
     if csv_probe_out=$(oc get csv "${csvName}" -n "${ACS_NAMESPACE}" -o name 2>&1); then
         break
@@ -597,6 +660,7 @@ while :; do
     if (( install_left <= 0 )); then break; fi
     if (( install_left < 5 )); then sleep "${install_left}"; else sleep 5; fi
 done
+_api_loud
 install_left=$(( install_deadline - $(date +%s) ))
 (( install_left < 0 )) && install_left=0
 
@@ -604,9 +668,13 @@ if ! oc wait csv "${csvName}" -n "${ACS_NAMESPACE}" \
     --for=jsonpath='{.status.phase}'=Succeeded \
     --timeout="${install_left}s" 2>&1; then
     _phase=$(oc get csv "${csvName}" -n "${ACS_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null) || _phase="unknown"
+    _probe_notfound=0
+    _api_quiet
+    if printf '%s' "${csv_probe_out}" | grep -qi "not found"; then _probe_notfound=1; fi
+    _api_loud
     if [[ "${_phase}" == "Failed" ]]; then
       _classify "acs-csv-failed" "CSV ${csvName} reached phase Failed"
-    elif [[ "${_phase}" == "unknown" ]] && printf '%s' "${csv_probe_out}" | grep -qi "not found"; then
+    elif [[ "${_phase}" == "unknown" ]] && (( _probe_notfound )); then
       _classify "acs-csv-timeout" "CSV object ${csvName} never created within ${ACS_INSTALL_TIMEOUT}s (currentCSV published, object absent)"
     else
       _classify "acs-csv-timeout" "CSV ${csvName} not Succeeded after ${ACS_INSTALL_TIMEOUT}s (phase: ${_phase})"
