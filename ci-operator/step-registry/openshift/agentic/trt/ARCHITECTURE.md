@@ -20,9 +20,12 @@ flowchart TD
         W["Continue tracking the pull request"]
         Q{"Pull-request event?"}
         F["Launch the configured follow-up job<br/>through Gangway and track it"]
+        X["Initial job fails before a PR is ready<br/>notify the user and complete tracking"]
         Z["PR merged or closed<br/>complete tracking and clean up"]
 
-        A --> B --> T --> N --> W --> Q
+        A --> B --> T
+        T -->|"PR discovered"| N --> W --> Q
+        T -->|"initial job fails<br/>before PR"| X
         Q -->|"merged or closed"| Z
         Q -->|"actionable review or<br/>newly failing required CI"| F
     end
@@ -36,7 +39,6 @@ flowchart TD
 
         IMG -.->|"runtime"| I
         IMG -.->|"runtime"| L
-        I --> G
         L --> G
         G --> P
     end
@@ -46,17 +48,18 @@ flowchart TD
     U --> A
     B -->|"Gangway"| I
     I --> PR
-    PR -.->|"discovered"| T
+    PR -.->|"visible while the job is running"| T
     F -->|"Gangway"| L
     P --> PR
-    PR -.->|"comments and required checks;<br/>optional Prow jobs excluded"| G
-    P -.->|"job completes"| W
+    PR -->|"initial job continues into the responder;<br/>optional Prow jobs excluded from required checks"| G
+    P -.->|"bounded job exits;<br/>PR tracking continues"| W
 ```
 
-The diagram shows one end-to-end lifecycle and one terminal outcome for Chai's
-tracking. The initial and follow-up Prow workflows both converge on the same
-review responder, but finishing a bounded CI job does not finish Chai's
-long-lived tracking. Chai continues until the pull request is merged or closed.
+The diagram shows one end-to-end lifecycle and both terminal outcomes for
+Chai's tracking: an initial job can fail before producing a PR, or tracking can
+end when an existing PR is merged or closed. The initial and follow-up Prow
+workflows both converge on the same review responder, but finishing a bounded
+CI job does not finish Chai's long-lived PR tracking.
 
 ## Component responsibilities
 
@@ -73,7 +76,9 @@ long-lived tracking. Chai continues until the pull request is merged or closed.
 - **Follow-up orchestration** starts another bounded Prow job when a new
   actionable review comment or newly failing required check needs attention.
   Optional Prow jobs are not treated as required-CI signals. When the PR merges
-  or closes, Chai completes tracking and cleans up the active request.
+  or closes, Chai completes tracking and cleans up the active request. If the
+  initial job fails before producing a PR, Chai notifies the user and completes
+  that request without entering PR tracking.
 
 These are the stable responsibilities of the orchestration layer. Storage
 details, polling intervals, and other operational defaults are intentionally
@@ -124,11 +129,14 @@ accept Gangway environment overrides.
    planning workflow is defined in this registry.
 4. The agent leaves a local commit. Pipeline code validates the branch and
    worktree, pushes the configured fork branch, and creates the upstream PR.
-5. Chai discovers the PR, notifies the user, moves the Jira issue to review,
-   and keeps tracking the PR after the initial job completes.
-6. Within the initial CI job, `review-responder` watches the new PR for a
-   bounded review/CI window and `emit-metrics` records the solve and review
-   phases when the workflow exits.
+5. While that CI job is still running, Chai can discover the PR, notify the
+   user, move the Jira issue to review, and begin PR tracking. The CI job
+   continues into `review-responder`, which watches the new PR for a bounded
+   review/CI window.
+6. `emit-metrics` records the solve and review phases when the workflow exits;
+   Chai keeps tracking the PR after that bounded job completes. If the initial
+   job fails before a PR is ready, Chai instead notifies the user and ends the
+   request.
 
 ### Later feedback
 
@@ -144,7 +152,7 @@ and SHA and checks out that exact commit. After a worker finishes, the pipeline
 revalidates those boundaries before updating the configured fork ref. A
 history-rewriting rebase is published only with a force-with-lease tied to the
 previously observed head. When the bounded job ends, Chai resumes PR tracking;
-it completes the solve only when the PR is merged or closed.
+once a PR exists, Chai completes tracking when that PR is merged or closed.
 
 ## Execution and authentication boundaries
 
