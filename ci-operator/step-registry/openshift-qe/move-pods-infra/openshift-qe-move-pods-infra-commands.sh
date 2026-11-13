@@ -246,6 +246,7 @@ data:
         value: reserved
         effect: NoExecute
     prometheusK8s:
+      collectionProfile: minimal
       nodeSelector:
         node-role.kubernetes.io/infra: ""
       tolerations:
@@ -348,6 +349,7 @@ data:
         value: reserved
         effect: NoExecute
     prometheusK8s:
+      collectionProfile: minimal
       retention: ${OPENSHIFT_PROMETHEUS_RETENTION_PERIOD}
       nodeSelector:
         node-role.kubernetes.io/infra: ""
