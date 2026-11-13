@@ -2,15 +2,9 @@
 
 set -uo pipefail
 
-function on_failure() {
-  echo "============================================"
-  echo "DEBUG: collect-validation-results failed"
-  echo "Sleeping 6 hours for live cluster investigation"
-  echo "Cluster API: $(oc whoami --show-server 2>/dev/null || echo 'unknown')"
-  echo "============================================"
-  sleep 21600
-}
-trap 'on_failure' ERR
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 set -e
 
@@ -57,9 +51,32 @@ oc wait --for=condition=ready --timeout=5m "pod/${PVC_READER_POD}" -n ocp-virt-v
 echo "=== Copying results from pvc-reader pod ==="
 RESULTS_DIR="${ARTIFACT_DIR}/validation-results"
 mkdir -p "${RESULTS_DIR}"
-oc exec -n ocp-virt-validation "${PVC_READER_POD}" -- \
-  tar cf - --exclude='lost+found' -C /results . 2>/dev/null | tar xf - -C "${RESULTS_DIR}/" || \
-  echo "WARNING: Failed to copy results from pvc-reader pod"
+
+TAR_SUCCESS=false
+for ATTEMPT in 1 2 3; do
+  echo "  Copy attempt ${ATTEMPT}..."
+  if oc exec -n ocp-virt-validation "${PVC_READER_POD}" -- \
+    tar cf - --exclude='lost+found' -C /results . 2>/dev/null | tar xf - -C "${RESULTS_DIR}/"; then
+    TAR_SUCCESS=true
+    break
+  fi
+  echo "  tar copy failed on attempt ${ATTEMPT}, retrying..."
+  sleep 5
+done
+
+if [[ "${TAR_SUCCESS}" != "true" ]]; then
+  echo "WARNING: tar copy failed after 3 attempts, falling back to per-suite oc cp"
+  for suite in compute network storage ssp tier2; do
+    oc exec -n ocp-virt-validation "${PVC_READER_POD}" -- ls "/results/${suite}" &>/dev/null || continue
+    mkdir -p "${RESULTS_DIR}/${suite}"
+    oc cp "ocp-virt-validation/${PVC_READER_POD}:/results/${suite}" "${RESULTS_DIR}/${suite}" 2>/dev/null || \
+      echo "  WARNING: failed to copy ${suite} results"
+  done
+  oc exec -n ocp-virt-validation "${PVC_READER_POD}" -- ls /results/completionTimestamp &>/dev/null && \
+    oc exec -n ocp-virt-validation "${PVC_READER_POD}" -- cat /results/completionTimestamp > "${RESULTS_DIR}/completionTimestamp" 2>/dev/null || true
+  oc exec -n ocp-virt-validation "${PVC_READER_POD}" -- ls /results/summary-log.txt &>/dev/null && \
+    oc exec -n ocp-virt-validation "${PVC_READER_POD}" -- cat /results/summary-log.txt > "${RESULTS_DIR}/summary-log.txt" 2>/dev/null || true
+fi
 
 echo "=== Copying JUnit XMLs to ARTIFACT_DIR ==="
 JUNIT_FILES=$(find "${RESULTS_DIR}" -type f \( -name "junit*.xml" -o -name "*junit*.xml" \) 2>/dev/null || true)
