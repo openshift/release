@@ -708,13 +708,14 @@ function get_yq() {
   return 0
 }
 
-# legacyize_vsphere_cloud_provider_config rewrites the installer-rendered
-# openshift-config/cloud-provider-config manifest from the current YAML
-# format into the legacy INI format, using the exact server/datacenter/
+# legacyize_vsphere_cloud_provider_config computes the legacy-INI form of
+# openshift-config/cloud-provider-config, using the exact server/datacenter/
 # datastore/folder values the installer itself resolved for this install's
-# sole failure domain. It must run before strip_vsphere_failure_domains
-# deletes that failure domain data from the Infrastructure manifest, since
-# that data is the only source for these values once it's gone.
+# sole failure domain, and stages it outside the manifests/ directory for
+# inject_vsphere_legacy_cloud_provider_config to apply later. It must run
+# before strip_vsphere_failure_domains deletes that failure domain data from
+# the Infrastructure manifest, since that data is the only source for these
+# values once it's gone.
 #
 # This exists because no installer version in active use renders
 # cloud-provider-config as INI anymore -- a fresh install always emits YAML
@@ -728,6 +729,22 @@ function get_yq() {
 # section instead; a real 4.12-origin cluster upgraded through day-2
 # multi-vCenter GA confirms cloud-provider-config stays INI, untouched since
 # original install, and that storage stays Available in that exact state.
+#
+# The result is staged rather than written straight into
+# manifests/cloud-provider-config.yaml because cluster-config-operator's
+# bootstrap-time render (invoked from bootkube.sh's "config-bootstrap" stage)
+# has no vSphere-specific transformer and just copies that ConfigMap
+# byte-for-byte into ControllerConfig.Spec.CloudProviderConfig, and from
+# there into /etc/kubernetes/cloud.conf on every node. The in-cluster
+# machine-config-controller regenerates that same field moments later from
+# cluster-cloud-controller-manager-operator's CCCMO-normalized (YAML) copy of
+# the same ConfigMap, so if the file were already legacy INI at render time,
+# the two renders would disagree byte-for-byte and trip MCD's one-time
+# "bootstrap generated MC vs in-cluster generated MC" mismatch check,
+# permanently degrading the machine-config ClusterOperator. See
+# inject_vsphere_legacy_cloud_provider_config, which applies this staged
+# content only after that render has already consumed the installer's native
+# (modern) YAML.
 function legacyize_vsphere_cloud_provider_config() {
   local dir=${1}
 
@@ -738,6 +755,7 @@ function legacyize_vsphere_cloud_provider_config() {
 
   local infra_manifest="${dir}/manifests/cluster-infrastructure-02-config.yml"
   local ccm_manifest="${dir}/manifests/cloud-provider-config.yaml"
+  local staged_ccm_manifest="${dir}/vsphere-legacy-cloud-provider-config.yaml"
 
   # infraID comes from the Infrastructure manifest's own
   # status.infrastructureName rather than metadata.json: metadata.json is not
@@ -781,7 +799,7 @@ function legacyize_vsphere_cloud_provider_config() {
   [[ -n "${folder}" ]] && folder_line="    folder = \"${folder}\""
   [[ -n "${resource_pool}" ]] && resource_pool_line="    resourcepool-path = \"${resource_pool}\""
 
-  echo "$(date -u --rfc-3339=seconds) - rewriting cloud-provider-config as legacy INI (SPLAT-3028)"
+  echo "$(date -u --rfc-3339=seconds) - staging legacy-INI cloud-provider-config for later injection (SPLAT-3028)"
   # Mirrors openshift-installer's own CloudProviderConfigIni() in
   # pkg/asset/manifests/vsphere/cloudproviderconfig.go -- dead code there
   # (no caller in the installer outside its own tests, since no installer
@@ -789,7 +807,11 @@ function legacyize_vsphere_cloud_provider_config() {
   # still the product's canonical legacy-INI shape, including its
   # infraID-based default folder, so what this job manufactures matches as
   # closely as possible what a real pre-4.13/UPI install would have produced.
-  cat > "${ccm_manifest}" <<EOF
+  #
+  # Written to staged_ccm_manifest, not ccm_manifest: see the function
+  # comment above for why this must not land in manifests/ until after
+  # inject_vsphere_legacy_cloud_provider_config's bootstrap-time swap.
+  cat > "${staged_ccm_manifest}" <<EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -812,6 +834,130 @@ ${port_line}    datacenters = "${datacenter}"
 ${folder_line}
 ${resource_pool_line}
 EOF
+}
+
+# inject_vsphere_legacy_cloud_provider_config merges a systemd unit into
+# bootstrap.ign that overwrites openshift-config/cloud-provider-config with
+# the legacy-INI content legacyize_vsphere_cloud_provider_config staged
+# earlier, but only once the bootstrap host's own "config-bootstrap" stage
+# (cluster-config-operator's bootstrap-time render) has already consumed the
+# installer's native (modern YAML) manifest -- see
+# legacyize_vsphere_cloud_provider_config's comment for why that ordering
+# matters.
+#
+# cluster-config-operator's render has no vSphere transformer, so whatever is
+# in that ConfigMap when it runs is copied byte-for-byte into
+# ControllerConfig.Spec.CloudProviderConfig. Letting it see the installer's
+# own YAML there is a no-op once vcenters/failureDomains are empty (both
+# cluster-config-operator's render and the in-cluster
+# cluster-cloud-controller-manager-operator transform converge on the same
+# content for that case), so bootstrap and in-cluster agree. The swap then
+# only needs to land before bootkube.sh's "cb-bootstrap" stage (the generic
+# manifest-apply step that actually creates the live ConfigMap object) --
+# gated here on the "cco-bootstrap" stage completing, the last stage bootkube
+# runs before that, for the maximum safety margin without racing the apply
+# itself.
+#
+# Must run after `create ignition-configs` has produced bootstrap.ign (there
+# must be one to merge onto) and after legacyize_vsphere_cloud_provider_config
+# has staged its content.
+function inject_vsphere_legacy_cloud_provider_config() {
+  local staged_ccm_manifest="${dir}/vsphere-legacy-cloud-provider-config.yaml"
+  local config_dir=/tmp/vsphere-legacy-cloud-config
+  mkdir -p "${config_dir}"
+
+  if [[ ! -s "${staged_ccm_manifest}" ]]; then
+    echo "ERROR: ${staged_ccm_manifest} is missing or empty; legacyize_vsphere_cloud_provider_config must run before inject_vsphere_legacy_cloud_provider_config" >&2
+    exit 1
+  fi
+  cp "${staged_ccm_manifest}" "${config_dir}/cloud-provider-config-legacy.yaml"
+
+  cat > "${config_dir}/swap-cloud-provider-config.sh" << 'SCRIPT_EOF'
+#!/bin/bash
+set -o nounset
+set -o pipefail
+
+marker=/opt/openshift/cco-bootstrap.done
+target=/opt/openshift/manifests/cloud-provider-config.yaml
+source_file=/opt/openshift/cloud-provider-config-legacy.yaml
+timeout_seconds=900
+elapsed=0
+
+echo "$(date -u --rfc-3339=seconds) - waiting for ${marker} before swapping cloud-provider-config to legacy INI (SPLAT-3028)"
+until [[ -f "${marker}" ]]; do
+  if (( elapsed >= timeout_seconds )); then
+    echo "$(date -u --rfc-3339=seconds) - ERROR: ${marker} did not appear within ${timeout_seconds}s; leaving cloud-provider-config.yaml in its modern (non-legacy) form. The legacy vSphere infra simulation did NOT take effect for cloud-provider-config (SPLAT-3028)." >&2
+    exit 1
+  fi
+  sleep 5
+  elapsed=$((elapsed + 5))
+done
+
+if ! cp "${source_file}" "${target}"; then
+  echo "$(date -u --rfc-3339=seconds) - ERROR: failed to overwrite ${target} with ${source_file}" >&2
+  exit 1
+fi
+echo "$(date -u --rfc-3339=seconds) - overwrote ${target} with the legacy INI ConfigMap after a ${elapsed}s wait for ${marker} (SPLAT-3028)"
+SCRIPT_EOF
+
+  cat > "${config_dir}/fcct.yml" << EOF
+variant: fcos
+version: 1.1.0
+ignition:
+  config:
+    merge:
+      - local: bootstrap_initial.ign
+storage:
+  files:
+    - path: /opt/openshift/cloud-provider-config-legacy.yaml
+      mode: 0644
+      overwrite: true
+      contents:
+        local: cloud-provider-config-legacy.yaml
+    - path: /usr/local/bin/swap-vsphere-cloud-provider-config.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        local: swap-cloud-provider-config.sh
+systemd:
+  units:
+    - name: swap-vsphere-cloud-provider-config.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Swap cloud-provider-config to the legacy INI form once cluster-config-operator's bootstrap render has consumed the modern YAML (SPLAT-3028)
+        After=network-online.target
+        Wants=network-online.target
+
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/local/bin/swap-vsphere-cloud-provider-config.sh
+
+        [Install]
+        WantedBy=multi-user.target
+EOF
+
+  cp "${dir}/bootstrap.ign" "${config_dir}/bootstrap_initial.ign"
+  # Fetch butane from the internal mirror, like the other vsphere
+  # step-registry scripts do, instead of github.com directly.
+  local butane_filename="butane"
+  if [[ "$(uname -m)" == "x86_64" ]]; then
+    butane_filename="butane-amd64"
+  else
+    butane_filename="butane-$(uname -m)"
+  fi
+  # SSL_CERT_FILE is set to the vCenter-only CA bundle earlier in this
+  # script (for talking to vCenter's API), which breaks TLS verification
+  # of this public mirror's normal certificate. Use the system trust
+  # store for this call instead.
+  if ! retry-ipi-install-command "fcct download" env -u SSL_CERT_FILE curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 \
+    "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/butane/latest/${butane_filename}" -o /tmp/fcct; then
+    echo "ERROR: failed to download butane/fcct for the vsphere legacy cloud-provider-config swap" >&2
+    exit 1
+  fi
+  chmod ug+x /tmp/fcct
+  /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
 }
 
 # strip_vsphere_failure_domains deletes vcenters/failureDomains from the
@@ -1279,7 +1425,12 @@ done <   <( find "${SHARED_DIR}" \( -name "openshift_manifests_[0-9]*.yml" -o -n
 case "${CLUSTER_TYPE}" in
 azure4|azure-arm64) OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP=${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-true} ;;
 esac
-if [ "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" == "true" ] || [ "${MULTI_NIC_IPI:-}" == "true" ]; then
+vsphere_legacy_cloud_config_pending=false
+if [[ "${CLUSTER_TYPE}" == vsphere* ]] && [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
+  vsphere_legacy_cloud_config_pending=true
+fi
+
+if [ "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" == "true" ] || [ "${MULTI_NIC_IPI:-}" == "true" ] || "${vsphere_legacy_cloud_config_pending}"; then
   set +o errexit
   ${INSTALLER_BINARY} --dir="${dir}" create ignition-configs &
   wait "$!"
@@ -1298,6 +1449,13 @@ if [ "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" == "true" ] || [ "${MULTI_NI
   if [ "${MULTI_NIC_IPI:-}" == "true" ]; then
     # Pin the secondary NIC off the default route / DNS path in bootstrap.ign
     inject_multinic_secondary_nic_bootstrap
+  fi
+
+  if "${vsphere_legacy_cloud_config_pending}"; then
+    # Swap cloud-provider-config to legacy INI in bootstrap.ign, once the
+    # installer's own bootstrap render has already consumed the modern
+    # YAML it generated (SPLAT-3028)
+    inject_vsphere_legacy_cloud_provider_config
   fi
 fi
 
