@@ -37,6 +37,10 @@ AUDIT_UNSAFE = re.compile(r"[^0-9A-Za-z._-]")
 # post-upload scanner replaces.
 AUDIT_OPAQUE = re.compile(r"[0-9A-Za-z]{20,}")
 PUBLISHED_DIR = "ocm-fvt-results"
+# A caller-supplied destination names a directory created inside ARTIFACT_DIR,
+# so it is restricted to a plain leading-alphanumeric name: no separator, no
+# relative component and no leading dot can reach the rename.
+PUBLISHED_NAME = re.compile(r"[0-9A-Za-z][0-9A-Za-z._-]{0,63}")
 RESULT_REPORT = "report.xml"
 # Entries publication deliberately keeps out of ARTIFACT_DIR, each with the
 # fixed classification it is recorded under. These are named after cluster
@@ -163,7 +167,16 @@ def audit_state(parent, name):
 
 
 def audit_expected_report(artifacts, budget):
-    """Describe the merged JUnit report as publication left it."""
+    """Describe the merged JUnit report as publication left it.
+
+    Only the main test step copies MERGED_REPORT into ARTIFACT_DIR. A caller
+    publishing a second tree under its own name never collects it, so probing
+    there would report a state of "missing" - which this manifest defines as
+    collected and later replaced - for a report that was never expected.
+    """
+    if budget["destination"] != PUBLISHED_DIR:
+        return {"state": "not-applicable", "name": MERGED_REPORT,
+                "published_copies": budget["reports"]}
     return dict(audit_state(artifacts, MERGED_REPORT),
                 name=MERGED_REPORT, published_copies=budget["reports"])
 
@@ -211,7 +224,10 @@ def audit_write(artifacts, budget, outcome):
     kept = sorted(kept + budget["failed"], key=ordering)
     manifest = {
         "schema": AUDIT_SCHEMA,
-        "publication": dict(outcome, destination=PUBLISHED_DIR),
+        # Rendered like every other name in the manifest: the destination is
+        # now caller-supplied rather than a constant, so it goes through the
+        # same restricted character set and token-run elision.
+        "publication": dict(outcome, destination=audit_component(budget["destination"])),
         "limits": {
             "entries_left": budget["entries_left"],
             "bytes_left": budget["bytes_left"],
@@ -423,8 +439,17 @@ def publish(source, destination, budget, depth=0, parents=()):
 def handle_publish(arguments):
     """Run the publish phase of artifact handling."""
     directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    # Callers that publish a second tree into their own ARTIFACT_DIR - the
+    # cleanup step publishes ocm-fvt-clean-results - name the destination;
+    # the main test step omits it and keeps PUBLISHED_DIR.
+    if len(arguments) not in (3, 4):
+        raise ValueError("publish takes an output directory, an artifact directory and a name")
+    published = arguments[3] if len(arguments) == 4 else PUBLISHED_DIR
+    if not PUBLISHED_NAME.fullmatch(published):
+        raise ValueError("Artifact destination must be a plain directory name")
     budget = {"entries_left": 8192, "bytes_left": 256 * 1024 * 1024, "excluded": False,
-              "audit": [], "private": {}, "failed": [], "reports": 0}
+              "audit": [], "private": {}, "failed": [], "reports": 0,
+              "destination": published}
     # Pessimistic until the publication tree is in place, so an unwinding this
     # function does not model - a signal, an interpreter error - cannot leave a
     # manifest claiming a publication that never completed.
@@ -447,9 +472,9 @@ def handle_publish(arguments):
                     finally:
                         os.close(destination)
                     try:
-                        os.stat(PUBLISHED_DIR, dir_fd=artifacts, follow_symlinks=False)
+                        os.stat(published, dir_fd=artifacts, follow_symlinks=False)
                     except FileNotFoundError:
-                        os.rename("published", PUBLISHED_DIR,
+                        os.rename("published", published,
                                   src_dir_fd=holding, dst_dir_fd=artifacts)
                     else:
                         raise PublishLimit("destination-exists",

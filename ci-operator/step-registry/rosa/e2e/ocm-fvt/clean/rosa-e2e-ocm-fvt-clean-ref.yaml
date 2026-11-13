@@ -49,3 +49,11 @@ ref:
     must-gather/extra can run against a live API (ROSAENG-67965). Requires
     OCM_FVT_DEFER_CLEAN=true on the test step so in-workflow destroy is skipped
     and SHARED_DIR/ocm-fvt-clean-state.tgz is populated.
+
+    The container writes its output as the image user, so the raw tree is kept
+    outside ARTIFACT_DIR and collector-owned copies are published as
+    ocm-fvt-clean-results by the SHARED_DIR helper that rosa-e2e-ocm-fvt-prepare
+    installs (it runs in the test phase, before rosa-e2e-ocm-fvt). Without it
+    the cleanup still runs, but its reports are not published: handing
+    container-owned directories to the Prow censor makes it fail to create the
+    temporary files it censors through.
