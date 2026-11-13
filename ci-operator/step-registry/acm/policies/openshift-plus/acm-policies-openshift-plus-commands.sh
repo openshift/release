@@ -223,8 +223,8 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
       done
       printf '</testsuite>\n'
     } > "${_tmp}" || { rm -f "${_tmp}"; return 0; }
-    # Checked invariant: parse and verify identity (counts AND the
-    # testcase name sequence equals the sorted normalized list), then
+    # Checked invariant: parse and verify the counts (testsuite root,
+    # tests == n, failures == n, one failure element per testcase), then
     # atomically replace the pre-seed.
     if python3 - "${_tmp}" "${_n}" "${_f}" <<'PY'
 import os
