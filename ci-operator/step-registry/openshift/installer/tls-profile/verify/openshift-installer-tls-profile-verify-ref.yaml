@@ -1,0 +1,37 @@
+ref:
+  as: openshift-installer-tls-profile-verify
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: openshift-installer-tls-profile-verify-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 1h30m0s
+  grace_period: 2m0s
+  env:
+    - name: INSTALL_CONFIG_TLS_PROFILE_TYPE
+      documentation: |-
+        TLS profile requested through install-config.yaml tlsProfileType by the ipi-conf step:
+        "Modern", "Intermediate" or "Old". Required; any other value fails the step.
+  documentation: |-
+    Verifies, without changing cluster configuration, that a cluster installed with
+    install-config.yaml tlsProfileType set to INSTALL_CONFIG_TLS_PROFILE_TYPE came up with that
+    TLS security profile. The step checks that the install-config.yaml given to the installer
+    requested the profile, that APIServer/cluster carries the profile type and tlsAdherence
+    StrictAllComponents, and that the default IngressController inherits the profile and reports
+    it in its status. It then performs live TLS handshakes against the external API endpoint,
+    every kube-apiserver instance and every etcd member (the latter two through oc port-forward)
+    and checks that TLS 1.3, TLS 1.2 with AEAD and with CBC cipher suites, TLS 1.1 and TLS 1.0
+    are accepted, refused for the protocol version or refused for the cipher suites exactly as
+    the profile, as implemented by each component, defines. Etcd raises minimum versions below
+    TLS 1.2 to TLS 1.2, so Old and Intermediate differ on etcd only in the cipher suites they
+    accept. A handshake is accepted only when the server answered with a ServerHello and refused
+    only when the server sent a protocol_version, handshake_failure or insufficient_security
+    alert first; client certificate failures after the ServerHello, connection failures and
+    unrecognized results never count as a refusal, and results that stay inconclusive after
+    retries fail the step. Before probing the cluster the step proves the probe client against
+    local OpenSSL servers. Results are written to a JUnit file and to tls-profile-verify/ in the
+    artifact directory.
