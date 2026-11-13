@@ -35,7 +35,7 @@ if [ -e "${ES_SECRETS_PATH}/host" ]; then
 fi
 ES_SERVER="https://${ES_USERNAME}:${ES_PASSWORD}@${ES_HOST}"
 
-REPO_URL="${E2E_REPO:-https://github.com/cloud-bulldozer/e2e-benchmarking}"
+REPO_URL="https://github.com/cloud-bulldozer/e2e-benchmarking"
 LATEST_TAG=$(git ls-remote --tags "${REPO_URL}.git" | awk -F'refs/tags/' '{print $2}' | grep -v '\^{}' | sort -V | tail -n1)
 if [ "${E2E_VERSION}" == "default" ]; then
   E2E_BRANCH="${LATEST_TAG}"
@@ -99,7 +99,6 @@ BASTION_ENV=( \
   BASTION_WORK_DIR="${BASTION_WORK_DIR}" \
   BUILD_ID="${BUILD_ID:-}" \
   E2E_BRANCH="${E2E_BRANCH}" \
-  E2E_REPO="${REPO_URL}" \
   ENABLE_LOCAL_INDEX="${ENABLE_LOCAL_INDEX}" \
   ES_METADATA_INDEX="${ES_METADATA_INDEX:-perf_scale_ci}" \
   ES_SERVER="${ES_SERVER}" \
@@ -109,8 +108,6 @@ BASTION_ENV=( \
   JOB_NAME="${JOB_NAME:-}" \
   JOB_TYPE="${JOB_TYPE:-}" \
   KUBE_BURNER_VERSION="${KUBE_BURNER_VERSION}" \
-  KUBE_BURNER_OCP_REF="${KUBE_BURNER_OCP_REF}" \
-  KUBE_BURNER_OCP_REPO="${KUBE_BURNER_OCP_REPO}" \
   PROFILE_TYPE="${PROFILE_TYPE}" \
   PROW_JOB_ID="${PROW_JOB_ID:-}" \
   PULL_NUMBER="${PULL_NUMBER:-0}" \
@@ -120,6 +117,15 @@ BASTION_ENV=( \
   REPO_OWNER="${REPO_OWNER:-}" \
   REPO_URL="${REPO_URL}" \
   UDN_BGP_LAYER2="${UDN_BGP_LAYER2:-true}" \
+  UDN_BGP_TIMEOUT="${UDN_BGP_TIMEOUT}" \
+  UDN_BGP_EXPORT_WORKER_COUNT="${UDN_BGP_EXPORT_WORKER_COUNT}" \
+  UDN_BGP_IMPORT_WORKER_COUNT="${UDN_BGP_IMPORT_WORKER_COUNT}" \
+  UDN_BGP_EXPORT_PINGER_TIMEOUT_MSEC="${UDN_BGP_EXPORT_PINGER_TIMEOUT_MSEC}" \
+  UDN_BGP_IMPORT_PINGER_TIMEOUT_MSEC="${UDN_BGP_IMPORT_PINGER_TIMEOUT_MSEC}" \
+  UDN_BGP_EXPORT_WAIT_BEFORE_PING_RETRY_MSEC="${UDN_BGP_EXPORT_WAIT_BEFORE_PING_RETRY_MSEC}" \
+  UDN_BGP_IMPORT_WAIT_BEFORE_PING_RETRY_MSEC="${UDN_BGP_IMPORT_WAIT_BEFORE_PING_RETRY_MSEC}" \
+  UDN_BGP_NUM_DUMMY_IFACES="${UDN_BGP_NUM_DUMMY_IFACES}" \
+  UDN_BGP_NUM_ADDRESS_ON_DUMMY_IFACE="${UDN_BGP_NUM_ADDRESS_ON_DUMMY_IFACE}" \
   UUID="${UUID}" \
 )
 
@@ -152,6 +158,15 @@ EXTRA_FLAGS+=" --gc-metrics=false --profile-type=${PROFILE_TYPE}"
 EXTRA_FLAGS+=" --frr-external-ip=${FRR_PEER_IP}"
 EXTRA_FLAGS+=" --pprof=${PPROF}"
 EXTRA_FLAGS+=" --log-level=debug"
+EXTRA_FLAGS+=" --timeout=${UDN_BGP_TIMEOUT}"
+EXTRA_FLAGS+=" --export-worker-count=${UDN_BGP_EXPORT_WORKER_COUNT}"
+EXTRA_FLAGS+=" --import-worker-count=${UDN_BGP_IMPORT_WORKER_COUNT}"
+EXTRA_FLAGS+=" --export-pinger-timeout-msec=${UDN_BGP_EXPORT_PINGER_TIMEOUT_MSEC}"
+EXTRA_FLAGS+=" --import-pinger-timeout-msec=${UDN_BGP_IMPORT_PINGER_TIMEOUT_MSEC}"
+EXTRA_FLAGS+=" --export-wait-before-ping-retry-msec=${UDN_BGP_EXPORT_WAIT_BEFORE_PING_RETRY_MSEC}"
+EXTRA_FLAGS+=" --import-wait-before-ping-retry-msec=${UDN_BGP_IMPORT_WAIT_BEFORE_PING_RETRY_MSEC}"
+EXTRA_FLAGS+=" --num-dummy-ifaces=${UDN_BGP_NUM_DUMMY_IFACES}"
+EXTRA_FLAGS+=" --num-address-on-dummy-iface=${UDN_BGP_NUM_ADDRESS_ON_DUMMY_IFACE}"
 if [[ "${PPROF_INTERVAL}" != "0" ]]; then
   EXTRA_FLAGS+=" --pprof-interval=${PPROF_INTERVAL}"
 fi
