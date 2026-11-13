@@ -789,6 +789,44 @@ tests:
     env:
       OS_IMAGE_STREAM: rhel-9
     workflow: openshift-upgrade-vsphere-runc
+- as: e2e-vsphere-ovn-csi
+  cron: 54 9 * * 5
+  reporter_config:
+    channel: '#team-ocp-storage-triage'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :external-link::vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+      ENABLE_VSPHERE_FILESHARE_TESTS: "true"
+      POOLS: vcenter.ci.ibmc.devcluster.openshift.com-cidatacenter-cicluster
+      TEST_SKIPS: 'Testpattern: Dynamic PV (xfs).*multiVolume.*should concurrently
+        access the single volume from pods on different node\|Testpattern: Dynamic
+        PV (block volmode).*multiVolume.*should concurrently access the single volume
+        from pods on different node'
+    workflow: openshift-e2e-vsphere-csi
+- as: e2e-aws-csi
+  cron: 44 0 * * 5
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      ENABLE_LONG_CSI_CERTIFICATION_TESTS: "true"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-csi
+- as: e2e-aws-ovn-upi
+  cron: 58 0 * * 6
+  steps:
+    cluster_profile: openshift-org-aws
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-upi
 zz_generated_metadata:
   branch: main
   org: openshift
