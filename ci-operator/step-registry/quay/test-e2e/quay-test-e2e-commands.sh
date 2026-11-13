@@ -69,7 +69,9 @@ case "${PLAYWRIGHT_PHASE}" in
     PLAYWRIGHT_USE_IMAGE_TESTS="${PLAYWRIGHT_N_USE_IMAGE_TESTS:-false}"
     # Per-phase repo defaults to PLAYWRIGHT_GIT_REPO (see n-minus-one above).
     PLAYWRIGHT_GIT_REPO="${PLAYWRIGHT_N_GIT_REPO:-${PLAYWRIGHT_GIT_REPO:-}}"
-    PLAYWRIGHT_GIT_BRANCH="${PLAYWRIGHT_N_GIT_BRANCH:-}"
+    # Only the verify ref declares PLAYWRIGHT_N_VERIFY_GIT_BRANCH, so verify can
+    # follow the seed's fixture contract while functional keeps the n ref.
+    PLAYWRIGHT_GIT_BRANCH="${PLAYWRIGHT_N_VERIFY_GIT_BRANCH:-${PLAYWRIGHT_N_GIT_BRANCH:-}}"
     ;;
   *)
     echo "ERROR: PLAYWRIGHT_PHASE must be empty, n-minus-one, or n" >&2
