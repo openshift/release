@@ -313,7 +313,16 @@ log "runbook step 2: add credentials for the new vCenter"
 # Credentials are added before the vCenter is registered so consumers can
 # authenticate the first time they see it. Values are base64-encoded without
 # a trailing newline; the patch adds the two keys and leaves the rest alone.
-creds_patch="$(jq -n \
+# The patch carries base64 credentials, so it is built in a protected file and
+# applied with --patch-file to keep the values out of the process list
+# (runbook Step 2c).
+[[ $- == *x* ]] && was_tracing=true || was_tracing=false
+set +x  # Disable tracing due to credential handling
+creds_patch_umask="$(umask)"
+umask 077
+creds_patch_file="$(mktemp)"
+trap 'rm -f "${creds_patch_file}"' EXIT
+jq -n \
   --arg server "${target_vcenter}" \
   --arg username "$(printf '%s' "${target_username}" | base64 | tr -d '\n')" \
   --arg password "$(printf '%s' "${target_password}" | base64 | tr -d '\n')" \
@@ -322,8 +331,13 @@ creds_patch="$(jq -n \
       ($server + ".username"): $username,
       ($server + ".password"): $password
     }
-  }')"
-oc patch secret vsphere-creds -n kube-system --type=merge -p "${creds_patch}"
+  }' > "${creds_patch_file}"
+oc patch secret vsphere-creds -n kube-system --type=merge --patch-file "${creds_patch_file}"
+rm -f "${creds_patch_file}"
+umask "${creds_patch_umask}"
+if [[ "${was_tracing}" == "true" ]]; then
+  set -x
+fi
 
 oc get secret vsphere-creds -n kube-system -o json \
   | jq -e --arg server "${target_vcenter}" '.data | has($server + ".username") and has($server + ".password")' >/dev/null
@@ -337,7 +351,9 @@ oc get infrastructure cluster -o yaml > "${ARTIFACT_DIR}/infrastructure-backup.y
 infra_json="$(oc get infrastructure cluster -o json)"
 source_vcenters_json="$(jq -c --arg target "${target_vcenter}" \
   '[.spec.platformSpec.vsphere.vcenters[].server | select(. != $target)]' <<< "${infra_json}")"
-log "source vCenters to retire: ${source_vcenters_json}"
+# vCenter hostnames are cluster infrastructure URLs; log a count and
+# first-label fingerprints instead of the full names.
+log "recorded $(jq 'length' <<< "${source_vcenters_json}") source vCenter(s) to retire: $(jq -r 'map(sub("\\..*"; "")) | join(", ")' <<< "${source_vcenters_json}")"
 
 # Merge patches replace arrays wholesale, so the patch carries the existing
 # entries plus the target ones. Networks stay as given in the rendered
@@ -376,7 +392,7 @@ function cloud_conf_has_target_vcenter() {
 # configuration either re-read it on every operation or redeploy themselves
 # when the generated cloud-conf changes.
 propagation_deadline=$(( $(date +%s) + 600 ))
-if ! poll "generated cloud-conf contains target vCenter ${target_vcenter}" "${propagation_deadline}" cloud_conf_has_target_vcenter; then
+if ! poll "generated cloud-conf contains target vCenter ${target_vcenter%%.*}" "${propagation_deadline}" cloud_conf_has_target_vcenter; then
   dump_cccmo_logs
   exit 1
 fi
@@ -398,12 +414,40 @@ if [[ -z "${sanitized_fd_name}" ]]; then
   sanitized_fd_name="default"
 fi
 
-fd_server="$(jq -r '.server' <<< "${target_fd}")"
-fd_datacenter="$(jq -r '.topology.datacenter' <<< "${target_fd}")"
-fd_datastore="$(jq -r '.topology.datastore' <<< "${target_fd}")"
-fd_resource_pool="$(jq -r '.topology.resourcePool' <<< "${target_fd}")"
-fd_networks_json="$(jq -c '.topology.networks' <<< "${target_fd}")"
-fd_template="$(jq -r '.topology.template' <<< "${target_fd}")"
+fd_server="$(jq -r '.server // ""' <<< "${target_fd}")"
+fd_datacenter="$(jq -r '.topology.datacenter // ""' <<< "${target_fd}")"
+fd_compute_cluster="$(jq -r '.topology.computeCluster // ""' <<< "${target_fd}")"
+fd_datastore="$(jq -r '.topology.datastore // ""' <<< "${target_fd}")"
+fd_resource_pool="$(jq -r '.topology.resourcePool // ""' <<< "${target_fd}")"
+fd_networks_json="$(jq -c '.topology.networks // []' <<< "${target_fd}")"
+fd_template="$(jq -r '.topology.template // ""' <<< "${target_fd}")"
+
+# Fail fast on an incomplete failure domain instead of building a MachineSet
+# that fails to provision: jq prints the literal string "null" for a missing
+# key, so every field is checked before it reaches a patch.
+fd_missing_field=""
+if [[ -z "${fd_server}" ]]; then
+  fd_missing_field="server"
+elif [[ -z "${fd_datacenter}" ]]; then
+  fd_missing_field="topology.datacenter"
+elif [[ -z "${fd_compute_cluster}" ]]; then
+  fd_missing_field="topology.computeCluster"
+elif [[ -z "${fd_datastore}" ]]; then
+  fd_missing_field="topology.datastore"
+elif [[ "$(jq 'length' <<< "${fd_networks_json}")" -eq 0 ]]; then
+  fd_missing_field="topology.networks"
+fi
+if [[ -n "${fd_missing_field}" ]]; then
+  log "target failure domain ${target_fd_name} is missing required field ${fd_missing_field}"
+  exit 1
+fi
+
+# A default-pool failure domain carries no resourcePool; machines then use
+# the compute cluster's default pool (runbook Step 5).
+if [[ -z "${fd_resource_pool}" ]]; then
+  fd_resource_pool="${fd_compute_cluster}/Resources"
+  log "failure domain ${target_fd_name} has no resourcePool; using the compute cluster default pool"
+fi
 
 source_machinesets=()
 created_machinesets=()
@@ -458,7 +502,8 @@ while IFS= read -r machineset_ref; do
         resourcePool: $resourcePool,
         folder: $folder
       }
-    | .spec.template.spec.providerSpec.value.network.devices = ($networks | map({networkName: .}))' <<< "${ms_json}")"
+    | .spec.template.spec.providerSpec.value.network.devices |=
+      (to_entries | map(.value + {networkName: ($networks[.key] // $networks[0])}))' <<< "${ms_json}")"
 
   log "creating MachineSet ${target_ms_name} (${replicas} replicas) from ${source_ms_name}"
   tee "${ARTIFACT_DIR}/machineset-${target_ms_name}.json" <<< "${target_ms_json}" > /dev/null
@@ -645,7 +690,7 @@ retire_patch="$(jq -n \
 oc patch infrastructure cluster --type=merge -p "${retire_patch}"
 
 while IFS= read -r source_vcenter; do
-  log "removing credentials for source vCenter ${source_vcenter}"
+  log "removing credentials for source vCenter ${source_vcenter%%.*}"
   oc patch secret vsphere-creds -n kube-system --type=merge \
     -p "$(jq -n --arg server "${source_vcenter}" '{data: {($server + ".username"): null, ($server + ".password"): null}}')"
 done < <(jq -r '.[]' <<< "${source_vcenters_json}")
