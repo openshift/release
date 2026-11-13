@@ -154,6 +154,28 @@ function wait_until() {
   return 1
 }
 
+# Dump the cluster state needed to diagnose an OLM resolution stall, where a
+# CatalogSource reports READY and its gRPC endpoint then refuses connections.
+# Catalog pod age and restart counts show whether the pod was replaced; node and
+# MachineConfigPool state shows whether a rollout drained it; the catalog-operator
+# log shows what the resolver itself hit.
+function dump_olm_diagnostics() {
+  echo ">>> CatalogSources in openshift-marketplace:" >&2
+  oc get catalogsource -n openshift-marketplace -o wide || true
+  oc get catalogsource -n openshift-marketplace -o yaml || true
+  echo ">>> Catalog pods in openshift-marketplace:" >&2
+  oc get pods -n openshift-marketplace -o wide || true
+  oc describe pods -n openshift-marketplace -l olm.catalogSource | tail -120 || true
+  echo ">>> Recent events in openshift-marketplace:" >&2
+  oc get events -n openshift-marketplace --sort-by=.lastTimestamp | tail -50 || true
+  echo ">>> MachineConfigPools:" >&2
+  oc get mcp || true
+  echo ">>> Nodes:" >&2
+  oc get nodes || true
+  echo ">>> OLM catalog-operator log:" >&2
+  oc logs -n openshift-operator-lifecycle-manager deploy/catalog-operator --tail=200 || true
+}
+
 
 # Usage: oc_with_retry [--retries N] [--interval S] command [args...]
 function oc_with_retry() {
@@ -573,8 +595,8 @@ function wait_for_operator_olmv0() {
   if [[ -n "${CATALOG_SOURCE_IMAGE}" && "${CATALOG_SOURCE_NAME}" != "redhat-operators" && -z "${MIRROR_CATALOG_SOURCE}" ]]; then
     if ! wait_until "CatalogSource ${OSC_DEV_CATALOG_NAME} READY" 600 5 \
       "[[ \"\$(oc get catalogsource -n openshift-marketplace '${OSC_DEV_CATALOG_NAME}' -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null)\" == \"READY\" ]]"; then
-      oc get catalogsource -n openshift-marketplace || true
       oc describe catalogsource -n openshift-marketplace "${OSC_DEV_CATALOG_NAME}" || true
+      dump_olm_diagnostics
       return 1
     fi
   fi
@@ -584,6 +606,7 @@ function wait_for_operator_olmv0() {
     "oc get subscription -n '${OSC_NAMESPACE}' sandboxed-containers-operator -o jsonpath='{.status.installplan.name}' 2>/dev/null | grep -q '^install-'"; then
     echo ">>> ERROR: Subscription has no InstallPlan reference" >&2
     oc get subscription -n "${OSC_NAMESPACE}" sandboxed-containers-operator -o yaml || true
+    dump_olm_diagnostics
     return 1
   fi
 
