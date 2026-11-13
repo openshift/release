@@ -145,8 +145,11 @@ total=${total:-0}
 matched=$(sed -nE "s#${log_prefix}Matched (${url_pattern}) \((.*)\)\$#\1\t\2#p" "${raw_log}")
 processed=$(printf '%s' "${matched}" | grep -c . || true)
 
-# GitHub search URL for the same query, so the report links to the live result list.
-query_url="https://github.com/search?q=${query// /%20}&type=pullrequests"
+# The commenter appends its own qualifiers to the query it runs, so the report
+# both shows and links the effective query instead of the raw one.
+query_cutoff=$(date -u -d "@$(( $(date +%s) - ${updated%h} * 3600 ))" +%Y-%m-%dT%H:%M:%SZ)
+effective_query="${query} archived:false is:open is:unlocked updated:<=${query_cutoff}"
+query_url="https://github.com/search?q=${effective_query// /%20}&type=pullrequests"
 query_url=${query_url//</%3C}
 query_url=${query_url//>/%3E}
 
@@ -239,7 +242,7 @@ HTML
     printf '</tbody>\n</table>\n</div>\n'
   fi
   printf '<p class="query"><span class="qlabel">Query</span><a href="%s" target="_blank" rel="noopener"><code>%s</code><span class="arrow">↗</span></a></p>\n' \
-    "$(xml_escape "${query_url}")" "$(xml_escape "${query}")"
+    "$(xml_escape "${query_url}")" "$(xml_escape "${effective_query}")"
   printf '</div>\n</body>\n</html>\n'
 } > "${html}"
 
