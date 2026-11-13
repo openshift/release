@@ -360,7 +360,8 @@ if ((getRc != 0)); then
         testFailureMsg["${test}"]="oc get quayintegration failed (rc=${getRc}) - cluster API error"
     done
 
-    exit 0
+    echo "ERROR: oc get quayintegration failed (rc=${getRc}) with all test cases marked failed; failing the step." >&2
+    exit 1
 elif [[ -z "${getOutput}" ]]; then
     : "ERROR: QuayIntegration CRD exists but CR 'quay' not found!"
     : "OPP bundle components are not properly configured."
@@ -371,7 +372,8 @@ elif [[ -z "${getOutput}" ]]; then
         testFailureMsg["${test}"]="QuayIntegration CR 'quay' not found - OPP bundle not configured"
     done
 
-    exit 0
+    echo "ERROR: QuayIntegration CR 'quay' not found with all test cases marked failed; failing the step." >&2
+    exit 1
 fi
 
 : "QuayIntegration quay found"
