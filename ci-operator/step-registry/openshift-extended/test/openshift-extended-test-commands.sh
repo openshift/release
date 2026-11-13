@@ -267,7 +267,20 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
 oc version --client
 oc wait nodes --all --for=condition=Ready=true --timeout=15m
 if [[ $IS_ACTIVE_CLUSTER_OPENSHIFT != "false" ]]; then
-    oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
+    # A preceding test step may have mutated cluster-wide configuration (for example proxy/cluster)
+    # and left the MachineConfigOperator draining and rebooting nodes one at a time. Node-local
+    # daemonsets (dns, node-ca, tuned, ovnkube-node, CSI node) keep their operators Progressing for
+    # the whole rollout, so gate on the MachineConfigPools before gating on the clusteroperators.
+    # Non-fatal: some clusters reaching this point have no MachineConfigPools at all.
+    oc wait mcp --all --for=condition=Updated=true --timeout=30m \
+        || echo "WARNING: not all MachineConfigPools reached Updated=True; continuing"
+    if ! oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m; then
+        # 'oc wait --all' visits resources sequentially against a single shared deadline, so one slow
+        # operator makes every operator report "timed out". Dump the real state to show which it was.
+        echo "ERROR: clusteroperators are still progressing; current state:"
+        oc get clusteroperators -o wide || true
+        exit 1
+    fi
     oc get clusterversion version -o yaml || true
 fi
 
