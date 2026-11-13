@@ -7,7 +7,22 @@ ref:
   - name: PODS_PER_NODE
     default: "200"
     documentation: |-
-      Number of pods per worker node created by the node-density-heavy workload.
+      Number of pods per worker node created by the node-density-heavy
+      workload on small clusters (up to SMALL_CLUSTER_MAX_WORKERS nodes).
+  - name: PODS_PER_WORKER
+    default: "100"
+    documentation: |-
+      Target number of pods per worker node for the cluster-density-v2
+      workload on large clusters. The number of iterations is derived from
+      the worker node count to reach this density (each iteration creates
+      roughly 25 pods).
+  - name: SMALL_CLUSTER_MAX_WORKERS
+    default: "50"
+    documentation: |-
+      Worker node count threshold at or below which the node-density-heavy
+      workload is used. Larger clusters run cluster-density-v2 instead,
+      since node-density-heavy at high pod counts overloads etcd on large
+      clusters.
   - name: TOTAL_ELAPSED_SECONDS
     default: "1800"
     documentation: |-
@@ -24,9 +39,13 @@ ref:
       cpu: 100m
       memory: 100Mi
   documentation: |-
-    Downloads kube-burner-ocp and runs the node-density-heavy workload with
-    --pods-per-node=200 --local-indexing --gc=false so the created pods remain
-    in the cluster (no garbage collection) for subsequent day0 measurements.
-    The step ensures a total elapsed time of TOTAL_ELAPSED_SECONDS (default 30
+    Downloads kube-burner-ocp and creates a workload that is left in the
+    cluster (--gc=false) for subsequent day0 measurements. The workload type
+    is selected automatically from the worker node count: clusters with up to
+    SMALL_CLUSTER_MAX_WORKERS workers run node-density-heavy with
+    --pods-per-node=PODS_PER_NODE, larger clusters run cluster-density-v2
+    with --iterations derived from the worker count (targeting
+    PODS_PER_WORKER pods per worker, ~25 pods per iteration). The step
+    ensures a total elapsed time of TOTAL_ELAPSED_SECONDS (default 30
     minutes) by sleeping for the remainder after kube-burner-ocp completes,
     letting the workload sit in the cluster before the step exits.
