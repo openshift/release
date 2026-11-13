@@ -2,6 +2,29 @@
 
 set -euo pipefail
 
+# Keep in sync with the helper in hypershift-gcp-control-plane-setup-commands.sh.
+# Each gcloud invocation must re-read the policy, not retry a stale setIamPolicy.
+# A subshell preserves the caller's tracing state without exposing policy output.
+retry_iam_policy_binding() (
+  set +x
+  local attempt delay=1 error rc
+  for attempt in {1..5}; do
+    if error=$("$@" 2>&1 >/dev/null); then
+      return 0
+    else
+      rc=$?
+    fi
+    printf '%s\n' "${error}" >&2
+    if [[ "${error}" != *"ABORTED: There were concurrent policy changes."* ]] || (( attempt == 5 )); then
+      return "${rc}"
+    fi
+    local pause=$((1 + RANDOM % delay))
+    echo "IAM policy conflict (attempt ${attempt}/5); retrying in ${pause}s." >&2
+    sleep "${pause}"
+    delay=$((delay * 2))
+  done
+)
+
 # Authenticate with GCP via WIF credential written by hypershift-gcp-wif-auth step.
 # If the file is missing (e.g., SHARED_DIR sync did not complete after a SIGTERM, or
 # wif-auth exited non-zero before the sync), re-derive the credential from wif-config.json
@@ -257,14 +280,14 @@ fi
 echo "Removing ExternalDNS WIF bindings for project ${CP_PROJECT_ID}..."
 set +x
 WIF_MEMBER="serviceAccount:${CP_PROJECT_ID}.svc.id.goog[hypershift/external-dns]"
-gcloud iam service-accounts remove-iam-policy-binding "${EXTERNAL_DNS_GSA}" \
+retry_iam_policy_binding gcloud iam service-accounts remove-iam-policy-binding "${EXTERNAL_DNS_GSA}" \
   --role=roles/iam.workloadIdentityUser \
   --member="${WIF_MEMBER}" \
-  --project="${HYPERSHIFT_GCP_CI_PROJECT}" || true
-gcloud iam service-accounts remove-iam-policy-binding "${EXTERNAL_DNS_GSA}" \
+  --project="${HYPERSHIFT_GCP_CI_PROJECT}" || echo "WARNING: Could not remove ExternalDNS workloadIdentityUser binding" >&2
+retry_iam_policy_binding gcloud iam service-accounts remove-iam-policy-binding "${EXTERNAL_DNS_GSA}" \
   --role=roles/iam.serviceAccountTokenCreator \
   --member="${WIF_MEMBER}" \
-  --project="${HYPERSHIFT_GCP_CI_PROJECT}" || true
+  --project="${HYPERSHIFT_GCP_CI_PROJECT}" || echo "WARNING: Could not remove ExternalDNS serviceAccountTokenCreator binding" >&2
 set -x
 
 if [[ "${DNS_CLEANUP_FAILED}" == "true" ]]; then
