@@ -20,7 +20,6 @@ TMP_DIR=$(mktemp -d)
 export XDG_RUNTIME_DIR="${TMP_DIR}/run"
 mkdir -p "${XDG_RUNTIME_DIR}/containers"
 cd "${TMP_DIR}"
-umask 077
 
 # Use profile credentials rather than retrieving the cluster pull secret.
 REDHAT_AUTH=$(jq -r '[.user, .password] | join(":") | @base64' /var/run/vault/mirror-registry/registry_redhat.json)
@@ -31,7 +30,8 @@ jq --arg redhat "${REDHAT_AUTH}" --arg stage "${STAGE_AUTH}" \
     '.auths += {"registry.redhat.io": {auth: $redhat}, "registry.stage.redhat.io": {auth: $stage}, ($host): {auth: $mirror}}' \
     "${CLUSTER_PROFILE_DIR}/pull-secret" > "${XDG_RUNTIME_DIR}/containers/auth.json"
 
-# oc-mirror requires readable catalog content for the non-root registry server.
+# auth.json is protected by the 0700 mktemp dir; restore umask 022 so
+# oc-mirror's non-root registry server can read the generated catalog content.
 umask 022
 
 ARCH=$(uname -m)
@@ -65,7 +65,10 @@ export CATSRC_NAME
 ./yq eval '.metadata.name = strenv(CATSRC_NAME)' -i "${OUTPUT_DIR}"/cs-*.yaml
 oc apply -f "${OUTPUT_DIR}"
 
-# Do not require observing the transient Updating=True condition.
+# Wait for the IDMS to reach every node before the shared installer creates
+# its Subscription: a single Updated wait can return on the stale Updated=True
+# from install time. Observe Updating first (best effort), then require Updated.
+oc wait mcp --all --for=condition=Updating --timeout=5m || true
 oc wait mcp --all --for=condition=Updated --timeout=20m
 oc wait "catalogsource/${CATSRC_NAME}" -n openshift-marketplace \
     --for=jsonpath='{.status.connectionState.lastObservedState}'=READY --timeout=5m
