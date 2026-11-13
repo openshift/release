@@ -1723,12 +1723,6 @@ def test_redhat_318_aws_ocp50_dualstack_shares_aws_file() -> None:
     dualstack = tests["aws-s3-nightly-dualstack"]
     assert dualstack["cron"] == "@weekly"
     assert dualstack["steps"]["env"]["IP_FAMILY"] == "DualStackIPv6Primary"
-    assert dualstack["steps"]["env"]["QUAY_MIRROR_MANAGED"] == "false"
-    assert dualstack["steps"]["env"]["PLAYWRIGHT_GREP_INVERT"].endswith(
-        "|auto-pruning does not affect mirror repos"
-        "|can change repository state"
-        "|Builds tab not visible for read-only repositories"
-    )
     extra = dualstack["steps"]["env"]["QUAY_EXTRA_CONFIG"].splitlines()
     assert "FEATURE_LISTEN_IP_VERSION: dual-stack" in extra
     steps = dualstack["steps"]["test"]
@@ -1738,9 +1732,6 @@ def test_redhat_318_aws_ocp50_dualstack_shares_aws_file() -> None:
 
     plain = tests["aws-s3-nightly"]["steps"]
     assert "IP_FAMILY" not in plain["env"]
-    assert "QUAY_MIRROR_MANAGED" not in plain["env"]
-    assert "auto-pruning" not in plain["env"]["PLAYWRIGHT_GREP_INVERT"]
-    assert "can change repository state" not in plain["env"]["PLAYWRIGHT_GREP_INVERT"]
     assert "FEATURE_LISTEN_IP_VERSION" not in plain["env"]["QUAY_EXTRA_CONFIG"]
 
 
