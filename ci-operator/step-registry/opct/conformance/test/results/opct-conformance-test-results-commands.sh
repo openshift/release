@@ -15,7 +15,145 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 source "${SHARED_DIR}/env"
 extract_opct
 
-trap 'dump_opct_namespace' EXIT TERM INT
+# --- Return-code accounting ------------------------------------------------
+# Each processing stage gets a dedicated variable initialised to NOT_RUN so
+# that an unexecuted stage is never confused with exit-code 0.  Raw codes
+# from each command are preserved exactly as returned and reported in the
+# structured summary.
+retrieve_rc="NOT_RUN"
+retrieve_tee_rc="NOT_RUN"
+retrieve_pipe_rc="NOT_RUN"
+results_rc="NOT_RUN"
+report_rc="NOT_RUN"
+publish_rc="NOT_RUN"
+# publish_reason classifies a nonzero publish_rc as either:
+#   rejected          = OPCT's own SLO checks declined the baseline (not an
+#                        infra/processing failure -- see publish step below)
+#   processing_error  = genuine infra/processing failure (e.g. S3 upload)
+publish_reason="NOT_RUN"
+indexer_rc="NOT_RUN"
+
+# check_plugin_gate return contract:
+#   0 = all intended plugins passed
+#   1 = valid intent, at least one required plugin missing or non-passed
+#   2 = untrustworthy intent or parse error (processing problem)
+plugin_gate_rc="NOT_RUN"
+plugin_gate_reason=""
+
+# Exit classes:
+#   0 = success (all stages passed)
+#   1 = plugin_failure (intended plugin(s) did not pass)
+#   2 = processing_failure (infrastructure/processing error)
+#   3 = both (plugin failure AND processing failure)
+exit_class=0
+
+# Set by _signal_handler when a signal is caught.
+_caught_signal=""
+
+# emit_summary writes the structured summary block to both console and
+# ARTIFACT_DIR (durable).  It is called in the normal flow and from the
+# EXIT trap so it always appears.  Values that may contain whitespace or
+# special characters are quoted to keep the block unambiguous.
+summary_emitted=""
+function emit_summary() {
+  [[ -n "${summary_emitted}" ]] && return
+  summary_emitted=1
+
+  # Quote plugin_gate_reason: replace newlines and single-quotes so the
+  # block stays parseable as a simple key=value list.
+  local safe_reason="${plugin_gate_reason//$'\n'/ }"
+  safe_reason="${safe_reason//\'/\'\\\'\'}"
+
+  # Build raw_status and raw_reason for unexpected/signal conditions.
+  local raw_status=""
+  local raw_reason=""
+  if [[ -n "${_caught_signal}" ]]; then
+    case "${_caught_signal}" in
+      TERM) raw_status="143" ;;
+      INT)  raw_status="130" ;;
+      *)    raw_status="signal-${_caught_signal}" ;;
+    esac
+    raw_reason="caught SIG${_caught_signal}"
+  elif [[ ${exit_class} -ne 0 && -z "${plugin_gate_reason}" && "${plugin_gate_rc}" == "0" ]]; then
+    raw_status="late-failure"
+    raw_reason="exit_class set to ${exit_class} after passing gate"
+  fi
+
+  local block
+  block=$(cat <<EOS
+
+#>> OPCT_RESULTS_SUMMARY
+retrieve_rc=${retrieve_rc}
+retrieve_tee_rc=${retrieve_tee_rc}
+retrieve_pipe_rc=${retrieve_pipe_rc}
+results_rc=${results_rc}
+report_rc=${report_rc}
+publish_rc=${publish_rc}
+publish_reason=${publish_reason}
+indexer_rc=${indexer_rc}
+plugin_gate_rc=${plugin_gate_rc}
+plugin_gate_reason='${safe_reason}'
+exit_class=${exit_class}
+caught_signal=${_caught_signal:-none}
+raw_status=${raw_status:-normal}
+raw_reason='${raw_reason}'
+#<< OPCT_RESULTS_SUMMARY
+EOS
+)
+  echo "${block}"
+  # Write to durable artifact.  If the write fails, the console output
+  # above still provides the outcome.
+  if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+    if ! echo "${block}" > "${ARTIFACT_DIR}/opct-results-summary.txt" 2>/dev/null; then
+      show_msg "WARNING: failed to write summary to ${ARTIFACT_DIR}/opct-results-summary.txt"
+    fi
+  fi
+}
+
+# Signal handler: records that a signal was caught and forces a processing
+# failure.  The EXIT trap (_exit_handler) then runs for cleanup.
+function _signal_handler() {
+  local sig="${1:-UNKNOWN}"
+  _caught_signal="${sig}"
+  exit_class=$((exit_class | 2))
+  # Map signal name to correct exit code (128 + signal number).
+  local sig_exit=143  # default: SIGTERM = 128 + 15
+  case "${sig}" in
+    INT)  sig_exit=130 ;;  # 128 + 2
+    TERM) sig_exit=143 ;;  # 128 + 15
+  esac
+  # exit triggers the EXIT trap which does emit_summary + dump.
+  exit ${sig_exit}
+}
+trap '_signal_handler TERM' TERM
+trap '_signal_handler INT' INT
+
+# EXIT handler: emits the summary and runs diagnostics.  If exit_class is
+# still 0 but we are exiting nonzero, a late processing error occurred
+# (e.g. mv failure after the gate passed).  Namespace dump runs here at
+# exit time, not earlier.
+function _exit_handler() {
+  local incoming_rc=$?
+  if [[ ${exit_class} -eq 0 && ${incoming_rc} -ne 0 ]]; then
+    exit_class=2
+  fi
+  emit_summary || true
+  # Namespace dump is best-effort; its failure must not change the
+  # original exit_class outcome.  The shared dump_opct_namespace helper
+  # (from opct-pre-init) captures rc=$? and calls 'exit $rc'.  Two
+  # isolation issues arise if it runs directly in this handler:
+  #   1. emit_summary resets $? to 0, so the helper always sees rc=0
+  #      and skips the namespace inspection even on error paths.
+  #   2. The helper's 'exit $rc' terminates the process before this
+  #      handler reaches 'exit ${exit_class}', overriding the intended
+  #      exit code.
+  # Running in a subshell solves both: '(exit N)' seeds $? with
+  # exit_class so the helper sees the correct error state, and the
+  # helper's 'exit' terminates only the subshell.
+  ( (exit ${exit_class}); dump_opct_namespace ) || true
+  exit ${exit_class}
+}
+trap '_exit_handler' EXIT
 
 function show_reader() {
   echo "#>>
@@ -32,27 +170,288 @@ function collect_inspect() {
 }
 
 function retrieve_artifact() {
-  # Retrieve after successful execution
+  # Retrieve after successful execution.
+  # Explicit return-code checks are required because this function is called
+  # inside 'if !', which disables errexit for the entire function body.
   show_reader "Retrieving Results"
   show_msg "\t>> running: ${OPCT_CLI} retrieve\n"
   mkdir -p "${ARTIFACT_DIR}/opct-results"
+
+  # Capture all pipeline component exit codes immediately after the
+  # pipeline statement.  PIPESTATUS must be read on the very next line;
+  # any intervening command (including '|| true') resets it.
+  # Under pipefail, $? is the rightmost nonzero or 0 if all succeed.
   ${OPCT_CLI} retrieve "${ARTIFACT_DIR}/opct-results" | tee -a "${ARTIFACT_DIR}"/log-retrieve.txt
-  RESULT_FILE=$(ls "${ARTIFACT_DIR}"/opct-results/*.tar*)
+  local -a ps=("${PIPESTATUS[@]}")
+  retrieve_rc=${ps[0]:-1}
+  retrieve_tee_rc=${ps[1]:-1}
+
+  # Reconstruct pipefail semantics: rightmost nonzero, or 0 if all succeed.
+  if [[ ${retrieve_tee_rc} -ne 0 ]]; then
+    retrieve_pipe_rc=${retrieve_tee_rc}
+  else
+    retrieve_pipe_rc=${retrieve_rc}
+  fi
+
+  if [[ ${retrieve_rc} -ne 0 ]]; then
+    show_msg "ERROR: '${OPCT_CLI} retrieve' failed with exit code ${retrieve_rc} (tee=${retrieve_tee_rc})"
+    return 1
+  fi
+
+  # tee failure is a processing error (log may be incomplete) even if
+  # retrieve itself succeeded.
+  if [[ ${retrieve_tee_rc} -ne 0 ]]; then
+    show_msg "ERROR: tee pipeline failed with exit code ${retrieve_tee_rc} (retrieve=${retrieve_rc})"
+    return 1
+  fi
+
+  # Identify the single result archive.  Glob into an array to detect
+  # missing or ambiguous results without relying on ls output parsing.
+  local -a archives=("${ARTIFACT_DIR}"/opct-results/*.tar*)
+  if [[ ${#archives[@]} -eq 0 || ! -f "${archives[0]}" ]]; then
+    show_msg "ERROR: no result archive found in ${ARTIFACT_DIR}/opct-results/"
+    return 1
+  fi
+  if [[ ${#archives[@]} -gt 1 ]]; then
+    show_msg "ERROR: multiple result archives found in ${ARTIFACT_DIR}/opct-results/ (${#archives[@]} files)"
+    return 1
+  fi
+  RESULT_FILE="${archives[0]}"
 }
 
 function show_results() {
   show_reader "Exporting Results"
-  # Run results summary (to log to file)
+
+  # Run results summary (to log to file).
+  # Explicit return-code checks are required because this function is called
+  # inside 'if !', which disables errexit for the entire function body.
   show_msg "\t>> running: ${OPCT_CLI} results\n"
-  ${OPCT_CLI} results "${RESULT_FILE}" > "${ARTIFACT_DIR}"/log-results.txt
+  local rc=0
+  ${OPCT_CLI} results "${RESULT_FILE}" > "${ARTIFACT_DIR}"/log-results.txt || rc=$?
+  results_rc=${rc}
+  if [[ ${rc} -ne 0 ]]; then
+    show_msg "ERROR: '${OPCT_CLI} results' exited with code ${rc}"
+    return ${rc}
+  fi
 
   # Run report (to log to file)
   show_msg "\n\t>> running: ${OPCT_CLI} report\n"
+  rc=0
   ${OPCT_CLI} report \
     --skip-server \
     --log-level=debug \
     --save-to "${ARTIFACT_DIR}"/opct-report \
-    "${RESULT_FILE}" > "${ARTIFACT_DIR}"/log-report.txt
+    "${RESULT_FILE}" > "${ARTIFACT_DIR}"/log-report.txt || rc=$?
+  report_rc=${rc}
+  if [[ ${rc} -ne 0 ]]; then
+    show_msg "ERROR: '${OPCT_CLI} report' exited with code ${rc}"
+    return ${rc}
+  fi
+}
+
+# extract_intended_plugins prints, one per line, the authoritative set of
+# plugins the run intended to execute, read from the result archive's
+# meta/info.json.
+#
+# This is Sonobuoy's own record of what it loaded for the run, written by
+# pkg/discovery/discovery.go (runInfo.LoadedPlugins, appended from
+# cfg.LoadedPlugins) and declared in pkg/discovery/discovery.go as
+#     LoadedPlugins []string  json:"plugins,omitempty"
+# -- note the on-disk key is "plugins", not "LoadedPlugins". The archive
+# path is meta/info.json (pkg/client/results/reader.go: metadataDir "meta/"
+# + InfoFile "info.json"), the same file OPCT itself reads in
+# internal/opct/summary/result.go getPluginList().
+#
+# The names it contains are the same plugin names used as keys under
+# .provider.plugins in opct-report.json, so the two sets are directly
+# comparable.
+#
+# Returns non-zero when the member is missing, unreadable, or does not parse
+# into a non-empty array of strings.
+function extract_intended_plugins() {
+  local archive="$1"
+  local info_json
+
+  # Sonobuoy writes members without a leading "./", but tolerate both forms
+  # rather than depending on the archiver's path style.
+  info_json=$(tar -xzOf "${archive}" meta/info.json 2>/dev/null) \
+    || info_json=$(tar -xzOf "${archive}" ./meta/info.json 2>/dev/null) \
+    || return 1
+
+  [[ -n "${info_json}" ]] || return 1
+
+  # "plugins" is omitempty, so an absent key means Sonobuoy loaded no
+  # plugins at all -- an anomaly, not an empty-but-valid run.
+  echo "${info_json}" | jq -e -r '
+    .plugins
+    | if type != "array" then error("meta/info.json .plugins is not an array: \(type)") else . end
+    | if length == 0 then error("meta/info.json .plugins is empty") else . end
+    | .[]
+  ' 2>/dev/null || return 1
+}
+
+# check_plugin_gate validates that every plugin the run intended to execute
+# reports stat.result == "passed", reading the structured opct-report.json
+# produced by 'opct report --save-to' -- the same data contract the OPCT
+# web UI consumes (internal/report/data.go ReportFileNameIndexJSON).
+#
+# The report alone is not sufficient to establish intent. OPCT builds
+# .provider.plugins by iterating a fixed list of known plugins and calling
+# populatePluginConformance for each (internal/report/data.go), which
+# returns early without writing a map entry when the plugin produced no
+# summary:
+#
+#     if pluginSum == nil || pluginSum.Name == "" { return nil }
+#
+# So a plugin that was loaded for the run but crashed hard enough to emit no
+# summary is simply absent from the report, and a gate that only iterates
+# the keys present would pass it silently -- the exact false-green this step
+# exists to prevent. The gate therefore cross-checks the report's key set
+# against the archive's own manifest (see extract_intended_plugins) and
+# treats any intended-but-absent plugin as a plugin failure.
+#
+# Deliberately omitted plugins are not affected: meta/info.json records what
+# Sonobuoy actually loaded for this run, so e.g. upgrade mode genuinely
+# omitting plugins 10/20/80 yields an intended set that already excludes
+# them.
+#
+# Per OPCT maintainer direction (Slack thread G012C6LKVM2/p1793807889222619):
+# gate on the report API's .stat.result, not the raw Sonobuoy status.
+# .stat.status mirrors the Sonobuoy plugin status verbatim, while
+# .stat.result is the OPCT-computed verdict: internal/report/data.go
+# populatePluginConformance sets Result = "passed" when FilterFailures == 0,
+# i.e. after the known-failures/baseline/flake/replay filter pipeline has
+# excluded failures OPCT's rules consider acceptable. Gating on Result gives
+# CI that same tolerance instead of failing the job on every single test
+# failure. If Result itself is failing, the failure survived OPCT's rules
+# and the job must be red. If .stat.result is absent from an older report
+# shape, fall back to .stat.status (raw Sonobuoy verdict).
+#
+# Replay plugin exclusion: 80-openshift-tests-replay is NOT gated. Per OPCT
+# maintainer direction (same thread): replay re-exercises e2e tests in the
+# same workflow to spare partners a manual re-run -- in CI the suite runs
+# 10 times statically while replay runs only once -- so its Result carries
+# no certification verdict. It is still listed in the executed-plugins log
+# for visibility, but never counted toward pass/fail.
+#
+# Return values (contract):
+#   0 = every intended plugin (excluding Replay) is present in the report
+#       and reports stat.result == "passed"
+#   1 = valid report parsed, but at least one plugin is non-passed or is
+#       missing from the report entirely (plugin failure)
+#   2 = report or archive manifest missing or malformed (processing problem)
+#
+# The caller must capture the return value directly; using 'if !' would
+# lose the distinction between 1 and 2.
+function check_plugin_gate() {
+  show_reader "Checking plugin results gate"
+
+  local report_json="${ARTIFACT_DIR}/opct-report/opct-report.json"
+  if [[ ! -f "${report_json}" ]]; then
+    plugin_gate_reason="opct-report.json missing at ${report_json}"
+
+    # opct-report.json is only written on a successful 'opct report' run, so
+    # its absence is always a processing failure (gate still returns 2 below).
+    # But 'opct report' can crash (e.g. the known SIGSEGV in
+    # GetClusterVersion) after 'opct results' already wrote its plain-text
+    # summary, in which case a real plugin failure is still knowable. Fold
+    # that into exit_class directly (best-effort, diagnostic only -- not a
+    # substitute for the opct-report.json gate above) so a genuine plugin
+    # failure isn't masked behind "report processing crashed".
+    local fallback_failed
+    fallback_failed=$(awk '
+      /^Plugin: / { plugin = $2 }
+      /^Status: / { if ($2 != "passed" && plugin != "") print plugin": "$2 }
+    ' "${ARTIFACT_DIR}/log-results.txt" 2>/dev/null)
+    if [[ -n "${fallback_failed}" ]]; then
+      # Replay stays in the diagnostic text but, consistent with the main
+      # gate below, never sets the plugin-failure bit.
+      if [[ -n "$(printf '%s\n' "${fallback_failed}" | awk '$1 != "80-openshift-tests-replay:"')" ]]; then
+        exit_class=$((exit_class | 1))
+      fi
+      plugin_gate_reason="${plugin_gate_reason}; fallback from log-results.txt found non-passed plugin(s): $(echo "${fallback_failed}" | paste -sd'; ' -)"
+    fi
+
+    show_msg "ERROR: ${plugin_gate_reason}"
+    return 2
+  fi
+
+  # Parse with jq.  This step uses the 'cli-jq' supplemental image
+  # (base cli + jq) because the base 'cli' image does not include jq.
+  local plugins_json
+  plugins_json=$(jq -e -c '
+    .provider.plugins
+    | if type != "object" then error("provider.plugins is not an object: \(type)") else . end
+    | if length == 0 then error("provider.plugins is empty") else . end
+    | to_entries
+    | map({
+        name: .key,
+        status: .value.stat.status,
+        # OPCT-computed verdict; fall back to raw Sonobuoy status when the
+        # report shape predates the result field.
+        result: (.value.stat.result // .value.stat.status)
+      })
+  ' "${report_json}" 2>&1) || {
+    plugin_gate_reason="failed to parse ${report_json}: ${plugins_json}"
+    show_msg "ERROR: ${plugin_gate_reason}"
+    return 2
+  }
+
+  show_msg "Executed plugins (from opct-report.json): $(echo "${plugins_json}" | jq -r '[.[].name] | join(" ")')"
+
+  # Cross-check the report's key set against the run's own manifest, so a
+  # plugin that was loaded but produced no summary cannot pass by being
+  # absent (see function comment).
+  local intended_plugins
+  if ! intended_plugins=$(extract_intended_plugins "${RESULT_FILE}"); then
+    plugin_gate_reason="unable to read intended plugin set from meta/info.json in ${RESULT_FILE}"
+    show_msg "ERROR: ${plugin_gate_reason}"
+    return 2
+  fi
+
+  show_msg "Intended plugins (from archive meta/info.json): $(echo "${intended_plugins}" | paste -sd' ' -)"
+
+  # Replay is excluded from the gate entirely (see function comment), so it
+  # is not required to be present either.
+  local missing_plugins=()
+  local p
+  while IFS= read -r p; do
+    [[ -n "${p}" ]] || continue
+    [[ "${p}" != "80-openshift-tests-replay" ]] || continue
+    if ! echo "${plugins_json}" | jq -e --arg p "${p}" 'any(.[]; .name == $p)' >/dev/null; then
+      missing_plugins+=("${p}")
+    fi
+  done <<< "${intended_plugins}"
+
+  if [[ ${#missing_plugins[@]} -ne 0 ]]; then
+    plugin_gate_reason="plugin(s) intended by the run but absent from opct-report.json (no results produced): ${missing_plugins[*]}"
+    show_msg "ERROR: Plugin gate FAILED: ${plugin_gate_reason}"
+    return 1
+  fi
+
+  # A plugin passes the gate when its OPCT-computed result is "passed".
+  # The Replay plugin is excluded from the gate entirely (see function
+  # comment); it is listed for visibility only.
+  local gated_json
+  gated_json=$(echo "${plugins_json}" | jq -c '[.[] | select(.name != "80-openshift-tests-replay")]')
+
+  local failed_json
+  failed_json=$(echo "${gated_json}" | jq -c '[.[] | select(.result != "passed")]')
+  local failed_count
+  failed_count=$(echo "${failed_json}" | jq 'length')
+
+  if [[ ${failed_count} -ne 0 ]]; then
+    plugin_gate_reason=$(echo "${failed_json}" | jq -r '
+      [.[] | "plugin \u0027\(.name)\u0027 result: \(.result) (sonobuoy status: \(.status), expected passed)"] | join("; ")
+    ')
+    show_msg "ERROR: Plugin gate FAILED: ${plugin_gate_reason}"
+    return 1
+  fi
+
+  local gated_total
+  gated_total=$(echo "${gated_json}" | jq 'length')
+  show_msg "Plugin gate passed: all ${gated_total} gated plugin(s) report stat.result: passed (Replay excluded from gate)"
+  return 0
 }
 
 function extract_container_logs() {
@@ -101,10 +500,60 @@ function extract_container_logs() {
   rm -rf "${tmp_podlogs}"
 }
 
+# ===== Main flow ============================================================
+
+# Diagnostic-only: namespace inspection (best-effort).
 collect_inspect || true
-retrieve_artifact || true
-show_results || true
+
+# Required: retrieve the result archive from the aggregator.
+if ! retrieve_artifact; then
+  show_msg "ERROR: Failed to retrieve result artifact."
+  # retrieve_rc / retrieve_tee_rc / retrieve_pipe_rc were set inside retrieve_artifact
+  exit_class=$((exit_class | 2))
+fi
+
+# Required: generate results summary and report.
+# Only attempt if retrieval succeeded (RESULT_FILE is set).
+if [[ -n "${RESULT_FILE:-}" ]]; then
+  if ! show_results; then
+    show_msg "ERROR: Failed to generate results summary or report."
+    # results_rc / report_rc were set inside show_results
+    exit_class=$((exit_class | 2))
+  fi
+else
+  show_msg "WARNING: Skipping results generation -- no result archive available."
+  results_rc="NOT_RUN"
+  report_rc="NOT_RUN"
+fi
+
+# Diagnostic-only: extract container logs from the archive (best-effort).
 extract_container_logs || true
+
+# Required: check plugin results gate.
+# Capture the return value directly to preserve the 0/1/2 contract.
+if [[ -n "${RESULT_FILE:-}" ]]; then
+  local_gate_rc=0
+  check_plugin_gate || local_gate_rc=$?
+  plugin_gate_rc=${local_gate_rc}
+  case ${local_gate_rc} in
+    0) ;;  # all plugins passed
+    1) exit_class=$((exit_class | 1))  # plugin failure
+       show_msg "ERROR: Required plugin results contain failures." ;;
+    *) exit_class=$((exit_class | 2))  # processing/parse error
+       show_msg "ERROR: Plugin gate encountered a processing error." ;;
+  esac
+else
+  plugin_gate_rc="NOT_RUN"
+  plugin_gate_reason="no archive available"
+fi
+
+# Exit now if any required operation failed.  Inspect and container logs
+# have already been collected; namespace dump runs at exit via the EXIT trap.
+if [[ ${exit_class} -ne 0 ]]; then
+  emit_summary
+  show_msg "FATAL: Required operations failed (exit_class=${exit_class}). See errors above."
+  exit ${exit_class}
+fi
 
 # Check if job is running in OPCT workflow in allowed job ref to skip upload results to
 # OPCT storage.
@@ -122,6 +571,7 @@ done
 # Ignore persisting data from unexpected jobs
 if [[ "${INVALID_OPCT_REPO}" == "true" ]]; then
   show_msg "# WARNING: Job $JOB_NAME is not allowed to persist baseline results, ignoring it."
+  emit_summary
   exit 0
 fi
 
@@ -143,13 +593,63 @@ mv -v "${RESULT_FILE}" "${artifact_result}"
 # - Report should not be created with baseline
 
 # Publish results to backend. This command must reject invalid results and return failure.
-# CI must caught the failure (exit code) and fail the job.
+# CI must catch the failure (exit code) and fail the job.
 show_msg "\n\t> Publish results in baseline artifacts storage. meta=[${OBJECT_PATH}]\n"
 export OPCT_ENABLE_ADM_BASELINE="1"
-${OPCT_CLI} adm baseline publish --log-level=debug "${artifact_result}" > "${ARTIFACT_DIR}"/log-publish.txt || true
+local_publish_rc=0
+${OPCT_CLI} adm baseline publish --log-level=debug "${artifact_result}" > "${ARTIFACT_DIR}"/log-publish.txt || local_publish_rc=$?
+publish_rc=${local_publish_rc}
 show_msg "> Debug log saved at {ARTIFACT_DIR}/log-publish.txt\n"
+
+# A rejected baseline (OPCT's own SLO checks, e.g. OPCT-001 Kubernetes
+# Conformance pass-rate) and a genuine infra/processing error (e.g. S3
+# upload failure) both exit nonzero from 'adm baseline publish' -- grep
+# the literal rejection message (pkg/cmd/adm/baseline/publish.go) to tell
+# them apart. Per OPCT maintainer direction (Slack 2026-10-26, OPCT-500):
+# a rejected baseline is OPCT correctly declining a bad conformance
+# result, not a CI/processing failure, and must not fail the job;
+# a processing error must.
+#
+# These markers are logged via logrus.Errorf (non-fatal) in publish.go, so
+# the command can still exit 0 even after one fires (e.g. report rendering
+# fails but the archive/summary JSON the uploader needs were already
+# written). Check for them unconditionally, not just when publish_rc != 0,
+# or a real processing error with a successful upload goes undetected.
+if grep -qE 'error (processing results|populating report|saving consolidated summary results|saving report results):' "${ARTIFACT_DIR}/log-publish.txt" 2>/dev/null; then
+  publish_reason="processing_error"
+  show_msg "ERROR: '${OPCT_CLI} adm baseline publish' logged a processing error (exit code ${local_publish_rc}): see log-publish.txt"
+  exit_class=$((exit_class | 2))
+  # Indexer depends on a trustworthy publish -- mark NOT_RUN.
+  indexer_rc="NOT_RUN"
+  emit_summary
+  exit ${exit_class}
+elif [[ ${local_publish_rc} -ne 0 ]]; then
+  if grep -qF 'baseline rejected, see the logs for more details.' "${ARTIFACT_DIR}/log-publish.txt" 2>/dev/null; then
+    publish_reason="rejected"
+    show_msg "WARNING: '${OPCT_CLI} adm baseline publish' rejected the baseline (not an infra/processing failure, not failing the job): see log-publish.txt"
+  else
+    publish_reason="processing_error"
+    show_msg "ERROR: '${OPCT_CLI} adm baseline publish' failed with exit code ${local_publish_rc}"
+    exit_class=$((exit_class | 2))
+  fi
+  # Indexer depends on successful publish -- mark NOT_RUN either way.
+  indexer_rc="NOT_RUN"
+  emit_summary
+  exit ${exit_class}
+fi
 
 # re-index the result to expose the valid baseline.
 show_msg "\n\t> Re-indexing the baseline artifacts to be consumed by 'report' and 'opct adm baseline list'\n"
-${OPCT_CLI} adm baseline indexer --log-level=debug > "${ARTIFACT_DIR}"/log-publish-indexer.txt || true
+local_indexer_rc=0
+${OPCT_CLI} adm baseline indexer --log-level=debug > "${ARTIFACT_DIR}"/log-publish-indexer.txt || local_indexer_rc=$?
+indexer_rc=${local_indexer_rc}
 show_msg "> Debug log saved at {ARTIFACT_DIR}/log-publish-indexer.txt\n"
+
+if [[ ${local_indexer_rc} -ne 0 ]]; then
+  show_msg "ERROR: '${OPCT_CLI} adm baseline indexer' failed with exit code ${local_indexer_rc}"
+  exit_class=$((exit_class | 2))
+  emit_summary
+  exit ${exit_class}
+fi
+
+emit_summary
