@@ -20,13 +20,18 @@ _junit_write() {
         failures=1
         case_body=$(printf '\n    <failure message="%s">%s</failure>' "${text}" "${text}")
     fi
-    mkdir -p "$(dirname "${_junit_file}")" 2>/dev/null || true
-    {
+    if ! mkdir -p "$(dirname "${_junit_file}")"; then
+        echo "JUNIT CONTRACT VIOLATION: carrier write failed: ${_junit_file}" >&2
+        return 0
+    fi
+    if ! {
         printf '<?xml version="1.0" encoding="UTF-8"?>\n'
         printf '<testsuite name="%s" tests="1" failures="%s">\n' "${_suite}" "${failures}"
         printf '  <testcase name="cluster-api-reachable" classname="interop.opp.wait-for-api">%s\n  </testcase>\n' "${case_body}"
         printf '</testsuite>\n'
-    } > "${_junit_file}" 2>/dev/null || true
+    } > "${_junit_file}"; then
+        echo "JUNIT CONTRACT VIOLATION: carrier write failed: ${_junit_file}" >&2
+    fi
     return 0
 }
 _on_exit() {
