@@ -1,0 +1,51 @@
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: agentic-validation
+  namespace: ci
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+spec:
+  runPolicy: Serial
+  completionDeadlineSeconds: 1800
+  successfulBuildsHistoryLimit: 2
+  failedBuildsHistoryLimit: 2
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+    limits:
+      memory: 4Gi
+  output:
+    pushSecret:
+      name: registry-push-credentials-ci-images-mirror
+    to:
+      kind: DockerImage
+      name: quay.io/openshift/ci:ci_agentic-validation_latest
+  source:
+    type: Git
+    git:
+      uri: https://github.com/openshift/release.git
+      ref: main
+    contextDir: ci-operator/step-registry/openshift/agentic/validate
+    dockerfile: |
+      FROM quay-proxy.ci.openshift.org/openshift/ci:ocp_4.21_cli AS cli
+      FROM quay-proxy.ci.openshift.org/openshift/ci:ci_nested-podman_latest
+      USER root
+      RUN dnf install -y python3.12 bash git diffutils && dnf clean all
+      RUN ln -sf /usr/bin/python3.12 /usr/bin/python3
+      COPY --from=cli /usr/bin/oc /usr/bin/oc
+      COPY *-commands.py /opt/agentic-validation/
+      RUN chmod -R a+rX /opt/agentic-validation && \
+          mkdir -p /work && chgrp 0 /work && chmod g+rwx /work
+      USER 1000
+      WORKDIR /work
+  strategy:
+    type: Docker
+    dockerStrategy:
+      pullSecret:
+        name: registry-pull-credentials
+      forcePull: true
+      imageOptimizationPolicy: SkipLayers
+  triggers:
+  - type: ConfigChange

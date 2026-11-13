@@ -1,0 +1,42 @@
+base_images:
+  agentic-validation:
+    namespace: ci
+    name: agentic-validation
+    tag: latest
+build_root:
+  image_stream_tag:
+    namespace: ocp
+    name: '4.21'
+    tag: cli
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: '5.1'
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-ipi
+  always_run: false
+  optional: true
+  capabilities:
+  - intranet
+  - nested-podman
+  cluster: build03
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      VALIDATION_COMPONENT: haproxy-router
+    test:
+    - ref: openshift-agentic-prepare-validation
+    - ref: openshift-agentic-validate
+    workflow: ipi-aws
+zz_generated_metadata:
+  org: openshift
+  repo: release
+  branch: main
+  variant: agentic-rehearsal
