@@ -73,7 +73,6 @@ cd "${ECO_CI_CD_DIR}"
 
 step_failed=0
 deployed_features=()
-deployed_artifact_suites=()
 
 echo "Deploy eco-gotests scripts for O-RAN features"
 for feature in ${ECO_GOTESTS_FEATURES}; do
@@ -92,7 +91,7 @@ for feature in ${ECO_GOTESTS_FEATURES}; do
   playbook_rc=0
   ansible-playbook ./playbooks/ran/deploy-run-eco-gotests-oran.yaml \
     -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "features=${feature} labels=${ECO_GOTESTS_LABELS} eco_gotest_dir=${ECO_GOTEST_DIR}" \
+    --extra-vars "features=${feature} labels='${ECO_GOTESTS_LABELS}' eco_gotest_dir=${ECO_GOTEST_DIR}" \
     --extra-vars "eco_gotests_tag=latest" \
     --extra-vars "hub_clusterconfigs_path=${HUB_CLUSTERCONFIGS_PATH}" \
     --extra-vars "mirror_registry=${MIRROR_REGISTRY}" \
@@ -103,14 +102,12 @@ for feature in ${ECO_GOTESTS_FEATURES}; do
     step_failed=1
   else
     deployed_features+=("${feature}")
-    deployed_artifact_suites+=("${artifact_suite}")
   fi
 done
 
 echo "Run eco-gotests O-RAN features via SSH (streaming output to CI pod)"
-for i in "${!deployed_features[@]}"; do
-  feature="${deployed_features[$i]}"
-  artifact_suite="${deployed_artifact_suites[$i]}"
+for feature in "${deployed_features[@]}"; do
+  artifact_suite="${feature//\//-}"
   ECO_GOTEST_DIR="/tmp/eco_gotests_${artifact_suite}"
   echo "Run eco-gotests ${feature} tests via SSH"
   # Use || true so test assertion failures do not set step_failed — the step
@@ -140,10 +137,11 @@ BASTION_ARTIFACTS_DIR="/tmp/eco_gotests_artifacts"
 echo "Using k8sreporter directory: ${K8S_REPORTER_DIR}"
 
 echo "Run artifact collection on bastion"
+deployed_suites="${deployed_features[*]//\//-}"
 collect_rc=0
 ssh "${SSH_OPTS_KEEPALIVE[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${WORKDIR}/temp_ssh_key" \
   "python3 /tmp/collect-eco-gotests-artifacts.py \
-     --suites '${deployed_artifact_suites[*]}' \
+     --suites '${deployed_suites}' \
      --junit-dir '${JUNIT_REPORT_DIR}' \
      --k8s-reporter-dir '${K8S_REPORTER_DIR}' \
      --artifacts-dir '${BASTION_ARTIFACTS_DIR}'" || collect_rc=$?
