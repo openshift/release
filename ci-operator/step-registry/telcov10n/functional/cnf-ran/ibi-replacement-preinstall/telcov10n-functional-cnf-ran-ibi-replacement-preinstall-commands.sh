@@ -64,6 +64,7 @@ configure_ssh() {
   export ANSIBLE_HOST_KEY_CHECKING=False
   export ANSIBLE_SSH_RETRIES=3
   export ANSIBLE_TIMEOUT=600
+  export ANSIBLE_REMOTE_TEMP=/tmp
 
   BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
   BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${INVENTORY_PATH}/group_vars/all" | sed "s/'//g")

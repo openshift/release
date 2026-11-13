@@ -8,6 +8,9 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
+# Tasks delegated to localhost also need writable module staging in Prow.
+export ANSIBLE_REMOTE_TEMP=/tmp
+
 INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
 
 # Load the seed inventory restored by ibu-restore-seed-inventory.
