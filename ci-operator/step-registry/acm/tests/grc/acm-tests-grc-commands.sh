@@ -185,7 +185,9 @@ print(json.dumps({
     "labels": d["metadata"].get("labels", {})
 }, indent=2))
 ' > "${_OPP_EVIDENCE_DIR}/02-managedcluster-labels.json" 2>&1
-    # 3. Placement status (pre-suite decisions).
+    # 3. Placement status (pre-suite state) and the authoritative
+    #    PlacementDecision resources (the placement controller writes
+    #    selected cluster names there, not into Placement.status).
     oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | \
         python3 -c '
 import json, sys
@@ -196,6 +198,33 @@ print(json.dumps({
     "status": d.get("status", {})
 }, indent=2))
 ' > "${_OPP_EVIDENCE_DIR}/03-placement-status.json" 2>&1
+    oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | \
+        python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+result = []
+for item in d.get("items", []):
+    result.append({
+        "name": item["metadata"]["name"],
+        "decisions": item.get("status", {}).get("decisions")
+    })
+print(json.dumps(result, indent=2))
+' > "${_OPP_EVIDENCE_DIR}/03-placementdecisions.json" 2>&1
+    # Validate the label baseline now: an unreadable baseline must never be
+    # interpreted as absent labels by the post-suite restore loop.
+    typeset -i _OPP_BASELINE_OK=0
+    if python3 -c '
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    raise SystemExit(0 if isinstance(d.get("labels"), dict) else 1)
+except Exception:
+    raise SystemExit(1)
+' "${_OPP_EVIDENCE_DIR}/02-managedcluster-labels.json"; then
+        _OPP_BASELINE_OK=1
+    else
+        echo "OPP label baseline unreadable; the post-suite restore will be skipped and reported as a failure"
+    fi
     # Scrub the snapshot files (both passes) before they land in artifacts.
     # Tracing is already off in this section; keep it off for the suite run.
     for _opp_f in "${_OPP_EVIDENCE_DIR}"/*.json; do
@@ -302,6 +331,11 @@ if [[ "${_OPP_ACTIVE}" -eq 1 ]]; then
         printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g' -e "s/'/\&apos;/g"
     }
     # Restore drifted OPP-relevant labels from the pre-suite snapshot.
+    # Only a validated baseline may drive label mutations: an unreadable
+    # baseline skips the restore entirely and is reported as a failure.
+    if [[ "${_OPP_BASELINE_OK}" -ne 1 ]]; then
+        echo "=== OPP label restore skipped: baseline snapshot unreadable $(date -u '+%Y-%m-%dT%H:%M:%SZ') ===" > "${_OPP_EVIDENCE_DIR}/04-label-restore.log"
+    else
     {
         echo "=== OPP label restore $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="
         for _opp_key in "${_OPP_LABEL_KEYS[@]}"; do
@@ -333,13 +367,33 @@ except Exception:
             fi
         done
     } > "${_OPP_EVIDENCE_DIR}/04-label-restore.log" 2>&1
+    fi
 
     # Wait (bounded, up to 5 minutes) for the placement to re-select
-    # local-cluster after the label restore.
+    # local-cluster after the label restore. The placement controller
+    # records selected cluster names in PlacementDecision resources, not
+    # in Placement.status; check the decisions first and fall back to the
+    # Placement status fields for older API shapes.
     typeset -i _opp_sel=0
     typeset -i _opp_try=0
     while (( _opp_try < 30 )); do
-        _opp_dec="$(oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | python3 -c '
+        _opp_dec="no"
+        if [[ "$(oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    names = []
+    for item in d.get("items", []):
+        for dec in item.get("status", {}).get("decisions", []) or []:
+            if dec.get("clusterName"):
+                names.append(dec["clusterName"])
+    print("yes" if "local-cluster" in names else "no")
+except Exception:
+    print("no")
+')" == "yes" ]]; then
+            _opp_dec="yes"
+        else
+            _opp_dec="$(oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | python3 -c '
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -351,6 +405,7 @@ try:
 except Exception:
     print("no")
 ')"
+        fi
         if [[ "${_opp_dec}" == "yes" ]]; then
             _opp_sel=1
             break
@@ -359,7 +414,7 @@ except Exception:
         sleep 10
     done
 
-    # Post-suite placement state as evidence.
+    # Post-suite placement state and decisions as evidence.
     oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | \
         python3 -c '
 import json, sys
@@ -370,6 +425,18 @@ print(json.dumps({
     "status": d.get("status", {})
 }, indent=2))
 ' > "${_OPP_EVIDENCE_DIR}/05-placement-status-post.json" 2>&1
+    oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | \
+        python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+result = []
+for item in d.get("items", []):
+    result.append({
+        "name": item["metadata"]["name"],
+        "decisions": item.get("status", {}).get("decisions")
+    })
+print(json.dumps(result, indent=2))
+' > "${_OPP_EVIDENCE_DIR}/06-placementdecisions-post.json" 2>&1
 
     # JUnit rows for both checks (INTEROP-9711 done-when evidence).
     typeset -i _opp_inv_ok=0
@@ -388,7 +455,7 @@ print(json.dumps({
         echo "  </testcase>"
         echo "  <testcase classname=\"grc-placement-restore\" name=\"placement-selects-local-cluster\">"
         if [[ "${_opp_sel}" -ne 1 ]]; then
-            echo "    <failure message=\"$(_opp_xesc "placement ${_OPP_PLACEMENT_NAME} does not select ${_OPP_MC_NAME} after the GRC suite; see 04-label-restore.log and 05-placement-status-post.json in this step artifacts")\"></failure>"
+            echo "    <failure message=\"$(_opp_xesc "placement ${_OPP_PLACEMENT_NAME} does not select ${_OPP_MC_NAME} after the GRC suite; see 04-label-restore.log, 05-placement-status-post.json and 06-placementdecisions-post.json in this step artifacts")\"></failure>"
         fi
         echo "  </testcase>"
         echo "</testsuite>"
