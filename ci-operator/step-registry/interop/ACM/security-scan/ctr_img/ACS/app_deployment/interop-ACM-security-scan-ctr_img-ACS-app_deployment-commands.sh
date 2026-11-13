@@ -6,7 +6,7 @@ _propagate_junit () {
     mkdir -p "${SHARED_DIR}/junit"
     # Error suppression justified: _propagate_junit is best-effort cleanup on EXIT trap.
     # If no XML files exist or ARTIFACT_DIR is unset, we want the trap to succeed (not fail the entire test).
-    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; || true
 }
 
 ################################################################################
@@ -254,13 +254,17 @@ function RunTestCase2 () {
     : "====== Test Case 2: Test ACS Integration ======"
     : "NOTE: Waiting for ACS to scan the httpd-example image built in Test Case 1."
 
-    # Fetch ACS credentials - disable xtrace for secret handling
-    typeset acsPassword=""
+    # Fetch ACS credentials.  The admin password is written to an
+    # ephemeral file inside a subshell with xtrace disabled (Best
+    # Practices secret handling): it is never set as a main-shell
+    # variable, never expanded in a trace, and never passed as a command
+    # argument.  acsHost is a route name, not a credential.
     typeset acsHost=""
-    set +x
-    acsPassword=$(oc get secret -n stackrox central-htpasswd -o json | /tmp/jq -r '.data.password' | base64 -d)
+    typeset acsPassFile="/tmp/acs-admin-password"
     acsHost=$(oc get secret -n stackrox sensor-tls -o json | /tmp/jq -r '.data."acs-host"' | base64 -d)
-    set -x
+    ( set +x
+      oc get secret -n stackrox central-htpasswd -o json | /tmp/jq -r '.data.password' | base64 -d >"${acsPassFile}"
+    true )
 
     # Query ACS for the image deployed by Test Case 1.  Match on the
     # namespace-qualified repository (registry host and path, tag/digest
@@ -281,7 +285,7 @@ function RunTestCase2 () {
     typeset saCaBundle='/var/run/secrets/kubernetes.io/serviceaccount/ca.crt'
     if [[ -f "${saCaBundle}" ]]; then
         typeset tlsProbe=''
-        tlsProbe="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 15 --max-time 30 --cacert "${saCaBundle}" "https://${acsHost}/v1/ping" 2>/dev/null)" || tlsProbe='000'
+        tlsProbe="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 15 --max-time 30 --cacert "${saCaBundle}" "https://${acsHost}/v1/ping")" || tlsProbe='000'
         if [[ -n "${tlsProbe}" && "${tlsProbe}" != '000' ]]; then
             acsTlsOpts=( --cacert "${saCaBundle}" )
         else
@@ -298,10 +302,15 @@ function RunTestCase2 () {
     typeset -i attempt=0
     for ((attempt = 1; attempt <= retries; ++attempt)); do
         : "Attempt ${attempt}/${retries}: Querying ACS for httpd-example image..."
-        # Disable xtrace to protect ACS password in curl arguments
-        set +x
-        httpdImageJson=$(curl -s "${acsTlsOpts[@]}" -u "admin:${acsPassword}" "https://${acsHost}/v1/images" | /tmp/jq "${jqFilter}")
-        set -x
+        # The query runs in a command-substitution subshell with xtrace
+        # disabled and curl reads the password from a process-substitution
+        # config, so the credential appears in neither the trace nor argv.
+        httpdImageJson="$(
+            set +x
+            curl -fsSL "${acsTlsOpts[@]}" \
+                --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+                "https://${acsHost}/v1/images" | /tmp/jq "${jqFilter}"
+        )"
         imageId=$(echo "${httpdImageJson}" | /tmp/jq .id)
         if [ "${imageId}" != "" ]; then
             cves=$(echo "${httpdImageJson}" | /tmp/jq .cves)
@@ -314,6 +323,8 @@ function RunTestCase2 () {
         [ "${attempt}" -lt "${retries}" ] && sleep "${retryInterval}"
     done
 
+    rm -f "${acsPassFile}"
+
     [ "${isImageFound}" = true ] || return 1
 
     return 0
@@ -324,14 +335,11 @@ function RunTestCase2 () {
 ################################################################################
 # Load ExitTrap library for Component Readiness JUnit remapping
 # Per Best Practices: Use exact pattern from library documentation.
-# The URL is pinned to a specific commit (instead of refs/heads/main) so a
-# push to the library's default branch cannot silently change what runs
-# in CI; bump the pin deliberately when picking up library changes.
 eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
-        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
 )"
 
 # Post-process the JUnit XML for Component Readiness routing.  Guarded on
