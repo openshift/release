@@ -1,6 +1,21 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+# Restrictive default permissions: anything this step writes is owner-only.
+umask 077
+
+# Hard wall-clock budget for the whole step.  The ref timeout is 2h with a
+# 5m grace period; the budget stops short of it so a phase that hits the
+# limit can record its failure row and let the EXIT trap write the JUnit
+# report, instead of the pod being terminated mid-wait with no report at
+# all.
+typeset -i stepStartBudget=0
+stepStartBudget=$(date +%s)
+typeset -i stepDeadline=$(( stepStartBudget + 115 * 60 ))
+# Longest single compliance pass (the oc wait timeout below), so a pass is
+# only started when a full pass still fits inside the step budget.
+typeset -i compliancePassBudget=$(( 40 * 60 ))
+
 # --- JUnit carrier ---------------------------------------------------
 # Every assertion this step performs is reported as one JUnit testcase.
 # The carrier runs from the EXIT trap, so the report is written on both
@@ -137,6 +152,9 @@ PostProcessJunit () {
 trap '_opp_test_status=$?; set +e; GenerateJunit; _propagate_junit; PostProcessJunit; exit ${_opp_test_status}' EXIT
 
 cd /tmp/
+# A re-run in the same pod leaves the clone behind and a shallow clone
+# refuses to target a non-empty directory, so clear it first.
+rm -rf /tmp/policy-collection
 git clone --depth 1 https://github.com/stolostron/policy-collection.git
 
 cd policy-collection/deploy/
@@ -168,8 +186,11 @@ PinSubscriptionChannel () {
     printf '%s\n' "Error: subscription ${subNamespace}/${subName} not found after 10 minutes; cannot pin channel ${channel}" >&2
     return 1
   fi
-  oc patch subscription "${subName}" -n "${subNamespace}" --type merge \
-    -p "{\"spec\":{\"channel\":\"${channel}\"}}"
+  if ! oc patch subscription "${subName}" -n "${subNamespace}" --type merge \
+    -p "{\"spec\":{\"channel\":\"${channel}\"}}"; then
+    printf '%s\n' "Error: failed to patch subscription ${subNamespace}/${subName} to channel ${channel}" >&2
+    return 1
+  fi
   printf '[%s] Pinned subscription %s/%s to channel %s\n' \
     "$(date -u +%FT%TZ)" "${subNamespace}" "${subName}" "${channel}"
 }
@@ -250,7 +271,27 @@ typeset -i quayStart=0
 quayStart=$(date +%s)
 typeset ns=''
 for ns in "${quayNamespacesArr[@]}"; do
-  if (($(oc get quayregistry -n "${ns}" -o json 2>/dev/null | jq '.items | length'))); then
+  # Branch on the query's exit status: an API or RBAC failure must not read
+  # as "no QuayRegistry in this namespace".  Only the CRD-absent and
+  # empty-list answers are expected, and those stay quiet.
+  typeset quayJson="" quayQueryErr=""
+  typeset -i quayQueryRc=0
+  quayJson="$(oc get quayregistry -n "${ns}" -o json 2>&1)" || quayQueryRc=$?
+  if (( quayQueryRc != 0 )); then
+    quayQueryErr="${quayJson}"
+    if [[ "${quayQueryErr}" == *"doesn't have a resource type"* || "${quayQueryErr}" == *"No resources found"* ]]; then
+      : "No QuayRegistry API or objects in namespace ${ns}"
+    else
+      printf '%s\n' "Warning: could not query QuayRegistry in namespace ${ns} (rc=${quayQueryRc}): ${quayQueryErr}" >&2
+    fi
+    continue
+  fi
+  typeset -i quayItemCount=0
+  if ! quayItemCount="$(printf '%s' "${quayJson}" | jq '.items | length')"; then
+    printf '%s\n' "Warning: could not count QuayRegistry objects in namespace ${ns}; skipping it" >&2
+    continue
+  fi
+  if (( quayItemCount > 0 )); then
     : "Found Quay Operator deployment in namespace ${ns}, waiting for ready condition"
     if ! oc wait quayregistry --all -n "${ns}" \
       --for condition=Available=True \
@@ -266,7 +307,7 @@ for ns in "${quayNamespacesArr[@]}"; do
   fi
 done
 if [[ "${quayFound}" == "false" ]]; then
-  : "Warning: no QuayRegistry found in namespaces: ${quayNamespacesArr[*]}"
+  printf '%s\n' "Warning: no QuayRegistry found in namespaces: ${quayNamespacesArr[*]}" >&2
   RecordResult "quay-registry-available" "skipped" "No QuayRegistry found in namespaces: ${quayNamespacesArr[*]}" "$(( $(date +%s) - quayStart ))"
 fi
 
@@ -276,7 +317,19 @@ fi
 # Non-existent policy names produce a warning, not a failure.
 typeset -a skipPoliciesArr=()
 if [[ -n "${SKIP_POLICIES:-}" ]]; then
-  IFS=',' read -ra skipPoliciesArr <<< "${SKIP_POLICIES}"
+  IFS=',' read -ra _skipRawArr <<< "${SKIP_POLICIES}"
+  for _skipEntry in "${_skipRawArr[@]}"; do
+    # Trim surrounding whitespace: an untrimmed entry ("a, b" yields " b")
+    # would never match a policy name and would silently skip nothing.
+    _skipEntry="${_skipEntry#"${_skipEntry%%[![:space:]]*}"}"
+    _skipEntry="${_skipEntry%"${_skipEntry##*[![:space:]]}"}"
+    if [[ -z "${_skipEntry}" ]]; then
+      printf '[%s] WARNING: ignoring empty entry in SKIP_POLICIES\n' \
+        "$(date -u +%FT%TZ)" >&2
+      continue
+    fi
+    skipPoliciesArr+=("${_skipEntry}")
+  done
   printf '[%s] SKIP_POLICIES set: will skip %d polic(ies):\n' \
     "$(date -u +%FT%TZ)" "${#skipPoliciesArr[@]}"
   for p in "${skipPoliciesArr[@]}"; do
@@ -325,7 +378,7 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
   for p in "${skipPoliciesArr[@]}"; do
     if ! PolicyExists "${p}" <<< "${allPolicies}"; then
       printf '[%s] WARNING: policy "%s" from SKIP_POLICIES not found in cluster (ignoring)\n' \
-        "$(date -u +%FT%TZ)" "${p}"
+        "$(date -u +%FT%TZ)" "${p}" >&2
     fi
   done
 fi
@@ -351,6 +404,18 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
   complianceSkipNote=" (skipped by SKIP_POLICIES: ${skipPoliciesArr[*]})"
 fi
 while (( policyCount != prevCount )); do
+  # Hard deadline: two 40m passes plus the earlier phases have to fit inside
+  # the step timeout.  Without this check an overrunning compliance phase
+  # leaves the pod to be terminated mid-wait, and the EXIT trap that writes
+  # the JUnit report never runs.
+  typeset -i passNow=0
+  passNow=$(date +%s)
+  if (( passNow + compliancePassBudget > stepDeadline )); then
+    printf '[%s] ERROR: no time left in the step budget for another compliance pass\n' \
+      "$(date -u +%FT%TZ)" >&2
+    RecordResult "policies-compliant" "failed" "Compliance wait stopped after $(( (passNow - complianceStart) / 60 )) minutes: the step time budget was exhausted before the policy set stabilized${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
+    exit 1
+  fi
   prevCount="${policyCount}"
   complianceAllSkipped=false
 
@@ -372,7 +437,7 @@ while (( policyCount != prevCount )); do
       if ! oc wait -n policies \
         --for jsonpath='{.status.compliant}'=Compliant \
         --timeout=40m "${applyPoliciesArr[@]}"; then
-        : "Non-skipped policies failed to become compliant:"
+        printf '%s\n' "Non-skipped policies failed to become compliant:" >&2
         RecordResult "policies-compliant" "failed" "Non-skipped policies failed to become compliant within 40 minutes${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
         oc get policies -n policies --ignore-not-found | FilterSkippedPolicies
         oc get policies -n policies --ignore-not-found -o yaml
@@ -390,7 +455,7 @@ while (( policyCount != prevCount )); do
     if ! oc wait policies --all -n policies \
       --for jsonpath='{.status.compliant}'=Compliant \
       --timeout=40m; then
-      : "Policies failed to become compliant:"
+      printf '%s\n' "Policies failed to become compliant:" >&2
       RecordResult "policies-compliant" "failed" "Policies failed to become compliant within 40 minutes" "$(( $(date +%s) - complianceStart ))"
       oc get policies -n policies --ignore-not-found
       oc get policies -n policies --ignore-not-found -o yaml
@@ -399,10 +464,19 @@ while (( policyCount != prevCount )); do
     fi
   fi
 
-  # Count after the pass: if the query fails transiently, treat it as a
-  # changed set so the next pass re-runs the wait (and fails properly
-  # through the wait's diagnostics if the cluster API is really broken).
-  policyCount="$(( $(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length' || echo 0) ))"
+  # Count after the pass.  A failed query is not a stable count: branch on
+  # the exit status and fail the row, so a broken API cannot record a pass
+  # for a policy set that was never observed.
+  typeset policyCountOut=""
+  typeset -i countRc=0
+  policyCountOut="$(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || countRc=$?
+  if (( countRc != 0 )) || [[ -z "${policyCountOut}" ]]; then
+    printf '[%s] ERROR: failed to count policies in namespace "policies" (rc=%d)\n' \
+      "$(date -u +%FT%TZ)" "${countRc}" >&2
+    RecordResult "policies-compliant" "failed" "Failed to count policies in namespace policies (rc=${countRc}); the policy set state is unknown${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
+    exit 1
+  fi
+  policyCount="${policyCountOut}"
   printf '[%s] Compliance pass complete: %d policies in the set\n' \
     "$(date -u +%FT%TZ)" "${policyCount}"
 done

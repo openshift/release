@@ -4,7 +4,7 @@ This directory contains **true interop tests** that test interaction between 2 o
 
 ## Directory Structure
 
-Pattern: `step-registry/interop/<main-operator>/<test-functional-group-1>[/.../<test-functional-group-n>]/<target-operators>/<test-name>`
+Pattern: `ci-operator/step-registry/interop/<main-operator>/<test-functional-group-1>[/.../<test-functional-group-n>]/<target-operators>/<test-name>`
 
 Every path component, at every level, is a lowercase RFC 1123 label: lowercase
 alphanumerics, with `-` as the only separator. No uppercase and no underscore
@@ -16,7 +16,7 @@ a DNS-1123 subdomain (lowercase alphanumerics, `-`, `.`) survive, so `_` and `+`
 fail at pod creation.
 
 ```
-step-registry/interop/
+ci-operator/step-registry/interop/
  |- <main-operator>/
      |- <test-functional-group-1>/
         /                                   \

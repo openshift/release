@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail; shopt -s inherit_errexit
 
+# Restrictive default permissions: the credential files this step writes
+# under /tmp are owner-only, whatever the image's default umask was.
+umask 077
+
 # --- Trace-to-file: always capture, dump on failure only ---
 _xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
 exec {_xtrace_fd}>"${_xtrace_log}"
@@ -9,8 +13,11 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
-  _exit_code=$?
+  _exit_code="${1:-0}"
   set +x 2>/dev/null
+  # Credential hygiene: these files must not survive the step, on the
+  # success and the failure path alike.
+  rm -f /tmp/quay-auth.json /tmp/quay-cookies.txt "${acsPassFile:-/tmp/acs-admin-password}"
   # Scrub credentials before copying
   sed -i -E \
     -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
@@ -24,7 +31,21 @@ _opp_cleanup() {
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
 }
-trap '_opp_cleanup' EXIT
+
+# One EXIT trap for the whole run.  The reporting functions are defined
+# further down, so every call is guarded on its definition: no window of the
+# run is left without cleanup.  errexit is off inside the handler so one
+# failing report step cannot skip the rest of the report.
+_opp_trap_handler() {
+  typeset exitCode=$?
+  set +e
+  _opp_cleanup "${exitCode}"
+  type -t GenerateJunit >/dev/null && GenerateJunit
+  type -t _propagate_junit >/dev/null && _propagate_junit
+  type -t PostProcessJunit >/dev/null && PostProcessJunit
+  true
+}
+trap '_opp_trap_handler' EXIT
 
 echo ">>> PHASE: initialization"
 
@@ -69,6 +90,12 @@ for t in "${allTests[@]}"; do
     testDuration["${t}"]=0
     testFailureMsg["${t}"]="Test did not run"
 done
+
+# Single source for the row names: the array drives the JUnit report, and the
+# recorders below quote the same strings instead of repeating the literals.
+typeset testNamePushPull="${allTests[0]}"
+typeset testNameOdf="${allTests[1]}"
+typeset testNameAcs="${allTests[2]}"
 
 typeset -i suiteStart=0
 suiteStart=$(date +%s)
@@ -127,8 +154,9 @@ EOF
 
 # shellcheck disable=SC2317
 _propagate_junit () {
+    [[ -n "${SHARED_DIR:-}" ]] || return 0
     mkdir -p "${SHARED_DIR}/junit"
-    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; || true
+    find "${ARTIFACT_DIR:-}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; || true
 }
 
 # Load ExitTrap library for JUnit XML post-processing at script level
@@ -158,27 +186,42 @@ PostProcessJunit () {
     true
 }
 
-trap '_opp_cleanup; GenerateJunit; _propagate_junit; PostProcessJunit' EXIT
-
 function DiscoverQuay () {
+    # Branch on API discovery instead of matching the error text: the CRD
+    # being absent is an environment limitation, while a failed discovery
+    # call is an error that must not read as "Quay is not deployed".
+    typeset apiOutput=""
+    typeset -i apiRc=0
+    apiOutput="$(oc api-resources --api-group=quay.redhat.com 2>&1)" || apiRc=$?
+    if (( apiRc != 0 )); then
+        echo "ERROR: oc api-resources failed (rc=${apiRc}); cannot determine whether the QuayRegistry CRD is installed: ${apiOutput}" >&2
+        return 2
+    fi
+    if ! grep -qi quayregistry <<< "${apiOutput}"; then
+        echo "INFO: QuayRegistry CRD absent; Quay is not deployed"
+        return 1
+    fi
+
     typeset registryJson="" discoverErr=""
     if ! registryJson="$(oc get quayregistry --all-namespaces -o json 2>&1)"; then
         discoverErr="${registryJson}"
-        if [[ "${discoverErr}" == *"the server doesn"*"have a resource type"* ]]; then
-            echo "INFO: QuayRegistry CRD absent; Quay is not deployed"
-            return 1
-        fi
         echo "ERROR: Failed to query QuayRegistry: ${discoverErr}" >&2
         return 2
     fi
 
+    # The count comes from a helper: a broken or missing helper must fail the
+    # step, never compare as zero and read as "Quay is not deployed".
     typeset itemCount=""
+    typeset -i countRc=0
     itemCount="$(printf '%s' "${registryJson}" | python3 -c "
 import sys,json
 print(len(json.load(sys.stdin).get('items',[])))
-")"
-
-    if [[ "${itemCount}" -eq 0 ]]; then
+" 2>&1)" || countRc=$?
+    if (( countRc != 0 )) || [[ ! "${itemCount}" =~ ^[0-9]+$ ]]; then
+        echo "ERROR: Could not count QuayRegistry items (helper exited ${countRc}: ${itemCount})" >&2
+        return 2
+    fi
+    if (( itemCount == 0 )); then
         echo "INFO: No QuayRegistry found; Quay is not deployed"
         return 1
     fi
@@ -197,6 +240,13 @@ print(len(json.load(sys.stdin).get('items',[])))
     true
 }
 
+# TLS verification for the Quay route: the route certificate is issued by
+# the Quay operator's own CA and is not trusted by step pods, so the route
+# calls use curl -k and skopeo --dest-tls-verify=false / --tls-verify=false.
+# This is the same decision as the ACS Central API block in RunAcsScan,
+# which prefers the service CA bundle and only then falls back to insecure
+# TLS; the relaxation covers certificate trust only, and the pushed image is
+# still verified by pulling it back.
 function GetQuayAuth () {
     # Quay credentials are exported for downstream use in the current
     # shell (Best Practices exception for variables needed downstream);
@@ -292,10 +342,14 @@ function CreateTestOrg () {
 
         if [[ -n "${csrf}" ]]; then
             typeset signinResult=''
+            # The payload is built inside the helper from the environment
+            # (the variables are exported above), and piped in via stdin, so
+            # the password appears in neither the helper's argv nor the curl
+            # command line.
             signinResult="$(python3 -c "
-import json, sys
-print(json.dumps({'username': sys.argv[1], 'password': sys.argv[2]}))
-" "${QUAY_USER}" "${QUAY_PASSWORD}" | curl -fsSLk --connect-timeout 15 --max-time 30 -X POST "https://${QUAY_HOST}/api/v1/signin" \
+import json, os
+print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['QUAY_PASSWORD']}))
+" | curl -fsSLk --connect-timeout 15 --max-time 30 -X POST "https://${QUAY_HOST}/api/v1/signin" \
                 -H "Content-Type: application/json" \
                 -H "X-CSRF-Token: ${csrf}" \
                 -b "${cookieFile}" -c "${cookieFile}" \
@@ -311,8 +365,10 @@ print(json.dumps({'username': sys.argv[1], 'password': sys.argv[2]}))
         echo "WARNING: No Quay token available; org creation may fail" >&2
     fi
 
+    # The bearer token is handed to curl through a process-substitution
+    # config, so it never appears in the curl argv.
     curl -fsSLk --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/organization/" \
-        -H "Authorization: Bearer ${QUAY_TOKEN}" \
+        --config <(printf 'header = "Authorization: Bearer %s"\n' "${QUAY_TOKEN}") \
         -H "Content-Type: application/json" \
         -d '{"name":"interop-smoke-test","email":"interop-test@example.com"}' || true
 
@@ -324,7 +380,7 @@ print(json.dumps({'username': sys.argv[1], 'password': sys.argv[2]}))
 # Test Case 1: Push and pull image via Quay route
 ################################################################################
 function RunPushPull () {
-    typeset testName="[sig-interop][Jira:INTEROP][Feature:Quay] Push and pull image via Quay route"
+    typeset testName="${testNamePushPull}"
     typeset -i start=0 elapsed=0
     start=$(date +%s)
 
@@ -379,20 +435,35 @@ function RunPushPull () {
 # Test Case 2: Verify ODF object storage integration
 ################################################################################
 function RunOdfStorageCheck () {
-    typeset testName="[sig-interop][Jira:INTEROP][Feature:Quay] Verify ODF object storage integration"
+    typeset testName="${testNameOdf}"
     typeset -i start=0 elapsed=0
     start=$(date +%s)
 
-    typeset noobaaPhase=''
-    noobaaPhase="$(oc get noobaa -n openshift-storage -o jsonpath='{.items[0].status.phase}' 2>/dev/null)" || noobaaPhase=""
-    if [[ "${noobaaPhase}" != "Ready" ]]; then
+    # Both readiness checks below are waits, not samples: a fresh ODF install
+    # answers the first query long before NooBaa reports Ready or the Quay OBC
+    # binds.
+    if ! oc wait noobaa/noobaa -n openshift-storage \
+        --for=jsonpath='{.status.phase}'=Ready --timeout=10m; then
+        typeset noobaaPhase=''
+        noobaaPhase=$(oc get noobaa noobaa -n openshift-storage \
+            -o jsonpath='{.status.phase}' 2>&1) || noobaaPhase="unknown"
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "NooBaa not Ready (phase: ${noobaaPhase:-not found})" "${elapsed}"
+        RecordResult "${testName}" "failed" "NooBaa noobaa in namespace openshift-storage did not reach phase Ready within 10 minutes (observed phase: ${noobaaPhase:-not set})" "${elapsed}"
         return 1
     fi
 
+    typeset obcJson=''
+    if ! obcJson=$(oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>&1); then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "Failed to list ObjectBucketClaims in namespace ${QUAY_NS}: ${obcJson}" "${elapsed}"
+        return 1
+    fi
+
+    # Helper exit codes are branched on: 1 is the expected "no matching
+    # claim", anything else is a broken helper and must not read as absence.
     typeset quayObc=''
-    quayObc=$(oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>/dev/null | \
+    typeset -i obcPickRc=0
+    quayObc=$(printf '%s' "${obcJson}" | \
         python3 -c "
 import sys, json, os
 registry = os.environ.get('QUAY_REGISTRY', '')
@@ -407,25 +478,39 @@ if data.get('items'):
     print(data['items'][0]['metadata']['name'])
     sys.exit(0)
 sys.exit(1)
-" 2>/dev/null) || quayObc=""
+" 2>&1) || obcPickRc=$?
 
+    if (( obcPickRc != 0 && obcPickRc != 1 )); then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "Could not select a Quay ObjectBucketClaim in namespace ${QUAY_NS} (helper exited ${obcPickRc}: ${quayObc})" "${elapsed}"
+        return 1
+    fi
     if [[ -z "${quayObc}" ]]; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "No ObjectBucketClaim found in Quay namespace ${QUAY_NS}" "${elapsed}"
         return 1
     fi
 
-    typeset obcPhase=''
-    obcPhase=$(oc get objectbucketclaim "${quayObc}" -n "${QUAY_NS}" \
-        -o jsonpath='{.status.phase}' 2>/dev/null) || obcPhase=""
-    if [[ "${obcPhase}" != "Bound" ]]; then
+    if ! oc wait "objectbucketclaim/${quayObc}" -n "${QUAY_NS}" \
+        --for=jsonpath='{.status.phase}'=Bound --timeout=10m; then
+        typeset obcPhase=''
+        obcPhase=$(oc get objectbucketclaim "${quayObc}" -n "${QUAY_NS}" \
+            -o jsonpath='{.status.phase}' 2>&1) || obcPhase="unknown"
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "Quay OBC ${quayObc} not Bound (phase: ${obcPhase:-unknown})" "${elapsed}"
+        RecordResult "${testName}" "failed" "ObjectBucketClaim ${quayObc} in namespace ${QUAY_NS} did not reach phase Bound within 10 minutes (observed phase: ${obcPhase:-not set})" "${elapsed}"
+        return 1
+    fi
+
+    typeset obJson=''
+    if ! obJson=$(oc get objectbucket -o json 2>&1); then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "Failed to list ObjectBuckets: ${obJson}" "${elapsed}"
         return 1
     fi
 
     typeset obName=''
-    obName=$(oc get objectbucket -o json 2>/dev/null | \
+    typeset -i obPickRc=0
+    obName=$(printf '%s' "${obJson}" | \
         python3 -c "
 import sys, json
 obc_name, obc_ns = sys.argv[1], sys.argv[2]
@@ -436,8 +521,13 @@ for item in data.get('items', []):
         print(item['metadata']['name'])
         sys.exit(0)
 sys.exit(1)
-" "${quayObc}" "${QUAY_NS}" 2>/dev/null) || obName=""
+" "${quayObc}" "${QUAY_NS}" 2>&1) || obPickRc=$?
 
+    if (( obPickRc != 0 && obPickRc != 1 )); then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "Could not resolve the ObjectBucket for Quay OBC ${quayObc} (helper exited ${obPickRc}: ${obName})" "${elapsed}"
+        return 1
+    fi
     if [[ -z "${obName}" ]]; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "No ObjectBucket found for Quay OBC ${quayObc}" "${elapsed}"
@@ -515,23 +605,26 @@ sys.exit(1)
           regPass="${QUAY_PASSWORD}"
       fi
 
+      # The registration credentials reach the helper through its environment
+      # and the payload reaches curl on stdin, so the values appear in neither
+      # the helper's argv nor the curl command line.
       typeset regPayload=''
-      regPayload=$(python3 -c "
-import json, sys, os
+      regPayload=$(QUAY_REG_USER="${regUser}" QUAY_REG_PASSWORD="${regPass}" python3 -c "
+import json, os
 payload = {
     'name': 'interop-quay-smoke',
     'type': 'docker',
     'categories': ['REGISTRY'],
     'docker': {
         'endpoint': os.environ['QUAY_HOST'],
-        'username': sys.argv[1],
-        'password': sys.argv[2],
+        'username': os.environ['QUAY_REG_USER'],
+        'password': os.environ['QUAY_REG_PASSWORD'],
         'insecure': True
     },
     'skipTestIntegration': True
 }
 print(json.dumps(payload))
-" "${regUser}" "${regPass}")
+")
 
       typeset regCode=""
       regCode=$(curl -s "${acsTlsOpts[@]}" -o /dev/null -w '%{http_code}' \
@@ -579,7 +672,7 @@ print(json.dumps(payload))
 }
 
 function RunAcsScan () {
-    typeset testName="[sig-interop][Jira:INTEROP][Feature:Quay] ACS scan of pushed Quay image"
+    typeset testName="${testNameAcs}"
     typeset -i start=0 elapsed=0
     start=$(date +%s)
 
@@ -635,26 +728,59 @@ function RunAcsScan () {
         return 1
     fi
 
-    typeset -i attempts=0 maxAttempts=40
+    typeset -i attempts=0 maxAttempts=40 retryInterval=15
+    typeset -i waitMinutes=$(( maxAttempts * retryInterval / 60 ))
+    typeset -i answeredAttempts=0
+    typeset lastQueryError=''
 
     while (( attempts < maxAttempts )); do
-        typeset scanResult=''
+        typeset scanResult='' scanErrFile='/tmp/acs-query.err'
+        typeset -i scanRc=0
         scanResult="$(
             set +x
             curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 30 \
                 --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
-                "https://${acsHost}/v1/images?query=Image:${pushTarget}"
-        )" || scanResult=""
+                "https://${acsHost}/v1/images?query=Image:${pushTarget}" 2>"${scanErrFile}"
+        )" || scanRc=$?
 
-        if echo "${scanResult}" | python3 -c "
+        # The helper answers 0 (image present), 1 (image absent) or anything
+        # else (helper or parse failure).  A failure must not read as "ACS did
+        # not detect the image", so the three outcomes are tracked apart.
+        # parseRc starts at 2: a helper that neither succeeds nor reports a
+        # status is a failure, not an answered query.
+        typeset -i parseRc=2
+        if (( scanRc == 0 )); then
+            parseRc=0
+            printf '%s' "${scanResult}" | python3 -c "
 import sys, json
-data = json.load(sys.stdin)
-images = data.get('images', [])
-sys.exit(0 if len(images) > 0 else 1)
-" 2>/dev/null; then
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(2)
+sys.exit(0 if data.get('images') else 1)
+" || parseRc=$?
+        fi
+
+        if (( scanRc == 0 && parseRc == 0 )); then
             elapsed=$(( $(date +%s) - start ))
             RecordResult "${testName}" "passed" "" "${elapsed}"
             return 0
+        fi
+
+        if (( scanRc == 0 && parseRc == 1 )); then
+            answeredAttempts=$(( answeredAttempts + 1 ))
+        else
+            lastQueryError=$(cat "${scanErrFile}" 2>/dev/null) || lastQueryError=''
+            if [[ -z "${lastQueryError}" ]]; then
+                if (( scanRc != 0 )); then
+                    lastQueryError="curl exited ${scanRc} without error output"
+                else
+                    lastQueryError="helper exited ${parseRc} without error output"
+                fi
+            fi
+            if (( attempts % 8 == 0 )); then
+                echo "WARNING: ACS image query failed on attempt ${attempts} of ${maxAttempts}: ${lastQueryError}" >&2
+            fi
         fi
 
         if (( attempts % 4 == 3 )); then
@@ -662,11 +788,15 @@ sys.exit(0 if len(images) > 0 else 1)
         fi
 
         attempts=$((attempts + 1))
-        sleep 15
+        sleep "${retryInterval}"
     done
 
     elapsed=$(( $(date +%s) - start ))
-    RecordResult "${testName}" "failed" "ACS did not detect pushed image within 10 minutes" "${elapsed}"
+    if (( answeredAttempts == 0 )); then
+        RecordResult "${testName}" "failed" "ACS never answered the image query within ${waitMinutes} minutes (last error: ${lastQueryError:-unknown}); this is a query failure, not a missing image" "${elapsed}"
+    else
+        RecordResult "${testName}" "failed" "ACS did not detect pushed image within ${waitMinutes} minutes (${answeredAttempts} answered queries)" "${elapsed}"
+    fi
     return 1
 }
 
@@ -675,6 +805,17 @@ sys.exit(0 if len(images) > 0 else 1)
 ################################################################################
 
 function Main () {
+    # python3 carries every JSON filter in this step: without it the
+    # discovery and polling helpers cannot tell "absent" from "broken", so
+    # fail hard here instead of degrading into a false green.
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "FATAL: python3 is required for the Quay, ODF and ACS checks but is not installed in this image" >&2
+        for t in "${allTests[@]}"; do
+            RecordResult "${t}" "failed" "python3 not available in the step image"
+        done
+        exit 1
+    fi
+
     typeset -i discoverRc=0
     DiscoverQuay || discoverRc=$?
     if (( discoverRc == 1 )); then
@@ -703,10 +844,8 @@ function Main () {
     if (( pushPassed )); then
         RunAcsScan || status=1
     else
-        RecordResult "[sig-interop][Jira:INTEROP][Feature:Quay] ACS scan of pushed Quay image" "skipped" "Skipped: push-pull test failed; no image available to scan"
+        RecordResult "${testNameAcs}" "skipped" "Skipped: push-pull test failed; no image available to scan"
     fi
-
-    rm -f /tmp/quay-auth.json "${acsPassFile}"
 
     exit "${status}"
 }
