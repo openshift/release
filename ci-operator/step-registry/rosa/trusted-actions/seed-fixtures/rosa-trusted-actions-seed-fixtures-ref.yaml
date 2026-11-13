@@ -1,0 +1,44 @@
+ref:
+  as: rosa-trusted-actions-seed-fixtures
+  from: cli
+  grace_period: 10m
+  timeout: 15m0s
+  commands: rosa-trusted-actions-seed-fixtures-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: FIXTURE_NAMESPACE
+    default: "rosa-ta-e2e"
+    documentation: |-
+      Namespace the fixtures are created in. It must also appear in the
+      server's allowed_namespaces (config/ci.yaml in the rosa-trusted-actions
+      repository), or every request targeting it is denied by the authorizer
+      before it reaches the cluster.
+  - name: FIXTURE_POD_IMAGE
+    default: "registry.access.redhat.com/ubi9/ubi-minimal:latest"
+    documentation: |-
+      Image for the pod the 'delete' test removes. Anything that stays running
+      and tolerates an arbitrary UID will do; the pod is never executed into.
+  - name: FIXTURE_READY_TIMEOUT
+    default: "5m"
+    documentation: |-
+      How long to wait for the seeded pod to become ready. Exceeding it is
+      logged and tolerated rather than failing the step.
+  documentation: |-
+    Seeds the cluster objects the Trusted Actions e2e suite writes to, and
+    records their names in ${SHARED_DIR}:
+
+      e2e-fixture-namespace, e2e-fixture-configmap, e2e-fixture-pod
+
+    A configmap for the 'patch' action and a pod for 'delete', both suffixed
+    per run, in a namespace dedicated to the suite. The read-only actions need
+    nothing seeded: they act on what any ROSA cluster already has.
+
+    This step uses the cluster-admin kubeconfig the provisioning chain leaves
+    in ${SHARED_DIR}; the test step that follows deliberately discards it. RTA
+    holds no cluster access in production and obtains it from backplane, so
+    the component under test must not be the one creating its own fixtures.
+
+    Run after the cluster is ready and before rosa-trusted-actions-e2e.
