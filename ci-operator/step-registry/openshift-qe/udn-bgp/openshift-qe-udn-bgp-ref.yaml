@@ -7,17 +7,61 @@ ref:
   cli: latest
   env:
   - name: ITERATIONS
-    default: "72"
+    default: "300"
     documentation: |-
-      Number of kube-burner iterations for the UDN-BGP workload
+      Number of kube-burner iterations for the UDN-BGP workload.
+  - name: UDN_BGP_LAYER2
+    default: "true"
+    documentation: |-
+      Use Layer2 topology for UDN-BGP CUDNs. Set to "false" to use Layer3.
   - name: E2E_VERSION
     default: "default"
     documentation: |-
-      Override the e2e version
+      e2e-benchmarking release tag. Set to "default" to use its latest tag.
   - name: KUBE_BURNER_VERSION
-    default: "default"
+    default: "1.13.2"
     documentation: |-
-      Override the kube burner version
+      kube-burner-ocp release version without the leading v.
+  - name: UDN_BGP_TIMEOUT
+    default: "4h"
+    documentation: |-
+      Overall benchmark timeout as a Go duration. Also supplies the job timeout
+      used by the sequential route export and import checks.
+  - name: UDN_BGP_EXPORT_WORKER_COUNT
+    default: "20"
+    documentation: |-
+      Number of workers verifying routes exported from the cluster.
+  - name: UDN_BGP_IMPORT_WORKER_COUNT
+    default: "10"
+    documentation: |-
+      Number of workers generating external routes and verifying their import.
+  - name: UDN_BGP_EXPORT_PINGER_TIMEOUT_MSEC
+    default: "100"
+    documentation: |-
+      Timeout for each export ping attempt, in milliseconds.
+  - name: UDN_BGP_IMPORT_PINGER_TIMEOUT_MSEC
+    default: "10"
+    documentation: |-
+      Timeout for each import ping attempt, in milliseconds.
+  - name: UDN_BGP_EXPORT_WAIT_BEFORE_PING_RETRY_MSEC
+    default: "100"
+    documentation: |-
+      Delay between failed export ping attempts, in milliseconds.
+  - name: UDN_BGP_IMPORT_WAIT_BEFORE_PING_RETRY_MSEC
+    default: "100"
+    documentation: |-
+      Delay between failed import ping attempts, in milliseconds.
+  - name: UDN_BGP_NUM_DUMMY_IFACES
+    default: "10"
+    documentation: |-
+      Number of dummy interfaces used for import routes. The default keeps
+      generated 20.<interface>.<address>.0/24 routes within UDN_BGP_IMPORT_CIDR
+      (20.0.0.0/12). Update the FRR filter and AWS ICMP allowance if expanding it.
+  - name: UDN_BGP_NUM_ADDRESS_ON_DUMMY_IFACE
+    default: "20"
+    documentation: |-
+      Addresses per dummy interface. Multiplied by UDN_BGP_NUM_DUMMY_IFACES to
+      determine the number of import routes (200 by default).
   - name: EXTRA_FLAGS
     default: ""
     documentation: |-
@@ -34,6 +78,14 @@ ref:
     default: "false"
     documentation: |-
       Trigger to enable local indexing
+  - name: PPROF
+    default: "false"
+    documentation: |-
+      Enable or disable pprof collection
+  - name: PPROF_INTERVAL
+    default: "0"
+    documentation: |-
+      Interval between pprof collections. Zero collects only at workload start and end.
   - name: ES_SECRETS_PATH
     default: ""
     documentation: |-
