@@ -489,11 +489,14 @@ fi
 
 # --- Create-if-absent: OperatorGroup (name compliance-operator,
 #     targetNamespaces [openshift-compliance]; any existing group is adopted;
-#     a second group in one namespace puts CSVs into TooManyOperatorGroups) ---
+#     a second group in one namespace puts CSVs into TooManyOperatorGroups).
+#     oc create, not apply: if a second writer (a live OperatorPolicy) wins the
+#     race, create fails AlreadyExists and we adopt; never overwrite the
+#     existing spec.targetNamespaces. ---
 if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${COMPLIANCE_NAMESPACE}" -o name 2>/dev/null)" ]]; then
   _prop "compliance_operatorgroup" "adopted"
 else
-  cat <<EOF | oc apply -f - 2>&1
+  if ! cat <<EOF | oc create -f - 2>&1
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -503,7 +506,19 @@ spec:
   targetNamespaces:
     - ${COMPLIANCE_NAMESPACE}
 EOF
-  _prop "compliance_operatorgroup" "created"
+  then
+    if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${COMPLIANCE_NAMESPACE}" -o name 2>/dev/null)" ]]; then
+      _prop "compliance_operatorgroup" "race-tolerated"
+      echo ">>> NOTE: OperatorGroup created concurrently by another writer - adopting"
+    else
+      _classify "compliance-operatorgroup-create-error" "failed to create OperatorGroup compliance-operator in ${COMPLIANCE_NAMESPACE}"
+      echo "ERROR: ${_class_detail}"
+      _dump_diagnostics
+      exit 1
+    fi
+  else
+    _prop "compliance_operatorgroup" "created"
+  fi
 fi
 
 # --- Create-if-absent: Subscription (oc create, not apply: if a second writer
