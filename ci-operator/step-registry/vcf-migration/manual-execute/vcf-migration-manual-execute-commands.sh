@@ -313,9 +313,11 @@ log "runbook step 2: add credentials for the new vCenter"
 # Credentials are added before the vCenter is registered so consumers can
 # authenticate the first time they see it. Values are base64-encoded without
 # a trailing newline; the patch adds the two keys and leaves the rest alone.
-# The patch carries base64 credentials, so it is built in a protected file and
-# applied with --patch-file to keep the values out of the process list
-# (runbook Step 2c).
+# The patch carries base64 credentials, so it is built in a protected file
+# (umask 077) and applied with --patch-file: the values stay out of the
+# oc patch arguments, the logs and any tracing, and are removed immediately
+# after the patch. They are only transiently visible in the jq argument
+# list within this step pod (runbook Step 2c).
 [[ $- == *x* ]] && was_tracing=true || was_tracing=false
 set +x  # Disable tracing due to credential handling
 creds_patch_umask="$(umask)"
@@ -381,11 +383,32 @@ oc get infrastructure cluster -o json \
 
 log "runbook step 4: wait for the cluster to pick up the new vCenter"
 
-function cloud_conf_has_target_vcenter() {
-  local cm_json
+# cloud_conf_has_vcenter <server> checks whether the generated cloud-conf
+# lists <server> under its vcenter section. The serialization of cloud.conf
+# is not guaranteed to be JSON — the runbook reads it as YAML — so the JSON
+# parse is tried first and a YAML read (yq-go, available in upi-installer)
+# is the fallback. Exit codes follow poll(): 0 present, 1 absent, 2 API
+# failure.
+function cloud_conf_has_vcenter() {
+  local server="$1"
+  local cm_json conf_file server_re
   cm_json="$(fetch_json get cm cloud-conf -n openshift-cloud-controller-manager)" || return 2
-  jq -e --arg server "${target_vcenter}" \
-    '.data."cloud.conf" | fromjson | .vcenter | has($server)' <<< "${cm_json}" >/dev/null
+  if jq -e --arg server "${server}" \
+    '.data."cloud.conf" | fromjson | .vcenter | has($server)' <<< "${cm_json}" >/dev/null 2>&1; then
+    return 0
+  fi
+  conf_file="$(mktemp)"
+  jq -r '.data."cloud.conf" // ""' <<< "${cm_json}" > "${conf_file}"
+  server_re="${server//./\\.}"
+  yq-go r "${conf_file}" 'vcenter' 2>/dev/null \
+    | grep -qE "^[[:space:]]*${server_re}:[[:space:]]*$"
+  local rc=$?
+  rm -f "${conf_file}"
+  return "${rc}"
+}
+
+function cloud_conf_has_target_vcenter() {
+  cloud_conf_has_vcenter "${target_vcenter}"
 }
 
 # Nothing is restarted by hand: the components consuming the vSphere
@@ -696,11 +719,20 @@ while IFS= read -r source_vcenter; do
 done < <(jq -r '.[]' <<< "${source_vcenters_json}")
 
 function cloud_conf_lacks_source_vcenters() {
-  local cm_json
-  cm_json="$(fetch_json get cm cloud-conf -n openshift-cloud-controller-manager)" || return 2
-  jq -e --argjson sources "${source_vcenters_json}" \
-    '(.data."cloud.conf" | fromjson | .vcenter // {}) as $vcenters
-    | [$sources[] | . as $source | select($vcenters | has($source))] | length == 0' <<< "${cm_json}" >/dev/null
+  local source_vcenter rc
+  while IFS= read -r source_vcenter; do
+    # Capture the check's exit code in the else branch: after a bare if/fi
+    # it would be the if statement's own status (zero), not the check's.
+    if cloud_conf_has_vcenter "${source_vcenter}"; then
+      return 1
+    else
+      rc=$?
+    fi
+    if [[ "${rc}" -eq 2 ]]; then
+      return 2
+    fi
+  done < <(jq -r '.[]' <<< "${source_vcenters_json}")
+  return 0
 }
 
 retire_deadline=$(( $(date +%s) + 600 ))

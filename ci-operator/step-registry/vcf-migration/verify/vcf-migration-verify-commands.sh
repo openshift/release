@@ -71,10 +71,17 @@ if [[ -n "${unexpected_machine_servers}" ]]; then
   fail_with_details "machines still reference non-target vCenters: ${unexpected_machine_servers}"
 fi
 
-migration_ready="$(oc -n "${MIGRATION_NAMESPACE}" get "vmwarecloudfoundationmigration/${MIGRATION_NAME}" -o json | jq -r '
-  .status.conditions[]? | select(.type == "Ready") | .status')"
-if [[ "${migration_ready}" != "True" ]]; then
-  fail_with_details "migration resource Ready condition is ${migration_ready:-unset}"
+# The manual workflow never deploys the operator, so the migration resource
+# (and its namespace) do not exist there; only enforce the Ready condition
+# when the resource is present (operator-driven workflow).
+if oc -n "${MIGRATION_NAMESPACE}" get "vmwarecloudfoundationmigration/${MIGRATION_NAME}" >/dev/null 2>&1; then
+  migration_ready="$(oc -n "${MIGRATION_NAMESPACE}" get "vmwarecloudfoundationmigration/${MIGRATION_NAME}" -o json | jq -r '
+    .status.conditions[]? | select(.type == "Ready") | .status')"
+  if [[ "${migration_ready}" != "True" ]]; then
+    fail_with_details "migration resource Ready condition is ${migration_ready:-unset}"
+  fi
+else
+  log "no VmwareCloudFoundationMigration resource; skipping the operator Ready check (manual migration)"
 fi
 
 # Verify node region/zone labels match target failure domain tags
