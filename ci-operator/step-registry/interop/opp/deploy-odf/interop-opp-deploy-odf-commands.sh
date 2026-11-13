@@ -877,6 +877,22 @@ EOF
   fi
 fi
 
+# --- Validate the placement of noobaa-default-bucket-class (adopted,
+#     race-tolerated or created): MCG/ODF can already own that name against
+#     its own default backing store (type aws-s3 on AWS), and the adoption
+#     above never overwrites it. Without this check the step would report
+#     odf_bucketclass=adopted and bucket claims would silently use the default
+#     store instead of the pv-pool this step provisions. ---
+_bc_stores=$(oc get bucketclasses.noobaa.io noobaa-default-bucket-class -n "${ODF_NAMESPACE}" \
+  -o jsonpath='{range .spec.placementPolicy.tiers[*]}{.backingStores}{"\n"}{end}' 2>/dev/null) || _bc_stores=""
+if [[ "${_bc_stores}" != *noobaa-pv-backing-store* ]]; then
+  _classify "odf-bucketclass-placement-error" "BucketClass noobaa-default-bucket-class does not use noobaa-pv-backing-store (backingStores: $(printf '%s' "${_bc_stores:-absent}" | tr '\n' ' '))"
+  echo "ERROR: ${_class_detail}"
+  _dump_diagnostics
+  exit 1
+fi
+_prop "bucketclass_backingstore" "noobaa-pv-backing-store"
+
 # --- Wait for BackingStore Ready (bounded: the pv-pool provisions 3 x 100Gi
 #     RBD volumes after Ceph and NooBaa are up) ---
 echo ">>> PHASE: waiting for BackingStore noobaa-pv-backing-store Ready (timeout: ${NOOBAA_BACKINGSTORE_TIMEOUT}s)"
