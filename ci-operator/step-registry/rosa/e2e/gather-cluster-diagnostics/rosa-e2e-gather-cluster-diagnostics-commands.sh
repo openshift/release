@@ -93,6 +93,10 @@ if [[ -z "${OCM_TOKEN:-}" && -f /usr/local/cs-qe-credentials/ocm_token ]]; then
 fi
 
 if [[ -z "${OCM_TOKEN:-}" ]]; then
+  OCM_TOKEN="${ORG_MEMBER_TOKEN:-}"
+fi
+
+if [[ -z "${OCM_TOKEN:-}" ]]; then
   log "ERROR: No OCM token found in cs-qe-credentials. Skipping diagnostics."
   $WAS_TRACING && set -x
   exit 0
