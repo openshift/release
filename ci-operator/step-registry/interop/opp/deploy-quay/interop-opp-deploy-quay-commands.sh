@@ -1013,17 +1013,33 @@ spec:
       serviceAccountName: create-admin-user
       terminationGracePeriodSeconds: 30
 JOBEOF
+  # Wait for Complete OR Failed: oc wait --for=condition=Complete never returns
+  # on a failed Job, so it burned the full timeout and then classified from
+  # .status.failed == 1 (wrong as soon as the default backoffLimit of 6 yields
+  # more than one failed pod). The Failed condition is the terminal signal;
+  # .status.failed is diagnostic detail only.
   _job_deadline=$(_clamp_deadline $(( $(date +%s) + QUAY_ADMIN_JOB_TIMEOUT )))
-  _job_left=$(( _job_deadline - $(date +%s) ))
-  if (( _job_left < 10 )); then _job_left=10; fi
-  if ! oc wait --for=condition=Complete job/create-admin-user -n "${QUAY_NAMESPACE}" --timeout="${_job_left}s" 2>&1; then
+  _job_state=""
+  while :; do
+    _job_conds=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" \
+      -o jsonpath='{range .status.conditions[?(@.status=="True")]}{.type}{" "}{end}' 2>/dev/null) || _job_conds=""
+    case " ${_job_conds} " in
+      *" Complete "*) _job_state="complete"; break ;;
+      *" Failed "*) _job_state="failed"; break ;;
+    esac
+    _job_left=$(( _job_deadline - $(date +%s) ))
+    if (( _job_left <= 0 )); then _job_state="timeout"; break; fi
+    if (( _job_left < _po_poll_interval )); then sleep "${_job_left}"; else sleep "${_po_poll_interval}"; fi
+  done
+  _prop "quay_admin_job_state" "${_job_state}"
+  if [[ "${_job_state}" != "complete" ]]; then
     _job_failed=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" -o jsonpath='{.status.failed}' 2>/dev/null) || _job_failed=""
     echo ">>> DIAG: create-admin-user Job logs (tail 200):"
     oc logs job/create-admin-user -n "${QUAY_NAMESPACE}" --tail=200 2>&1 | head -c 65536 || true
-    if [[ "${_job_failed}" == "1" ]]; then
-      _classify "quay-admin-job-failed" "create-admin-user Job reported failed pods"
+    if [[ "${_job_state}" == "failed" ]]; then
+      _classify "quay-admin-job-failed" "create-admin-user Job reported condition Failed=True (failed pods=${_job_failed:-none})"
     else
-      _classify "quay-admin-job-timeout" "create-admin-user Job not Complete within ${QUAY_ADMIN_JOB_TIMEOUT}s (failed=${_job_failed:-none})"
+      _classify "quay-admin-job-timeout" "create-admin-user Job neither Complete nor Failed within ${QUAY_ADMIN_JOB_TIMEOUT}s (failed pods=${_job_failed:-none})"
     fi
     echo "ERROR: ${_class_detail}"
     _dump_diagnostics
