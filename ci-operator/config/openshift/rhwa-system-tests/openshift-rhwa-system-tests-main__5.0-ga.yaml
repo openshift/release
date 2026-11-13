@@ -1,0 +1,325 @@
+base_images:
+  aws-efs-csi-operator-create-efs:
+    name: "5.0"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.27
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- as: e2e-sbr-ga-weekly-aws-odf
+  capabilities:
+  - intranet
+  cron: 0 23 * * 0
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      CATALOG_IMAGE_REF: registry.redhat.io/redhat/redhat-operator-index:v5.0
+      CATALOG_MODE: direct
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
+      ECO_TEST_VERBOSE: "true"
+      OCP_VERSION: "500"
+      ODF_OPERATOR_CHANNEL: stable-5.0
+      ODF_VERSION_MAJOR_MINOR: "5.0"
+      OO_CHANNEL: stable
+      OPERATORS: storage-based-remediation,node-healthcheck-operator
+      TEST_NAME: e2e-sbr-ga-weekly-aws-odf
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
+    test:
+    - chain: medik8s-setup
+    - ref: medik8s-deploy-odf-dev-catalog
+    - ref: medik8s-sbr-nfs-dynamic-provisioner
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-sbr-ga-weekly-aws-efs
+  capabilities:
+  - intranet
+  cron: 0 0 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      CATALOG_IMAGE_REF: registry.redhat.io/redhat/redhat-operator-index:v5.0
+      CATALOG_MODE: direct
+      CLUSTERCSIDRIVER: efs.csi.aws.com
+      ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
+      ECO_TEST_VERBOSE: "true"
+      OCP_VERSION: "500"
+      OO_CHANNEL: stable
+      OPERATORS: storage-based-remediation,node-healthcheck-operator
+      TEST_CSI_DRIVER_MANIFEST: manifest-aws-efs.yaml
+      TEST_NAME: e2e-sbr-ga-weekly-aws-efs
+      TEST_STEPS: e2e-test
+      TRUECONDITIONS: AWSEFSDriverControllerServiceControllerAvailable AWSEFSDriverNodeServiceControllerAvailable
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    - ref: storage-destroy-csi-aws-efs-sts-operator-role
+    - chain: ipi-aws-post
+    test:
+    - chain: medik8s-setup
+    - ref: storage-create-csi-aws-efs-sts-operator-role
+    - ref: storage-subscribe-aws-efs-csi-driver
+    - ref: storage-create-csi-aws-efs
+    - ref: storage-conf-wait-for-csi-driver
+    - ref: medik8s-sbr-nfs-dynamic-provisioner
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-far-ga-weekly-aws
+  capabilities:
+  - intranet
+  cron: 0 1 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      CATALOG_IMAGE_REF: registry.redhat.io/redhat/redhat-operator-index:v5.0
+      CATALOG_MODE: direct
+      ECO_TEST_FEATURES: far-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
+      ECO_TEST_VERBOSE: "true"
+      OCP_VERSION: "500"
+      OO_CHANNEL: stable
+      OPERATORS: fence-agents-remediation
+      TEST_NAME: e2e-far-ga-weekly-aws
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
+    test:
+    - chain: medik8s-setup
+    - ref: medik8s-aws-credentials
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 1Gi
+    workflow: ipi-aws
+- as: e2e-snr-ga-weekly-aws
+  capabilities:
+  - intranet
+  cron: 0 2 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      CATALOG_IMAGE_REF: registry.redhat.io/redhat/redhat-operator-index:v5.0
+      CATALOG_MODE: direct
+      ECO_TEST_FEATURES: snr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
+      ECO_TEST_VERBOSE: "true"
+      OCP_VERSION: "500"
+      OO_CHANNEL: stable
+      OPERATORS: self-node-remediation,node-healthcheck-operator
+      SNR_INJECTOR_IMAGE: quay.io/nicolaka/netshoot:latest
+      TEST_NAME: e2e-snr-ga-weekly-aws
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
+    test:
+    - chain: medik8s-setup
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
+      - name: SNR_INJECTOR_IMAGE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-nhc-ga-weekly-aws
+  capabilities:
+  - intranet
+  cron: 0 3 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      CATALOG_IMAGE_REF: registry.redhat.io/redhat/redhat-operator-index:v5.0
+      CATALOG_MODE: direct
+      ECO_TEST_FEATURES: nhc-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
+      ECO_TEST_VERBOSE: "true"
+      OCP_VERSION: "500"
+      OO_CHANNEL: stable
+      OPERATORS: node-healthcheck-operator,self-node-remediation
+      TEST_NAME: e2e-nhc-ga-weekly-aws
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
+    test:
+    - chain: medik8s-setup
+    - ref: ssh-bastion
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-mdr-ga-weekly-aws
+  capabilities:
+  - intranet
+  cron: 0 4 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      CATALOG_IMAGE_REF: registry.redhat.io/redhat/redhat-operator-index:v5.0
+      CATALOG_MODE: direct
+      ECO_TEST_FEATURES: mdr-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
+      ECO_TEST_VERBOSE: "true"
+      OCP_VERSION: "500"
+      OO_CHANNEL: stable
+      OPERATORS: machine-deletion-remediation,node-healthcheck-operator
+      TEST_NAME: e2e-mdr-ga-weekly-aws
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
+    test:
+    - chain: medik8s-setup
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-nmo-ga-weekly-aws
+  capabilities:
+  - intranet
+  cron: 0 5 * * 1
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      CATALOG_IMAGE_REF: registry.redhat.io/redhat/redhat-operator-index:v5.0
+      CATALOG_MODE: direct
+      ECO_TEST_FEATURES: nmo-operator
+      ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
+        && !tier:upgrade-cluster && !tier:interop'
+      ECO_TEST_VERBOSE: "true"
+      OCP_VERSION: "500"
+      OO_CHANNEL: stable
+      OPERATORS: node-maintenance-operator
+      TEST_NAME: e2e-nmo-ga-weekly-aws
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
+    test:
+    - chain: medik8s-setup
+    - as: e2e-test
+      cli: latest
+      commands: |
+        [[ -f "${SHARED_DIR}/workload_image" ]] && export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        make run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_VERBOSE
+      - name: ECO_TEST_LABELS
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: rhwa-system-tests
+  variant: 5.0-ga
