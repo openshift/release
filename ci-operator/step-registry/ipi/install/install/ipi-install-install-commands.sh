@@ -853,10 +853,16 @@ EOF
 # cluster-cloud-controller-manager-operator transform converge on the same
 # content for that case), so bootstrap and in-cluster agree. The swap then
 # only needs to land before bootkube.sh's "cb-bootstrap" stage (the generic
-# manifest-apply step that actually creates the live ConfigMap object) --
-# gated here on the "cco-bootstrap" stage completing, the last stage bootkube
-# runs before that, for the maximum safety margin without racing the apply
-# itself.
+# manifest-apply step that actually creates the live ConfigMap object).
+# Gate on "config-bootstrap.done" -- the marker for the very stage whose
+# cluster-config-operator render reads this ConfigMap -- and not on a later
+# marker: observed in a real bootstrap, "cco-bootstrap" completes and
+# "cb-bootstrap" starts within the same second, so gating on it left the
+# swap landing ~4s *after* cluster-bootstrap had begun reading manifests/.
+# That is harmless (cluster-bootstrap retries and the file parses), but it
+# is a race with no margin. "config-bootstrap" finishes several bootkube
+# stages earlier, which is still after the render and comfortably before the
+# apply.
 #
 # Must run after `create ignition-configs` has produced bootstrap.ign (there
 # must be one to merge onto) and after legacyize_vsphere_cloud_provider_config
@@ -877,7 +883,7 @@ function inject_vsphere_legacy_cloud_provider_config() {
 set -o nounset
 set -o pipefail
 
-marker=/opt/openshift/cco-bootstrap.done
+marker=/opt/openshift/config-bootstrap.done
 target=/opt/openshift/manifests/cloud-provider-config.yaml
 source_file=/opt/openshift/cloud-provider-config-legacy.yaml
 timeout_seconds=900

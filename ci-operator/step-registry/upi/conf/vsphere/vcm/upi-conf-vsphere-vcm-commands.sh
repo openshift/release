@@ -965,10 +965,15 @@ fi
 # cluster-cloud-controller-manager-operator transform converge on the same
 # content for that case), so bootstrap and in-cluster agree (SPLAT-3028).
 #
-# The merged systemd unit below waits for /opt/openshift/cco-bootstrap.done
-# -- the last bootkube.sh stage before "cb-bootstrap", the generic
-# manifest-apply step that actually creates the live ConfigMap object -- for
-# the maximum safety margin without racing that apply.
+# The merged systemd unit below waits for /opt/openshift/config-bootstrap.done:
+# the marker for the very stage whose cluster-config-operator render reads
+# this ConfigMap, and several bootkube stages before "cb-bootstrap", the
+# generic manifest-apply step that actually creates the live ConfigMap object.
+# It must not gate on a later marker: observed in a real bootstrap,
+# "cco-bootstrap" completes and "cb-bootstrap" starts within the same second,
+# so gating there let the swap land ~4s after cluster-bootstrap had begun
+# reading manifests/ -- harmless, since cluster-bootstrap retries and the file
+# parses, but a race with no margin.
 if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
   echo "$(date -u --rfc-3339=seconds) - injecting the legacy cloud-provider-config swap into bootstrap.ign (SPLAT-3028)"
 
@@ -986,7 +991,7 @@ if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
 set -o nounset
 set -o pipefail
 
-marker=/opt/openshift/cco-bootstrap.done
+marker=/opt/openshift/config-bootstrap.done
 target=/opt/openshift/manifests/cloud-provider-config.yaml
 source_file=/opt/openshift/cloud-provider-config-legacy.yaml
 timeout_seconds=900
