@@ -33,9 +33,10 @@ fi
 
 SHARED_AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
 if [[ ! -f "${SHARED_AWSCRED}" ]]; then
-  log "ERROR: shared VPC inputs present but ${SHARED_AWSCRED} not found;"
-  log "       cannot verify the shared account for orphaned resources"
-  exit 1
+  # Same-account shared VPC mode: the shared resources were created in the
+  # cluster account, so verify them with the cluster credentials.
+  SHARED_AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+  log "No .awscred_shared_account in the cluster profile: verifying the shared VPC resources in the cluster account (same-account mode)"
 fi
 export AWS_SHARED_CREDENTIALS_FILE="${SHARED_AWSCRED}"
 export AWS_DEFAULT_REGION="${REGION:-${LEASED_RESOURCE}}"

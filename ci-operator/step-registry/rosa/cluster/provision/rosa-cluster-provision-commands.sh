@@ -287,11 +287,14 @@ AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
 
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
-  if [[ ! -e "${CLUSTER_PROFILE_DIR}/.awscred_shared_account" ]]; then
-    echo "Error: Shared VPC is enabled, but not find .awscred_shared_account, exit now"
-    exit 1
+  if [[ -e "${CLUSTER_PROFILE_DIR}/.awscred_shared_account" ]]; then
+    export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+  else
+    # Same-account shared VPC mode: no second AWS account in the cluster
+    # profile, so the shared resources live in the cluster account and the
+    # cluster credentials identify it.
+    echo "Shared VPC is enabled without .awscred_shared_account: using the cluster account (same-account mode)"
   fi
-  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
 
   SHARED_VPC_AWS_ACCOUNT_ID=$(aws sts get-caller-identity --output text | awk '{print $1}')
   SHARED_VPC_AWS_ACCOUNT_ID_MASK=$(echo "${SHARED_VPC_AWS_ACCOUNT_ID:0:4}***")

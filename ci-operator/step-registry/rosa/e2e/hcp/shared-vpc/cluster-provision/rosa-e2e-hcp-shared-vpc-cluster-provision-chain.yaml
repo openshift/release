@@ -1,0 +1,30 @@
+chain:
+  as: rosa-e2e-hcp-shared-vpc-cluster-provision
+  env:
+  - name: ENABLE_SHARED_VPC
+    default: "yes"
+    documentation: |-
+      Provision the cluster in a shared VPC: rosa-cluster-provision adds
+      --base-domain/--private-hosted-zone-id/--shared-vpc-role-arn and, for
+      Hosted Control Plane clusters, --vpc-endpoint-role-arn and
+      --hcp-internal-communication-hosted-zone-id, using the resources
+      rosa-e2e-hcp-shared-vpc-prepare created. ENABLE_SHARED_VPC is scoped to
+      this chain instead of the workflow env map so the aws-provision-vpc-shared
+      and aws-provision-tags-for-byo-vpc-ocm-pre steps in the same workflow
+      keep their default (no) and provision the VPC in the cluster account.
+  steps:
+  - chain: rosa-cluster-provision
+  - ref: rosa-e2e-rosa-cli-publish-contract
+  documentation: |-
+    Provisions the cluster for the shared VPC row of the ROSAENG-308
+    provision x validate matrix: rosa-cluster-provision runs with
+    ENABLE_SHARED_VPC=yes (adding --base-domain,
+    --private-hosted-zone-id, --shared-vpc-role-arn and the Hosted Control
+    Plane --vpc-endpoint-role-arn/--hcp-internal-communication-hosted-zone-id
+    flags) and rosa-e2e-rosa-cli-publish-contract publishes the SHARED_DIR
+    provisioner-to-validator contract (cluster-id, kubeconfig,
+    cluster-metadata.json, ROSAENG-67580) afterwards. The shared-account
+    resources the flags reference are created beforehand by
+    rosa-e2e-hcp-shared-vpc-prepare: in the second AWS account when the
+    cluster profile carries .awscred_shared_account, otherwise in the
+    cluster account (same-account mode).

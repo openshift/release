@@ -12,7 +12,8 @@ log() {
 
 # HCP shared VPC preparation (ROSAENG-63353): creates every shared VPC
 # resource rosa create cluster needs in the shared AWS account (the second
-# account that holds the VPC and DNS, ${CLUSTER_PROFILE_DIR}/.awscred_shared_account):
+# account that holds the DNS, ${CLUSTER_PROFILE_DIR}/.awscred_shared_account;
+# without it the cluster account itself, same-account mode):
 # the ingress private hosted zone, the shared route53 role and policy, and
 # the HCP-only VPC endpoint role and internal communication hosted zone
 # (rosa create cluster requires --vpc-endpoint-role-arn and
@@ -27,8 +28,10 @@ REGION="${REGION:-${LEASED_RESOURCE}}"
 
 SHARED_AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
 if [[ ! -f "${SHARED_AWSCRED}" ]]; then
-  log "ERROR: ${SHARED_AWSCRED} not found; shared VPC needs a second AWS account"
-  exit 1
+  # Same-account shared VPC mode: no second AWS account in the cluster
+  # profile, so the shared resources are created in the cluster account.
+  SHARED_AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+  log "No .awscred_shared_account in the cluster profile: creating the shared VPC resources in the cluster account (same-account mode)"
 fi
 
 VPC_ID="$(head -n 1 "${SHARED_DIR}/vpc_id")"

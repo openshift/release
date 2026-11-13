@@ -70,8 +70,10 @@ if [[ -s "${SHARED_DIR}/hosted_zone_id" && -s "${SHARED_DIR}/hosted_zone_role_ar
   if [[ -f "${CLUSTER_PROFILE_DIR}/.awscred_shared_account" ]]; then
     export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
   else
-    log "WARNING: shared VPC inputs present but ${CLUSTER_PROFILE_DIR}/.awscred_shared_account not found;"
-    log "         cross-account specs will skip themselves"
+    # Same-account shared VPC mode: the shared resources live in the cluster
+    # account, so the specs query them with the cluster credentials.
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+    log "No .awscred_shared_account in the cluster profile: running the shared VPC specs with the cluster account credentials (same-account mode)"
   fi
   log "Shared VPC inputs exported (hosted zone: ${SHARED_VPC_HOSTED_ZONE_ID})"
 fi

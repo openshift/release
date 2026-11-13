@@ -76,8 +76,10 @@ done
 # --- Shared-account resources (second AWS account) ---
 SHARED_AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
 if [[ ! -f "${SHARED_AWSCRED}" ]]; then
-  log "ERROR: ${SHARED_AWSCRED} not found; cannot clean up the shared account"
-  exit 1
+  # Same-account shared VPC mode: the shared resources were created in the
+  # cluster account, so clean them up with the cluster credentials.
+  SHARED_AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+  log "No .awscred_shared_account in the cluster profile: cleaning up the shared VPC resources in the cluster account (same-account mode)"
 fi
 export AWS_SHARED_CREDENTIALS_FILE="${SHARED_AWSCRED}"
 

@@ -5,13 +5,14 @@ workflow:
       CHANNEL_GROUP: stable
       HOSTED_CP: "true"
       REPLICAS: "3"
-      # Shared VPC row (ROSAENG-63353): the VPC, PHZ and the shared VPC roles
-      # are created in a second AWS account
-      # (${CLUSTER_PROFILE_DIR}/.awscred_shared_account), and
-      # rosa-cluster-provision adds
-      # --base-domain/--private-hosted-zone-id/--shared-vpc-role-arn
-      # (ENABLE_SHARED_VPC).
-      ENABLE_SHARED_VPC: "yes"
+      # Shared VPC row (ROSAENG-63353): the PHZ and the shared VPC roles are
+      # created by rosa-e2e-hcp-shared-vpc-prepare, in the second AWS account
+      # (${CLUSTER_PROFILE_DIR}/.awscred_shared_account) when the cluster
+      # profile carries it, otherwise in the cluster account with .awscred
+      # (same-account mode). ENABLE_SHARED_VPC=yes is set by the
+      # rosa-e2e-hcp-shared-vpc-cluster-provision chain, not here, so the
+      # aws-provision-vpc-shared and aws-provision-tags-for-byo-vpc-ocm-pre
+      # steps keep provisioning the VPC in the cluster account.
       # Scoped to the rosa-e2e Feature:SharedVPC specs. Env on the workflow
       # step list is silently dropped by the registry resolver for ref steps;
       # only this map overrides the validate-customer ref's default filter.
@@ -25,19 +26,20 @@ workflow:
     - ref: aws-provision-vpc-shared
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
     - chain: rosa-sts-oidc-config-create
-    # Creates every shared VPC resource in the second AWS account: the ingress
-    # private hosted zone (named rosa.<cluster>.<base-domain>, which OCM
-    # validates the HCP cluster domain prefix against), the shared route53
-    # role and policy, and the HCP-only VPC endpoint role and internal
-    # communication hosted zone, plus the cluster-account assume-role
-    # permission policies. Runs after the oidc-config chain so the installer
-    # and operator role ARNs exist.
+    # Creates every shared VPC resource: the ingress private hosted zone
+    # (named rosa.<cluster>.<base-domain>, which OCM validates the HCP cluster
+    # domain prefix against), the shared route53 role and policy, and the
+    # HCP-only VPC endpoint role and internal communication hosted zone, plus
+    # the cluster-account assume-role permission policies. Uses the second AWS
+    # account (.awscred_shared_account) when the profile carries it, otherwise
+    # the cluster account (same-account mode). Runs after the oidc-config
+    # chain so the installer and operator role ARNs exist.
     - ref: rosa-e2e-hcp-shared-vpc-prepare
-    - chain: rosa-cluster-provision
-    # Publish the SHARED_DIR provisioner-to-validator contract (cluster-id,
-    # kubeconfig, cluster-metadata.json, ROSAENG-67580) after the rosa-CLI head
-    # has provisioned the cluster.
-    - ref: rosa-e2e-rosa-cli-publish-contract
+    # Provisions the cluster with ENABLE_SHARED_VPC=yes (scoped to the chain:
+    # the aws VPC and subnet tagging steps in this workflow keep using
+    # .awscred) and publishes the SHARED_DIR provisioner-to-validator contract
+    # (cluster-id, kubeconfig, cluster-metadata.json, ROSAENG-67580).
+    - chain: rosa-e2e-hcp-shared-vpc-cluster-provision
     - ref: aws-provision-tags-for-byo-vpc
     - ref: rosa-cluster-wait-ready-hosted-cp
     - ref: rosa-cluster-wait-ready-nodes
@@ -85,25 +87,33 @@ workflow:
     (ROSAENG-63353): the rosa-CLI head provisions an HCP cluster in a shared
     VPC - rosa-cluster-dnsdomain-create claims a customer-managed base domain
     and rosa-e2e-hcp-shared-vpc-prepare creates every shared-account resource
-    rosa create cluster needs in a second AWS account (ENABLE_SHARED_PHZ,
-    ${CLUSTER_PROFILE_DIR}/.awscred_shared_account): the ingress private
-    hosted zone (named rosa.<cluster>.<base-domain>, which OCM validates the
-    HCP cluster domain prefix against), the shared route53 role and policy
-    (trusting the installer, ingress-operator and control-plane-operator
-    roles), and the HCP-only VPC endpoint role and internal communication
-    hosted zone, plus the cluster-account assume-role permission policies. The
-    validation tail is provisioner-agnostic: the customer step runs the
-    rosa-e2e Feature:SharedVPC specs (cross-account DNS records in the shared
-    private hosted zone), while the platform step runs its
-    Area:ManagementPlane selection, which includes the shared VPC role trust
-    spec. The post phase ends with rosa-e2e-validate-shared-vpc-teardown, a
-    non-best-effort orphan gate that fails the job if shared-account resources
-    or the cluster-account assume-role policies survive the teardown
-    (ROSAENG-61409).
+    rosa create cluster needs: the ingress private hosted zone (named
+    rosa.<cluster>.<base-domain>, which OCM validates the HCP cluster domain
+    prefix against), the shared route53 role and policy (trusting the
+    installer, ingress-operator and control-plane-operator roles), and the
+    HCP-only VPC endpoint role and internal communication hosted zone, plus
+    the cluster-account assume-role permission policies. These resources are
+    created in the second AWS account when the cluster profile carries
+    ${CLUSTER_PROFILE_DIR}/.awscred_shared_account; without it every step
+    falls back to .awscred and they are created in the cluster account
+    (same-account mode, which is how the rosa-e2e-01 profile runs today: no
+    second account credentials need to be added to its GSM group). The VPC
+    itself is always provisioned in the cluster account by
+    aws-provision-vpc-shared (ENABLE_SHARED_VPC stays scoped to the
+    rosa-e2e-hcp-shared-vpc-cluster-provision chain), which matches the
+    same-account mode. The validation tail is provisioner-agnostic: the
+    customer step runs the rosa-e2e Feature:SharedVPC specs (cross-account DNS
+    records in the shared private hosted zone), while the platform step runs
+    its Area:ManagementPlane selection, which includes the shared VPC role
+    trust spec. The post phase ends with
+    rosa-e2e-validate-shared-vpc-teardown, a non-best-effort orphan gate that
+    fails the job if shared-account resources or the cluster-account
+    assume-role policies survive the teardown (ROSAENG-61409).
 
-    The cluster profile must carry .awscred_shared_account: the rosa-e2e-01
-    profile's GSM group (rosa-e2e/rosa-e2e-prow-ci-01) needs the second AWS
-    account credentials added before this workflow can run against it. The
+    To move this workflow to a real second AWS account later, add
+    .awscred_shared_account to the profile's GSM group and switch the VPC
+    provisioning to the shared account (for example by setting
+    ENABLE_SHARED_VPC=yes in the workflow env map instead of the chain). The
     platform plane requires corp-network reachability: run this workflow only
     where backplane is reachable (capabilities: [intranet],
     restrict_network_access: false, network-access-rehearsals-ok label for
