@@ -1,12 +1,17 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+# Restrictive default permissions: the credential file this step writes is
+# owner-only.
+umask 077
+
 # shellcheck disable=SC2317
 _propagate_junit () {
+    [[ -n "${SHARED_DIR:-}" ]] || return 0
     mkdir -p "${SHARED_DIR}/junit"
     # Error suppression justified: _propagate_junit is best-effort cleanup on EXIT trap.
     # If no XML files exist or ARTIFACT_DIR is unset, we want the trap to succeed (not fail the entire test).
-    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; || true
+    find "${ARTIFACT_DIR:-}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; || true
 }
 
 # Suite naming for the JUnit post-processing library: compose its suite-name
@@ -128,11 +133,11 @@ EOF
 
         if [ "${status}" = "failed" ]; then
             typeset escapedMsg=""
-            escapedMsg=$(echo "${failureMsg}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
+            escapedMsg=$(printf '%s\n' "${failureMsg}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
             echo "    <testcase name=\"${test}\" classname=\"interop-acm-security-scan-ctr-img-acs-app-deployment\" time=\"${duration}\"><failure message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
         elif [ "${status}" = "skipped" ]; then
             typeset escapedMsg=""
-            escapedMsg=$(echo "${failureMsg}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
+            escapedMsg=$(printf '%s\n' "${failureMsg}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
             echo "    <testcase name=\"${test}\" classname=\"interop-acm-security-scan-ctr-img-acs-app-deployment\" time=\"${duration}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
         else
             echo "    <testcase name=\"${test}\" classname=\"interop-acm-security-scan-ctr-img-acs-app-deployment\" time=\"${duration}\"/>" >> "${junitFile}"
@@ -188,7 +193,7 @@ function RunTestCase1 () {
     # Wait for deployment (which implicitly waits for build to complete)
     : "Waiting for deployment to be available (timeout: 10m)..."
     if ! oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=10m; then
-        : "ERROR: Deployment did not become available"
+        printf '%s\n' "ERROR: Deployment did not become available" >&2
 
         # Collect diagnostics to understand why deployment failed
         : "=== Build Status ==="
@@ -271,13 +276,26 @@ function RunTestCase2 () {
     # ephemeral file inside a subshell with xtrace disabled (Best
     # Practices secret handling): it is never set as a main-shell
     # variable, never expanded in a trace, and never passed as a command
-    # argument.  acsHost is a route name, not a credential.
+    # argument.  acsHost is a route name, not a credential.  Both reads are
+    # checked here so a missing secret fails in seconds instead of burning
+    # the ACS retry budget on an empty host or password.
     typeset acsHost=""
     typeset acsPassFile="/tmp/acs-admin-password"
-    acsHost=$(oc get secret -n stackrox sensor-tls -o json | /tmp/jq -r '.data."acs-host"' | base64 -d)
+    if ! acsHost=$(oc get secret -n stackrox sensor-tls -o json | /tmp/jq -r '.data."acs-host"' | base64 -d); then
+        echo "ERROR: Could not read the ACS host from secret stackrox/sensor-tls" >&2
+        return 1
+    fi
+    if [[ -z "${acsHost}" ]]; then
+        echo "ERROR: Secret stackrox/sensor-tls carries no acs-host value" >&2
+        return 1
+    fi
     ( set +x
       oc get secret -n stackrox central-htpasswd -o json | /tmp/jq -r '.data.password' | base64 -d >"${acsPassFile}"
-    true )
+    ) || true
+    if [[ ! -s "${acsPassFile}" ]]; then
+        echo "ERROR: Could not read the ACS admin password from secret stackrox/central-htpasswd" >&2
+        return 1
+    fi
 
     # Query ACS for the image deployed by Test Case 1.  Match on the
     # namespace-qualified repository (registry host and path, tag/digest
@@ -287,7 +305,9 @@ function RunTestCase2 () {
     if [[ -n "${deployedImage:-}" ]]; then
         deployedRepo="$(printf '%s' "${deployedImage}" | cut -d'@' -f1 | sed 's/:[^/:]*$//')"
     fi
-    typeset jqFilter=".images[] | select(.name | contains(\"${deployedRepo}\"))"
+    # The repository name is passed with --arg, so a name carrying jq quoting
+    # characters cannot rewrite the program.
+    typeset jqFilter='.images[] | select(.name | contains($repo))'
 
     # TLS verification for the ACS Central API: prefer the service CA
     # bundle mounted in the pod (pattern from interop-opp-must-gather-acs);
@@ -302,7 +322,7 @@ function RunTestCase2 () {
         if [[ -n "${tlsProbe}" && "${tlsProbe}" != '000' ]]; then
             acsTlsOpts=( --cacert "${saCaBundle}" )
         else
-            : "WARNING: ACS route certificate not verifiable with the service CA bundle; falling back to insecure TLS"
+            printf '%s\n' "WARNING: ACS route certificate not verifiable with the service CA bundle; falling back to insecure TLS" >&2
         fi
     fi
 
@@ -322,7 +342,7 @@ function RunTestCase2 () {
             set +x
             curl -fsSL "${acsTlsOpts[@]}" \
                 --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
-                "https://${acsHost}/v1/images" | /tmp/jq "${jqFilter}"
+                "https://${acsHost}/v1/images" | /tmp/jq --arg repo "${deployedRepo}" "${jqFilter}"
         )"
         imageId=$(echo "${httpdImageJson}" | /tmp/jq .id)
         if [ "${imageId}" != "" ]; then
@@ -366,19 +386,24 @@ eval "$(
 PostProcessJunit () {
     if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
         ExitTrap--PostProcessPrep junit--interop-acm-security-scan-ctr-img-acs-app-deployment.xml ||
-            : "WARNING: junit post-processing failed"
+            printf '%s\n' "WARNING: junit post-processing failed" >&2
     else
-        : "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping"
+        printf '%s\n' "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping" >&2
     fi
     true
 }
 
 # Set trap to generate JUnit XML and remap for Component Readiness
 # Integrates existing GenerateJunitXml function with ExitTrap library
+# errexit is off inside the trap so one failing report step cannot skip the
+# rest, and the credential file is removed here so it does not survive an
+# early return.
 trap '{(
+    set +e
     GenerateJunitXml
     _propagate_junit
     PostProcessJunit
+    rm -f /tmp/acs-admin-password
     true
 )}' EXIT
 
@@ -396,7 +421,7 @@ typeset -i apiRc=0
 apiOutput=$(oc api-resources --api-group=quay.redhat.com) || apiRc=$?
 
 if ((apiRc != 0)); then
-    : "WARNING: oc api-resources failed (rc=${apiRc}) - cannot determine CRD presence, falling through to CR check"
+    printf '%s\n' "WARNING: oc api-resources failed (rc=${apiRc}) - cannot determine CRD presence, falling through to CR check" >&2
 elif ! grep -qi quayintegration <<< "${apiOutput}"; then
     : "QuayIntegration CRD is not installed on this cluster."
     : "Quay Bridge Operator is not available - skipping OPP app tests."
@@ -414,26 +439,26 @@ typeset -i getRc=0
 getOutput=$(oc get quayintegration quay --ignore-not-found -o name) || getRc=$?
 
 if ((getRc != 0)); then
-    : "WARNING: oc get quayintegration failed (rc=${getRc}) - cluster API error"
-    : "Marking all test cases as failed."
+    printf '%s\n' "WARNING: oc get quayintegration failed (rc=${getRc}) - cluster API error" >&2
+    printf '%s\n' "Marking all test cases as failed." >&2
 
     for test in "${allTestCasesArr[@]}"; do
         testStatus["${test}"]="failed"
         testFailureMsg["${test}"]="oc get quayintegration failed (rc=${getRc}) - cluster API error"
     done
 
-    exit 0
+    exit 1
 elif [[ -z "${getOutput}" ]]; then
-    : "ERROR: QuayIntegration CRD exists but CR 'quay' not found!"
-    : "OPP bundle components are not properly configured."
-    : "Cannot proceed with testing - marking all test cases as failed."
+    printf '%s\n' "ERROR: QuayIntegration CRD exists but CR 'quay' not found!" >&2
+    printf '%s\n' "OPP bundle components are not properly configured." >&2
+    printf '%s\n' "Cannot proceed with testing - marking all test cases as failed." >&2
 
     for test in "${allTestCasesArr[@]}"; do
         testStatus["${test}"]="failed"
         testFailureMsg["${test}"]="QuayIntegration CR 'quay' not found - OPP bundle not configured"
     done
 
-    exit 0
+    exit 1
 fi
 
 : "QuayIntegration quay found"
