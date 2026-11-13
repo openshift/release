@@ -522,7 +522,7 @@ spec:
   - kind: quay
     managed: true
   - kind: mirror
-    managed: ${QUAY_MIRROR_MANAGED}
+    managed: true
   - kind: clair
     managed: true
   - kind: tls
