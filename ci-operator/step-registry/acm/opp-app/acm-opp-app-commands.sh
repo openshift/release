@@ -155,7 +155,7 @@ function RunTestCase1 () {
     # 60s sleep, so the build trigger hit a missing buildconfig). Wait for
     # both within one bounded budget instead of racing a fixed sleep.
     typeset -i remediationDeadline=$(( $(date +%s) + 600 ))
-    until oc get namespace e2e-opp --ignore-not-found >/dev/null 2>&1; do
+    until oc get namespace e2e-opp >/dev/null 2>&1; do
         if (( $(date +%s) >= remediationDeadline )); then
             : "ERROR: e2e-opp namespace was not created within 10m of deploy"
             : "=== Policy Status ==="
@@ -175,7 +175,7 @@ function RunTestCase1 () {
 
     # Wait for the buildconfig policy to remediate before triggering a
     # build; oc start-build fails when the buildconfig does not exist yet.
-    until oc get buildconfig httpd-example -n e2e-opp --ignore-not-found >/dev/null 2>&1; do
+    until oc get buildconfig httpd-example -n e2e-opp >/dev/null 2>&1; do
         if (( $(date +%s) >= remediationDeadline )); then
             : "ERROR: buildconfig httpd-example was not created within 10m of deploy"
             : "=== Policy Status ==="
