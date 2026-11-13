@@ -76,10 +76,15 @@ specific `public_upstreams` mapping supplies it. Public branch overrides apply
 only to the public source. Missing or inaccessible sources remain errors.
 
 Use `owner:ref` to fetch from a fork; an unqualified branch, tag or commit uses
-`openshift-eng/art-tools`. Merge this credential wiring before art-tools #3919,
-because subsequent runs fetch art-tools `main` and its new checks require private
-source access. To rehearse the new checks before that PR merges, set
-`ART_TOOLS_REF` to `ashwindasr:codex/ART-24206-validate-sources-and-rpa-mappings`.
+`openshift-eng/art-tools`. To rehearse Pyxis validation before
+[art-tools #3947](https://github.com/openshift-eng/art-tools/pull/3947) merges, set
+`ART_TOOLS_REF` to `shruti-rh:art-25812-pyxis-content-streams` in the target branch's
+CI configuration and regenerate its Prow job. This ref accepts `--pyxis-root`;
+older validator refs do not and exit before writing `validation.json`.
+After #3947 merges, remove the override to use the default `main`.
+Keep the Pyxis checkout and `--pyxis-root` enabled during rehearsal. Until
+[Pyxis MR !2027](https://gitlab.cee.redhat.com/releng/pyxis-repo-configs/-/merge_requests/2027)
+merges, its `latest`-only entries should produce validation findings in the report.
 OCP job migration is separate work.
 
 ## Local testing
