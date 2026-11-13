@@ -18,9 +18,9 @@ The required first pass covers every existing ACM and MCE release branch:
 
 The other 45 release branches are also configured across cert-manager, COO, DVO,
 external-secrets, installer-ove-ui, Kueue, Logging, mirror-gui, MTA, MTC, OADP,
-oc-mirror, OMR, OSUS, Quay, RHOSDT and zero-trust. These jobs are optional until
-their metadata, source access and RPA baselines have been validated. This includes
-newly created streams whose build metadata or release mappings are not ready yet.
+oc-mirror, OMR, OSUS, Quay, RHOSDT and zero-trust. These jobs are required;
+validation failures block matching metadata changes from merging. Ensure metadata,
+source access and RPA mappings are ready for each stream.
 
 A job can run when its branch selector matches the PR's target branch and the PR changes metadata matched by `run_if_changed`.
 The existing 16 ACM/MCE jobs remain required; their validation failures block
