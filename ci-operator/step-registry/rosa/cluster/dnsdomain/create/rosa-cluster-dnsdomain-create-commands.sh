@@ -37,7 +37,14 @@ else
 fi
 
 output=$(mktemp)
-rosa create dnsdomain | tee $output
+# OCM hands out classic-architecture domains (s1.devshift.org) without the
+# flag, which rosa create cluster then rejects for Hosted Control Plane
+# clusters (HCP requires the hcp-architecture parent domain, s3.devshift.org).
+if [[ "${HOSTED_CP}" == "true" ]]; then
+  rosa create dnsdomain --hosted-cp | tee $output
+else
+  rosa create dnsdomain | tee $output
+fi
 grep -oE "[0-9A-Za-z]{4}\.[0-9A-Za-z\.]+{4}" ${output} > "${SHARED_DIR}/rosa_dns_domain"
 
 dns_domain=$(head -n 1 "${SHARED_DIR}/rosa_dns_domain")
