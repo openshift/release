@@ -887,12 +887,17 @@ def classify(evidence: Evidence, roles: dict[str, str]) -> tuple[str, list[str],
 # interrupt flag, JUnit byte cap) are injected by mode_scan below. One
 # terminal result line, ever: the sent file is touched immediately
 # before printing it so the bash fallback cannot duplicate.
+import atexit
 import json
 import os
 import re
+import shutil
 import signal
 import sys
+import tempfile
 import time
+import urllib.parse
+import urllib.request
 
 ROLE_TABLE_TEXT = sys.argv[1]
 ARGS = sys.argv[2:]
@@ -1019,25 +1024,151 @@ def mode_marker_selfcheck():
     print(json.dumps(results))
 
 
+def _gcs_get(url, timeout, limit):
+    req = urllib.request.Request(url, headers={'User-Agent':
+                                               'opp-slack-reporter'})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read(limit + 1)
+
+
+def _gcs_build_prefix():
+    """The build's public GCS prefix: pr-logs/pull/<org_repo>/<pr>/
+    <job>/<build> for pull-context builds, logs/<job>/<build> otherwise.
+    Returns None when the Prow identity is incomplete."""
+    job = os.environ.get('JOB_NAME', '')
+    build = os.environ.get('BUILD_ID', '')
+    if not job or not build:
+        return None
+    owner = os.environ.get('REPO_OWNER', '')
+    repo = os.environ.get('REPO_NAME', '')
+    pull = os.environ.get('PULL_NUMBER', '')
+    if owner and repo and pull:
+        return 'pr-logs/pull/%s/%s/%s/%s' % (owner + '_' + repo, pull,
+                                             job, build)
+    return 'logs/%s/%s' % (job, build)
+
+
+def materialize_gcs_base():
+    """Production scan base: the build's public GCS artifact tree,
+    materialized into a temp dir. The container-local <test>/<step>/
+    tree does not exist for a post step (each step pod owns an
+    isolated emptyDir; rehearsal 2121229677761662976, PR 88215: the
+    ../.. fallback resolved to / and failed closed with
+    base_invalid_root). Returns (test_dir, None) on success or
+    (None, reason) fail-closed. Never guesses a layout: the test dir
+    is the single parent of the observed step markers, else a named
+    reason. Over-cap and unfetchable objects are skipped (the scan
+    records their absence, never a fabricated payload)."""
+    deadline = time.time() + float(os.environ.get(
+        'SLACK_REPORTER_GCS_DEADLINE', '240') or 240)
+    api_root = os.environ.get(
+        'SLACK_REPORTER_GCS_API_ROOT',
+        'https://storage.googleapis.com/storage/v1/b/'
+        'test-platform-results-public/o')
+    media_root = os.environ.get(
+        'SLACK_REPORTER_GCS_MEDIA_ROOT',
+        'https://storage.googleapis.com/test-platform-results-public')
+    list_timeout = float(os.environ.get(
+        'SLACK_REPORTER_GCS_LIST_TIMEOUT', '60') or 60)
+    fetch_timeout = float(os.environ.get(
+        'SLACK_REPORTER_GCS_FETCH_TIMEOUT', '60') or 60)
+    max_objects = int(os.environ.get(
+        'SLACK_REPORTER_GCS_MAX_OBJECTS', '400') or 400)
+    max_junit_bytes = int(os.environ.get(
+        'SLACK_REPORTER_GCS_MAX_JUNIT_BYTES', '5000000') or 5000000)
+    marker_re = re.compile(r'(^|/)finished\.json$')
+    junit_re = re.compile(
+        r'(^|/)(junit_[^/]*|TEST-[^/]*)\.xml$|/junit/[^/]*\.xml$')
+    prefix = _gcs_build_prefix()
+    if prefix is None:
+        return None, 'gcs_identity_absent'
+    names = []
+    token = ''
+    while True:
+        query = {'prefix': prefix + '/artifacts/', 'maxResults': '1000'}
+        if token:
+            query['pageToken'] = token
+        url = api_root + '?' + urllib.parse.urlencode(query)
+        try:
+            page = json.loads(_gcs_get(url, list_timeout, 10000000))
+        except Exception:
+            return None, 'gcs_listing_failed'
+        for item in page.get('items', []):
+            name = item.get('name', '')
+            if marker_re.search(name) or junit_re.search(name):
+                names.append(name)
+        token = page.get('nextPageToken', '')
+        if not token:
+            break
+        if time.time() > deadline:
+            return None, 'gcs_listing_deadline'
+    if not names:
+        return None, 'gcs_no_evidence_objects'
+    if len(names) > max_objects:
+        return None, 'gcs_object_cap:%d' % len(names)
+    root = tempfile.mkdtemp(prefix='slack-reporter-gcs.')
+    atexit.register(shutil.rmtree, root, True)
+    tests = set()
+    for name in names:
+        rel = name.split('/artifacts/', 1)[1]
+        parts = rel.split('/')
+        if marker_re.search(name) and len(parts) >= 3:
+            tests.add(parts[0])
+        if time.time() > deadline or _INTERRUPTED['flag']:
+            return None, 'gcs_materialization_interrupted'
+        cap = max_junit_bytes if junit_re.search(name) else 65536
+        try:
+            payload = _gcs_get(
+                media_root + '/' + urllib.parse.quote(name), fetch_timeout,
+                cap)
+        except Exception:
+            continue
+        if len(payload) > cap:
+            continue
+        target = os.path.join(root, rel)
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, 'wb') as handle:
+            handle.write(payload)
+    if not tests:
+        return None, 'gcs_no_step_markers'
+    if len(tests) > 1:
+        return None, 'gcs_ambiguous_tests:%d' % len(tests)
+    return os.path.join(root, sorted(tests)[0]), None
+
+
 def mode_scan():
     artifact_dir = os.environ.get('ARTIFACT_DIR', '')
     if not artifact_dir:
         emit_terminal_line('CONFIG_ERROR', 'unknown', {}, '0', 'none',
                            ['artifact_dir_unset'])
         return
-    base = os.environ.get('ARTIFACT_BASE_DIR') or os.path.join(
-        artifact_dir, '..', '..')
+    explicit_base = os.environ.get('ARTIFACT_BASE_DIR', '')
+    base = explicit_base or os.path.join(artifact_dir, '..', '..')
     base = os.path.normpath(base)
-    if base == os.sep:
-        # the ../.. fallback from /logs/artifacts resolves to /; a scan root
-        # must never be the filesystem root (every child fails containment)
-        emit_terminal_line('CONFIG_ERROR', 'unknown', {}, '0', 'none',
-                           ['base_invalid_root'])
-        return
-    if not os.path.isdir(base):
-        emit_terminal_line('CONFIG_ERROR', 'unknown', {}, '0', 'none',
-                           ['base_unresolvable'])
-        return
+    if explicit_base:
+        # an explicit seam is authoritative: an invalid value fails
+        # closed, never silently retargeted (the GCS fallback below is
+        # for the derived production path only)
+        if base == os.sep:
+            # the ../.. fallback from /logs/artifacts resolves to /; a scan root
+            # must never be the filesystem root (every child fails containment)
+            emit_terminal_line('CONFIG_ERROR', 'unknown', {}, '0', 'none',
+                               ['base_invalid_root'])
+            return
+        if not os.path.isdir(base):
+            emit_terminal_line('CONFIG_ERROR', 'unknown', {}, '0', 'none',
+                               ['base_unresolvable'])
+            return
+    elif base == os.sep or not os.path.isdir(base):
+        # production: the derived local base does not exist (each step
+        # pod owns an isolated emptyDir); materialize the build's public
+        # GCS tree and scan that (rehearsal 2121229677761662976,
+        # PR 88215)
+        base, gcs_reason = materialize_gcs_base()
+        if base is None:
+            emit_terminal_line('CONFIG_ERROR', 'unknown', {}, '0', 'none',
+                               [gcs_reason])
+            return
     table, digest, source, failure = resolve_role_table()
     if table is None:
         emit_terminal_line('CONFIG_ERROR', 'unknown', {}, '0', 'none',
