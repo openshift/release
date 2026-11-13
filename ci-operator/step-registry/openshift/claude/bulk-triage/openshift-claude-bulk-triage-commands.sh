@@ -140,12 +140,39 @@ WORKDIR=$(mktemp -d /tmp/claude-bulk-triage-XXXXXX)
 cd "${WORKDIR}"
 
 REPORT_FILE="triage-duty-report-${TRIAGE_VIEW}.md"
+# HTML copy of the report for the Prow job page: the Spyglass html lens shows
+# artifacts whose names match .*-summary.*\.html.
+SUMMARY_HTML="triage-summary-${TRIAGE_VIEW}.html"
+MARKDOWN_TO_HTML="/opt/ai-helpers/plugins/prow-agent/scripts/markdown_to_html.py"
 
-# Ensure the report and session logs are copied to artifacts even if the script exits early
+# Best effort: the markdown report stays the primary artifact, so a missing
+# report, an image without the helper, or a rendering failure only warns.
+render_summary_html() {
+    local src="${WORKDIR:-}/${REPORT_FILE}"
+    if [[ ! -s "${src}" ]]; then
+        echo "No markdown report to render; skipping ${SUMMARY_HTML}."
+        return 0
+    fi
+    if [[ ! -f "${MARKDOWN_TO_HTML}" ]]; then
+        echo "Warning: ${MARKDOWN_TO_HTML} is not in this image; skipping ${SUMMARY_HTML}."
+        return 0
+    fi
+    # The html lens puts artifact names into the job page without escaping them.
+    if [[ ! "${SUMMARY_HTML}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+        echo "Warning: TRIAGE_VIEW has characters other than letters, digits, '.', '_' and '-'; skipping the HTML report."
+        return 0
+    fi
+    timeout 120 python3 "${MARKDOWN_TO_HTML}" --title "${REPORT_FILE}" "${src}" "${ARTIFACT_DIR}/${SUMMARY_HTML}" \
+        || echo "Warning: could not render ${SUMMARY_HTML}."
+}
+
+# Ensure the report and session logs are copied to artifacts even if the script exits early.
+# On exit this also renders the HTML copy from the final report, after the session usage is appended.
 copy_reports() {
     if [[ -d "${WORKDIR:-}" ]]; then
         echo "Copying reports to artifact directory..."
         find "${WORKDIR}" -maxdepth 1 -name "*.md" -exec cp {} "${ARTIFACT_DIR}/" \; || true
+        render_summary_html || true
     fi
 
     # Archive the full Claude session directory (including subagent logs) for session continuation.
