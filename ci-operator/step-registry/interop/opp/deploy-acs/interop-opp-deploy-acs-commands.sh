@@ -148,6 +148,21 @@ _api_err_class() {
   esac
 }
 
+# _diag_get <command...> — run one diagnostic query with stderr contained.
+# The caller's jsonpath keeps API-controlled fields out of the log; stderr
+# carries the raw API error, which is API-controlled text as well, so a failed
+# query contributes only its classification and never the error body.
+_diag_get() {
+  local _errf _rc=0
+  _errf=$(mktemp) || return 0
+  "$@" 2>"${_errf}" || _rc=$?
+  if (( _rc != 0 )); then
+    printf '  (query failed: %s)\n' "$(_api_err_class "$(cat "${_errf}")")"
+  fi
+  rm -f "${_errf}"
+  return 0
+}
+
 # _junit_seed — write the default-FAILING case before any work, atomically.
 _junit_seed() {
   mkdir -p "$(dirname "${_jfile}")" 2>/dev/null || true
@@ -279,20 +294,20 @@ _clamp_deadline() {
 _dump_diagnostics() {
   _api_quiet
   echo ">>> DIAG: Subscription rhacs-operator in ${ACS_NAMESPACE} (allowlisted fields):"
-  oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
-    -o jsonpath='{.metadata.name} channel={.spec.channel} currentCSV={.status.currentCSV} installedCSV={.status.installedCSV}{"\n"}' 2>&1 | head -c 262144 || true
+  _diag_get oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
+    -o jsonpath='{.metadata.name} channel={.spec.channel} currentCSV={.status.currentCSV} installedCSV={.status.installedCSV}{"\n"}' | head -c 262144 || true
   echo ">>> DIAG: Subscription conditions (type/status/reason only):"
-  oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
-    -o jsonpath='{range .status.conditions[*]}  {.type}={.status} reason={.reason}{"\n"}{end}' 2>&1 | head -50 || true
+  _diag_get oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
+    -o jsonpath='{range .status.conditions[*]}  {.type}={.status} reason={.reason}{"\n"}{end}' | head -50 || true
   echo ">>> DIAG: events in ${ACS_NAMESPACE} (last 50, no messages):"
-  oc get events -n "${ACS_NAMESPACE}" --sort-by='.lastTimestamp' \
-    -o jsonpath='{range .items[*]}{.lastTimestamp} {.type} {.reason} {.involvedObject.kind}/{.involvedObject.name} x{.count}{"\n"}{end}' 2>&1 | tail -50 || true
+  _diag_get oc get events -n "${ACS_NAMESPACE}" --sort-by='.lastTimestamp' \
+    -o jsonpath='{range .items[*]}{.lastTimestamp} {.type} {.reason} {.involvedObject.kind}/{.involvedObject.name} x{.count}{"\n"}{end}' | tail -50 || true
   echo ">>> DIAG: events in openshift-marketplace (last 50, no messages):"
-  oc get events -n openshift-marketplace --sort-by='.lastTimestamp' \
-    -o jsonpath='{range .items[*]}{.lastTimestamp} {.type} {.reason} {.involvedObject.kind}/{.involvedObject.name} x{.count}{"\n"}{end}' 2>&1 | tail -50 || true
+  _diag_get oc get events -n openshift-marketplace --sort-by='.lastTimestamp' \
+    -o jsonpath='{range .items[*]}{.lastTimestamp} {.type} {.reason} {.involvedObject.kind}/{.involvedObject.name} x{.count}{"\n"}{end}' | tail -50 || true
   echo ">>> DIAG: CSVs in ${ACS_NAMESPACE} (name/phase only):"
-  oc get csv -n "${ACS_NAMESPACE}" \
-    -o jsonpath='{range .items[*]}  {.metadata.name} {.status.phase}{"\n"}{end}' 2>&1 | head -50 || true
+  _diag_get oc get csv -n "${ACS_NAMESPACE}" \
+    -o jsonpath='{range .items[*]}  {.metadata.name} {.status.phase}{"\n"}{end}' | head -50 || true
   _api_loud
 }
 
