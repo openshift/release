@@ -1,0 +1,31 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.25-openshift-4.21
+prowgen:
+  expose: true
+  private: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: nhe-sriov-intranet-preflight
+  capabilities:
+  - intranet
+  commands: bash ci/prow/nhe-intranet-probe.sh
+  container:
+    from: src
+  cron: 0 0 * * 1
+  restrict_network_access: false
+  secrets:
+  - collection: nhe-lab233-probe
+    field: lab233-hostname
+    group: probe
+    mount_path: /var/run/nhe-probe
+zz_generated_metadata:
+  branch: main
+  org: openshift-eng
+  repo: nhe-sriov-prow
