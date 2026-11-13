@@ -174,6 +174,14 @@ function RunTestCase1 () {
     # plain condition waits fail fast on NotFound).
     oc wait namespace/e2e-opp --for=create --timeout=5m || return 1
 
+    # The policies create the BuildConfig and the Deployment after the
+    # namespace: await their creation before using them.  Without this,
+    # `oc start-build` has no BuildConfig to start, and the condition wait
+    # below fails fast on a Deployment that does not exist yet (same Best
+    # Practice as the namespace wait above).
+    oc wait buildconfig/httpd-example -n e2e-opp --for=create --timeout=10m || return 1
+    oc wait deployment/httpd-example -n e2e-opp --for=create --timeout=10m || return 1
+
     # RunTestCase1 executes under an if condition, so errexit is suspended
     # here: every failure must return explicitly.
     oc label managedcluster local-cluster oppapps=httpd-example --overwrite || return 1
@@ -302,12 +310,20 @@ function RunTestCase2 () {
     # stripped) so an older build of the same application does not satisfy
     # the check.
     typeset deployedRepo='httpd-example'
+    typeset deployedDigest=''
     if [[ -n "${deployedImage:-}" ]]; then
         deployedRepo="$(printf '%s' "${deployedImage}" | cut -d'@' -f1 | sed 's/:[^/:]*$//')"
+        [[ "${deployedImage}" == *@* ]] && deployedDigest="${deployedImage##*@}"
     fi
     # The repository name is passed with --arg, so a name carrying jq quoting
-    # characters cannot rewrite the program.
+    # characters cannot rewrite the program.  When the deployment runs by
+    # digest, the ACS record must carry that digest too: the repository alone
+    # also matches an older build of the same application, and such a record
+    # would satisfy the check even if ACS never saw the running image.
     typeset jqFilter='.images[] | select(.name | contains($repo))'
+    if [[ -n "${deployedDigest}" ]]; then
+        jqFilter+=' | select(((.name // "") | contains($digest)) or ((.id // "") == $digest))'
+    fi
 
     # TLS verification for the ACS Central API: prefer the service CA
     # bundle mounted in the pod (pattern from interop-opp-must-gather-acs);
@@ -340,13 +356,17 @@ function RunTestCase2 () {
         # config, so the credential appears in neither the trace nor argv.
         httpdImageJson="$(
             set +x
-            curl -fsSL "${acsTlsOpts[@]}" \
+            curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 60 \
                 --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
-                "https://${acsHost}/v1/images" | /tmp/jq --arg repo "${deployedRepo}" "${jqFilter}"
+                "https://${acsHost}/v1/images" | /tmp/jq --arg repo "${deployedRepo}" --arg digest "${deployedDigest}" "${jqFilter}"
         )"
         imageId=$(echo "${httpdImageJson}" | /tmp/jq .id)
-        if [ "${imageId}" != "" ]; then
-            cves=$(echo "${httpdImageJson}" | /tmp/jq .cves)
+        cves=$(echo "${httpdImageJson}" | /tmp/jq .cves)
+        # A matching record only proves ACS ingested the image once it carries
+        # both a real image id and a numeric CVE count: jq renders a missing
+        # field as the literal `null`, which is neither.  A completed scan
+        # with zero CVEs is accepted (0 is a number).
+        if [ "${imageId}" != "" ] && [ "${imageId}" != "null" ] && [ "${cves}" != "" ] && [ "${cves}" != "null" ]; then
             image=$(echo "${httpdImageJson}" | /tmp/jq .name)
             : "Success: Found ${cves} CVEs for image ${image}"
             isImageFound=true
