@@ -172,6 +172,308 @@ metadata:
 EOF
 }
 
+# Run a learn catalog setup operation, collecting best-effort diagnostics on failure.
+# Diagnostic errors must not replace the original operation's exit status.
+function run_learn_catalog_command() {
+    local status=0
+    "$@" || status=$?
+    if [[ ${status} -ne 0 ]]; then
+        echo "Learn catalog setup failed (exit ${status}); collecting diagnostics..."
+        oc -n openshift-marketplace describe "deployment/${CATALOGSOURCE_NAME}" || true
+        oc -n openshift-marketplace get pods -l "app=${CATALOGSOURCE_NAME}" || true
+        oc -n openshift-marketplace describe pods -l "app=${CATALOGSOURCE_NAME}" || true
+        oc -n openshift-marketplace get events --sort-by=.lastTimestamp || true
+        oc -n openshift-marketplace logs -l "app=${CATALOGSOURCE_NAME}" -c registry --tail=200 || true
+        oc -n openshift-marketplace logs -l "app=${CATALOGSOURCE_NAME}" -c registry --previous --tail=200 || true
+    fi
+    return "${status}"
+}
+
+# Serve the unchanged stage content together with pinned public learn bundles.
+# The additional FBC file is mounted only in this job's catalog pod.
+function create_catalog_source_with_learn() {
+    local index_image="$1"
+
+    cat <<'EOF' | run_learn_catalog_command oc apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: qe-app-registry-learn
+  namespace: openshift-marketplace
+data:
+  learn.yaml: |
+    ---
+    image: quay.io/olmqe/learn-operator-bundle@sha256:18538c4301b263f1b2fa3af6cf4159ce35e3c4b52cb951892f0ad8b251dbd4f5
+    name: learn-operator.v0.0.1
+    package: learn
+    properties:
+    - type: olm.gvk
+      value:
+        group: app.learn.com
+        kind: Learn
+        version: v1
+    - type: olm.package
+      value:
+        packageName: learn
+        version: 0.0.1
+    - type: olm.csv.metadata
+      value:
+        annotations:
+          alm-examples: "[\n  {\n    \"apiVersion\": \"app.learn.com/v1\",\n    \"kind\": \"Learn\",\n    \"metadata\": {\n      \"name\": \"example-learn\"\n    },\n    \"spec\": {\n      \"size\": 2\n    }\n  }\n]"
+          capabilities: Basic Install
+        apiServiceDefinitions: {}
+        crdDescriptions:
+          owned:
+          - description: An example to show how to make it managed by OLM
+            displayName: Jian's Learn Operator
+            kind: Learn
+            name: learns.app.learn.com
+            version: v1
+        description: An operator for testing.
+        displayName: Learn Operator
+        installModes:
+        - supported: true
+          type: OwnNamespace
+        - supported: true
+          type: SingleNamespace
+        - supported: true
+          type: MultiNamespace
+        - supported: true
+          type: AllNamespaces
+        maturity: alpha
+        provider:
+          name: OLM QE
+    relatedImages:
+    - image: quay.io/olmqe/learn-operator-bundle@sha256:18538c4301b263f1b2fa3af6cf4159ce35e3c4b52cb951892f0ad8b251dbd4f5
+      name: ''
+    - image: quay.io/olmqe/learn-operator@sha256:0f04654a7421ea5694a20958dc99c6685299f325a595911258a8daf2b301a686
+      name: ''
+    schema: olm.bundle
+    ---
+    entries:
+    - name: learn-operator.v0.0.1
+    - name: learn-operator.v0.0.2
+      replaces: learn-operator.v0.0.1
+    name: alpha
+    package: learn
+    schema: olm.channel
+    ---
+    image: quay.io/olmqe/learn-operator-bundle@sha256:e66036186481618dbb889e4d209c9b69010e3f7c193d9a9396939835e81ad328
+    name: learn-operator.v0.0.2
+    package: learn
+    properties:
+    - type: olm.gvk
+      value:
+        group: app.learn.com
+        kind: Learn
+        version: v1
+    - type: olm.package
+      value:
+        packageName: learn
+        version: 0.0.2
+    - type: olm.csv.metadata
+      value:
+        annotations:
+          alm-examples: "[\n  {\n    \"apiVersion\": \"app.learn.com/v1\",\n    \"kind\": \"Learn\",\n    \"metadata\": {\n      \"name\": \"example-learn\"\n    },\n    \"spec\": {\n      \"size\": 2\n    }\n  }\n]"
+          capabilities: Basic Install
+        apiServiceDefinitions: {}
+        crdDescriptions:
+          owned:
+          - description: An example to show how to make it managed by OLM
+            displayName: Jian's Learn Operator
+            kind: Learn
+            name: learns.app.learn.com
+            version: v1
+        description: An operator for testing.
+        displayName: Learn Operator
+        installModes:
+        - supported: true
+          type: OwnNamespace
+        - supported: true
+          type: SingleNamespace
+        - supported: true
+          type: MultiNamespace
+        - supported: true
+          type: AllNamespaces
+        maturity: alpha
+        provider:
+          name: OLM QE
+    relatedImages:
+    - image: quay.io/olmqe/learn-operator-bundle@sha256:e66036186481618dbb889e4d209c9b69010e3f7c193d9a9396939835e81ad328
+      name: ''
+    - image: quay.io/olmqe/learn-operator@sha256:0f04654a7421ea5694a20958dc99c6685299f325a595911258a8daf2b301a686
+      name: ''
+    schema: olm.bundle
+    ---
+    entries:
+    - name: learn-operator.v0.0.3
+      replaces: learn-operator.v0.0.2
+    name: beta
+    package: learn
+    schema: olm.channel
+    ---
+    defaultChannel: beta
+    name: learn
+    schema: olm.package
+    ---
+    image: quay.io/olmqe/learn-operator-bundle@sha256:af12543bbb247f607c20bd7d25b84bedea4e70635dfebcd116172ed2954b018f
+    name: learn-operator.v0.0.3
+    package: learn
+    properties:
+    - type: olm.gvk
+      value:
+        group: app.learn.com
+        kind: Learn
+        version: v1
+    - type: olm.package
+      value:
+        packageName: learn
+        version: 0.0.3
+    - type: olm.csv.metadata
+      value:
+        annotations:
+          alm-examples: "[\n  {\n    \"apiVersion\": \"app.learn.com/v1\",\n    \"kind\": \"Learn\",\n    \"metadata\": {\n      \"name\": \"example-learn\"\n    },\n    \"spec\": {\n      \"size\": 2\n    }\n  }\n]"
+          capabilities: Basic Install
+        apiServiceDefinitions: {}
+        crdDescriptions:
+          owned:
+          - description: An example to show how to make it managed by OLM
+            displayName: Jian's Learn Operator
+            kind: Learn
+            name: learns.app.learn.com
+            version: v1
+        description: An operator for testing.
+        displayName: Learn Operator
+        installModes:
+        - supported: true
+          type: OwnNamespace
+        - supported: true
+          type: SingleNamespace
+        - supported: true
+          type: MultiNamespace
+        - supported: true
+          type: AllNamespaces
+        maturity: alpha
+        provider:
+          name: OLM QE
+    relatedImages:
+    - image: quay.io/olmqe/learn-operator-bundle@sha256:af12543bbb247f607c20bd7d25b84bedea4e70635dfebcd116172ed2954b018f
+      name: ''
+    - image: quay.io/olmqe/learn-operator@sha256:0f04654a7421ea5694a20958dc99c6685299f325a595911258a8daf2b301a686
+      name: ''
+    schema: olm.bundle
+EOF
+
+    cat <<EOF | run_learn_catalog_command oc apply -f -
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${CATALOGSOURCE_NAME}
+  namespace: openshift-marketplace
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ${CATALOGSOURCE_NAME}
+  template:
+    metadata:
+      labels:
+        app: ${CATALOGSOURCE_NAME}
+        olm.catalogSource: ${CATALOGSOURCE_NAME}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: registry
+        image: ${index_image}
+        imagePullPolicy: Always
+        command: ["/bin/opm"]
+        args: ["serve", "/configs", "--cache-dir=/tmp/cache", "--cache-enforce-integrity=false"]
+        ports:
+        - name: grpc
+          containerPort: 50051
+        readinessProbe:
+          tcpSocket:
+            port: grpc
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 512Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - name: learn
+          mountPath: /configs/qe-learn.yaml
+          subPath: learn.yaml
+          readOnly: true
+        - name: cache
+          mountPath: /tmp
+      volumes:
+      - name: learn
+        configMap:
+          name: qe-app-registry-learn
+      - name: cache
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${CATALOGSOURCE_NAME}
+  namespace: openshift-marketplace
+spec:
+  selector:
+    app: ${CATALOGSOURCE_NAME}
+  ports:
+  - name: grpc
+    port: 50051
+    targetPort: grpc
+---
+# Address-based CatalogSources do not get OLM-managed network policies.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ${CATALOGSOURCE_NAME}-grpc-server
+  namespace: openshift-marketplace
+spec:
+  podSelector:
+    matchLabels:
+      app: ${CATALOGSOURCE_NAME}
+  policyTypes:
+  - Ingress
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: 50051
+EOF
+
+    # A restarted pod reloads the ConfigMap even when the image tag is unchanged.
+    run_learn_catalog_command oc -n openshift-marketplace rollout restart "deployment/${CATALOGSOURCE_NAME}"
+    run_learn_catalog_command oc -n openshift-marketplace rollout status "deployment/${CATALOGSOURCE_NAME}" --timeout=600s
+
+    cat <<EOF | run_learn_catalog_command oc create -f -
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: ${CATALOGSOURCE_NAME}
+  namespace: openshift-marketplace
+spec:
+  displayName: Stage FBC Operators and QE Learn
+  publisher: OpenShift QE
+  sourceType: grpc
+  address: ${CATALOGSOURCE_NAME}.openshift-marketplace.svc:50051
+EOF
+}
+
 function create_catalog_source() {
     local index_image="quay.io/openshift-art/stage-fbc-fragments:ocp-${OCP_MAJOR_MINOR}"
 
@@ -182,7 +484,10 @@ function create_catalog_source() {
     echo "Creating stage FBC catalogsource: ${CATALOGSOURCE_NAME}"
     echo "Using index image: ${index_image}"
 
-    if ! [[ ${OCP_MAJOR} -eq 4 && ${OCP_MINOR} -lt 15 ]]; then
+    if [[ "${ENABLE_LEARN_CATALOG:-false}" == "true" ]]; then
+        echo "Serving stage FBC content together with the public learn test operator"
+        create_catalog_source_with_learn "${index_image}"
+    elif ! [[ ${OCP_MAJOR} -eq 4 && ${OCP_MINOR} -lt 15 ]]; then
         echo "OCP 4.15+ — using FBC format with grpcPodConfig.extractContent"
         cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
