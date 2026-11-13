@@ -639,28 +639,58 @@ function copyArtifacts {
       { print }
     ' "${xml}" > "${xml}.tmp" && mv "${xml}.tmp" "${xml}" || rm -f "${xml}.tmp"
   done || true
-  # A passing testcase with a -retry<N>/ ATTACHMENT in <system-out> was retried; Prow's
-  # junit lens flags flaky only when a name+classname has both a passed and a failed entry,
-  # so tag it flaky and emit a matching failed twin. Idempotent; awk only.
+  # results.json marks a test that failed and then passed on retry as "flaky"; the
+  # JUnit file does not. Prow's junit lens flags flaky only when a name+classname has
+  # both a passed and a failed entry, so tag each flaky test's passing testcase and
+  # emit a matching failed twin. node lists them as hostname, classname and name,
+  # escaped as Playwright's junit reporter writes them: hostname is the project,
+  # classname the file, and name the describe titles and test title joined by " › ".
+  # Idempotent; best-effort.
+  local flaky_list
+  flaky_list="$(mktemp)" || true
+  node - "${ARTIFACT_DIR}/results.json" > "${flaky_list}" 2>/dev/null <<'NODE' || true
+const fs = require('fs');
+const esc = (s) => s.replace(/[&"'<>]/g, (c) => ({'&': '&amp;', '"': '&quot;', "'": '&apos;', '<': '&lt;', '>': '&gt;'}[c]));
+function walk(suite, file, titles) {
+  for (const spec of suite.specs || []) {
+    for (const t of spec.tests || []) {
+      if (t.status === 'flaky') console.log([t.projectName, file, [...titles, spec.title].join(' › ')].map(esc).join('\t'));
+    }
+  }
+  for (const child of suite.suites || []) walk(child, file, child.title ? [...titles, child.title] : titles);
+}
+for (const file of JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).suites || []) walk(file, file.title, []);
+NODE
   for xml in "${ARTIFACT_DIR}"/junit_*.xml; do
     [[ -f "${xml}" ]] || continue
-    awk '
+    awk -v list="${flaky_list}" '
+      BEGIN { while ((getline line < list) > 0) flaky[line] = 1 }
+      /<testsuite[ \t>]/ && !buffering {
+        host = ""
+        if (match($0, /[ \t]hostname="[^"]*"/)) {
+          host = substr($0, RSTART, RLENGTH); sub(/^[ \t]hostname="/, "", host); sub(/"$/, "", host)
+        }
+      }
       /<testcase/ && !buffering {
         buffering = 1; n = 0
-        isretry = 0; hasfailure = 0; hasflaky = 0; hasprops = 0; inserted = 0
-        insysout = 0; tag = ""; tagdone = 0; tagendidx = 0
+        hasfailure = 0; hasflaky = 0; hasprops = 0; inserted = 0
+        tag = ""; tagdone = 0; tagendidx = 0
       }
       buffering {
         buf[n++] = $0
         if (!tagdone) { tag = (tag == "" ? $0 : tag " " $0); if ($0 ~ />/) { tagdone = 1; tagendidx = n - 1 } }
-        if ($0 ~ /<system-out/) insysout = 1
-        if (insysout && $0 ~ /\[\[ATTACHMENT\|.*-retry[0-9]+\//) isretry = 1
-        if ($0 ~ /<\/system-out>/) insysout = 0
         if ($0 ~ /<failure/ || $0 ~ /<error/) hasfailure = 1
         if ($0 ~ /<property name="flaky"/) hasflaky = 1
         if ($0 ~ /<properties>/) hasprops = 1
         if ($0 ~ /<\/testcase>/) {
-          addflaky = (isretry && !hasfailure && !hasflaky)
+          name = ""; cls = ""
+          if (match(tag, /[ \t]name="[^"]*"/)) {
+            name = substr(tag, RSTART, RLENGTH); sub(/^[ \t]name="/, "", name); sub(/"$/, "", name)
+          }
+          if (match(tag, /[ \t]classname="[^"]*"/)) {
+            cls = substr(tag, RSTART, RLENGTH); sub(/^[ \t]classname="/, "", cls); sub(/"$/, "", cls)
+          }
+          addflaky = ((host "\t" cls "\t" name) in flaky && !hasfailure && !hasflaky)
           if (addflaky && hasprops) {
             for (i = 0; i < n; i++) {
               if (!inserted && buf[i] ~ /<\/properties>/) {
@@ -678,17 +708,8 @@ function copyArtifacts {
           } else {
             for (i = 0; i < n; i++) print buf[i]
           }
-          if (addflaky) {
-            name = ""; cls = ""
-            if (match(tag, /[ \t]name="[^"]*"/)) {
-              name = substr(tag, RSTART, RLENGTH); sub(/^[ \t]name="/, "", name); sub(/"$/, "", name)
-            }
-            if (match(tag, /[ \t]classname="[^"]*"/)) {
-              cls = substr(tag, RSTART, RLENGTH); sub(/^[ \t]classname="/, "", cls); sub(/"$/, "", cls)
-            }
-            if (name != "" && cls != "")
-              print "<testcase name=\"" name "\" classname=\"" cls "\" time=\"0\"><failure message=\"flaky: passed on retry\"></failure></testcase>"
-          }
+          if (addflaky)
+            print "<testcase name=\"" name "\" classname=\"" cls "\" time=\"0\"><failure message=\"flaky: passed on retry\"></failure></testcase>"
           buffering = 0
         }
         next
@@ -696,6 +717,7 @@ function copyArtifacts {
       { print }
     ' "${xml}" > "${xml}.tmp" && mv "${xml}.tmp" "${xml}" || rm -f "${xml}.tmp"
   done || true
+  rm -f "${flaky_list}"
   # results.json and the JUnit files carry the same call logs as stdout.
   for f in "${ARTIFACT_DIR}"/results.json "${ARTIFACT_DIR}"/junit_*.xml; do
     [[ -f "${f}" ]] || continue
