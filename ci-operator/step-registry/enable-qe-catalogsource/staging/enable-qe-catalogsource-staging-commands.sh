@@ -243,7 +243,6 @@ data:
         maturity: alpha
         provider:
           name: OLM QE
-          url: https://github.com/jianzhangbjz/learn-operator
     relatedImages:
     - image: quay.io/olmqe/learn-operator-bundle@sha256:18538c4301b263f1b2fa3af6cf4159ce35e3c4b52cb951892f0ad8b251dbd4f5
       name: ''
@@ -299,7 +298,6 @@ data:
         maturity: alpha
         provider:
           name: OLM QE
-          url: https://github.com/jianzhangbjz/learn-operator
     relatedImages:
     - image: quay.io/olmqe/learn-operator-bundle@sha256:e66036186481618dbb889e4d209c9b69010e3f7c193d9a9396939835e81ad328
       name: ''
@@ -358,7 +356,6 @@ data:
         maturity: alpha
         provider:
           name: OLM QE
-          url: https://github.com/jianzhangbjz/learn-operator
     relatedImages:
     - image: quay.io/olmqe/learn-operator-bundle@sha256:af12543bbb247f607c20bd7d25b84bedea4e70635dfebcd116172ed2954b018f
       name: ''
