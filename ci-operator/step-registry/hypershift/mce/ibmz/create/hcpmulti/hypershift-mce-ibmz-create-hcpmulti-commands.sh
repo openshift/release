@@ -183,30 +183,12 @@ oc --kubeconfig "${VIRT_KC}" config set-cluster "${CLSTR_NAME}" \
   --insecure-skip-tls-verify=true
 echo "$(date) Patched nested_kubeconfig server → https://${MGMT_HOST_IP}:${NODEPORT}"
 
-# --- Verify the fixed NodePort is reachable via the LPAR haproxy ---
-echo "$(date) Probing kube-apiserver via LPAR haproxy at ${MGMT_HOST_IP}:${NODEPORT}"
-for i in {1..10}; do
-  READYZ=$(curl -sk --connect-timeout 5 "https://${MGMT_HOST_IP}:${NODEPORT}/readyz" 2>/dev/null || true)
-  echo "$(date) [probe ${i}/10] /readyz: ${READYZ}"
-  [[ "${READYZ}" == "ok" ]] && break
-  sleep 10
-done
-
 echo "$(date) Nodepool status........"
 oc get np -A || true
 oc describe np -A || true
 
 wait_for_nodes() {
   local retries=0
-
-  # --- Check kube-apiserver reachability via /readyz before polling nodes ---
-  READYZ_RESPONSE=$(curl -sk "https://${MGMT_HOST_IP}:${NODEPORT}/readyz" 2>&1 || true)
-  echo "$(date) /readyz response: ${READYZ_RESPONSE}"
-  if [[ "${READYZ_RESPONSE}" == "ok" ]]; then
-    echo "$(date) kube-apiserver is reachable and ready"
-  else
-    echo "$(date) WARNING: kube-apiserver /readyz did not return 'ok' — API may not be reachable yet"
-  fi
 
   while [[ ${retries} -lt ${MAX_RETRIES} ]]; do
     # --- Per-retry reachability check ---
@@ -421,7 +403,4 @@ oc get deploy,statefulset -n ${HC_NS}-${HC_NAME} \
   --kubeconfig="${SHARED_DIR}/kubeconfig" \
   -o custom-columns='KIND:.kind,NAME:.metadata.name,CPU:.spec.template.spec.containers[0].resources.requests.cpu,MEM:.spec.template.spec.containers[0].resources.requests.memory' || true
 
-oc adm top pods -n ${HC_NS}-${HC_NAME} || true 
-
-# --- Step 10: Switch KUBECONFIG to the guest cluster for downstream conformance steps ---
-export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+oc adm top pods -n ${HC_NS}-${HC_NAME} || true
