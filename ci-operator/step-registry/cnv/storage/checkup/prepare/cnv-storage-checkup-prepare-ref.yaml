@@ -1,0 +1,40 @@
+ref:
+  as: cnv-storage-checkup-prepare
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  cli: latest
+  commands: cnv-storage-checkup-prepare-commands.sh
+  timeout: 1h0m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  env:
+  - name: CHECKUP_CNV_NAMESPACE
+    default: openshift-cnv
+    documentation: Namespace containing the installed CNV operator and HyperConverged resource.
+  - name: CHECKUP_CNV_SUBSCRIPTION
+    default: hco-operatorhub
+    documentation: Subscription whose installed CSV supplies the product checkup image.
+  - name: CHECKUP_EXPECTED_CNV_VERSION
+    default: ""
+    documentation: Optional exact installed CSV version to require; the discovered version is always recorded.
+  - name: CHECKUP_STORAGE_CLASS
+    default: ""
+    documentation: Storage class to check; empty selects the virtualization default, then the Kubernetes default.
+  - name: CHECKUP_EXPECTED_PROVISIONER
+    default: ""
+    documentation: Optional exact provisioner to require for the selected storage class.
+  - name: CHECKUP_GOLDEN_IMAGES_NAMESPACE
+    default: openshift-virtualization-os-images
+    documentation: Namespace whose CNV-managed DataImportCrons and DataSources must become ready.
+  - name: CHECKUP_PREPARE_TIMEOUT_SECONDS
+    default: "3000"
+    documentation: Readiness polling budget in seconds (1-3300), leaving time for final API calls within the one-hour step.
+  documentation: |-
+    Wait for installed CNV, schedulable nodes with KVM, the selected StorageProfile,
+    and CNV-managed boot sources. Resolve the shipped checkup image from the
+    installed CSV and save the run context in SHARED_DIR. Storage installation
+    and default-class configuration belong to the calling workflow.

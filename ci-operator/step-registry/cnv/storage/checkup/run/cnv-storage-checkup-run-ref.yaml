@@ -1,0 +1,159 @@
+ref:
+  as: cnv-storage-checkup-run
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  cli: latest
+  commands: cnv-storage-checkup-run-commands.sh
+  timeout: 40m0s
+  grace_period: 1m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  env:
+  - name: CHECKUP_TIMEOUT
+    default: 10m
+    documentation: Positive duration using h, m, or s, passed through spec.timeout; must be shorter than the Job deadline.
+  - name: CHECKUP_VMI_TIMEOUT
+    default: 3m
+    documentation: Positive duration using h, m, or s for VMI operations; must be shorter than CHECKUP_TIMEOUT.
+  - name: CHECKUP_NUM_VMS
+    default: "10"
+    documentation: Number of concurrent VMs; workers need capacity for their memory and virtualization overhead.
+  - name: CHECKUP_SKIP_TEARDOWN
+    default: onfailure
+    documentation: Product teardown mode (never, onfailure, or always); the post step always removes the run namespace.
+  - name: CHECKUP_JOB_TIMEOUT_SECONDS
+    default: "900"
+    documentation: Job deadline in seconds (1-2100), longer than CHECKUP_TIMEOUT; the step reserves five more minutes for setup and reporting at the maximum deadline.
+  - name: CHECKUP_EXPECTED_RESULTS
+    default: '{}'
+    documentation: |-
+      Optional JSON object mapping status.result field names to required regular
+      expressions, for example {"vmLiveMigration":"migration completed"}.
+      Configure backend-specific requirements here rather than branching the script.
+  - name: CHECKUP_NAMESPACE_MANIFEST
+    default: |-
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        generateName: cnv-storage-checkup-
+        labels:
+          ci.openshift.io/storage-checkup: "true"
+    documentation: Namespace manifest used for each checkup run.
+  - name: CHECKUP_RBAC_MANIFEST
+    default: |-
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata:
+        name: storage-checkup-sa
+        namespace: __NAMESPACE__
+      ---
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: Role
+      metadata:
+        name: storage-checkup
+        namespace: __NAMESPACE__
+      rules:
+      - apiGroups: [""]
+        resources: [configmaps]
+        verbs: [get, update]
+      - apiGroups: [kubevirt.io]
+        resources: [virtualmachines]
+        verbs: [create, delete, get, patch]
+      - apiGroups: [kubevirt.io]
+        resources: [virtualmachineinstances]
+        verbs: [get]
+      - apiGroups: [subresources.kubevirt.io]
+        resources: [virtualmachineinstances/addvolume, virtualmachineinstances/removevolume, virtualmachines/stop]
+        verbs: [update]
+      - apiGroups: [kubevirt.io]
+        resources: [virtualmachineinstancemigrations]
+        verbs: [create]
+      - apiGroups: [cdi.kubevirt.io]
+        resources: [datavolumes]
+        verbs: [create, delete]
+      - apiGroups: [""]
+        resources: [persistentvolumeclaims]
+        verbs: [delete]
+      - apiGroups: [snapshot.kubevirt.io]
+        resources: [virtualmachinesnapshots, virtualmachinerestores]
+        verbs: [create, get, delete]
+      ---
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: storage-checkup
+        namespace: __NAMESPACE__
+      subjects:
+      - kind: ServiceAccount
+        name: storage-checkup-sa
+        namespace: __NAMESPACE__
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: Role
+        name: storage-checkup
+      ---
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: ClusterRoleBinding
+      metadata:
+        name: __NAMESPACE__-reader
+      subjects:
+      - kind: ServiceAccount
+        name: storage-checkup-sa
+        namespace: __NAMESPACE__
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: cluster-reader
+    documentation: Namespaced permissions and run-specific cluster-reader binding; __NAMESPACE__ is substituted at runtime.
+  - name: CHECKUP_CONFIGMAP_MANIFEST
+    default: |-
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: storage-checkup-config
+        namespace: __NAMESPACE__
+      data:
+        spec.timeout: "__CHECKUP_TIMEOUT__"
+        spec.param.storageClass: "__STORAGE_CLASS__"
+        spec.param.vmiTimeout: "__CHECKUP_VMI_TIMEOUT__"
+        spec.param.numOfVMs: "__CHECKUP_NUM_VMS__"
+        spec.param.skipTeardown: "__CHECKUP_SKIP_TEARDOWN__"
+    documentation: Product checkup ConfigMap; placeholders are replaced from the run configuration and discovered storage class.
+  - name: CHECKUP_JOB_MANIFEST
+    default: |-
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: storage-checkup
+        namespace: __NAMESPACE__
+      spec:
+        backoffLimit: 0
+        activeDeadlineSeconds: __CHECKUP_JOB_TIMEOUT_SECONDS__
+        template:
+          spec:
+            serviceAccountName: storage-checkup-sa
+            restartPolicy: Never
+            containers:
+            - name: storage-checkup
+              image: "__CHECKUP_IMAGE__"
+              imagePullPolicy: Always
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+              env:
+              - name: CONFIGMAP_NAMESPACE
+                value: __NAMESPACE__
+              - name: CONFIGMAP_NAME
+                value: storage-checkup-config
+    documentation: Kubernetes Job for the checkup image discovered from the installed CNV CSV.
+  documentation: |-
+    Execute the storage checkup shipped with installed CNV in a unique namespace.
+    Require successful completion and non-skipped provisioning, VM boot, clone,
+    hotplug, and concurrent boot results. Preserve capability-dependent results
+    and apply optional expectations, then publish the result ConfigMap, a JSON
+    summary with runtime image IDs, and per-check JUnit with explicit skip reasons.

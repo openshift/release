@@ -1,0 +1,22 @@
+workflow:
+  as: cnv-storage-checkup-gcp
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: ipi-conf-cpu-manager
+    - chain: ipi-gcp-pre
+    - ref: cnv-deploy-cnv
+    - ref: cnv-storage-checkup-prepare
+    test:
+    - ref: cnv-storage-checkup-run
+    post:
+    - ref: cnv-storage-checkup-gather
+    - chain: ipi-gcp-post
+  documentation: |-
+    Provision OCP on GCP, install CNV, and run its shipped storage checkup
+    through shared preparation, execution, and collection steps. The caller
+    supplies a GCP cluster_profile, OCP release, CNV catalog/channel inputs,
+    and nested-virtualization-capable worker sizing. Preparation verifies
+    schedulable KVM capacity. Select a GCP PD CSI StorageClass and assert its
+    provisioner in the calling job. Post steps collect diagnostics before
+    deleting the checkup resources and OCP cluster.

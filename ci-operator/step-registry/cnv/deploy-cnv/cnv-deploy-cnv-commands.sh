@@ -28,6 +28,12 @@ trap wait_for_manual_debug ERR
 create_cnv_catalog_source() {
   local catalog_source_name=${1}
   local catalog_image=${2}
+  # Invalid input must exit directly instead of entering the manual debug pause.
+  # In particular, the string "null" becomes an unset image in the YAML below.
+  if [[ -z ${catalog_image} || ${catalog_image} == "null" || ${catalog_image} =~ [[:space:]] ]]; then
+    echo "Error: CNV_CATALOG_IMAGE must be a non-empty image pullspec, not null or whitespace" >&2
+    exit 1
+  fi
   (tee "${ARTIFACT_DIR}/${catalog_source_name}.yaml" | oc apply -o yaml -f -) <<__EOF__
     apiVersion: operators.coreos.com/v1alpha1
     kind: CatalogSource
@@ -77,8 +83,11 @@ __EOF__
 resolve_iib_from_map () {
     local iib_map_file_url="https://raw.githubusercontent.com/openshift-cnv/cnv-ci/refs/heads/master/version-mapping.json"
     local result
-    result=$(curl -sL "${iib_map_file_url}" \
-      | jq --arg version "${CNV_VERSION}" -r '.[$version].index_image // empty') || true
+    result=$(curl -fsSL "${iib_map_file_url}" \
+      | jq --arg version "${CNV_VERSION}" -er '
+          .[$version].index_image | strings |
+          select(length > 0 and . != "null" and (test("\\s") | not))
+        ') || true
     echo "${result}"
 }
 
@@ -109,7 +118,7 @@ fi
 if [[ -z ${CNV_CATALOG_IMAGE} && -n ${CNV_CATALOG_SOURCE} && ${CNV_CATALOG_SOURCE} == "${CNV_IIB_CATALOG_NAME}" ]]; then
     CNV_CATALOG_IMAGE=$(resolve_iib_from_map)
     if [[ -z ${CNV_CATALOG_IMAGE} ]]; then
-        echo "Error: Failed to resolve IIB image for version ${CNV_VERSION}"
+        echo "Error: Failed to resolve a valid IIB image for version ${CNV_VERSION} from version-mapping.json; supply a valid CNV_CATALOG_IMAGE or repair the mapping" >&2
         exit 1
     fi
     echo "Resolved IIB image for version ${CNV_VERSION}: ${CNV_CATALOG_IMAGE}"
