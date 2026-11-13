@@ -181,8 +181,9 @@ export SENTINEL_IMAGE_REPO="${SENTINEL_IMAGE_REPO:-ci/hyperfleet-sentinel}"
 export SENTINEL_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_SENTINEL_IMAGE_TAG:-latest}"
 export APPLIER_IMAGE_TAG="${MULTISTAGE_PARAM_OVERRIDE_APPLIER_IMAGE_TAG:-latest}"
 
-# Configure authentication mode for HyperFleet.
+# Configure authentication and tenant isolation for HyperFleet.
 export AUTH_MODE="${AUTH_MODE:-EDGE+API}"
+export TENANT_ISOLATION_ENABLED=true
 export OIDC_ISSUER_MODE="${OIDC_ISSUER_MODE:-mock}"
 echo "${AUTH_MODE}" > "${SHARED_DIR}/auth_mode"
 
@@ -212,6 +213,13 @@ NAMESPACE=${NAMESPACE_NAME} HELMFILE_ENV="${HELMFILE_ENV}" make install-hyperfle
 HELMFILE_JSON="${SHARED_DIR}/helm-release-${NAMESPACE_NAME}.json"
 NAMESPACE="${NAMESPACE_NAME}" \
   helmfile -f helmfile/helmfile.yaml.gotmpl list -e "${HELMFILE_ENV}" --output json > "${HELMFILE_JSON}"
+
+log "Verifying tenant isolation is enabled in the deployed API"
+if ! helm get values hyperfleet-api --all --namespace "${NAMESPACE_NAME}" --output json | \
+    jq -e '.config.server.tenant.enabled == true' >/dev/null; then
+  log "ERROR: hyperfleet-api was deployed without config.server.tenant.enabled=true"
+  exit 1
+fi
 
 # Verify deployed components
 log "=== Checking all deployed resources ==="
