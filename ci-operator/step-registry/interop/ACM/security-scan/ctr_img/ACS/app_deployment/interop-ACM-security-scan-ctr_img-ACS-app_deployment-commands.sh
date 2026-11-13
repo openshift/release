@@ -151,10 +151,10 @@ function RunTestCase1 () {
     cd policy-collection/deploy/ || return 1
     echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp || return 1
 
-    sleep 60
-
-    # Verify e2e-opp namespace was created
-    oc get namespace e2e-opp || return 1
+    # Wait for the e2e-opp namespace the policy deployment creates
+    # (Best Practices: `oc wait --for=create` instead of a fixed sleep;
+    # plain condition waits fail fast on NotFound).
+    oc wait namespace/e2e-opp --for=create --timeout=5m || return 1
 
     # RunTestCase1 executes under an if condition, so errexit is suspended
     # here: every failure must return explicitly.

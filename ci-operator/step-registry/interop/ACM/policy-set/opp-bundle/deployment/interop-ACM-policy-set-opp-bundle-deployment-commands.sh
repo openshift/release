@@ -25,18 +25,11 @@ done
 # without triggering policy remediation.
 PinSubscriptionChannel () {
   typeset subNamespace="${1}" subName="${2}" channel="${3}"
-  # Wait through oc wait (Best Practices).  oc wait does not wait for
-  # not-yet-created objects (it fails fast on NotFound), so retry it until
-  # the subscription appears.
-  typeset -i pinWaitMax=600
-  SECONDS=0
-  while ((SECONDS < pinWaitMax)); do
-    oc wait "subscription/${subName}" -n "${subNamespace}" \
-      --for jsonpath='{.metadata.name}'="${subName}" \
-      --timeout 10s 1>/dev/null && break
-    sleep 5
-  done
-  if ((SECONDS >= pinWaitMax)); then
+  # Best Practices: wait with `oc wait --for=create` (plain condition
+  # waits fail fast on NotFound, so the object must be awaited for
+  # creation first); then pin the channel on the existing subscription.
+  if ! oc wait "subscription/${subName}" -n "${subNamespace}" \
+      --for=create --timeout=600s 1>/dev/null; then
     printf '%s\n' "Error: subscription ${subNamespace}/${subName} not found after 10 minutes; cannot pin channel ${channel}" >&2
     return 1
   fi
@@ -73,19 +66,10 @@ done
 # causing stackrox-opp-readiness to timeout.  Best effort: if the placement
 # shape differs or the appsub resync restores the predicate, behaviour falls
 # back to the upstream default.
-typeset isPlacementFound=false
-typeset -i placementWaitMax=300
-SECONDS=0
-while ((SECONDS < placementWaitMax)); do
-  if oc wait "placement/placement-openshift-plus-clusters" -n policies \
-    --for jsonpath='{.metadata.name}'=placement-openshift-plus-clusters \
-    --timeout 10s 1>/dev/null; then
-    isPlacementFound=true
-    break
-  fi
-  sleep 5
-done
-if [[ "${isPlacementFound}" == true ]]; then
+# Best Practices: wait with `oc wait --for=create` instead of a polling
+# loop (plain condition waits fail fast on NotFound).
+if oc wait "placement/placement-openshift-plus-clusters" -n policies \
+    --for=create --timeout=300s 1>/dev/null; then
   oc patch placement placement-openshift-plus-clusters -n policies --type json \
     -p '[{"op":"test","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1/key","value":"local-cluster"},{"op":"remove","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1"}]' \
     || printf '%s\n' "Warning: could not remove local-cluster NotIn predicate from placement (continuing with upstream default)" >&2
