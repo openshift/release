@@ -1,75 +1,85 @@
 # TRT Agentic Solve Architecture
 
-This directory defines reusable CI-operator workflows that turn a Jira issue
-into a pull request and continue working on that pull request when review or
-required-CI feedback arrives. Repository-specific CI configurations supply the
-target repository, fork, development environment, setup command, and allowed
-tools; the step registry supplies the common solve and follow-up behavior.
-
-The workflows run in Prow. Request intake, selection of a repository job, and
-detection of feedback after a workflow has finished are external orchestration
-concerns and are intentionally outside this document.
+The agentic solve workflow has two cooperating layers. Chai (ship-help-bot)
+orchestrates a solve from the user's request through pull-request completion.
+Prow and ci-operator run the repository-specific work that creates or updates
+the pull request. Keeping those responsibilities separate lets Chai manage the
+long-lived conversation and PR lifecycle while each CI job remains bounded.
 
 ## System overview
 
 ```mermaid
 flowchart TD
-    IR["Initial request<br/>Jira key and optional model override"]
-    FR["Later feedback signal<br/>actionable review or newly failing required CI"]
-    SJ["Repository solve Prow job"]
-    FJ["Repository follow-up Prow job"]
+    U["User asks Chai to solve a Jira issue"]
+
+    subgraph Chai["Chai / ship-help-bot orchestration"]
+        A["Validate the request and select<br/>the configured repository solve job"]
+        B["Launch the initial Prow job through Gangway<br/>and track the solve request"]
+        T["Monitor job status and discover<br/>the upstream pull request"]
+        N["Notify the user and move<br/>the Jira issue to review"]
+        W["Continue tracking the pull request"]
+        Q{"Pull-request event?"}
+        F["Launch the configured follow-up job<br/>through Gangway and track it"]
+        Z["PR merged or closed<br/>complete tracking and clean up"]
+
+        A --> B --> T --> N --> W --> Q
+        Q -->|"merged or closed"| Z
+        Q -->|"actionable review or<br/>newly failing required CI"| F
+    end
 
     subgraph Prow["Prow / ci-operator execution"]
         IMG["Repository-specific agentic-dev image<br/>project environment + source + agent helpers"]
+        I["Initial solve workflow<br/>authenticate and initialize → solve and validate →<br/>pipeline publishes fork branch and creates PR"]
+        L["Later follow-up workflow<br/>authenticate and initialize → locate existing PR →<br/>verify and check out exact PR head"]
+        G["Shared review-responder<br/>read-only gate routes actionable comments<br/>or required-CI work to dedicated workers"]
+        P["Pipeline revalidates and updates only<br/>the configured fork; metrics go to job artifacts"]
 
-        subgraph Initial["Initial solve workflow"]
-            I["GitHub App auth → model/harness init → issue init"]
-            S["jira-solver<br/>set up repository, implement, validate, commit locally"]
-            C["Pipeline checks the result,<br/>pushes the fork branch, and creates the PR"]
-            I --> S --> C
-        end
-
-        subgraph Later["Later follow-up workflow"]
-            F["GitHub App auth → model/harness init → issue init"]
-            L["pr-followup<br/>locate the existing PR and fork branch"]
-            H["Verify and check out the exact PR head"]
-            F --> L --> H
-        end
-
-        subgraph Response["Shared review-responder"]
-            G{"Read-only gate:<br/>actionable work?"}
-            RC["Review worker<br/>address actionable comments"]
-            CI["CI worker<br/>triage required failures, fix PR-caused failures,<br/>rebase when requested, or request Prow retests"]
-            P["Pipeline revalidates the PR head<br/>and updates only the configured fork branch"]
-            M["emit-metrics<br/>phase and session results to job artifacts"]
-            G -->|"review comments"| RC --> P --> G
-            G -->|"required CI failure<br/>(optional Prow jobs excluded)"| CI --> P
-            G -->|"quiet polling window"| M
-        end
+        IMG -.->|"runtime"| I
+        IMG -.->|"runtime"| L
+        I --> G
+        L --> G
+        G --> P
     end
 
     PR[("Upstream pull request")]
-    D["Workflow complete"]
 
-    IR --> SJ --> I
-    FR --> FJ --> F
-    IMG -.->|"runtime"| I
-    IMG -.->|"runtime"| F
-    C --> PR
-    C --> G
-    H --> G
+    U --> A
+    B -->|"Gangway"| I
+    I --> PR
+    PR -.->|"discovered"| T
+    F -->|"Gangway"| L
     P --> PR
-    G -.->|"reads comments and checks"| PR
-    M --> D
+    PR -.->|"comments and required checks;<br/>optional Prow jobs excluded"| G
+    P -.->|"job completes"| W
 ```
 
-Both production workflows converge on the same review responder. The initial
-workflow creates a PR and watches its first review/CI window. A later follow-up
-workflow reopens that loop for an existing PR; it does not create another PR.
-The diagram therefore has one workflow terminal and does not conflate it with
-any state an external orchestrator may persist.
+The diagram shows one end-to-end lifecycle and one terminal outcome for Chai's
+tracking. The initial and follow-up Prow workflows both converge on the same
+review responder, but finishing a bounded CI job does not finish Chai's
+long-lived tracking. Chai continues until the pull request is merged or closed.
 
 ## Component responsibilities
+
+### Chai orchestration
+
+- **Request tools** accept the solve request, validate the Jira issue, and use
+  repository configuration to select the solve job, follow-up job, and fork.
+- **Solve tracking and monitoring** record the active request, monitor the Prow
+  job, discover its pull request, and continue tracking that PR after the
+  initial job exits.
+- **GitHub and Jira integration** inspect PR state and feedback, move the Jira
+  issue to review when the PR is ready, and notify the user when work is ready
+  for review or when an initial job fails.
+- **Follow-up orchestration** starts another bounded Prow job when a new
+  actionable review comment or newly failing required check needs attention.
+  Optional Prow jobs are not treated as required-CI signals. When the PR merges
+  or closes, Chai completes tracking and cleans up the active request.
+
+These are the stable responsibilities of the orchestration layer. Storage
+details, polling intervals, and other operational defaults are intentionally
+omitted from this overview.
+
+### Prow and ci-operator execution
 
 - **Repository job configuration** builds `agentic-dev` from the repository's
   development image, checked-out source, nested-container support, and shared
@@ -86,8 +96,8 @@ any state an external orchestrator may persist.
   surrounding script verifies that a committed change exists, pushes only to
   the configured fork, and opens the upstream PR.
 - **`pr-followup`** finds the PR associated with the issue and prepares its fork
-  branch. It is the entry point for feedback that arrives after an earlier
-  workflow has ended.
+  branch. It is the runner entry point for feedback that arrives after an
+  earlier workflow has ended.
 - **`review-responder`** uses a read-only gate to separate actionable review
   comments from required-CI work. Dedicated workers address comments or triage
   CI; the pipeline, rather than the worker, owns branch publication. Rebase
@@ -101,26 +111,31 @@ any state an external orchestrator may persist.
 
 ### Initial work
 
-The repository jobs are defined as yearly periodics so they are available for
-on-demand execution rather than a frequent schedule. Their Jira-key and model
-inputs accept Gangway environment overrides.
+The repository jobs are defined as yearly periodics so Chai can launch them on
+demand rather than on a frequent schedule. Their Jira-key and model inputs
+accept Gangway environment overrides.
 
-1. `github-app-auth`, `init-model`, and `init` prepare authentication, select
-   the agent harness, and fetch issue context.
-2. `jira-solver` runs the target repository's setup, combines the common solve
+1. Chai validates the request, selects the configured repository job, launches
+   it through Gangway with the Jira issue key, and begins tracking it.
+2. In Prow, `github-app-auth`, `init-model`, and `init` prepare authentication,
+   select the agent harness, and fetch issue context.
+3. `jira-solver` runs the target repository's setup, combines the common solve
    process with repository guidance, and invokes the agent. No separate
    planning workflow is defined in this registry.
-3. The agent leaves a local commit. Pipeline code validates the branch and
+4. The agent leaves a local commit. Pipeline code validates the branch and
    worktree, pushes the configured fork branch, and creates the upstream PR.
-4. `review-responder` watches the new PR for an initial window, processes
-   actionable comments and required-CI failures, and publishes guarded updates.
-5. `emit-metrics` records the solve and review phases when the workflow exits.
+5. Chai discovers the PR, notifies the user, moves the Jira issue to review,
+   and keeps tracking the PR after the initial job completes.
+6. Within the initial CI job, `review-responder` watches the new PR for a
+   bounded review/CI window and `emit-metrics` records the solve and review
+   phases when the workflow exits.
 
 ### Later feedback
 
-External orchestration may start the follow-up job when a new actionable review
-comment or a newly failing required check appears after the initial job. The
-required-CI signal excludes optional Prow jobs.
+While tracking the PR, Chai looks for new actionable review comments and newly
+failing required CI. Optional Prow jobs are excluded. When either signal
+appears, Chai launches the configured follow-up job through Gangway and tracks
+that job to completion.
 
 The follow-up workflow repeats authentication and initialization, uses
 `pr-followup` to locate the existing PR, then runs the same review responder.
@@ -128,10 +143,14 @@ Before a worker runs, the responder verifies the PR head repository, branch,
 and SHA and checks out that exact commit. After a worker finishes, the pipeline
 revalidates those boundaries before updating the configured fork ref. A
 history-rewriting rebase is published only with a force-with-lease tied to the
-previously observed head.
+previously observed head. When the bounded job ends, Chai resumes PR tracking;
+it completes the solve only when the PR is merged or closed.
 
 ## Execution and authentication boundaries
 
+- Chai decides when and which configured job to launch, tracks job and PR
+  lifecycle, and owns user and Jira notifications. It does not implement the
+  repository change inside the bot process.
 - Prow supplies credentials as mounted inputs. The auth step exchanges the
   GitHub App credential for installation tokens and shares only the files that
   downstream steps need.
