@@ -1,0 +1,72 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.27
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: workload-availability-operator
+operator:
+  bundles:
+  - dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/medik8s/workload-availability-operator:v0.1.0
+    with: workload-availability-operator
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 500Mi
+tests:
+- as: install-wao-nmo-daily-aws
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_DUMP_FAILED_TESTS: "true"
+      ECO_TEST_FEATURES: nmo-operator
+      ECO_TEST_LABELS: '!component:olm'
+      ECO_TEST_VERBOSE: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      OO_PACKAGE: workload-availability-operator
+      OO_TARGET_NAMESPACES: '!all'
+      WORKLOAD_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    test:
+    - as: e2e-nmo
+      cli: latest
+      commands: |
+        make e2e-tests
+      env:
+      - name: ECO_DUMP_FAILED_TESTS
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: WORKLOAD_IMAGE
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 2h0m0s
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: wao
+  org: medik8s
+  repo: workload-availability-operator
+  variant: "5.0"
