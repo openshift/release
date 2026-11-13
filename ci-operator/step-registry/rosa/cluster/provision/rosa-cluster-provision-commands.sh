@@ -778,7 +778,9 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   SHARED_VPC_HOSTED_ZONE_ID=$(head -n 1 "${SHARED_DIR}/hosted_zone_id")
   SHARED_VPC_ROLE_ARN=$(head -n 1 "${SHARED_DIR}/hosted_zone_role_arn")
   SHARED_VPC_BASE_DOMAIN=$(head -n 1 "${SHARED_DIR}/rosa_dns_domain")
-  SHARED_VPC_SWITCH="--base-domain ${SHARED_VPC_BASE_DOMAIN} --private-hosted-zone-id ${SHARED_VPC_HOSTED_ZONE_ID} --shared-vpc-role-arn ${SHARED_VPC_ROLE_ARN}"
+  # --ingress-private-hosted-zone-id and --route53-role-arn replace the
+  # deprecated --private-hosted-zone-id and --shared-vpc-role-arn flags.
+  SHARED_VPC_SWITCH="--base-domain ${SHARED_VPC_BASE_DOMAIN} --ingress-private-hosted-zone-id ${SHARED_VPC_HOSTED_ZONE_ID} --route53-role-arn ${SHARED_VPC_ROLE_ARN}"
 
   record_cluster "aws.sts" "private_hosted_zone_id" ${SHARED_VPC_HOSTED_ZONE_ID}
   record_cluster "aws.sts" "private_hosted_zone_role_arn" ${SHARED_VPC_ROLE_ARN}
