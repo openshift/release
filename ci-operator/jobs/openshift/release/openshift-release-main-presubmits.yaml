@@ -285,6 +285,43 @@ presubmits:
     branches:
     - ^main$
     - ^main-
+    cluster: build02
+    context: ci/prow/classic-idp-parser
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - ./ci-operator/step-registry/rosa/e2e/collect-cs-telemetry
+      - ./hack/classic-idp-telemetry
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-classic-idp-parser
+    rerun_command: /test classic-idp-parser
+    run_if_changed: ^(hack/classic-idp-telemetry/.*|ci-operator/step-registry/rosa/e2e/collect-cs-telemetry/.*)$
+    spec:
+      containers:
+      - args:
+        - -m
+        - unittest
+        - discover
+        - -s
+        - hack/classic-idp-telemetry
+        - -p
+        - '*_test.py'
+        - -v
+        command:
+        - python3
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )classic-idp-parser,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
     cluster: core-ci
     context: ci/prow/cluster-manifest-verifier
     decorate: true
