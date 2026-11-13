@@ -1755,6 +1755,28 @@ tests:
       CONTROL_PLANE_AMI: ami-0b78302f83217d149
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-ovn-nested-virtualization-techpreview
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: openshift-org-aws
+    env:
+      COMPUTE_MACHINE_MANAGEMENT: ClusterAPI
+      COMPUTE_NESTED_VIRTUALIZATION: Enabled
+      COMPUTE_NODE_TYPE: m8i.2xlarge
+      FEATURE_SET: TechPreviewNoUpgrade
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - chain: aws-provision-iam-user-minimal-permission
+    - chain: ipi-install
+    - ref: ipi-aws-describe
+    test:
+    - ref: aws-verify-nested-virtualization
+    - ref: openshift-e2e-test
 zz_generated_metadata:
   branch: release-5.1
   org: openshift
