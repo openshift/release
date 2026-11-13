@@ -155,15 +155,16 @@ function RunTestCase1 () {
     # 60s sleep, so the build trigger hit a missing buildconfig). Wait for
     # both within one bounded budget instead of racing a fixed sleep.
     typeset -i remediationDeadline=$(( $(date +%s) + 600 ))
-    until oc get namespace e2e-opp >/dev/null 2>&1; do
-        if (( $(date +%s) >= remediationDeadline )); then
-            : "ERROR: e2e-opp namespace was not created within 10m of deploy"
-            : "=== Policy Status ==="
-            oc get policies -n policies | sed -n '/example/p' || true
-            return 1
-        fi
-        sleep 15
-    done
+    # Best Practices: oc wait --for=create for a not-yet-created object
+    # (an existence poll with sleep is the fixed-sleep violation). Both
+    # waits below charge the one shared deadline.
+    typeset -i _waitBudget=$(( remediationDeadline - $(date +%s) ))
+    if ! oc wait namespace/e2e-opp --for=create --timeout="${_waitBudget}s"; then
+        : "ERROR: e2e-opp namespace was not created within 10m of deploy"
+        : "=== Policy Status ==="
+        oc get policies -n policies | sed -n '/example/p' || true
+        return 1
+    fi
 
     oc label managedcluster local-cluster oppapps=httpd-example --overwrite
 
@@ -175,15 +176,13 @@ function RunTestCase1 () {
 
     # Wait for the buildconfig policy to remediate before triggering a
     # build; oc start-build fails when the buildconfig does not exist yet.
-    until oc get buildconfig httpd-example -n e2e-opp >/dev/null 2>&1; do
-        if (( $(date +%s) >= remediationDeadline )); then
-            : "ERROR: buildconfig httpd-example was not created within 10m of deploy"
-            : "=== Policy Status ==="
-            oc get policies -n policies | sed -n '/example/p' || true
-            return 1
-        fi
-        sleep 15
-    done
+    _waitBudget=$(( remediationDeadline - $(date +%s) ))
+    if (( _waitBudget <= 0 )) || ! oc wait buildconfig/httpd-example -n e2e-opp --for=create --timeout="${_waitBudget}s"; then
+        : "ERROR: buildconfig httpd-example was not created within 10m of deploy"
+        : "=== Policy Status ==="
+        oc get policies -n policies | sed -n '/example/p' || true
+        return 1
+    fi
 
     # Trigger build if needed
     typeset latestBuildName=""
