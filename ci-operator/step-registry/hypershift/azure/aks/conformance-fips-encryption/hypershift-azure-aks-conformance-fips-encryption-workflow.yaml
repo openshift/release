@@ -32,6 +32,12 @@ workflow:
     Conformance then runs the upstream openshift/origin suite against the guest cluster
     to confirm the encrypted cluster is fully functional.
 
+    The two VM encryption checks work by enumerating the guest cluster nodes and
+    inspecting the backing Azure VM of each one, so they would pass without checking
+    anything if no nodes had joined yet. hypershift-wait-for-nodes closes the pre phase
+    to rule that out: it waits for the NodePools to report Ready and for the matching
+    number of guest nodes to join.
+
     Learn more about HyperShift here: https://github.com/openshift/hypershift
 
     Track HyperShift's development here: https://issues.redhat.com/projects/CNTRLPLANE/summary
@@ -47,6 +53,7 @@ workflow:
     - ref: hypershift-install
     - ref: cucushift-hypershift-extended-k8s-mgmt-get-guest-annotations
     - chain: hypershift-azure-create
+    - ref: hypershift-wait-for-nodes
     test:
     - ref: hypershift-hostedcluster-fips-check
     - ref: cucushift-hypershift-extended-etcd-encryption-health-check-azure
