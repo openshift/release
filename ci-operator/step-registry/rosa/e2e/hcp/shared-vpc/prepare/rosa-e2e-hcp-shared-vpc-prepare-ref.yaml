@@ -1,0 +1,35 @@
+ref:
+  as: rosa-e2e-hcp-shared-vpc-prepare
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: rosa-e2e-hcp-shared-vpc-prepare-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: REGION
+    default: ""
+    documentation: Cloud region for the shared-account resources. Falls back to LEASED_RESOURCE if empty.
+  documentation: |-
+    Prepares every shared-account resource an HCP shared VPC cluster needs
+    (ROSAENG-63353). Using ${CLUSTER_PROFILE_DIR}/.awscred_shared_account
+    when the cluster profile carries it, otherwise the cluster account
+    credentials ${CLUSTER_PROFILE_DIR}/.awscred (same-account mode),
+    creates the ingress private hosted zone (named
+    rosa.<cluster>.<base-domain>, which OCM validates the HCP cluster domain
+    prefix against), the shared route53 policy and role (trusting the cluster
+    account's installer, ingress-operator and control-plane-operator roles),
+    the internal communication hosted zone (<cluster>.hypershift.local) and
+    the VPC endpoint policy and role (trusting the installer and
+    control-plane-operator roles); rosa create cluster requires
+    --vpc-endpoint-role-arn and --hcp-internal-communication-hosted-zone-id
+    for Hosted Control Plane shared VPC clusters. Then, with the cluster
+    account credentials, attaches the <shared-role>-assume-role permission
+    policies to the installer, ingress-operator and control-plane-operator
+    roles (what rosa create account-roles/operator-roles attach when run with
+    the shared VPC flags). Publishes cluster-name, hosted_zone_id,
+    hosted_zone_role_arn, shared_install_policy_arn, vpc_endpoint_role_arn,
+    vpc_endpoint_policy_arn and hcp_internal_communication_hosted_zone_id to
+    ${SHARED_DIR} for rosa-cluster-provision and the post-phase cleanup and
+    orphan gate.
