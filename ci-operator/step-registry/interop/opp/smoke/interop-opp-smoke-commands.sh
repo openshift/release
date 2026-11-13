@@ -23,6 +23,7 @@ _opp_cleanup() {
     cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
+  rm -rf "${_opp_smoke_tmp:-}" 2>/dev/null || true
 }
 trap '_opp_cleanup' EXIT
 
@@ -59,6 +60,8 @@ OPP_OPERATORS="${OPP_OPERATORS:-advanced-cluster-management,rhacs-operator,odf-o
 SMOKE_SETTLE_SECONDS="${SMOKE_SETTLE_SECONDS:-120}"
 
 typeset junitFile="${ARTIFACT_DIR}/junit_opp_smoke.xml"
+# Scratch space for oc stderr captures (CRD-absence classification).
+_opp_smoke_tmp="$(mktemp -d)"
 
 # Accumulators for JUnit generation
 typeset -a tcNamesArr=()
@@ -112,6 +115,14 @@ WriteJunit() {
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
         echo "<testsuite name=\"lp-interop--OPP--smoke\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        # Effective configuration in the JUnit carrier: the lane-level
+        # OPP_OPERATORS override has been observed not reaching this step
+        # (runs 2118373032635404288 / 2118380423871467520 checked operators
+        # outside the configured list); publish what actually ran.
+        echo "  <properties>"
+        echo "    <property name=\"opp_operators\" value=\"$(XmlEscape "${OPP_OPERATORS}")\"/>"
+        echo "    <property name=\"smoke_settle_seconds\" value=\"$(XmlEscape "${SMOKE_SETTLE_SECONDS}")\"/>"
+        echo "  </properties>"
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
             name="$(XmlEscape "${tcNamesArr[$i]}")"
@@ -255,13 +266,17 @@ TestOppOperators() {
         op="$(echo "${op}" | xargs)"  # trim whitespace
         : "Checking operator: ${op}"
 
-        # Find CSV matching this operator prefix
+        # Find CSV matching this operator prefix. The jq array + `first`
+        # form is pipefail-safe: `jq | head -1` raced SIGPIPE under
+        # `set -o pipefail` and surfaced as spurious "Failed to query CSVs"
+        # on healthy clusters (INTEROP-9670).
         typeset csvInfo=""
         if ! csvInfo="$(oc get csv --all-namespaces -o json | jq -r --arg prefix "${op}" '
-            .items[]
-            | select(.metadata.name | startswith($prefix))
-            | "\(.metadata.namespace)/\(.metadata.name)/\(.status.phase)"
-        ' | head -1)"; then
+            [ .items[]
+              | select(.metadata.name | startswith($prefix))
+              | "\(.metadata.namespace)/\(.metadata.name)/\(.status.phase)" ]
+            | first // empty
+        ')"; then
             typeset apiMsg="Failed to query CSVs for ${op}"
             : "FAIL: ${apiMsg}"
             if [[ -n "${failMsg}" ]]; then failMsg="${failMsg}; ${apiMsg}"; else failMsg="${apiMsg}"; fi
@@ -349,9 +364,15 @@ TestAcmConnectivity() {
     fi
     typeset failMsg=""
 
-    # Check if ManagedCluster resources exist
+    # Check if ManagedCluster resources exist. An absent CRD (no
+    # ClusterManager on this lane) is a skip, not a failure (INTEROP-9670).
     typeset -i mcCount=0
-    if ! mcCount=$(oc get managedclusters -o json | jq '.items | length'); then
+    if ! mcCount="$(oc get managedclusters -o json 2>"${_opp_smoke_tmp}/mc.err" | jq '.items | length')"; then
+        if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/mc.err"; then
+            : "SKIP: managedclusters CRD not present (no ClusterManager on this lane)"
+            AddResult "acm-connectivity" "skip" "managedclusters CRD not present (no ClusterManager on this lane)"
+            return
+        fi
         AddResult "acm-connectivity" "fail" "Failed to query ManagedClusters"
         return
     fi
@@ -402,12 +423,20 @@ TestAcsSensors() {
     fi
     typeset failMsg=""
 
-    # Check SecuredCluster CR status first
+    # Check SecuredCluster CR status first. An absent CRD (no ACS install on
+    # this lane) is a skip; the jq array + `first` form keeps the query
+    # pipefail-safe (INTEROP-9670).
     typeset scStatus=""
-    if ! scStatus="$(oc get securedclusters.platform.stackrox.io --all-namespaces -o json | jq -r '
-        .items[]
-        | "\(.metadata.namespace)/\(.metadata.name)/\(.status.conditions // [] | map(select(.type=="Deployed" or .type=="Initialized")) | map(.status) | join(","))"
-    ' | head -1)"; then
+    if ! scStatus="$(oc get securedclusters.platform.stackrox.io --all-namespaces -o json 2>"${_opp_smoke_tmp}/sc.err" | jq -r '
+        [ .items[]
+          | "\(.metadata.namespace)/\(.metadata.name)/\(.status.conditions // [] | map(select(.type=="Deployed" or .type=="Initialized")) | map(.status) | join(","))" ]
+        | first // empty
+    ')"; then
+        if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/sc.err"; then
+            : "SKIP: securedclusters CRD not present (ACS operator not installed on this lane)"
+            AddResult "acs-sensors" "skip" "securedclusters CRD not present (ACS operator not installed on this lane)"
+            return
+        fi
         AddResult "acs-sensors" "fail" "Failed to query SecuredCluster resources"
         return
     fi
@@ -442,8 +471,8 @@ TestAcsSensors() {
         # No SecuredCluster CR; check if ACS operator is even installed
         typeset acsCsv=""
         acsCsv="$(oc get csv --all-namespaces -o json | jq -r '
-            .items[] | select(.metadata.name | startswith("rhacs-operator")) | .metadata.name
-        ' | head -1)" || true
+            [ .items[] | select(.metadata.name | startswith("rhacs-operator")) | .metadata.name ] | first // empty
+        ')" || true
 
         if [[ -z "${acsCsv}" ]]; then
             : "SKIP: ACS operator not installed"
@@ -482,11 +511,12 @@ TestQuayPull() {
     typeset quayRoute=""
     set +x  # suppress xtrace — route hostnames are sensitive
     if ! quayRoute="$(oc get routes --all-namespaces -o json | jq -r '
-        .items[]
-        | select(.metadata.name | test("quay"; "i"))
-        | select(.spec.host | test("quay"; "i"))
-        | .spec.host
-    ' | head -1)"; then
+        [ .items[]
+          | select(.metadata.name | test("quay"; "i"))
+          | select(.spec.host | test("quay"; "i"))
+          | .spec.host ]
+        | first // empty
+    ')"; then
         : "Route query failed, trying QuayRegistry CR..."
     fi
     set -x
@@ -503,22 +533,41 @@ TestQuayPull() {
     fi
 
     if [[ -z "${quayRoute}" ]]; then
-        # Check if Quay operator is even installed
-        typeset quayCsv=""
-        if ! quayCsv="$(oc get csv --all-namespaces -o json | jq -r '
-            .items[] | select(.metadata.name | startswith("quay-operator")) | .metadata.name
-        ' | head -1)"; then
-            AddResult "quay-pull" "fail" "Failed to query CSVs for Quay operator"
+        # Distinguish "no QuayRegistry CR deployed on this lane" (operator-
+        # only install: nothing to pull - skip) from "registry deployed but
+        # route missing" (genuine failure) (INTEROP-9670).
+        typeset -i qrCount=0
+        if ! qrCount="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json 2>"${_opp_smoke_tmp}/qr.err" | jq '.items | length')"; then
+            if ! grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/qr.err"; then
+                AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources"
+                return
+            fi
+            qrCount=0
+        fi
+
+        if (( qrCount == 0 )); then
+            # Check if Quay operator is even installed
+            typeset quayCsv=""
+            if ! quayCsv="$(oc get csv --all-namespaces -o json | jq -r '
+                [ .items[] | select(.metadata.name | startswith("quay-operator")) | .metadata.name ] | first // empty
+            ')"; then
+                AddResult "quay-pull" "fail" "Failed to query CSVs for Quay operator"
+                return
+            fi
+
+            if [[ -z "${quayCsv}" ]]; then
+                : "SKIP: Quay operator not installed"
+                AddResult "quay-pull" "skip" "Quay operator not installed"
+                return
+            fi
+
+            failMsg="Quay operator installed but no QuayRegistry CR deployed on this lane"
+            : "SKIP: ${failMsg}"
+            AddResult "quay-pull" "skip" "${failMsg}"
             return
         fi
 
-        if [[ -z "${quayCsv}" ]]; then
-            : "SKIP: Quay operator not installed"
-            AddResult "quay-pull" "skip" "Quay operator not installed"
-            return
-        fi
-
-        failMsg="Quay operator installed but no registry route found"
+        failMsg="QuayRegistry present but no registry route found"
         : "FAIL: ${failMsg}"
         AddResult "quay-pull" "fail" "${failMsg}"
         return
