@@ -115,20 +115,16 @@ as the source of truth.
 
 ## Rehearsal and rollout
 
-On the release PR, a different OpenShift org member must authorize network access:
-
-```text
-/pj-rehearse network-access-allowed
-```
-
-Then run the generated ACM job:
+On the release PR, run the generated ACM job:
 
 ```text
 /pj-rehearse pull-ci-openshift-eng-ocp-build-data-acm-5.0-art-build-data-validation
 ```
 
+If the rehearsal bot reports that network authorization is required, ask a
+different OpenShift org member to run `/pj-rehearse network-access-allowed`.
 To request rehearsals for all affected first-pass jobs (up to 25), use
-`/pj-rehearse max` after network access is authorized. The default command runs
+`/pj-rehearse max`. The default command runs
 at most five jobs; inspect the bot's affected-job list when selecting rehearsals.
 
 After release merges, an ACM or MCE metadata PR can use `/test art-build-data-validation`.
