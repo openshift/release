@@ -1,0 +1,27 @@
+ref:
+  as: enmaas-deploy
+  from: enmaas-deploy-image
+  commands: enmaas-deploy-commands.sh
+  cli: latest
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  credentials:
+  - collection: ocp-perfscale-cpt
+    group: enmaas-github
+    mount_path: /secret/enmaas
+  env:
+  - name: ENMAAS_BRANCH
+    default: "main"
+    documentation: |-
+      Branch of the EnMaaS-opps repository to clone for deployment manifests.
+  - name: ENMAAS_ENV
+    default: "stage"
+    documentation: |-
+      Environment directory under clusters/ in the EnMaaS-opps repository.
+  documentation: |-
+    Deploys the EnMaaS stack onto the cluster. Clones the EnMaaS-opps repository,
+    discovers the cluster app domain, patches configuration, creates namespaces,
+    and applies the rendered manifests for both enmaas and enmaas-monitoring projects.
