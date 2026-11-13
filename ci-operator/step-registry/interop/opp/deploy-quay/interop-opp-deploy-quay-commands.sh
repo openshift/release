@@ -520,11 +520,13 @@ oc label namespace "${QUAY_NAMESPACE}" openshift.io/cluster-monitoring=true --ov
 
 # --- Create-if-absent: OperatorGroup (name local-quay, targetNamespaces
 #     [local-quay]; any existing group is adopted; a second group in one
-#     namespace puts CSVs into TooManyOperatorGroups) ---
+#     namespace puts CSVs into TooManyOperatorGroups). oc create, not apply: if
+#     a second writer (a live OperatorPolicy) wins the race, create fails
+#     AlreadyExists and we adopt; never overwrite spec.targetNamespaces. ---
 if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${QUAY_NAMESPACE}" -o name 2>/dev/null)" ]]; then
   _prop "quay_operatorgroup" "adopted"
 else
-  cat <<EOF | oc apply -f - 2>&1
+  if ! cat <<EOF | oc create -f - 2>&1
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -534,7 +536,19 @@ spec:
   targetNamespaces:
     - ${QUAY_NAMESPACE}
 EOF
-  _prop "quay_operatorgroup" "created"
+  then
+    if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${QUAY_NAMESPACE}" -o name 2>/dev/null)" ]]; then
+      _prop "quay_operatorgroup" "race-tolerated"
+      echo ">>> NOTE: OperatorGroup created concurrently by another writer - adopting"
+    else
+      _classify "quay-operatorgroup-create-error" "failed to create OperatorGroup ${QUAY_NAMESPACE} in ${QUAY_NAMESPACE}"
+      echo "ERROR: ${_class_detail}"
+      _dump_diagnostics
+      exit 1
+    fi
+  else
+    _prop "quay_operatorgroup" "created"
+  fi
 fi
 
 # --- Create-if-absent: Subscription (oc create, not apply: if a second writer

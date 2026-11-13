@@ -515,11 +515,14 @@ oc label namespace "${ODF_NAMESPACE}" openshift.io/cluster-monitoring=true --ove
 
 # --- Create-if-absent: OperatorGroup (name openshift-storage-operatorgroup,
 #     targetNamespaces [openshift-storage]; any existing group is adopted; a
-#     second group in one namespace puts CSVs into TooManyOperatorGroups) ---
+#     second group in one namespace puts CSVs into TooManyOperatorGroups).
+#     oc create, not apply: if a second writer (a live OperatorPolicy) wins the
+#     race, create fails AlreadyExists and we adopt; never overwrite the
+#     existing spec.targetNamespaces. ---
 if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${ODF_NAMESPACE}" -o name 2>/dev/null)" ]]; then
   _prop "odf_operatorgroup" "adopted"
 else
-  cat <<EOF | oc apply -f - 2>&1
+  if ! cat <<EOF | oc create -f - 2>&1
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -529,7 +532,19 @@ spec:
   targetNamespaces:
     - ${ODF_NAMESPACE}
 EOF
-  _prop "odf_operatorgroup" "created"
+  then
+    if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${ODF_NAMESPACE}" -o name 2>/dev/null)" ]]; then
+      _prop "odf_operatorgroup" "race-tolerated"
+      echo ">>> NOTE: OperatorGroup created concurrently by another writer - adopting"
+    else
+      _classify "odf-operatorgroup-create-error" "failed to create OperatorGroup openshift-storage-operatorgroup in ${ODF_NAMESPACE}"
+      echo "ERROR: ${_class_detail}"
+      _dump_diagnostics
+      exit 1
+    fi
+  else
+    _prop "odf_operatorgroup" "created"
+  fi
 fi
 
 # --- Create-if-absent: Subscription (oc create, not apply: if a second writer
