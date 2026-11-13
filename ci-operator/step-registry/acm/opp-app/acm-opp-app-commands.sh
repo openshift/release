@@ -414,9 +414,9 @@ if RunTestCase1; then
     RecordTestResult "deploy-opp-application" "passed" "" "${case1Duration}"
     : "Test Case 1 (Deploy OPP Application) Result: PASSED"
 
-    # Run Test Case 2 (ACS Integration); RunTestCase2 returns 2 when the
-    # ACS integration is unavailable (no SecuredCluster), which is a skip,
-    # not a failure.
+    # Run Test Case 2 (ACS Integration). A skip is distinguished from a
+    # failure by the _acs_skip_reason side-channel (reset just below,
+    # before the call); the return code is not captured.
     typeset -i case2Start=0
     case2Start=$(date +%s)
     _acs_skip_reason=""
