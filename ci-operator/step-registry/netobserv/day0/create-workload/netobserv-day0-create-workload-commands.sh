@@ -21,6 +21,8 @@ echo "  PODS_PER_WORKER=${PODS_PER_WORKER}"
 echo "  SMALL_CLUSTER_MAX_WORKERS=${SMALL_CLUSTER_MAX_WORKERS}"
 echo "  TOTAL_ELAPSED_SECONDS=${TOTAL_ELAPSED_SECONDS}"
 echo "  KUBE_BURNER_OCP_VERSION=${KUBE_BURNER_OCP_VERSION}"
+echo "  KUBE_BURNER_QPS=${KUBE_BURNER_QPS}"
+echo "  KUBE_BURNER_BURST=${KUBE_BURNER_BURST}"
 
 START_TIME=$(date +%s)
 
@@ -38,12 +40,22 @@ if [[ -z "${WORKER_COUNT}" || "${WORKER_COUNT}" -eq 0 ]]; then
 fi
 echo "Worker nodes: ${WORKER_COUNT}"
 
+# Common flags for both workload types. A low client-side rate limit keeps
+# kube-burner from overwhelming etcd on large clusters, which otherwise leads
+# to request timeouts, retried creates hitting AlreadyExists, and a hard job
+# failure.
+KUBE_BURNER_COMMON_ARGS=(
+    --qps=20
+    --burst=20
+    --local-indexing
+    --gc=false
+)
+
 if (( WORKER_COUNT <= SMALL_CLUSTER_MAX_WORKERS )); then
     echo "Running kube-burner-ocp node-density-heavy with ${PODS_PER_NODE} pods per node (pods will NOT be garbage collected)"
     ./kube-burner-ocp node-density-heavy \
         --pods-per-node="${PODS_PER_NODE}" \
-        --local-indexing \
-        --gc=false
+        "${KUBE_BURNER_COMMON_ARGS[@]}"
 else
     # Derive the number of cluster-density-v2 iterations from the worker
     # node count. Each iteration creates roughly PODS_PER_ITERATION pods
@@ -58,8 +70,7 @@ else
     echo "Running kube-burner-ocp cluster-density-v2 with ${ITERATIONS} iterations (pods will NOT be garbage collected)"
     ./kube-burner-ocp cluster-density-v2 \
         --iterations="${ITERATIONS}" \
-        --local-indexing \
-        --gc=false
+        "${KUBE_BURNER_COMMON_ARGS[@]}"
 fi
 
 popd
