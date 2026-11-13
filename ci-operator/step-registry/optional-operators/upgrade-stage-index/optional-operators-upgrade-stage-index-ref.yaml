@@ -1,0 +1,35 @@
+ref:
+  as: optional-operators-upgrade-stage-index
+  from: cli
+  commands: optional-operators-upgrade-stage-index-commands.sh
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+  env:
+  - name: STAGE_OO_INDEX
+    documentation: |-
+      The pull-spec of the stage OLM index image that carries the operator
+      version being upgraded to (treated as unreleased). A new grpc
+      CatalogSource is created from this image and the operator's Subscription
+      is repointed at it. Requires stage registry pull credentials to already be
+      present in the cluster global pull-secret (see merge-stage-registry-credentials).
+  - name: OO_PACKAGE
+    documentation: The name of the operator package being upgraded. Must match the package installed by the subscribe step.
+  - name: OO_CHANNEL
+    documentation: The name of the operator channel to track for the upgrade.
+  - name: OO_LATEST_CSV
+    documentation: The name of the CSV being upgraded to. The InstallPlan carrying this CSV is approved and the step waits for it to reach phase Succeeded.
+  documentation: |-
+    Upgrades an optional operator that was installed by the subscribe step (from a
+    production OLM index) to a newer version sourced from a STAGE OLM index.
+
+    optional-operators-ci-upgrade only switches the channel on the same catalog,
+    so it cannot move a Subscription across two different index images (prod ->
+    stage). This step instead creates a new grpc CatalogSource from
+    STAGE_OO_INDEX, repoints the existing Subscription's source/sourceNamespace/
+    channel at it with Manual approval, approves the InstallPlan carrying
+    OO_LATEST_CSV, and waits for that CSV to become ready.
+
+    It reads ${SHARED_DIR}/oo-install-namespace and ${SHARED_DIR}/oo-subscription
+    written by the subscribe step.
