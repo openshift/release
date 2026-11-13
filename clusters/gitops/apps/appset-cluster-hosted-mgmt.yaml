@@ -7,7 +7,8 @@ metadata:
   namespace: openshift-gitops
 spec:
   goTemplate: true
-  goTemplateOptions: ["missingkey=error"]
+  goTemplateOptions:
+  - missingkey=error
   generators:
   - git:
       directories:
@@ -20,13 +21,20 @@ spec:
     metadata:
       annotations:
         argocd.argoproj.io/compare-options: ServerSideDiff=false
-      name: 'hosted-mgmt-{{.path.basename}}'
+      name: hosted-mgmt-{{.path.basename}}
       namespace: openshift-gitops
     spec:
       destination:
         name: hosted-mgmt
         namespace: openshift-gitops
       project: hosted-mgmt
+      ignoreDifferences:
+      - group: machine.openshift.io
+        kind: MachineSet
+        namespace: openshift-machine-api
+        jqPathExpressions:
+        - .spec.template.spec.providerSpec.value.ami
+        - .spec.template.spec.providerSpec.value.disks[]? | select(.boot == true) | .image
       source:
         directory:
           exclude: '{OWNERS,*.md}'
@@ -41,6 +49,7 @@ spec:
           prune: false
           selfHeal: true
         syncOptions:
-          - ApplyOutOfSyncOnly=true
-          - CreateNamespace=true
-          - PruneLast=true
+        - ApplyOutOfSyncOnly=true
+        - CreateNamespace=true
+        - PruneLast=true
+        - RespectIgnoreDifferences=true
