@@ -103,6 +103,96 @@ if [[ ! -d "${TESTS_DIR}/test/e2e" ]]; then
 fi
 cd "${TESTS_DIR}/test/e2e"
 
+# --- Temporary: mirror pull secret for restricted-network runs ----------------
+# Restricted-network pipelines mirror workload images to a private registry
+# and publish its credentials as the osc-mirror-pull-secret Secret in the
+# default namespace (see the mirror-operator step). Peer-pod VMs pull workload
+# images themselves (guest pull) and only receive credentials through the
+# pod's imagePullSecrets, which the adaptor forwards into the VM. The suite
+# creates a fresh namespace per spec without wiring that secret in, so guest
+# pulls would fail with "Not authorized" against the mirror.
+#
+# Until the suite handles this itself, patch its namespace bootstrap to copy
+# the secret into every generated namespace and link it to the default
+# ServiceAccount. The patch is a no-op on connected clusters (the secret does
+# not exist there), and fails loudly if the upstream code drifts, so it cannot
+# silently stop applying. Remove once the fix ships upstream.
+# Tracked by: https://github.com/openshift/sandboxed-containers-operator/issues/3783
+if oc get secret osc-mirror-pull-secret -n default >/dev/null 2>&1; then
+    echo "Restricted-network run: applying temporary namespace pull-secret patch (issue 3783)"
+    pull_secret_patch="$(mktemp /tmp/osc-pull-secret-patch-XXXXXX)"
+    cat > "${pull_secret_patch}" <<'PULL_SECRET_PATCH_EOF'
+--- a/test/e2e/oc_client.go	2026-11-10 14:18:19.573316906 +0000
++++ b/test/e2e/oc_client.go	2026-11-10 14:20:17.464139590 +0000
+@@ -2,10 +2,12 @@
+ 
+ import (
+ 	"bytes"
++	"encoding/base64"
+ 	"fmt"
+ 	"os"
+ 	"os/exec"
+ 	"strings"
++	"time"
+ 
+ 	"github.com/onsi/ginkgo/v2"
+ 	"github.com/onsi/gomega"
+@@ -59,6 +61,47 @@
+ 			"--overwrite",
+ 		).Execute()
+ 		gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to label namespace %s", nsName)
++
++		// Restricted-network runs mirror workload images to a private registry
++		// whose credentials are published as the osc-mirror-pull-secret Secret
++		// in the default namespace. Peer-pod VMs pull workload images
++		// themselves and only receive credentials through the pod's
++		// imagePullSecrets, so copy the secret into this namespace and link it
++		// to the default ServiceAccount. No-op on connected clusters, where
++		// the secret does not exist. See sandboxed-containers-operator#3783.
++		if _, err := cli.AsAdmin().WithoutNamespace().Run("get").Args(
++			"secret", "osc-mirror-pull-secret", "-n", "default",
++		).Output(); err == nil {
++			encoded, err := cli.AsAdmin().WithoutNamespace().Run("get").Args(
++				"secret", "osc-mirror-pull-secret", "-n", "default",
++				"-o=jsonpath={.data.\\.dockerconfigjson}",
++			).Output()
++			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to read osc-mirror-pull-secret")
++			decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(encoded))
++			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to decode osc-mirror-pull-secret")
++			dockerconfig := os.TempDir() + "/" + nsName + "-osc-mirror-pull-secret.json"
++			gomega.Expect(os.WriteFile(dockerconfig, decoded, 0o600)).To(gomega.Succeed())
++			_, err = cli.AsAdmin().WithoutNamespace().Run("create").Args(
++				"secret", "docker-registry", "osc-mirror-pull-secret",
++				"--from-file=.dockerconfigjson=" + dockerconfig, "-n", nsName,
++			).Output()
++			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to create osc-mirror-pull-secret in %s", nsName)
++			for i := 0; i < 30; i++ {
++				if _, err := cli.AsAdmin().WithoutNamespace().Run("get").Args(
++					"serviceaccount", "default", "-n", nsName,
++				).Output(); err == nil {
++					break
++				}
++				if i == 29 {
++					ginkgo.Fail("default ServiceAccount never appeared in namespace " + nsName)
++				}
++				time.Sleep(time.Second)
++			}
++			_, err = cli.AsAdmin().WithoutNamespace().Run("secrets").Args(
++				"link", "default", "osc-mirror-pull-secret", "--for=pull", "-n", nsName,
++			).Output()
++			gomega.Expect(err).NotTo(gomega.HaveOccurred(), "failed to link osc-mirror-pull-secret in %s", nsName)
++		}
+ 	})
+ 
+ 	return cli
+PULL_SECRET_PATCH_EOF
+    if ! git -C "${TESTS_DIR}" apply --verbose "${pull_secret_patch}"; then
+        echo "ERROR: the temporary pull-secret patch no longer applies: the suite code changed."
+        echo "       Update or remove the patch (upstream fix tracked in issue 3783)."
+        exit 1
+    fi
+fi
+
 # --- Run the golang (Ginkgo v2) e2e tests ------------------------------------
 # The suite reads its configuration from the osc-config configmap that the
 # env-cm step already created in the cluster. Ginkgo v2 writes JUnit via
