@@ -31,6 +31,19 @@ The [sandboxed-containers-operator-env-cm](./env-cm/) step creates the osc-confi
 
 Currently not all parameters are enabled. In particular, only GA release type is supported, meaning it doesn't install development builds of OSC.
 
+### sandboxed-containers-operator-gather-must-gather
+
+The [gather-must-gather](./gather-must-gather/) step defaults to the Konflux
+`quay.io/redhat-user-workloads/ose-osc-tenant/osc-must-gather:latest` image.
+It resolves that specific `:latest` to the active version-epoch tag with the
+newest source commit timestamp and logs the selected image. Explicit image
+tags and digests are used unchanged. If no build tag can be resolved, the step
+fails rather than silently using an unrelated image.
+
+In the restricted-network workflow, the mirror step resolves and copies the
+same image before tests, then shares the mirror reference with must-gather.
+Local resolver tests: `make -C ci-operator/config/openshift/sandboxed-containers-operator test-must-gather`.
+
 ### sandboxed-containers-operator-install-trustee-operator
 
 The [sandboxed-containers-operator-install-trustee-operator](./install-trustee-operator/) step installs the Trustee operator for Confidential Containers (CoCo) workloads. This step is only needed for CoCo tests.
