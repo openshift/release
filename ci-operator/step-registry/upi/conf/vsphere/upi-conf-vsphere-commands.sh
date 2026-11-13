@@ -648,7 +648,11 @@ systemd:
 EOF
 
   cp "${dir}/bootstrap.ign" "${vsphere_legacy_cc_dir}/bootstrap_initial.ign"
-  if ! curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 \
+  # SSL_CERT_FILE may be set to a vCenter-only CA bundle in this environment
+  # (the other vsphere step scripts in this repo unset it for the same
+  # reason), which breaks TLS verification of this public mirror's normal
+  # certificate. Use the system trust store for this call instead.
+  if ! env -u SSL_CERT_FILE curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 \
     "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/butane/latest/butane-amd64" -o /tmp/fcct; then
     echo "ERROR: failed to download butane/fcct for the vsphere legacy cloud-provider-config swap" >&2
     exit 1
