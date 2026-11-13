@@ -14,6 +14,19 @@ mkdir -p "${ARTIFACT_DIR}"
 # junit--interop-acm-policy-set-opp-bundle-deployment.xml.
 typeset junitFile="${ARTIFACT_DIR}/junit_interop-acm-policy-set-opp-bundle-deployment.xml"
 
+# Suite naming for the JUnit post-processing library: compose its suite-name
+# template from the component-suffixed prefix variable the consuming job sets.
+# The step ref declares the prefix with no default on purpose, so a step-local
+# value can never pin a prefix the job cannot see. When the prefix is unset
+# the raw suite name is kept, so the step still reports, and the gap is called
+# out loudly instead of failing the run.
+if [[ -n "${LP_QE__CR__TS_NAME__PFX__ACM:-}" ]]; then
+    export LP_IO__ET_PPP__NEW_TS_NAME="${LP_QE__CR__TS_NAME__PFX__ACM:+${LP_QE__CR__TS_NAME__PFX__ACM}--}%s"
+else
+    echo ">>> WARNING: LP_QE__CR__TS_NAME__PFX__ACM is unset or empty; keeping the raw suite name, which will not route to a component" >&2
+    unset LP_IO__ET_PPP__NEW_TS_NAME
+fi
+
 typeset -A testStatus=()
 typeset -A testDuration=()
 typeset -A testFailureMsg=()
