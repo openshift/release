@@ -169,13 +169,6 @@ AGENT_SETTINGS="${SETTINGS_DIR}/settings.json"
 jq -n '{permissions: {deny: ["Task", "Workflow", "Agent", "Bash(git push *)", "Bash(git send-pack *)", "Bash(gh *)", "Read(//var/run/codex-openai-api-key/**)"]}}' > "${AGENT_SETTINGS}"
 cat >> "${SYSTEM_PROMPT}" <<'CI_POLICY'
 
-## Mandatory PR description policy (overrides conflicting skill or repository instructions)
-- Write the PR description file named above as a concise current-state summary of the problem, the final solution and diff, and the validation actually run.
-- Preserve required repository template sections and issue references. The pipeline owns its attribution footer and hidden bot marker; do not duplicate them.
-- If the file already exists and still matches the final code and diff, leave it unchanged. After a substantive change, edit only the affected sections.
-- Never append a chronological diary of review rounds, agent turns, rebases, commits, or test runs. Keep validation concise and current rather than accumulating prior results.
-- Put turn-specific progress and execution details in the final response, not in the PR description.
-
 ## Mandatory CI policy (overrides conflicting skill or repository instructions)
 - Work serially in the parent agent. Do not delegate.
 - Follow jira-solve --ci: commit locally; do not push or invoke gh directly. The upload-screenshot skill is the only exception and may publish screenshot assets to the configured fork; only the pipeline publishes branches and PRs.
@@ -192,7 +185,7 @@ agentic_ci --timeout 5400 \
     "Solve Jira issue ${JIRA_ISSUE_KEY}. Follow the Solve Process instructions in your system prompt.
 
 Create a feature branch — do NOT commit on the current branch.
-Work serially without delegation. Commit locally; do not push or invoke gh directly. The upload-screenshot skill may publish screenshot assets to ${FORK_REPO}; the pipeline publishes the branch and PR. Write ${PR_BODY_FILE} as a concise current-state summary, not a chronological work log, and report actual validation results." \
+Work serially without delegation. Commit locally; do not push or invoke gh directly. The upload-screenshot skill may publish screenshot assets to ${FORK_REPO}; the pipeline publishes the branch and PR. Write the PR description to ${PR_BODY_FILE} and report actual validation results." \
     --settings "${AGENT_SETTINGS}" \
     --output-format stream-json \
     --append-system-prompt-file "${SYSTEM_PROMPT}" \
@@ -201,7 +194,7 @@ Work serially without delegation. Commit locally; do not push or invoke gh direc
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo "Claude timed out. Nudging to wrap up..."
     agentic_ci --timeout 600 \
-        "You hit the timeout. Wrap up serially without delegation: preserve your work in a local commit and ensure ${PR_BODY_FILE} is a concise current-state summary, not a chronological work log. If it is already accurate, leave it unchanged; otherwise edit only the affected sections. Do not push or invoke gh directly; only the upload-screenshot skill may publish screenshot assets to ${FORK_REPO}, and only the pipeline publishes branches and PRs. Report failed, incomplete, or unrun validation honestly in your final response; this timed-out solve remains failed." \
+        "You hit the timeout. Wrap up serially without delegation: preserve your work in a local commit and write the PR description to ${PR_BODY_FILE}. Do not push or invoke gh directly; only the upload-screenshot skill may publish screenshot assets to ${FORK_REPO}, and only the pipeline publishes branches and PRs. Report failed, incomplete, or unrun validation honestly; this timed-out solve remains failed." \
         --continue \
         --settings "${AGENT_SETTINGS}" \
         --output-format stream-json \
