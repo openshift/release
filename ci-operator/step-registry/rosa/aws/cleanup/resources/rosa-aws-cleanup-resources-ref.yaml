@@ -19,9 +19,7 @@ ref:
   - name: REGIONS
     default: ""
     documentation: |-
-      Space- or comma-separated AWS regions to scan in dry-run mode. Live
-      cleanup requires a single region because aws-deprovision-stacks accepts
-      one REGION per run.
+      Space- or comma-separated AWS regions to scan and clean.
   - name: RESOURCE_AGE_HOURS
     default: "24"
     documentation: Minimum resource age in hours before it is eligible for cleanup.
@@ -39,7 +37,11 @@ ref:
     tag. IAM roles and policies must follow the generated
     ci-rosa[-h|-s]-xxxx naming convention. OIDC providers must carry the
     red-hat-managed=true tag added by ROSA and must not be trusted by a retained
-    IAM role. Eligible VPC stacks are passed to aws-deprovision-stacks through
-    SHARED_DIR; IAM dependencies are removed before their roles, policies, and
+    IAM role. Before each eligible VPC stack is deleted, load balancers left in
+    its VPC by the ingress operator (which are not stack-managed and would
+    otherwise block deletion) are removed. Stack deletion requests are then
+    submitted asynchronously and all stack-related failures are warnings so a
+    stuck stack cannot block the job. IAM dependencies are removed before their
+    roles, policies, and
     OIDC providers are deleted. A policy is retained when any attached IAM
     principal is not independently eligible for cleanup.

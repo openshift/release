@@ -297,11 +297,15 @@ tests:
         SNO_BIP_SKIP_DNSMASQ=true
     workflow: baremetalds-sno
 - as: e2e-metal-ovn-single-node-live-iso
+  capabilities:
+  - intranet
   interval: 168h
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-sno
 - as: e2e-metal-ovn-single-node-with-worker-live-iso
+  capabilities:
+  - intranet
   interval: 168h
   steps:
     cluster_profile: equinix-edge-enablement
@@ -333,12 +337,14 @@ tests:
   capabilities:
   - intranet
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv4
+  timeout: 6h0m0s
 - as: e2e-metal-ipi-serial-ovn-ipv4-techpreview
   capabilities:
   - intranet
@@ -360,12 +366,14 @@ tests:
   capabilities:
   - intranet
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-ipv6
+  timeout: 6h0m0s
 - as: e2e-metal-ipi-ovn-serial-virtualmedia
   capabilities:
   - intranet
@@ -381,12 +389,14 @@ tests:
   capabilities:
   - intranet
   interval: 168h
+  shard_count: 2
   steps:
     cluster_profile: equinix-ocp-metal
     observers:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
+  timeout: 6h0m0s
 - as: e2e-metal-ipi-ovn-upgrade
   capabilities:
   - intranet
@@ -1494,6 +1504,30 @@ tests:
     env:
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\]'
     workflow: openshift-e2e-vsphere-upi-multi-vcenter
+- as: e2e-vsphere-ovn-upi-legacy-infra
+  cron: 55 18 * * 4
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-upi-legacy-infra
+- as: e2e-vsphere-ovn-legacy-infra
+  cron: 55 19 * * 4
+  reporter_config:
+    channel: '#forum-ocp-splat-alerts'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      :red_jenkins_circle: :vsphere: Periodical job *{{.Spec.Job}}* ended with *{{.Status.State}}*. (<{{.Status.URL}}|View logs>) (<https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>)
+  steps:
+    cluster_profile: vsphere-elastic
+    workflow: openshift-e2e-vsphere-legacy-infra
 - as: e2e-vsphere-ovn-hybrid-env
   cron: 45 1 * * *
   steps:
@@ -2811,6 +2845,8 @@ tests:
       AWS_PUBLIC_IPV4_POOL_ID: ipv4pool-ec2-0768267342e327ea9
     workflow: openshift-e2e-aws
 - as: metal-ovn-single-node-recert-cluster-rename
+  capabilities:
+  - intranet
   cron: '@weekly'
   steps:
     cluster_profile: equinix-edge-enablement
@@ -3002,7 +3038,7 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azure-runc
-- as: e2e-azure-ovn-multidisk-techpreview
+- as: e2e-azure-ovn-multidisk
   cron: 48 10,22 * * *
   steps:
     cluster_profile: openshift-org-azure
@@ -3014,7 +3050,6 @@ tests:
         etcd:etcddisk:64:0:Premium_LRS:
         user-defined:containers:32:1:StandardSSD_LRS:/var/lib/containers
       COMPUTE_NODE_TYPE: Standard_D4as_v6
-      FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
       - observers-resource-watch

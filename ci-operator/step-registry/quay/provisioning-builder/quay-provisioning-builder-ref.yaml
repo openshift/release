@@ -17,6 +17,10 @@ ref:
     config_builder.yaml (FEATURE_BUILD_SUPPORT + BUILDMAN/executor config) to
     ${SHARED_DIR} for the deploy step, which fills BUILDER_CONTAINER_IMAGE from
     the installed quay-operator CSV. Unmanaged TLS is a prerequisite.
+    QUAY_BUILDER_EXECUTOR=kubernetes configures the QEMU ("bare metal") builder
+    instead: it grants quay-builder the privileged SCC, fails unless every
+    worker has /dev/kvm (recorded in kvm-probe.txt), and leaves
+    BUILDER_VM_CONTAINER_IMAGE and the worker image to quay-deploy-aws-s3.
   credentials:
   - collection: quay-tests
     group: quaybuilder
@@ -28,3 +32,9 @@ ref:
   - name: QUAYNAMESPACE
     documentation: The Quay installed namespace
     default: "quay-enterprise"
+  - name: QUAY_BUILDER_EXECUTOR
+    documentation: |-
+      Build manager executor: kubernetesPodman (an unprivileged builder pod) or
+      kubernetes (a privileged pod that boots each build in a qemu-kvm VM; needs
+      /dev/kvm on every worker).
+    default: "kubernetesPodman"

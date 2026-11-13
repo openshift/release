@@ -7,6 +7,52 @@ postsubmits:
     decorate: true
     decoration_config:
       sparse_checkout_files:
+      - ./ci-operator/config/openshift/ci-tools-standalone
+      - ./ci-operator/step-registry
+      timeout: 1h0m0s
+    labels:
+      ci.openshift.io/role: infra
+    max_concurrency: 1
+    name: branch-ci-openshift-release-main-prowgen-ci-tools-standalone
+    run_if_changed: ^(ci-operator/config/openshift/ci-tools-standalone/|core-services/prow/_managed-repos\.yaml$)
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - args:
+        - --from-file=ci-operator/config/openshift/ci-tools-standalone/openshift-ci-tools-standalone-main.yaml
+        - --from-file=ci-operator/config/openshift/ci-tools-standalone/openshift-ci-tools-standalone-main__agentic.yaml
+        - --registry=ci-operator/step-registry
+        - --to-dir=/mnt/job-configs
+        command:
+        - ci-operator-prowgen
+        image: quay.io/openshift/ci-public:ci_ci-operator-prowgen_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: "1"
+            memory: 4Gi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - mountPath: /mnt/job-configs
+          name: job-configs
+      securityContext:
+        fsGroup: 1000
+      volumes:
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
+  - agent: kubernetes
+    branches:
+    - ^main$
+    cluster: app.ci
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
       - ./ci-operator/config
       - ./ci-operator/jobs
       - ./core-services/prow/02_config

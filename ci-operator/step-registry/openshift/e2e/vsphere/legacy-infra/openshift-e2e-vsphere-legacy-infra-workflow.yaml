@@ -1,0 +1,22 @@
+workflow:
+  as: openshift-e2e-vsphere-legacy-infra
+  steps:
+    pre:
+    - chain: ipi-conf-vsphere
+    - ref: ovn-conf
+    - chain: ipi-install-vsphere
+    test:
+    - ref: vsphere-legacy-infra-check
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-vsphere-post
+    env:
+      PULL_THROUGH_CACHE: enabled
+      STRIP_VSPHERE_FAILURE_DOMAINS: "true"
+  documentation: |-
+    Installs a single-vCenter vSphere IPI cluster whose Infrastructure CR is missing
+    vcenters/failureDomains, simulating clusters installed via UPI or before OpenShift
+    4.13 that never had this data populated -- a state the installer never backfills on
+    upgrade (SPLAT-3028). Runs vsphere-legacy-infra-check instead of full conformance to
+    catch regressions in components that assume this data is always present.

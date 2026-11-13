@@ -2,10 +2,9 @@
 
 from dataclasses import dataclass
 import hashlib
-import os
 from pathlib import Path
 import re
-import subprocess
+from typing import Optional
 
 
 class EvalError(Exception):
@@ -32,6 +31,10 @@ class EvalPlan:  # pylint: disable=too-many-instance-attributes
     cases: tuple = ()
     config_chain: tuple = ()
     eval_name: str = ""
+    # Preflight-resolved identity the post-run check compares the run against;
+    # never re-read from the eval YAML after the orchestrator has run.
+    skill: Optional[str] = None
+    dataset_path: Optional[str] = None
 
     @property
     def artifact_name(self):
@@ -81,22 +84,3 @@ def repo_directory(repo, value, field):
     if not path.is_relative_to(repo) or not path.is_dir():
         raise EvalError(f"{field} must reference an existing directory inside the repository: {value}")
     return path
-
-
-def changed_files(repo, base_sha):
-    if not re.fullmatch(r"[0-9a-fA-F]{7,64}", base_sha):
-        raise EvalError("changed-file selection requires PULL_BASE_SHA containing a Git commit SHA")
-    try:
-        root = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=repo,
-                              check=True, capture_output=True, text=True).stdout.strip()
-        if Path(root).resolve() != repo:
-            raise EvalError("EVAL_WORKDIR must be the root of the PR Git checkout")
-        # --no-renames includes both old and new paths, so a move out of a
-        # triggered directory still selects its eval. -z preserves odd filenames.
-        diff = subprocess.run(
-            ["git", "diff", "--name-only", "-z", "--no-renames", f"{base_sha}...HEAD", "--"],
-            cwd=repo, check=True, capture_output=True).stdout
-    except subprocess.CalledProcessError as error:
-        raise EvalError("cannot compute PR changes; ensure the checkout includes PULL_BASE_SHA "
-                        "and its merge base (a diff failure is not a no-op)") from error
-    return [os.fsdecode(path) for path in diff.split(b"\0") if path]

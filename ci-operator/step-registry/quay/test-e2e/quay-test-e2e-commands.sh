@@ -3,30 +3,6 @@
 set -euo pipefail
 set -x
 
-# On baremetalds (bare-metal) clusters the API and ingress routes
-# (*.apps.<cluster>.metalkube.org) are reachable only via the bastion squid
-# proxy. Source it when present so the Quay/Mailpit route calls (and the
-# Playwright run) can connect; cloud jobs have no such file and skip this.
-if test -f "${SHARED_DIR}/proxy-conf.sh"; then
-  # Disable xtrace while sourcing: proxy-conf.sh exports proxy URLs that may
-  # carry credentials, which `set -x` would echo into the Prow logs.
-  set +x
-  # shellcheck source=/dev/null
-  source "${SHARED_DIR}/proxy-conf.sh"
-  set -x
-  # The bastion squid proxy only allows the cluster's own domains. npm, the
-  # Playwright browser CDN, and the public registries/CDNs the suite's container
-  # specs use (registry.access.redhat.com for the ubi test images and
-  # access.redhat.com, which serves their container signatures during skopeo
-  # copy; quay.io is already in the base NO_PROXY) must bypass it and use the CI
-  # pod's direct egress, or `npm ci` / `npx playwright install` / `skopeo copy`
-  # get HTTP 403 Forbidden from squid. The Quay/Mailpit routes stay on the
-  # proxy (they are *.metalkube.org hosts that squid allows); github.com is
-  # already in NO_PROXY for the suite clone.
-  export NO_PROXY="${NO_PROXY:+${NO_PROXY},}registry.npmjs.org,cdn.playwright.dev,playwright.azureedge.net,playwright.download.prss.microsoft.com,registry.access.redhat.com,access.redhat.com"
-  export no_proxy="${no_proxy:+${no_proxy},}registry.npmjs.org,cdn.playwright.dev,playwright.azureedge.net,playwright.download.prss.microsoft.com,registry.access.redhat.com,access.redhat.com"
-fi
-
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
 PLAYWRIGHT_ARTIFACT_SUBDIR="${PLAYWRIGHT_ARTIFACT_SUBDIR:-}"
 if [[ -n "${PLAYWRIGHT_ARTIFACT_SUBDIR}" ]]; then
@@ -37,6 +13,14 @@ if [[ -n "${PLAYWRIGHT_ARTIFACT_SUBDIR}" ]]; then
   ARTIFACT_DIR="${ARTIFACT_DIR}/${PLAYWRIGHT_ARTIFACT_SUBDIR}"
 fi
 mkdir -p "${ARTIFACT_DIR}"
+
+# Standalone Quay runs outside OpenShift: no cluster to query for the image,
+# builder diagnostics or Jaeger, so every oc call against a cluster is skipped.
+PLAYWRIGHT_STANDALONE="${PLAYWRIGHT_STANDALONE:-false}"
+if [[ "${PLAYWRIGHT_STANDALONE}" != "true" && "${PLAYWRIGHT_STANDALONE}" != "false" ]]; then
+  echo "ERROR: PLAYWRIGHT_STANDALONE must be true or false" >&2
+  exit 1
+fi
 
 # Read the Quay route written by the deploy step
 QUAY_ROUTE=$(cat "${SHARED_DIR}/quayroute")
@@ -61,8 +45,6 @@ export CI=true
 # process.env.MAILPIT_API_URL (NOT MAILPIT_API), so the var name must match or the
 # suite falls back to http://localhost:8025 and reports "Mailpit NOT available".
 # Written by the quay-deploy-mailpit step. Left unset when mailing is off.
-# On proxied (bare-metal) runs this Route URL is later replaced with a local
-# port-forward by startMailpitPortForward; see its comment for why.
 if [[ -s "${SHARED_DIR}/mailpit_api" ]]; then
   MAILPIT_API_URL=$(cat "${SHARED_DIR}/mailpit_api")
   export MAILPIT_API_URL
@@ -194,7 +176,7 @@ clone_playwright_sources() {
 # has no jq.
 function mirror_pullspecs() {
   local pullspec="$1"
-  if [[ "${pullspec}" == *@* ]]; then
+  if [[ "${pullspec}" == *@* && "${PLAYWRIGHT_STANDALONE}" != "true" ]]; then
     # One get per kind: a combined get fails whole when either kind is not served.
     local kind
     for kind in imagecontentsourcepolicies imagedigestmirrorsets; do
@@ -227,8 +209,12 @@ declare -A PW_LABELS=()
 function resolve_playwright_ref() {
   local ns="${QUAYNAMESPACE:-quay-enterprise}"
   local app_img authfile errfile candidate info="" key value sha tried=" " was_tracing
-  app_img=$(oc -n "${ns}" get pods -l quay-component=quay-app \
-    -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
+  if [[ "${PLAYWRIGHT_STANDALONE}" == "true" ]]; then
+    app_img=$(cat "${SHARED_DIR}/quay_app_image" 2>/dev/null || true)
+  else
+    app_img=$(oc -n "${ns}" get pods -l quay-component=quay-app \
+      -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
+  fi
   if [[ -z "${app_img}" ]]; then
     echo "WARNING: could not determine the deployed quay-app imageID" >&2
     return 1
@@ -240,8 +226,13 @@ function resolve_playwright_ref() {
   set +x
   authfile=$(mktemp)
   errfile=$(mktemp)
-  oc get secret/pull-secret -n openshift-config \
-    --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${authfile}" 2>/dev/null || true
+  # A copy, so the rm below never deletes the SHARED_DIR original.
+  if [[ "${PLAYWRIGHT_STANDALONE}" == "true" ]]; then
+    cp "${SHARED_DIR}/quay-pull-auth.json" "${authfile}" 2>/dev/null || true
+  else
+    oc get secret/pull-secret -n openshift-config \
+      --template='{{index .data ".dockerconfigjson" | base64decode}}' > "${authfile}" 2>/dev/null || true
+  fi
   # stderr stays out of ${info}: a warning on the success path would corrupt the JSON.
   for candidate in $(mirror_pullspecs "${app_img}"); do
     if info=$(oc image info "${candidate}" --filter-by-os linux/amd64 \
@@ -372,6 +363,7 @@ function gatherBuilderDiagnostics {
   local ns="${QUAYNAMESPACE:-quay-enterprise}"
   local bns="virtual-builders"
   local out="${ARTIFACT_DIR}/builder-diagnostics"
+  [[ "${PLAYWRIGHT_STANDALONE}" != "true" ]] || return 0
   command -v oc >/dev/null 2>&1 || return 0
   oc whoami >/dev/null 2>&1 || return 0
   echo "Gathering virtual-builder diagnostics into ${out}..."
@@ -406,6 +398,10 @@ function startJaegerPortForward {
   # Drop any inherited value so the "unset" paths below cannot leave an
   # unverified URL in the suite's environment.
   unset JAEGER_QUERY_URL
+  if [[ "${PLAYWRIGHT_STANDALONE}" == "true" ]]; then
+    echo "PLAYWRIGHT_STANDALONE=true: no cluster Jaeger; leaving JAEGER_QUERY_URL unset"
+    return 0
+  fi
   if [[ ! -f "${SHARED_DIR}/jaeger_deployed" ]]; then
     echo "Jaeger was not deployed; leaving JAEGER_QUERY_URL unset"
     return 0
@@ -445,71 +441,6 @@ function stopJaegerPortForward {
   kill "${JAEGER_PF_PID}" 2>/dev/null || true
   wait "${JAEGER_PF_PID}" 2>/dev/null || true
   JAEGER_PF_PID=""
-}
-
-# Same idea as the Jaeger forward, but for Mailpit, and only on proxied runs:
-# the Route URL in SHARED_DIR/mailpit_api is a private *.apps host that only the
-# bastion proxy can resolve and reach. global-setup's calls go through a
-# proxy-aware Playwright request context (quay/quay#7765), but the mailpit
-# helpers invoked from inside the tests use Node's native fetch, which ignores
-# HTTP(S)_PROXY entirely and cannot even resolve the host -- every
-# email-dependent spec then fails with getaddrinfo ENOTFOUND. Port-forward the
-# in-cluster Service to 127.0.0.1 and point MAILPIT_API_URL there instead:
-# native fetch connects directly, and the proxy-aware contexts bypass 127.0.0.1
-# through NO_PROXY. Unproxied (cloud) runs keep the Route URL, which native
-# fetch reaches directly, so this is a no-op there.
-function startMailpitPortForward {
-  MAILPIT_PF_PID=""
-  # Empty MAILPIT_API_URL means the deploy step ran with mailing off.
-  if [[ -z "${MAILPIT_API_URL:-}" ]]; then
-    return 0
-  fi
-  if [[ ! -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
-    echo "No proxy configured; keeping MAILPIT_API_URL=${MAILPIT_API_URL}"
-    return 0
-  fi
-
-  local ns="${QUAYNAMESPACE:-quay-enterprise}"
-  # Supervise the forward like the Jaeger one: the suite runs for hours and a
-  # single forward does not survive a Mailpit pod restart or an idle drop.
-  (
-    pf=""
-    trap '[[ -n "${pf}" ]] && kill "${pf}" 2>/dev/null; exit 0' TERM
-    while true; do
-      oc port-forward -n "${ns}" svc/mailpit 8025:8025 >> "${ARTIFACT_DIR}/mailpit-port-forward.log" 2>&1 &
-      pf=$!
-      wait "${pf}" || true
-      sleep 5
-    done
-  ) &
-  MAILPIT_PF_PID=$!
-
-  # Prove the forward answers the exact request mailpit.getEmails() makes
-  # before pointing the suite at it. curl honors NO_PROXY (127.0.0.1 is in the
-  # bastion proxy's list), so this stays direct.
-  for _ in $(seq 1 12); do
-    if curl -sf --connect-timeout 5 --max-time 10 "http://127.0.0.1:8025/api/v1/messages" -o /dev/null; then
-      export MAILPIT_API_URL="http://127.0.0.1:8025/api/v1"
-      echo "MAILPIT_API_URL=${MAILPIT_API_URL} (local port-forward)"
-      return 0
-    fi
-    sleep 5
-  done
-
-  # Fail loudly rather than hand the suite a URL native fetch cannot reach:
-  # on a proxied run every email-dependent spec would later fail with
-  # getaddrinfo ENOTFOUND, far from the cause. Same stance as
-  # quay-deploy-mailpit, which exits 1 when the Route is unreachable.
-  echo "ERROR: Mailpit port-forward never became reachable on a proxied run; native fetch cannot use the Route URL ${MAILPIT_API_URL}" >&2
-  stopMailpitPortForward
-  exit 1
-}
-
-function stopMailpitPortForward {
-  [[ -n "${MAILPIT_PF_PID:-}" ]] || return 0
-  kill "${MAILPIT_PF_PID}" 2>/dev/null || true
-  wait "${MAILPIT_PF_PID}" 2>/dev/null || true
-  MAILPIT_PF_PID=""
 }
 
 # Public GCS prefix under which this job's per-step artifacts land once the job
@@ -818,8 +749,12 @@ function copyArtifacts {
       quay_rev="${PW_TEST_SHA}"
     fi
     local quay_image
-    quay_image=$(timeout 30 oc -n "${QUAYNAMESPACE:-quay-enterprise}" get pods -l quay-component=quay-app \
-      -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
+    if [[ "${PLAYWRIGHT_STANDALONE}" == "true" ]]; then
+      quay_image=$(cat "${SHARED_DIR}/quay_app_image" 2>/dev/null || true)
+    else
+      quay_image=$(timeout 30 oc -n "${QUAYNAMESPACE:-quay-enterprise}" get pods -l quay-component=quay-app \
+        -o jsonpath='{.items[0].status.containerStatuses[?(@.name=="quay-app")].imageID}' 2>/dev/null || true)
+    fi
     # PLAYWRIGHT_SPYGLASS_TITLE is the Prow html-lens section name (<title>).
     local spyglass_title="${PLAYWRIGHT_SPYGLASS_TITLE:-Quay e2e results}"
     {
@@ -849,8 +784,12 @@ EOF
       if [[ -f "${ARTIFACT_DIR}/index.html" ]]; then
         echo "<li><a target=\"_blank\" href=\"${steps_base}/${report_path}/index.html\">Playwright report<span>Failures, traces and screenshots</span></a></li>"
       fi
-      echo "<li><a target=\"_blank\" href=\"${steps_base}/quay-gather/artifacts/\">Quay logs<span>Pods, events and container logs</span></a></li>"
-      echo "<li><a target=\"_blank\" href=\"${steps_base}/gather-must-gather/artifacts/\">must-gather<span>Cluster state after the run</span></a></li>"
+      if [[ "${PLAYWRIGHT_STANDALONE}" == "true" ]]; then
+        echo "<li><a target=\"_blank\" href=\"${steps_base}/quay-standalone-gather/artifacts/\">Quay logs<span>Node containers, journals and AWS state</span></a></li>"
+      else
+        echo "<li><a target=\"_blank\" href=\"${steps_base}/quay-gather/artifacts/\">Quay logs<span>Pods, events and container logs</span></a></li>"
+        echo "<li><a target=\"_blank\" href=\"${steps_base}/gather-must-gather/artifacts/\">must-gather<span>Cluster state after the run</span></a></li>"
+      fi
       if [[ -n "${quay_rev}" ]]; then
         echo "<li><a target=\"_blank\" href=\"https://github.com/quay/quay/tree/${quay_rev}\">quay ${quay_rev:0:12}<span>Source under test on GitHub</span></a></li>"
       fi
@@ -865,7 +804,7 @@ EOF
   fi
   gatherBuilderDiagnostics || true
 }
-trap 'copyArtifacts; stopJaegerPortForward; stopMailpitPortForward' EXIT
+trap 'copyArtifacts; stopJaegerPortForward' EXIT
 
 # Test users (admin/testuser/readonly) are created by Playwright's global-setup.ts,
 # exactly as in upstream Quay CI (.github/workflows/ci-web.yaml). With FEATURE_MAILING
@@ -940,16 +879,9 @@ function probe_route() {
     "${DISCOVERY_URL}" 2>/dev/null)" || curl_exit=$?
   read -r http_code t_dns t_conn t_tls t_ttfb <<<"${metrics:-000 0 0 0 0}"
 
-  # The DNS gate is based on curl's own resolution, not local getent. On baremetal
-  # the route is a private *.apps.<cluster> name that only the cluster's bastion
-  # proxy can resolve, so getent (the pod's local resolver) returns empty even
-  # though curl via HTTPS_PROXY reaches it (curl exit 0). curl exit 6 = could not
-  # resolve host, 5 = could not resolve proxy -- on unproxied (cloud) runs those
-  # capture the fresh-cluster DNS warmup window. On proxied runs squid resolves
-  # the target itself, so an unresolvable host surfaces as a failed CONNECT
-  # (curl exit 56 or a proxy error) and is labelled `transport` below; exit 5
-  # never fires there because the proxy is an IP literal. The label differs, the
-  # retry behaviour does not. getent stays in the log as evidence.
+  # curl exit 6 means the route did not resolve; exit 5 means a configured proxy
+  # did not resolve. Both are transient DNS failures while a fresh cluster's
+  # ingress records propagate. getent stays in the log as additional evidence.
   if [[ "${curl_exit}" -eq 5 || "${curl_exit}" -eq 6 ]]; then
     PROBE_CLASS=dns
     PROBE_DETAIL="${QUAY_HOST} did not resolve (curl exit ${curl_exit}, local getent='${dns:-empty}')"
@@ -1098,7 +1030,6 @@ if [[ -n "${PLAYWRIGHT_MAX_FAILURES:-}" ]]; then
 fi
 
 startJaegerPortForward
-startMailpitPortForward
 
 echo "Running Playwright e2e install tests from ${PLAYWRIGHT_WORKDIR} (ref ${PLAYWRIGHT_GIT_REF}, workers ${PLAYWRIGHT_WORKERS})..."
 pushd "${PLAYWRIGHT_WORKDIR}"

@@ -20,10 +20,9 @@ STORAGE_BY_CLOUD = {
     "gcp": "gcs",
     "azure": "blob",
     "libvirt": "s3",
-    # Bare metal (Equinix) has no cloud object store and the dev-scripts cluster
-    # has no default StorageClass for ODF/NooBaa, so Quay uses an external AWS S3
-    # bucket (objectstorage managed:false) for registry storage.
-    "baremetal": "s3",
+    # True AWS bare metal: metal workers with the same external S3 registry
+    # storage as the aws lane (see templates/clouds/aws-metal.yaml.j2).
+    "aws-metal": "s3",
 }
 # Storage values a cloud accepts beyond its STORAGE_BY_CLOUD default.
 EXTRA_STORAGE_BY_CLOUD: dict[str, set[str]] = {
@@ -34,9 +33,8 @@ DEPLOY_REF_BY_CLOUD = {
     "gcp": "quay-deploy-gcp-gcs",
     "azure": "quay-deploy-azure-blob",
     "libvirt": "quay-deploy-aws-s3",
-    # Bare metal uses the external AWS S3 deploy step (bucket creds come from the
-    # quay-tests vault, not the cluster profile).
-    "baremetal": "quay-deploy-aws-s3",
+    # True AWS bare metal reuses the aws lane's deploy step unchanged.
+    "aws-metal": "quay-deploy-aws-s3",
 }
 DEPLOY_REF_BY_STORAGE = {
     "odf": "quay-deploy-odf",
@@ -60,6 +58,9 @@ DATABASE_DEPROVISION_REF_BY_CLOUD = {
 BUILD_ROOT_OCP_FLOOR = "4.22"
 # Tests that target another repo in the same org; the rest use global_defaults.repo.
 REPO_BY_TEST = {"e2e-chainsaw": "quay-operator"}
+# Tests rendered from one complete templates/scenarios/<test>.yaml.j2 instead of
+# the base/cloud/test layers, with the job `as` they get when the row sets none.
+SCENARIO_AS_BY_TEST = {"standalone-ha": "e2e"}
 
 
 @dataclass(frozen=True)
@@ -83,6 +84,7 @@ class Cell:
     optional: bool | None = None
     run_if_changed: str | None = None
     skip_if_only_changed: str | None = None
+    pipeline_run_if_changed: str | None = None
     fips: bool = False
     sts: bool = False
     storage_override: str | None = None
@@ -94,6 +96,8 @@ class Cell:
     # The upgrade lane's OCP release channel: "stable", or "candidate" for an OCP
     # minor with no stable channel yet. Other tests render a nightly payload instead.
     ocp_channel: str = "stable"
+    # A job's `variant:`; replaces the derived variant in the filename and job name.
+    variant_override: str | None = None
 
     @property
     def upgrade_from_nodot(self) -> str:
@@ -181,6 +185,8 @@ class Cell:
 
     @property
     def variant(self) -> str:
+        if self.variant_override is not None:
+            return self.variant_override
         cloud = self.cloud if self.arch == "amd64" else f"{self.cloud}-{self.arch}"
         # The upgrade lane carries the storage token (e.g. aws-ocp422-s3-upgrade) so
         # the variant/filename stays unambiguous across storage backends.
@@ -194,6 +200,8 @@ class Cell:
         # (e.g. upgrade_from "3.17" -> "from-317"), derived rather than hand-set.
         if self.test == "upgrade":
             return f"from-{self.upgrade_from_nodot}"
+        if self.test in SCENARIO_AS_BY_TEST:
+            return SCENARIO_AS_BY_TEST[self.test]
         # No arch suffix: a non-amd64 arch is already in the variant, which
         # Prow puts ahead of `as` in the job name. database: true inserts the
         # cloud DB kind (rds/postgres) before source; fips still suffixes.

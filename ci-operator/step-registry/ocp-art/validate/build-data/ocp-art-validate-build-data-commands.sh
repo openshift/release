@@ -34,5 +34,6 @@ uv run --project "${work_dir}/art-tools" --locked --no-dev python -I -m validato
   --repo "${repo_root}" \
   --rpa-root "${work_dir}/release-data/config" \
   --application "${KONFLUX_APPLICATION}" \
+  --github-token-file /etc/github-private/oauth \
   --registry-auth-file /var/run/secrets/ci-pull-credentials/.dockerconfigjson \
   --report "${ARTIFACT_DIR}/validation.json"

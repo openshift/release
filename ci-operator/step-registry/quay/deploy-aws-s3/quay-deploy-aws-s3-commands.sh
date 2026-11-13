@@ -4,21 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# On baremetalds (bare-metal) clusters the API and ingress routes
-# (*.apps.<cluster>.metalkube.org) are reachable only via the bastion squid
-# proxy. Source it when present so the Quay route calls below can connect; cloud
-# jobs have no such file and skip this (no-op).
-if test -f "${SHARED_DIR}/proxy-conf.sh"; then
-  # shellcheck source=/dev/null
-  source "${SHARED_DIR}/proxy-conf.sh"
-  # The bastion squid proxy only allows the cluster's own domains, so Terraform's
-  # public provider registry must bypass it and use the CI pod's direct egress
-  # (AWS APIs already bypass via amazonaws.com in NO_PROXY). Without this,
-  # `terraform init` gets HTTP 403 Forbidden from squid for registry.terraform.io.
-  export NO_PROXY="${NO_PROXY:+${NO_PROXY},}registry.terraform.io,releases.hashicorp.com"
-  export no_proxy="${no_proxy:+${no_proxy},}registry.terraform.io,releases.hashicorp.com"
-fi
-
 command -v yq >/dev/null || { echo "yq not found in image ci/quay-deploy-tools; refusing to download at runtime" >&2; exit 1; }
 
 if [ "${MAP_TESTS}" = "true" ]; then
@@ -460,19 +445,24 @@ if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
   TLS_MANAGED="false"
   cat "${SHARED_DIR}/config_builder.yaml" >> config.yaml
 
-  # The builder image is always the RELATED_IMAGE_COMPONENT_BUILDER the
-  # Subscription's installed CSV ships, so the builder matches the installed
-  # operator. quay-provisioning-builder leaves "from-csv" for it. No fallback.
-  if ! grep -qE '^ *BUILDER_CONTAINER_IMAGE: from-csv$' config.yaml; then
-    echo "ERROR: config_builder.yaml has no 'BUILDER_CONTAINER_IMAGE: from-csv' line to fill" >&2
+  # The builder images are always the RELATED_IMAGE_COMPONENT_BUILDER{,_QEMU}
+  # the Subscription's installed CSV ships, so the builder matches the installed
+  # operator. quay-provisioning-builder leaves "from-csv" (kubernetesPodman) or
+  # "from-csv-qemu" (kubernetes) for them. No fallback.
+  if ! grep -qE '^ *(BUILDER_CONTAINER_IMAGE: from-csv|BUILDER_VM_CONTAINER_IMAGE: from-csv-qemu)$' config.yaml; then
+    echo "ERROR: config_builder.yaml has no 'BUILDER_CONTAINER_IMAGE: from-csv' or 'BUILDER_VM_CONTAINER_IMAGE: from-csv-qemu' line to fill" >&2
     QL_INSTALL_STATUS="failed"
     QL_INSTALL_FAILURE="config_builder.yaml has no builder image placeholder"
     exit 1
   fi
   csv_json=$(oc -n quay-enterprise get csv "$CSV" -o json)
-  mapfile -t builder_images < <(jq -r '[.spec.install.spec.deployments[]?.spec.template.spec.containers[]?.env[]?
-      | select(.name == "RELATED_IMAGE_COMPONENT_BUILDER") | .value // empty | select(. != "")]
-      | unique | .[]' <<<"$csv_json")
+  # Prints the unique non-empty values the CSV's deployments set for env var $1.
+  function csv_env_values() {
+    jq -r --arg name "$1" '[.spec.install.spec.deployments[]?.spec.template.spec.containers[]?.env[]?
+        | select(.name == $name) | .value // empty | select(. != "")]
+        | unique | .[]' <<<"$csv_json"
+  }
+  mapfile -t builder_images < <(csv_env_values RELATED_IMAGE_COMPONENT_BUILDER)
   if [[ ${#builder_images[@]} -ne 1 ]]; then
     echo "ERROR: CSV ${CSV} must set exactly one non-empty RELATED_IMAGE_COMPONENT_BUILDER value; got: ${builder_images[*]:-none}" >&2
     QL_INSTALL_STATUS="failed"
@@ -481,6 +471,19 @@ if [[ "${ENABLE_BUILD_SUPPORT:-false}" == "true" ]]; then
   fi
   echo "Builder image from CSV ${CSV}: ${builder_images[0]}" >&2
   sed -i -E "s|^( *BUILDER_CONTAINER_IMAGE:) from-csv$|\1 ${builder_images[0]}|" config.yaml
+
+  if grep -qE '^ *BUILDER_VM_CONTAINER_IMAGE: from-csv-qemu$' config.yaml; then
+    mapfile -t qemu_images < <(csv_env_values RELATED_IMAGE_COMPONENT_BUILDER_QEMU)
+    if [[ ${#qemu_images[@]} -ne 1 ]]; then
+      echo "ERROR: CSV ${CSV} must set exactly one non-empty RELATED_IMAGE_COMPONENT_BUILDER_QEMU value; got: ${qemu_images[*]:-none}" >&2
+      QL_INSTALL_STATUS="failed"
+      QL_INSTALL_FAILURE="Quay Operator CSV ${CSV} has no unique builder VM image"
+      exit 1
+    fi
+    QEMU_IMAGE="${qemu_images[0]}"
+    echo "Builder VM image from CSV ${CSV}: ${QEMU_IMAGE}" >&2
+    sed -i -E "s|^( *BUILDER_VM_CONTAINER_IMAGE:) from-csv-qemu$|\1 ${QEMU_IMAGE}|" config.yaml
+  fi
 
   secret_args=(
     --from-file config.yaml=./config.yaml
@@ -528,6 +531,74 @@ spec:
     managed: true
 EOF
 
+# The kubernetes executor's VM has no cluster pull secret or mirror config. It
+# logs in to the WORKER_IMAGE registry as QUAY_USERNAME and runs
+# WORKER_IMAGE:WORKER_TAG, which quay-provisioning-builder points at a throwaway
+# user of this Quay. Create that user, copy the CSV's builder image there, and
+# pre-pull the VM image on every worker for IMAGE_PULL_POLICY IfNotPresent.
+function prepare_qemu_worker() {
+  [[ -n "${QEMU_IMAGE:-}" ]] || return 0
+  local executor='.BUILD_MANAGER[1].EXECUTORS[0]' worker host user password
+  local cookies response csrf code="" authfile arch src mirrored="" node
+  worker="$(yq e "${executor}.WORKER_IMAGE" config.yaml):$(yq e "${executor}.WORKER_TAG" config.yaml)"
+  user=$(yq e "${executor}.QUAY_USERNAME" config.yaml)
+  password=$(yq e "${executor}.QUAY_PASSWORD" config.yaml)
+  host=${worker%%/*}
+  if [[ "https://${host}" != "$(cat "${SHARED_DIR}/quayroute")" ]]; then
+    echo "ERROR: WORKER_IMAGE host ${host} is not the Quay route $(cat "${SHARED_DIR}/quayroute")" >&2
+    return 1
+  fi
+
+  # Quay rejects session POSTs without a CSRF token. Retry while the route settles.
+  cookies=$(mktemp)
+  response=$(mktemp)
+  for _ in $(seq 1 12); do
+    csrf=$(curl -sk -c "${cookies}" "https://${host}/csrf_token" | jq -r '.csrf_token // empty' || true)
+    code=$(jq -n --arg u "${user}" --arg p "${password}" '{username: $u, password: $p, email: ($u + "@example.com")}' |
+      curl -sk -o "${response}" -w '%{http_code}' -X POST "https://${host}/api/v1/user/" \
+        -b "${cookies}" -H "X-CSRF-Token: ${csrf}" -H 'Content-Type: application/json' --data @- || true)
+    [[ "${code}" == "200" ]] && break
+    sleep 10
+  done
+  if [[ "${code}" != "200" ]]; then
+    echo "ERROR: creating Quay user ${user} returned HTTP ${code}: $(cat "${response}")" >&2
+    return 1
+  fi
+  rm -f "${cookies}" "${response}"
+  echo "Created Quay user ${user} for the builder VM" >&2
+
+  # oc image mirror does not read the cluster's ImageDigestMirrorSets (a nightly
+  # CSV's registry.redhat.io/quay digests live on registry.stage.redhat.io), so
+  # try each mirror of the image before the image itself.
+  authfile=$(mktemp)
+  oc -n openshift-config get secret pull-secret -o jsonpath='{.data.\.dockerconfigjson}' | base64 -d |
+    jq --arg h "${host}" --arg a "$(printf '%s:%s' "${user}" "${password}" | base64 -w0)" \
+      '.auths[$h] = {auth: $a}' >"${authfile}"
+  arch=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[0].status.nodeInfo.architecture}')
+  for src in $(oc get imagedigestmirrorset -o json | jq -r --arg img "${builder_images[0]}" '
+      .items[].spec.imageDigestMirrors[]? | .source as $s
+      | select(($img | startswith($s + "/")) or ($img | startswith($s + "@")))
+      | .mirrors[]? + ($img | ltrimstr($s))') "${builder_images[0]}"; do
+    if oc image mirror -a "${authfile}" --insecure=true --filter-by-os="linux/${arch}" "${src}" "${worker}"; then
+      mirrored="${src}"
+      break
+    fi
+  done
+  rm -f "${authfile}"
+  if [[ -z "${mirrored}" ]]; then
+    echo "ERROR: could not copy ${builder_images[0]} to ${worker}" >&2
+    return 1
+  fi
+  echo "Copied builder image ${mirrored} to ${worker}" >&2
+
+  # The kubeconfig sets no namespace, so without -n oc debug looks up the CI
+  # pod's own namespace, which does not exist on this cluster.
+  for node in $(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{.items[*].metadata.name}'); do
+    echo "Pre-pulling ${QEMU_IMAGE} on ${node}" >&2
+    oc debug -n default "node/${node}" -- chroot /host podman pull -q --authfile /var/lib/kubelet/config.json "${QEMU_IMAGE}" >&2
+  done
+}
+
 echo "Waiting for Quay to become ready (timeout: 15m)..." >&2
 for i in $(seq 1 90); do
   status="$(oc -n "${QUAY_NS}" get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null || true)"
@@ -537,6 +608,7 @@ for i in $(seq 1 90); do
     oc -n "${QUAY_NS}" get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
     oc get quayregistry quay -n "${QUAY_NS}" -o jsonpath='{.status.registryEndpoint}' > "$SHARED_DIR"/quayroute || true
     archive_pod_info
+    prepare_qemu_worker
     exit 0
   fi
   if (( i % 6 == 0 )); then

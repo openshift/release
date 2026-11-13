@@ -15,13 +15,21 @@ images:
       COPY src/ /opt/app-root/src
       WORKDIR /opt/app-root/src/rosa-clusters-service
       USER root
-      RUN dnf install -y git go make jq python3 python3-pip skopeo wget xz
+      RUN dnf install -y git gcc make jq python3 python3-pip skopeo wget xz
       RUN dnf clean all
+      COPY golang/ /usr/lib/golang/
+      ENV GOROOT=/usr/lib/golang
+      ENV GOPATH=/tmp/go
+      ENV GOCACHE=/tmp/go-build
+      ENV PATH=/usr/lib/golang/bin:${PATH}
+      RUN go version
       RUN curl -sL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar xzf - -C /usr/local/bin oc
     from: nested-podman
     inputs:
       src:
         paths:
+        - destination_dir: golang
+          source_path: /usr/lib/golang/.
         - destination_dir: src
           source_path: /go/src/github.com/openshift-online/rosa-clusters-service
     to: golang-plus

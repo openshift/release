@@ -11,12 +11,42 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
+combined_ca=""
+# Clean owned CA/extension-auth files even on initialization failure; leave caller paths intact.
+function cleanup() {
+    if [[ -n "${combined_ca:-}" ]]; then
+        rm -f "${combined_ca}"
+    fi
+    if [[ "${REGISTRY_AUTH_FILE:-}" == "${SHARED_DIR}/openshift-tests-registry-auth" || -f "${SHARED_DIR}/mirrored_extension_image" ]]; then
+        rm -f "${SHARED_DIR}/openshift-tests-registry-auth"
+    fi
+    echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"
+}
+trap cleanup EXIT
+
 # Optional shared test-tool environment. Projects that install developer tools
 # in a preceding step can expose them to openshift-tests and its extensions by
 # writing this file into SHARED_DIR.
 if [[ -f "${SHARED_DIR}/cluster-debug-tools.env" ]]; then
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/cluster-debug-tools.env"
+fi
+
+if [[ -f "${SHARED_DIR}/mirrored_extension_image" ]]; then
+    test -s "${SHARED_DIR}/openshift-tests-registry-auth"
+    export REGISTRY_AUTH_FILE="${SHARED_DIR}/openshift-tests-registry-auth"
+fi
+if [[ -z "${SSL_CERT_FILE:-}" && -s "${SHARED_DIR}/additional_trust_bundle" ]]; then
+    # Explicit /tmp placement avoids serializing a CA file when TMPDIR is shared.
+    combined_ca=$(mktemp /tmp/openshift-tests-ca.XXXXXX)
+    if [[ -s /etc/pki/tls/certs/ca-bundle.crt ]]; then
+        cat /etc/pki/tls/certs/ca-bundle.crt "${SHARED_DIR}/additional_trust_bundle" > "${combined_ca}"
+    elif [[ -s /etc/ssl/certs/ca-certificates.crt ]]; then
+        cat /etc/ssl/certs/ca-certificates.crt "${SHARED_DIR}/additional_trust_bundle" > "${combined_ca}"
+    else
+        cp "${SHARED_DIR}/additional_trust_bundle" "${combined_ca}"
+    fi
+    export SSL_CERT_FILE="${combined_ca}"
 fi
 
 echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
@@ -85,14 +115,6 @@ if [[ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ]] && [[ -e "${SHARED_DIR}/${TEST_OCP
 fi
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
-function cleanup() {
-    #echo "Requesting risk analysis for test failures in this job run from sippy:"
-    #openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
-
-    echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"
-}
-trap cleanup EXIT
 
 mkdir -p "${HOME}"
 
