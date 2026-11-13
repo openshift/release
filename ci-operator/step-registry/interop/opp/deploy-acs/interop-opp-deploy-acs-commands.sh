@@ -519,10 +519,15 @@ else
 fi
 
 # --- Create-if-absent: OperatorGroup (any existing group is adopted; a
-# second group in one namespace puts CSVs into TooManyOperatorGroups) ---
-if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${ACS_NAMESPACE}" -o name 2>/dev/null)" ]]; then
-  _prop "acs_operatorgroup" "adopted"
-else
+#     second group in one namespace puts CSVs into TooManyOperatorGroups).
+#     A FAILED list is not an EMPTY list: an oc error collapsing to empty
+#     output sends a differently named existing group down the create path
+#     and installs the second group this check exists to prevent. The query
+#     keeps its exit status, retries, and classifies rather than guessing.
+_og_names() {
+  oc get operatorgroups.operators.coreos.com -n "${ACS_NAMESPACE}" -o name 2>&1
+}
+_og_apply() {
   cat <<EOF | oc apply -f - 2>&1
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
@@ -531,8 +536,53 @@ metadata:
   namespace: ${ACS_NAMESPACE}
 spec: {}
 EOF
-  _prop "acs_operatorgroup" "created"
+}
+_api_quiet
+_og_query_ok=false
+_og_listed=""
+for _og_attempt in 1 2 3; do
+  if _og_listed=$(_og_names); then
+    _og_query_ok=true
+    break
+  fi
+  (( _og_attempt < 3 )) || break
+  sleep 5
+done
+if [[ "${_og_query_ok}" != "true" ]]; then
+  _classify "acs-operatorgroup-error" "operatorgroups query failed in ${ACS_NAMESPACE} after 3 attempts ($(_api_err_class "${_og_listed}"))"
+  echo "ERROR: ${_class_detail}"
+  _dump_diagnostics
+  exit 1
 fi
+_og_objects=$(printf '%s\n' "${_og_listed}" | grep '^operatorgroup' || true)
+if [[ -n "${_og_objects}" ]]; then
+  _prop "acs_operatorgroup" "adopted"
+  _og_count=$(printf '%s\n' "${_og_objects}" | grep -c . || true)
+  if (( _og_count > 1 )); then
+    _prop "acs_operatorgroup_count" "${_og_count}"
+  fi
+else
+  if _og_out=$(_og_apply); then
+    _prop "acs_operatorgroup" "created"
+  else
+    # Re-list on create failure: a live OperatorPolicy (or any other writer)
+    # can create the group between the list and the apply. Adopt whatever is
+    # there now; classify only when nothing was created.
+    _og_relist=""
+    _og_relist_ok=false
+    if _og_relist=$(_og_names); then _og_relist_ok=true; fi
+    if [[ "${_og_relist_ok}" == "true" ]] && [[ -n "$(printf '%s\n' "${_og_relist}" | grep '^operatorgroup' || true)" ]]; then
+      _prop "acs_operatorgroup" "race-tolerated"
+      echo ">>> NOTE: OperatorGroup created concurrently by another writer - adopting"
+    else
+      _classify "acs-operatorgroup-error" "failed to create OperatorGroup rhacs-operator-group in ${ACS_NAMESPACE} ($(_api_err_class "${_og_out}"))"
+      echo "ERROR: ${_class_detail}"
+      _dump_diagnostics
+      exit 1
+    fi
+  fi
+fi
+_api_loud
 
 # --- Create-if-absent: Subscription (never apply over an existing one) ---
 _prop "channel_requested" "${ACS_CHANNEL}"
