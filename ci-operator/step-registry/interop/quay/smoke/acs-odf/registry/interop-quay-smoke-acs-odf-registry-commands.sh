@@ -31,9 +31,23 @@ echo ">>> PHASE: initialization"
 ARTIFACT_DIR="${ARTIFACT_DIR:=/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
 # Raw suite name and file name carry the step identity; ExitTrap
-# post-processing renames the suite (LP_IO__ET_PPP__NEW_TS_NAME) and
+# post-processing renames the suite with the template composed below and
 # merges this file into junit--interop-quay-smoke-acs-odf-registry.xml.
 typeset junitFile="${ARTIFACT_DIR}/junit_interop-quay-smoke-acs-odf-registry.xml"
+
+# Suite naming for the JUnit post-processing library: compose its suite-name
+# template from the component-suffixed prefix variable the consuming job sets.
+# The step ref declares the prefix with no default on purpose, so a step-local
+# value can never pin a prefix the job cannot see. When the prefix is unset
+# the raw suite name is kept, so the step still reports, and the gap is called
+# out loudly instead of failing the run.
+if [[ -n "${LP_QE__CR__TS_NAME__PFX__QUAY:-}" ]]; then
+    export LP_IO__ET_PPP__NEW_TS_NAME="${LP_QE__CR__TS_NAME__PFX__QUAY:+${LP_QE__CR__TS_NAME__PFX__QUAY}--}%s"
+else
+    echo ">>> WARNING: LP_QE__CR__TS_NAME__PFX__QUAY is unset or empty; keeping the raw suite name, which will not route to a component" >&2
+    unset LP_IO__ET_PPP__NEW_TS_NAME
+fi
+
 typeset imageTag=''
 imageTag="${BUILD_ID:-$(date +%s)}"
 # Ephemeral ACS admin password file: written once by RunAcsScan inside a
