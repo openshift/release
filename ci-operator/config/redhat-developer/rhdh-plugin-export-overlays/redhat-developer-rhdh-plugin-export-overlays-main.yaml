@@ -17,6 +17,53 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+# Temporary presubmit for `/pj-rehearse`; remove after validating the release job.
+- always_run: false
+  as: e2e-ocp-helm-osl-rc-rehearsal
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  max_concurrency: 1
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    env:
+      MUST_GATHER_KEEP_UNPACKED: "true"
+      MULTISTAGE_PARAM_OVERRIDE_OSL_RELEASE_JSON: >-
+        {"rhdhVersion":"2.1","ocpVersion":"4.20","logic":{"iib":"registry-proxy.engineering.redhat.com/rh-osbs/iib@sha256:f2b2a4c8da5202b788f6d53782daa889c8cbbbf5a159a13ae02257530c8506a7","package":"logic-operator","channel":"stable-1.37","startingCSV":"logic-operator.v1.37.4","expectedVersion":"1.37.4"}}
+    post:
+    - ref: gather-must-gather
+    test:
+    - ref: redhat-developer-rhdh-plugin-export-overlays-ocp-helm-osl-rc
+    workflow: generic-claim
+- as: e2e-ocp-helm-osl-rc
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    labels:
+      region: us-east-2
+    owner: rhdh
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  max_concurrency: 1
+  postsubmit: true
+  run_if_changed: ^$
+  steps:
+    allow_skip_on_success: true
+    env:
+      MUST_GATHER_KEEP_UNPACKED: "true"
+    post:
+    - ref: gather-must-gather
+    test:
+    - ref: redhat-developer-rhdh-plugin-export-overlays-ocp-helm-osl-rc
+    workflow: generic-claim
 - always_run: false
   as: e2e-ocp-helm
   cluster_claim:
