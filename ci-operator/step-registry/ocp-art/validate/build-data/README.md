@@ -1,52 +1,38 @@
 # Build-data validation
 
-The required ACM/MCE presubmits follow the existing `art-konflux-delivery-repo-check`
-configuration pattern:
+The shared presubmits validate LP and OCP metadata in `ocp-build-data`.
+Each release branch needs a CI configuration referencing the `ocp-art-build-data`
+workflow; new branches are not onboarded automatically. Tests run for every PR on the configured branch, including renames that move
+metadata outside its expected directories. Required checks block merging on
+validation errors.
+Tide policy and branch protection are configured separately.
 
 ```text
-ci-operator/config/openshift-eng/ocp-build-data/openshift-eng-ocp-build-data-<branch>.yaml
-  -> generated branch-specific Prow presubmit
-  -> ocp-art-build-data workflow
-  -> ocp-art-validate-build-data step
-  -> uv run --locked --no-dev python -I -m validator.ci
+branch CI configuration -> generated Prow job -> ocp-art-build-data workflow
+  -> ocp-art-validate-build-data step -> uv run python -I -m validator.ci
 ```
-
-The first pass covers every existing ACM and MCE release branch:
-
-- ACM: `2.11`, `2.13`, `2.14`, `2.15`, `2.16`, `2.17`, `5.0`, `5.1`.
-- MCE: `2.6`, `2.8`, `2.9`, `2.10`, `2.11`, `2.17`, `5.0`, `5.1`.
-
-All 16 jobs are required for PRs that change metadata matched by `run_if_changed`.
-Validation failures block merging. Each additional branch needs its own CI
-configuration referencing the same workflow. New y-streams
-are not automatically onboarded to the job. A `__periodics.yaml` variant is only
-needed for scheduled runs. Tide merge policy and branch protection are separate.
 
 ## Checks
 
-The validator reuses OCP YAML/schema, release, and basic member/stream validation,
-and adds the ticket's ownership, delivery-name, source-branch and Dockerfile checks:
+The validator checks:
 
-- Owners must be nonempty, and image `name` must match a delivery repository name.
-- Both the declared midstream (`content.source.git.url`) and public upstream
-  (`content.source.git.web`) must have a usable target/fallback branch.
-- The explicit Dockerfile, or `Dockerfile` by default, and any configured manifests
-  directory must exist in both sources.
-- In both stage and prod RPAs, image delivery repositories must be mapped under the
-  expected image component, and any bundle repository under its expected bundle component.
+- Metadata schemas, nonempty owners, and image names matching delivery repositories.
+- Image and stream references, declared dependents, and parent-member cycles.
+- Decreases in the configured product version compared with the PR target.
+- Branches, Dockerfiles and configured manifests directories in both the private
+  midstream and public upstream. The default Dockerfile is `Dockerfile`.
+- Image and bundle repositories under their own components in stage and production RPAs.
+- Production FBC catalog availability for configured `OCP_TARGET_VERSIONS`.
 
-These source and component-specific RPA checks are implemented in
-[art-tools #3919](https://github.com/openshift-eng/art-tools/pull/3919).
-Disabled and non-release images are excluded from RPA checks. Disabled images
-are skipped; WIP findings are nonblocking. No additional builder/dependent cycle
-policy is introduced. Parent `from.member` cycles and self-references are
-rejected, matching Doozer's existing ancestry validation.
+Disabled images are skipped. WIP findings are nonblocking. Images marked
+`for_release: false` are excluded from RPA checks. A failed access check is
+reported as an error rather than treated as evidence that a resource is missing.
 
 ## Runtime inputs
 
-Each branch config supplies its application, e.g. `KONFLUX_APPLICATION: acm-5-0` to select its RPAs, just as
-OCP supplies `OCP_VERSION` to its delivery-repos check. It is explicit because a
-rehearsal's primary PR targets release/main, not the ACM metadata branch.
+Each branch configuration sets `KONFLUX_APPLICATION` to select its stage and
+production RPAs. Set this explicitly because rehearsals target the release PR
+rather than a metadata PR.
 
 The step fetches `ART_TOOLS_REF` (default `main`) outside the metadata checkout,
 logs the checked-out commit, and uses its locked dependencies through `uv run`. Python `-I` prevents metadata PR
@@ -75,12 +61,8 @@ An explicit `git.web` selects the public repository; when absent, the most
 specific `public_upstreams` mapping supplies it. Public branch overrides apply
 only to the public source. Missing or inaccessible sources remain errors.
 
-Use `owner:ref` to fetch from a fork; an unqualified branch, tag or commit uses
-`openshift-eng/art-tools`. Merge this credential wiring before art-tools #3919,
-because subsequent runs fetch art-tools `main` and its new checks require private
-source access. To rehearse the new checks before that PR merges, set
-`ART_TOOLS_REF` to `ashwindasr:codex/ART-24206-validate-sources-and-rpa-mappings`.
-OCP job migration is separate work.
+`ART_TOOLS_REF` accepts a branch, tag or commit from `openshift-eng/art-tools`,
+or `owner:ref` for a fork. It defaults to `main`.
 
 ## Local testing
 
@@ -93,12 +75,13 @@ uv run python -I -m validator.ci \
   --schema-only --report /tmp/build-data-validation.json
 ```
 
-For source and RPA checks, replace `--schema-only` with:
+For source, RPA and catalog checks, replace `--schema-only` with:
 
 ```text
 --rpa-root /absolute/path/to/konflux-release-data/config
 --application acm-5-0
 --github-token-file /path/to/read-only-github-token
+--registry-auth-file /path/to/registry-auth.json
 ```
 
 After changing branch configs, run `make ci-operator-config jobs` and
