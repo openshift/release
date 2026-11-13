@@ -25,14 +25,21 @@ done
 # without triggering policy remediation.
 PinSubscriptionChannel () {
   typeset subNamespace="${1}" subName="${2}" channel="${3}"
-  typeset -i pinDeadline=$((SECONDS + 600))
-  until oc get subscription "${subName}" -n "${subNamespace}" >/dev/null 2>&1; do
-    ((SECONDS > pinDeadline)) && {
-      printf '%s\n' "Error: subscription ${subNamespace}/${subName} not found after 10 minutes; cannot pin channel ${channel}" >&2
-      return 1
-    }
+  # Wait through oc wait (Best Practices).  oc wait does not wait for
+  # not-yet-created objects (it fails fast on NotFound), so retry it until
+  # the subscription appears.
+  typeset -i pinWaitMax=600
+  SECONDS=0
+  while ((SECONDS < pinWaitMax)); do
+    oc wait "subscription/${subName}" -n "${subNamespace}" \
+      --for jsonpath='{.metadata.name}'="${subName}" \
+      --timeout 10s 1>/dev/null && break
     sleep 5
   done
+  if ((SECONDS >= pinWaitMax)); then
+    printf '%s\n' "Error: subscription ${subNamespace}/${subName} not found after 10 minutes; cannot pin channel ${channel}" >&2
+    return 1
+  fi
   oc patch subscription "${subName}" -n "${subNamespace}" --type merge \
     -p "{\"spec\":{\"channel\":\"${channel}\"}}"
   printf '[%s] Pinned subscription %s/%s to channel %s\n' \
@@ -45,7 +52,7 @@ echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n p
 # racing the GitOps Subscription propagation (stolostron/policy-collection#174)
 typeset -i expectedMinPolicies=4
 typeset -i pollDeadline=$((SECONDS + 600))
-until (( $(oc get policies -n policies -o json 2>/dev/null | jq '.items | length') >= expectedMinPolicies )); do
+until (( $(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length') >= expectedMinPolicies )); do
   ((SECONDS > pollDeadline)) && {
     printf '%s\n' "Error: fewer than ${expectedMinPolicies} policies after 10 minutes" >&2
     exit 1
@@ -62,22 +69,28 @@ done
 # Remove the local-cluster exclusion from the clusters placement in-cluster
 # so SecuredCluster policies can target local-cluster.  In OPP single-cluster
 # test environments local-cluster is the only managed cluster, and the
-# default NotIn rule prevents the SecuredCluster CR from being created —
+# default NotIn rule prevents the SecuredCluster CR from being created:
 # causing stackrox-opp-readiness to timeout.  Best effort: if the placement
 # shape differs or the appsub resync restores the predicate, behaviour falls
 # back to the upstream default.
-typeset -i placementDeadline=$((SECONDS + 300))
-until oc get placement placement-openshift-plus-clusters -n policies >/dev/null 2>&1; do
-  ((SECONDS > placementDeadline)) && {
-    printf '%s\n' "Warning: placement placement-openshift-plus-clusters not found after 5 minutes; skipping local-cluster predicate removal" >&2
+typeset isPlacementFound=false
+typeset -i placementWaitMax=300
+SECONDS=0
+while ((SECONDS < placementWaitMax)); do
+  if oc wait "placement/placement-openshift-plus-clusters" -n policies \
+    --for jsonpath='{.metadata.name}'=placement-openshift-plus-clusters \
+    --timeout 10s 1>/dev/null; then
+    isPlacementFound=true
     break
-  }
+  fi
   sleep 5
 done
-if oc get placement placement-openshift-plus-clusters -n policies >/dev/null 2>&1; then
+if [[ "${isPlacementFound}" == true ]]; then
   oc patch placement placement-openshift-plus-clusters -n policies --type json \
     -p '[{"op":"test","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1/key","value":"local-cluster"},{"op":"remove","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1"}]' \
     || printf '%s\n' "Warning: could not remove local-cluster NotIn predicate from placement (continuing with upstream default)" >&2
+else
+  printf '%s\n' "Warning: placement placement-openshift-plus-clusters not found after 5 minutes; skipping local-cluster predicate removal" >&2
 fi
 
 # Wait for Quay registry to be ready (checks operator-deployed Quay)
@@ -107,7 +120,7 @@ done
 typeset -a skipPoliciesArr=()
 if [[ -n "${SKIP_POLICIES:-}" ]]; then
   IFS=',' read -ra skipPoliciesArr <<< "${SKIP_POLICIES}"
-  printf '[%s] SKIP_POLICIES set — will skip %d polic(ies):\n' \
+  printf '[%s] SKIP_POLICIES set: will skip %d polic(ies):\n' \
     "$(date -u +%FT%TZ)" "${#skipPoliciesArr[@]}"
   for p in "${skipPoliciesArr[@]}"; do
     printf '  - %s\n' "${p}"
@@ -116,7 +129,7 @@ fi
 
 # Write the full skip manifest for auditing / artifact collection
 {
-  printf '# skip-policies manifest — generated %s\n' "$(date -u +%FT%TZ)"
+  printf '# skip-policies manifest: generated %s\n' "$(date -u +%FT%TZ)"
   printf '# SKIP_POLICIES=%s\n' "${SKIP_POLICIES:-}"
   printf '# Total policies to skip: %d\n' "${#skipPoliciesArr[@]}"
   for p in "${skipPoliciesArr[@]}"; do
@@ -137,6 +150,7 @@ FilterSkippedPolicies () {
     done
     [[ "${skip}" == false ]] && printf '%s\n' "${line}"
   done
+  true
 }
 
 if (( ${#skipPoliciesArr[@]} > 0 )); then
@@ -150,7 +164,7 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
     return 1
   }
   typeset allPolicies=""
-  allPolicies="$(oc get policies -n policies -o name 2>/dev/null)" || true
+  allPolicies="$(oc get policies -n policies -o name)" || true
   for p in "${skipPoliciesArr[@]}"; do
     if ! PolicyExists "${p}" <<< "${allPolicies}"; then
       printf '[%s] WARNING: policy "%s" from SKIP_POLICIES not found in cluster (ignoring)\n' \
@@ -173,24 +187,22 @@ while (( policyCount != prevCount )); do
   prevCount="${policyCount}"
 
   if (( ${#skipPoliciesArr[@]} > 0 )); then
-    # Fetch the full policy list first — fail hard if oc cannot reach the cluster
+    # Fetch the full policy list first: fail hard if oc cannot reach the cluster
     typeset policyList=""
     policyList="$(oc get policies -n policies -o name)" || {
       printf '[%s] ERROR: failed to list policies in namespace "policies"\n' \
         "$(date -u +%FT%TZ)" >&2
       exit 1
     }
-    # Filter out skipped policies (no-match is tolerated via || true)
-    typeset applyPolicies=""
-    applyPolicies="$(printf '%s\n' "${policyList}" | FilterSkippedPolicies)" || true
+    typeset -a applyPoliciesArr=()
+    mapfile -t applyPoliciesArr < <(printf '%s\n' "${policyList}" | FilterSkippedPolicies)
 
-    if [[ -n "${applyPolicies}" ]]; then
+    if (( ${#applyPoliciesArr[@]} > 0 )); then
       printf '[%s] Waiting for %d non-skipped polic(ies) to become Compliant…\n' \
-        "$(date -u +%FT%TZ)" "$(echo "${applyPolicies}" | wc -l)"
-      if ! echo "${applyPolicies}" |
-        xargs oc wait -n policies \
-          --for jsonpath='{.status.compliant}'=Compliant \
-          --timeout=40m; then
+        "$(date -u +%FT%TZ)" "${#applyPoliciesArr[@]}"
+      if ! oc wait -n policies \
+        --for jsonpath='{.status.compliant}'=Compliant \
+        --timeout=40m "${applyPoliciesArr[@]}"; then
         : "Non-skipped policies failed to become compliant:"
         oc get policies -n policies --ignore-not-found | FilterSkippedPolicies
         oc get policies -n policies --ignore-not-found -o yaml
@@ -198,11 +210,11 @@ while (( policyCount != prevCount )); do
         exit 1
       fi
     else
-      printf '[%s] All policies are in the skip list — no policies to wait for\n' \
+      printf '[%s] All policies are in the skip list: no policies to wait for\n' \
         "$(date -u +%FT%TZ)"
     fi
   else
-    printf '[%s] No policies to skip — waiting for ALL policies to become Compliant…\n' \
+    printf '[%s] No policies to skip: waiting for ALL policies to become Compliant…\n' \
       "$(date -u +%FT%TZ)"
     if ! oc wait policies --all -n policies \
       --for jsonpath='{.status.compliant}'=Compliant \
@@ -218,7 +230,7 @@ while (( policyCount != prevCount )); do
   # Count after the pass: if the query fails transiently, treat it as a
   # changed set so the next pass re-runs the wait (and fails properly
   # through the wait's diagnostics if the cluster API is really broken).
-  policyCount="$(( $(oc get policies -n policies -o json 2>/dev/null | jq '.items | length' || echo 0) ))"
+  policyCount="$(( $(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length' || echo 0) ))"
   printf '[%s] Compliance pass complete: %d policies in the set\n' \
     "$(date -u +%FT%TZ)" "${policyCount}"
 done

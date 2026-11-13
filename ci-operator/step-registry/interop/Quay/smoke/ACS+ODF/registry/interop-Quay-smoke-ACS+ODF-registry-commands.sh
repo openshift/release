@@ -36,6 +36,10 @@ mkdir -p "${ARTIFACT_DIR}"
 typeset junitFile="${ARTIFACT_DIR}/junit_interop-quay-smoke-ACS+ODF-registry.xml"
 typeset imageTag=''
 imageTag="${BUILD_ID:-$(date +%s)}"
+# Ephemeral ACS admin password file: written once by RunAcsScan inside a
+# subshell with xtrace disabled, read by the ACS helpers through
+# process-substitution curl configs, removed in Main.
+typeset acsPassFile='/tmp/acs-admin-password'
 
 typeset -A testStatus=()
 typeset -A testDuration=()
@@ -110,19 +114,16 @@ EOF
 # shellcheck disable=SC2317
 _propagate_junit () {
     mkdir -p "${SHARED_DIR}/junit"
-    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; || true
 }
 
 # Load ExitTrap library for JUnit XML post-processing at script level
 # (must be loaded before trap can fire to avoid secondary errors).
-# The URL is pinned to a specific commit (instead of refs/heads/main) so a
-# push to the library's default branch cannot silently change what runs
-# in CI; bump the pin deliberately when picking up library changes.
 eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
-        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
 )"
 
 # Post-process the JUnit XML for Component Readiness routing.  Guarded on
@@ -174,7 +175,7 @@ print(len(json.load(sys.stdin).get('items',[])))
     QUAY_HOST="${QUAY_HOST#https://}"
     if [[ -z "${QUAY_HOST}" ]]; then
         echo "ERROR: QuayRegistry ${QUAY_REGISTRY} exists but its registryEndpoint is empty (route not ready)" >&2
-        # rc 2: Quay is deployed but not usable — distinct from rc 1 (Quay
+        # rc 2: Quay is deployed but not usable: distinct from rc 1 (Quay
         # not deployed), so the caller fails instead of reporting a skip.
         return 2
     fi
@@ -183,62 +184,72 @@ print(len(json.load(sys.stdin).get('items',[])))
 }
 
 function GetQuayAuth () {
+    # Quay credentials are exported for downstream use in the current
+    # shell (Best Practices exception for variables needed downstream);
+    # xtrace is disabled once for the whole credential flow and restored
+    # at the single exit below, instead of toggled around each use.
+    typeset xtraceOn=false
+    [[ "${-}" == *x* ]] && xtraceOn=true
+    typeset authOk=false
+    set +x
+
     QUAY_USER=""
     QUAY_PASSWORD=""
     QUAY_TOKEN=""
 
-    typeset xtraceOn=false
-    [[ "${-}" == *x* ]] && xtraceOn=true
-    set +x
-
-    if oc get secret quayadmin -n "${QUAY_NS}" 2>/dev/null; then
-        QUAY_TOKEN="$(oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d 2>/dev/null)" || QUAY_TOKEN=""
-        QUAY_PASSWORD="$(oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null)" || QUAY_PASSWORD=""
+    if oc get secret quayadmin -n "${QUAY_NS}" -o name 1>/dev/null; then
+        QUAY_TOKEN="$(oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.token}' | base64 -d)" || QUAY_TOKEN=""
+        QUAY_PASSWORD="$(oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.password}' | base64 -d)" || QUAY_PASSWORD=""
         QUAY_USER="quayadmin"
         if [[ -n "${QUAY_TOKEN}" || -n "${QUAY_PASSWORD}" ]]; then
-            "${xtraceOn}" && set -x
+            authOk=true
             echo "INFO: Quay credentials obtained from quayadmin secret"
-            export QUAY_USER QUAY_PASSWORD QUAY_TOKEN
-            return 0
         fi
     fi
 
-    if oc get secret quaydevel -n "${QUAY_NS}" 2>/dev/null; then
-        QUAY_PASSWORD="$(oc get secret quaydevel -n "${QUAY_NS}" -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null)" || QUAY_PASSWORD=""
-        QUAY_USER="quaydevel"
-        if [[ -n "${QUAY_PASSWORD}" ]]; then
-            "${xtraceOn}" && set -x
-            echo "INFO: Quay credentials obtained from quaydevel secret"
-            export QUAY_USER QUAY_PASSWORD QUAY_TOKEN
-            return 0
+    if [[ "${authOk}" == false ]]; then
+        if oc get secret quaydevel -n "${QUAY_NS}" -o name 1>/dev/null; then
+            QUAY_PASSWORD="$(oc get secret quaydevel -n "${QUAY_NS}" -o jsonpath='{.data.password}' | base64 -d)" || QUAY_PASSWORD=""
+            QUAY_USER="quaydevel"
+            if [[ -n "${QUAY_PASSWORD}" ]]; then
+                authOk=true
+                echo "INFO: Quay credentials obtained from quaydevel secret"
+            fi
         fi
     fi
 
-    typeset initPassword=''
-    initPassword="$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(20)))")"
-    typeset initResult=''
-    initResult="$(curl -sk --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" \
-        -H "Content-Type: application/json" \
-        -d "{\"username\":\"quayadmin\",\"password\":\"${initPassword}\",\"email\":\"quayadmin@example.com\",\"access_token\":true}" 2>/dev/null)" || initResult=""
+    if [[ "${authOk}" == false ]]; then
+        typeset initPassword=''
+        initPassword="$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(20)))")"
+        typeset initResult=''
+        # The payload is piped in via stdin so the generated password is
+        # never part of the curl argv.
+        initResult="$(printf '%s' "{\"username\":\"quayadmin\",\"password\":\"${initPassword}\",\"email\":\"quayadmin@example.com\",\"access_token\":true}" | \
+            curl -fsSLk --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" \
+                -H "Content-Type: application/json" \
+                -d @-)" || initResult=""
 
-    QUAY_TOKEN="$(echo "${initResult}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)" || QUAY_TOKEN=""
-    if [[ -n "${QUAY_TOKEN}" ]]; then
-        QUAY_USER="quayadmin"
-        QUAY_PASSWORD="${initPassword}"
-        "${xtraceOn}" && set -x
-        echo "INFO: Quay admin user initialized via /api/v1/user/initialize"
-        export QUAY_USER QUAY_PASSWORD QUAY_TOKEN
-        return 0
+        QUAY_TOKEN="$(printf '%s' "${initResult}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)" || QUAY_TOKEN=""
+        if [[ -n "${QUAY_TOKEN}" ]]; then
+            QUAY_USER="quayadmin"
+            QUAY_PASSWORD="${initPassword}"
+            authOk=true
+            echo "INFO: Quay admin user initialized via /api/v1/user/initialize"
+        fi
     fi
+
+    export QUAY_USER QUAY_PASSWORD QUAY_TOKEN
     "${xtraceOn}" && set -x
 
+    if [[ "${authOk}" == true ]]; then
+        return 0
+    fi
     echo "ERROR: Could not obtain Quay credentials from any source" >&2
-    export QUAY_USER QUAY_PASSWORD QUAY_TOKEN
     return 1
 }
 
 function PreflightCheck () {
-    if ! curl -sk --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/api/v1/discovery" | grep -qi "quay"; then
+    if ! curl -fsSLk --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/api/v1/discovery" | grep -qi "quay"; then
         echo "ERROR: Quay registry endpoint not reachable" >&2
         return 1
     fi
@@ -246,47 +257,51 @@ function PreflightCheck () {
 }
 
 function CreateTestOrg () {
+    # Best effort: create the interop-smoke-test organization; re-runs
+    # against an existing organization return an HTTP error that must not
+    # fail the step, and the push test surfaces a real problem with its
+    # own message.  The signin token exchange sets QUAY_TOKEN for
+    # downstream use in the current shell (Best Practices exception), so
+    # xtrace is disabled once here and restored at the single exit below.
     typeset xtraceOn=false
     [[ "${-}" == *x* ]] && xtraceOn=true
-    # xtrace off for the whole function: the [[ ]] emptiness checks on
-    # QUAY_TOKEN below expand the credential into the trace log, and the
-    # scrub patterns in _opp_cleanup do not cover those forms (the log is
-    # copied into the public artifact dir when the step fails).
     set +x
 
     if [[ -z "${QUAY_TOKEN}" && -n "${QUAY_PASSWORD}" ]]; then
-        typeset cookieFile="/tmp/quay-cookies.txt"
+        # Password-only auth: exchange the password for an API token via
+        # the signin endpoint.  The payload is piped in via stdin so the
+        # password is never part of the curl argv.
+        typeset cookieFile='/tmp/quay-cookies.txt'
         typeset csrf=''
-        csrf="$(curl -sk --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/csrf_token" -c "${cookieFile}" | \
+        csrf="$(curl -fsSLk --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/csrf_token" -c "${cookieFile}" | \
             python3 -c "import sys,json; print(json.load(sys.stdin).get('csrf_token',''))" 2>/dev/null)" || csrf=""
 
         if [[ -n "${csrf}" ]]; then
             typeset signinResult=''
-            typeset signinPayload=''
-            signinPayload="$(python3 -c "
+            signinResult="$(python3 -c "
 import json, sys
 print(json.dumps({'username': sys.argv[1], 'password': sys.argv[2]}))
-" "${QUAY_USER}" "${QUAY_PASSWORD}")"
-            signinResult="$(curl -sk --connect-timeout 15 --max-time 30 -X POST "https://${QUAY_HOST}/api/v1/signin" \
+" "${QUAY_USER}" "${QUAY_PASSWORD}" | curl -fsSLk --connect-timeout 15 --max-time 30 -X POST "https://${QUAY_HOST}/api/v1/signin" \
                 -H "Content-Type: application/json" \
                 -H "X-CSRF-Token: ${csrf}" \
                 -b "${cookieFile}" -c "${cookieFile}" \
-                -d "${signinPayload}" 2>/dev/null)" || signinResult=""
-            QUAY_TOKEN="$(echo "${signinResult}" | \
+                -d @-)" || signinResult=""
+            QUAY_TOKEN="$(printf '%s' "${signinResult}" | \
                 python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null)" || QUAY_TOKEN=""
+            export QUAY_TOKEN
         fi
         rm -f "${cookieFile}"
-        export QUAY_TOKEN
     fi
 
     if [[ -z "${QUAY_TOKEN}" ]]; then
         echo "WARNING: No Quay token available; org creation may fail" >&2
     fi
 
-    curl -sk --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/organization/" \
+    curl -fsSLk --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/organization/" \
         -H "Authorization: Bearer ${QUAY_TOKEN}" \
         -H "Content-Type: application/json" \
         -d '{"name":"interop-smoke-test","email":"interop-test@example.com"}' || true
+
     "${xtraceOn}" && set -x
     true
 }
@@ -302,30 +317,27 @@ function RunPushPull () {
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
     typeset authFile="/tmp/quay-auth.json"
 
-    # xtrace off: the [[ ]] emptiness check below and the auth file
-    # contents expand QUAY_TOKEN / QUAY_PASSWORD into the trace log, and
-    # the scrub patterns in _opp_cleanup do not cover those forms.
-    typeset xtraceOn=false
-    [[ "${-}" == *x* ]] && xtraceOn=true
-    set +x
-    if [[ -z "${QUAY_TOKEN}" && -z "${QUAY_PASSWORD}" ]]; then
-        "${xtraceOn}" && set -x
+    # The credential check and the auth file are handled inside subshells
+    # with xtrace disabled (Best Practices secret handling): the values
+    # are never expanded in a trace.  skopeo reads the auth file, so no
+    # credential appears in the command lines either.
+    if ! ( set +x
+           [[ -n "${QUAY_TOKEN}" || -n "${QUAY_PASSWORD}" ]]
+         ); then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "No valid Quay authentication token or password available" "${elapsed}"
         return 1
     fi
 
-    typeset registryAuth=''
-    if [[ -n "${QUAY_TOKEN}" ]]; then
-        registryAuth="$(echo -n "\$oauthtoken:${QUAY_TOKEN}" | base64 -w0)"
-    else
-        registryAuth="$(echo -n "${QUAY_USER}:${QUAY_PASSWORD}" | base64 -w0)"
-    fi
-
-    cat > "${authFile}" <<EOF
-{"auths":{"${QUAY_HOST}":{"auth":"${registryAuth}"}}}
-EOF
-    "${xtraceOn}" && set -x
+    ( set +x
+      typeset registryAuth=''
+      if [[ -n "${QUAY_TOKEN}" ]]; then
+          registryAuth="$(printf '%s' "\$oauthtoken:${QUAY_TOKEN}" | base64 -w0)"
+      else
+          registryAuth="$(printf '%s' "${QUAY_USER}:${QUAY_PASSWORD}" | base64 -w0)"
+      fi
+      printf '{"auths":{"%s":{"auth":"%s"}}}\n' "${QUAY_HOST}" "${registryAuth}" >"${authFile}"
+    true )
 
     if ! skopeo copy --dest-tls-verify=false \
         --dest-authfile="${authFile}" \
@@ -449,21 +461,22 @@ print(' '.join(unbound))
 # Test Case 3: ACS scan of pushed Quay image
 ################################################################################
 function RegisterQuayInAcs () {
-    typeset acsHost="${1}" acsPassword="${2}"
-    typeset xtraceOn=false
-    [[ "${-}" == *x* ]] && xtraceOn=true
-    set +x  # tracing off: credentials
+    typeset acsHost="${1}"
+    # Runs in a subshell with xtrace disabled: the registration payload
+    # embeds the Quay credentials, and the ACS admin password is read
+    # from the ephemeral file into a process-substitution curl config, so
+    # neither appears in a trace or in argv.
+    ( set +x
+      typeset response=''
+      if ! response=$(curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 60 \
+          --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+          "https://${acsHost}/v1/imageintegrations"); then
+          echo "ERROR: Failed to query ACS image integrations" >&2
+          exit 1
+      fi
 
-    typeset response=''
-    if ! response=$(curl -s "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 60 -u "admin:${acsPassword}" \
-        "https://${acsHost}/v1/imageintegrations" 2>/dev/null); then
-        echo "ERROR: Failed to query ACS image integrations" >&2
-        "${xtraceOn}" && set -x
-        return 1
-    fi
-
-    typeset existing=''
-    existing=$(echo "${response}" | python3 -c "
+      typeset existing=''
+      existing=$(printf '%s' "${response}" | python3 -c "
 import sys, json, os
 host = os.environ['QUAY_HOST']
 data = json.load(sys.stdin)
@@ -474,23 +487,22 @@ for i in data.get('integrations', []):
 sys.exit(1)
 " 2>/dev/null) || existing=""
 
-    if [[ -n "${existing}" ]]; then
-        echo "INFO: Quay integration already registered in ACS"
-        "${xtraceOn}" && set -x
-        return 0
-    fi
+      if [[ -n "${existing}" ]]; then
+          echo "INFO: Quay integration already registered in ACS"
+          exit 0
+      fi
 
-    typeset regUser='' regPass=''
-    if [[ -n "${QUAY_TOKEN}" ]]; then
-        regUser="\$oauthtoken"
-        regPass="${QUAY_TOKEN}"
-    else
-        regUser="${QUAY_USER}"
-        regPass="${QUAY_PASSWORD}"
-    fi
+      typeset regUser='' regPass=''
+      if [[ -n "${QUAY_TOKEN}" ]]; then
+          regUser="\$oauthtoken"
+          regPass="${QUAY_TOKEN}"
+      else
+          regUser="${QUAY_USER}"
+          regPass="${QUAY_PASSWORD}"
+      fi
 
-    typeset regPayload=''
-    regPayload=$(python3 -c "
+      typeset regPayload=''
+      regPayload=$(python3 -c "
 import json, sys, os
 payload = {
     'name': 'interop-quay-smoke',
@@ -507,53 +519,49 @@ payload = {
 print(json.dumps(payload))
 " "${regUser}" "${regPass}")
 
-    typeset regCode=""
-    regCode=$(curl -s "${acsTlsOpts[@]}" -o /dev/null -w '%{http_code}' \
-        --connect-timeout 15 --max-time 60 \
-        -X POST "https://${acsHost}/v1/imageintegrations" \
-        -u "admin:${acsPassword}" \
-        -H "Content-Type: application/json" \
-        -d "${regPayload}" 2>/dev/null) || regCode="000"
-    if [[ "${regCode}" != 2* ]]; then
-        echo "ERROR: Failed to register Quay in ACS (HTTP ${regCode})" >&2
-        "${xtraceOn}" && set -x
-        return 1
-    fi
+      typeset regCode=""
+      regCode=$(curl -s "${acsTlsOpts[@]}" -o /dev/null -w '%{http_code}' \
+          --connect-timeout 15 --max-time 60 \
+          -X POST "https://${acsHost}/v1/imageintegrations" \
+          --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+          -H "Content-Type: application/json" \
+          -d "${regPayload}" 2>/dev/null) || regCode="000"
+      if [[ "${regCode}" != 2* ]]; then
+          echo "ERROR: Failed to register Quay in ACS (HTTP ${regCode})" >&2
+          exit 1
+      fi
 
-    echo "INFO: Registered Quay as ACS image integration"
-    "${xtraceOn}" && set -x
-    true
+      echo "INFO: Registered Quay as ACS image integration"
+    )
 }
 
 function RequestAcsScan () {
-    typeset acsHost="${1}" acsPassword="${2}" imageName="${3}"
-    typeset xtraceOn=false
-    [[ "${-}" == *x* ]] && xtraceOn=true
-    set +x  # tracing off: credentials
-
-    typeset scanPayload=''
-    scanPayload=$(python3 -c "
+    typeset acsHost="${1}" imageName="${2}"
+    # Runs in a subshell with xtrace disabled; the ACS admin password is
+    # read from the ephemeral file into a process-substitution curl
+    # config (never in a trace or in argv).
+    ( set +x
+      typeset scanPayload=''
+      scanPayload=$(python3 -c "
 import json, sys
 payload = {'imageName': sys.argv[1], 'force': True}
 print(json.dumps(payload))
 " "${imageName}")
 
-    typeset scanCode=""
-    scanCode=$(curl -s "${acsTlsOpts[@]}" -o /dev/null -w '%{http_code}' \
-        --connect-timeout 15 --max-time 60 \
-        -X POST "https://${acsHost}/v1/images/scan" \
-        -u "admin:${acsPassword}" \
-        -H "Content-Type: application/json" \
-        -d "${scanPayload}" 2>/dev/null) || scanCode="000"
-    if [[ "${scanCode}" != 2* ]]; then
-        echo "ERROR: ACS scan request failed (HTTP ${scanCode})" >&2
-        "${xtraceOn}" && set -x
-        return 1
-    fi
+      typeset scanCode=""
+      scanCode=$(curl -s "${acsTlsOpts[@]}" -o /dev/null -w '%{http_code}' \
+          --connect-timeout 15 --max-time 60 \
+          -X POST "https://${acsHost}/v1/images/scan" \
+          --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+          -H "Content-Type: application/json" \
+          -d "${scanPayload}" 2>/dev/null) || scanCode="000"
+      if [[ "${scanCode}" != 2* ]]; then
+          echo "ERROR: ACS scan request failed (HTTP ${scanCode})" >&2
+          exit 1
+      fi
 
-    echo "INFO: Requested ACS scan for pushed image"
-    "${xtraceOn}" && set -x
-    true
+      echo "INFO: Requested ACS scan for pushed image"
+    )
 }
 
 function RunAcsScan () {
@@ -561,26 +569,26 @@ function RunAcsScan () {
     typeset -i start=0 elapsed=0
     start=$(date +%s)
 
-    typeset acsHost='' acsPassword=''
-    acsHost="$(oc get route -n stackrox central -o jsonpath='{.spec.host}' 2>/dev/null)" || acsHost=""
+    typeset acsHost=''
+    acsHost="$(oc get route -n stackrox central -o jsonpath='{.spec.host}')" || acsHost=""
     if [[ -z "${acsHost}" ]]; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "skipped" "ACS not deployed (Central route not found)" "${elapsed}"
         return 0
     fi
 
-    typeset xtraceOn=false
-    [[ "${-}" == *x* ]] && xtraceOn=true
-    set +x
-    acsPassword="$(oc get secret -n stackrox central-htpasswd -o jsonpath='{.data.password}' 2>/dev/null | base64 -d 2>/dev/null)" || acsPassword=""
-    # xtrace still off: the check below expands the password
-    if [[ -z "${acsPassword}" ]]; then
-        "${xtraceOn}" && set -x
+    # The ACS admin password is written to an ephemeral file inside a
+    # subshell with xtrace disabled (Best Practices secret handling): it
+    # is never set as a main-shell variable, never expanded in a trace,
+    # and never passed as a command argument.
+    ( set +x
+      oc get secret -n stackrox central-htpasswd -o jsonpath='{.data.password}' | base64 -d >"${acsPassFile}" || true
+    true )
+    if [[ ! -s "${acsPassFile}" ]]; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "skipped" "ACS admin password not available" "${elapsed}"
         return 0
     fi
-    "${xtraceOn}" && set -x
 
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
 
@@ -594,7 +602,7 @@ function RunAcsScan () {
     typeset saCaBundle='/var/run/secrets/kubernetes.io/serviceaccount/ca.crt'
     if [[ -f "${saCaBundle}" ]]; then
         typeset tlsProbe=''
-        tlsProbe="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 15 --max-time 30 --cacert "${saCaBundle}" "https://${acsHost}/v1/ping" 2>/dev/null)" || tlsProbe='000'
+        tlsProbe="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 15 --max-time 30 --cacert "${saCaBundle}" "https://${acsHost}/v1/ping")" || tlsProbe='000'
         if [[ -n "${tlsProbe}" && "${tlsProbe}" != '000' ]]; then
             acsTlsOpts=( --cacert "${saCaBundle}" )
         else
@@ -602,30 +610,27 @@ function RunAcsScan () {
         fi
     fi
 
-    # Mask credentials: function call args expand in xtrace
-    set +x 2>/dev/null
-    if ! RegisterQuayInAcs "${acsHost}" "${acsPassword}"; then
-        "${xtraceOn}" && set -x
+    if ! RegisterQuayInAcs "${acsHost}"; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "Failed to register Quay in ACS" "${elapsed}"
         return 1
     fi
-    if ! RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}"; then
-        "${xtraceOn}" && set -x
+    if ! RequestAcsScan "${acsHost}" "${pushTarget}"; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "ACS scan request failed" "${elapsed}"
         return 1
     fi
-    "${xtraceOn}" && set -x
 
     typeset -i attempts=0 maxAttempts=40
 
     while (( attempts < maxAttempts )); do
         typeset scanResult=''
-        set +x
-        scanResult=$(curl -s "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 30 -u "admin:${acsPassword}" \
-            "https://${acsHost}/v1/images?query=Image:${pushTarget}" 2>/dev/null) || scanResult=""
-        "${xtraceOn}" && set -x
+        scanResult="$(
+            set +x
+            curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 30 \
+                --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+                "https://${acsHost}/v1/images?query=Image:${pushTarget}"
+        )" || scanResult=""
 
         if echo "${scanResult}" | python3 -c "
 import sys, json
@@ -639,9 +644,7 @@ sys.exit(0 if len(images) > 0 else 1)
         fi
 
         if (( attempts % 4 == 3 )); then
-            set +x 2>/dev/null
-            RequestAcsScan "${acsHost}" "${acsPassword}" "${pushTarget}" || true
-            "${xtraceOn}" && set -x
+            RequestAcsScan "${acsHost}" "${pushTarget}" || true
         fi
 
         attempts=$((attempts + 1))
@@ -689,7 +692,7 @@ function Main () {
         RecordResult "[sig-interop][Jira:INTEROP][Feature:Quay] ACS scan of pushed Quay image" "skipped" "Skipped: push-pull test failed; no image available to scan"
     fi
 
-    rm -f /tmp/quay-auth.json
+    rm -f /tmp/quay-auth.json "${acsPassFile}"
 
     exit "${status}"
 }
