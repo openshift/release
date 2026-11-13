@@ -1,7 +1,7 @@
 ref:
-  as: openshift-evpn-gateway-appliance-e2e
+  as: openshift-evpn-gateway-appliance-test
   from: ansible-test-runner
-  commands: openshift-evpn-gateway-appliance-e2e-commands.sh
+  commands: openshift-evpn-gateway-appliance-test-commands.sh
   credentials:
   - namespace: test-credentials
     bundle: registry-pull-credentials
@@ -30,6 +30,8 @@ ref:
   - name: EE_BASE_IMAGE
     default: ""
     documentation: Execution-environment base; set by the centos-stream10 dependency.
+  - name: EGA_ENTRYPOINT
+    documentation: run_remote.sh entrypoint to run, set per test (entrypoint_e2e.sh for e2e, entrypoint_molecule.sh for molecule).
   - name: FRR_IMAGE
     default: ""
     documentation: FRR payload baked into the appliance; set by the metallb-frr dependency.
@@ -37,11 +39,12 @@ ref:
     default: ""
     documentation: node-exporter payload baked into the appliance; set by the prometheus-node-exporter dependency.
   documentation: >-
-    Runs the emulated EVPN e2e lane on the EC2 VM from the
+    Runs an appliance test lane on the EC2 VM from the
     openshift-image-based-infra-aws-ec2 chain. This runs in the CI image
     (ansible-test-runner), which bakes test/e2e/run_remote.sh and carries skopeo + ssh,
     and runs run_remote.sh in remote mode: it exports CI_IMAGE and the base images to
-    tarballs, ships them to the VM, and builds and runs the lane there. The image inputs
-    default to public images and are overridden by the base_images dependencies
-    (CI_IMAGE/FRR_IMAGE/NODE_EXPORTER_IMAGE/EE_BASE_IMAGE); APPLIANCE_BASE_IMAGE has no
-    mirror so it stays the public default.
+    tarballs, ships them to the VM, and builds and runs the lane there. EGA_ENTRYPOINT
+    selects the lane (entrypoint_e2e.sh for e2e, entrypoint_molecule.sh for molecule).
+    The image inputs default to public images and are overridden by the base_images
+    dependencies (CI_IMAGE/FRR_IMAGE/NODE_EXPORTER_IMAGE/EE_BASE_IMAGE);
+    APPLIANCE_BASE_IMAGE has no mirror so it stays the public default.

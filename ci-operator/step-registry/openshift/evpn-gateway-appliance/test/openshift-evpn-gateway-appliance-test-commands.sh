@@ -11,7 +11,7 @@ set -euo pipefail
 # Target VM from the provisioning chain.
 remote="$(cat "${SHARED_DIR}/ssh_user")@$(cat "${SHARED_DIR}/public_address")"
 ssh_opts="-i ${CLUSTER_PROFILE_DIR}/ssh-privatekey -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=30 -o ConnectTimeout=30"
-echo "e2e: target VM ${remote}"
+echo "target VM ${remote}"
 
 # Install what load.sh/build.sh/run.sh need (netavark explicit so a bumped podman doesn't outrun
 # it) and enable the podman socket. Wait for sshd first (ec2 chain waits for instance-status-ok).
@@ -30,4 +30,5 @@ exec env \
 	NODE_EXPORTER_IMAGE="${NODE_EXPORTER_IMAGE}" \
 	EE_BASE_IMAGE="${EE_BASE_IMAGE}" \
 	APPLIANCE_BASE_IMAGE="${APPLIANCE_BASE_IMAGE}" \
+	EGA_ENTRYPOINT="${EGA_ENTRYPOINT}" \
 	bash /src/test/e2e/run_remote.sh
