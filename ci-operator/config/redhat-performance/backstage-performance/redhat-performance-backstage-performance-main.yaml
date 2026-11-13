@@ -558,6 +558,44 @@ tests:
       USERS: "1"
       WORKERS: "1"
     workflow: redhat-performance-backstage-performance
+- as: ui-dynamic-plugins-cpt
+  cron: 15 2 * * *
+  reporter_config:
+    channel: '#rhdh-perfscale-notify'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: <@U0AKNPBBVT7>, RHDH CPT job *<{{.Status.URL}}|{{.Spec.Job}}>*
+      finished with *{{.Status.State}}*
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      CATALOG_REFRESH_INTERVAL_MINUTES: "120"
+      DURATION: 10m
+      ENABLE_ORCHESTRATOR: "false"
+      ENABLE_RBAC: "true"
+      ENSURE_CATALOG_POPULATION_TIMEOUT: "7200"
+      LDAP_SCHEDULE_TIMEOUT_MINUTES: "120"
+      LOCUST_WORKER_MEMORY_LIMIT: 4Gi
+      OPENSEARCH_INDEX: rhdh-performance.ui-dynamic-plugins-cpt
+      PERFORM_REGRESSION: "false"
+      PRE_LOAD_DB: "true"
+      RHDH_RESOURCES_EPHEMERAL_STORAGE_LIMITS: 10Gi
+      RHDH_STARTUP_TIMEOUT_SECONDS: "7200"
+      SCALE_ACTIVE_USERS_SPAWN_RATES: "1:1"
+      SCALE_BS_USERS_GROUPS: 1000:10000
+      SCALE_CATALOG_SIZES: 1250:1250
+      SCALE_CPU_REQUESTS_LIMITS: "2:2"
+      SCALE_DB_STORAGES: 20Gi
+      SCALE_MEMORY_REQUESTS_LIMITS: 3Gi:3Gi
+      SCALE_PAGE_N_CATALOG_TAB_N_COUNTS: 0:0 5:5 25:25 50:50
+      SCALE_REPLICAS: "1:1"
+      SCALE_WORKERS: "1"
+      SCENARIO: ui-baseline
+      UPLOAD_TO_OPENSEARCH: "false"
+      USE_PR_BRANCH: "false"
+    workflow: redhat-performance-backstage-performance-scalability
 zz_generated_metadata:
   branch: main
   org: redhat-performance
