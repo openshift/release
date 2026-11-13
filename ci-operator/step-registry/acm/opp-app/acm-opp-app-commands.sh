@@ -265,14 +265,22 @@ function RunTestCase2 () {
         return 2
     fi
 
-    # Fetch ACS credentials - disable xtrace for secret handling
+    # Fetch ACS credentials - disable xtrace for secret handling. The
+    # emptiness check stays inside the untraced block as well: bash prints the
+    # expanded arguments of a test under `set -x`, so `[[ -z "${acsPassword}" ]]`
+    # would write the password to the build log. Tracing is restored on both
+    # the success and the credential-missing path.
     typeset acsPassword=""
     typeset acsHost=""
+    typeset -i acsCredsMissing=0
     set +x
     acsPassword=$(oc get secret -n stackrox central-htpasswd -o json | /tmp/jq -r '.data.password' | base64 -d)
     acsHost=$(oc get secret -n stackrox sensor-tls -o json | /tmp/jq -r '.data."acs-host"' | base64 -d)
-    set -x
     if [[ -z "${acsPassword}" ]] || [[ -z "${acsHost}" ]]; then
+        acsCredsMissing=1
+    fi
+    set -x
+    if (( acsCredsMissing )); then
         : "ERROR: ACS credentials unavailable - central-htpasswd or sensor-tls secret missing in namespace stackrox"
         _acs_fail_reason="ACS credentials unavailable: central-htpasswd/sensor-tls secret not found in namespace stackrox"
         return 1
