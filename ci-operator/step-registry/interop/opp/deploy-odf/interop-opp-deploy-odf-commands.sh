@@ -884,8 +884,10 @@ fi
 #     odf_bucketclass=adopted and bucket claims would silently use the default
 #     store instead of the pv-pool this step provisions. ---
 _bc_stores=$(oc get bucketclasses.noobaa.io noobaa-default-bucket-class -n "${ODF_NAMESPACE}" \
-  -o jsonpath='{range .spec.placementPolicy.tiers[*]}{.backingStores}{"\n"}{end}' 2>/dev/null) || _bc_stores=""
-if [[ "${_bc_stores}" != *noobaa-pv-backing-store* ]]; then
+  -o jsonpath='{range .spec.placementPolicy.tiers[*].backingStores[*]}{.}{"\n"}{end}' 2>/dev/null) || _bc_stores=""
+# Exact line match: a substring test would also accept
+# noobaa-pv-backing-store-archive or any longer name containing the target.
+if ! printf '%s\n' "${_bc_stores}" | grep -qx 'noobaa-pv-backing-store'; then
   _classify "odf-bucketclass-placement-error" "BucketClass noobaa-default-bucket-class does not use noobaa-pv-backing-store (backingStores: $(printf '%s' "${_bc_stores:-absent}" | tr '\n' ' '))"
   echo "ERROR: ${_class_detail}"
   _dump_diagnostics
