@@ -1,0 +1,26 @@
+workflow:
+  as: rhwa-system-tests-s390x-fbc-fresh-install
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: upi-libvirt-cleanup-pre
+    - chain: upi-conf-libvirt
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - chain: upi-install-libvirt
+    test:
+    - chain: rhwa-system-tests-s390x-fbc-fresh-install-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: rhwa-system-tests-s390x-cleanup
+    - ref: upi-libvirt-cleanup-post
+  documentation: |-
+    s390x Orange Zone libvirt lifecycle for RHWA FBC fresh-install jobs.
+
+    Same UPI/libvirt pre/post as rhwa-system-tests-s390x, but the test phase runs
+    medik8s-fbc-fresh-install (no SSH bastion) instead of medik8s-setup + GA-label
+    make run-tests. Kubelet-stop uses MEDIK8S_KUBELET_STOP_OCDEBUG from the FBC
+    step. Use for openshift/rhwa-system-tests variant 5.0-s390x-fresh-install.
+    Set TEST_NAME / TEST_STEPS for Claude failure analysis.
