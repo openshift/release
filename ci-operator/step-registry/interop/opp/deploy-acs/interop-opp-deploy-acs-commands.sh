@@ -32,7 +32,8 @@ shopt -u patsub_replacement 2>/dev/null || true
 #       4. CSV phase Failed -> acs-csv-failed
 #       5. deadline -> acs-csv-timeout
 #       default -> acs-unclassified:<type>/<reason> (JUnit error, never pass)
-#   * Self-disable: when operatorpolicy-rhacs-operator is Compliant with a
+#   * Self-disable: when the operatorpolicy-rhacs-operator that owns THIS
+#     step's namespace (spec.subscription.namespace) is Compliant with a
 #     matching channel and the CSV is Succeeded, emit
 #     workaround_removal_ready=true and exit 0 without installing.
 #   * Create-if-absent only: an existing Subscription is adopted (channel
@@ -399,26 +400,38 @@ if oc get crd operatorpolicies.policy.open-cluster-management.io >/dev/null 2>&1
     _self_disable=$(printf '%s' "${_op_status}" | python3 -c '
 import json, sys
 requested = sys.argv[1] if len(sys.argv) > 1 else ""
+target_ns = sys.argv[2] if len(sys.argv) > 2 else ""
 try:
     d = json.load(sys.stdin)
     items = d.get("items", [d])
-    out = "false"
-    for i in items:
-        if i.get("metadata", {}).get("name") != "operatorpolicy-rhacs-operator":
-            continue
+    # OperatorPolicy is namespaced and the list above is cluster-wide, so the
+    # name alone does not identify the policy that owns this install. Bind the
+    # match to spec.subscription.namespace, the namespace this step manages.
+    matches = [i for i in items
+               if i.get("metadata", {}).get("name") == "operatorpolicy-rhacs-operator"
+               and (i.get("spec", {}).get("subscription", {}) or {}).get("namespace") == target_ns]
+    if not matches:
+        # No policy owns this namespace: the install path runs.
+        print("false")
+    elif len(matches) > 1:
+        # Ambiguous: several same-named policies claim this namespace. Fail
+        # closed, never claim the workaround is removable.
+        print("ambiguous")
+    else:
+        i = matches[0]
         conds = i.get("status", {}).get("conditions", [])
         compliant = any(c.get("type") == "Compliant" and c.get("status") == "True" for c in conds)
         spec_ch = (i.get("spec", {}).get("subscription", {}) or {}).get("channel")
         # Self-disable only on a matching channel: an adopted Subscription on a
         # different channel is not workaround-removal ready, so report the
         # observed channel and let the install path record the mismatch.
+        out = "false"
         if compliant and spec_ch:
             out = "true" if spec_ch == requested else "withheld " + spec_ch
-        break
-    print(out)
+        print(out)
 except Exception:
     print("false")
-' "${ACS_CHANNEL}" 2>/dev/null || echo "false")
+' "${ACS_CHANNEL}" "${ACS_NAMESPACE}" 2>/dev/null || echo "false")
     if [[ "${_self_disable}" == "true" ]]; then
       _existing_csv=$(oc get csv -n "${ACS_NAMESPACE}" -l "operators.coreos.com/rhacs-operator.${ACS_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _existing_csv=""
       if [[ "${_existing_csv}" == "Succeeded" ]]; then
@@ -427,6 +440,9 @@ except Exception:
         _prop "acs_subscription" "adopted"
         exit 0
       fi
+    elif [[ "${_self_disable}" == "ambiguous" ]]; then
+      echo ">>> NOTE: more than one OperatorPolicy claims subscription namespace ${ACS_NAMESPACE}: self-disable withheld, installing"
+      _prop "operatorpolicy_match" "ambiguous"
     elif [[ "${_self_disable}" == withheld* ]]; then
       _policy_ch="${_self_disable#withheld }"
       echo ">>> NOTE: OperatorPolicy channel '${_policy_ch}' != requested '${ACS_CHANNEL}': self-disable withheld, installing"
