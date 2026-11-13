@@ -73,15 +73,24 @@ fi
 
 # The manual workflow never deploys the operator, so the migration resource
 # (and its namespace) do not exist there; only enforce the Ready condition
-# when the resource is present (operator-driven workflow).
-if oc -n "${MIGRATION_NAMESPACE}" get "vmwarecloudfoundationmigration/${MIGRATION_NAME}" >/dev/null 2>&1; then
+# when the resource is present (operator-driven workflow). The manual
+# variant also has no CRD, so the not-found family — a missing resource or a
+# missing resource type — is the expected absence; any other error (RBAC,
+# apiserver, timeout) must fail the verification instead of silently
+# skipping the Ready gate.
+migration_get_status=0
+migration_get_output="$(oc -n "${MIGRATION_NAMESPACE}" get "vmwarecloudfoundationmigration/${MIGRATION_NAME}" 2>&1)" \
+  || migration_get_status=$?
+if [[ "${migration_get_status}" -eq 0 ]]; then
   migration_ready="$(oc -n "${MIGRATION_NAMESPACE}" get "vmwarecloudfoundationmigration/${MIGRATION_NAME}" -o json | jq -r '
     .status.conditions[]? | select(.type == "Ready") | .status')"
   if [[ "${migration_ready}" != "True" ]]; then
     fail_with_details "migration resource Ready condition is ${migration_ready:-unset}"
   fi
-else
+elif grep -qiE "NotFound|not found|doesn't have a resource type|has no resource type" <<< "${migration_get_output}"; then
   log "no VmwareCloudFoundationMigration resource; skipping the operator Ready check (manual migration)"
+else
+  fail_with_details "failed to read the migration resource: ${migration_get_output}"
 fi
 
 # Verify node region/zone labels match target failure domain tags

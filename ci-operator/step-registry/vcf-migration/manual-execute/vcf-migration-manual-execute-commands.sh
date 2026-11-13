@@ -391,7 +391,7 @@ log "runbook step 4: wait for the cluster to pick up the new vCenter"
 # failure.
 function cloud_conf_has_vcenter() {
   local server="$1"
-  local cm_json conf_file server_re
+  local cm_json conf_file conf_out server_re
   cm_json="$(fetch_json get cm cloud-conf -n openshift-cloud-controller-manager)" || return 2
   if jq -e --arg server "${server}" \
     '.data."cloud.conf" | fromjson | .vcenter | has($server)' <<< "${cm_json}" >/dev/null 2>&1; then
@@ -400,11 +400,13 @@ function cloud_conf_has_vcenter() {
   conf_file="$(mktemp)"
   jq -r '.data."cloud.conf" // ""' <<< "${cm_json}" > "${conf_file}"
   server_re="${server//./\\.}"
-  yq-go r "${conf_file}" 'vcenter' 2>/dev/null \
-    | grep -qE "^[[:space:]]*${server_re}:[[:space:]]*$"
-  local rc=$?
+  # Capture the YAML read instead of piping it: under pipefail an
+  # early-exiting grep can SIGPIPE the producer and turn a match into a
+  # failure, and a failing producer would mask the grep result. A failed
+  # read yields an empty string, which the grep treats as absent.
+  conf_out="$(yq-go r "${conf_file}" 'vcenter' 2>/dev/null || true)"
   rm -f "${conf_file}"
-  return "${rc}"
+  grep -qE "^[[:space:]]*${server_re}:[[:space:]]*$" <<< "${conf_out}"
 }
 
 function cloud_conf_has_target_vcenter() {
@@ -728,8 +730,15 @@ function cloud_conf_lacks_source_vcenters() {
     else
       rc=$?
     fi
+    # Only a clean "absent" (rc 1) satisfies the retirement check: rc 2 is
+    # an API failure (propagated for poll's failure budget), and any other
+    # code means the check could not evaluate the generated configuration —
+    # neither may count as retired.
     if [[ "${rc}" -eq 2 ]]; then
       return 2
+    fi
+    if [[ "${rc}" -ne 1 ]]; then
+      return 1
     fi
   done < <(jq -r '.[]' <<< "${source_vcenters_json}")
   return 0
