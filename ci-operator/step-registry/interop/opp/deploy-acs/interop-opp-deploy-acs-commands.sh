@@ -25,7 +25,9 @@ shopt -u patsub_replacement 2>/dev/null || true
 #       1. 3 consecutive poll/query failures -> acs-subscription-query-failed
 #       2. precondition: packagemanifest absent (successful query) ->
 #          acs-catalog-missing; query error after retries ->
-#          acs-catalog-query-failed
+#          acs-catalog-query-failed; the Subscription probe decided absent in
+#          both, and an undecided probe with an unavailable listing ->
+#          acs-subscription-query-failed
 #       3. Subscription conditions -> acs-subscription-unsatisfiable /
 #          acs-installplan-missing / acs-installplan-failed /
 #          acs-catalog-missing
@@ -563,20 +565,51 @@ _prop "workaround_removal_ready" "false"
 #     it. Resolving the Subscription first keeps an adopted Subscription on
 #     a channel the current catalog listing no longer offers from failing as
 #     acs-catalog-missing before adoption is considered.
-#     A failed probe reads as absent, which is the create-if-absent default:
-#     the create path below re-checks and adopts on AlreadyExists. The probe
-#     captures stderr, so it runs under the same quiet scope as every other
-#     API-response block: set -x would otherwise trace the expanded value into
-#     the xtrace log that _opp_cleanup copies to the artifacts.
-_sub_existing=false
+#     The probe keeps three states, present/absent/undecided, the same
+#     convention the OperatorPolicy CRD lookup and list use: only the API
+#     server's NotFound shape means absence, and any other error is retried
+#     (5s, then 15s) before it settles as undecided. A failed probe is NOT
+#     absence: reading one as absent let a Forbidden, a transport error, or a
+#     bare "command not found" combine with an unavailable catalog into
+#     acs-catalog-missing / acs-catalog-query-failed on a cluster whose
+#     Subscription exists and which the adoption path permits. When the
+#     listing is usable, undecided is left to the create-if-absent adoption
+#     net below (the create re-checks and adopts on AlreadyExists) exactly as
+#     an absent answer was. Only the conjunction of an undecided probe and an
+#     unavailable listing classifies, as acs-subscription-query-failed: the
+#     probe never answered, so neither a missing nor an erroring catalog can
+#     be reported as the reason a Subscription is not being adopted.
+#     The probe captures stderr, so it runs under the same quiet scope as
+#     every other API-response block: set -x would otherwise trace the
+#     expanded value into the xtrace log that _opp_cleanup copies to the
+#     artifacts.
+_sub_state="undecided"
 _sub_existing_channel=""
 _sub_probe=""
 _api_quiet
-if _sub_probe=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>&1); then
-  _sub_existing=true
-  _sub_existing_channel="${_sub_probe}"
-fi
+for _sub_attempt in 1 2 3; do
+  if _sub_probe=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>&1); then
+    _sub_state="present"
+    _sub_existing_channel="${_sub_probe}"
+    break
+  fi
+  # The same shape test the sibling probes use: a missing helper or a wrapper
+  # message carrying the phrase is a broken capture path, not an API answer.
+  if [[ "${_sub_probe}" == *"Error from server (NotFound)"* ]]; then
+    _sub_state="absent"
+    break
+  fi
+  # No sleep after the last attempt: there is no retry left to use it.
+  if (( _sub_attempt >= 3 )); then
+    echo ">>> subscription probe failed (attempt ${_sub_attempt}/3), no attempts left: $(_api_err_class "${_sub_probe}")"
+    break
+  fi
+  _sub_backoff=$(( _sub_attempt == 1 ? 5 : 15 ))
+  echo ">>> subscription probe failed (attempt ${_sub_attempt}/3), retrying in ${_sub_backoff}s: $(_api_err_class "${_sub_probe}")"
+  sleep "${_sub_backoff}"
+done
 _api_loud
+_prop "subscription_probe" "${_sub_state}"
 
 # --- Fail-fast precondition: packagemanifest must exist, and the channel this
 #     step would create a Subscription on must be listed. Three-way classify
@@ -621,7 +654,7 @@ done
 _catalog_listing=false
 if [[ "${_precondition_ok}" == "true" ]]; then
   _catalog_listing=true
-elif [[ "${_sub_existing}" == "true" ]]; then
+elif [[ "${_sub_state}" == "present" ]]; then
   if [[ "${_pm_notfound}" == "true" ]]; then
     _prop "catalog_precondition" "missing-adopted"
     echo ">>> NOTE: packagemanifest rhacs-operator not found in openshift-marketplace; Subscription rhacs-operator already exists - not gating adoption on the catalog listing"
@@ -629,6 +662,14 @@ elif [[ "${_sub_existing}" == "true" ]]; then
     _prop "catalog_precondition" "query-failed-adopted"
     echo ">>> NOTE: packagemanifest query failed after 3 attempts ($(_api_err_class "${_pm_raw}")); Subscription rhacs-operator already exists - not gating adoption on the catalog listing"
   fi
+elif [[ "${_sub_state}" == "undecided" ]]; then
+  # Both answers are unknown at once: the probe never answered and the catalog
+  # listing is unavailable. A Subscription may exist, so neither a missing nor
+  # an erroring catalog may be reported in its place; the probe's own failure
+  # is the classification and the catalog outcome is a class in the detail.
+  _classify "acs-subscription-query-failed" "subscription rhacs-operator probe errored after 3 attempts ($(_api_err_class "${_sub_probe}")) with the catalog listing also unavailable ($(_api_err_class "${_pm_raw}"))"
+  echo "ERROR: ${_class_detail}"
+  exit 1
 elif [[ "${_pm_notfound}" == "true" ]]; then
   _classify "acs-catalog-missing" "packagemanifest rhacs-operator not found in openshift-marketplace (successful query)"
   echo "ERROR: ${_class_detail}"
@@ -675,7 +716,7 @@ if [[ "${_chk}" != "parsed" ]]; then
   _chk_names=""
 fi
 if [[ "${_req_listed}" == "unlisted" ]]; then
-  if [[ "${_sub_existing}" == "true" ]]; then
+  if [[ "${_sub_state}" == "present" ]]; then
     # Adopted: this step creates nothing, so the requested channel does not
     # have to be offered by the current listing. Record it and keep going.
     echo ">>> NOTE: channel '${ACS_CHANNEL}' not listed for rhacs-operator (${_chk_names}); Subscription rhacs-operator already exists with channel '${_sub_existing_channel:-empty}', adopting, not creating"
@@ -695,7 +736,7 @@ if [[ "${_obs_listed}" == "unlisted" ]]; then
   echo ">>> NOTE: adopted Subscription channel '${_sub_existing_channel}' not listed for rhacs-operator (${_chk_names}); left untouched, the CSV wait classifies the outcome"
   _prop "channel_delisted" "${_sub_existing_channel}"
 fi
-if [[ "${_sub_existing}" == "true" ]]; then
+if [[ "${_sub_state}" == "present" ]]; then
   if [[ "${_catalog_listing}" == "true" ]]; then
     echo ">>> precondition: rhacs-operator present; adopted Subscription channel '${_sub_existing_channel:-empty}' (requested ${ACS_CHANNEL}, head: ${_req_head})"
   else
