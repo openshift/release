@@ -25,11 +25,20 @@ _propagate_junit () {
 #      - Queries ACS API for httpd-example image
 #      - Validates image appears in ACS with CVE scanning results
 #      - Only runs if Case 1 passes
+#      - Skipped (not failed) when no SecuredCluster exists anywhere on
+#        the cluster: without a secured cluster ACS cannot scan images, so
+#        the case would otherwise burn its retry budget and fail with a
+#        generic message
 #
 # Test Reporting:
 #   - Results are recorded in JUnit XML format
 #   - JUnit XML is generated on exit (via trap) regardless of test results
-#   - Script always exits 0 to allow subsequent Prow test steps to run
+#   - Script exits nonzero when any test case is marked failed (the
+#     preflight failure paths and the end-of-script status check); a
+#     fully skipped report exits 0 unless the lane sets
+#     QUAY_EXPECTATION=required. The ref is best_effort and the
+#     consuming jobs allow best-effort post steps, so later steps in
+#     the lane still run after a nonzero exit
 #   - Individual test failures are visible in Prow UI via JUnit reporting
 #
 ################################################################################
@@ -149,10 +158,22 @@ function RunTestCase1 () {
     cd policy-collection/deploy/ || return 1
     echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp || return 1
 
-    sleep 60
-
-    # Verify e2e-opp namespace was created
-    oc get namespace e2e-opp || return 1
+    # The e2e-opp namespace and the httpd-example buildconfig are created
+    # by policy remediation, which can lag well past a minute on loaded
+    # clusters (observed: policies still Pending after the previous fixed
+    # 60s sleep, so the build trigger hit a missing buildconfig). Wait for
+    # both within one bounded budget instead of racing a fixed sleep.
+    typeset -i remediationDeadline=$(( $(date +%s) + 600 ))
+    # Best Practices: oc wait --for=create for a not-yet-created object
+    # (an existence poll with sleep is the fixed-sleep violation). Both
+    # waits below charge the one shared deadline.
+    typeset -i _waitBudget=$(( remediationDeadline - $(date +%s) ))
+    if ! oc wait namespace/e2e-opp --for=create --timeout="${_waitBudget}s"; then
+        : "ERROR: e2e-opp namespace was not created within 10m of deploy"
+        : "=== Policy Status ==="
+        oc get policies -n policies | sed -n '/example/p' || true
+        return 1
+    fi
 
     oc label managedcluster local-cluster oppapps=httpd-example --overwrite
 
@@ -161,6 +182,16 @@ function RunTestCase1 () {
     oc get build -n e2e-opp || true
     oc get po -n e2e-opp || true
     oc get deployment -n e2e-opp || true
+
+    # Wait for the buildconfig policy to remediate before triggering a
+    # build; oc start-build fails when the buildconfig does not exist yet.
+    _waitBudget=$(( remediationDeadline - $(date +%s) ))
+    if (( _waitBudget <= 0 )) || ! oc wait buildconfig/httpd-example -n e2e-opp --for=create --timeout="${_waitBudget}s"; then
+        : "ERROR: buildconfig httpd-example was not created within 10m of deploy"
+        : "=== Policy Status ==="
+        oc get policies -n policies | sed -n '/example/p' || true
+        return 1
+    fi
 
     # Trigger build if needed
     typeset latestBuildName=""
@@ -244,13 +275,43 @@ function RunTestCase2 () {
     : "====== Test Case 2: Test ACS Integration ======"
     : "NOTE: Waiting for ACS to scan the httpd-example image built in Test Case 1."
 
-    # Fetch ACS credentials - disable xtrace for secret handling
+    # Pre-flight: a SecuredCluster is what registers and scans images with
+    # ACS Central. When none exists the image can never appear, so the
+    # retries below cannot succeed; skip the case with a named reason
+    # instead of failing after 300s of dead retries. Return 2 = skip.
+    typeset scOutput=""
+    typeset -i scRc=0
+    scOutput=$(oc get securedclusters.platform.stackrox.io --all-namespaces -o name) || scRc=$?
+    if (( scRc != 0 )); then
+        : "WARNING: oc get securedclusters failed (rc=${scRc}) - cannot determine SecuredCluster presence"
+        _acs_fail_reason="oc get securedclusters failed (rc=${scRc}) - cannot determine SecuredCluster presence"
+        return 1
+    elif [[ -z "${scOutput}" ]]; then
+        : "No SecuredCluster CR found in any namespace - ACS integration unavailable, skipping test case"
+        _acs_skip_reason="No SecuredCluster deployed; ACS image scanning unavailable"
+        return 2
+    fi
+
+    # Fetch ACS credentials - disable xtrace for secret handling. The
+    # emptiness check stays inside the untraced block as well: bash prints the
+    # expanded arguments of a test under `set -x`, so `[[ -z "${acsPassword}" ]]`
+    # would write the password to the build log. Tracing is restored on both
+    # the success and the credential-missing path.
     typeset acsPassword=""
     typeset acsHost=""
+    typeset -i acsCredsMissing=0
     set +x
     acsPassword=$(oc get secret -n stackrox central-htpasswd -o json | /tmp/jq -r '.data.password' | base64 -d)
     acsHost=$(oc get secret -n stackrox sensor-tls -o json | /tmp/jq -r '.data."acs-host"' | base64 -d)
+    if [[ -z "${acsPassword}" ]] || [[ -z "${acsHost}" ]]; then
+        acsCredsMissing=1
+    fi
     set -x
+    if (( acsCredsMissing )); then
+        : "ERROR: ACS credentials unavailable - central-htpasswd or sensor-tls secret missing in namespace stackrox"
+        _acs_fail_reason="ACS credentials unavailable: central-htpasswd/sensor-tls secret not found in namespace stackrox"
+        return 1
+    fi
 
     # Query ACS for httpd-example image
     typeset jqFilter='.images[] | select(.name | contains("httpd-example"))'
@@ -335,6 +396,15 @@ elif ! grep -qi quayintegration <<< "${apiOutput}"; then
         testFailureMsg["${test}"]="QuayIntegration CRD not available - Quay Bridge Operator not installed"
     done
 
+    # INTEROP-9700: the skip marks above reach JUnit through the exit trap,
+    # but on a lane that requires Quay an absent CRD is exactly the
+    # skip-only case this gate exists to catch, so fail closed here rather
+    # than exiting green before the end-of-script check runs.
+    if [[ "${QUAY_EXPECTATION:-}" == "required" ]]; then
+        echo "ERROR: QuayIntegration CRD not available with QUAY_EXPECTATION=required; failing the step." >&2
+        exit 1
+    fi
+
     exit 0
 fi
 
@@ -351,7 +421,8 @@ if ((getRc != 0)); then
         testFailureMsg["${test}"]="oc get quayintegration failed (rc=${getRc}) - cluster API error"
     done
 
-    exit 0
+    echo "ERROR: oc get quayintegration failed (rc=${getRc}) with all test cases marked failed; failing the step." >&2
+    exit 1
 elif [[ -z "${getOutput}" ]]; then
     : "ERROR: QuayIntegration CRD exists but CR 'quay' not found!"
     : "OPP bundle components are not properly configured."
@@ -362,7 +433,8 @@ elif [[ -z "${getOutput}" ]]; then
         testFailureMsg["${test}"]="QuayIntegration CR 'quay' not found - OPP bundle not configured"
     done
 
-    exit 0
+    echo "ERROR: QuayIntegration CR 'quay' not found with all test cases marked failed; failing the step." >&2
+    exit 1
 fi
 
 : "QuayIntegration quay found"
@@ -380,18 +452,27 @@ if RunTestCase1; then
     RecordTestResult "deploy-opp-application" "passed" "" "${case1Duration}"
     : "Test Case 1 (Deploy OPP Application) Result: PASSED"
 
-    # Run Test Case 2 (ACS Integration)
+    # Run Test Case 2 (ACS Integration). A skip is distinguished from a
+    # failure by the _acs_skip_reason side-channel (reset just below,
+    # before the call); the return code is not captured.
     typeset -i case2Start=0
     case2Start=$(date +%s)
+    _acs_skip_reason=""
+    _acs_fail_reason=""
     if RunTestCase2; then
         typeset -i case2Duration=0
         case2Duration=$(( $(date +%s) - case2Start ))
         RecordTestResult "test-acs-integration" "passed" "" "${case2Duration}"
         : "Test Case 2 (Test ACS Integration) Result: PASSED"
+    elif [[ -n "${_acs_skip_reason}" ]]; then
+        typeset -i case2Duration=0
+        case2Duration=$(( $(date +%s) - case2Start ))
+        RecordTestResult "test-acs-integration" "skipped" "${_acs_skip_reason}" "${case2Duration}"
+        : "Test Case 2 (Test ACS Integration) Result: SKIPPED (${_acs_skip_reason})"
     else
         typeset -i case2Duration=0
         case2Duration=$(( $(date +%s) - case2Start ))
-        RecordTestResult "test-acs-integration" "failed" "ACS integration test failed" "${case2Duration}"
+        RecordTestResult "test-acs-integration" "failed" "${_acs_fail_reason:-ACS integration test failed}" "${case2Duration}"
         : "Test Case 2 (Test ACS Integration) Result: FAILED"
     fi
 else
@@ -416,6 +497,22 @@ for test in "${allTestCasesArr[@]}"; do
 done
 
 if [[ "${_overall_status}" == "PASS" ]]; then
+    # INTEROP-9700: surface all-skipped runs on lanes that require Quay.
+    # When every test case is skipped the step asserted nothing; with
+    # QUAY_EXPECTATION=required that fails the step instead of exiting
+    # green on a skip-only report.
+    if [[ "${QUAY_EXPECTATION:-}" == "required" ]]; then
+        typeset -i _non_skipped=0
+        for test in "${allTestCasesArr[@]}"; do
+            if [[ "${testStatus[${test}]}" != "skipped" ]]; then
+                _non_skipped=$((_non_skipped + 1))
+            fi
+        done
+        if (( _non_skipped == 0 )); then
+            echo "ERROR: all test cases skipped with QUAY_EXPECTATION=required; failing the step." >&2
+            exit 1
+        fi
+    fi
     exit 0
 else
     exit 1

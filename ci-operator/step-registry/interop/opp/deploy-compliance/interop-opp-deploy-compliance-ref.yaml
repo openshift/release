@@ -1,0 +1,42 @@
+ref:
+  as: interop-opp-deploy-compliance
+  commands: interop-opp-deploy-compliance-commands.sh
+  documentation: |-
+    Deploys the compliance operator through OLM: namespace
+    openshift-compliance, OperatorGroup compliance-operator, Subscription on
+    COMPLIANCE_OPERATOR_CHANNEL (default stable) from redhat-operators, then
+    waits for the CSV to reach Succeeded. No post-install custom resources are
+    created, matching policy-compliance-operator-install.
+
+    Every object is created only if absent (oc create, never apply): when the
+    ACM policy set already owns the install, the step adopts what it finds and
+    never overwrites a live operator policy. When operatorpolicy-comp-operator
+    is Compliant, the subscription channel matches and the CSV is Succeeded,
+    the step records workaround_removal_ready=true and exits 0 without
+    installing (workaround self-disable).
+
+    Emits one JUnit testcase, lp-interop--OPP--compliance-deploy, and a
+    properties file for the skip-ratio/evidence gates.
+  env:
+    - default: stable
+      documentation: OLM channel for the compliance-operator subscription
+      name: COMPLIANCE_OPERATOR_CHANNEL
+    - default: openshift-compliance
+      documentation: Namespace for the compliance operator
+      name: COMPLIANCE_NAMESPACE
+    - default: "600"
+      documentation: Seconds to wait for the Subscription to report status.currentCSV
+      name: COMPLIANCE_CSV_WAIT_TIMEOUT
+    - default: "600"
+      documentation: Seconds to wait for the compliance-operator CSV to reach Succeeded
+      name: COMPLIANCE_INSTALL_TIMEOUT
+    - default: "0"
+      documentation: When 1, report observed object states and exit 0 without installing (detection only)
+      name: COMPLIANCE_REPORT_ONLY
+  from: cli
+  grace_period: 2m30s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 30m

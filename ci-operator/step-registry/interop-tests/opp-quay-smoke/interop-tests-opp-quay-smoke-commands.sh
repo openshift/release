@@ -147,7 +147,7 @@ print(len(json.load(sys.stdin).get('items',[])))
     true
 }
 
-function GetQuayAuth () {
+function GetQuayAuthOnce () {
     QUAY_USER=""
     QUAY_PASSWORD=""
     QUAY_TOKEN=""
@@ -200,6 +200,27 @@ function GetQuayAuth () {
     echo "ERROR: Could not obtain Quay credentials from any source" >&2
     export QUAY_USER QUAY_PASSWORD QUAY_TOKEN
     return 1
+}
+
+function GetQuayAuth () {
+    # The quayadmin secret is provisioned by the create-admin-user Job from
+    # the policy-config-quay policy, which can still be running (or waiting
+    # on its compliance wait) when the smoke starts. Retry the credential
+    # sources within a bounded budget instead of failing on the first miss;
+    # healthy lanes succeed on the first attempt with no added delay.
+    typeset -i authAttempts=0
+    typeset -i authMaxAttempts=20
+    while true; do
+        if GetQuayAuthOnce; then
+            return 0
+        fi
+        authAttempts=$(( authAttempts + 1 ))
+        if (( authAttempts >= authMaxAttempts )); then
+            echo "ERROR: Could not obtain Quay credentials from any source after ${authMaxAttempts} attempts (30s apart)" >&2
+            return 1
+        fi
+        sleep 30
+    done
 }
 
 function PreflightCheck () {
@@ -603,6 +624,12 @@ function Main () {
         for t in "${allTests[@]}"; do
             RecordResult "${t}" "skipped" "Quay not deployed"
         done
+        # INTEROP-9700: on lanes that require Quay a not-deployed Quay fails
+        # the step instead of exiting green on a skip-only report.
+        if [[ "${QUAY_EXPECTATION:-}" == "required" ]]; then
+            echo "ERROR: Quay not deployed with QUAY_EXPECTATION=required; failing the step." >&2
+            exit 1
+        fi
         exit 0
     elif (( discoverRc != 0 )); then
         for t in "${allTests[@]}"; do

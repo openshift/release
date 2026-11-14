@@ -108,4 +108,37 @@ for dir in test-results playwright-report ../tests/cypress/results; do
   fi
 done
 
+# INTEROP-9598: assertiveness floor plus carrier guarantee. Playwright's global
+# setup can abort before a single spec runs (known cause: the AAP operator
+# preflight) and still leave a well-formed zero-test test-results/junit.xml, so
+# the step exits green and prow renders nothing. Whenever no runner report
+# carries a test case, replace the report with one failing row that names the
+# condition and fail the step. The runner's original bytes are kept beside it
+# (suffixed, so the EXIT trap merge, which globs *.xml, leaves them alone).
+typeset _junit_report="${ARTIFACT_DIR}/test-results/junit.xml"
+typeset -i _junit_cases=0
+while IFS= read -r -d '' _junit_file; do
+    _junit_cases+=$(grep -c '<testcase' "${_junit_file}" || true)
+done < <(find "${ARTIFACT_DIR}" -type f -iname 'junit*.xml' -print0 2>/dev/null)
+
+if (( _junit_cases == 0 )); then
+    if [[ -f "${_junit_report}" ]]; then
+        _junit_condition="the JUnit report declares zero test cases"
+        cp -f "${_junit_report}" "${_junit_report}.empty-original" || true
+    else
+        _junit_condition="the runner wrote no JUnit report"
+        mkdir -p "$(dirname "${_junit_report}")"
+    fi
+    cat > "${_junit_report}" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="acm-tests-alc" tests="1" failures="1" errors="0" skipped="0">
+  <testcase name="acm-tests-alc: runner asserted nothing" classname="acm-tests-alc">
+    <failure message="${_junit_condition}" type="empty-junit-carrier">${_junit_condition}, so this step asserted nothing. Look for the runner abort in the step build log; a known cause is the AAP operator preflight in the runner global setup (INTEROP-9598).</failure>
+  </testcase>
+</testsuite>
+EOF
+    echo "ERROR: ${_junit_condition}; failing the step and recording a JUnit row that names it (INTEROP-9598)." >&2
+    _test_rc=1
+fi
+
 exit "${_test_rc}"
