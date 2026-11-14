@@ -890,17 +890,18 @@ function RunAcsScan () {
         return 0
     fi
 
-    # The ACS admin password is written to an ephemeral file inside a
-    # subshell with xtrace disabled (Best Practices secret handling): it
-    # is never set as a main-shell variable, never expanded in a trace,
-    # and never passed as a command argument.
+    # The ACS admin password is required once Central is deployed: an
+    # unreadable or empty credential is a broken deployment, not an absent one,
+    # and must not turn the ACS test into a successful skip.
+    typeset -i passRc=0
     ( set +x
-      oc get secret -n stackrox central-htpasswd -o jsonpath='{.data.password}' | base64 -d >"${acsPassFile}" || true
-    true )
-    if [[ ! -s "${acsPassFile}" ]]; then
+      oc get secret -n stackrox central-htpasswd -o jsonpath='{.data.password}' | base64 -d >"${acsPassFile}"
+    ) || passRc=$?
+    if (( passRc != 0 )) || [[ ! -s "${acsPassFile}" ]]; then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "skipped" "ACS admin password not available" "${elapsed}"
-        return 0
+        rm -f "${acsPassFile}"
+        RecordResult "${testName}" "failed" "ACS Central is deployed but its admin credential (secret stackrox/central-htpasswd) could not be read (rc=${passRc}); the scan cannot run" "${elapsed}"
+        return 1
     fi
 
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
