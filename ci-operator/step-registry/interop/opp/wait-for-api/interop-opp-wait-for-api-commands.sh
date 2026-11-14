@@ -53,7 +53,7 @@ echo "Waiting for cluster API to become reachable..."
 REQUIRED_CONSECUTIVE_SUCCESSES=5
 CONSECUTIVE_SUCCESSES=0
 for i in $(seq 1 "${API_WAIT_RETRIES}"); do
-    if oc get --raw=/version &>/dev/null; then
+    if oc get --raw=/version --request-timeout=30s &>/dev/null; then
         CONSECUTIVE_SUCCESSES=$((CONSECUTIVE_SUCCESSES + 1))
         if [[ "${CONSECUTIVE_SUCCESSES}" -ge "${REQUIRED_CONSECUTIVE_SUCCESSES}" ]]; then
             echo "Cluster API is reachable."
