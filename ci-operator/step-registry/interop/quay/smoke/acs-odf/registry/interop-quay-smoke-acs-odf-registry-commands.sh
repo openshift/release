@@ -350,26 +350,46 @@ for r in items:
     fi
 
     # Certificates the Quay operator publishes for this QuayRegistry: any
-    # secret it owns that carries a ca.crt or tls.crt payload.
+    # secret it owns that carries a ca.crt, tls.crt or ssl.cert payload, plus
+    # the ssl.cert a Quay configured to serve its own TLS keeps in its config
+    # secret.  A Quay that serves its own certificate sits behind a passthrough
+    # route, so the route carries no certificate and only these payloads can
+    # verify it; each candidate is proved against the endpoint below, so
+    # widening the sources cannot admit an anchor that does not fit.
     oc get secrets -n "${QUAY_NS}" -o json 2>/dev/null | \
         QUAY_OWNER="${QUAY_REGISTRY}" CA_DIR="${quayCaDir}" python3 -c "
 import base64, json, os, sys
+
 try:
     items = json.load(sys.stdin).get('items', [])
 except Exception:
     items = []
-n = 0
+
+owner = os.environ['QUAY_OWNER']
+ca_dir = os.environ['CA_DIR']
+counts = {'20-owned': 0, '25-ssl': 0}
+
+
+def write(prefix, payload):
+    counts[prefix] += 1
+    path = os.path.join(ca_dir, '%s-%02d.pem' % (prefix, counts[prefix]))
+    with open(path, 'wb') as fh:
+        fh.write(payload)
+
+
 for s in items:
     refs = (s.get('metadata') or {}).get('ownerReferences') or []
-    if not any((r.get('name') or '') == os.environ['QUAY_OWNER'] for r in refs):
+    owned = any((r.get('name') or '') == owner for r in refs)
+    data = s.get('data') or {}
+    if not owned:
+        if data.get('ssl.cert'):
+            write('25-ssl', base64.b64decode(data['ssl.cert']))
         continue
     for key in ('ca.crt', 'tls.crt'):
-        val = (s.get('data') or {}).get(key)
-        if not val:
-            continue
-        n += 1
-        with open(os.path.join(os.environ['CA_DIR'], '20-owned-%02d.pem' % n), 'wb') as fh:
-            fh.write(base64.b64decode(val))
+        if data.get(key):
+            write('20-owned', base64.b64decode(data[key]))
+    if data.get('ssl.cert'):
+        write('25-ssl', base64.b64decode(data['ssl.cert']))
 " || true
 
     # The ingress CA signs route certificates that no operator issued.
