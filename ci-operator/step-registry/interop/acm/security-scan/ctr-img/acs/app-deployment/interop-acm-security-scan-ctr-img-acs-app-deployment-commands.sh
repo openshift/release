@@ -397,22 +397,45 @@ def lastn($d): split("/") | .[-$d:] | join("/");
     jqFilter+=']
 '
 
-    # TLS verification for the ACS Central API: prefer the service CA
-    # bundle mounted in the pod (pattern from interop-opp-must-gather-acs);
-    # fall back to -k with a warning when the route certificate cannot be
-    # verified with it, so an unknown certificate does not hard-fail the
-    # test.
-    typeset -a acsTlsOpts=( -k )
+    # TLS verification for the ACS Central API.  The admin credential is only
+    # ever sent over a connection whose certificate is verified, so a CA that
+    # checks the route is resolved before the first credential-bearing
+    # request: the ingress router CA (which signs .apps route certificates)
+    # first, then the service CA bundle mounted in the pod (pattern from
+    # interop-opp-must-gather-acs).  There is deliberately no -k fallback: an
+    # unverified connection would hand the admin password to an on-path
+    # attacker, and an unverifiable route fails the case instead.
+    typeset ingressCaBundle=''
+    ingressCaBundle="$(oc get configmap default-ingress-cert -n openshift-config-managed -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null)" || ingressCaBundle=''
+    typeset -a acsCaCandidates=()
+    if [[ -n "${ingressCaBundle}" ]]; then
+        printf '%s\n' "${ingressCaBundle}" > /tmp/acs-ingress-ca.crt
+        acsCaCandidates+=( /tmp/acs-ingress-ca.crt )
+    fi
     typeset saCaBundle='/var/run/secrets/kubernetes.io/serviceaccount/ca.crt'
     if [[ -f "${saCaBundle}" ]]; then
-        typeset tlsProbe=''
-        tlsProbe="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 15 --max-time 30 --cacert "${saCaBundle}" "https://${acsHost}/v1/ping")" || tlsProbe='000'
-        if [[ -n "${tlsProbe}" && "${tlsProbe}" != '000' ]]; then
-            acsTlsOpts=( --cacert "${saCaBundle}" )
-        else
-            printf '%s\n' "WARNING: ACS route certificate not verifiable with the service CA bundle; falling back to insecure TLS" >&2
-        fi
+        acsCaCandidates+=( "${saCaBundle}" )
     fi
+    typeset acsCaFile=''
+    typeset candidateCa=''
+    typeset tlsProbe=''
+    if (( ${#acsCaCandidates[@]} > 0 )); then
+        for candidateCa in "${acsCaCandidates[@]}"; do
+            tlsProbe="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 15 --max-time 30 --cacert "${candidateCa}" "https://${acsHost}/v1/ping")" || tlsProbe='000'
+            if [[ -n "${tlsProbe}" && "${tlsProbe}" != '000' ]]; then
+                acsCaFile="${candidateCa}"
+                break
+            fi
+        done
+    fi
+    if [[ -z "${acsCaFile}" ]]; then
+        acsFailureMsg="Could not verify the ACS Central route certificate for ${acsHost} with the ingress router CA or the service CA bundle; refusing to send the admin credential over unverified TLS"
+        printf '%s\n' "ERROR: ${acsFailureMsg}" >&2
+        rm -f "${acsPassFile}" /tmp/acs-ingress-ca.crt
+        RecordTestResult "test-acs-integration" "failed" "${acsFailureMsg}" "0"
+        return 1
+    fi
+    typeset -a acsTlsOpts=( --cacert "${acsCaFile}" )
 
     typeset -i retries=10
     typeset -i retryInterval=30
@@ -463,7 +486,7 @@ def lastn($d): split("/") | .[-$d:] | join("/");
         [ "${attempt}" -lt "${retries}" ] && sleep "${retryInterval}"
     done
 
-    rm -f "${acsPassFile}"
+    rm -f "${acsPassFile}" /tmp/acs-ingress-ca.crt
 
     if [ "${isImageFound}" != true ]; then
         # Name the multi-match condition on exhaustion: a registry that keeps
