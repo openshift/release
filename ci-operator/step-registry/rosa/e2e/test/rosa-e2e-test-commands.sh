@@ -6,6 +6,23 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+if [[ "${HO_MINIMAL_DIAGNOSTICS:-false}" == true ]]; then
+  gather_ho_on_exit() {
+    local original_status=$? temporary=''
+    set +x
+    if ! HO_DIAGNOSTIC_PHASE="test" bash "${BASH_SOURCE[0]%/*}/rosa-hypershift-operator-gather-minimal" >/dev/null 2>&1; then
+      if ! { [[ -n "${ARTIFACT_DIR:-}" ]] && mkdir -p "${ARTIFACT_DIR}" && temporary=$(mktemp "${ARTIFACT_DIR}/.ho-minimal.XXXXXX") &&
+        printf '%s\n' '{"schemaVersion":1,"outcome":"failed","failure":"helper_unavailable","truncated":false}' > "${temporary}" &&
+        mv -f "${temporary}" "${ARTIFACT_DIR}/ho-minimal-diagnostics.json"; } 2>/dev/null; then
+        [[ -z "${temporary}" ]] || rm -f "${temporary}" 2>/dev/null || true
+        echo 'HO minimum diagnostics: artifact write failed' >&2
+      fi
+    fi
+    exit "${original_status}"
+  }
+  trap gather_ho_on_exit EXIT
+fi
+
 log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
 }
