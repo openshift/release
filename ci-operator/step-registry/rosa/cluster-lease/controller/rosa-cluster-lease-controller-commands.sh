@@ -55,7 +55,9 @@ if [[ "${BASH_SOURCE[0]:-$0}" != "$0" ]]; then
 fi
 
 LEASE_NAMESPACE="${LEASE_NAMESPACE:-rosa-cluster-lease}"
-LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
+# Overridable only so hack/tests can run this script; the step does not declare
+# it in its ref, so ci-operator always leaves the mounted credential path below.
+LEASE_HOST_KUBECONFIG="${LEASE_HOST_KUBECONFIG:-/etc/rosa-cluster-lease-manager/kubeconfig}"
 OCM_LOGIN_ENV="${OCM_LOGIN_ENV:-staging}"
 STALE_LEASE_HOURS="${STALE_LEASE_HOURS:-1}"
 ERROR_REPLACE_HOURS="${ERROR_REPLACE_HOURS:-1}"
@@ -639,7 +641,19 @@ log "Phase 4: Health checking existing clusters"
 ACTUAL_CMS=$(lease_oc get configmap -n "${LEASE_NAMESPACE}" -l "rosa-cluster-lease/managed=true" -o json 2>/dev/null || echo '{"items":[]}')
 ACTUAL_COUNT=$(echo "${ACTUAL_CMS}" | jq '.items | length')
 
+# Summary counters:
+#   HEALTHY       clusters this run left serving or ready to serve: available,
+#                 in-use, maintenance (mid-upgrade, pre-existing behaviour) and
+#                 clusters that finished installing during this run.
+#   PROVISIONING  clusters OCM is still building (pending/installing/waiting),
+#                 counted apart from HEALTHY so in-flight capacity is not
+#                 reported as usable.
+#   UNHEALTHY     clusters moved to error, or whose ConfigMap was removed.
+#   RECOVERED     stale leases released back to the pool.
+# Clusters skipped because OCM was unreachable or returned an unexpected state
+# are counted in none of these, so the totals may be lower than the inventory.
 HEALTHY=0
+PROVISIONING=0
 UNHEALTHY=0
 RECOVERED=0
 
@@ -808,8 +822,9 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
             fi
             UNHEALTHY=$((UNHEALTHY + 1))
         elif [[ "${OCM_CHECK_STATUS}" == "pending" || "${OCM_CHECK_STATUS}" == "installing" || "${OCM_CHECK_STATUS}" == "waiting" ]]; then
+            # Still building in OCM: not an error, but not usable capacity either.
             echo "PROVISIONING: ${CM_NAME} (OCM: ${OCM_CHECK_STATUS})" >> "${REPORT}"
-            HEALTHY=$((HEALTHY + 1))
+            PROVISIONING=$((PROVISIONING + 1))
         else
             log "WARNING: ${CM_NAME} has unexpected OCM state ${OCM_CHECK_STATUS}, leaving provisioning for retry"
             echo "SKIPPED: ${CM_NAME} (unexpected OCM state: ${OCM_CHECK_STATUS})" >> "${REPORT}"
@@ -1315,7 +1330,7 @@ for i in $(seq 0 $((FINAL_COUNT - 1))); do
 done
 
 echo "" >> "${REPORT}"
-echo "Summary: ${HEALTHY} healthy, ${UNHEALTHY} unhealthy, ${RECOVERED} recovered" >> "${REPORT}"
+echo "Summary: ${HEALTHY} healthy, ${PROVISIONING} provisioning, ${UNHEALTHY} unhealthy, ${RECOVERED} recovered" >> "${REPORT}"
 
-log "Controller reconcile complete"
+log "Controller reconcile complete: ${HEALTHY} healthy, ${PROVISIONING} provisioning, ${UNHEALTHY} unhealthy, ${RECOVERED} recovered"
 cat "${REPORT}"
