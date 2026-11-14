@@ -927,6 +927,8 @@ terms = {
     "rhacs_csv_count": (str(len(rhacs_csvs))
                         if csvs_s in ("ok", "absent") else "unknown"),
     "rhacs_csv_name": rhacs_csvs[0]["name"] if rhacs_csvs else "unknown",
+    "rhacs_csv_phase": (rhacs_csvs[0].get("phase") or "unknown"
+                        if rhacs_csvs else "unknown"),
     "rhacs_csv_matches_subscription": (
         str(rhacs_csv_matches_subscription).lower()
         if rhacs_csv_matches_subscription is not None else "unknown"),
@@ -957,12 +959,15 @@ terms = {
 # Per-run removal precondition: the OperatorPolicy owns the rhacs
 # subscription (its spec.subscription targets that subscription) with a
 # matching channel, one non-copied CSV in the subscription namespace that is
-# the CSV the subscription resolves, the package resolvable in the
-# subscription's effective catalog source and offering the version the
-# subscription resolves, and the policy actually enforces a re-creating
-# state (a compliant inform or mustnothave policy would not restore the
-# subscription). The two-run aggregation and the named-build comparison live
-# in the ticket rule.
+# the CSV the subscription resolves and that has reached Succeeded, the
+# package resolvable in the subscription's effective catalog source and
+# offering the version the subscription resolves, and the policy actually
+# enforces a re-creating state (a compliant inform or mustnothave policy
+# would not restore the subscription). The two-run aggregation and the
+# named-build comparison live in the ticket rule. The phase term mirrors
+# deploy-acs, which waits for status.phase Succeeded before it reports the
+# operator deployed: a CSV still Installing, Replacing, Failed, or Pending
+# leaves the install unsettled even when the CSV is the resolved one.
 terms["removal_preconditions_met"] = str(
     inputs_classified
     and terms["operatorpolicy_compliant"] == "true"
@@ -972,6 +977,7 @@ terms["removal_preconditions_met"] = str(
     and terms["rhacs_subscription_count"] == "1"
     and terms["rhacs_csv_count"] == "1"
     and terms["rhacs_csv_matches_subscription"] == "true"
+    and terms["rhacs_csv_phase"] == "Succeeded"
     and terms["rhacs_subscription_channel"] != "unknown"
     and terms["rhacs_subscription_channel"] == terms["operatorpolicy_spec_channel"]
     and terms["rhacs_subscription_source"] != "unknown"
@@ -1340,11 +1346,39 @@ FIXTURE
   _expect rhacs_csv_matches_subscription false
   _expect removal_preconditions_met false
 
+  # Non-Succeeded phase (reviewer row 2): everything else is in its true
+  # form, but the installed CSV has not finished installing. deploy-acs waits
+  # for status.phase Succeeded before calling the operator deployed, so this
+  # step cannot call the install settled. Self-contained: every input is
+  # restated here.
+  cat > "${tmp}/01-operatorpolicy.json" <<'FIXTURE'
+[{"name": "operatorpolicy-rhacs-operator", "namespace": "policies",
+  "spec": {"subscriptionName": "rhacs-operator",
+           "subscriptionNamespace": "rhacs-operator",
+           "channel": "stable", "remediationAction": "enforce",
+           "complianceType": "musthave"},
+  "conditions": [{"type": "Compliant", "status": "True"}]}]
+FIXTURE
+  cat > "${tmp}/03-subscription.json" <<'FIXTURE'
+[{"name": "rhacs-operator", "namespace": "rhacs-operator",
+  "apiVersion": "operators.coreos.com/v1alpha1",
+  "currentCSV": "rhacs-operator.v4.11.6", "state": "AtLatestKnown",
+  "conditions": [], "channel": "stable", "source": "redhat-operators"}]
+FIXTURE
+  echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "rhacs-operator", "phase": "Installing", "reason": "Installing"}]' > "${tmp}/05-csv.json"
+  echo '{"name": "rhacs-operator", "catalogSource": "redhat-operators", "catalogSourceNamespace": "openshift-marketplace", "channels": [{"name": "stable", "currentCSV": "rhacs-operator.v4.11.6"}]}' > "${tmp}/08-packagemanifest-rhacs.json"
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect rhacs_csv_matches_subscription true
+  _expect csv_catalog_matches_subscription true
+  _expect packagemanifest_resolves_current_csv true
+  _expect rhacs_csv_phase Installing
+  _expect removal_preconditions_met false
+
   if [[ ${_st_failed} -ne 0 ]]; then
     rm -rf "${tmp}"
     return 22
   fi
-  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, target-mismatch, unset-target, no-OperatorPolicy, non-enforcing, removal-blocking, unspecified-enforcement, upgrade-pending, and FALSE fixtures all classified correctly"
+  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, target-mismatch, unset-target, no-OperatorPolicy, non-enforcing, removal-blocking, unspecified-enforcement, upgrade-pending, non-Succeeded-phase, and FALSE fixtures all classified correctly"
   rm -rf "${tmp}"
   return 0
 }
