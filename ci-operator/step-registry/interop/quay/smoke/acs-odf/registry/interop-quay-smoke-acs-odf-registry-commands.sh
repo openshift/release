@@ -328,12 +328,13 @@ function PreflightCheck () {
 }
 
 function CreateTestOrg () {
-    # Best effort: create the interop-smoke-test organization; re-runs
-    # against an existing organization return an HTTP error that must not
-    # fail the step, and the push test surfaces a real problem with its
-    # own message.  The signin token exchange sets QUAY_TOKEN for
-    # downstream use in the current shell (Best Practices exception), so
-    # xtrace is disabled once here and restored at the single exit below.
+    # Creates the interop-smoke-test organization the push test writes to.
+    # A re-run against an existing organization answers with an HTTP error and
+    # that does not fail the step, because the organization the push needs is
+    # there; every other failure is recorded and reported.  The signin token
+    # exchange sets QUAY_TOKEN for downstream use in the current shell (Best
+    # Practices exception), so xtrace is disabled once here and restored at
+    # each exit below.
     typeset xtraceOn=false
     [[ "${-}" == *x* ]] && xtraceOn=true
     set +x
@@ -374,7 +375,25 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
             typeset signinOk=''
             signinOk="$(printf '%s' "${signinResult}" | \
                 python3 -c "import sys,json; print(json.load(sys.stdin).get('success',''))" 2>/dev/null)" || signinOk=""
-            if [[ "${signinOk}" != "True" ]]; then
+            if [[ "${signinOk}" == "True" ]]; then
+                # Signin rotates the session CSRF token (Quay replaces it from
+                # common_login), so the token read before signin is stale: the
+                # organization request below would be rejected with HTTP 403
+                # and the push would run without an organization.  Read the
+                # token that belongs to the session signin just created, over
+                # the same cookie jar, and send that one.
+                csrf="$(curl -fsSLk --connect-timeout 15 --max-time 30 \
+                    -b "${cookieFile}" -c "${cookieFile}" \
+                    "https://${QUAY_HOST}/csrf_token" | \
+                    python3 -c "import sys,json; print(json.load(sys.stdin).get('csrf_token',''))" 2>/dev/null)" || csrf=""
+                if [[ -z "${csrf}" ]]; then
+                    echo "ERROR: the CSRF token refresh after signin returned no token; skipping the organization request" >&2
+                    RecordResult "${testNamePushPull}" "failed" "Could not refresh the Quay CSRF token after signin; the organization request would send a stale token" "0"
+                    rm -f "${cookieFile}"
+                    "${xtraceOn}" && set -x
+                    return 1
+                fi
+            else
                 echo "WARNING: Quay signin did not report success; the organization request has no session to use" >&2
             fi
         fi
@@ -386,20 +405,76 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
 
     typeset -a orgPayloadOpts=( -H "Content-Type: application/json"
         -d '{"name":"interop-smoke-test","email":"interop-test@example.com"}' )
+    # The organization request is reported, not swallowed: the response body
+    # and the HTTP status are both kept, so a rejected request cannot continue
+    # as a success and leave the push lane without an organization.  The body
+    # of a rejected request is what names the rejection, so this request does
+    # not use -f: the status is appended with -w and split off instead.
+    typeset orgRaw=''
+    typeset orgResponse=''
+    typeset orgHttp='000'
+    typeset -i orgRc=0
     if [[ -z "${QUAY_TOKEN}" && -f "${cookieFile}" && -n "${csrf}" ]]; then
         # Password-only signin produced a session, not a token: send the
-        # session cookie and its CSRF token, otherwise this request goes out
-        # with an empty bearer header and the push below has no organization.
-        curl -fsSLk --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/organization/" \
+        # session cookie and the CSRF token refreshed for that session,
+        # otherwise this request goes out with an empty bearer header and the
+        # push below has no organization.
+        orgRaw="$(curl -sSLk --connect-timeout 15 --max-time 60 -X POST \
+            -w '\n%{http_code}' \
+            "https://${QUAY_HOST}/api/v1/organization/" \
             -b "${cookieFile}" \
             -H "X-CSRF-Token: ${csrf}" \
-            "${orgPayloadOpts[@]}" || true
+            "${orgPayloadOpts[@]}" 2>/dev/null)" || orgRc=$?
     else
         # The bearer token is handed to curl through a process-substitution
         # config, so it never appears in the curl argv.
-        curl -fsSLk --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/organization/" \
+        orgRaw="$(curl -sSLk --connect-timeout 15 --max-time 60 -X POST \
+            -w '\n%{http_code}' \
+            "https://${QUAY_HOST}/api/v1/organization/" \
             --config <(printf 'header = "Authorization: Bearer %s"\n' "${QUAY_TOKEN}") \
-            "${orgPayloadOpts[@]}" || true
+            "${orgPayloadOpts[@]}" 2>/dev/null)" || orgRc=$?
+    fi
+    typeset -a orgRawLines=()
+    mapfile -t orgRawLines <<< "${orgRaw}"
+    typeset -i orgLineCount=${#orgRawLines[@]}
+    if (( orgLineCount > 0 )) && [[ "${orgRawLines[orgLineCount-1]}" =~ ^[0-9]{3}$ ]]; then
+        orgHttp="${orgRawLines[orgLineCount-1]}"
+        orgResponse="$(printf '%s\n' "${orgRawLines[@]:0:orgLineCount-1}")"
+    else
+        orgResponse="${orgRaw}"
+    fi
+
+    typeset orgSuccess=''
+    orgSuccess="$(printf '%s' "${orgResponse}" | \
+        python3 -c "import sys,json; print(json.load(sys.stdin).get('success',''))" 2>/dev/null)" || orgSuccess=''
+    if (( orgRc != 0 )) || [[ ! "${orgHttp}" =~ ^2[0-9]{2}$ ]] || [[ "${orgSuccess}" != "True" ]]; then
+        # A re-run against an existing organization answers with an HTTP
+        # error, and that must not fail the step: the organization the push
+        # needs is already there.  Read it back instead of matching error
+        # text, so only a genuinely missing organization is reported.
+        typeset orgPresentHttp=''
+        if [[ -z "${QUAY_TOKEN}" && -f "${cookieFile}" && -n "${csrf}" ]]; then
+            orgPresentHttp="$(curl -sSLk --connect-timeout 15 --max-time 30 -o /dev/null \
+                -w '%{http_code}' \
+                -b "${cookieFile}" \
+                "https://${QUAY_HOST}/api/v1/organization/interop-smoke-test" 2>/dev/null)" || orgPresentHttp=''
+        else
+            orgPresentHttp="$(curl -sSLk --connect-timeout 15 --max-time 30 -o /dev/null \
+                -w '%{http_code}' \
+                --config <(printf 'header = "Authorization: Bearer %s"\n' "${QUAY_TOKEN}") \
+                "https://${QUAY_HOST}/api/v1/organization/interop-smoke-test" 2>/dev/null)" || orgPresentHttp=''
+        fi
+        if [[ "${orgPresentHttp}" != "200" ]]; then
+            typeset orgError=''
+            orgError="$(printf '%s' "${orgResponse}" | \
+                python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('error') or d.get('error_message') or d.get('message') or '')" 2>/dev/null)" || orgError=''
+            echo "ERROR: organization creation failed (http ${orgHttp}, curl rc=${orgRc}${orgError:+: ${orgError}}); the push test has no organization" >&2
+            RecordResult "${testNamePushPull}" "failed" "Could not create the interop-smoke-test organization (http ${orgHttp}, curl rc=${orgRc}): ${orgError:-the response carried no error field}" "0"
+            rm -f "${cookieFile}"
+            "${xtraceOn}" && set -x
+            return 1
+        fi
+        echo "INFO: organization interop-smoke-test already exists; continuing without creating it" >&2
     fi
     rm -f "${cookieFile}"
 
@@ -877,10 +952,18 @@ function Main () {
         RecordResult "${testNameAcs}" "skipped" "Skipped: Quay preflight (discovery endpoint) failed"
         exit 1
     fi
-    CreateTestOrg
+    # The organization request is what makes the push target writable, so a
+    # recorded organization failure is why the push lane is skipped: running
+    # the push would only overwrite that reason with a symptom of it.
+    typeset -i orgRc=0
+    CreateTestOrg || orgRc=$?
 
     typeset -i status=0 pushPassed=0
-    RunPushPull && pushPassed=1 || status=1
+    if (( orgRc == 0 )); then
+        RunPushPull && pushPassed=1 || status=1
+    else
+        status=1
+    fi
     RunOdfStorageCheck || status=1
     if (( pushPassed )); then
         RunAcsScan || status=1
