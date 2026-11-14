@@ -99,10 +99,12 @@ tests:
     allow_best_effort_post_steps: true
     cluster_profile: aws-cspi-qe
     env:
+      ACS_EXPECTATION: required
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      E2E_SKIP_ANSIBLE_PREP: "1"
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["5.0-lp","opp-aws-lp","opp-lp"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: mpruitt@redhat.com
@@ -117,8 +119,9 @@ tests:
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
+      QUAY_EXPECTATION: required
       QUAY_OPERATOR_CHANNEL: stable-3.17
-      SKIP_POLICIES: policy-acs,policy-acs-central-ca-bundle,policy-acs-central-status,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
+      SKIP_POLICIES: policy-acs,policy-acs-central-ca-bundle,policy-acs-central-status,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
       ZONES_COUNT: "3"
     post:
     - ref: acm-fetch-operator-versions
@@ -141,8 +144,12 @@ tests:
     test:
     - ref: install-operators
     - ref: acm-mch
+    - ref: interop-opp-deploy-acs
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
+    - ref: interop-opp-deploy-odf
+    - ref: interop-opp-deploy-quay
+    - ref: interop-opp-deploy-compliance
     - ref: interop-opp-wait-mcp
     - ref: stackrox-opp-readiness
     - ref: stackrox-opp-smoke
@@ -174,10 +181,12 @@ tests:
     allow_best_effort_post_steps: true
     cluster_profile: aws-cspi-qe
     env:
+      ACS_EXPECTATION: required
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       COMPUTE_NODE_REPLICAS: "6"
       COMPUTE_NODE_TYPE: m6a.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      E2E_SKIP_ANSIBLE_PREP: "1"
       FIPS_ENABLED: "true"
       FIREWATCH_CONFIG_FILE_PATH: https://raw.githubusercontent.com/CSPI-QE/cspi-utils/refs/heads/main/firewatch-base-configs/opp/lp-interop-aws.json
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["5.0-lp","opp-aws-lp","opp-lp","fips"]'
@@ -190,8 +199,9 @@ tests:
         [
           {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.17", "install_namespace": "ocm", "target_namespaces": "ocm", "operator_group": "acm-operator-group"}
         ]
+      QUAY_EXPECTATION: required
       QUAY_OPERATOR_CHANNEL: stable-3.17
-      SKIP_POLICIES: policy-acs,policy-acs-central-ca-bundle,policy-acs-central-status,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-config-quay,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
+      SKIP_POLICIES: policy-acs,policy-acs-central-ca-bundle,policy-acs-central-status,policy-acs-monitor-certs,policy-acs-operator-central,policy-acs-sync-resources,policy-advanced-managed-cluster-security,policy-advanced-managed-cluster-status,policy-compliance-operator-install,policy-hub-quay-bridge,policy-install-quay,policy-observability-operator,policy-observability-storage,policy-observability-storage-status,policy-odf,policy-odf-cluster,policy-odf-noobaa,policy-odf-status,policy-quay-bridge,policy-quay-status
       ZONES_COUNT: "3"
     post:
     - ref: acm-fetch-operator-versions
@@ -214,8 +224,12 @@ tests:
     test:
     - ref: install-operators
     - ref: acm-mch
+    - ref: interop-opp-deploy-acs
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
+    - ref: interop-opp-deploy-odf
+    - ref: interop-opp-deploy-quay
+    - ref: interop-opp-deploy-compliance
     - ref: interop-opp-wait-mcp
     - ref: stackrox-opp-readiness
     - ref: stackrox-opp-smoke
