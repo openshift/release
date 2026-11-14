@@ -87,8 +87,13 @@ RESULT_PREFIX = "test-result-"
 # field it emits is either a member of a closed vocabulary fixed in this file or
 # a bounded integer, so it carries no text taken from a report: no spec text,
 # label, author tag, failure message, stack trace, resource identifier, file
-# name, timestamp or URL. Nothing either censoring layer removes can be
-# reconstructed from it, and it has no content for the scanner to match.
+# name, timestamp or URL, and nothing either censoring layer removes can be
+# reconstructed from it.
+#
+# This is data minimisation, not an exemption. The summary is uploaded like
+# every other artifact and is scanned like every other artifact, and this file
+# cannot promise what that scanner will do with it; carrying no content from
+# the reports is what makes a match unlikely, and the claim stops there.
 SUMMARY_SCHEMA = 1
 # Ginkgo serialises types.SpecState to one of these strings (onsi/ginkgo
 # types.SpecState MarshalJSON). A value outside the set is counted as
@@ -98,13 +103,28 @@ SPEC_STATES = ("pending", "skipped", "passed", "failed", "aborted", "panicked",
 # types.SpecStateFailureStates.
 FAILURE_STATES = ("failed", "aborted", "panicked", "interrupted", "timedout")
 UNRECOGNIZED_STATE = "unrecognized"
-# Ginkgo labels are the only metadata that carries a case identity, and the OCM
-# FVT suites tag a case as id_<number> (the zero-egress case is referred to as
-# @id_76488 in rosa-e2e-ocm-fvt-commands.sh). Only a canonical unpadded decimal
-# run of at most nine digits is accepted, so a padded, token-shaped or
-# otherwise ambiguous label contributes no identifier instead of being copied.
-# A JSON true, a number or a nested list is not a string and never matches.
-SUMMARY_CASE = re.compile(r"id_([1-9][0-9]{0,8})")
+# A case is identified by the @id_<number> tag the OCM FVT suites give it -
+# the convention rosa-e2e-ocm-fvt-commands.sh already refers to as @id_76488.
+# Public Prow artifacts put that tag in the spec's own name rather than in a
+# Ginkgo label: across eight per-phase reports from four job families in
+# test-platform-results-public, 7928 spec records carry no id label at all,
+# while 6237 of them - including a failed one - carry @id_<5 digits> in their
+# text. Both places are therefore read, and only the number is taken.
+#
+# Reading the spec name is not reading the spec text out: the tag is matched
+# as a whole token and nothing but the integer it holds is kept, so no part
+# of a name, message or description reaches the artifact.
+#
+# A label is the tag on its own, with or without the @. In text the tag must
+# stand alone: no word character - \w, so non-ASCII letters and digits count -
+# and no second @ may touch either end, so @id_123abc, x@id_12, @@id_12,
+# @id_1\u0660, @id_12@id_13 and @id_0123 contribute nothing rather than a
+# prefix of themselves, which would pin a failure on a case that did not fail. Only a
+# canonical unpadded decimal run of at most nine digits is accepted, and ASCII
+# digits only, so a padded, overlong or non-ASCII form is refused. A JSON
+# true, a number or a nested list is not a string and never matches.
+SUMMARY_LABEL_CASE = re.compile(r"@?id_([1-9][0-9]{0,8})")
+SUMMARY_TEXT_CASE = re.compile(r"(?<![\w@])@id_([1-9][0-9]{0,8})(?![\w@])")
 # No source location is emitted. A Ginkgo report carries LeafNodeLocation, but
 # its file name comes from the private test repository: no public vocabulary
 # fixes which basenames are legitimate, so any basename copied from a report
@@ -128,6 +148,11 @@ SUMMARY_MAX_BYTES = 8 * 1024 * 1024
 SUMMARY_MAX_SPECS = 4096
 # Labels examined per spec, over all of its label groups.
 SUMMARY_MAX_LABELS = 256
+# Strings of a spec's own text scanned for the tag, and characters taken from
+# each. A scan that runs out of either cannot say the spec holds one tag, so
+# it reports that instead of a case.
+SUMMARY_MAX_TEXTS = 32
+SUMMARY_MAX_TEXT_CHARS = 4096
 SUMMARY_MAX_FAILURES = 64
 # Why one report could not be folded in, in the order a phase reports them when
 # it holds several unusable reports and no usable one.
@@ -450,47 +475,80 @@ def handle_metadata(arguments):
         artifact.write("\n")
 
 
-def summary_labels(spec):
-    """Yield the bounded Ginkgo labels of one spec, ignoring anything else.
+def summary_strings(spec, fields, budget):
+    """Yield the strings of one spec's label or text fields, within a budget.
 
-    One budget covers every group, rather than one per group: the identifier
-    is the single datum this reads, so the bound has to be a number the whole
-    spec is measured against instead of one a spec can multiply.
+    One budget covers every field and group, rather than one each: the tag is
+    the single datum this reads, so the bound has to be a number the whole
+    spec is measured against instead of one a spec can multiply. budget is
+    [remaining, incomplete]; incomplete is set when the scan stops early or
+    meets a shape it does not read, so the caller can tell a scan that saw
+    the whole spec from one that may have missed a tag. A number or a boolean
+    cannot hold a tag and leaves the scan complete.
     """
-    groups = [spec.get("LeafNodeLabels")]
-    hierarchy = spec.get("ContainerHierarchyLabels")
-    if isinstance(hierarchy, list):
-        groups.extend(hierarchy)
-    budget = SUMMARY_MAX_LABELS
-    for group in groups:
-        if not isinstance(group, list):
+    for field in fields:
+        value = spec.get(field)
+        if isinstance(value, str):
+            value = [value]
+        elif not isinstance(value, list):
+            budget[1] = budget[1] or value is not None
             continue
-        for label in group:
-            if budget == 0:
-                return
-            budget -= 1
-            if isinstance(label, str):
-                yield label
+        for item in value:
+            for leaf in (item if isinstance(item, list) else [item]):
+                if budget[0] == 0:
+                    budget[1] = True
+                    return
+                budget[0] -= 1
+                if isinstance(leaf, str):
+                    yield leaf
+                elif isinstance(leaf, (list, dict)):
+                    # Nested deeper than a Ginkgo label group: not descended
+                    # into, so the scan cannot claim it saw every tag.
+                    budget[1] = True
+
+
+def summary_tags(spec):
+    """Collect the case tags of one spec, and whether the scan was complete.
+
+    Labels are read first, then the spec's own name: public reports put the
+    tag in the name, and a few suites may yet label it.
+    """
+    found = set()
+    labels = [SUMMARY_MAX_LABELS, False]
+    for label in summary_strings(spec, ("LeafNodeLabels", "ContainerHierarchyLabels"), labels):
+        match = SUMMARY_LABEL_CASE.fullmatch(label)
+        if match:
+            found.add(int(match.group(1)))
+    texts = [SUMMARY_MAX_TEXTS, False]
+    truncated = labels[1]
+    for text in summary_strings(spec, ("LeafNodeText", "ContainerHierarchyTexts"), texts):
+        # A tag past the character cap, or straddling it, is not read, so a
+        # longer name leaves the scan incomplete rather than half read.
+        truncated = truncated or len(text) > SUMMARY_MAX_TEXT_CHARS
+        found.update(int(number) for number
+                     in SUMMARY_TEXT_CASE.findall(text[:SUMMARY_MAX_TEXT_CHARS]))
+    return found, truncated or texts[1]
 
 
 def summary_case(spec):
     """Return how a case was identified and the identifier, when there is one.
 
-    A case is named only when the labels agree on exactly one identifier. Two
-    different identifiers are reported as conflicting and neither is emitted,
-    because guessing between them would attribute a failure to a case that did
-    not fail. "ambiguous" is deliberately not reused here: it is already the
-    state of a report whose shape this summary does not model.
+    A case is named only when the spec holds exactly one tag and the whole
+    spec was scanned. Two different tags are reported as conflicting and
+    neither is emitted, because guessing between them would attribute a
+    failure to a case that did not fail; a scan that hit its budget is
+    reported as truncated for the same reason, since a tag it did not reach
+    could have disagreed. "ambiguous" is deliberately not reused for either:
+    it is already the state of a report whose shape this summary does not
+    model.
     """
-    found = set()
-    for label in summary_labels(spec):
-        match = SUMMARY_CASE.fullmatch(label)
-        if match:
-            found.add(int(match.group(1)))
-            if len(found) > 1:
-                return "conflicting", None
+    found, truncated = summary_tags(spec)
+    if len(found) > 1:
+        return "conflicting", None
+    if truncated:
+        return "truncated", None
     if len(found) == 1:
-        return "label", found.pop()
+        return "tag", found.pop()
     return "none", None
 
 

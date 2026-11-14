@@ -7,6 +7,11 @@ here; no private report is used and none is needed, because the summary reads
 only state and label metadata. Every test asserts the projection as a whole:
 each string in the artifact must belong to a vocabulary fixed in this file, so
 a field that ever copied report text would fail every case, not only its own.
+
+The censoring case replaces published reports with a notice itself: it shows
+that the summary stays readable when the verbose artifacts no longer are. It
+does not exercise the post-upload scanner, which runs outside this repository
+and is not reachable from a fixture.
 """
 
 import json
@@ -49,15 +54,21 @@ VOCABULARY = set(PHASES) | {
     "counts", "identified", "case", "truncated",
     "results", "results_dropped", "results_unreadable", "failures_dropped", "max_failures",
     "scanned", "missing", "irregular", "unreadable", "parsed", "partial", "oversized",
-    "malformed", "ambiguous", "unavailable", "unrecognized", "label", "none", "conflicting",
+    "malformed", "ambiguous", "unavailable", "unrecognized", "tag", "none", "conflicting",
     "pending", "skipped", "passed", "aborted", "panicked", "interrupted", "timedout",
 }
 
 
-def spec(state, labels=(), hierarchy=(), **overrides):
-    """Build one synthetic Ginkgo SpecReport carrying hostile text."""
+def spec(state, labels=(), hierarchy=(), tag=None, **overrides):
+    """Build one synthetic Ginkgo SpecReport carrying hostile text.
+
+    tag places an @id_<number> in the spec's own name, where the public
+    reports carry it, rather than in a Ginkgo label.
+    """
     report = dict(HOSTILE, State=state, LeafNodeLabels=list(labels),
                   ContainerHierarchyLabels=[list(group) for group in hierarchy])
+    if tag is not None:
+        report["LeafNodeText"] = f"{tag} creates a cluster with token {SECRET}"
     report.update(overrides)
     return report
 
@@ -157,10 +168,10 @@ class SummaryProjectionTests(SummaryFixture):
         self.assertEqual(data["output"], "scanned")
         self.assertEqual(data["failures"], [
             {"phase": "pre-cluster-creation", "state": "failed",
-             "identified": "label", "case": 12345},
+             "identified": "tag", "case": 12345},
             {"phase": "pre-cluster-creation", "state": "timedout",
-             "identified": "label", "case": 6789},
-            {"phase": "post-clean", "state": "panicked", "identified": "label", "case": 1},
+             "identified": "tag", "case": 6789},
+            {"phase": "post-clean", "state": "panicked", "identified": "tag", "case": 1},
         ])
         creation = self.phase(data, "pre-cluster-creation")
         self.assertEqual(creation["state"], "parsed")
@@ -207,9 +218,12 @@ class SummaryProjectionTests(SummaryFixture):
             spec(None),
         ])
         data = self.summary()
+        # The nested list is not a Ginkgo label list, and reading it as one
+        # would be guessing: two tags are then in play, so the record says
+        # conflicting rather than picking either.
         self.assertEqual(data["failures"],
                          [{"phase": "post-clean", "state": "failed",
-                           "identified": "label", "case": 7}])
+                           "identified": "conflicting"}])
         self.assertEqual(self.phase(data, "post-clean")["counts"],
                          {"failed": 1, "unrecognized": 3})
 
@@ -221,7 +235,7 @@ class SummaryProjectionTests(SummaryFixture):
         # comes first and names no case, the failed spec whose labels agree
         # carries one.
         self.assertEqual([record["identified"] for record in data["failures"]],
-                         ["conflicting", "label"])
+                         ["conflicting", "tag"])
         self.assertNotIn("case", data["failures"][0])
         self.assertEqual(data["failures"][1]["case"], 13)
 
@@ -243,11 +257,11 @@ class SummaryProjectionTests(SummaryFixture):
         self.report("Day2CH", "<testsuites/>", result=result, name="Day2CH_000303.xml")
         data = self.summary()
         self.assertEqual(data["failures"], [
-            {"phase": "Day1Post", "state": "failed", "identified": "label", "case": 12},
-            {"phase": "Day2Pre", "state": "failed", "identified": "label", "case": 13},
-            {"phase": "Day2CH", "state": "failed", "identified": "label", "case": 14},
-            {"phase": "Day2CH", "state": "panicked", "identified": "label", "case": 15},
-            {"phase": "Day2CH", "state": "timedout", "identified": "label", "case": 16},
+            {"phase": "Day1Post", "state": "failed", "identified": "tag", "case": 12},
+            {"phase": "Day2Pre", "state": "failed", "identified": "tag", "case": 13},
+            {"phase": "Day2CH", "state": "failed", "identified": "tag", "case": 14},
+            {"phase": "Day2CH", "state": "panicked", "identified": "tag", "case": 15},
+            {"phase": "Day2CH", "state": "timedout", "identified": "tag", "case": 16},
         ])
         changes = self.phase(data, "Day2CH")
         self.assertEqual((changes["state"], changes["reports"], changes["specs"]),
@@ -269,7 +283,7 @@ class SummaryProjectionTests(SummaryFixture):
         self.assertEqual((record["state"], record["specs"]), ("parsed", 2))
         self.assertEqual(data["failures"],
                          [{"phase": "other", "state": "failed",
-                           "identified": "label", "case": 18}])
+                           "identified": "tag", "case": 18}])
 
     def test_metadata_collector_labels_the_same_phases(self):
         result = "test-result-fixture"
@@ -291,6 +305,64 @@ class SummaryProjectionTests(SummaryFixture):
         reports = json.loads(contents)["output"]["results"][0]["reports"]
         self.assertEqual(sorted(report["label"] for report in reports),
                          ["Day2CH-json", "merged-xml", "other-json", "other-xml"])
+
+
+    def test_case_tag_is_read_from_the_spec_name(self):
+        # Public reports carry the case as an @id_<number> tag in the spec's
+        # own name, with Ginkgo labels holding no identifier at all.
+        self.report("Day2CH", [
+            spec("failed", labels=["Runtime", "Critical"], tag="@id_46990"),
+            spec("panicked", hierarchy=[["Serial"]],
+                 ContainerHierarchyTexts=["Cluster day2 @id_57001 behaviour"],
+                 LeafNodeText=f"keeps the cluster ready {SECRET}"),
+            spec("passed", tag="@id_57002"),
+        ])
+        data = self.summary()
+        self.assertEqual(data["failures"], [
+            {"phase": "Day2CH", "state": "failed", "identified": "tag", "case": 46990},
+            {"phase": "Day2CH", "state": "panicked", "identified": "tag", "case": 57001},
+        ])
+        raw = (self.artifacts / SUMMARY).read_text(encoding="utf-8")
+        # "cluster" is not checked: pre-cluster-creation is a fixed phase name.
+        for leaked in ("Runtime", "Critical", "Serial", "behaviour", "ready", "id_", "@"):
+            self.assertNotIn(leaked, raw)
+
+    def test_tag_must_stand_alone_in_the_spec_name(self):
+        rejected = ("@id_123abc fails", "x@id_124 fails", "@id_0125 fails",
+                    "@id_1234567890 fails", "id_126 without the at sign",
+                    "@id_\u0661\u0662 fails", "@id_ fails", "@@id_127 fails",
+                    # A non-ASCII letter or digit is a word character too, so
+                    # it must not let a prefix of the number through.
+                    "@id_1\u0660 fails", "@id_12\u0663 fails", "\u0661@id_55 fails",
+                    "\u00e9@id_124 fails", "@id_12@id_13 fails")
+        for index, text in enumerate(rejected):
+            self.report("post-clean", [spec("failed", LeafNodeText=text)],
+                        result=f"test-result-{index:02d}")
+        data = self.summary()
+        self.assertEqual(len(data["failures"]), len(rejected))
+        self.assertEqual({record["identified"] for record in data["failures"]}, {"none"})
+        self.assertTrue(all("case" not in record for record in data["failures"]))
+
+    def test_two_tags_in_one_spec_name_conflict(self):
+        self.report("Day2CH", [spec("failed", LeafNodeText="@id_300 and @id_301 together"),
+                               spec("failed", LeafNodeText="@id_302 twice @id_302")])
+        data = self.summary()
+        self.assertEqual([record["identified"] for record in data["failures"]],
+                         ["conflicting", "tag"])
+        self.assertEqual(data["failures"][1]["case"], 302)
+
+    def test_hostile_text_around_a_tag_is_not_copied(self):
+        self.report("Day2CH", [spec(
+            "failed",
+            LeafNodeText=f"@id_46991 Bearer {SECRET} https://example.invalid/leak",
+            ContainerHierarchyTexts=[f"[author:someone] {SECRET}"])])
+        data = self.summary()
+        raw = (self.artifacts / SUMMARY).read_text(encoding="utf-8")
+        for leaked in ("Bearer", "author", "example.invalid", SECRET, "@id_46991"):
+            self.assertNotIn(leaked, raw)
+        self.assertEqual(data["failures"],
+                         [{"phase": "Day2CH", "state": "failed",
+                           "identified": "tag", "case": 46991}])
 
 
 class SummaryFailClosedTests(SummaryFixture):
@@ -446,7 +518,7 @@ class SummaryBoundsTests(SummaryFixture):
         creation = self.phase(data, "pre-cluster-creation")
         self.assertEqual((creation["state"], creation["reports"]), ("parsed", 1))
         self.assertIn({"phase": "pre-cluster-creation", "state": "failed",
-                       "identified": "label", "case": 76488}, data["failures"])
+                       "identified": "tag", "case": 76488}, data["failures"])
 
     def test_failure_budget_reaches_the_test_phases_before_teardown(self):
         self.report("post-clean", [spec("failed", labels=[f"id_{900 + index}"])
@@ -455,7 +527,7 @@ class SummaryBoundsTests(SummaryFixture):
         data = self.summary()
         self.assertEqual(len(data["failures"]), 64)
         self.assertIn({"phase": "pre-cluster-creation", "state": "failed",
-                       "identified": "label", "case": 76488}, data["failures"])
+                       "identified": "tag", "case": 76488}, data["failures"])
         self.assertEqual(self.phase(data, "pre-cluster-creation")["dropped"], 0)
         self.assertEqual(self.phase(data, "post-clean")["dropped"], 7)
         self.assertEqual(data["limits"]["failures_dropped"], 7)
@@ -491,16 +563,49 @@ class SummaryBoundsTests(SummaryFixture):
         self.assertEqual(data["failures"][0]["case"], 8)
         self.assertEqual(data["limits"]["results"], 1)
 
-    def test_label_budget_is_bounded_per_spec(self):
+    def test_truncated_scan_never_claims_a_case(self):
+        # Over the label budget either way: a tag the scan did not reach
+        # could have disagreed with the one it found, so neither spec names a
+        # case and both say so.
         padding = [f"label-{index}" for index in range(400)]
         self.report("post-clean", [spec("failed", labels=padding + ["id_9"]),
                                    spec("failed", labels=["id_10"] + padding)])
         data = self.summary()
-        # The spec whose id_ label sits past the budget names no case; the one
-        # whose id_ label comes first still does.
         self.assertEqual([record["identified"] for record in data["failures"]],
-                         ["none", "label"])
-        self.assertEqual(data["failures"][1]["case"], 10)
+                         ["truncated", "truncated"])
+        self.assertTrue(all("case" not in record for record in data["failures"]))
+
+    def test_truncated_text_scan_never_claims_a_case(self):
+        self.report("post-clean", [
+            spec("failed", LeafNodeText="@id_31 " + "x" * 9000),
+            spec("failed", ContainerHierarchyTexts=[f"part-{index}" for index in range(40)],
+                 LeafNodeText="@id_32 short"),
+            spec("failed", LeafNodeText="y" * 4090 + "@id_33 straddles the cut"),
+        ])
+        data = self.summary()
+        self.assertEqual([record["identified"] for record in data["failures"]],
+                         ["truncated"] * 3)
+        self.assertTrue(all("case" not in record for record in data["failures"]))
+
+    def test_a_complete_scan_at_the_limits_still_names_the_case(self):
+        self.report("post-clean", [
+            spec("failed", LeafNodeText="@id_34 " + "z" * (4096 - len("@id_34 "))),
+            spec("failed", labels=[f"label-{index}" for index in range(255)] + ["id_35"]),
+            spec("failed", ContainerHierarchyTexts=["@id_36"] + [""] * 31,
+                 LeafNodeText=None),
+        ])
+        data = self.summary()
+        self.assertEqual([record.get("case") for record in data["failures"]], [34, 35, 36])
+        self.assertEqual({record["identified"] for record in data["failures"]}, {"tag"})
+
+    def test_structures_the_scan_does_not_read_are_not_a_clean_scan(self):
+        self.report("post-clean", [
+            spec("failed", labels=["id_37"], ContainerHierarchyTexts=[{"a": "@id_38"}]),
+            spec("failed", LeafNodeLabels=["id_39", [["id_40"]]]),
+            spec("failed", labels=["id_41"], LeafNodeText={"nested": "@id_42"}),
+        ])
+        data = self.summary()
+        self.assertEqual({record["identified"] for record in data["failures"]}, {"truncated"})
 
 
     def test_catch_all_phase_has_its_own_report_budget(self):
@@ -515,7 +620,7 @@ class SummaryBoundsTests(SummaryFixture):
                          (32, 8, "partial"))
         self.assertEqual(self.phase(data, "Day2CH")["state"], "parsed")
         self.assertIn({"phase": "Day2CH", "state": "failed",
-                       "identified": "label", "case": 76488}, data["failures"])
+                       "identified": "tag", "case": 76488}, data["failures"])
 
     def test_long_unknown_phase_name_is_still_counted(self):
         self.report("other", [spec("failed", labels=["id_21"])],
@@ -584,7 +689,7 @@ class SummaryIntegrationTests(SummaryFixture):
         data = json.loads((self.artifacts / SUMMARY).read_text(encoding="utf-8"))
         self.check_vocabulary(data)
         self.assertEqual(data["failures"], [{"phase": "Day2CH", "state": "failed",
-                                             "identified": "label", "case": 76488}])
+                                             "identified": "tag", "case": 76488}])
 
 
 if __name__ == "__main__":
