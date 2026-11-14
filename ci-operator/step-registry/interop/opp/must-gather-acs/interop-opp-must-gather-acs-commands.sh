@@ -768,6 +768,24 @@ rhacs_csvs = [
     and c.get("reason") != "Copied"
     and (sub_namespace is None or c.get("namespace") == sub_namespace)
 ]
+
+# CSV binding (finding deep-2-retry-f1): any non-copied rhacs-operator.v* CSV
+# used to satisfy the precondition, so an upgrade-pending cluster whose only
+# installed CSV is one release behind the subscription's currentCSV read as
+# removal-ready with the upgrade still outstanding. The installed CSV must be
+# the CSV the subscription resolves, reported as its own term. Kept separate
+# from rhacs_csvs instead of filtering that list, so rhacs_csv_count still
+# means "CSVs installed for the package" and the exactly-one precondition is
+# not quietly narrowed to "one CSV that happens to match" (a lingering second
+# CSV would otherwise go uncounted). A subscription with no currentCSV, or no
+# single rhacs subscription to read one from, reads unknown, not true.
+if sub is None:
+    rhacs_csv_matches_subscription = None
+else:
+    rhacs_csv_matches_subscription = any(
+        c.get("name") == sub.get("currentCSV") for c in rhacs_csvs
+    )
+
 rhacs_op = [o for o in ops if o.get("name") == "operatorpolicy-rhacs-operator"]
 
 sub_channel = sub.get("channel") if sub else None
@@ -868,6 +886,24 @@ elif pm_s == "absent" and rhacs_csvs:
 else:
     csv_catalog_matches_subscription = None
 
+# Channel resolution (finding deep-2-retry-f1): the catalog term says which
+# catalog the packagemanifest lives in, not that the manifest still offers
+# the version the subscription resolves. An upgrade-pending cluster keeps
+# the right catalog, so the catalog term alone cannot tell a settled install
+# from one the catalog has already moved past. The captured manifest must
+# list the subscription's currentCSV on one of its channels, reported as its
+# own term so the two bindings are independently readable.
+sub_currentcsv = sub.get("currentCSV") if sub is not None else None
+if pm_ok and sub_currentcsv:
+    packagemanifest_resolves_current_csv = any(
+        ch.get("currentCSV") == sub_currentcsv
+        for ch in pm.get("channels") or []
+    )
+elif pm_s == "absent" and rhacs_csvs:
+    packagemanifest_resolves_current_csv = False
+else:
+    packagemanifest_resolves_current_csv = None
+
 # The predicate is computable only when every input is definitively
 # classified (present or absent); query failures make it unknown.
 inputs_classified = (
@@ -891,9 +927,15 @@ terms = {
     "rhacs_csv_count": (str(len(rhacs_csvs))
                         if csvs_s in ("ok", "absent") else "unknown"),
     "rhacs_csv_name": rhacs_csvs[0]["name"] if rhacs_csvs else "unknown",
+    "rhacs_csv_matches_subscription": (
+        str(rhacs_csv_matches_subscription).lower()
+        if rhacs_csv_matches_subscription is not None else "unknown"),
     "csv_catalog_matches_subscription": (
         str(csv_catalog_matches_subscription).lower()
         if csv_catalog_matches_subscription is not None else "unknown"),
+    "packagemanifest_resolves_current_csv": (
+        str(packagemanifest_resolves_current_csv).lower()
+        if packagemanifest_resolves_current_csv is not None else "unknown"),
     "operatorpolicy_present": (str(bool(rhacs_op)).lower()
                                if ops_s in ("ok", "absent") else "unknown"),
     "operatorpolicy_compliant": (str(op_compliant).lower()
@@ -914,11 +956,13 @@ terms = {
 }
 # Per-run removal precondition: the OperatorPolicy owns the rhacs
 # subscription (its spec.subscription targets that subscription) with a
-# matching channel, a non-copied CSV in the subscription namespace, and the
-# package resolvable in the subscription's effective catalog source, and the
-# policy actually enforces a re-creating state (a compliant inform or
-# mustnothave policy would not restore the subscription). The two-run
-# aggregation and the named-build comparison live in the ticket rule.
+# matching channel, one non-copied CSV in the subscription namespace that is
+# the CSV the subscription resolves, the package resolvable in the
+# subscription's effective catalog source and offering the version the
+# subscription resolves, and the policy actually enforces a re-creating
+# state (a compliant inform or mustnothave policy would not restore the
+# subscription). The two-run aggregation and the named-build comparison live
+# in the ticket rule.
 terms["removal_preconditions_met"] = str(
     inputs_classified
     and terms["operatorpolicy_compliant"] == "true"
@@ -927,10 +971,12 @@ terms["removal_preconditions_met"] = str(
     and terms["operatorpolicy_recreates_subscription"] == "true"
     and terms["rhacs_subscription_count"] == "1"
     and terms["rhacs_csv_count"] == "1"
+    and terms["rhacs_csv_matches_subscription"] == "true"
     and terms["rhacs_subscription_channel"] != "unknown"
     and terms["rhacs_subscription_channel"] == terms["operatorpolicy_spec_channel"]
     and terms["rhacs_subscription_source"] != "unknown"
     and terms["csv_catalog_matches_subscription"] == "true"
+    and terms["packagemanifest_resolves_current_csv"] == "true"
 ).lower()
 
 out = ev / "acs-central-status.properties"
@@ -1264,11 +1310,41 @@ FIXTURE
   _expect operatorpolicy_recreates_subscription unknown
   _expect removal_preconditions_met false
 
+  # Upgrade-pending (finding deep-2-retry-f1): the subscription resolves a
+  # newer CSV than the only installed one, so the catalog is right and
+  # offers that version, yet the upgrade has not landed. The installed CSV
+  # is not the CSV the subscription resolves and cannot satisfy the
+  # precondition. Self-contained: every input is restated here.
+  cat > "${tmp}/01-operatorpolicy.json" <<'FIXTURE'
+[{"name": "operatorpolicy-rhacs-operator", "namespace": "policies",
+  "spec": {"subscriptionName": "rhacs-operator",
+           "subscriptionNamespace": "rhacs-operator",
+           "channel": "stable", "remediationAction": "enforce",
+           "complianceType": "musthave"},
+  "conditions": [{"type": "Compliant", "status": "True"}]}]
+FIXTURE
+  cat > "${tmp}/03-subscription.json" <<'FIXTURE'
+[{"name": "rhacs-operator", "namespace": "rhacs-operator",
+  "apiVersion": "operators.coreos.com/v1alpha1",
+  "currentCSV": "rhacs-operator.v4.12.0", "state": "UpgradePending",
+  "conditions": [], "channel": "stable", "source": "redhat-operators"}]
+FIXTURE
+  echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "rhacs-operator", "phase": "Succeeded", "reason": "Succeeded"}]' > "${tmp}/05-csv.json"
+  echo '{"name": "rhacs-operator", "catalogSource": "redhat-operators", "catalogSourceNamespace": "openshift-marketplace", "channels": [{"name": "stable", "currentCSV": "rhacs-operator.v4.12.0"}]}' > "${tmp}/08-packagemanifest-rhacs.json"
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect csv_catalog_matches_subscription true
+  _expect packagemanifest_resolves_current_csv true
+  _expect rhacs_subscription_channel stable
+  _expect rhacs_csv_count 1
+  _expect rhacs_csv_name rhacs-operator.v4.11.6
+  _expect rhacs_csv_matches_subscription false
+  _expect removal_preconditions_met false
+
   if [[ ${_st_failed} -ne 0 ]]; then
     rm -rf "${tmp}"
     return 22
   fi
-  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, target-mismatch, unset-target, no-OperatorPolicy, non-enforcing, removal-blocking, unspecified-enforcement, and FALSE fixtures all classified correctly"
+  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, target-mismatch, unset-target, no-OperatorPolicy, non-enforcing, removal-blocking, unspecified-enforcement, upgrade-pending, and FALSE fixtures all classified correctly"
   rm -rf "${tmp}"
   return 0
 }

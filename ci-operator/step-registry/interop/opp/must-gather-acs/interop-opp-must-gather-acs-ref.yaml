@@ -24,12 +24,12 @@ ref:
       not exercised in self-test mode: it validates the per-run
       removal-precondition predicate only, and stays runnable without a
       cluster (it never reads live artifacts into the fixture assertions).
-      The predicate is evaluated against twelve embedded fixture classes
+      The predicate is evaluated against thirteen embedded fixture classes
       (TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV,
       target-mismatch, unset-target, no-OperatorPolicy, non-enforcing,
-      removal-blocking, unspecified-enforcement, FALSE) and the step
-      exits 22 if any of them classifies wrongly. Used to validate the
-      detector in rehearsals (a detector never observed TRUE is not
+      removal-blocking, unspecified-enforcement, upgrade-pending, FALSE) and
+      the step exits 22 if any of them classifies wrongly. Used to validate
+      the detector in rehearsals (a detector never observed TRUE is not
       actionable).
   documentation: |-
     Downloads ACS/StackRox diagnostic bundle via the Central API and captures
@@ -74,12 +74,17 @@ ref:
     traceback) in place and the probe-sanity assertion does not flag it;
     read those artifacts as advisory only. The per-run removal-precondition
     terms are written to olm-evidence/acs-central-status.properties,
-    including the catalog-source binding of the subscription (a same-named
-    package in a non-subscribed catalog does not satisfy the precondition)
-    and the OperatorPolicy enforcement gate (a policy that only reports, or
-    whose compliance type works against the object's existence, does not
-    own the precondition; an unset enforcement field reads unknown, not
-    true by default);
+    including the CSV binding of the subscription (the installed CSV must be
+    the CSV the subscription's currentCSV resolves, so an upgrade-pending
+    cluster whose only installed CSV is one release behind does not satisfy
+    the precondition), the catalog-source binding of the subscription (a
+    same-named package in a non-subscribed catalog does not satisfy the
+    precondition), the version binding of that catalog (the captured
+    PackageManifest must resolve the subscription's currentCSV on one of its
+    channels), and the OperatorPolicy enforcement gate (a policy that only
+    reports, or whose compliance type works against the object's existence,
+    does not own the precondition; an unset enforcement field reads unknown,
+    not true by default);
     the two-run aggregation is a ticket-level rule, not computed here.
     Signal surfaces: the evidence JSONs, the properties file, and the step
     log line EVIDENCE ASSERTIONS FAILED (rc=N), which reports the
