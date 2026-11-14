@@ -17,7 +17,7 @@ _opp_cleanup() {
   set +x 2>/dev/null
   # Credential hygiene: these files must not survive the step, on the
   # success and the failure path alike.
-  rm -f /tmp/quay-auth.json /tmp/quay-cookies.txt "${acsPassFile:-/tmp/acs-admin-password}" /tmp/acs-ingress-ca.crt
+  rm -f /tmp/quay-auth.json /tmp/quay-cookies.txt "${acsPassFile:-/tmp/acs-admin-password}" /tmp/acs-ingress-ca.crt /tmp/acs-central-ca.crt
   rm -rf /tmp/quay-ca-candidates
   # Scrub credentials before copying
   sed -i -E \
@@ -908,16 +908,24 @@ function RunAcsScan () {
     # TLS verification for the ACS Central API.  The admin credential, and the
     # Quay credential carried in the registration body, are only ever sent
     # over a connection whose certificate is verified: resolve a CA that
-    # checks the Central route before the first such request, trying the
-    # ingress router CA (which signs .apps route certificates) and then the
-    # service CA bundle mounted in the pod (pattern from
-    # interop-opp-must-gather-acs).  There is deliberately no -k fallback: an
-    # unverifiable route is recorded failed and no credential is sent.
+    # checks the Central route before the first such request, trying Central's
+    # own serving CA (the central route terminates TLS in the pod, so the
+    # client sees Central's certificate rather than a router certificate), the
+    # ingress router CA, and the service CA bundle mounted in the pod (pattern
+    # from interop-opp-must-gather-acs).  There is deliberately no -k
+    # fallback: an unverifiable route is recorded failed and no credential is
+    # sent.
     # Declared here so the helper functions called below (dynamic scoping)
     # share the same options.
+    typeset centralCa=''
+    centralCa="$(oc get secret central-tls -n stackrox -o jsonpath='{.data.ca\.pem}' 2>/dev/null | base64 -d 2>/dev/null)" || centralCa=''
+    typeset -a acsCaCandidates=()
+    if [[ -n "${centralCa}" ]]; then
+        printf '%s\n' "${centralCa}" > /tmp/acs-central-ca.crt
+        acsCaCandidates+=( /tmp/acs-central-ca.crt )
+    fi
     typeset ingressCaBundle=''
     ingressCaBundle="$(oc get configmap default-ingress-cert -n openshift-config-managed -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null)" || ingressCaBundle=''
-    typeset -a acsCaCandidates=()
     if [[ -n "${ingressCaBundle}" ]]; then
         printf '%s\n' "${ingressCaBundle}" > /tmp/acs-ingress-ca.crt
         acsCaCandidates+=( /tmp/acs-ingress-ca.crt )
@@ -940,8 +948,8 @@ function RunAcsScan () {
     fi
     if [[ -z "${acsCaFile}" ]]; then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "Could not verify the ACS Central route certificate for ${acsHost} with the ingress router CA or the service CA bundle; refusing to send the admin credential over unverified TLS" "${elapsed}"
-        rm -f "${acsPassFile}" /tmp/acs-ingress-ca.crt
+        RecordResult "${testName}" "failed" "Could not verify the ACS Central route certificate for ${acsHost} with Central's serving CA (secret stackrox/central-tls), the ingress router CA or the service CA bundle; refusing to send the admin credential over unverified TLS" "${elapsed}"
+        rm -f "${acsPassFile}" /tmp/acs-ingress-ca.crt /tmp/acs-central-ca.crt
         return 1
     fi
     typeset -a acsTlsOpts=( --cacert "${acsCaFile}" )
