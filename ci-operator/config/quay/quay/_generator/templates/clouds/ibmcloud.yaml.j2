@@ -1,0 +1,17 @@
+tests:
+- steps:
+    cluster_profile: ibmcloud-quay
+    env:
+      BASE_DOMAIN: quay-ibmcloud.ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: bx2-16x64
+      IBMCLOUD_INGRESS_IDLE_TIMEOUT: "300"
+      QUAY_STORAGE_PROVIDER: ibmcloud
+    post:
+    - ref: quay-gather-jaeger-traces
+    - ref: quay-gather
+    - ref: quay-deprovision
+{%- if database_deprovision_ref %}
+    - ref: "{{ database_deprovision_ref }}"
+{%- endif %}
+    - chain: ipi-ibmcloud-post
+    workflow: ipi-ibmcloud
