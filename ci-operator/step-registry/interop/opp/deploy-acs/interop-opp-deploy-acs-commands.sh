@@ -122,7 +122,8 @@ _props="${ARTIFACT_DIR:-/tmp}/acs-deploy-properties.txt"
 # a poll deadline cannot push classification/JUnit past the work budget (and
 # so cannot leave TERM to record StepTerminated in place of acs-csv-timeout).
 # Reserves subtracted from the deadline when capping a phase:
-#   _diag_reserve        bounded diagnostics (4 x 20s request-timeout) + JUnit
+#   _diag_reserve        bounded diagnostics: five queries, each with the 20s
+#                        request timeout, under a 120s cap, plus the JUnit write
 #   _oc_overrun_reserve  one in-flight 20s oc request at a phase deadline
 # Phase deadlines are capped at _work_deadline - both reserves.
 _work_budget=1650
