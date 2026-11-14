@@ -164,11 +164,16 @@ ref:
     label, so both are read, the tag has to stand alone as a whole token, and
     only the number is kept. Two different tags are reported as conflicting
     and a scan that hit its budget as truncated, because in neither case can
-    the summary say which case failed. Phases are read in run order and every limit is
-    applied per phase, so a teardown that fails every spec cannot push the
-    test phases out of the summary; what a limit did drop is counted on the
-    phase that lost it, and a phase that lost a report to a cap is reported
-    as partial rather than parsed.
+    the summary say which case failed. The tag is matched on a bounded slice
+    of the text composed to NFC, so the two spellings of one character cannot
+    be read differently, and a tag written against a word character, a
+    combining mark or a second @ is not a token. Phases are read in run order
+    and every report limit is applied per phase, and the single failure-record
+    budget is handed out to the phases in run order once the whole tree has
+    been read rather than as each result directory is read, so a teardown that
+    fails every spec cannot push the test phases out of the summary; what a
+    limit did drop is counted on the phase that lost it, and a phase that lost
+    a report to a cap is reported as partial rather than parsed.
 
     A report is named <phase>_<HHMMSS>.<xml|json> inside
     test-result-<job>-<timestamp>/, and the phase part is chosen by the run:
