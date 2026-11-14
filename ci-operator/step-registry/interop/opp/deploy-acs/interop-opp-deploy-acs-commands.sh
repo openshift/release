@@ -213,9 +213,9 @@ _junit_emit() {
   local _type _msg _edetail
   if [[ -n "${_signal}" ]]; then
     _type="StepTerminated"
-    _msg="step terminated by signal ${_signal} after ${_jd}s"
+    _msg=$(_xml_escape "step terminated by signal ${_signal} after ${_jd}s")
     _fc=1
-    _fx="<failure message=\"${_msg}\" type=\"${_type}\">${_msg}; classification at termination: ${_class}</failure>"
+    _fx="<failure message=\"${_msg}\" type=\"${_type}\">${_msg}; classification at termination: $(_xml_escape "${_class}")</failure>"
   elif (( _jr != 0 )); then
     _type="${_class}"
     _msg=$(_xml_escape "${_jn} failed: ${_class_detail}")
