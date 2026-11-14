@@ -14,6 +14,8 @@ does not exercise the post-upload scanner, which runs outside this repository
 and is not reachable from a fixture.
 """
 
+import contextlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -23,6 +25,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 REPOSITORY = Path(__file__).resolve().parents[1]
@@ -30,6 +33,7 @@ STEP = REPOSITORY / "ci-operator/step-registry/rosa/e2e/ocm-fvt"
 HELPER = STEP / "prepare/rosa-e2e-ocm-fvt-prepare-commands.py"
 RUNNER = STEP / "rosa-e2e-ocm-fvt-commands.sh"
 SUMMARY = "ocm-fvt-failure-summary.json"
+RESULT_REPORT = "report.xml"
 # The phase vocabulary the helper fixes, taken from public Prow artifacts.
 PHASES = ("pre-env-validation", "pre-vpc-cleaner", "pre-cluster-creation",
           "Day1Post", "Day1PostE2E", "CPUpgrade", "Day2Pre", "Day2CH", "Day2E2E",
@@ -57,6 +61,26 @@ VOCABULARY = set(PHASES) | {
     "malformed", "ambiguous", "unavailable", "unrecognized", "tag", "none", "conflicting",
     "pending", "skipped", "passed", "aborted", "panicked", "interrupted", "timedout",
 }
+
+
+def helper_module():
+    """Import the delivered helper, for a case that has to drive its scan.
+
+    Every other case runs the helper the way the step runs it, as a
+    subprocess; a case about what a directory's read order does to a cap
+    cannot choose that order from outside the process. The helper's main
+    guard means importing it runs nothing.
+    """
+    spec_ = importlib.util.spec_from_file_location("ocm_fvt_helper", HELPER)
+    module = importlib.util.module_from_spec(spec_)
+    # Without this the import leaves a __pycache__ beside the delivered
+    # command, and the step registry refuses a name of that shape.
+    cached, sys.dont_write_bytecode = sys.dont_write_bytecode, True
+    try:
+        spec_.loader.exec_module(module)
+    finally:
+        sys.dont_write_bytecode = cached
+    return module
 
 
 def spec(state, labels=(), hierarchy=(), tag=None, **overrides):
@@ -165,6 +189,36 @@ class SummaryFixture(unittest.TestCase):
         contents = (self.artifacts / artifact).read_text(encoding="utf-8")
         self.assertNotIn(SECRET, contents)
         return contents, json.loads(contents)
+
+    def collect_metadata_in_order(self, merged_at):
+        """Collect metadata with the merged report at a fixed scan position.
+
+        The collector reads a result directory with os.scandir, whose order
+        is the filesystem's and which decides what its child cap keeps, so a
+        case about the cap has to choose that order instead of arranging
+        names and hoping. The entries are the real ones this fixture wrote;
+        only the position report.xml is yielded at is chosen. Run in process,
+        because the order a subprocess reads cannot be reached from here.
+        """
+        artifact = self.artifacts / f"ocm-fvt-artifact-metadata-{merged_at}.json"
+        collector = helper_module()
+        listing = os.scandir
+
+        @contextlib.contextmanager
+        def ordered(target):
+            with listing(target) as entries:
+                listed = sorted(entries, key=lambda entry: entry.name)
+            merged = [entry for entry in listed if entry.name == RESULT_REPORT]
+            rest = [entry for entry in listed if entry.name != RESULT_REPORT]
+            yield iter(rest[:merged_at] + merged + rest[merged_at:])
+
+        with mock.patch("os.scandir", ordered):
+            # Called as the main guard calls it: the script path, then the
+            # arguments the step passes after the subcommand.
+            collector.handle_metadata([str(HELPER), str(self.output), str(artifact)])
+        contents = artifact.read_text(encoding="utf-8")
+        self.assertNotIn(SECRET, contents)
+        return contents, json.loads(contents)["output"]["results"][0]
 
 
 class SummaryProjectionTests(SummaryFixture):
@@ -572,31 +626,28 @@ class SummaryBoundsTests(SummaryFixture):
         self.assertEqual(data["limits"]["failures_dropped"], 7)
 
     def test_metadata_child_cap_holds_past_the_merged_report(self):
-        # The merged report keeps its record whatever the cap did; the entries
-        # scanned after it must not get in behind it. readdir order belongs to
-        # the filesystem, so the directory grows until report.xml is past the
-        # cap in that order - the arrangement the cap has to survive.
+        # The merged report keeps its record whatever the cap did, and the
+        # entries scanned after it must not get in behind it. Where it falls
+        # in the scan decides which of those two things is under test, and a
+        # directory's order belongs to the filesystem, so both positions are
+        # read deliberately rather than hoped for: scanned before the cap is
+        # full the merged record is inside it, scanned after it is the one
+        # record past it and the entries behind it must still be refused.
         result = self.output / "test-result-fixture"
         result.mkdir()
         (result / "report.xml").write_text("<testsuites/>", encoding="utf-8")
-        written, index = 0, 0
-        while written < 512 and index < 32:
-            for name in range(written, written + 64):
-                (result / f"post-clean_{name:06d}.json").write_text("[]", encoding="utf-8")
-            written += 64
-            with os.scandir(result) as entries:
-                index = [entry.name for entry in entries].index("report.xml")
-        # Asserted, so that an order putting the merged report first cannot
-        # turn the case below into one the unfixed collector also passes.
-        self.assertGreaterEqual(index, 32)
-        contents, data = self.collect_metadata()
-        self.assertNotIn("post-clean_0", contents)
-        collected = data["output"]["results"][0]
-        labels = [report["label"] for report in collected["reports"]]
-        self.assertEqual(labels.count("merged-xml"), 1)
+        for index in range(64):
+            (result / f"post-clean_{index:06d}.json").write_text("[]", encoding="utf-8")
+        first_text, first = self.collect_metadata_in_order(0)
+        late_text, late = self.collect_metadata_in_order(40)
+        for contents, collected in ((first_text, first), (late_text, late)):
+            self.assertNotIn("post-clean_0", contents)
+            labels = [report["label"] for report in collected["reports"]]
+            self.assertEqual(labels.count("merged-xml"), 1)
+            self.assertTrue(collected["truncated"])
+        self.assertEqual(len(first["reports"]), 32)
         # The cap, plus the merged record the exception adds past it.
-        self.assertEqual(len(collected["reports"]), 33)
-        self.assertTrue(collected["truncated"])
+        self.assertEqual(len(late["reports"]), 33)
 
     def test_specs_per_report_are_bounded(self):
         self.report("post-clean", [spec("passed")] * 5000)
