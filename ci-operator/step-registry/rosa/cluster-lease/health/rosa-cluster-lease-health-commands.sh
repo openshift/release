@@ -77,6 +77,13 @@ for i in $(seq 0 $((TOTAL - 1))); do
     echo "Cluster: ${CM_NAME} (${CLUSTER_ID})" >> "${REPORT}"
     echo "  Status: ${STATUS}" >> "${REPORT}"
 
+    REVOLVING_DOOR=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/revolving-door"] // ""')
+    ERROR_REASON=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/error-reason"] // ""')
+    if [[ "${REVOLVING_DOOR}" == "true" ]]; then
+        echo "  REVOLVING-DOOR: cluster stuck in replace loop (error: ${ERROR_REASON})" >> "${REPORT}"
+        log "REVOLVING-DOOR: ${CM_NAME} stuck in replace loop (error: ${ERROR_REASON})"
+    fi
+
     if [[ "${STATUS}" == "in-use" && -n "${ACQUIRED_AT}" ]]; then
         ACQUIRED_EPOCH=$(date -d "${ACQUIRED_AT}" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "${ACQUIRED_AT}" +%s 2>/dev/null || echo "0")
         LEASE_AGE=$(( NOW_EPOCH - ACQUIRED_EPOCH ))
@@ -152,7 +159,7 @@ for i in $(seq 0 $((TOTAL - 1))); do
     CP_CHECK_SKIPPED=""
     if ! ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" 2>/dev/null | jq -r '.kubeconfig' > "${CLUSTER_KUBECONFIG}" 2>/dev/null || [[ ! -s "${CLUSTER_KUBECONFIG}" ]]; then
         log "WARNING: ${CM_NAME} could not fetch cluster kubeconfig from OCM, skipping ClusterPackage check"
-        CP_CHECK_SKIPPED="true"
+        CP_CHECK_SKIPPED="credentials-unavailable"
     fi
 
     if [[ -z "${CP_CHECK_SKIPPED}" ]]; then
@@ -209,6 +216,7 @@ for i in $(seq 0 $((TOTAL - 1))); do
             fi
         else
             log "WARNING: ${CM_NAME} could not list ClusterPackages, skipping CP check"
+            CP_CHECK_SKIPPED="clusterpackages-unreadable"
         fi
     fi
     rm -f "${CLUSTER_KUBECONFIG}"
@@ -216,13 +224,63 @@ for i in $(seq 0 $((TOTAL - 1))); do
 
     if [[ "${STATUS}" == "error" ]]; then
         log "RESTORED: ${CM_NAME} is healthy again, setting to available"
-        lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
-            "metadata": {
-                "labels": { "rosa-cluster-lease/status": "available" },
-                "annotations": { "rosa-cluster-lease/error-reason": "", "rosa-cluster-lease/error-at": "" }
-            }
-        }' || true
-        echo "  RESTORED to available" >> "${REPORT}"
+        # Revolving-door state records that a replacement already failed to clear this
+        # error, so it may only be dropped by a check that actually establishes
+        # recovery from the recorded reason. Reaching here means this step's OCM check
+        # passed, which settles the OCM-sourced reasons, and a completed ClusterPackage
+        # check settles the ClusterPackage ones — an OCM-ready cluster can still have
+        # degraded ClusterPackages, so a skipped check settles nothing. The controller's
+        # RBAC and PKO checks do not run in this step, so those reasons (and any reason
+        # this step does not recognise) keep their revolving-door annotation and
+        # replacement history for the controller's own restore path to clear. The lease
+        # is still returned to available as before; only the protection state is held.
+        RD_KEEP_REASON=""
+        if [[ -n "${CP_CHECK_SKIPPED}" ]]; then
+            RD_KEEP_REASON="${CP_CHECK_SKIPPED}"
+        else
+            case "${ERROR_REASON}" in
+                "ClusterPackage: "*|"OCM status: "*|"Cluster deleted from OCM") ;;
+                *) RD_KEEP_REASON="unverified-error-reason" ;;
+            esac
+        fi
+        if [[ -n "${RD_KEEP_REASON}" ]]; then
+            RESTORE_PATCH='{
+                "metadata": {
+                    "labels": { "rosa-cluster-lease/status": "available" },
+                    "annotations": { "rosa-cluster-lease/error-reason": "", "rosa-cluster-lease/error-at": "" }
+                }
+            }'
+        else
+            RESTORE_PATCH='{
+                "metadata": {
+                    "labels": { "rosa-cluster-lease/status": "available" },
+                    "annotations": { "rosa-cluster-lease/error-reason": "", "rosa-cluster-lease/error-at": "", "rosa-cluster-lease/revolving-door": "" }
+                }
+            }'
+        fi
+        if lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p "${RESTORE_PATCH}"; then
+            if [[ -n "${RD_KEEP_REASON}" ]]; then
+                log "Restored ${CM_NAME} to available without establishing recovery from its recorded error (${RD_KEEP_REASON}); keeping revolving-door state and replacement history"
+                echo "  RESTORED to available (recovery unverified: ${RD_KEEP_REASON}; revolving-door state kept)" >> "${REPORT}"
+            else
+                # Only a successful restore invalidates the previous replacement record.
+                # Dropping it after a failed patch would leave the lease in error with no
+                # history, so the controller would replace it again without
+                # revolving-door protection.
+                if ! lease_oc delete configmap "${CM_NAME}-replace-history" -n "${LEASE_NAMESPACE}" --ignore-not-found; then
+                    log "WARNING: failed to delete ${CM_NAME}-replace-history; stale history may cause a false revolving-door match"
+                fi
+                if [[ "${REVOLVING_DOOR}" == "true" ]]; then
+                    log "Cleared revolving-door state for ${CM_NAME}"
+                    echo "  RESTORED to available (revolving-door cleared)" >> "${REPORT}"
+                else
+                    echo "  RESTORED to available" >> "${REPORT}"
+                fi
+            fi
+        else
+            log "WARNING: failed to restore ${CM_NAME} to available; keeping replacement history"
+            echo "  WARNING: restore to available failed" >> "${REPORT}"
+        fi
     fi
 
     HEALTHY=$((HEALTHY + 1))

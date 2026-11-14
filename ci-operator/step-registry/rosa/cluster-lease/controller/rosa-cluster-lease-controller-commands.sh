@@ -59,6 +59,7 @@ LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
 OCM_LOGIN_ENV="${OCM_LOGIN_ENV:-staging}"
 STALE_LEASE_HOURS="${STALE_LEASE_HOURS:-1}"
 ERROR_REPLACE_HOURS="${ERROR_REPLACE_HOURS:-1}"
+REVOLVING_DOOR_HOURS="${REVOLVING_DOOR_HOURS:-2}"
 MAX_CLUSTER_AGE_HOURS="${MAX_CLUSTER_AGE_HOURS:-0}"
 REFRESH_DAY="${REFRESH_DAY:-6}"
 MAX_REFRESH_PER_RUN="${MAX_REFRESH_PER_RUN:-2}"
@@ -412,6 +413,11 @@ ocm_authenticate || exit $?
 NOW_EPOCH=$(date +%s)
 STALE_THRESHOLD=$((STALE_LEASE_HOURS * 3600))
 ERROR_THRESHOLD=$((ERROR_REPLACE_HOURS * 3600))
+if [[ ! "${REVOLVING_DOOR_HOURS}" =~ ^[1-9][0-9]{0,3}$ ]] || (( REVOLVING_DOOR_HOURS > 8760 )); then
+    log "ERROR: REVOLVING_DOOR_HOURS must be a positive integer between 1 and 8760, got '${REVOLVING_DOOR_HOURS}'"
+    exit 1
+fi
+REVOLVING_DOOR_THRESHOLD=$((REVOLVING_DOOR_HOURS * 3600))
 REPORT="${ARTIFACT_DIR}/controller-report.txt"
 echo "Lease Controller Report - $(date -u)" > "${REPORT}"
 echo "======================================" >> "${REPORT}"
@@ -904,6 +910,10 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
     RBAC_KUBECONFIG=$(mktemp)
     trap 'rm -f "${RBAC_KUBECONFIG}"' EXIT
     RBAC_CHECK_FAILED=false
+    # Only a definitive "yes" establishes that an RBAC error has recovered. A skipped
+    # or inconclusive probe must not be read as recovery when the restore path below
+    # decides whether to drop revolving-door state.
+    RBAC_CHECK_CONCLUSIVE=false
     if ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" 2>/dev/null \
         | jq -r '.kubeconfig // empty' > "${RBAC_KUBECONFIG}" 2>/dev/null \
         && [[ -s "${RBAC_KUBECONFIG}" ]]; then
@@ -917,6 +927,8 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
             RBAC_CHECK_FAILED=true
         elif [[ "${RBAC_RESULT}" != "yes" ]]; then
             log "WARNING: ${CM_NAME} RBAC check inconclusive (connectivity issue?), skipping"
+        else
+            RBAC_CHECK_CONCLUSIVE=true
         fi
     else
         log "WARNING: ${CM_NAME} could not retrieve cluster kubeconfig for RBAC check, skipping"
@@ -943,9 +955,13 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
     PKO_KUBECONFIG=$(mktemp)
     trap 'rm -f "${PKO_KUBECONFIG}"' EXIT
     PKO_CHECK_FAILED=false
+    # Set once the probe actually reached the cluster, for the same reason as
+    # RBAC_CHECK_CONCLUSIVE above.
+    PKO_CHECK_RAN=false
     if ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" 2>/dev/null \
         | jq -r '.kubeconfig // empty' > "${PKO_KUBECONFIG}" 2>/dev/null \
         && [[ -s "${PKO_KUBECONFIG}" ]]; then
+        PKO_CHECK_RAN=true
         STUCK_PKGS=$(oc get clusterpackage -l "hive.openshift.io/managed=true" \
             -o json --kubeconfig="${PKO_KUBECONFIG}" 2>/dev/null \
             | jq -r '.items[] | select(.status.conditions[]? | select(.type=="Progressing" and (.message // "" | contains("refusing adoption")))) | .metadata.name + "|" + (.status.conditions[] | select(.type=="Progressing") | .message)' 2>/dev/null) || true
@@ -1035,12 +1051,61 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
         else
             log "RESTORED: ${CM_NAME} is healthy again"
             if ! dry_run_guard "Would restore ${CM_NAME} to available"; then
-                lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
-                    "metadata": {
-                        "labels": { "rosa-cluster-lease/status": "available" },
-                        "annotations": { "rosa-cluster-lease/error-reason": "", "rosa-cluster-lease/error-at": "" }
-                    }
-                }' || true
+                REVOLVING_DOOR_ANNOTATION=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/revolving-door"] // ""')
+                # Revolving-door state may only be dropped by a probe that actually
+                # establishes recovery from the recorded reason. Reaching here means the
+                # OCM check passed, which settles the OCM-sourced reasons, but the RBAC
+                # and PKO probes above can be skipped or inconclusive without failing.
+                # When the matching probe did not conclude — or the reason is not one
+                # this phase recognises — restore the lease as before but keep the
+                # annotation and replacement history. ClusterPackage reasons never reach
+                # here; they are deferred to the health step above.
+                RD_KEEP_REASON=""
+                case "${ERROR_REASON}" in
+                    "OCM status: "*|"Cluster deleted from OCM") ;;
+                    "RBAC: "*)
+                        [[ "${RBAC_CHECK_CONCLUSIVE}" == "true" ]] || RD_KEEP_REASON="rbac-check-inconclusive"
+                        ;;
+                    "PKO: "*)
+                        [[ "${PKO_CHECK_RAN}" == "true" ]] || RD_KEEP_REASON="pko-check-skipped"
+                        ;;
+                    *)
+                        RD_KEEP_REASON="unverified-error-reason"
+                        ;;
+                esac
+                if [[ -n "${RD_KEEP_REASON}" ]]; then
+                    RESTORE_PATCH='{
+                        "metadata": {
+                            "labels": { "rosa-cluster-lease/status": "available" },
+                            "annotations": { "rosa-cluster-lease/error-reason": "", "rosa-cluster-lease/error-at": "" }
+                        }
+                    }'
+                else
+                    RESTORE_PATCH='{
+                        "metadata": {
+                            "labels": { "rosa-cluster-lease/status": "available" },
+                            "annotations": { "rosa-cluster-lease/error-reason": "", "rosa-cluster-lease/error-at": "", "rosa-cluster-lease/revolving-door": "" }
+                        }
+                    }'
+                fi
+                if lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p "${RESTORE_PATCH}"; then
+                    if [[ -n "${RD_KEEP_REASON}" ]]; then
+                        log "Restored ${CM_NAME} to available without establishing recovery from its recorded error (${RD_KEEP_REASON}); keeping revolving-door state and replacement history"
+                    else
+                        # Only a successful restore invalidates the previous replacement
+                        # record. Dropping it after a failed patch would leave the lease in
+                        # error with no history, so Phase 5 would replace it again without
+                        # revolving-door protection.
+                        if ! lease_oc delete configmap "${CM_NAME}-replace-history" -n "${LEASE_NAMESPACE}" --ignore-not-found; then
+                            log "WARNING: failed to delete ${CM_NAME}-replace-history; stale history may cause a false revolving-door match"
+                        fi
+                        if [[ "${REVOLVING_DOOR_ANNOTATION}" == "true" ]]; then
+                            log "Cleared revolving-door state for ${CM_NAME}"
+                        fi
+                    fi
+                else
+                    log "WARNING: failed to restore ${CM_NAME} to available; keeping replacement history"
+                fi
             fi
             echo "RESTORED: ${CM_NAME}" >> "${REPORT}"
         fi
@@ -1156,6 +1221,52 @@ for i in $(seq 0 $((ERROR_COUNT - 1))); do
         continue
     fi
 
+    # --- Revolving door detection ---
+    CURRENT_ERROR_REASON=$(echo "${CM}" | jq -r '.metadata.annotations["rosa-cluster-lease/error-reason"] // ""')
+    # --ignore-not-found separates "no history recorded yet" (exit 0 with empty
+    # output, replacement is allowed) from a genuine read failure (non-zero exit).
+    # Treating a failed read as "no history" would silently drop revolving-door
+    # protection and delete a cluster that may already be annotated as a revolving
+    # door, so skip this lease instead and retry on the next run.
+    REPLACE_HISTORY=""
+    HISTORY_READ_RC=0
+    REPLACE_HISTORY=$(lease_oc get configmap "${CM_NAME}-replace-history" -n "${LEASE_NAMESPACE}" -o json --ignore-not-found 2>/dev/null) || HISTORY_READ_RC=$?
+
+    if (( HISTORY_READ_RC != 0 )); then
+        log "WARNING: could not read ${CM_NAME}-replace-history (oc exit ${HISTORY_READ_RC}). Skipping replacement of ${CM_NAME} this run so revolving-door protection is not lost."
+        echo "SKIPPED: ${CM_NAME} (replacement history unreadable)" >> "${REPORT}"
+        continue
+    fi
+
+    if [[ -n "${REPLACE_HISTORY}" ]]; then
+        LAST_REPLACE_REASON=$(echo "${REPLACE_HISTORY}" | jq -r '.data["last-replace-reason"] // ""')
+        LAST_REPLACE_AT=$(echo "${REPLACE_HISTORY}" | jq -r '.data["last-replace-at"] // ""')
+
+        if [[ -n "${LAST_REPLACE_AT}" && -n "${LAST_REPLACE_REASON}" ]]; then
+            LAST_REPLACE_EPOCH=$(date -d "${LAST_REPLACE_AT}" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "${LAST_REPLACE_AT}" +%s 2>/dev/null || echo "0")
+            # Measure how soon after the replacement the error recurred, not how long
+            # ago the replacement happened. This loop only reaches here once the lease
+            # has already sat in error for ERROR_REPLACE_HOURS, so comparing against
+            # NOW_EPOCH would add that grace period to every measurement and hide
+            # genuine revolving doors. The two windows stay independent.
+            ERROR_AFTER_REPLACE=$(( ERROR_EPOCH - LAST_REPLACE_EPOCH ))
+
+            if (( ERROR_AFTER_REPLACE >= 0 )) && (( ERROR_AFTER_REPLACE < REVOLVING_DOOR_THRESHOLD )) && [[ "${CURRENT_ERROR_REASON}" == "${LAST_REPLACE_REASON}" ]]; then
+                log "WARNING: Revolving door detected for ${CM_NAME}: same error '${CURRENT_ERROR_REASON}' recurred $((ERROR_AFTER_REPLACE / 60))m after replacement (window $((REVOLVING_DOOR_THRESHOLD / 60))m). Skipping replacement — likely an environment-level issue, not a cluster issue."
+                if ! dry_run_guard "Would annotate ${CM_NAME} as revolving-door"; then
+                    lease_oc patch configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}" --type merge -p '{
+                        "metadata": {
+                            "annotations": { "rosa-cluster-lease/revolving-door": "true" }
+                        }
+                    }' || true
+                fi
+                echo "REVOLVING-DOOR: ${CM_NAME} (same error: ${CURRENT_ERROR_REASON})" >> "${REPORT}"
+                continue
+            fi
+        fi
+    fi
+    # --- End revolving door detection ---
+
     log "REPLACE: ${CM_NAME} has been in error for $((ERROR_AGE / 3600))h, deleting"
     echo "REPLACE: ${CM_NAME} (error for $((ERROR_AGE / 3600))h)" >> "${REPORT}"
 
@@ -1180,6 +1291,24 @@ for i in $(seq 0 $((ERROR_COUNT - 1))); do
     # Remove the ConfigMap (next reconcile will provision a replacement)
     lease_oc delete configmap "${CM_NAME}" -n "${LEASE_NAMESPACE}"
     log "Deleted ${CM_NAME}. Replacement will be provisioned on next reconcile."
+
+    # Record replacement in history for revolving-door detection. Written only
+    # after the lease ConfigMap is gone, so a failed delete cannot leave history
+    # that blocks the next replacement attempt. Serialized with jq rather than an
+    # interpolated heredoc so the reason is stored byte-for-byte: the later
+    # comparison in this phase is an exact string match, and a quote or newline in
+    # the reason would otherwise reshape the document or alter the stored value.
+    jq -n \
+        --arg name "${CM_NAME}-replace-history" \
+        --arg namespace "${LEASE_NAMESPACE}" \
+        --arg reason "${CURRENT_ERROR_REASON}" \
+        --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        '{
+            apiVersion: "v1",
+            kind: "ConfigMap",
+            metadata: { name: $name, namespace: $namespace },
+            data: { "last-replace-reason": $reason, "last-replace-at": $at }
+        }' | lease_oc apply -n "${LEASE_NAMESPACE}" -f -
 done
 
 # ---------------------------------------------------------------
