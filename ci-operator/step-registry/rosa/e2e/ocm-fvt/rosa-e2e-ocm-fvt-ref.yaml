@@ -158,8 +158,13 @@ ref:
     reports were seen, read and dropped by a cap, a spec count per Ginkgo
     state, and one record per failed, aborted, panicked, interrupted or timed
     out spec carrying the phase, that state, and the numeric case id when the
-    spec's Ginkgo labels name exactly one id_<number> - identified as label,
-    none or conflicting. Phases are read in run order and every limit is
+    spec names exactly one case - identified as tag, none, conflicting or
+    truncated. The case tag is the @id_<number> convention these suites use;
+    public artifacts put it in the spec's own name rather than in a Ginkgo
+    label, so both are read, the tag has to stand alone as a whole token, and
+    only the number is kept. Two different tags are reported as conflicting
+    and a scan that hit its budget as truncated, because in neither case can
+    the summary say which case failed. Phases are read in run order and every limit is
     applied per phase, so a teardown that fails every spec cannot push the
     test phases out of the summary; what a limit did drop is counted on the
     phase that lost it, and a phase that lost a report to a cap is reported
@@ -194,6 +199,11 @@ ref:
     than parsed. Summarising is best effort and
     runs after the test container has exited, so it cannot change the suite's
     exit status, its teardown or its reports.
+
+    The summary is an uploaded artifact like the others and is scanned like
+    the others. Holding no content from the reports is what makes it unlikely
+    to match, and this step claims no more than that: what the scanner does
+    with any object is decided after upload, outside this repository.
 
     Uploaded artifacts are pattern-scanned after upload as well, and a whole
     matching object is then replaced with a short notice, which makes a report
