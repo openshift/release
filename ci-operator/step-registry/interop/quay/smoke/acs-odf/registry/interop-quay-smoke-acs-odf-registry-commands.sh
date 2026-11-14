@@ -690,6 +690,9 @@ function RunOdfStorageCheck () {
 
     # Helper exit codes are branched on: 1 is the expected "no matching
     # claim", anything else is a broken helper and must not read as absence.
+    # The claim has to belong to the discovered QuayRegistry: another
+    # registry's claim in the same namespace would otherwise be waited on and
+    # reported as this registry's ODF integration.
     typeset quayObc=''
     typeset -i obcPickRc=0
     quayObc=$(printf '%s' "${obcJson}" | \
@@ -697,12 +700,24 @@ function RunOdfStorageCheck () {
 import sys, json, os
 registry = os.environ.get('QUAY_REGISTRY', '')
 data = json.load(sys.stdin)
+owned = []
+hinted = []
 for item in data.get('items', []):
-    name = item['metadata']['name']
-    owners = item['metadata'].get('ownerReferences', [])
-    if any(o.get('kind') == 'QuayRegistry' for o in owners) or registry in name:
-        print(name)
-        sys.exit(0)
+    meta = item.get('metadata') or {}
+    name = meta.get('name') or ''
+    if not name:
+        continue
+    refs = [r for r in (meta.get('ownerReferences') or [])
+            if r.get('kind') == 'QuayRegistry']
+    bound = ((item.get('status') or {}).get('phase') == 'Bound')
+    if any(r.get('name') == registry for r in refs if registry):
+        owned.append((0 if bound else 1, name))
+    elif registry and name.startswith(registry + '-'):
+        hinted.append((0 if bound else 1, name))
+pick = sorted(owned) or sorted(hinted)
+if pick:
+    print(pick[0][1])
+    sys.exit(0)
 sys.exit(1)
 " 2>&1) || obcPickRc=$?
 
