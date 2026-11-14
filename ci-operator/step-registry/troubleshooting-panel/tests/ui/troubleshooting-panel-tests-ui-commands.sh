@@ -62,6 +62,29 @@ spec:
   type: TroubleshootingPanel
 EOF
 
+# Wait for COO to reconcile the plugin before running tests: the plugin
+# deployment, its korrel8r backend, and the console registration must be
+# ready, otherwise the "Signal correlation" launcher entry is missing.
+function wait_ready() {
+  local what="$1" check="$2"
+  for _ in $(seq 1 12); do
+    if ${check} &>/dev/null; then
+      echo "${what} is ready"
+      return 0
+    fi
+    sleep 10
+  done
+  echo "Warning: ${what} not ready after 2m, continuing"
+  return 1
+}
+
+wait_ready "deployment ${coo_namespace}/troubleshooting-panel" \
+  "oc wait deployment/troubleshooting-panel -n ${coo_namespace} --for=condition=Available --timeout=10s"
+wait_ready "deployment ${coo_namespace}/korrel8r" \
+  "oc wait deployment/korrel8r -n ${coo_namespace} --for=condition=Available --timeout=10s"
+wait_ready "ConsolePlugin troubleshooting-panel-console-plugin" \
+  "oc get consoleplugin troubleshooting-panel-console-plugin"
+
 echo "--- Cloning troubleshooting-panel-console-plugin ---"
 if ! git clone --depth 1 https://github.com/openshift/troubleshooting-panel-console-plugin.git "${repo_dir}"; then
   echo "Error: failed to clone repository, skipping tests."
