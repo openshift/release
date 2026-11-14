@@ -282,8 +282,20 @@ json.dump(bc,sys.stdout,indent=2)
     typeset -g deployedImageDigest=''
     typeset -g deployedDigestNote=''
     typeset podSelector=''
-    podSelector="$(oc get deployment httpd-example -n e2e-opp -o jsonpath='{range $k, $v := .spec.selector.matchLabels}{$k}={$v},{end}' 2>/dev/null)" || podSelector=''
-    podSelector="${podSelector%,}"
+    # The selector is read as JSON and rendered here: JSONPath has no
+    # `$k, $v :=` form, and an oc call that cannot parse its own output would
+    # leave the selector empty and silently skip the digest read.
+    podSelector="$(oc get deployment httpd-example -n e2e-opp -o json 2>/dev/null | python3 -c "
+import json, sys
+
+try:
+    labels = ((json.load(sys.stdin).get('spec') or {}).get('selector') or {}).get('matchLabels') or {}
+except Exception:
+    sys.exit(1)
+if not labels:
+    sys.exit(1)
+sys.stdout.write(','.join('%s=%s' % (k, labels[k]) for k in sorted(labels)))
+")" || podSelector=''
     typeset -i rolloutRc=0
     typeset digestList=''
     typeset -i digestCount=0
