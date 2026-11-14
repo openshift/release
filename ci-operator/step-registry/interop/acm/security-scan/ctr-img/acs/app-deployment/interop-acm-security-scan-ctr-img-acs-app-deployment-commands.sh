@@ -79,6 +79,11 @@ done
 typeset -i startTime=0
 startTime=$(date +%s)
 
+# The ACS case records its own failure detail: the top-level caller cannot see
+# which precondition failed, so RunTestCase2 leaves the reason here and the
+# caller records the row with it.
+typeset -g acsFailureMsg='ACS integration test failed'
+
 # Function to record test result
 function RecordTestResult () {
     typeset testName="${1:-}"; (($#)) && shift
@@ -279,6 +284,7 @@ json.dump(bc,sys.stdout,indent=2)
 function RunTestCase2 () {
     : "====== Test Case 2: Test ACS Integration ======"
     : "NOTE: Waiting for ACS to scan the httpd-example image built in Test Case 1."
+    acsFailureMsg='ACS integration test failed'
 
     # Fetch ACS credentials.  The admin password is written to an
     # ephemeral file inside a subshell with xtrace disabled (Best
@@ -305,24 +311,82 @@ function RunTestCase2 () {
         return 1
     fi
 
-    # Query ACS for the image deployed by Test Case 1.  Match on the
-    # namespace-qualified repository (registry host and path, tag/digest
-    # stripped) so an older build of the same application does not satisfy
-    # the check.
-    typeset deployedRepo='httpd-example'
-    typeset deployedDigest=''
-    if [[ -n "${deployedImage:-}" ]]; then
-        deployedRepo="$(printf '%s' "${deployedImage}" | cut -d'@' -f1 | sed 's/:[^/:]*$//')"
-        [[ "${deployedImage}" == *@* ]] && deployedDigest="${deployedImage##*@}"
+    # Query ACS for the image deployed by Test Case 1.  Match on the exact
+    # repository and on the reference the deployment runs, so an older build
+    # of the same application cannot satisfy the check.
+    #
+    # An unreadable deployment image used to leave the fallback repository
+    # name in place, which turned the ACS match into a substring test over
+    # every image in the registry.  Fail the case instead: without the
+    # reference there is nothing to anchor the match to.
+    if [[ -z "${deployedImage:-}" ]]; then
+        acsFailureMsg="Could not read the image reference of deployment e2e-opp/httpd-example; the ACS image match has no reference to anchor on"
+        printf '%s\n' "ERROR: ${acsFailureMsg}" >&2
+        RecordTestResult "test-acs-integration" "failed" "${acsFailureMsg}" "0"
+        return 1
     fi
-    # The repository name is passed with --arg, so a name carrying jq quoting
-    # characters cannot rewrite the program.  When the deployment runs by
-    # digest, the ACS record must carry that digest too: the repository alone
-    # also matches an older build of the same application, and such a record
-    # would satisfy the check even if ACS never saw the running image.
-    typeset jqFilter='.images[] | select(.name | contains($repo))'
+
+    # Split the deployed reference into repository path and reference.  An
+    # @-pinned image carries a digest; otherwise the tag is whatever follows
+    # the last colon when that colon comes after the last slash, so a registry
+    # port is not mistaken for a tag.  A bare repository name resolves to the
+    # latest tag (Docker default), which keeps the comparison meaningful.
+    typeset deployedRepoPath="${deployedImage%%@*}"
+    typeset deployedDigest=''
+    typeset deployedTag=''
+    typeset deployedLastSegment="${deployedRepoPath##*/}"
+    if [[ "${deployedLastSegment}" == *:* ]]; then
+        deployedTag="${deployedLastSegment##*:}"
+        deployedRepoPath="${deployedRepoPath%:*}"
+    fi
+    if [[ "${deployedImage}" == *@* ]]; then
+        deployedDigest="${deployedImage#*@}"
+    fi
+    if [[ -z "${deployedTag}" && -z "${deployedDigest}" ]]; then
+        deployedTag='latest'
+    fi
+    # Compare the repository by its last two path components on both sides
+    # (or the whole path when it is shorter): the same application seen from a
+    # registry host, a namespace or a route host has the same trailing path,
+    # while an unrelated repository that merely contains this name does not
+    # match.  ACS record names always carry at least a namespace and a
+    # repository, so the depth is capped at two.
+    typeset -a deployedRepoParts=()
+    IFS='/' read -ra deployedRepoParts <<< "${deployedRepoPath}"
+    typeset -i deployedRepoCount=${#deployedRepoParts[@]}
+    typeset -i deployedRepoDepth=2
+    (( deployedRepoCount < 2 )) && deployedRepoDepth=${deployedRepoCount}
+    (( deployedRepoDepth > 0 )) || deployedRepoDepth=1
+    typeset deployedRepo=''
+    typeset -i repoPart=0
+    for (( repoPart = deployedRepoCount - deployedRepoDepth; repoPart < deployedRepoCount; repoPart++ )); do
+        deployedRepo+="${deployedRepoParts[repoPart]}/"
+    done
+    deployedRepo="${deployedRepo%/}"
+
+    # The repository and reference values are passed with --arg/--argjson, so
+    # a name carrying jq quoting characters cannot rewrite the program.  A
+    # digest-pinned deployment must find that digest (ACS reports it as the
+    # image id) and a tag-pinned deployment must find that tag: a
+    # repository-only match also accepts an older build of the same
+    # application, which is a record ACS may have scanned long ago.
+    # The jq programs are single-quoted on purpose: they are not shell
+    # expansions, and every value reaches jq as an argument.
+    # shellcheck disable=SC2016
+    typeset jqFilter='
+def repopath: sub("@.*$"; "") | sub(":[^/]*$"; "");
+def lastn($d): split("/") | .[-$d:] | join("/");
+.images[]
+| select((((.name // "") | repopath | lastn($depth)) == $repo))
+'
     if [[ -n "${deployedDigest}" ]]; then
-        jqFilter+=' | select(((.name // "") | contains($digest)) or ((.id // "") == $digest))'
+        # shellcheck disable=SC2016
+        jqFilter+='| select(((.name // "") | contains("@" + $digest)) or ((.id // "") == $digest))
+'
+    else
+        # shellcheck disable=SC2016
+        jqFilter+='| select(((.name // "") | endswith(":" + $tag)))
+'
     fi
 
     # TLS verification for the ACS Central API: prefer the service CA
@@ -358,7 +422,8 @@ function RunTestCase2 () {
             set +x
             curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 60 \
                 --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
-                "https://${acsHost}/v1/images" | /tmp/jq --arg repo "${deployedRepo}" --arg digest "${deployedDigest}" "${jqFilter}"
+                "https://${acsHost}/v1/images" | /tmp/jq --arg repo "${deployedRepo}" --argjson depth "${deployedRepoDepth}" \
+                    --arg digest "${deployedDigest}" --arg tag "${deployedTag}" "${jqFilter}"
         )"
         imageId=$(echo "${httpdImageJson}" | /tmp/jq .id)
         cves=$(echo "${httpdImageJson}" | /tmp/jq .cves)
@@ -507,7 +572,7 @@ if RunTestCase1; then
     else
         typeset -i case2Duration=0
         case2Duration=$(( $(date +%s) - case2Start ))
-        RecordTestResult "test-acs-integration" "failed" "ACS integration test failed" "${case2Duration}"
+        RecordTestResult "test-acs-integration" "failed" "${acsFailureMsg}" "${case2Duration}"
         : "Test Case 2 (Test ACS Integration) Result: FAILED"
     fi
 else
