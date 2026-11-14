@@ -622,16 +622,40 @@ function cpms_generation_observed() {
   jq -e '(.status.observedGeneration // 0) >= .metadata.generation' <<< "${cpms_json}" >/dev/null
 }
 
+# cpms_degraded_since tracks when a Degraded/Error condition was first seen
+# in the current episode; empty while none is present.
+cpms_degraded_since=""
+
 function cpms_rollout_complete() {
-  local cpms_json
+  local cpms_json condition now
   cpms_json="$(fetch_json get controlplanemachineset cluster -n openshift-machine-api)" || return 2
-  # A Degraded or Error condition means the rollout has stopped and will not
-  # proceed without intervention; a replacement that fails holds the rollout.
-  if jq -e '[.status.conditions[]? | select((.type == "Degraded" or .type == "Error") and .status == "True")] | length > 0' <<< "${cpms_json}" >/dev/null; then
-    log "control plane machine set is Degraded; the rollout is held"
-    dump_cpms_debug
-    exit 1
+  # During a RollingUpdate replacement the new node registers with kubelet
+  # before the machine controller links it to the replacement machine, which
+  # reports a transient Degraded (typically UnmanagedNodes) that clears once
+  # the mapping settles. A condition must therefore persist continuously for
+  # 600 seconds before the rollout is treated as held; a genuinely held
+  # rollout (a replacement that fails to provision) stays Degraded far
+  # longer, so the runbook's abort-on-Degraded intent is preserved.
+  condition="$(jq -r '
+    [.status.conditions[]? | select((.type == "Degraded" or .type == "Error") and .status == "True")]
+    | first
+    | if . == null then "" else (.type + " reason=" + (.reason // "unknown") + " message=" + (.message // "unknown")) end' <<< "${cpms_json}")"
+  if [[ -n "${condition}" ]]; then
+    now="$(date +%s)"
+    if [[ -z "${cpms_degraded_since}" ]]; then
+      cpms_degraded_since="${now}"
+      log "control plane machine set reports Degraded (${condition}); giving the rollout 600s to clear"
+    fi
+    if (( now - cpms_degraded_since >= 600 )); then
+      log "control plane machine set has been Degraded for at least 600s (${condition}); the rollout is held"
+      dump_cpms_debug
+      exit 1
+    fi
+    return 1
   fi
+  # A clean observation ends any Degraded episode: per-replacement flapping
+  # must never abort while the rollout is progressing.
+  cpms_degraded_since=""
   jq -e '
     (.status.observedGeneration // 0) >= .metadata.generation
     and (.status.replicas // 0) == (.spec.replicas // 3)
