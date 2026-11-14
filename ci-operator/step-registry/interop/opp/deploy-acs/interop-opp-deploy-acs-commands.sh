@@ -429,9 +429,36 @@ if [[ "${ACS_REPORT_ONLY}" == "1" ]]; then
 fi
 
 # --- Self-disable: if the OperatorPolicy already owns a healthy install,
-#     the workaround is redundant — report and exit 0 without installing.
-if oc get crd operatorpolicies.policy.open-cluster-management.io >/dev/null 2>&1; then
-  _api_quiet
+#     the workaround is redundant - report and exit 0 without installing.
+#     The CRD lookup gates this whole block, so only a NotFound answer means
+#     "no OperatorPolicy CRD on this cluster": a Forbidden, timeout, or
+#     transport error would skip the ownership check entirely and report
+#     workaround_removal_ready=false for an install the policy owns. Keep the
+#     exit status, retry, and fail closed, the same convention the list query
+#     below uses.
+_api_quiet
+_op_crd_state="undecided"
+_op_crd_out=""
+for _crd_attempt in 1 2 3; do
+  if _op_crd_out=$(oc get crd operatorpolicies.policy.open-cluster-management.io 2>&1); then
+    _op_crd_state="present"
+    break
+  fi
+  if [[ "${_op_crd_out}" == *"Error from server (NotFound)"* ]]; then
+    _op_crd_state="absent"
+    break
+  fi
+  (( _crd_attempt < 3 )) || break
+  sleep 5
+done
+_prop "operatorpolicy_crd" "${_op_crd_state}"
+if [[ "${_op_crd_state}" == "undecided" ]]; then
+  _classify "acs-operatorpolicy-query-failed" "operatorpolicy CRD lookup failed after 3 attempts ($(_api_err_class "${_op_crd_out}")); self-disable undecidable, not installing"
+  echo "ERROR: ${_class_detail}"
+  _dump_diagnostics
+  exit 1
+fi
+if [[ "${_op_crd_state}" == "present" ]]; then
   # A FAILED cluster-wide list is not "no policy": the list decides whether a
   # live OperatorPolicy owns this install, so an RBAC, timeout or transport
   # error collapsing to empty output would let the step skip the self-disable
@@ -534,14 +561,19 @@ _prop "workaround_removal_ready" "false"
 #     a channel the current catalog listing no longer offers from failing as
 #     acs-catalog-missing before adoption is considered.
 #     A failed probe reads as absent, which is the create-if-absent default:
-#     the create path below re-checks and adopts on AlreadyExists.
+#     the create path below re-checks and adopts on AlreadyExists. The probe
+#     captures stderr, so it runs under the same quiet scope as every other
+#     API-response block: set -x would otherwise trace the expanded value into
+#     the xtrace log that _opp_cleanup copies to the artifacts.
 _sub_existing=false
 _sub_existing_channel=""
 _sub_probe=""
+_api_quiet
 if _sub_probe=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>&1); then
   _sub_existing=true
   _sub_existing_channel="${_sub_probe}"
 fi
+_api_loud
 
 # --- Fail-fast precondition: packagemanifest must exist, and the channel this
 #     step would create a Subscription on must be listed. Three-way classify
