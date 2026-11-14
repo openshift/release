@@ -401,8 +401,10 @@ fi
 # stopped moving for the duration of that pass, not that GitOps finished
 # creating the set: the set can stall below its final size for longer than
 # a pass, and a pass over an already-compliant partial set returns at once.
-# Succeed only after a pass ran against a set of the same size that then
-# stayed unchanged across several spaced polls.
+# Succeed only after a pass ran against a set carrying the same names that
+# then stayed unchanged across several spaced polls.  A same-size swap is not
+# completion either: when one policy is replaced while the pass runs, the
+# count is unchanged but the replacement was never waited on.
 typeset -i compliancePollTarget=3
 typeset -i compliancePollIntervalSeconds=30
 typeset complianceStableSet=''
@@ -484,6 +486,7 @@ ReadStablePolicySet () {
 
 typeset -i policyCount=0
 typeset -i prevCount=0
+typeset prevSet=''
 typeset -i complianceStart=0
 complianceStart=$(date +%s)
 typeset complianceAllSkipped=false
@@ -528,6 +531,15 @@ while :; do
     exit 1
   fi
   prevCount="${policyCount}"
+  # Names the pass below actually covers.  `oc wait --all` and the explicit
+  # name list both only consider policies that exist when the wait starts, so
+  # a policy replaced by another during the pass leaves the count unchanged
+  # while the replacement policy was never waited on.  Capture the identities
+  # so the post-pass comparison can tell an unchanged set from a swap.
+  if ! prevSet="$(PolicyNameSet)"; then
+    RecordResult "policies-compliant" "failed" "Failed to read the policy name set before the compliance pass; the set the wait covers is unknown${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
+    exit 1
+  fi
   complianceAllSkipped=false
 
   if (( ${#skipPoliciesArr[@]} > 0 )); then
@@ -607,14 +619,14 @@ while :; do
     RecordResult "policies-compliant" "failed" "Could not observe a stable policy set after the compliance pass (rc=${passStableRc}): the set may still be growing, so compliance cannot be accepted${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
     exit 1
   fi
-  if (( complianceStableCount != prevCount )); then
-    printf '[%s] Policy set changed while proving stability (%d -> %d policies); re-running the compliance wait\n' \
+  if [[ "${complianceStableSet}" != "${prevSet}" ]] || (( complianceStableCount != prevCount )); then
+    printf '[%s] Policy set changed while proving stability (%d -> %d policies, or the names differ from the set the pass covered); re-running the compliance wait\n' \
       "$(date -u +%FT%TZ)" "${prevCount}" "${complianceStableCount}"
     policyCount="${complianceStableCount}"
     continue
   fi
   policyCount="${complianceStableCount}"
-  complianceStabilityNote="${policyCount} policies, set unchanged across ${compliancePollTarget} consecutive ${compliancePollIntervalSeconds}s polls"
+  complianceStabilityNote="${policyCount} policies, same name set as the compliance pass, unchanged across ${compliancePollTarget} consecutive ${compliancePollIntervalSeconds}s polls"
   break
 done
 
