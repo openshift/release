@@ -664,8 +664,12 @@ fi
 _og_names() {
   oc get operatorgroups.operators.coreos.com -n "${ACS_NAMESPACE}" -o name 2>&1
 }
-_og_apply() {
-  cat <<EOF | oc apply -f - 2>&1
+# oc create, not apply: an apply over a same-named object another writer
+# created between the list and this call would modify it (this manifest's
+# spec: {} drops a targetNamespaces the other writer set), which breaks the
+# adoption contract - an object this step did not create is never written.
+_og_create() {
+  cat <<EOF | oc create -f - 2>&1
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -673,6 +677,13 @@ metadata:
   namespace: ${ACS_NAMESPACE}
 spec: {}
 EOF
+}
+# Used only on the success path of _og_create, where rhacs-operator-group is
+# this step's own object: a second group that appeared concurrently is
+# reconciled by removing THIS step's group and adopting the other writer's,
+# never by touching an object this step did not create.
+_og_delete_own() {
+  oc delete operatorgroups.operators.coreos.com rhacs-operator-group -n "${ACS_NAMESPACE}" 2>&1
 }
 _api_quiet
 _og_query_ok=false
@@ -699,17 +710,48 @@ if [[ -n "${_og_objects}" ]]; then
     _prop "acs_operatorgroup_count" "${_og_count}"
   fi
 else
-  if _og_out=$(_og_apply); then
+  if _og_out=$(_og_create); then
     _prop "acs_operatorgroup" "created"
+    # A DIFFERENTLY named group can appear in the same window: the caller's
+    # list could not see it and this create cannot collide with it, so without
+    # a second look two groups would stay in the namespace and every CSV in it
+    # would sit in TooManyOperatorGroups. One re-list settles it.
+    _og_after=""
+    if _og_after=$(_og_names); then
+      _og_after_objs=$(printf '%s\n' "${_og_after}" | grep '^operatorgroup' || true)
+      _og_after_count=$(printf '%s\n' "${_og_after_objs}" | grep -c . || true)
+      if (( _og_after_count > 1 )); then
+        _prop "acs_operatorgroup_count" "${_og_after_count}"
+        if _og_del_out=$(_og_delete_own); then
+          _prop "acs_operatorgroup" "adopted-concurrent"
+          echo ">>> NOTE: ${_og_after_count} OperatorGroups appeared concurrently - removed this step's rhacs-operator-group, adopting the other writer's group"
+        else
+          _prop "acs_operatorgroup_reconcile" "delete-failed"
+          echo ">>> NOTE: ${_og_after_count} OperatorGroups appeared concurrently and this step's rhacs-operator-group could not be removed ($(_api_err_class "${_og_del_out}")); the CSV wait classifies the outcome"
+        fi
+      fi
+    else
+      _prop "acs_operatorgroup_reconcile" "query-failed"
+    fi
   else
     # Re-list on create failure: a live OperatorPolicy (or any other writer)
-    # can create the group between the list and the apply. Adopt whatever is
+    # can create the group between the list and this create. Adopt whatever is
     # there now; classify only when nothing was created.
     _og_relist=""
     _og_relist_ok=false
     if _og_relist=$(_og_names); then _og_relist_ok=true; fi
-    if [[ "${_og_relist_ok}" == "true" ]] && [[ -n "$(printf '%s\n' "${_og_relist}" | grep '^operatorgroup' || true)" ]]; then
+    _og_relist_objs=""
+    if [[ "${_og_relist_ok}" == "true" ]]; then
+      _og_relist_objs=$(printf '%s\n' "${_og_relist}" | grep '^operatorgroup' || true)
+    fi
+    if [[ -n "${_og_relist_objs}" ]]; then
       _prop "acs_operatorgroup" "race-tolerated"
+      _og_relist_count=$(printf '%s\n' "${_og_relist_objs}" | grep -c . || true)
+      if (( _og_relist_count > 1 )); then
+        # Another writer's object, so it is never removed here: record and let
+        # the CSV wait classify the TooManyOperatorGroups outcome.
+        _prop "acs_operatorgroup_count" "${_og_relist_count}"
+      fi
       echo ">>> NOTE: OperatorGroup created concurrently by another writer - adopting"
     else
       _classify "acs-operatorgroup-error" "failed to create OperatorGroup rhacs-operator-group in ${ACS_NAMESPACE} ($(_api_err_class "${_og_out}"))"

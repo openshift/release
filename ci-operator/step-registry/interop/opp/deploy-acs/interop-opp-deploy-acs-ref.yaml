@@ -28,10 +28,14 @@ ref:
     timeout), acs-catalog-missing, acs-catalog-query-failed (non-reverting),
     acs-subscription-unsatisfiable, acs-installplan-missing/-failed,
     acs-csv-failed, acs-csv-timeout, default acs-unclassified:* (JUnit
-    error). Existing objects are adopted, never overwritten (the Subscription
-    is created with oc create and adopted on AlreadyExists; the OperatorGroup
-    is applied only when the namespace has no group, which never overwrites
-    one; channel mismatches recorded as properties). The requested channel
+    error). Existing objects are adopted, never modified (the Subscription
+    and the OperatorGroup are both created with oc create and adopted on
+    AlreadyExists; nothing this step did not create is ever written). A
+    second OperatorGroup appearing concurrently from another writer is
+    reconciled by removing only the group this step created (a second group
+    makes every CSV in the namespace TooManyOperatorGroups); a group only
+    another writer created is never removed. Channel mismatches are recorded
+    as properties. The requested channel
     has to be listed by the current packagemanifest only when this step
     creates the Subscription: an adopted Subscription is never gated on the
     current listing, so a channel the listing no longer offers is recorded
