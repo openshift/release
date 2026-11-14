@@ -400,14 +400,21 @@ def lastn($d): split("/") | .[-$d:] | join("/");
     # TLS verification for the ACS Central API.  The admin credential is only
     # ever sent over a connection whose certificate is verified, so a CA that
     # checks the route is resolved before the first credential-bearing
-    # request: the ingress router CA (which signs .apps route certificates)
-    # first, then the service CA bundle mounted in the pod (pattern from
-    # interop-opp-must-gather-acs).  There is deliberately no -k fallback: an
-    # unverified connection would hand the admin password to an on-path
-    # attacker, and an unverifiable route fails the case instead.
+    # request: Central's own serving CA first (the central route terminates TLS
+    # in the pod, so the client sees Central's certificate rather than a router
+    # certificate), then the ingress router CA, then the service CA bundle
+    # mounted in the pod.  There is deliberately no -k fallback: an unverified
+    # connection would hand the admin password to an on-path attacker, and an
+    # unverifiable route fails the case instead.
+    typeset centralCa=''
+    centralCa="$(oc get secret central-tls -n stackrox -o jsonpath='{.data.ca\.pem}' 2>/dev/null | base64 -d 2>/dev/null)" || centralCa=''
+    typeset -a acsCaCandidates=()
+    if [[ -n "${centralCa}" ]]; then
+        printf '%s\n' "${centralCa}" > /tmp/acs-central-ca.crt
+        acsCaCandidates+=( /tmp/acs-central-ca.crt )
+    fi
     typeset ingressCaBundle=''
     ingressCaBundle="$(oc get configmap default-ingress-cert -n openshift-config-managed -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null)" || ingressCaBundle=''
-    typeset -a acsCaCandidates=()
     if [[ -n "${ingressCaBundle}" ]]; then
         printf '%s\n' "${ingressCaBundle}" > /tmp/acs-ingress-ca.crt
         acsCaCandidates+=( /tmp/acs-ingress-ca.crt )
@@ -429,9 +436,9 @@ def lastn($d): split("/") | .[-$d:] | join("/");
         done
     fi
     if [[ -z "${acsCaFile}" ]]; then
-        acsFailureMsg="Could not verify the ACS Central route certificate for ${acsHost} with the ingress router CA or the service CA bundle; refusing to send the admin credential over unverified TLS"
+        acsFailureMsg="Could not verify the ACS Central route certificate for ${acsHost} with Central's serving CA (secret stackrox/central-tls), the ingress router CA or the service CA bundle; refusing to send the admin credential over unverified TLS"
         printf '%s\n' "ERROR: ${acsFailureMsg}" >&2
-        rm -f "${acsPassFile}" /tmp/acs-ingress-ca.crt
+        rm -f "${acsPassFile}" /tmp/acs-ingress-ca.crt /tmp/acs-central-ca.crt
         RecordTestResult "test-acs-integration" "failed" "${acsFailureMsg}" "0"
         return 1
     fi
@@ -486,7 +493,7 @@ def lastn($d): split("/") | .[-$d:] | join("/");
         [ "${attempt}" -lt "${retries}" ] && sleep "${retryInterval}"
     done
 
-    rm -f "${acsPassFile}" /tmp/acs-ingress-ca.crt
+    rm -f "${acsPassFile}" /tmp/acs-ingress-ca.crt /tmp/acs-central-ca.crt
 
     if [ "${isImageFound}" != true ]; then
         # Name the multi-match condition on exhaustion: a registry that keeps
