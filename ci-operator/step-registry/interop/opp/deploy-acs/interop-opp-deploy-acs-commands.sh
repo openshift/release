@@ -746,18 +746,26 @@ fi
 echo ">>> PHASE: Waiting for ACS operator CSV (timeout: ${ACS_CSV_WAIT_TIMEOUT}s)"
 typeset csvName=""
 typeset -i query_failures=0
-typeset -i csv_deadline csv_now csv_left csv_diag_at
+typeset -i csv_start csv_budget csv_deadline csv_now csv_left csv_diag_at
 typeset -i csv_elapsed=0
-_csv_want=$(( $(date +%s) + ACS_CSV_WAIT_TIMEOUT ))
+typeset _csv_clamp_note=""
+csv_start=$(date +%s)
+_csv_want=$(( csv_start + ACS_CSV_WAIT_TIMEOUT ))
 csv_deadline=$(_clamp_deadline "${_csv_want}")
+csv_budget=$(( csv_deadline - csv_start ))
 if (( csv_deadline < _csv_want )); then
-  echo ">>> NOTE: CSV-name wait clamped to $(( csv_deadline - $(date +%s) ))s (requested ${ACS_CSV_WAIT_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
+  _csv_clamp_note=" (requested ${ACS_CSV_WAIT_TIMEOUT}s, clamped by the shared ${_work_budget}s work budget)"
+  echo ">>> NOTE: CSV-name wait clamped to ${csv_budget}s (requested ${ACS_CSV_WAIT_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
 fi
-csv_diag_at=$(( $(date +%s) + 30 ))
+# Elapsed time is measured from the phase start recorded above. Deriving it as
+# the requested timeout minus the remaining time measures against the CLAMPED
+# deadline instead, so a clamped wait reported the seconds the phase asked for
+# rather than the seconds it had been running (a 35s clamped wait read 55s).
+csv_diag_at=$(( csv_start + 30 ))
 while [[ -z "${csvName}" ]]; do
     csv_now=$(date +%s)
     csv_left=$(( csv_deadline - csv_now ))
-    csv_elapsed=$(( ACS_CSV_WAIT_TIMEOUT - csv_left ))
+    csv_elapsed=$(( csv_now - csv_start ))
     if (( csv_left <= 0 )); then break; fi
     if csvName=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
         -o jsonpath='{.status.currentCSV}' 2>/dev/null); then
@@ -776,7 +784,7 @@ while [[ -z "${csvName}" ]]; do
         # Periodic condition diagnostics every 30s of elapsed time.
         if (( csv_now >= csv_diag_at )); then
             _api_quiet
-            echo ">>> CSV poll: waited ${csv_elapsed}/${ACS_CSV_WAIT_TIMEOUT}s — Subscription conditions:"
+            echo ">>> CSV poll: waited ${csv_elapsed}s of ${csv_budget}s${_csv_clamp_note}; Subscription conditions:"
             oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
                 -o jsonpath='{range .status.conditions[*]}  {.type}={.status} reason={.reason}{"\n"}{end}' 2>/dev/null || true
             _api_loud
