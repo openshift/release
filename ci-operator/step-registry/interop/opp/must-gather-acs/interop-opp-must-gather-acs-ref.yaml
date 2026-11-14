@@ -14,10 +14,72 @@ ref:
     default: "rhacs-operator"
     documentation: |-
       Namespace where the ACS operator is installed. Override this in your config env if you need to change it.
+  - name: ACS_EVIDENCE_SELF_TEST
+    default: "0"
+    documentation: |-
+      Set to "1" to run the removal-predicate fixture self-test. The mode
+      collects the numbered captures through [10/10] and then exits, before
+      the verdict section and the cross-artifact run_assertions block, so the
+      exit-20 (disagreement) and exit-21 (probe sanity) assertion classes are
+      not exercised in self-test mode: it validates the per-run
+      removal-precondition predicate only, and stays runnable without a
+      cluster (it never reads live artifacts into the fixture assertions).
+      The predicate is evaluated against nine embedded fixture classes (TRUE,
+      query-failed, CRD-absent, catalog-mismatch, copied-CSV,
+      target-mismatch, unset-target, no-OperatorPolicy, FALSE) and the step
+      exits 22 if any of them classifies wrongly. Used to validate the
+      detector in rehearsals (a detector never observed TRUE is not
+      actionable).
   documentation: |-
     Downloads ACS/StackRox diagnostic bundle via the Central API and captures
     OLM lifecycle evidence (INTEROP-9525) for debugging operator installation
     failures on OCP 5.0/5.1. The OLM evidence section runs independently of
-    ACS diagnostics — it collects OperatorPolicy, CatalogSource, Subscription,
-    InstallPlan, CSV, CRD, Central CR, and PackageManifest state even when
-    ACS is not yet installed.
+    ACS diagnostics — it collects, with the exact fields each artifact
+    carries: OperatorPolicy (spec subscription target/channel, full
+    status.conditions), CatalogSource (spec.image, status.connectionState),
+    OLM Subscription (fully-qualified subscriptions.operators.coreos.com —
+    with ACM installed the bare kind resolves to ACM's CRD; spec
+    channel/source, status currentCSV/state/conditions), InstallPlan (phase,
+    conditions), CSV (phase, reason, message — the operator-reported
+    condition text, not the full conditions array), Central CR (specName,
+    status, the Available condition only), SecuredCluster CR (status only),
+    PackageManifest (channels, catalogSource, and the selection provenance:
+    both 08-* artifacts come from one inventory query that records each
+    package's catalog, and the per-package capture is selected from the
+    catalog the subscription uses), ACM policy compliance
+    verdicts (fully-qualified policies.policy.open-cluster-management.io
+    and configurationpolicies.policy.open-cluster-management.io, matching
+    their CRD probes: conditions, compliant, per-cluster status), and the
+    ACM CSV version with the governance-policy-addon-controller image ref,
+    even when ACS is not yet installed.
+
+    Capture contract (scoped to the numbered OLM lifecycle captures,
+    steps [1/10] through [10/10], artifacts 01 through
+    11-acm-csv-addon-controller.json): every one of those queries is
+    classified present | absent | probe_error/QUERY FAILED, so a query
+    failure is never rendered as absence (a not-registered CRD renders as
+    CRD_ABSENT, an API error as QUERY FAILED, and the status properties
+    report unknown, not absent, for a failed capture); both 08-*
+    packagemanifest files are always written, from a single inventory query
+    over all namespaces, so a package offered by several catalogs cannot be
+    attributed to the wrong one; cross-artifact agreement
+    assertions run at the end and fail the step with exit code 20
+    (disagreement) or 21 (probe sanity; when several fire, the highest code
+    is reported). The storage-axis and image captures (11-placementdecisions
+    and 12 through 17) are outside this contract: they are best-effort,
+    written with `|| true`, and carry no probe_error classification, so a
+    failed query there leaves that artifact's own parser error (a JSON
+    traceback) in place and the probe-sanity assertion does not flag it;
+    read those artifacts as advisory only. The per-run removal-precondition
+    terms are written to olm-evidence/acs-central-status.properties,
+    including the catalog-source binding of the subscription (a same-named
+    package in a non-subscribed catalog does not satisfy the precondition);
+    the two-run aggregation is a ticket-level rule, not computed here.
+    Signal surfaces: the evidence JSONs, the properties file, and the step
+    log line EVIDENCE ASSERTIONS FAILED (rc=N), which reports the
+    run_assertions exit code (20 for disagreement, 21 for probe sanity); prow
+    finished.json records the step result and pass status, not that numeric
+    code, and this step emits no JUnit XML of its own and is best_effort, so
+    job color is not the signal either. Durable authority for
+    the classification and predicate: opp-interop-testing
+    docs/design/acs-deploy-evidence.md.
