@@ -1,0 +1,24 @@
+ref:
+  as: interop-opp-slack-reporter
+  from: cli
+  commands: interop-opp-slack-reporter-commands.sh
+  documentation: |-
+    Non-binary job-result reporting to #opp-discussion (INTEROP-9627).
+    Parses JUnit XML and step-completion markers under the run's
+    artifact tree, derives one of PASS / PASS WITH FAILURES / UNVERIFIED
+    / FAIL (masked failures never render green), enriches with LPINTEROP
+    links and the Prow run URL, and delivers one message via the shared
+    GSM webhook secret. Best-effort: exits 0 on every graceful path.
+    Emits a versioned stage=skeleton|terminal result line and a
+    slack-reporter.json receipt; emits NO JUnit.
+  timeout: 5m
+  grace_period: 30s
+  best_effort: true
+  credentials:
+  - collection: ieng--interop--ci-operator
+    group: opp-discussion-webhook
+    mount_path: /tmp/secrets/opp-discussion-webhook
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
