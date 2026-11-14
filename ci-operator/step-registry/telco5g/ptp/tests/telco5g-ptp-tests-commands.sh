@@ -127,7 +127,286 @@ if [[ "${RUN_ON_HYPERVISOR:-false}" != "true" ]]; then
       hv_ssh "rm -f ${SESSION_LOCK} ${SESSION_HEARTBEAT}" >/dev/null 2>&1 || true
     fi
   }
-  trap 'session_lock_release || true' EXIT
+  # Optional log relay for web clients. It is started only for the tests
+  # container and stopped when the phase exits.
+  relay_start() {
+    local bind="${PTP_LOG_RELAY_BIND:-0.0.0.0}"
+    local port="${PTP_LOG_RELAY_PORT:-8080}"
+    local token="${PTP_LOG_RELAY_TOKEN:-}"
+    local relay_args
+    relay_args="$(printf '%q ' --bind "${bind}" --port "${port}")"
+    if [[ -n "${token}" ]]; then
+      relay_args+="$(printf '%q ' --token "${token}")"
+    fi
+    relay_stop
+    if ! hv_ssh "cat > ~/runner/telco5g-ptp-log-relay.py" < /tmp/telco5g-ptp-log-relay.py; then
+      echo "[WARNING] unable to copy the PTP log relay to the hypervisor"
+      return 0
+    fi
+    if ! hv_ssh "command -v python3 >/dev/null 2>&1"; then
+      echo "[WARNING] python3 is not available on the hypervisor; the PTP log relay is disabled"
+      return 0
+    fi
+    if ! hv_ssh "nohup python3 -u ~/runner/telco5g-ptp-log-relay.py ${relay_args}< /dev/null > ~/runner/log-relay.log 2>&1 & echo \$! > ~/runner/log-relay.pid"; then
+      echo "[WARNING] unable to start the PTP log relay (see ~/runner/log-relay.log)"
+      return 0
+    fi
+    if ! hv_ssh "for i in \$(seq 1 10); do curl -fsS --max-time 2 http://127.0.0.1:${port}/v1/health >/dev/null 2>&1 && exit 0; sleep 1; done; exit 1"; then
+      echo "[WARNING] the PTP log relay did not become ready; its log follows"
+      hv_ssh "cat ~/runner/log-relay.log 2>/dev/null || true"
+      relay_stop
+      return 0
+    fi
+    echo "[INFO] PTP log relay available at http://${CLUSTER_HV_IP:-10.6.34.246}:${port}/v1/logs/tests (allow ${port}/tcp in the hypervisor firewall)"
+  }
+
+  relay_stop() {
+    hv_ssh "if [ -f ~/runner/log-relay.pid ]; then kill \$(cat ~/runner/log-relay.pid) 2>/dev/null || true; rm -f ~/runner/log-relay.pid; fi; pkill -f '[t]elco5g-ptp-log-relay' 2>/dev/null || true" >/dev/null 2>&1 || true
+  }
+
+  cat > /tmp/telco5g-ptp-log-relay.py <<'RELAY'
+#!/usr/bin/env python3
+"""Temporary HTTP relay that streams logs of the PTP phase containers.
+
+It is started by the tests step before the test container and stopped when the
+test finishes, so it is only reachable while the test is running. It never
+exposes the podman API: it only runs `podman logs --follow` for an allowlisted
+set of containers.
+"""
+
+import argparse
+import hmac
+import json
+import os
+import re
+import signal
+import subprocess
+import sys
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
+from urllib.parse import parse_qs, urlparse
+
+PHASES = {
+    "cluster-setup": "telco5g-ptp-cluster-setup",
+    "tests": "telco5g-ptp-tests",
+    "gather": "telco5g-ptp-gather",
+}
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
+
+
+PODMAN = os.environ.get("PODMAN_BIN", "podman")
+TOKEN = ""
+CHILDREN = set()
+CHILDREN_LOCK = threading.Lock()
+
+
+def podman_inspect(name):
+    try:
+        result = subprocess.run(
+            [
+                PODMAN,
+                "container",
+                "inspect",
+                "--format",
+                "{{.State.Running}}|{{.State.StartedAt}}|{{.State.ExitCode}}",
+                name,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return {"exists": False, "running": False, "started": "", "exitCode": None}
+    if result.returncode != 0:
+        return {"exists": False, "running": False, "started": "", "exitCode": None}
+    fields = result.stdout.strip().split("|")
+    exit_code = fields[2] if len(fields) > 2 else ""
+    return {
+        "exists": True,
+        "running": bool(fields and fields[0] == "true"),
+        "started": fields[1] if len(fields) > 1 else "",
+        "exitCode": int(exit_code) if exit_code.lstrip("-").isdigit() else None,
+    }
+
+
+def stop_children(*_args):
+    with CHILDREN_LOCK:
+        for child in list(CHILDREN):
+            child.terminate()
+    sys.exit(0)
+
+
+class Handler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.0"
+    server_version = "ptp-log-relay"
+
+    def log_message(self, fmt, *args):
+        sys.stderr.write("%s %s\n" % (self.address_string(), fmt % args))
+
+    def _cors(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header(
+            "Access-Control-Allow-Headers", "Authorization, Last-Event-ID"
+        )
+        self.send_header("Cache-Control", "no-store")
+
+    def _json(self, code, payload):
+        body = json.dumps(payload).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self._cors()
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _authorized(self, query):
+        if not TOKEN:
+            return True
+        header = self.headers.get("Authorization", "")
+        if header.startswith("Bearer ") and hmac.compare_digest(
+            header[len("Bearer ") :], TOKEN
+        ):
+            return True
+        return hmac.compare_digest(query.get("token", [""])[0], TOKEN)
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self._cors()
+        self.end_headers()
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        query = parse_qs(parsed.query)
+        if not self._authorized(query):
+            self._json(401, {"error": "unauthorized"})
+            return
+        if parsed.path == "/v1/health":
+            self._json(200, {"ok": True})
+        elif parsed.path == "/v1/containers":
+            self._json(
+                200,
+                {
+                    "containers": [
+                        dict(name=name, phase=phase, **podman_inspect(name))
+                        for phase, name in PHASES.items()
+                    ]
+                },
+            )
+        elif parsed.path.startswith("/v1/logs/"):
+            self._stream_logs(parsed.path[len("/v1/logs/") :], query)
+        else:
+            self._json(404, {"error": "not found"})
+
+    def _stream_logs(self, phase, query):
+        name = PHASES.get(phase)
+        if not name:
+            self._json(404, {"error": "unknown phase"})
+            return
+        state = podman_inspect(name)
+        if not state["exists"] or not state["running"]:
+            self._json(409, {"error": "container is not running", "phase": phase})
+            return
+        try:
+            tail = int(query.get("tail", ["0"])[0])
+            if tail < 0:
+                raise ValueError
+        except ValueError:
+            self._json(400, {"error": "invalid tail"})
+            return
+        since = query.get("since", [""])[0]
+        if since and not re.fullmatch(r"[0-9T:.+\-Z]{4,40}|\d+[smhd]", since):
+            self._json(400, {"error": "invalid since"})
+            return
+
+        command = [PODMAN, "logs", "--follow", "--tail", str(tail)]
+        if since:
+            command.extend(["--since", since])
+        command.append(name)
+        child = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            bufsize=1,
+        )
+        with CHILDREN_LOCK:
+            CHILDREN.add(child)
+
+        sse = "text/event-stream" in self.headers.get("Accept", "")
+        self.send_response(200)
+        if sse:
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("X-Accel-Buffering", "no")
+        else:
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self._cors()
+        self.end_headers()
+
+        try:
+            for line in child.stdout:
+                if sse:
+                    self.wfile.write(
+                        ("data: " + line.rstrip("\n") + "\n\n").encode()
+                    )
+                else:
+                    self.wfile.write(line.encode())
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        finally:
+            child.terminate()
+            try:
+                child.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                child.kill()
+            with CHILDREN_LOCK:
+                CHILDREN.discard(child)
+
+        if sse:
+            try:
+                self.wfile.write(
+                    ('event: end\ndata: {"exitCode": %s}\n\n' % child.returncode).encode()
+                )
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+
+def main():
+    global TOKEN
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--bind", default=os.environ.get("PTP_LOG_RELAY_BIND", "0.0.0.0")
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("PTP_LOG_RELAY_PORT", "8080")),
+    )
+    parser.add_argument("--token", default=os.environ.get("PTP_LOG_RELAY_TOKEN", ""))
+    args = parser.parse_args()
+    TOKEN = args.token
+    if not TOKEN:
+        print(
+            "WARNING: no relay token configured; log streams are unauthenticated",
+            file=sys.stderr,
+        )
+    signal.signal(signal.SIGTERM, stop_children)
+    signal.signal(signal.SIGINT, stop_children)
+    server = ThreadingHTTPServer((args.bind, args.port), Handler)
+    print("listening on %s:%d" % (args.bind, args.port), file=sys.stderr)
+    server.serve_forever()
+
+
+if __name__ == "__main__":
+    main()
+RELAY
+
+  trap 'relay_stop || true; session_lock_release || true' EXIT
   step_marker "Acquire the PTP session lock"
   session_lock_acquire || exit 1
   session_heartbeat_start
@@ -959,6 +1238,9 @@ TEST_SCRIPT
   hv_ssh "podman run --rm --replace --name telco5g-ptp-tests-seed --userns=keep-id --entrypoint /bin/bash -v ~/runner/output:/dest:Z registry.ci.openshift.org/ci/telco-runner:latest -c 'cp -r /output/. /dest/ && chown -R 1000:1000 /dest'" \
     || { echo "ERROR: unable to seed a writable /output for the test container"; exit 1; }
 
+  step_marker "Start the PTP log relay"
+  relay_start
+
   step_marker "Start the PTP test container"
   hv_ssh "cd ~/runner && nohup bash -c 'podman run --rm --replace --name telco5g-ptp-tests --net=host --userns=keep-id --entrypoint /bin/bash -v ~/runner/output:/output:Z -v ~/runner:/runner:Z -e RUN_ON_HYPERVISOR=true -e SHARED_DIR=/runner/shared -e ARTIFACT_DIR=/runner/artifacts -w /runner registry.ci.openshift.org/ci/telco-runner:latest /runner/shared/telco5g-ptp-tests-commands.sh; rc=\$?; echo \$rc > ~/runner/test.exitcode; rm -f ~/runner/test.pid' > ~/runner/tests-output.log 2>&1 & echo \$! > ~/runner/test.pid"
 
@@ -967,6 +1249,11 @@ TEST_SCRIPT
     echo "Waiting for the hypervisor test run..."
     sleep 30
   done
+
+  relay_stop
+  if hv_ssh "test -f ~/runner/log-relay.log"; then
+    hv_ssh "cat ~/runner/log-relay.log" > "$ARTIFACT_DIR/log-relay.log" || true
+  fi
 
   step_marker "Collect the test artifacts"
   mkdir -p "$ARTIFACT_DIR"
