@@ -37,9 +37,12 @@ shopt -u patsub_replacement 2>/dev/null || true
 #     matching channel and the CSV is Succeeded, emit
 #     workaround_removal_ready=true and exit 0 without installing.
 #   * Create-if-absent only: an existing Subscription is adopted (channel
-#     mismatch recorded, never overwritten — the OperatorPolicy owns it
-#     once ACM 2.17.z carrying stolostron/governance-policy-addon-
-#     controller#1397 ships).
+#     mismatch recorded, never overwritten; the OperatorPolicy owns it once
+#     ACM 2.17.z carrying stolostron/governance-policy-addon-controller#1397
+#     ships). The requested channel has to be offered by the current catalog
+#     only when this step is the one that creates the Subscription: an
+#     adopted Subscription's pinned channel is reported (channel_delisted)
+#     and the CSV wait classifies the outcome.
 
 # --- Trace-to-file: always capture, dump on failure only ---
 _xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
@@ -468,9 +471,26 @@ except Exception:
 fi
 _prop "workaround_removal_ready" "false"
 
-# --- Fail-fast precondition: packagemanifest must exist and list the
-#     requested channel. Three-way classify with bounded retry; a query
-#     error is NEVER classified as catalog-missing.
+# --- Subscription state, resolved BEFORE the catalog precondition.
+#     Adoption decides whether the requested channel has to exist. An
+#     existing Subscription is never created or overwritten here, so its
+#     pinned channel governs that install and ACS_CHANNEL is irrelevant to
+#     it. Resolving the Subscription first keeps an adopted Subscription on
+#     a channel the current catalog listing no longer offers from failing as
+#     acs-catalog-missing before adoption is considered.
+#     A failed probe reads as absent, which is the create-if-absent default:
+#     the create path below re-checks and adopts on AlreadyExists.
+_sub_existing=false
+_sub_existing_channel=""
+_sub_probe=""
+if _sub_probe=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>&1); then
+  _sub_existing=true
+  _sub_existing_channel="${_sub_probe}"
+fi
+
+# --- Fail-fast precondition: packagemanifest must exist, and the channel this
+#     step would create a Subscription on must be listed. Three-way classify
+#     with bounded retry; a query error is NEVER classified as catalog-missing.
 _precondition_ok=false
 _pm_raw=""
 _api_quiet
@@ -493,28 +513,63 @@ if [[ "${_precondition_ok}" != "true" ]]; then
   echo "ERROR: ${_class_detail}"
   exit 1
 fi
+# One parse answers two membership questions: is the REQUESTED channel still
+# listed (the channel a fresh Subscription would be created on), and is the
+# ADOPTED Subscription's channel still listed ("na" when there is no
+# Subscription or it omits spec.channel). Both answers are needed because the
+# requested channel is only a requirement for the create path.
 _channel_ok=$(printf '%s' "${_pm_raw}" | python3 -c '
 import json, sys
 try:
-    ch = sys.argv[1]
+    requested = sys.argv[1]
+    observed = sys.argv[2] if len(sys.argv) > 2 else ""
     d = json.load(sys.stdin)
-    names = [c.get("name") for c in d.get("status", {}).get("channels", [])]
-    head = next((c.get("currentCSV") for c in d.get("status", {}).get("channels", []) if c.get("name") == ch), None)
-    print("ok " + str(head) if ch in names else "absent " + ",".join(names[:8]))
+    chans = d.get("status", {}).get("channels", [])
+    names = [c.get("name") for c in chans]
+    head = next((c.get("currentCSV") for c in chans if c.get("name") == requested), None)
+    req = "listed" if requested in names else "unlisted"
+    if not observed:
+        obs = "na"
+    else:
+        obs = "listed" if observed in names else "unlisted"
+    print(" ".join(["parsed", req, obs, str(head), ",".join(names[:8])]))
 except Exception:
     print("error")
-' "${ACS_CHANNEL}" 2>/dev/null || echo "error")
-if [[ "${_channel_ok}" == absent* ]]; then
-  _classify "acs-catalog-missing" "channel '${ACS_CHANNEL}' not listed for rhacs-operator ($(printf '%s' "${_channel_ok#absent }" | head -c 160))"
-  echo "ERROR: ${_class_detail}"
-  exit 1
-fi
-if [[ "${_channel_ok}" == "error" ]]; then
+' "${ACS_CHANNEL}" "${_sub_existing_channel}" 2>/dev/null || echo "error")
+read -r _chk _req_listed _obs_listed _req_head _chk_names <<<"${_channel_ok}"
+# The helper prints "parsed" first: a parse error, an empty answer, or a helper
+# that did not run all land here as a listing that is not usable.
+if [[ "${_chk}" != "parsed" ]]; then
   _classify "acs-catalog-query-failed" "packagemanifest channel listing unparseable (query succeeded but returned non-JSON)"
   echo "ERROR: ${_class_detail}"
   exit 1
 fi
-echo ">>> precondition: rhacs-operator present; channel ${ACS_CHANNEL} head: ${_channel_ok#ok }"
+if [[ "${_req_listed}" == "unlisted" ]]; then
+  if [[ "${_sub_existing}" == "true" ]]; then
+    # Adopted: this step creates nothing, so the requested channel does not
+    # have to be offered by the current listing. Record it and keep going.
+    echo ">>> NOTE: channel '${ACS_CHANNEL}' not listed for rhacs-operator (${_chk_names}); Subscription rhacs-operator already exists with channel '${_sub_existing_channel:-empty}', adopting, not creating"
+    _prop "channel_requested_unlisted" "${ACS_CHANNEL}"
+  else
+    _classify "acs-catalog-missing" "channel '${ACS_CHANNEL}' not listed for rhacs-operator ($(printf '%s' "${_chk_names}" | head -c 160))"
+    echo "ERROR: ${_class_detail}"
+    exit 1
+  fi
+fi
+if [[ "${_obs_listed}" == "unlisted" ]]; then
+  # The adopted Subscription's own channel is gone from the listing (renamed
+  # or dropped by a newer catalog). That is a condition of the adopted
+  # Subscription, not a missing catalog: the Subscription stays pinned as
+  # found, and the CSV wait plus the Subscription-condition classification
+  # below decide the outcome.
+  echo ">>> NOTE: adopted Subscription channel '${_sub_existing_channel}' not listed for rhacs-operator (${_chk_names}); left untouched, the CSV wait classifies the outcome"
+  _prop "channel_delisted" "${_sub_existing_channel}"
+fi
+if [[ "${_sub_existing}" == "true" ]]; then
+  echo ">>> precondition: rhacs-operator present; adopted Subscription channel '${_sub_existing_channel:-empty}' (requested ${ACS_CHANNEL}, head: ${_req_head})"
+else
+  echo ">>> precondition: rhacs-operator present; channel ${ACS_CHANNEL} head: ${_req_head}"
+fi
 _api_loud
 
 
