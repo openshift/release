@@ -14,7 +14,9 @@ test_dir="$(mktemp -d)"
 server_pids=()
 failures=0
 
-cleanup() {
+# Named so that sourcing the step script, which defines cleanup(), does not
+# replace the function this trap runs.
+cleanup_test() {
     local pid
     for pid in "${server_pids[@]+"${server_pids[@]}"}"; do
         kill "${pid}" 2>/dev/null || true
@@ -22,7 +24,7 @@ cleanup() {
     done
     rm -rf "${test_dir}"
 }
-trap cleanup EXIT
+trap cleanup_test EXIT
 
 for tool in jq openssl; do
     command -v "${tool}" >/dev/null || { echo "FAIL: ${tool} is required" >&2; exit 1; }
@@ -243,7 +245,9 @@ case "${args}" in
     "get apiserver.config.openshift.io cluster -o json") cat "${MOCK_DIR}/apiserver.json" ;;
     "get featuregate cluster -o json") echo '{"status":{"featureGates":[]}}' ;;
     "get ingresscontroller.operator.openshift.io default -n openshift-ingress-operator -o json") cat "${MOCK_DIR}/ingress.json" ;;
-    "get kubeapiserver.operator.openshift.io cluster -o json"|"get etcd.operator.openshift.io cluster -o json") echo '{}' ;;
+    "get kubeapiserver.operator.openshift.io cluster -o json"|"get etcd.operator.openshift.io cluster -o json")
+        echo '{"spec":{"observedConfig":{"servingInfo":{"minTLSVersion":"VersionTLS12","cipherSuites":["TLS_AES_128_GCM_SHA256"],"namedCertificates":[{"names":["api.private.example.invalid"],"certFile":"/etc/tls.crt"}]}}}}'
+        ;;
     "whoami --show-server") echo "https://localhost:$(cat "${MOCK_DIR}/external-port")" ;;
     "get nodes -l node-role.kubernetes.io/control-plane -o name") printf 'node/master-0\nnode/master-1\n' ;;
     "get pods -n openshift-kube-apiserver -l apiserver=true -o json") cat "${MOCK_DIR}/kube-apiserver-pods.json" ;;
@@ -393,6 +397,15 @@ run_scenario etcd-wrong-certificate Modern 1 kube-apiserver:Modern etcd:Modern e
     "serves a etcd certificate | issuer CN 'kube-apiserver-lb-signer' does not match etcd"
 run_scenario etcd-not-ready Modern 1 kube-apiserver:Modern etcd:Modern etcd-not-ready \
     "etcd instances are ready | found 1 ready pods for 2 control plane nodes"
+
+# Diagnostic artifacts keep only the TLS fields of the observed servingInfo.
+observed="${test_dir}/scenario-modern/artifacts/tls-profile-verify/kube-apiserver-observed-tls.json"
+if [[ -s "${observed}" ]] && jq -e '.minTLSVersion == "VersionTLS12" and (.cipherSuites | length) == 1' "${observed}" >/dev/null \
+    && ! grep -rq 'api.private.example.invalid' "${test_dir}/scenario-modern/artifacts"; then
+    pass "observed servingInfo artifacts keep TLS fields and drop host names"
+else
+    fail "observed servingInfo artifacts keep TLS fields and drop host names"
+fi
 
 # A rejected handshake must never be reported as passing when the endpoint is unreachable.
 if grep -q '^pass .*etcd etcd-master-0:2379.*handshake' "${test_dir}/scenario-etcd-unreachable/artifacts/tls-profile-verify/summary.txt"; then

@@ -562,11 +562,13 @@ check_ingress_profile() {
 }
 
 save_observed_config() {
-  # Diagnostics only: the effective servingInfo the operators derived.
+  # Diagnostics only: the TLS settings the operators derived. Only the TLS
+  # fields are kept; servingInfo can also list named certificate host names.
+  local filter='.spec.observedConfig.servingInfo // {} | {minTLSVersion, cipherSuites, groups}'
   oc get kubeapiserver.operator.openshift.io cluster -o json \
-    | jq '.spec.observedConfig.servingInfo // {}' >"${VERIFY_ARTIFACT_DIR}/kube-apiserver-observed-servinginfo.json" || true
+    | jq "${filter}" >"${VERIFY_ARTIFACT_DIR}/kube-apiserver-observed-tls.json" || true
   oc get etcd.operator.openshift.io cluster -o json \
-    | jq '.spec.observedConfig.servingInfo // {}' >"${VERIFY_ARTIFACT_DIR}/etcd-observed-servinginfo.json" || true
+    | jq "${filter}" >"${VERIFY_ARTIFACT_DIR}/etcd-observed-tls.json" || true
 }
 
 # Probes one endpoint with every probe and records a result per probe. Results
