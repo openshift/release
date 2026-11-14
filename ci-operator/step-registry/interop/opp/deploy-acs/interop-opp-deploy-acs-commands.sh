@@ -143,6 +143,32 @@ _classify() {
   fi
 }
 
+# _cond_classify - classify a failed install from the Subscription conditions.
+# The documented failure precedence puts the Subscription conditions above the
+# CSV phase and the deadline: an InstallPlan that went missing or failed, an
+# unsatisfiable channel, or unhealthy catalog sources is a more specific cause
+# than "the CSV is not Succeeded yet", and it has to classify the same way
+# whether or not status.currentCSV is already published. Sets _cond_class and
+# _cond_detail; _cond_class stays empty when no condition matched, so each call
+# site keeps its own default detail. The query runs under the quiet scope: set
+# -x would trace the expanded condition text into the artifact log.
+typeset _cond_class="" _cond_detail=""
+_cond_classify() {
+  local _cond
+  _api_quiet
+  _cond=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
+      -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason} {end}' 2>/dev/null) || _cond=""
+  _api_loud
+  _cond_class=""
+  _cond_detail=""
+  case "${_cond}" in
+    *CatalogSourcesUnhealthy=True*) _cond_class="acs-catalog-missing"; _cond_detail="Subscription condition CatalogSourcesUnhealthy=True" ;;
+    *ConstraintsNotSatisfiable*)    _cond_class="acs-subscription-unsatisfiable"; _cond_detail="Subscription condition ConstraintsNotSatisfiable" ;;
+    *InstallPlanMissing*)           _cond_class="acs-installplan-missing"; _cond_detail="Subscription condition InstallPlanMissing" ;;
+    *InstallPlanFailed*)            _cond_class="acs-installplan-failed"; _cond_detail="Subscription condition InstallPlanFailed" ;;
+  esac
+}
+
 # _api_err_class <text> - collapse an oc error to a fixed token. The raw text
 # is API/RBAC controlled and would otherwise reach the step log, the xtrace
 # log, and the JUnit detail verbatim.
@@ -998,17 +1024,12 @@ done
 
 if [[ -z "${csvName}" ]]; then
     # Classify from Subscription conditions before defaulting to timeout.
-    _api_quiet
-    _cond=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
-        -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason} {end}' 2>/dev/null) || _cond=""
-    case "${_cond}" in
-      *CatalogSourcesUnhealthy=True*) _classify "acs-catalog-missing" "Subscription condition CatalogSourcesUnhealthy=True" ;;
-      *ConstraintsNotSatisfiable*)    _classify "acs-subscription-unsatisfiable" "Subscription condition ConstraintsNotSatisfiable" ;;
-      *InstallPlanMissing*)           _classify "acs-installplan-missing" "Subscription condition InstallPlanMissing" ;;
-      *InstallPlanFailed*)            _classify "acs-installplan-failed" "Subscription condition InstallPlanFailed" ;;
-      *)                              _classify "acs-csv-timeout" "no currentCSV after ${ACS_CSV_WAIT_TIMEOUT}s (no classified condition; see DIAG)" ;;
-    esac
-    _api_loud
+    _cond_classify
+    if [[ -n "${_cond_class}" ]]; then
+      _classify "${_cond_class}" "${_cond_detail}"
+    else
+      _classify "acs-csv-timeout" "no currentCSV after ${ACS_CSV_WAIT_TIMEOUT}s (no classified condition; see DIAG)"
+    fi
     echo "ERROR: ${_class_detail}"
     _dump_diagnostics
     exit 1
@@ -1057,7 +1078,15 @@ if ! oc wait csv "${csvName}" -n "${ACS_NAMESPACE}" \
     # detail. No pipe over the probe error (it can be a full API error body).
     if [[ "${csv_probe_out}" == *"Error from server (NotFound)"* ]]; then _probe_notfound=1; fi
     _api_loud
-    if [[ "${_phase}" == "Failed" ]]; then
+    # Precedence: a classified Subscription condition outranks the CSV phase and
+    # the deadline, exactly as the no-currentCSV branch above applies it. An
+    # InstallPlan that fails after status.currentCSV is published never creates
+    # the named CSV, so reporting acs-csv-timeout there would attribute the
+    # failure to the deadline instead of the InstallPlan.
+    _cond_classify
+    if [[ -n "${_cond_class}" ]]; then
+      _classify "${_cond_class}" "${_cond_detail} (CSV ${csvName}, phase ${_phase})"
+    elif [[ "${_phase}" == "Failed" ]]; then
       _classify "acs-csv-failed" "CSV ${csvName} reached phase Failed"
     elif [[ "${_phase}" == "unknown" ]] && (( _probe_notfound )); then
       _classify "acs-csv-timeout" "CSV object ${csvName} never created within ${ACS_INSTALL_TIMEOUT}s (currentCSV published, object absent)"
