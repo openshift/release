@@ -553,7 +553,12 @@ for _attempt in 1 2 3; do
     _precondition_ok=true
     break
   fi
-  if echo "${_pm_raw}" | grep -qi "not found"; then
+  # Here-string, not a pipe: grep exits at the first match, so a
+  # producer that is still writing (this payload is a full packagemanifest
+  # JSON) takes SIGPIPE, and pipefail turns the pipeline non-zero even though
+  # the pattern matched. A NotFound answer would then fall through to the
+  # query-failed class.
+  if grep -qi "not found" <<< "${_pm_raw}"; then
     _classify "acs-catalog-missing" "packagemanifest rhacs-operator not found in openshift-marketplace (successful query)"
     echo "ERROR: ${_class_detail}"
     exit 1
@@ -875,7 +880,9 @@ if ! oc wait csv "${csvName}" -n "${ACS_NAMESPACE}" \
     _phase=$(oc get csv "${csvName}" -n "${ACS_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null) || _phase="unknown"
     _probe_notfound=0
     _api_quiet
-    if printf '%s' "${csv_probe_out}" | grep -qi "not found"; then _probe_notfound=1; fi
+    # Same here-string reason as the precondition: the probe error can be a
+    # full API error body, larger than a pipe buffer.
+    if grep -qi "not found" <<< "${csv_probe_out}"; then _probe_notfound=1; fi
     _api_loud
     if [[ "${_phase}" == "Failed" ]]; then
       _classify "acs-csv-failed" "CSV ${csvName} reached phase Failed"
