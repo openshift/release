@@ -14,4 +14,15 @@ export LOCATION="${SELECTED_LOCATION:-${LOCATION:-}}"
 
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 
+# Optional PR-tunable baseline pin. Fetches the ref and forces the
+# PULL_BASE_SHA path in ARO-HCP's provision-from-main.sh (which otherwise
+# uses the Prow merge base).
+if [[ -n "${ARO_HCP_BASELINE_GIT_REF:-}" ]]; then
+  echo "ARO_HCP_BASELINE_GIT_REF=${ARO_HCP_BASELINE_GIT_REF}: fetching baseline override ..."
+  git fetch https://github.com/Azure/ARO-HCP.git "${ARO_HCP_BASELINE_GIT_REF}"
+  export PULL_BASE_SHA
+  PULL_BASE_SHA=$(git rev-parse FETCH_HEAD)
+  echo "Resolved baseline override to ${PULL_BASE_SHA}"
+fi
+
 exec hack/ci/provision-from-main.sh

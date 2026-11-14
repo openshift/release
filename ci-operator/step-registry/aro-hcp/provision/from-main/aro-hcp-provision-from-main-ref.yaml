@@ -33,6 +33,13 @@ ref:
     - name: COMPRESS_TIMING_METADATA
       default: "true"
       documentation: Whether to compress timing metadata files with gzip.
+    - name: ARO_HCP_BASELINE_GIT_REF
+      default: ""
+      documentation: |-
+        Optional git ref (SHA, branch, or tag) to provision as the upgrade
+        baseline instead of the Prow merge base / tip of main. When set,
+        the step fetches the ref from Azure/ARO-HCP and forces that commit
+        for baseline checkout (including rehearsals and periodics).
   documentation: |-
     Provision an ARO HCP baseline environment from the main branch.
     Used as the first phase of upgrade-path validation: the environment
@@ -41,6 +48,8 @@ ref:
     commit (no network fetch required). Detects rehearsal runs via the
     JOB_NAME prefix and fetches main explicitly; non-rehearsal runs
     with an invalid PULL_BASE_SHA fail immediately.
+    Set ARO_HCP_BASELINE_GIT_REF to pin a specific baseline commit
+    (fetched explicitly; overrides PULL_BASE_SHA / tip-of-main).
     Resolves the base commit's images in ACR (pushed by the postsubmit
     images-push job), polling until available. If the base commit's
     images never appear, walks back through recent history to find the
