@@ -76,15 +76,21 @@ class SummaryFixture(unittest.TestCase):
         self.output.mkdir()
         self.artifacts = self.base / "artifacts"
         self.artifacts.mkdir()
+        self.stamp = 0
         self.outside = self.base / "outside"
         self.outside.mkdir()
         (self.outside / "secret").write_text(SECRET, encoding="utf-8")
 
-    def report(self, phase, specs, result="test-result-fixture", index=0, name=None):
-        """Write one synthetic per-phase report into a result directory."""
+    def report(self, phase, specs, name=None, result="test-result-fixture"):
+        """Write one synthetic per-phase report into a result directory.
+
+        Report names carry a stamp like the real ones; the fixture counts
+        rather than reading a clock, so every name is distinct and fixed.
+        """
         directory = self.output / result
         directory.mkdir(exist_ok=True)
-        path = directory / (name or f"{phase}_{index:06d}.json")
+        self.stamp += 1
+        path = directory / (name or f"{phase}_{self.stamp:06d}.json")
         if isinstance(specs, (str, bytes)):
             mode = "wb" if isinstance(specs, bytes) else "w"
             with path.open(mode) as report:
@@ -146,7 +152,7 @@ class SummaryProjectionTests(SummaryFixture):
             spec("failed", labels=["id_12345", "critical", "author:someone"]),
             spec("timedout", hierarchy=[["id_6789"], ["e2e"]]),
         ])
-        self.report("post-clean", [spec("panicked", labels=["id_1"])], index=1)
+        self.report("post-clean", [spec("panicked", labels=["id_1"])])
         data = self.summary()
         self.assertEqual(data["output"], "scanned")
         self.assertEqual(data["failures"], [
@@ -335,8 +341,8 @@ class SummaryFailClosedTests(SummaryFixture):
         self.assertEqual(self.phase(data, "post-clean")["state"], "oversized")
 
     def test_phase_mixing_usable_and_unusable_reports_is_partial(self):
-        self.report("post-clean", [spec("failed", labels=["id_4"])], index=1)
-        self.report("post-clean", "{", index=2)
+        self.report("post-clean", [spec("failed", labels=["id_4"])])
+        self.report("post-clean", "{")
         data = self.summary()
         record = self.phase(data, "post-clean")
         self.assertEqual((record["state"], record["reports"], record["parsed_reports"]),
@@ -431,9 +437,9 @@ class SummaryBoundsTests(SummaryFixture):
         self.assertEqual(self.phase(data, "post-clean")["reports"], 16)
 
     def test_reports_per_phase_are_bounded_without_starving_other_phases(self):
-        for index in range(40):
-            self.report("post-clean", [spec("failed", labels=["id_900"])], index=index)
-        self.report("pre-cluster-creation", [spec("failed", labels=["id_76488"])], index=99)
+        for _ in range(40):
+            self.report("post-clean", [spec("failed", labels=["id_900"])])
+        self.report("pre-cluster-creation", [spec("failed", labels=["id_76488"])])
         data = self.summary()
         teardown = self.phase(data, "post-clean")
         self.assertEqual((teardown["reports"], teardown["dropped_reports"]), (8, 32))
@@ -445,7 +451,7 @@ class SummaryBoundsTests(SummaryFixture):
     def test_failure_budget_reaches_the_test_phases_before_teardown(self):
         self.report("post-clean", [spec("failed", labels=[f"id_{900 + index}"])
                                    for index in range(70)])
-        self.report("pre-cluster-creation", [spec("failed", labels=["id_76488"])], index=1)
+        self.report("pre-cluster-creation", [spec("failed", labels=["id_76488"])])
         data = self.summary()
         self.assertEqual(len(data["failures"]), 64)
         self.assertIn({"phase": "pre-cluster-creation", "state": "failed",
