@@ -1,6 +1,6 @@
 # Build-data validation
 
-The required ACM/MCE presubmits follow the existing `art-konflux-delivery-repo-check`
+The LP presubmits follow the existing `art-konflux-delivery-repo-check`
 configuration pattern:
 
 ```text
@@ -11,13 +11,20 @@ ci-operator/config/openshift-eng/ocp-build-data/openshift-eng-ocp-build-data-<br
   -> uv run --locked --no-dev python -I -m validator.ci
 ```
 
-The first pass covers every existing ACM and MCE release branch:
+The required first pass covers every existing ACM and MCE release branch:
 
 - ACM: `2.11`, `2.13`, `2.14`, `2.15`, `2.16`, `2.17`, `5.0`, `5.1`.
 - MCE: `2.6`, `2.8`, `2.9`, `2.10`, `2.11`, `2.17`, `5.0`, `5.1`.
 
-All 16 jobs are required for PRs that change metadata matched by `run_if_changed`.
-Validation failures block merging. Each additional branch needs its own CI
+The other 45 release branches are also configured across cert-manager, COO, DVO,
+external-secrets, installer-ove-ui, Kueue, Logging, mirror-gui, MTA, MTC, OADP,
+oc-mirror, OMR, OSUS, Quay, RHOSDT and zero-trust. These jobs are required;
+validation failures block matching metadata changes from merging. Ensure metadata,
+source access and RPA mappings are ready for each stream.
+
+A job can run when its branch selector matches the PR's target branch and the PR changes metadata matched by `run_if_changed`.
+The existing 16 ACM/MCE jobs remain required; their validation failures block
+merging. Each additional branch needs its own CI
 configuration referencing the same workflow. New y-streams
 are not automatically onboarded to the job. A `__periodics.yaml` variant is only
 needed for scheduled runs. Tide merge policy and branch protection are separate.
@@ -108,20 +115,16 @@ as the source of truth.
 
 ## Rehearsal and rollout
 
-On the release PR, a different OpenShift org member must authorize network access:
-
-```text
-/pj-rehearse network-access-allowed
-```
-
-Then run the generated ACM job:
+On the release PR, run the generated ACM job:
 
 ```text
 /pj-rehearse pull-ci-openshift-eng-ocp-build-data-acm-5.0-art-build-data-validation
 ```
 
+If the rehearsal bot reports that network authorization is required, ask a
+different OpenShift org member to run `/pj-rehearse network-access-allowed`.
 To request rehearsals for all affected first-pass jobs (up to 25), use
-`/pj-rehearse max` after network access is authorized. The default command runs
+`/pj-rehearse max`. The default command runs
 at most five jobs; inspect the bot's affected-job list when selecting rehearsals.
 
 After release merges, an ACM or MCE metadata PR can use `/test art-build-data-validation`.
