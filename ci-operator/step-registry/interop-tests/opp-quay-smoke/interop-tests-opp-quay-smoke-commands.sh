@@ -204,23 +204,28 @@ function GetQuayAuthOnce () {
 
 function GetQuayAuth () {
     # The quayadmin secret is provisioned by the create-admin-user Job from
-    # the policy-config-quay policy, which can still be running (or waiting
-    # on its compliance wait) when the smoke starts. Retry the credential
-    # sources within a bounded budget instead of failing on the first miss;
-    # healthy lanes succeed on the first attempt with no added delay.
-    typeset -i authAttempts=0
-    typeset -i authMaxAttempts=20
-    while true; do
-        if GetQuayAuthOnce; then
-            return 0
+    # the policy-config-quay policy, which can still be running when the
+    # smoke starts. Wait for the object instead of polling the credential
+    # sources with a fixed sleep: --for=create covers the not-yet-created
+    # case, and the jsonpath wait covers the window where the secret exists
+    # but the Job has not written its token yet. Both stages share one
+    # bounded budget. A miss is not fatal here: GetQuayAuthOnce still tries
+    # the quaydevel secret and the user-initialize endpoint.
+    typeset -i authBudgetSeconds=600
+    typeset -i authDeadline=0
+    typeset -i authWait=0
+    authDeadline=$(( $(date +%s) + authBudgetSeconds ))
+    authWait=$(( authDeadline - $(date +%s) ))
+    if ! oc wait secret/quayadmin -n "${QUAY_NS}" --for=create --timeout="${authWait}s"; then
+        echo "WARN: quayadmin secret was not created within $(( authBudgetSeconds / 60 ))m; falling back to the other credential sources" >&2
+    else
+        authWait=$(( authDeadline - $(date +%s) ))
+        if (( authWait > 0 )) && ! oc wait secret/quayadmin -n "${QUAY_NS}" \
+            --for=jsonpath='{.data.token}' --timeout="${authWait}s"; then
+            echo "WARN: quayadmin token was not written within $(( authBudgetSeconds / 60 ))m; falling back to the other credential sources" >&2
         fi
-        authAttempts=$(( authAttempts + 1 ))
-        if (( authAttempts >= authMaxAttempts )); then
-            echo "ERROR: Could not obtain Quay credentials from any source after ${authMaxAttempts} attempts (30s apart)" >&2
-            return 1
-        fi
-        sleep 30
-    done
+    fi
+    GetQuayAuthOnce
 }
 
 function PreflightCheck () {
