@@ -185,7 +185,6 @@ JUNITEOF
   mv -f "${_tmp}" "${_jfile}"
 }
 
-# _junit_emit <exit-code> — replace the seeded case IN PLACE (same
 # _xml_escape <string> — escape XML special characters for attribute/body
 # interpolation (raw oc error output can contain quotes and ampersands).
 _xml_escape() {
@@ -199,6 +198,7 @@ _xml_escape() {
   printf '%s' "${s}"
 }
 
+# _junit_emit <exit-code> - replace the seeded case IN PLACE (same
 # testcase id, never appended). tests>=1 always; exit!=0 implies >=1
 # failure/error. Atomic write; sha256 and byte count logged.
 _junit_emit() {
