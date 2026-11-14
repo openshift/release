@@ -35,7 +35,10 @@ shopt -u patsub_replacement 2>/dev/null || true
 #   * Self-disable: when the operatorpolicy-rhacs-operator that owns THIS
 #     step's namespace (spec.subscription.namespace) is Compliant with a
 #     matching channel and the CSV is Succeeded, emit
-#     workaround_removal_ready=true and exit 0 without installing.
+#     workaround_removal_ready=true and exit 0 without installing. A failed
+#     cluster-wide OperatorPolicy list is never read as "no policy": it
+#     retries, then fails closed as acs-operatorpolicy-query-failed (an RBAC,
+#     timeout, or transport error must not install a second Subscription).
 #   * Create-if-absent only: an existing Subscription is adopted (channel
 #     mismatch recorded, never overwritten; the OperatorPolicy owns it once
 #     ACM 2.17.z carrying stolostron/governance-policy-addon-controller#1397
@@ -413,7 +416,35 @@ fi
 #     the workaround is redundant — report and exit 0 without installing.
 if oc get crd operatorpolicies.policy.open-cluster-management.io >/dev/null 2>&1; then
   _api_quiet
-  _op_status=$(oc get operatorpolicy -A -o json 2>/dev/null) || _op_status=""
+  # A FAILED cluster-wide list is not "no policy": the list decides whether a
+  # live OperatorPolicy owns this install, so an RBAC, timeout or transport
+  # error collapsing to empty output would let the step skip the self-disable
+  # decision and install a second Subscription for an operator the policy
+  # already owns. Keep the exit status, retry, and fail closed, the same
+  # convention the OperatorGroup query below uses. A NotFound answer (the CRD
+  # is registered but the API no longer serves the resource) is a real
+  # absence: no policy of that kind can exist, so the install path runs.
+  _op_query_ok=false
+  _op_status=""
+  for _op_attempt in 1 2 3; do
+    if _op_status=$(oc get operatorpolicy -A -o json 2>&1); then
+      _op_query_ok=true
+      break
+    fi
+    (( _op_attempt < 3 )) || break
+    sleep 5
+  done
+  if [[ "${_op_query_ok}" != "true" ]]; then
+    if [[ "${_op_status}" == *"Error from server (NotFound)"* ]]; then
+      _prop "operatorpolicy_query" "not-found"
+      _op_status=""
+    else
+      _classify "acs-operatorpolicy-query-failed" "operatorpolicy list failed cluster-wide after 3 attempts ($(_api_err_class "${_op_status}")); self-disable undecidable, not installing"
+      echo "ERROR: ${_class_detail}"
+      _dump_diagnostics
+      exit 1
+    fi
+  fi
   if [[ -n "${_op_status}" ]]; then
     _self_disable=$(printf '%s' "${_op_status}" | python3 -c '
 import json, sys
