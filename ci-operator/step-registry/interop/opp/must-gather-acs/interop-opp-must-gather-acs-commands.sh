@@ -13,9 +13,9 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 # "not found" also matches a missing helper (`bash: oc: command not found`), a
 # wrapper failure, or any client-side message carrying the phrase, which turns
 # a broken capture path into confirmed absence and hides it from the capture
-# assertion (reviewer rows 8 and 9). Callers keep their own three-way
-# classification: notfound -> absent, no resource type -> absent, anything
-# else -> probe_error/QUERY FAILED.
+# assertion (a bare "not found" substring test). Callers keep their own
+# three-way classification: notfound -> absent, no resource type -> absent,
+# anything else -> probe_error/QUERY FAILED.
 oc_notfound() { # oc_notfound <rc> <stderr-text>
   [[ ${1:-0} -ne 0 ]] || return 1
   grep -qE '(^|: )Error from server \(NotFound\)' <<< "${2:-}"
@@ -785,16 +785,17 @@ rhacs_csvs = [
     and (sub_namespace is None or c.get("namespace") == sub_namespace)
 ]
 
-# CSV binding (finding deep-2-retry-f1): any non-copied rhacs-operator.v* CSV
-# used to satisfy the precondition, so an upgrade-pending cluster whose only
-# installed CSV is one release behind the subscription's currentCSV read as
-# removal-ready with the upgrade still outstanding. The installed CSV must be
-# the CSV the subscription resolves, reported as its own term. Kept separate
-# from rhacs_csvs instead of filtering that list, so rhacs_csv_count still
-# means "CSVs installed for the package" and the exactly-one precondition is
-# not quietly narrowed to "one CSV that happens to match" (a lingering second
-# CSV would otherwise go uncounted). A subscription with no currentCSV, or no
-# single rhacs subscription to read one from, reads unknown, not true.
+# CSV binding (the installed CSV must be the subscription's resolved version,
+# not just any non-copied rhacs-operator.v* CSV): an upgrade-pending cluster
+# whose only installed CSV is one release behind the subscription's
+# currentCSV read as removal-ready with the upgrade still outstanding. The
+# installed CSV must be the CSV the subscription resolves, reported as its
+# own term. Kept separate from rhacs_csvs instead of filtering that list, so
+# rhacs_csv_count still means "CSVs installed for the package" and the
+# exactly-one precondition is not quietly narrowed to "one CSV that happens
+# to match" (a lingering second CSV would otherwise go uncounted). A
+# subscription with no currentCSV, or no single rhacs subscription to read
+# one from, reads unknown, not true.
 if sub is None:
     rhacs_csv_matches_subscription = None
 else:
@@ -808,20 +809,20 @@ sub_channel = sub.get("channel") if sub else None
 op_spec = (rhacs_op[0].get("spec") or {}) if rhacs_op else {}
 op_channel = op_spec.get("channel")
 
-# Target binding (minor finding, thread 4517377052): the OperatorPolicy must
-# target THIS subscription. A policy whose spec.subscription names another
-# subscription re-creates that one on removal, so adopt-vs-duplicate does not
-# apply to rhacs-operator and the precondition cannot be met. A field the
-# policy leaves unset (None) does not constrain, mirroring OLM's defaulting
-# of an omitted target, so only a declared and different value fails. With no
-# single rhacs subscription to bind to, the binding is unknown, not false.
+# Target binding: the OperatorPolicy must name THIS subscription. A policy
+# whose spec.subscription names another subscription re-creates that one on
+# removal, so adopt-vs-duplicate does not apply to rhacs-operator and the
+# precondition cannot be met. A field the policy leaves unset (None) does not
+# constrain, mirroring OLM's defaulting of an omitted target, so only a
+# declared and different value fails. With no single rhacs subscription to
+# bind to, the binding is unknown, not false.
 #
-# The no-policy case is separate (finding deep-2-f2): with no OperatorPolicy
-# captured there are no target fields at all, and reading both as "unset, so
-# does not constrain" reported operatorpolicy_targets_subscription=true for a
-# cluster that has no policy to do the targeting. A classified query that
-# found no policy means nothing targets the subscription (false), while a
-# failed capture means the answer is unknown.
+# The no-policy case is separate: with no OperatorPolicy captured there are
+# no target fields at all, and reading both as "unset, so does not constrain"
+# reported operatorpolicy_targets_subscription=true for a cluster that has no
+# policy to do the targeting. A classified query that found no policy means
+# nothing targets the subscription (false), while a failed capture means the
+# answer is unknown.
 op_sub_name = op_spec.get("subscriptionName")
 op_sub_namespace = op_spec.get("subscriptionNamespace")
 if ops_s not in ("ok", "absent"):
@@ -844,16 +845,15 @@ if rhacs_op:
         for c in conds
     )
 
-# Enforcement gate (finding deep-3-f1): compliance alone does not make the
-# policy the owner of the subscription. An OperatorPolicy with
-# remediationAction: inform reports compliance and never re-creates a removed
-# Subscription, and a mustnothave policy would work against the object's
-# existence rather than restoring it, so neither can satisfy the removal
-# precondition. Only a declared enforcing action with a re-creating
-# compliance type counts. An unset field reads unknown (fail closed) instead
-# of assuming a default: the captured artifact records the policy spec only,
-# and a PlacementBinding can override enforcement at a level this step does
-# not capture.
+# Enforcement gate: compliance alone does not make the policy the owner of
+# the subscription. An OperatorPolicy with remediationAction: inform reports
+# compliance and never re-creates a removed Subscription, and a mustnothave
+# policy would work against the object's existence rather than restoring it,
+# so neither can satisfy the removal precondition. Only a declared enforcing
+# action with a re-creating compliance type counts. An unset field reads
+# unknown (fail closed) instead of assuming a default: the captured artifact
+# records the policy spec only, and a PlacementBinding can override
+# enforcement at a level this step does not capture.
 op_remediation = None
 op_compliance = None
 if rhacs_op and ops_s in ("ok", "absent"):
@@ -902,13 +902,13 @@ elif pm_s == "absent" and rhacs_csvs:
 else:
     csv_catalog_matches_subscription = None
 
-# Channel resolution (finding deep-2-retry-f1): the catalog term says which
-# catalog the packagemanifest lives in, not that the manifest still offers
-# the version the subscription resolves. An upgrade-pending cluster keeps
-# the right catalog, so the catalog term alone cannot tell a settled install
-# from one the catalog has already moved past. The captured manifest must
-# list the subscription's currentCSV on one of its channels, reported as its
-# own term so the two bindings are independently readable.
+# Channel resolution: the catalog term says which catalog the packagemanifest
+# lives in, not that the manifest still offers the version the subscription
+# resolves. An upgrade-pending cluster keeps the right catalog, so the
+# catalog term alone cannot tell a settled install from one the catalog has
+# already moved past. The captured manifest must list the subscription's
+# currentCSV on one of its channels, reported as its own term so the two
+# bindings are independently readable.
 sub_currentcsv = sub.get("currentCSV") if sub is not None else None
 if pm_ok and sub_currentcsv:
     packagemanifest_resolves_current_csv = any(
@@ -1232,7 +1232,7 @@ FIXTURE
 
   # FALSE fixture: no OperatorPolicy (today's 5.0 state). With the policy
   # absent there is nothing to target the subscription, so the term is false
-  # rather than true-by-unset-field (finding deep-2-f2).
+  # rather than true by an unset field.
   echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "rhacs-operator", "phase": "Succeeded", "reason": "Succeeded"}]' > "${tmp}/05-csv.json"
   echo '[]' > "${tmp}/01-operatorpolicy.json"
   EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
@@ -1257,9 +1257,9 @@ FIXTURE
   EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
   _expect operatorpolicy_present false
 
-  # Target binding (thread 4517377052): the policy must name this
-  # subscription. A declared and different target fails the precondition;
-  # a field the policy leaves unset does not constrain (pass-through).
+  # Target binding: the policy must name this subscription. A declared and
+  # different target fails the precondition; a field the policy leaves unset
+  # does not constrain (pass-through).
   echo '[{"name": "rhacs-operator", "namespace": "rhacs-operator", "apiVersion": "operators.coreos.com/v1alpha1", "currentCSV": "rhacs-operator.v4.11.6", "state": "AtLatestKnown", "conditions": [], "channel": "stable", "source": "redhat-operators"}]' > "${tmp}/03-subscription.json"
   echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "rhacs-operator", "phase": "Succeeded", "reason": "Succeeded"}]' > "${tmp}/05-csv.json"
   cat > "${tmp}/01-operatorpolicy.json" <<'FIXTURE'
@@ -1284,9 +1284,9 @@ FIXTURE
   _expect operatorpolicy_targets_subscription true
   _expect removal_preconditions_met true
 
-  # Enforcement gate (finding deep-3-f1): a compliant policy that only
-  # reports does not re-create a removed subscription, so compliance plus a
-  # correct target is not enough on its own.
+  # Enforcement gate: a compliant policy that only reports does not
+  # re-create a removed subscription, so compliance plus a correct target is
+  # not enough on its own.
   cat > "${tmp}/01-operatorpolicy.json" <<'FIXTURE'
 [{"name": "operatorpolicy-rhacs-operator", "namespace": "policies",
   "spec": {"subscriptionName": "rhacs-operator",
@@ -1332,11 +1332,11 @@ FIXTURE
   _expect operatorpolicy_recreates_subscription unknown
   _expect removal_preconditions_met false
 
-  # Upgrade-pending (finding deep-2-retry-f1): the subscription resolves a
-  # newer CSV than the only installed one, so the catalog is right and
-  # offers that version, yet the upgrade has not landed. The installed CSV
-  # is not the CSV the subscription resolves and cannot satisfy the
-  # precondition. Self-contained: every input is restated here.
+  # Upgrade-pending: the subscription resolves a newer CSV than the only
+  # installed one, so the catalog is right and offers that version, yet the
+  # upgrade has not landed. The installed CSV is not the CSV the subscription
+  # resolves and cannot satisfy the precondition. Self-contained: every input
+  # is restated here.
   cat > "${tmp}/01-operatorpolicy.json" <<'FIXTURE'
 [{"name": "operatorpolicy-rhacs-operator", "namespace": "policies",
   "spec": {"subscriptionName": "rhacs-operator",
@@ -1362,9 +1362,9 @@ FIXTURE
   _expect rhacs_csv_matches_subscription false
   _expect removal_preconditions_met false
 
-  # Non-Succeeded phase (reviewer row 2): everything else is in its true
-  # form, but the installed CSV has not finished installing. deploy-acs waits
-  # for status.phase Succeeded before calling the operator deployed, so this
+  # Non-Succeeded phase: everything else is in its true form, but the
+  # installed CSV has not finished installing. deploy-acs waits for
+  # status.phase Succeeded before calling the operator deployed, so this
   # step cannot call the install settled. Self-contained: every input is
   # restated here.
   cat > "${tmp}/01-operatorpolicy.json" <<'FIXTURE'
@@ -1390,9 +1390,9 @@ FIXTURE
   _expect rhacs_csv_phase Installing
   _expect removal_preconditions_met false
 
-  # Error classification (reviewer rows 8 and 9): only the API server's
-  # NotFound error shape counts as absence, so a missing helper, a wrapper
-  # failure, or a denied request can never be read as a confirmed absence.
+  # Error classification: only the API server's NotFound error shape counts
+  # as absence, so a missing helper, a wrapper failure, or a denied request
+  # can never be read as a confirmed absence.
   _st_check_class() { # _st_check_class <label> <expected> <rc> <text>
     local got=false
     oc_notfound "$3" "$4" && got=true
