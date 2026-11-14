@@ -10,6 +10,38 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 # prevent the OLM evidence capture section from running.  This is critical
 # because OLM evidence is most valuable when the operator fails to install.
 
+# _central_backend_target <namespace> <service>
+# Prints "<address> <port>" for one ready backend of the service, taken from
+# the EndpointSlices the endpoint controller maintains for it. Prints nothing
+# when the service has no ready backend or the EndpointSlices cannot be read.
+_central_backend_target() {
+    oc get endpointslices -n "$1" \
+      -l "kubernetes.io/service-name=$2" -o json 2>/dev/null | \
+      python3 -c '
+import json, sys
+
+try:
+    data = json.load(sys.stdin)
+except ValueError:
+    sys.exit(0)
+
+for item in data.get("items", []):
+    ports = [p for p in item.get("ports", []) or [] if p.get("port")]
+    if not ports:
+        continue
+    # A single-port service has one entry; prefer an explicitly named https
+    # port when the service exposes more than one.
+    ports.sort(key=lambda p: 0 if p.get("name") == "https" else 1)
+    for endpoint in item.get("endpoints", []) or []:
+        if (endpoint.get("conditions") or {}).get("ready") is False:
+            continue
+        addresses = endpoint.get("addresses") or []
+        if addresses:
+            print(addresses[0], ports[0]["port"])
+            sys.exit(0)
+' || true
+}
+
 # collect_acs_diagnostics — downloads ACS/StackRox diagnostic bundle
 # via the Central API. Skips silently if ACS is not installed.
 collect_acs_diagnostics() {
@@ -82,6 +114,7 @@ collect_acs_diagnostics() {
     # exchange the admin password only after that verification succeeds.
     TLS_MODE="unverified"
     CURL_TLS_OPTS=""
+    CENTRAL_URL_HOST="${CENTRAL_HOST}"
     CENTRAL_CA_FILE="${ARTIFACT_DIR}/acs-must-gather/central-ca.pem"
     TLS_PREFLIGHT_ERR="${ARTIFACT_DIR}/acs-must-gather/tls-preflight.err"
     CENTRAL_CA="$(oc get secret central-tls -n "${WORKLOAD_NS}" \
@@ -92,11 +125,79 @@ collect_acs_diagnostics() {
         # uses: curl exit 0 means the served certificate chained to Central's CA
         # (an unauthenticated 401 is still a verified handshake); non-zero means
         # CA or hostname mismatch — no credential is involved either way.
-        if curl -s -o /dev/null --cacert "${CENTRAL_CA_FILE}" \
+        # -sS keeps successful output silent while surfacing preflight errors
+        # in tls-preflight.err (with -s alone a failing preflight left the file
+        # the warning points at empty).
+        if curl -sS -o /dev/null --cacert "${CENTRAL_CA_FILE}" \
               --connect-timeout 10 --max-time 30 -w '' \
               "https://${CENTRAL_HOST}/v1/debug/diagnostics" 2>"${TLS_PREFLIGHT_ERR}"; then
             TLS_MODE="verified"
             CURL_TLS_OPTS="--cacert ${CENTRAL_CA_FILE}"
+        else
+            # A passthrough route serving Central's generated certificate can
+            # have a route host outside the certificate's service DNS names:
+            # the direct preflight then fails hostname verification (curl exit
+            # 60) even though the CA is correct, and the bundle would be
+            # skipped. The service DNS name is the name the generated
+            # certificate covers, but it cannot be presented as SNI to the
+            # route host: a passthrough router picks the backend by TLS SNI
+            # route match, so a ClientHello naming the service DNS name selects
+            # no route and never reaches Central. Retry against a ready backend
+            # endpoint of the Central service instead: --connect-to redirects
+            # only the TCP connection (backend address and container port),
+            # while the URL host stays the service DNS name, so SNI and
+            # hostname verification continue to use the verified name against
+            # Central's own CA. Routes with a custom certificate that includes
+            # the route host pass the direct preflight above and never reach
+            # this retry.
+            _central_svc="$(oc get route central -n "${WORKLOAD_NS}" \
+              -o jsonpath='{.spec.to.name}' 2>/dev/null || true)"
+            _central_backend=""
+            if [[ -n "${_central_svc}" ]]; then
+                _central_backend="$(_central_backend_target "${WORKLOAD_NS}" "${_central_svc}")"
+            fi
+            if [[ -n "${_central_svc}" && -n "${_central_backend}" ]]; then
+                _central_svc_dns="${_central_svc}.${WORKLOAD_NS}.svc"
+                read -r _central_addr _central_port <<<"${_central_backend}"
+                if [[ "${_central_addr}" == *:* ]]; then
+                    _central_addr="[${_central_addr}]"
+                fi
+                _central_connect_to="${_central_svc_dns}:443:${_central_addr}:${_central_port}"
+                if curl -sS -o /dev/null --cacert "${CENTRAL_CA_FILE}" \
+                      --connect-to "${_central_connect_to}" \
+                      --connect-timeout 10 --max-time 30 -w '' \
+                      "https://${_central_svc_dns}/v1/debug/diagnostics" \
+                      2>/dev/null; then
+                    TLS_MODE="verified"
+                    CURL_TLS_OPTS="--cacert ${CENTRAL_CA_FILE} --connect-to ${_central_connect_to}"
+                    CENTRAL_URL_HOST="${_central_svc_dns}"
+                    # Log and artifact text name no service host, backend
+                    # address or port (INTEROP-9647 log sanitization): curl's
+                    # own stderr, which carries the service DNS name, is
+                    # discarded and the failure is recorded as its exit status.
+                    echo "TLS verified against Central's own CA through a ready backend endpoint of the route target service, with the certificate's service name as SNI and verified name (route host outside certificate DNS names)"
+                else
+                    _central_direct_rc=$?
+                    echo "Backend-direct TLS preflight against a ready backend endpoint failed (curl exit ${_central_direct_rc}); see tls-preflight.err." >&2
+                    echo "backend-direct preflight failed: curl exit ${_central_direct_rc}" >>"${TLS_PREFLIGHT_ERR}"
+                fi
+            else
+                # Record why the retry could not run: a missing route target and
+                # an unreadable or empty EndpointSlice both leave _central_backend
+                # empty, and tls-preflight.err would otherwise show only the
+                # route-host error. Presence only: neither the route target
+                # service name nor the ready backend address belongs in an
+                # artifact.
+                _svc_present="no"
+                _backend_present="no"
+                if [[ -n "${_central_svc}" ]]; then
+                    _svc_present="yes"
+                fi
+                if [[ -n "${_central_backend}" ]]; then
+                    _backend_present="yes"
+                fi
+                echo "Backend-direct fallback not attempted: route target service present=${_svc_present} ready backend present=${_backend_present} (EndpointSlice lookup or oc access returned nothing)." >>"${TLS_PREFLIGHT_ERR}"
+            fi
         fi
     else
         echo "central-tls ca.pem not readable in ${WORKLOAD_NS}" > "${TLS_PREFLIGHT_ERR}"
@@ -123,7 +224,7 @@ collect_acs_diagnostics() {
 
     # shellcheck disable=SC2086
     HTTP_CODE=$(curl -s ${CURL_TLS_OPTS} --connect-timeout 10 --max-time 120 -K "${CURL_CFG}" -w '%{http_code}' \
-      "https://${CENTRAL_HOST}/v1/debug/diagnostics" \
+      "https://${CENTRAL_URL_HOST}/v1/debug/diagnostics" \
       -o "${ARTIFACT_DIR}/acs-must-gather/acs-diagnostic-bundle.zip" 2>&1) || {
         echo "WARNING: curl failed to connect to Central."
         echo "FAILED: curl transport error" > "${ARTIFACT_DIR}/acs-must-gather/FAILED"
