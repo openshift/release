@@ -793,9 +793,10 @@ rhacs_csvs = [
 # own term. Kept separate from rhacs_csvs instead of filtering that list, so
 # rhacs_csv_count still means "CSVs installed for the package" and the
 # exactly-one precondition is not quietly narrowed to "one CSV that happens
-# to match" (a lingering second CSV would otherwise go uncounted). A
-# subscription with no currentCSV, or no single rhacs subscription to read
-# one from, reads unknown, not true.
+# to match" (a lingering second CSV would otherwise go uncounted). The term
+# reads unknown only when there is no single rhacs subscription to read; a
+# subscription that publishes no currentCSV compares against nothing and
+# reads false, so the term is fail-closed and never true without a match.
 if sub is None:
     rhacs_csv_matches_subscription = None
 else:
