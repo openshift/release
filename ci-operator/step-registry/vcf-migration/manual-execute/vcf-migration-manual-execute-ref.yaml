@@ -1,0 +1,33 @@
+ref:
+  as: vcf-migration-manual-execute
+  from: upi-installer
+  commands: vcf-migration-manual-execute-commands.sh
+  grace_period: 60s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 240m0s
+  credentials:
+  - collection: vsphere
+    group: ibmcloud/ci
+    mount_path: /var/run/vault/vsphere-ibmcloud-ci
+  - collection: vsphere
+    group: ibmcloud/config
+    mount_path: /var/run/vault/vsphere-ibmcloud-config
+  - collection: vsphere-vmc
+    group: ibmcloud
+    mount_path: /var/run/vault/ibmcloud
+  - collection: vsphere-vmc
+    group: ibmcloud-2
+    mount_path: /var/run/vault/ibmcloud-2
+  documentation: |-
+    Performs the Day 2 vCenter migration manually, without deploying the
+    vcf-migration-operator: prepares the target vCenter (region and zone
+    tags, VM folder with ownership tag, RHCOS OVA templates), registers it on
+    the cluster (vsphere-creds keys, Infrastructure vcenters and failure
+    domains), waits for the generated cloud-conf to pick it up, re-provisions
+    worker and control plane machines onto it, and retires the source vCenter.
+    The runbook at docs/user/day2-vcenter-migration.md in
+    openshift/vcf-migration-operator is the source of truth for the ordering
+    and wait conditions this step follows.
