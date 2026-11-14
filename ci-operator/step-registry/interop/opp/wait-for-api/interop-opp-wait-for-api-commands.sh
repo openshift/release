@@ -43,6 +43,10 @@ _on_exit() {
     fi
     return 0
 }
+# A TERM (the step's timeout path) has to leave a nonzero status behind,
+# otherwise bash runs the EXIT trap with the last child's status, which is
+# 0 mid-wait, and the carrier records a pass for an interrupted run.
+trap 'exit 143' TERM
 trap _on_exit EXIT
 
 echo "Waiting for cluster API to become reachable..."
