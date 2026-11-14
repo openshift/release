@@ -593,12 +593,14 @@ for _attempt in 1 2 3; do
     _precondition_ok=true
     break
   fi
-  # Here-string, not a pipe: grep exits at the first match, so a
-  # producer that is still writing (this payload is a full packagemanifest
-  # JSON) takes SIGPIPE, and pipefail turns the pipeline non-zero even though
-  # the pattern matched. A NotFound answer would then fall through to the
-  # query-failed class.
-  if grep -qi "not found" <<< "${_pm_raw}"; then
+  # Only the API server's NotFound error shape means absence, the same test
+  # the OperatorPolicy queries use. A substring test on "not found" also
+  # matches a missing helper (a bare "command not found") or a wrapper
+  # message carrying the phrase, which would read as a missing packagemanifest
+  # and make the "(successful query)" detail below false. The shape test also
+  # needs no pipe over this payload (a full packagemanifest JSON), so a
+  # producer still writing when the test answers cannot take SIGPIPE.
+  if [[ "${_pm_raw}" == *"Error from server (NotFound)"* ]]; then
     _pm_notfound=true
     break
   fi
@@ -985,9 +987,11 @@ if ! oc wait csv "${csvName}" -n "${ACS_NAMESPACE}" \
     _phase=$(oc get csv "${csvName}" -n "${ACS_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null) || _phase="unknown"
     _probe_notfound=0
     _api_quiet
-    # Same here-string reason as the precondition: the probe error can be a
-    # full API error body, larger than a pipe buffer.
-    if grep -qi "not found" <<< "${csv_probe_out}"; then _probe_notfound=1; fi
+    # Same shape test as the precondition: a missing helper or a wrapper
+    # message carrying "not found" is a failed probe, not an absent CSV, so
+    # only the API server's NotFound answer selects the "never created"
+    # detail. No pipe over the probe error (it can be a full API error body).
+    if [[ "${csv_probe_out}" == *"Error from server (NotFound)"* ]]; then _probe_notfound=1; fi
     _api_loud
     if [[ "${_phase}" == "Failed" ]]; then
       _classify "acs-csv-failed" "CSV ${csvName} reached phase Failed"
