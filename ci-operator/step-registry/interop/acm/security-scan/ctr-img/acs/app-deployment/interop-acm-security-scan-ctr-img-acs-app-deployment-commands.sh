@@ -271,6 +271,19 @@ json.dump(bc,sys.stdout,indent=2)
     typeset -g deployedImage=''
     deployedImage="$(oc get deployment httpd-example -n e2e-opp -o jsonpath='{.spec.template.spec.containers[0].image}')" || deployedImage=''
 
+    # The digest the running container actually pulled.  A tag can be reused by
+    # a later build while ACS still holds the older build's record under that
+    # tag, so the ACS match anchors on this digest: the deployment spec alone
+    # carries the reference that was requested, not the build that is running.
+    typeset -g deployedImageDigest=''
+    typeset podSelector=''
+    podSelector="$(oc get deployment httpd-example -n e2e-opp -o jsonpath='{range $k, $v := .spec.selector.matchLabels}{$k}={$v},{end}' 2>/dev/null)" || podSelector=''
+    podSelector="${podSelector%,}"
+    if [[ -n "${podSelector}" ]]; then
+        deployedImageDigest="$(oc get pods -n e2e-opp -l "${podSelector}" -o jsonpath='{range .items[*].status.containerStatuses[*]}{.imageID}{"\n"}{end}' 2>/dev/null \
+            | sed -n 's/.*\(sha256:[0-9a-f]\{64\}\).*/\1/p' | head -n 1)" || deployedImageDigest=''
+    fi
+
     # Collect final status
     oc get build,po,deployment -n e2e-opp || true
     oc get is -n e2e-opp httpd-example -o yaml --ignore-not-found | awk '/status:/{n=6} n>0{print; n--}'
@@ -326,24 +339,31 @@ function RunTestCase2 () {
         return 1
     fi
 
-    # Split the deployed reference into repository path and reference.  An
+    # Split the deployed reference into repository path and digest.  An
     # @-pinned image carries a digest; otherwise the tag is whatever follows
     # the last colon when that colon comes after the last slash, so a registry
-    # port is not mistaken for a tag.  A bare repository name resolves to the
-    # latest tag (Docker default), which keeps the comparison meaningful.
+    # port is not mistaken for a tag and is stripped from the repository path
+    # before the name comparison.
     typeset deployedRepoPath="${deployedImage%%@*}"
     typeset deployedDigest=''
-    typeset deployedTag=''
     typeset deployedLastSegment="${deployedRepoPath##*/}"
     if [[ "${deployedLastSegment}" == *:* ]]; then
-        deployedTag="${deployedLastSegment##*:}"
         deployedRepoPath="${deployedRepoPath%:*}"
     fi
     if [[ "${deployedImage}" == *@* ]]; then
         deployedDigest="${deployedImage#*@}"
     fi
-    if [[ -z "${deployedTag}" && -z "${deployedDigest}" ]]; then
-        deployedTag='latest'
+    # A tag is not evidence of which build was scanned: the deployment may run
+    # a tag whose earlier build ACS already holds, so a tag-pinned deployment
+    # anchors on the digest the running container pulled.
+    if [[ -z "${deployedDigest}" && -n "${deployedImageDigest:-}" ]]; then
+        deployedDigest="${deployedImageDigest}"
+    fi
+    if [[ -z "${deployedDigest}" ]]; then
+        acsFailureMsg="Could not resolve the digest of the running image in deployment e2e-opp/httpd-example; a tag alone cannot anchor the ACS image match"
+        printf '%s\n' "ERROR: ${acsFailureMsg}" >&2
+        RecordTestResult "test-acs-integration" "failed" "${acsFailureMsg}" "0"
+        return 1
     fi
     # Compare the repository by its last two path components on both sides
     # (or the whole path when it is shorter): the same application seen from a
@@ -387,10 +407,6 @@ def lastn($d): split("/") | .[-$d:] | join("/");
     if [[ -n "${deployedDigest}" ]]; then
         # shellcheck disable=SC2016
         jqFilter+='  | select(((.name // "") | contains("@" + $digest)) or ((.id // "") == $digest))
-'
-    else
-        # shellcheck disable=SC2016
-        jqFilter+='  | select(((.name // "") | endswith(":" + $tag)))
 '
     fi
     # shellcheck disable=SC2016
@@ -463,7 +479,7 @@ def lastn($d): split("/") | .[-$d:] | join("/");
             curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 60 \
                 --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
                 "https://${acsHost}/v1/images" | /tmp/jq --arg repo "${deployedRepo}" --argjson depth "${deployedRepoDepth}" \
-                    --arg digest "${deployedDigest}" --arg tag "${deployedTag}" "${jqFilter}"
+                    --arg digest "${deployedDigest}" "${jqFilter}"
         )"
         # Read the record only out of a single-element answer.  Two or more
         # matching records are named and retried instead of being read: jq
