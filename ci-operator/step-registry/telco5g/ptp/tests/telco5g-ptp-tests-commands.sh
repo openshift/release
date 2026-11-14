@@ -1,9 +1,465 @@
 #!/bin/bash
 
+
+# Keep a per-phase log in the job artifacts; ci-operator uploads it to Prow.
+if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+  exec > >(tee -a "${ARTIFACT_DIR}/tests.log") 2>&1
+fi
+if [[ "${RUN_ON_HYPERVISOR:-false}" != "true" ]]; then
+  set -o nounset
+  set -o errexit
+  set -o pipefail
+
+  if [ -x "$HOME/fix_uid.sh" ]; then
+    "$HOME/fix_uid.sh"
+  fi
+
+  # Emit a machine-readable step marker for log scrapers. The timestamp is UTC.
+  step_marker() {
+    local timestamp was_tracing=false
+    [[ $- == *x* ]] && was_tracing=true
+    { set +x; } 2>/dev/null
+    timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf '[STEP] %s - %s\n' "${timestamp}" "$*"
+    if ${was_tracing}; then set -x; fi
+  }
+
+  step_marker "Configure hypervisor access"
+
+  # When the launcher runs on the hypervisor itself (local phase commands),
+  # run the same commands locally instead of over SSH.
+  if [[ "${HYPERVISOR_LOCAL:-false}" == "true" ]]; then
+    hv_ssh() { bash -c "$*"; }
+  else
+    CLUSTER_HV_IP="$(cat "$SHARED_DIR/hv-ip" 2>/dev/null || echo 10.6.34.246)"
+    BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
+    BASTION_USER="$(cat /var/run/bastion-user/bastionuser)"
+    SSH_PKEY="${HOME}/key"
+    cp /var/run/ci-key/cikey "$SSH_PKEY"
+    chmod 600 "$SSH_PKEY"
+    COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
+    hv_ssh() {
+      ssh -i "${SSH_PKEY}" ${COMMON_SSH_ARGS} -C -o BatchMode=yes \
+        -o "ProxyCommand=ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -o BatchMode=yes -W %h:%p -q ${BASTION_USER}@${BASTION_IP}" \
+        "kni@${CLUSTER_HV_IP}" "$@"
+    }
+  fi
+
+  # Session lock shared by the PTP phases. The owning pod refreshes a heartbeat
+  # while its phase runs; a lock whose container is gone or whose heartbeat
+  # stopped is reclaimed, so a cancelled job does not block the next one.
+  SESSION_LOCK="\$HOME/ptp-session.lock"
+  SESSION_HEARTBEAT="\$HOME/ptp-session.beat"
+  SESSION_STALE_SECONDS="${SESSION_STALE_SECONDS:-180}"
+  SESSION_WAIT_SECONDS="${SESSION_WAIT_SECONDS:-600}"
+  JOB_ID="${BUILD_ID:-${PROW_JOB_ID:-local-$(date +%s)-$$}}"
+  PHASE=tests
+  CONTAINER=telco5g-ptp-tests
+
+  session_field() {
+    hv_ssh "sed -n 's/^$1=//p' ${SESSION_LOCK} 2>/dev/null" || true
+  }
+
+  session_lock_write() {
+    hv_ssh "printf 'job=%s\nphase=%s\ncontainer=%s\nstarted=%s\n' '${JOB_ID}' '${PHASE}' '${CONTAINER}' '$(date +%s)' > ${SESSION_LOCK} && date +%s > ${SESSION_HEARTBEAT}"
+  }
+
+  session_lock_acquire() {
+    local owner container phase beat age deadline
+    deadline=$((SECONDS + SESSION_WAIT_SECONDS))
+    while hv_ssh "test -f ${SESSION_LOCK}"; do
+      owner="$(session_field job)"
+      container="$(session_field container)"
+      phase="$(session_field phase)"
+      if [[ "${owner}" == "${JOB_ID}" ]]; then
+        echo "INFO: session lock already owned by this job (${JOB_ID})"
+        session_lock_write
+        return 0
+      fi
+      if [[ -n "${container}" ]] && ! hv_ssh "podman container exists ${container} >/dev/null 2>&1"; then
+        echo "INFO: reclaiming the session lock: phase '${phase}' container ${container} no longer exists"
+      else
+        beat="$(hv_ssh "cat ${SESSION_HEARTBEAT} 2>/dev/null" || true)"
+        age=999999
+        if [[ "${beat}" =~ ^[0-9]+$ ]]; then age=$(( $(date +%s) - beat )); fi
+        if (( age > SESSION_STALE_SECONDS )); then
+          echo "INFO: reclaiming the session lock: job ${owner} phase '${phase}' has no heartbeat for ${age}s"
+        elif (( SECONDS > deadline )); then
+          echo "ERROR: job ${owner} is running phase '${phase}' on the hypervisor (heartbeat ${age}s ago)"
+          return 1
+        else
+          echo "Waiting for job ${owner} (phase ${phase}, heartbeat ${age}s ago) to finish..."
+          sleep 20
+          continue
+        fi
+      fi
+      # Reclaim: stop what the previous owner left behind so it stops using the
+      # cluster before this phase starts.
+      if [[ -n "${container}" && "${container}" != "${CONTAINER}" ]]; then
+        hv_ssh "podman rm -f ${container} >/dev/null 2>&1 || true"
+      fi
+      session_lock_write
+      return 0
+    done
+    session_lock_write
+  }
+
+  session_heartbeat_start() {
+    (
+      while true; do
+        hv_ssh "date +%s > ${SESSION_HEARTBEAT}" >/dev/null 2>&1 || true
+        sleep 20
+      done
+    ) &
+    SESSION_HEARTBEAT_PID=$!
+  }
+
+  session_heartbeat_stop() {
+    if [[ -n "${SESSION_HEARTBEAT_PID:-}" ]]; then
+      kill "${SESSION_HEARTBEAT_PID}" 2>/dev/null || true
+      wait "${SESSION_HEARTBEAT_PID}" 2>/dev/null || true
+    fi
+  }
+
+  session_lock_release() {
+    session_heartbeat_stop
+    if [[ "$(session_field job)" == "${JOB_ID}" ]]; then
+      hv_ssh "rm -f ${SESSION_LOCK} ${SESSION_HEARTBEAT}" >/dev/null 2>&1 || true
+    fi
+  }
+  # Optional log relay for web clients. It is started only for the tests
+  # container and stopped when the phase exits.
+  relay_start() {
+    local bind="${PTP_LOG_RELAY_BIND:-0.0.0.0}"
+    local port="${PTP_LOG_RELAY_PORT:-8080}"
+    local token="${PTP_LOG_RELAY_TOKEN:-}"
+    local relay_args
+    relay_args="$(printf '%q ' --bind "${bind}" --port "${port}")"
+    if [[ -n "${token}" ]]; then
+      relay_args+="$(printf '%q ' --token "${token}")"
+    fi
+    relay_stop
+    if ! hv_ssh "cat > ~/runner/telco5g-ptp-log-relay.py" < /tmp/telco5g-ptp-log-relay.py; then
+      echo "[WARNING] unable to copy the PTP log relay to the hypervisor"
+      return 0
+    fi
+    if ! hv_ssh "command -v python3 >/dev/null 2>&1"; then
+      echo "[WARNING] python3 is not available on the hypervisor; the PTP log relay is disabled"
+      return 0
+    fi
+    if ! hv_ssh "nohup python3 -u ~/runner/telco5g-ptp-log-relay.py ${relay_args}< /dev/null > ~/runner/log-relay.log 2>&1 & echo \$! > ~/runner/log-relay.pid"; then
+      echo "[WARNING] unable to start the PTP log relay (see ~/runner/log-relay.log)"
+      return 0
+    fi
+    if ! hv_ssh "for i in \$(seq 1 10); do curl -fsS --max-time 2 http://127.0.0.1:${port}/v1/health >/dev/null 2>&1 && exit 0; sleep 1; done; exit 1"; then
+      echo "[WARNING] the PTP log relay did not become ready; its log follows"
+      hv_ssh "cat ~/runner/log-relay.log 2>/dev/null || true"
+      relay_stop
+      return 0
+    fi
+    echo "[INFO] PTP log relay available at http://${CLUSTER_HV_IP:-10.6.34.246}:${port}/v1/logs/tests (allow ${port}/tcp in the hypervisor firewall)"
+  }
+
+  relay_stop() {
+    hv_ssh "if [ -f ~/runner/log-relay.pid ]; then kill \$(cat ~/runner/log-relay.pid) 2>/dev/null || true; rm -f ~/runner/log-relay.pid; fi; pkill -f '[t]elco5g-ptp-log-relay' 2>/dev/null || true" >/dev/null 2>&1 || true
+  }
+
+  cat > /tmp/telco5g-ptp-log-relay.py <<'RELAY'
+#!/usr/bin/env python3
+"""Temporary HTTP relay that streams logs of the PTP phase containers.
+
+It is started by the tests step before the test container and stopped when the
+test finishes, so it is only reachable while the test is running. It never
+exposes the podman API: it only runs `podman logs --follow` for an allowlisted
+set of containers.
+"""
+
+import argparse
+import hmac
+import json
+import os
+import re
+import signal
+import subprocess
+import sys
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from socketserver import ThreadingMixIn
+from urllib.parse import parse_qs, urlparse
+
+PHASES = {
+    "cluster-setup": "telco5g-ptp-cluster-setup",
+    "tests": "telco5g-ptp-tests",
+    "gather": "telco5g-ptp-gather",
+}
+class ThreadingHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
+
+
+PODMAN = os.environ.get("PODMAN_BIN", "podman")
+TOKEN = ""
+CHILDREN = set()
+CHILDREN_LOCK = threading.Lock()
+
+
+def podman_inspect(name):
+    try:
+        result = subprocess.run(
+            [
+                PODMAN,
+                "container",
+                "inspect",
+                "--format",
+                "{{.State.Running}}|{{.State.StartedAt}}|{{.State.ExitCode}}",
+                name,
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return {"exists": False, "running": False, "started": "", "exitCode": None}
+    if result.returncode != 0:
+        return {"exists": False, "running": False, "started": "", "exitCode": None}
+    fields = result.stdout.strip().split("|")
+    exit_code = fields[2] if len(fields) > 2 else ""
+    return {
+        "exists": True,
+        "running": bool(fields and fields[0] == "true"),
+        "started": fields[1] if len(fields) > 1 else "",
+        "exitCode": int(exit_code) if exit_code.lstrip("-").isdigit() else None,
+    }
+
+
+def stop_children(*_args):
+    with CHILDREN_LOCK:
+        for child in list(CHILDREN):
+            child.terminate()
+    sys.exit(0)
+
+
+class Handler(BaseHTTPRequestHandler):
+    protocol_version = "HTTP/1.0"
+    server_version = "ptp-log-relay"
+
+    def log_message(self, fmt, *args):
+        sys.stderr.write("%s %s\n" % (self.address_string(), fmt % args))
+
+    def _cors(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header(
+            "Access-Control-Allow-Headers", "Authorization, Last-Event-ID"
+        )
+        self.send_header("Cache-Control", "no-store")
+
+    def _json(self, code, payload):
+        body = json.dumps(payload).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self._cors()
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _authorized(self, query):
+        if not TOKEN:
+            return True
+        header = self.headers.get("Authorization", "")
+        if header.startswith("Bearer ") and hmac.compare_digest(
+            header[len("Bearer ") :], TOKEN
+        ):
+            return True
+        return hmac.compare_digest(query.get("token", [""])[0], TOKEN)
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self._cors()
+        self.end_headers()
+
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        query = parse_qs(parsed.query)
+        if not self._authorized(query):
+            self._json(401, {"error": "unauthorized"})
+            return
+        if parsed.path == "/v1/health":
+            self._json(200, {"ok": True})
+        elif parsed.path == "/v1/containers":
+            self._json(
+                200,
+                {
+                    "containers": [
+                        dict(name=name, phase=phase, **podman_inspect(name))
+                        for phase, name in PHASES.items()
+                    ]
+                },
+            )
+        elif parsed.path.startswith("/v1/logs/"):
+            self._stream_logs(parsed.path[len("/v1/logs/") :], query)
+        else:
+            self._json(404, {"error": "not found"})
+
+    def _stream_logs(self, phase, query):
+        name = PHASES.get(phase)
+        if not name:
+            self._json(404, {"error": "unknown phase"})
+            return
+        state = podman_inspect(name)
+        if not state["exists"] or not state["running"]:
+            self._json(409, {"error": "container is not running", "phase": phase})
+            return
+        try:
+            tail = int(query.get("tail", ["0"])[0])
+            if tail < 0:
+                raise ValueError
+        except ValueError:
+            self._json(400, {"error": "invalid tail"})
+            return
+        since = query.get("since", [""])[0]
+        if since and not re.fullmatch(r"[0-9T:.+\-Z]{4,40}|\d+[smhd]", since):
+            self._json(400, {"error": "invalid since"})
+            return
+
+        command = [PODMAN, "logs", "--follow", "--tail", str(tail)]
+        if since:
+            command.extend(["--since", since])
+        command.append(name)
+        child = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            bufsize=1,
+        )
+        with CHILDREN_LOCK:
+            CHILDREN.add(child)
+
+        sse = "text/event-stream" in self.headers.get("Accept", "")
+        self.send_response(200)
+        if sse:
+            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("X-Accel-Buffering", "no")
+        else:
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self._cors()
+        self.end_headers()
+
+        try:
+            for line in child.stdout:
+                if sse:
+                    self.wfile.write(
+                        ("data: " + line.rstrip("\n") + "\n\n").encode()
+                    )
+                else:
+                    self.wfile.write(line.encode())
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        finally:
+            child.terminate()
+            try:
+                child.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                child.kill()
+            with CHILDREN_LOCK:
+                CHILDREN.discard(child)
+
+        if sse:
+            try:
+                self.wfile.write(
+                    ('event: end\ndata: {"exitCode": %s}\n\n' % child.returncode).encode()
+                )
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+
+def main():
+    global TOKEN
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--bind", default=os.environ.get("PTP_LOG_RELAY_BIND", "0.0.0.0")
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("PTP_LOG_RELAY_PORT", "8080")),
+    )
+    parser.add_argument("--token", default=os.environ.get("PTP_LOG_RELAY_TOKEN", ""))
+    args = parser.parse_args()
+    TOKEN = args.token
+    if not TOKEN:
+        print(
+            "WARNING: no relay token configured; log streams are unauthenticated",
+            file=sys.stderr,
+        )
+    signal.signal(signal.SIGTERM, stop_children)
+    signal.signal(signal.SIGINT, stop_children)
+    server = ThreadingHTTPServer((args.bind, args.port), Handler)
+    print("listening on %s:%d" % (args.bind, args.port), file=sys.stderr)
+    server.serve_forever()
+
+
+if __name__ == "__main__":
+    main()
+RELAY
+
+  trap 'relay_stop || true; session_lock_release || true' EXIT
+  step_marker "Acquire the PTP session lock"
+  session_lock_acquire || exit 1
+  session_heartbeat_start
+
+  step_marker "Prepare the hypervisor runner directory"
+
+  # Start from a clean runner directory, copy the test script and the CI environment,
+  # then run the test shell there in the background. The seed step can leave
+  # files owned outside the kni UID mapping, so a plain rm -rf as kni is not enough.
+  if ! hv_ssh "podman unshare rm -rf ~/runner 2>/dev/null"; then
+    hv_ssh "sudo -n rm -rf ~/runner" \
+      || { echo "ERROR: unable to clean up ~/runner on the hypervisor"; exit 1; }
+  fi
+  hv_ssh "mkdir -p ~/runner/shared ~/runner/artifacts ~/runner/output"
+  # v18 scans the GNSS stream for GNRMC instead of only the first line, so
+  # IfPTPCaps.GnssDevice is populated even when UBX binary records come first.
+  export L2_DISCOVERY_IMAGE="${L2_DISCOVERY_IMAGE:-quay.io/redhat-cne/l2discovery:v18}"
+  {
+    for var in T5CI_VERSION T5CI_JOB_TYPE T5CI_DEPLOY_UPSTREAM E2E_TESTS_CONFIG EVENT_PROXY_IMAGE L2_DISCOVERY_IMAGE TEST_REPO TEST_BRANCH PTP_REPO PTP_UNDER_TEST_BRANCH DAEMON_REPO CEP_REPO SKIP_INTERFACES COLLECT_POD_LOGS PTP_LOG_LEVEL PTP_TEST_MODES NAMESPACE JOB_NAME JOB_SPEC BUILD_ID PROW_JOB_ID; do
+      if [[ -n "${!var:-}" ]]; then
+        printf 'export %s=%q\n' "$var" "${!var}"
+      fi
+    done
+  } > "$SHARED_DIR/ci.env"
+  cat > "$SHARED_DIR/telco5g-ptp-tests-commands.sh" <<'TEST_SCRIPT'
+#!/bin/bash
 set -x
 set -o nounset
 set -o errexit
 set -o pipefail
+
+# Load the CI environment copied by the launcher (the test runs on the hypervisor).
+if [[ -f "$SHARED_DIR/ci.env" ]]; then
+  source "$SHARED_DIR/ci.env"
+fi
+
+# The CI container runs with a random UID that has no passwd entry. ssh needs
+# one to resolve the local user, otherwise it exits with "No user exists for uid".
+if [ -x "$HOME/fix_uid.sh" ]; then
+  "$HOME/fix_uid.sh"
+fi
+
+# Emit a machine-readable step marker for log scrapers. The timestamp is UTC.
+step_marker() {
+  local timestamp was_tracing=false
+  [[ $- == *x* ]] && was_tracing=true
+  { set +x; } 2>/dev/null
+  timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  printf '[STEP] %s - %s\n' "${timestamp}" "$*"
+  if ${was_tracing}; then set -x; fi
+}
+
+step_marker "Load the PTP test configuration"
 
 # ===========================================================================
 # CONFIGURATION
@@ -28,9 +484,10 @@ fi
 export USE_CEPV2
 
 # --- Source repos and branches ---
-# Test code: repo and branch for the conformance test suite
-export TEST_REPO="${TEST_REPO:-https://github.com/k8snetworkplumbingwg/ptp-operator.git}"
-export TEST_BRANCH="${TEST_BRANCH:-main}"
+# Test code: repo and branch for the conformance test suite.
+# TEMP: use the fix-downstream-ci branch from edcdavid's fork for this run.
+export TEST_REPO="https://github.com/edcdavid/ptp-operator-upstream.git"
+export TEST_BRANCH="fix-downstream-ci"
 
 # Product under test: repo and branch for the operator being deployed
 if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
@@ -45,7 +502,7 @@ fi
 
 # --- Test settings ---
 export PTP_LOG_LEVEL="${PTP_LOG_LEVEL:-debug}"
-export SKIP_INTERFACES="${SKIP_INTERFACES:-eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12409,eno8303,eno8403,ens6f0np0,ens6f1np1,eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12399}"
+export SKIP_INTERFACES="${SKIP_INTERFACES:-eno12399,eno12409,eno8303,eno8303np0,eno8403,eno8403np1,eno8503np2,eno8603np3,ens3f0,ens3f1,ens5f0,ens5f1,ens5f2,ens5f3,ens6f0,ens6f1,ens7f3}"
 export COLLECT_POD_LOGS="${COLLECT_POD_LOGS:-true}"
 
 # --- Event API, consumer image, and test modes (version-dependent) ---
@@ -69,13 +526,13 @@ else
 fi
 
 # Test modes by release:
-#   Release  | oc | bc | dualnicbc | dualnicbcha | dualfollower | tbc | tgm
-#   ---------+----+----+-----------+-------------+--------------+-----+----
-#   4.12     | Y  | Y  |           |             |              |     |
-#   4.13-4.15| Y  | Y  | Y         |             |              |     |
-#   4.16-4.18| Y  | Y  | Y         | Y           |              |     |
-#   4.19     | Y  | Y  | Y         | Y           | Y            |     | Y
-#   4.20+    | Y  | Y  | Y         | Y           | Y            | Y   | Y
+#   Release  | oc | bc | dualnicbc | dualnicbcha | dualfollower | tbc | tgm | tgmoc | tgmbc
+#   ---------+----+----+-----------+-------------+--------------+-----+-----+-------+------
+#   4.12     | Y  | Y  |           |             |              |     |     |       |
+#   4.13-4.15| Y  | Y  | Y         |             |              |     |     |       |
+#   4.16-4.18| Y  | Y  | Y         | Y           |              |     |     |       |
+#   4.19     | Y  | Y  | Y         | Y           | Y            |     | Y   |       |
+#   4.20+    | Y  | Y  | Y         | Y           | Y            | Y   | Y   | Y     | Y
 if [[ "$T5CI_VERSION" == 4.12 ]]; then
   export CONSUMER_IMG="${CONSUMER_IMG:-quay.io/redhat-cne/cloud-event-consumer:release-4.18}"
   TEST_MODES=("bc" "oc")
@@ -91,19 +548,25 @@ elif [[ "$T5CI_VERSION" == 4.19 ]]; then
 else
   # 4.20+
   export CONSUMER_IMG="${CONSUMER_IMG:-quay.io/redhat-cne/cloud-event-consumer:latest}"
-  TEST_MODES=("tgm" "tbc" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
+  # tbc is supported on 4.20+ but is not part of the default CI run; select it
+  # explicitly with PTP_TEST_MODES when needed.
+  TEST_MODES=("tgm" "tgmoc" "tgmbc" "dualfollower" "dualnicbc" "dualnicbcha" "bc" "oc")
+fi
+
+# Allow a caller (local run or a targeted debug job) to restrict the modes.
+if [[ -n "${PTP_TEST_MODES:-}" ]]; then
+  IFS=',' read -r -a TEST_MODES <<<"${PTP_TEST_MODES}"
 fi
 
 # ===========================================================================
 
 # ---------------------------------------------------------------------------
-# Build script that runs inside the podman builder pod.
-# Clones, builds, and pushes PTP operator / daemon / sidecar images.
-# Placeholder tokens (PTP_IMAGE, OPERATOR_VERSION, etc.) are substituted
-# by build_pod_definition() before the pod is created.
+# Build scripts that run inside the podman builder containers.
+# The operator, daemon, and sidecar are built concurrently in separate
+# containers of the same privileged builder pod.
 # ---------------------------------------------------------------------------
-build_script() {
-  cat <<'BUILDSCRIPT'
+build_preamble() {
+  cat <<'PREAMBLE'
 set -xe
 yum install jq git wget podman-docker -y
 yum group install "development-tools" -y
@@ -116,99 +579,90 @@ go version
 set +xe
 
 echo "podman login with serviceaccount"
-
-# Used for 4.16 and newer releases.
-pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".auth /var/run/secrets/openshift.io/push/.dockercfg )
+pass=$( jq '.["image-registry.openshift-image-registry.svc:5000"].auth' /var/run/secrets/openshift.io/push/.dockercfg )
 pass=`echo ${pass:1:-1} | base64 -d`
 podman login -u serviceaccount -p ${pass:8} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
-
-# Used for 4.15 and older releases.
 if ! podman login --get-login image-registry.openshift-image-registry.svc:5000 &> /dev/null; then
-  pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".password /var/run/secrets/openshift.io/push/.dockercfg )
+  pass=$( jq '.["image-registry.openshift-image-registry.svc:5000"].password' /var/run/secrets/openshift.io/push/.dockercfg )
   podman login -u serviceaccount -p ${pass:1:-1} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
 fi
-
 set -x
-
-export IMG=PTP_IMAGE
-export DAEMON_IMG="DAEMON_IMAGE"
-export SIDECAR_IMG="SIDECAR_IMAGE"
 
 export T5CI_VERSION="T5CI_VERSION_VAL"
 export USE_UPSTREAM="USE_UPSTREAM_VAL"
 export USE_CEPV2="USE_CEPV2_VAL"
+PREAMBLE
+}
 
-# Clone the operator under test (OPERATOR_VERSION = PTP_UNDER_TEST_BRANCH: the
-# fork/upstream branch for upstream runs, or release-<version> for downstream).
+build_operator_script() {
+  build_preamble
+  cat <<'OPERATOR'
+export IMG=PTP_IMAGE
 echo "Cloning ptp-operator branch OPERATOR_VERSION"
 git clone --single-branch --branch OPERATOR_VERSION PTP_REPO_URL
 cd ptp-operator
-# OCPBUGS-52327 fix build due to libresolv.so link error
 sed -i "s/\(CGO_ENABLED=\${CGO_ENABLED}\) \(GOOS=\${GOOS}\)/\1 CC=\"gcc -fuse-ld=gold\" \2/" hack/build.sh
-# For UPSTREAM use Dockerfile for upstream contents
 if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ || "${USE_UPSTREAM:-false}" == "true" ]]; then
   sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
   make docker-build
 else
-  # Dockerfile is updated to upstream in 4.19+. Use .ocp or .ci versions for non-UPSTREAM runs
-  if [ -f "Dockerfile.ocp" ]; then
-    DOCKERFILE="Dockerfile.ocp"
-  else
-    DOCKERFILE="Dockerfile.ci"
-  fi
+  if [ -f "Dockerfile.ocp" ]; then DOCKERFILE="Dockerfile.ocp"; else DOCKERFILE="Dockerfile.ci"; fi
   sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" "$DOCKERFILE"
   podman build -t "${IMG}" -f "$DOCKERFILE"
 fi
-podman push ${IMG} --tls-verify=false
-cd ..
+podman push "${IMG}" --tls-verify=false
+OPERATOR
+}
 
+build_daemon_script() {
+  build_preamble
+  cat <<'DAEMON'
+export DAEMON_IMG="DAEMON_IMAGE"
 if [[ "${USE_UPSTREAM:-false}" == "false" ]]; then
-  # If we a running a downstream run we are done
+  echo "Downstream run: skipping upstream linuxptp-daemon build"
   exit 0
 fi
-
-# If were running upstream we should also use the upstream daemon!
 echo "Running on upstream main branch of linuxptp-daemon"
 git clone --single-branch --branch main DAEMON_REPO_URL
 cd linuxptp-daemon
-# Split DAEMON_IMG into IMAGE_TAG_BASE and VERSION because
-# hack/build-image.sh unconditionally overwrites IMG from these two vars.
 IMAGE_TAG_BASE="${DAEMON_IMG%:*}" VERSION="${DAEMON_IMG##*:}" make image
-podman push ${DAEMON_IMG} --tls-verify=false
+podman push "${DAEMON_IMG}" --tls-verify=false
+DAEMON
+}
 
+build_sidecar_script() {
+  build_preamble
+  cat <<'SIDECAR'
+export SIDECAR_IMG="SIDECAR_IMAGE"
+if [[ "${USE_UPSTREAM:-false}" == "false" ]]; then
+  echo "Downstream run: skipping upstream sidecar build"
+  exit 0
+fi
 if [[ "${USE_CEPV2:-false}" == "true" ]]; then
-  # 5.1+: cloud-event-proxy (CEPv2) is built from linuxptp-daemon/Dockerfile.cep;
-  # there is no longer a standalone cloud-event-proxy repo.
   echo "Building cloud-event-proxy (CEPv2) from linuxptp-daemon/Dockerfile.cep"
+  git clone --single-branch --branch main DAEMON_REPO_URL
+  cd linuxptp-daemon
   podman build -t "${SIDECAR_IMG}" -f Dockerfile.cep .
-  podman push ${SIDECAR_IMG} --tls-verify=false
-  cd ..
+  podman push "${SIDECAR_IMG}" --tls-verify=false
 else
-  cd ..
-  # <5.1: cloud-event-proxy (CEPv1) is built from its standalone repo.
   echo "Running on main branch of cloud-event-proxy"
   git clone --single-branch --branch main CEP_REPO_URL
   cd cloud-event-proxy
   IMG=${SIDECAR_IMG} make podman-build
-  podman push ${SIDECAR_IMG} --tls-verify=false
-  cd ..
+  podman push "${SIDECAR_IMG}" --tls-verify=false
 fi
-BUILDSCRIPT
+SIDECAR
 }
 
 # ---------------------------------------------------------------------------
 # Assemble the RBAC + Pod YAML for the builder pod.
-# Substitutes all placeholder tokens and returns the final manifest on stdout.
-# Requires: dockercfg_secret (name of the builder-dockercfg-* secret)
 # ---------------------------------------------------------------------------
 build_pod_definition() {
   local dockercfg_secret=$1
-  local script
-  script=$(build_script)
-
-  # Indent the build script to fit inside the YAML command block (10 spaces)
-  local indented_script
-  indented_script=$(echo "$script" | sed 's/^/          /')
+  local operator_script daemon_script sidecar_script
+  operator_script=$(build_operator_script | sed 's/^/          /')
+  daemon_script=$(build_daemon_script | sed 's/^/          /')
+  sidecar_script=$(build_sidecar_script | sed 's/^/          /')
 
   cat <<EOF
 ---
@@ -230,7 +684,6 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  managedFields:
   name: privileged-rights
   namespace: openshift-ptp
 roleRef:
@@ -251,15 +704,51 @@ spec:
   restartPolicy: Never
   serviceAccountName: builder
   containers:
-    - name: priv
+    - name: operator
       image: quay.io/podman/stable:v4.9.4
-      command:
-        - /bin/bash
-        - -c
+      command: ["/bin/bash", "-c"]
+      args:
         - |
-${indented_script}
+${operator_script}
       securityContext:
         privileged: true
+      resources:
+        requests: {cpu: "2", memory: 4Gi}
+        limits: {cpu: "4", memory: 8Gi}
+      volumeMounts:
+        - mountPath: /var/run/secrets/openshift.io/push
+          name: dockercfg
+          readOnly: true
+        - name: secret-volume
+          mountPath: /root/.docker
+    - name: daemon
+      image: quay.io/podman/stable:v4.9.4
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+${daemon_script}
+      securityContext:
+        privileged: true
+      resources:
+        requests: {cpu: "2", memory: 4Gi}
+        limits: {cpu: "4", memory: 8Gi}
+      volumeMounts:
+        - mountPath: /var/run/secrets/openshift.io/push
+          name: dockercfg
+          readOnly: true
+        - name: secret-volume
+          mountPath: /root/.docker
+    - name: sidecar
+      image: quay.io/podman/stable:v4.9.4
+      command: ["/bin/bash", "-c"]
+      args:
+        - |
+${sidecar_script}
+      securityContext:
+        privileged: true
+      resources:
+        requests: {cpu: "2", memory: 4Gi}
+        limits: {cpu: "4", memory: 8Gi}
       volumeMounts:
         - mountPath: /var/run/secrets/openshift.io/push
           name: dockercfg
@@ -329,26 +818,25 @@ build_images() {
   echo "$jobdefinition"
   echo "$jobdefinition" | oc apply -f -
 
-  # Wait for builder pod to complete
-  local success=0 iterations=0 sleep_time=10 max_iterations=120
-  until [[ $success -eq 1 ]] || [[ $iterations -eq $max_iterations ]]; do
-    run_status=$(oc -n openshift-ptp get pod podman -o json | jq '.status.phase' | tr -d '"')
-    if [ "$run_status" == "Succeeded" ]; then
-      success=1
-      break
-    elif [ "$run_status" == "Failed" ]; then
-      echo "[ERROR] builder pod failed at iteration ${iterations}"
-      break
-    fi
-    iterations=$((iterations + 1))
-    sleep $sleep_time
-  done
+  # Wait for builder pod to complete, failing fast on Succeeded or Failed.
+  local wait_timeout=1200
+  oc wait --for=jsonpath='{.status.phase}'=Succeeded pod/podman -n openshift-ptp --timeout="${wait_timeout}s" >/dev/null 2>&1 &
+  local success_pid=$!
+  oc wait --for=jsonpath='{.status.phase}'=Failed pod/podman -n openshift-ptp --timeout="${wait_timeout}s" >/dev/null 2>&1 &
+  local failed_pid=$!
+  wait -n "${success_pid}" "${failed_pid}" || true
+  kill "${success_pid}" "${failed_pid}" 2>/dev/null || true
+  wait "${success_pid}" "${failed_pid}" 2>/dev/null || true
+  run_status=$(oc -n openshift-ptp get pod podman -o jsonpath='{.status.phase}' 2>/dev/null || echo Unknown)
 
   echo "[INFO] --- builder pod logs ---"
-  oc -n openshift-ptp logs podman
+  for c in operator daemon sidecar; do
+    echo "[INFO] --- builder container: ${c} ---"
+    oc -n openshift-ptp logs podman -c "${c}" || true
+  done
   echo "[INFO] --- end builder pod logs ---"
 
-  if [[ $success -eq 1 ]]; then
+  if [[ "${run_status}" == "Succeeded" ]]; then
     echo "[INFO] index build succeeded"
   else
     echo "[ERROR] index build failed (status: ${run_status})"
@@ -401,7 +889,7 @@ set_events_output_file() {
 # Parse E2E test config overrides
 # ---------------------------------------------------------------------------
 echo "************ telco5g cnf-tests commands ************"
-echo "[INFO] ===== Step: Parse E2E test config overrides ====="
+step_marker "Parse E2E test config overrides"
 
 if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
   readarray -t config <<<"${E2E_TESTS_CONFIG}"
@@ -423,9 +911,28 @@ export IMG_VERSION="release-${T5CI_VERSION}"
 # ---------------------------------------------------------------------------
 # Pre-flight checks
 # ---------------------------------------------------------------------------
+# The tests run directly on the hypervisor, which has access to the cluster API.
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
-echo "[INFO] ===== Step: Pre-flight checks ====="
+# The setup step generates the NTP MachineConfigs in SHARED_DIR. Apply them
+# from the hypervisor with its local kubeconfig; no CI-pod API port-forward.
+if [[ -f "$SHARED_DIR/disable_ntp.yml" ]]; then
+  step_marker "Apply the NTP MachineConfigs"
+  ntp_apply_out="$(oc apply -f "$SHARED_DIR/disable_ntp.yml")"
+  echo "${ntp_apply_out}"
+  # The pool keeps reporting Updated=True until its controller notices the new
+  # MachineConfigs, so waiting right after the apply returns on the pre-apply
+  # state. When the apply changed something, wait for the rollout to start
+  # before waiting for it to finish.
+  if grep -qE ' (configured|created)$' <<<"${ntp_apply_out}"; then
+    oc wait mcp worker --for=condition=Updating=True --timeout=600s \
+      || echo "[WARNING] the worker MCP did not report Updating within 10m"
+  fi
+  oc wait mcp worker --for=condition=Updated=True --timeout=2700s
+  oc wait mcp worker --for=condition=Updating=False --timeout=600s
+fi
+
+step_marker "Pre-flight checks"
 echo "************ Checking node readiness ************"
 oc get nodes -owide
 NOT_READY_NODES=$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | grep -v "True$" || true)
@@ -446,7 +953,7 @@ echo "***************************************************"
 # ---------------------------------------------------------------------------
 # Build and deploy PTP operator
 # ---------------------------------------------------------------------------
-echo "[INFO] ===== Step: Build and deploy PTP operator ====="
+step_marker "Build and deploy PTP operator"
 echo "[INFO] T5CI_VERSION=${T5CI_VERSION} PTP_REPO=${PTP_REPO} PTP_UNDER_TEST_BRANCH=${PTP_UNDER_TEST_BRANCH}"
 echo "[INFO] DEPLOY_UPSTREAM=${T5CI_DEPLOY_UPSTREAM:-false} EVENT_API=${EVENT_API_VERSION} TEST_MODES=${TEST_MODES[*]}"
 
@@ -455,6 +962,14 @@ if [[ "$T5CI_VERSION" =~ 4.1[2-5]+ ]]; then
 else
   source "$HOME"/golang-1.22.4
 fi
+# The product branch may require a newer Go toolchain (e.g. controller-gen
+# v0.18 needs Go 1.24) than the one in the runner image. Let Go fetch it.
+export GOTOOLCHAIN=auto
+# The image's golang profile points GOPATH at /go, which is root-owned
+# inside the container; use the writable HOME copy instead.
+export GOPATH="$HOME/go"
+export GOCACHE="$HOME/.cache/go-build"
+export GOMODCACHE="$GOPATH/pkg/mod"
 
 temp_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$temp_dir" || exit 1
@@ -468,19 +983,19 @@ export REGISTRY="image-registry.openshift-image-registry.svc:5000"
 export IMG="${REGISTRY}/openshift-ptp/ptp-operator:${T5CI_VERSION}"
 export DAEMON_IMG="${REGISTRY}/openshift-ptp/linuxptp-daemon:${T5CI_VERSION}"
 export SIDECAR_IMG="${REGISTRY}/openshift-ptp/cloud-event-proxy:${T5CI_VERSION}"
-echo "[INFO] --- Building PTP images via builder pod ---"
+step_marker "Build the PTP images via the builder pod"
 build_images
 echo "[INFO] --- Build complete ---"
 
-echo "[INFO] --- Downloading latest oc client ---"
-mkdir ~/bin
+step_marker "Download the latest oc client"
+mkdir -p ~/bin
 wget https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
 tar -zxvf openshift-client-linux.tar.gz -C ~/bin
 export PATH=$HOME/bin:$PATH
 
 oc version --client
 
-echo "[INFO] --- Deploying PTP operator ---"
+step_marker "Deploy the PTP operator"
 echo "Cloning ptp-operator from ${PTP_REPO} branch ${PTP_UNDER_TEST_BRANCH}"
 git clone "${PTP_REPO}" -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
 
@@ -492,10 +1007,14 @@ grep -r "imagePullPolicy: IfNotPresent" --files-with-matches | awk '{print  "sed
 # deploy ptp-operator
 if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
   if [[ "${USE_CEPV2:-false}" == "true" ]]; then
-    # 5.1+: setting EVENT_PROXY_IMAGE signals the operator to deploy CEPv2
+    # 5.1+: setting EVENT_PROXY_IMAGE signals the operator to deploy CEPv2.
+    # The operator prefers SIDECAR_EVENT_IMAGE when it is set, and env.yaml
+    # carries a quay default whose binary layout does not match the operator's
+    # /usr/local/bin/cloud-event-proxy command. Pass both so the built image wins.
     make deploy \
       IMG=${IMG} \
       LINUXPTP_DAEMON_IMAGE=${DAEMON_IMG} \
+      SIDECAR_EVENT_IMAGE=${SIDECAR_IMG} \
       EVENT_PROXY_IMAGE=${SIDECAR_IMG}
   else
     make deploy \
@@ -511,25 +1030,26 @@ else
   fi
 fi
 
+step_marker "Wait for the linuxptp-daemon rollout"
 # wait until the linuxptp-daemon pods are ready
-retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
+retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp --timeout=300s
 
 # ---------------------------------------------------------------------------
 # Enable PTP events on the cluster
 # ---------------------------------------------------------------------------
-echo "[INFO] ===== Step: Enable PTP events (API ${EVENT_API_VERSION}) ====="
+step_marker "Enable PTP events (API ${EVENT_API_VERSION})"
 if [[ "$EVENT_API_VERSION" == "1.0" ]]; then
   oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "storageType":"emptyDir"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
 else
   oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "apiVersion":"'"${EVENT_API_VERSION}"'"}, "daemonNodeSelector": {"node-role.kubernetes.io/worker":""}}}' --type=merge
 fi
 
-retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
+retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp --timeout=300s
 
 # ---------------------------------------------------------------------------
 # Clone test code and run conformance tests
 # ---------------------------------------------------------------------------
-echo "[INFO] ===== Step: Clone test code and run conformance tests ====="
+step_marker "Clone test code and run conformance tests"
 cd -
 echo "running conformance tests from ${TEST_REPO} branch ${TEST_BRANCH}"
 git clone "${TEST_REPO}" -b "${TEST_BRANCH}" ptp-operator-conformance-test
@@ -542,6 +1062,7 @@ cat <<'EOF' >"${SHARED_DIR}"/test-config.yaml
 global:
   maxoffset: 100
   minoffset: -100
+  holdover_timeout: 600
 soaktest:
   disable_all: false
   event_output_file: "./event-output.csv"
@@ -596,22 +1117,38 @@ export PTP_TEST_CONFIG_FILE=${SHARED_DIR}/test-config.yaml
 # ---------------------------------------------------------------------------
 # Run test suites for each mode
 # ---------------------------------------------------------------------------
-echo "[INFO] --- Waiting 300s for OpenShift to complete initialization ---"
-sleep 300
+step_marker "Wait for the PTP operator and linuxptp-daemon to become ready"
+if ! kubectl rollout status deployment/ptp-operator -n openshift-ptp --timeout=300s; then
+  echo "[ERROR] PTP operator deployment did not become ready"
+  kubectl get deployment,daemonset,pods -n openshift-ptp -o wide || true
+  kubectl describe deployment/ptp-operator -n openshift-ptp || true
+  exit 1
+fi
+if ! kubectl rollout status daemonset/linuxptp-daemon -n openshift-ptp --timeout=300s; then
+  echo "[ERROR] linuxptp-daemon daemonset did not become ready"
+  kubectl get deployment,daemonset,pods -n openshift-ptp -o wide || true
+  kubectl describe daemonset/linuxptp-daemon -n openshift-ptp || true
+  exit 1
+fi
+echo "[INFO] --- PTP operator and linuxptp-daemon are ready ---"
 
 print_time  # RTC logs
 
-echo "[INFO] ===== Step: Run test suites ====="
+# Remove test-created PtpConfigs left by previous runs on a reused cluster;
+# otherwise KEEP_PTPCONFIG=true reuses a stale config and skips the test fixes.
+oc -n openshift-ptp get ptpconfig -o name 2>/dev/null | grep '/test-' | xargs -r oc delete || true
+
+step_marker "Run test suites"
 for mode in "${TEST_MODES[@]}"; do
-  echo "[INFO] --- Running tests for PTP_TEST_MODE=${mode} ---"
+  step_marker "Run PTP conformance tests (mode ${mode})"
 
   export PTP_TEST_MODE="${mode}"
-  export JUNIT_OUTPUT_FILE="test_results_${PTP_TEST_MODE}.xml"
+  export JUNIT_OUTPUT_FILE="test_results.xml"
   set_events_output_file
 
   temp_status="temp_status_${mode}" # Convert to lowercase for variable naming
   exit_code=0
-  make functests || exit_code=$?
+  ./scripts/run-tests.sh --kind both --mode "${mode}" || exit_code=$?
   declare "$temp_status=$exit_code"
 
   # Get RTC logs
@@ -621,7 +1158,7 @@ done
 # ---------------------------------------------------------------------------
 # Collect results and determine exit status
 # ---------------------------------------------------------------------------
-echo "[INFO] ===== Step: Collect results ====="
+step_marker "Collect results"
 status=0
 for mode in "${TEST_MODES[@]}"; do
   temp_status="temp_status_${mode}"
@@ -644,7 +1181,7 @@ done
 # ---------------------------------------------------------------------------
 # Cleanup and publish results
 # ---------------------------------------------------------------------------
-echo "[INFO] ===== Step: Cleanup and publish results ====="
+step_marker "Cleanup and publish results"
 set +e
 make undeploy
 cd -
@@ -684,5 +1221,50 @@ rm -rf "$temp_dir"
 set -e
 
 # return saved status
-echo "[INFO] ===== Done (exit ${status}) ====="
+step_marker "PTP tests complete (exit ${status})"
 exit "${status}"
+TEST_SCRIPT
+  tar -C "$SHARED_DIR" -cf - . | hv_ssh "tar -C ~/runner/shared -xf -"
+
+  step_marker "Prepare the PTP test container"
+  hv_ssh "command -v podman >/dev/null 2>&1" \
+    || { echo "ERROR: hypervisor is missing podman"; exit 1; }
+  hv_ssh "podman image exists registry.ci.openshift.org/ci/telco-runner:latest >/dev/null 2>&1 || podman pull registry.ci.openshift.org/ci/telco-runner:latest >/dev/null 2>&1" \
+    || { echo "ERROR: unable to pull the telco-runner image on the hypervisor"; exit 1; }
+
+  # The image uses /output as HOME, but that path is root-owned in the image.
+  # Seed a writable copy so the test can create ~/bin and download oc. Do not
+  # preserve the image ownership; the next run must be able to remove it as kni.
+  hv_ssh "podman run --rm --replace --name telco5g-ptp-tests-seed --userns=keep-id --entrypoint /bin/bash -v ~/runner/output:/dest:Z registry.ci.openshift.org/ci/telco-runner:latest -c 'cp -r /output/. /dest/ && chown -R 1000:1000 /dest'" \
+    || { echo "ERROR: unable to seed a writable /output for the test container"; exit 1; }
+
+  step_marker "Start the PTP log relay"
+  relay_start
+
+  step_marker "Start the PTP test container"
+  hv_ssh "cd ~/runner && nohup bash -c 'podman run --rm --replace --name telco5g-ptp-tests --net=host --userns=keep-id --entrypoint /bin/bash -v ~/runner/output:/output:Z -v ~/runner:/runner:Z -e RUN_ON_HYPERVISOR=true -e SHARED_DIR=/runner/shared -e ARTIFACT_DIR=/runner/artifacts -w /runner registry.ci.openshift.org/ci/telco-runner:latest /runner/shared/telco5g-ptp-tests-commands.sh; rc=\$?; echo \$rc > ~/runner/test.exitcode; rm -f ~/runner/test.pid' > ~/runner/tests-output.log 2>&1 & echo \$! > ~/runner/test.pid"
+
+  step_marker "Wait for the PTP test run to finish"
+  while hv_ssh "test -e ~/runner/test.pid"; do
+    echo "Waiting for the hypervisor test run..."
+    sleep 30
+  done
+
+  relay_stop
+  if hv_ssh "test -f ~/runner/log-relay.log"; then
+    hv_ssh "cat ~/runner/log-relay.log" > "$ARTIFACT_DIR/log-relay.log" || true
+  fi
+
+  step_marker "Collect the test artifacts"
+  mkdir -p "$ARTIFACT_DIR"
+  if hv_ssh "test -d ~/runner/artifacts"; then
+    hv_ssh "tar -C ~/runner/artifacts -cf - ." | tar -C "$ARTIFACT_DIR" -xf - || true
+  fi
+  if hv_ssh "test -f ~/runner/tests-output.log"; then
+    hv_ssh "cat ~/runner/tests-output.log" > "$ARTIFACT_DIR/tests-output.log"
+    cat "$ARTIFACT_DIR/tests-output.log"
+  fi
+  rc="$(hv_ssh "cat ~/runner/test.exitcode" 2>/dev/null || echo 1)"
+  step_marker "PTP test phase complete (exit ${rc})"
+  exit "$rc"
+fi
