@@ -25,7 +25,10 @@ STEP = REPOSITORY / "ci-operator/step-registry/rosa/e2e/ocm-fvt"
 HELPER = STEP / "prepare/rosa-e2e-ocm-fvt-prepare-commands.py"
 RUNNER = STEP / "rosa-e2e-ocm-fvt-commands.sh"
 SUMMARY = "ocm-fvt-failure-summary.json"
-PHASES = ("pre-env-validation", "pre-vpc-cleaner", "pre-cluster-creation", "post-clean")
+# The phase vocabulary the helper fixes, taken from public Prow artifacts.
+PHASES = ("pre-env-validation", "pre-vpc-cleaner", "pre-cluster-creation",
+          "Day1Post", "Day1PostE2E", "CPUpgrade", "Day2Pre", "Day2CH", "Day2E2E",
+          "Destructive", "post-alerts", "other", "post-clean")
 # Text a report may carry that the summary must never reproduce.
 SECRET = "FIXTURE_SECRET_DO_NOT_PRINT"
 HOSTILE = {
@@ -217,6 +220,73 @@ class SummaryProjectionTests(SummaryFixture):
         self.assertEqual(data["failures"][1]["case"], 13)
 
 
+    def test_day_phases_of_a_real_run_shape(self):
+        # Mirrors the public artifact shape: test-result-<job>-<timestamp>/
+        # holding <phase>_<HHMMSS>.json for Day1Post, Day2Pre and Day2CH.
+        result = "test-result-fixture-job-2020-01-01T00:00:00.000000000Z"
+        self.report("Day1Post", [spec("passed", labels=["id_11"]),
+                                 spec("failed", labels=["id_12"])],
+                    result=result, name="Day1Post_000101.json")
+        self.report("Day2Pre", [spec("failed", labels=["id_13"])],
+                    result=result, name="Day2Pre_000202.json")
+        self.report("Day2CH", [spec("failed", labels=["id_14"]),
+                               spec("panicked", labels=["id_15"]),
+                               spec("timedout", labels=["id_16"]),
+                               spec("passed", labels=["id_17"])],
+                    result=result, name="Day2CH_000303.json")
+        self.report("Day2CH", "<testsuites/>", result=result, name="Day2CH_000303.xml")
+        data = self.summary()
+        self.assertEqual(data["failures"], [
+            {"phase": "Day1Post", "state": "failed", "identified": "label", "case": 12},
+            {"phase": "Day2Pre", "state": "failed", "identified": "label", "case": 13},
+            {"phase": "Day2CH", "state": "failed", "identified": "label", "case": 14},
+            {"phase": "Day2CH", "state": "panicked", "identified": "label", "case": 15},
+            {"phase": "Day2CH", "state": "timedout", "identified": "label", "case": 16},
+        ])
+        changes = self.phase(data, "Day2CH")
+        self.assertEqual((changes["state"], changes["reports"], changes["specs"]),
+                         ("parsed", 1, 4))
+        self.assertEqual(changes["counts"], {"failed": 1, "panicked": 1,
+                                             "timedout": 1, "passed": 1})
+        self.assertEqual(self.phase(data, "post-clean")["state"], "unavailable")
+
+    def test_unknown_phase_names_are_counted_without_being_named(self):
+        # A job whose reports are named after the job itself, as the public
+        # osdfm artifacts are: counted under the fixed "other" phase, and the
+        # name never reaches the artifact.
+        self.report("other", [spec("failed", labels=["id_18"]), spec("passed")],
+                    name="fixture-job-stage_000404.json")
+        data = self.summary()
+        raw = (self.artifacts / SUMMARY).read_text(encoding="utf-8")
+        self.assertNotIn("fixture-job-stage", raw)
+        record = self.phase(data, "other")
+        self.assertEqual((record["state"], record["specs"]), ("parsed", 2))
+        self.assertEqual(data["failures"],
+                         [{"phase": "other", "state": "failed",
+                           "identified": "label", "case": 18}])
+
+    def test_metadata_collector_labels_the_same_phases(self):
+        result = "test-result-fixture"
+        self.report("Day2CH", [spec("failed", labels=["id_19"])],
+                    result=result, name="Day2CH_000505.json")
+        self.report("other", [spec("passed")], result=result,
+                    name="fixture-job-stage_000606.json")
+        self.report("other", "<testsuites/>", result=result,
+                    name="fixture-job-stage_000606.xml")
+        (self.output / result / "report.xml").write_text("<testsuites/>", encoding="utf-8")
+        collected = subprocess.run(
+            [sys.executable, "-I", str(HELPER), "metadata", str(self.output),
+             str(self.artifacts / "ocm-fvt-artifact-metadata.json")],
+            capture_output=True, text=True, timeout=60, check=False)
+        self.assertEqual(collected.returncode, 0, collected.stderr)
+        contents = (self.artifacts / "ocm-fvt-artifact-metadata.json").read_text(
+            encoding="utf-8")
+        self.assertNotIn("fixture-job-stage", contents)
+        reports = json.loads(contents)["output"]["results"][0]["reports"]
+        self.assertEqual(sorted(report["label"] for report in reports),
+                         ["Day2CH-json", "merged-xml", "other-json", "other-xml"])
+
+
 class SummaryFailClosedTests(SummaryFixture):
     def test_missing_and_empty_output(self):
         data = self.summary(output=self.base / "absent")
@@ -276,10 +346,21 @@ class SummaryFailClosedTests(SummaryFixture):
     def test_junit_siblings_and_foreign_names_are_not_read(self):
         self.report("post-clean", "<testsuites/>", name="post-clean_000001.xml")
         self.report("post-clean", "<testsuites/>", name="report.xml")
-        self.report("post-clean", json.dumps(document(spec("failed"))), name="other.json")
+        self.report("post-clean", json.dumps(document(spec("failed"))),
+                    name="test-matrix.json")
+        self.report("post-clean", json.dumps(document(spec("failed"))),
+                    name="cluster-info.json")
         data = self.summary()
-        self.assertEqual(self.phase(data, "post-clean")["state"], "unavailable")
+        self.assertTrue(all(record["state"] == "unavailable" for record in data["phases"]))
         self.assertEqual(data["limits"]["results"], 1)
+
+    def test_shape_matching_non_report_is_read_and_fails_closed(self):
+        # A file that is not a Ginkgo report but carries the report shape is
+        # classified as "other" and refused, never parsed and never named.
+        self.report("other", json.dumps({"cluster": SECRET}), name="cluster-info_000001.json")
+        data = self.summary()
+        self.assertEqual(self.phase(data, "other")["state"], "ambiguous")
+        self.assertEqual(data["failures"], [])
 
     def test_symlinked_output_tree_is_not_followed(self):
         link = self.base / "linked-output"
@@ -416,6 +497,38 @@ class SummaryBoundsTests(SummaryFixture):
         self.assertEqual(data["failures"][1]["case"], 10)
 
 
+    def test_catch_all_phase_has_its_own_report_budget(self):
+        for index in range(40):
+            self.report("other", [spec("failed", labels=[f"id_{700 + index}"])],
+                        name=f"fixture-job-{index:02d}_{index:06d}.json")
+        self.report("Day2CH", [spec("failed", labels=["id_76488"])],
+                    name="Day2CH_000303.json")
+        data = self.summary()
+        record = self.phase(data, "other")
+        self.assertEqual((record["reports"], record["dropped_reports"], record["state"]),
+                         (32, 8, "partial"))
+        self.assertEqual(self.phase(data, "Day2CH")["state"], "parsed")
+        self.assertIn({"phase": "Day2CH", "state": "failed",
+                       "identified": "label", "case": 76488}, data["failures"])
+
+    def test_long_unknown_phase_name_is_still_counted(self):
+        self.report("other", [spec("failed", labels=["id_21"])],
+                    name="f" * 200 + "_000707.json")
+        data = self.summary()
+        record = self.phase(data, "other")
+        self.assertEqual((record["state"], record["reports"]), ("parsed", 1))
+        self.assertEqual(data["failures"][0]["case"], 21)
+        self.assertNotIn("ffff", (self.artifacts / SUMMARY).read_text(encoding="utf-8"))
+
+    def test_distinct_unknown_names_fold_into_one_record(self):
+        self.report("other", [spec("failed", labels=["id_22"])], name="alpha-job_000808.json")
+        self.report("other", [spec("failed", labels=["id_23"])], name="beta.job_000909.json")
+        data = self.summary()
+        record = self.phase(data, "other")
+        self.assertEqual((record["reports"], record["specs"], record["failed"]), (2, 2, 2))
+        self.assertEqual([failure["case"] for failure in data["failures"]], [22, 23])
+
+
 class SummaryIntegrationTests(SummaryFixture):
     def test_runner_summarises_before_publishing(self):
         script = RUNNER.read_text(encoding="utf-8")
@@ -431,8 +544,10 @@ class SummaryIntegrationTests(SummaryFixture):
                               capture_output=True, text=True, timeout=60, check=False)
 
     def test_summary_survives_publication_and_censoring(self):
-        self.report("pre-cluster-creation", [spec("failed", labels=["id_76488"]),
-                                             spec("passed", labels=["id_1"])])
+        self.report("Day2CH", [spec("failed", labels=["id_76488"]),
+                               spec("passed", labels=["id_1"])],
+                    result="test-result-fixture-job-2020-01-01T00:00:00.000000000Z",
+                    name="Day2CH_000303.json")
         workdir = self.base / "staging"
         workdir.mkdir()
         shutil.copytree(self.output, workdir / "output")
@@ -462,7 +577,7 @@ class SummaryIntegrationTests(SummaryFixture):
         self.assertEqual(replaced, 1)
         data = json.loads((self.artifacts / SUMMARY).read_text(encoding="utf-8"))
         self.check_vocabulary(data)
-        self.assertEqual(data["failures"], [{"phase": "pre-cluster-creation", "state": "failed",
+        self.assertEqual(data["failures"], [{"phase": "Day2CH", "state": "failed",
                                              "identified": "label", "case": 76488}])
 
 

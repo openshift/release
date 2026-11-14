@@ -152,8 +152,8 @@ ref:
     the per-phase Ginkgo JSON reports in the private output tree. The verbose
     reports and the merged junit are the only record of which cases failed,
     and a whole one of them can be replaced after upload, so the summary keeps
-    that one question answerable. It is a projection, not a copy: for each of
-    the four known phases it reports a fixed state - parsed, partial,
+    that one question answerable. It is a projection, not a copy: for each
+    known phase it reports a fixed state - parsed, partial,
     unavailable, unreadable, oversized, malformed or ambiguous - how many
     reports were seen, read and dropped by a cap, a spec count per Ginkgo
     state, and one record per failed, aborted, panicked, interrupted or timed
@@ -162,7 +162,24 @@ ref:
     none or conflicting. Phases are read in run order and every limit is
     applied per phase, so a teardown that fails every spec cannot push the
     test phases out of the summary; what a limit did drop is counted on the
-    phase that lost it.
+    phase that lost it, and a phase that lost a report to a cap is reported
+    as partial rather than parsed.
+
+    A report is named <phase>_<HHMMSS>.<xml|json> inside
+    test-result-<job>-<timestamp>/, and the phase part is chosen by the run:
+    some jobs put their own job name there. The helper matches that name by
+    shape and maps it onto a list of phase names fixed in its source -
+    pre-env-validation, pre-vpc-cleaner, pre-cluster-creation, Day1Post,
+    Day1PostE2E, CPUpgrade, Day2Pre, Day2CH, Day2E2E, Destructive,
+    post-alerts and post-clean, in the order the public artifacts show them
+    running. Anything else with the shape of a report, including a job-named
+    one, is counted under the fixed phase "other" and its own name is never
+    emitted, so a job added later is still summarised and still cannot put
+    text of its own into the artifact. The list comes from public Prow
+    artifacts alone: a sample of 988 per-phase reports across six
+    openshift-online/rosa-e2e ocm-fvt job families in
+    test-platform-results-public. The artifact metadata collector classifies
+    report names the same way, so its labels cover the same phases.
 
     Every field is a member of a vocabulary fixed in the helper or a bounded
     integer. No spec text, label, author tag, failure message, stack trace,

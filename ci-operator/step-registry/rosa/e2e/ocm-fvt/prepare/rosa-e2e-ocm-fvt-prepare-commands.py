@@ -56,10 +56,27 @@ PRIVATE_SUFFIX_RULE = "kubeconfig-named"
 # publication runs, so the manifest can tell "never collected" from "collected
 # and later replaced".
 MERGED_REPORT = "junit-ocm-fvt-report.xml"
-# Per-phase Ginkgo reports ocmtest writes beside the merged report.
-PHASES = ("pre-env-validation", "pre-vpc-cleaner", "pre-cluster-creation", "post-clean")
-PHASE_REPORT = re.compile(r"(" + "|".join(re.escape(phase) for phase in PHASES)
-                          + r")_[0-9]{6}\.(xml|json)")
+# Per-phase Ginkgo reports ocmtest writes beside the merged report, as
+# <phase>_<HHMMSS>.<xml|json> inside test-result-<job>-<timestamp>/.
+#
+# The phase part of that name is data the run chose, and some jobs use their
+# own job name there, so it is matched by shape and then mapped onto this
+# fixed list. The list is taken from public Prow artifacts only: a sample of
+# 988 per-phase reports across six openshift-online/rosa-e2e ocm-fvt job
+# families in the public test-platform-results-public bucket shows exactly
+# these phase names recurring across jobs, in this order by the HHMMSS stamp
+# each report carries. A name outside the list - a job name, or a phase added
+# later - is counted under OTHER_PHASE and is never itself emitted, so no
+# artifact field can carry a name this file does not already contain.
+PHASES = ("pre-env-validation", "pre-vpc-cleaner", "pre-cluster-creation",
+          "Day1Post", "Day1PostE2E", "CPUpgrade", "Day2Pre", "Day2CH", "Day2E2E",
+          "Destructive", "post-alerts", "other", "post-clean")
+OTHER_PHASE = "other"
+PHASE_NAMES = frozenset(PHASES) - {OTHER_PHASE}
+# The token is bounded only by what a file name can hold: it is never
+# emitted, and refusing a long one would hide the report behind a state that
+# means "no report", which is the ambiguity this artifact exists to remove.
+PHASE_REPORT = re.compile(r"([0-9A-Za-z][0-9A-Za-z._-]{0,254})_([0-9]{6})\.(xml|json)")
 RESULT_PREFIX = "test-result-"
 
 # Failure summary. The per-phase reports and the merged JUnit report are
@@ -97,6 +114,9 @@ SUMMARY_MAX_RESULTS = 16
 # Per phase per result directory, so a phase that wrote many reports cannot
 # push another phase out of the summary entirely.
 SUMMARY_MAX_REPORTS = 8
+# OTHER_PHASE collects every unrecognised name at once, so it cannot share the
+# per-phase budget a single known phase gets.
+SUMMARY_MAX_OTHER_REPORTS = 32
 # Directory entries examined. Counted apart from the report limit so that a
 # result directory holding unrelated files does not hide the reports in it.
 SUMMARY_MAX_SCAN = 4096
@@ -112,6 +132,21 @@ SUMMARY_MAX_FAILURES = 64
 # Why one report could not be folded in, in the order a phase reports them when
 # it holds several unusable reports and no usable one.
 SUMMARY_UNUSABLE = ("unreadable", "oversized", "malformed", "ambiguous")
+
+
+def phase_report(name):
+    """Classify a result-directory entry as one phase report, or None.
+
+    Returns the phase, the extension and the HHMMSS stamp the name carries.
+    The phase is a member of PHASES: a name the public artifacts show is a
+    phase, or OTHER_PHASE for anything else that has the shape of a report.
+    The token itself never leaves this function.
+    """
+    match = PHASE_REPORT.fullmatch(name)
+    if match is None:
+        return None
+    token = match.group(1)
+    return (token if token in PHASE_NAMES else OTHER_PHASE), match.group(3), match.group(2)
 
 
 class PublishLimit(ValueError):
@@ -368,15 +403,25 @@ def handle_metadata(arguments):
             result["reports" if result_directory else "results"] = children
             with os.scandir(descriptor) as entries:
                 for index, entry in enumerate(itertools.islice(entries, 129)):
-                    if index == 128 or len(children) == (32 if result_directory else 16):
+                    merged = result_directory and entry.name == RESULT_REPORT
+                    # The merged report keeps its record whatever the cap did:
+                    # it is the one name that tells "never collected" from
+                    # "collected and replaced", and the phase names now
+                    # matched here can fill the list before it is reached.
+                    if index == 128 or (not merged and len(children) ==
+                                        (32 if result_directory else 16)):
                         result["truncated"] = True
-                        break
+                        if not merged:
+                            # Keep scanning the bounded window: the merged
+                            # report must be recorded even when the entries
+                            # before it already filled the list.
+                            continue
                     if result_directory:
-                        match = PHASE_REPORT.fullmatch(entry.name)
-                        if entry.name == RESULT_REPORT:
+                        report = phase_report(entry.name)
+                        if merged:
                             label = "merged-xml"
-                        elif match:
-                            label = "-".join(match.groups())
+                        elif report:
+                            label = "-".join(report[:2])
                         else:
                             continue
                         child = metadata(descriptor, entry.name)
@@ -551,9 +596,9 @@ def summary_fold(phase, record, specs, failures, budget):
 def summary_phase_state(record):
     """Reduce what happened to a phase's reports to one fixed state."""
     if not record["reports"]:
-        return "unavailable"
+        return "unavailable" if not record["dropped_reports"] else "partial"
     if record["parsed_reports"] == record["reports"]:
-        return "parsed"
+        return "parsed" if not record["dropped_reports"] else "partial"
     if record["parsed_reports"]:
         return "partial"
     for reason in SUMMARY_UNUSABLE:
@@ -578,21 +623,23 @@ def summary_result(parent, name, phases, failures, budget):
                 if index == SUMMARY_MAX_SCAN:
                     budget["truncated"] = True
                     break
-                match = PHASE_REPORT.fullmatch(entry.name)
+                report = phase_report(entry.name)
                 # Only the JSON form is read: the sibling XML is JUnit, which
                 # does not carry Ginkgo labels, so reading it could not name a
                 # case without falling back to spec text.
-                if match and match.group(2) == "json":
-                    found[match.group(1)].append(entry.name)
+                if report and report[1] == "json":
+                    found[report[0]].append((report[2], entry.name))
         names = []
         for phase in PHASES:
-            # Sorted, so which reports a cap keeps does not depend on the
-            # order the filesystem returned them, and capped per phase, so a
-            # phase that wrote many reports cannot displace another phase.
+            # Sorted by the stamp the report carries, so which reports a cap
+            # keeps follows the run rather than the order the filesystem
+            # returned them, and capped per phase, so a phase that wrote many
+            # reports cannot displace another phase.
             found[phase].sort()
-            kept = found[phase][:SUMMARY_MAX_REPORTS]
+            limit = SUMMARY_MAX_OTHER_REPORTS if phase == OTHER_PHASE else SUMMARY_MAX_REPORTS
+            kept = found[phase][:limit]
             phases[phase]["dropped_reports"] += len(found[phase]) - len(kept)
-            names.extend((phase, report_name) for report_name in kept)
+            names.extend((phase, report_name) for _, report_name in kept)
         # Run order, so the failure budget reaches the test phases first.
         for phase, report_name in names:
             record = phases[phase]
