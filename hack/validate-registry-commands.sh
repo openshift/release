@@ -70,40 +70,64 @@ fi
 
 find "${registry_dir}" -name "*.sh" -print0 | xargs -0 -n1 shellcheck -S warning
 
-# The downstream-sync behavioral tests intentionally live outside the step
-# registry because registry validation only accepts registered step files.
-downstream_sync_test_path="hack/tests/github-downstream-sync-commands_test.sh"
-downstream_sync_test="${base_dir}/${downstream_sync_test_path}"
-downstream_sync_test_dir="${base_dir}/hack/tests"
-created_downstream_sync_test=false
-created_downstream_sync_test_dir=false
+# Behavioral tests for registry command scripts intentionally live outside the
+# step registry because registry validation only accepts registered step files.
+registry_command_tests=(
+  hack/tests/github-downstream-sync-commands_test.sh
+  hack/tests/rosa-cluster-lease-summary_test.sh
+)
 
-cleanup_downstream_sync_test() {
-  if [[ "${created_downstream_sync_test}" == true ]]; then
-    rm -f "${downstream_sync_test}"
-  fi
-  if [[ "${created_downstream_sync_test_dir}" == true ]]; then
-    rmdir "${downstream_sync_test_dir}" 2>/dev/null || true
-  fi
+created_test_files=()
+created_test_dirs=()
+test_failures=0
+
+cleanup_materialized_tests() {
+  local created
+  for created in ${created_test_files[@]+"${created_test_files[@]}"}; do
+    rm -f "${created}"
+  done
+  for created in ${created_test_dirs[@]+"${created_test_dirs[@]}"}; do
+    rmdir "${created}" 2>/dev/null || true
+  done
 }
-trap cleanup_downstream_sync_test EXIT
+trap cleanup_materialized_tests EXIT
 
-if ! git -C "${base_dir}" cat-file -e "HEAD:${downstream_sync_test_path}"; then
-  echo "ERROR: ${downstream_sync_test_path} does not exist in HEAD" >&2
+for test_path in "${registry_command_tests[@]}"; do
+  # The job passes "./" as the base directory, so trim the trailing slash to
+  # keep the paths in shellcheck diagnostics and test output readable.
+  test_file="${base_dir%/}/${test_path}"
+  test_dir=$(dirname "${test_file}")
+
+  if ! git -C "${base_dir}" cat-file -e "HEAD:${test_path}"; then
+    echo "ERROR: ${test_path} does not exist in HEAD" >&2
+    exit 1
+  fi
+
+  # Prow derives sparse-checkout paths from the base branch configuration, so a
+  # test added by the PR can exist in HEAD while still being absent from disk.
+  if [[ ! -e "${test_file}" ]]; then
+    if [[ ! -d "${test_dir}" ]]; then
+      mkdir -p "${test_dir}"
+      created_test_dirs+=("${test_dir}")
+    fi
+    created_test_files+=("${test_file}")
+    git -C "${base_dir}" show "HEAD:${test_path}" > "${test_file}"
+    chmod 0755 "${test_file}"
+  fi
+
+  # Report every test's result even when an earlier one fails, so a single PR
+  # sees the complete picture instead of only the first failure. That applies to
+  # the lint of each test too, which would otherwise abort the loop under set -e.
+  if ! shellcheck -S warning "${test_file}"; then
+    echo "ERROR: shellcheck failed for ${test_path}" >&2
+    test_failures=$((test_failures + 1))
+    continue
+  fi
+
+  "${test_file}" || test_failures=$((test_failures + 1))
+done
+
+if (( test_failures > 0 )); then
+  echo "ERROR: ${test_failures} registry command test(s) failed lint or execution" >&2
   exit 1
 fi
-
-# Prow derives sparse-checkout paths from the base branch configuration, so a
-# test added by the PR can exist in HEAD while still being absent from disk.
-if [[ ! -e "${downstream_sync_test}" ]]; then
-  if [[ ! -d "${downstream_sync_test_dir}" ]]; then
-    mkdir -p "${downstream_sync_test_dir}"
-    created_downstream_sync_test_dir=true
-  fi
-  created_downstream_sync_test=true
-  git -C "${base_dir}" show "HEAD:${downstream_sync_test_path}" > "${downstream_sync_test}"
-  chmod 0755 "${downstream_sync_test}"
-fi
-
-shellcheck -S warning "${downstream_sync_test}"
-"${downstream_sync_test}"

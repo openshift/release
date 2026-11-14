@@ -9,7 +9,9 @@ log(){
 }
 
 LEASE_NAMESPACE="${LEASE_NAMESPACE:-rosa-cluster-lease}"
-LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
+# Overridable only so hack/tests can run this script; the step does not declare
+# it in its ref, so ci-operator always leaves the mounted credential path below.
+LEASE_HOST_KUBECONFIG="${LEASE_HOST_KUBECONFIG:-/etc/rosa-cluster-lease-manager/kubeconfig}"
 OCM_LOGIN_ENV="${OCM_LOGIN_ENV:-staging}"
 STALE_LEASE_HOURS="${STALE_LEASE_HOURS:-4}"
 
@@ -55,7 +57,21 @@ TOTAL=$(echo "${ALL_CMS}" | jq '.items | length')
 
 log "Lease health check: ${TOTAL} cluster(s) in inventory"
 
+# Summary counters:
+#   HEALTHY       clusters that passed the checks below, plus in-use clusters.
+#   PROVISIONING  clusters labelled provisioning, which skip the checks below
+#                 and are counted apart from HEALTHY so in-flight capacity is
+#                 not reported as usable. This bucket comes from the lease
+#                 label alone; the controller, not this script, reconciles that
+#                 label against the state OCM reports.
+#   UNHEALTHY     clusters that failed a check this run, and are marked error
+#                 unless they already were.
+#   RECOVERED     stale leases force-released; such a cluster is re-checked
+#                 afterwards as available.
+# HEALTHY, PROVISIONING and UNHEALTHY partition the inventory; RECOVERED
+# overlaps HEALTHY and UNHEALTHY.
 HEALTHY=0
+PROVISIONING=0
 UNHEALTHY=0
 RECOVERED=0
 NOW_EPOCH=$(date +%s)
@@ -118,7 +134,7 @@ for i in $(seq 0 $((TOTAL - 1))); do
 
     # Skip health checks for provisioning clusters
     if [[ "${STATUS}" == "provisioning" ]]; then
-        HEALTHY=$((HEALTHY + 1))
+        PROVISIONING=$((PROVISIONING + 1))
         echo "  Provisioning (skipped)" >> "${REPORT}"
         continue
     fi
@@ -229,7 +245,7 @@ for i in $(seq 0 $((TOTAL - 1))); do
 done
 
 echo "" >> "${REPORT}"
-echo "Summary: ${HEALTHY} healthy, ${UNHEALTHY} unhealthy, ${RECOVERED} recovered" >> "${REPORT}"
+echo "Summary: ${HEALTHY} healthy, ${PROVISIONING} provisioning, ${UNHEALTHY} unhealthy, ${RECOVERED} recovered" >> "${REPORT}"
 
-log "Lease health check complete: ${HEALTHY} healthy, ${UNHEALTHY} unhealthy, ${RECOVERED} stale leases recovered"
+log "Lease health check complete: ${HEALTHY} healthy, ${PROVISIONING} provisioning, ${UNHEALTHY} unhealthy, ${RECOVERED} stale leases recovered"
 cat "${REPORT}"
