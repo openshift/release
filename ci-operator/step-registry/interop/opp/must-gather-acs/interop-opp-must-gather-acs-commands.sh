@@ -730,7 +730,7 @@ def probe(name):
       unparseable   — neither of the above and not valid JSON
       missing       — file not written
     A failed query must never read as an empty capture: the report then
-    says unknown, not absent (follow-up 1)."""
+    says unknown, not absent."""
     p = ev / name
     try:
         raw = p.read_text()
@@ -765,7 +765,7 @@ sub = rhacs_subs[0] if len(rhacs_subs) == 1 else None
 sub_source = sub.get("source") if sub else None
 sub_namespace = sub.get("namespace") if sub else None
 
-# Effective catalog source of the subscription (follow-up 2): spec.source
+# Effective catalog source of the subscription: spec.source
 # (adopted subscriptions keep theirs); fall back to the catalog of the
 # packagemanifest whose channel resolves the subscription's currentCSV.
 effective_source = sub_source
@@ -777,7 +777,7 @@ if effective_source is None and sub is not None and pm_ok:
 
 # CSVs: exclude OLM copies (reason Copied) and bind to the subscription
 # namespace — name-only counting accepted same-named packages from
-# another catalog (follow-up 2).
+# another catalog.
 rhacs_csvs = [
     c for c in csvs
     if c.get("name", "").startswith("rhacs-operator.v")
@@ -871,7 +871,7 @@ if op_compliance is not None:
     op_recreates = op_compliance in ("musthave", "mustonlyhave")
 
 # Central presence: unknown (not absent) when the capture failed —
-# distinct report values for query-failed vs resource-absent (follow-up 1).
+# distinct report values for query-failed vs resource-absent.
 if central_s == "ok":
     central_present = bool(central) and len(central) > 0
     central_available = any(
@@ -891,7 +891,7 @@ for a in acm:
         acm_version = a["version"]
     addon_images += a.get("governancePolicyAddonControllerImages") or []
 
-# Catalog binding (follow-up 2): the packagemanifest that provides the
+# Catalog binding: the packagemanifest that provides the
 # package must live in the subscription's effective catalog source. With
 # no packagemanifest at all, a CSV's catalog origin is unverifiable —
 # fail closed rather than accept it on name alone.
@@ -928,7 +928,7 @@ inputs_classified = (
     and pm_s in ("ok", "absent")
 )
 
-# Per-term values follow the Central rule (follow-up 1): a query
+# Per-term values follow the Central presence rule: a query
 # failure reads as unknown, never as confirmed absence (false/0).
 terms = {
     "central_query": central_s,
@@ -1023,7 +1023,7 @@ write_status_properties
 run_assertions() {
   local failed=0 rc
   # (a) No classified evidence file may carry a probe_error or QUERY FAILED
-  #     marker: a failed query must never read as a clean pass (follow-up 1).
+  #     marker: a failed query must never read as a clean pass.
   #     The storage-axis captures (11-placementdecisions, 12 through 17)
   #     write no marker, so this check does not cover them.
   for f in "${EVIDENCE_DIR}"/*.json "${EVIDENCE_DIR}"/*.txt; do
@@ -1199,7 +1199,7 @@ FIXTURE
   _expect removal_preconditions_met true
   _expect predicate_inputs_classified true
 
-  # Follow-up 1, acceptance (a): a failed Central query must not read as
+  # Failed-query classification (a): a failed Central query must not read as
   # absence — distinct report values for denied vs absent.
   echo "QUERY FAILED (rc=1): simulated API denial" > "${tmp}/07-central-cr.json"
   EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
@@ -1207,14 +1207,14 @@ FIXTURE
   _expect central_present unknown
   _expect removal_preconditions_met false
 
-  # Follow-up 1, acceptance (b): a genuinely absent resource type reports
+  # Failed-query classification (b): a genuinely absent resource type reports
   # absence — a different value from the denied case.
   echo "CRD_ABSENT: centrals.platform.stackrox.io not registered on this cluster (successful query, resource type absent)" > "${tmp}/07-central-cr.json"
   EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
   _expect central_query absent
   _expect central_present false
 
-  # Follow-up 2, acceptance: the package present only in a non-subscribed
+  # Catalog agreement: the package present only in a non-subscribed
   # catalog fails the precondition.
   echo '[{"name": "central", "namespace": "stackrox", "available": {"type": "Available", "status": "True"}}]' > "${tmp}/07-central-cr.json"
   echo '{"name": "rhacs-operator", "catalogSource": "community-operators", "catalogSourceNamespace": "openshift-marketplace", "channels": [{"name": "stable", "currentCSV": "rhacs-operator.v4.11.6"}]}' > "${tmp}/08-packagemanifest-rhacs.json"
@@ -1222,7 +1222,7 @@ FIXTURE
   _expect csv_catalog_matches_subscription false
   _expect removal_preconditions_met false
 
-  # Follow-up 2 (Copied CSV): a copied CSV in another namespace must not
+  # Catalog agreement (Copied CSV): a copied CSV in another namespace must not
   # count toward the precondition.
   echo '{"name": "rhacs-operator", "catalogSource": "redhat-operators", "catalogSourceNamespace": "openshift-marketplace", "channels": [{"name": "stable", "currentCSV": "rhacs-operator.v4.11.6"}]}' > "${tmp}/08-packagemanifest-rhacs.json"
   echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "policies", "phase": "Succeeded", "reason": "Copied"}]' > "${tmp}/05-csv.json"
@@ -1240,7 +1240,7 @@ FIXTURE
   _expect operatorpolicy_targets_subscription false
   _expect removal_preconditions_met false
 
-  # Follow-up 1 (per-term gating): a failed ops/subs/csvs query must not
+  # Per-term gating: a failed ops/subs/csvs query must not
   # read as confirmed absence in the report terms — unknown, not false/0.
   # A genuinely absent (CRD not registered) OperatorPolicy still reads false.
   echo "probe_error: subscription query failed" > "${tmp}/03-subscription.json"
