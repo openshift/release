@@ -29,7 +29,12 @@ _propagate_junit () {
 # Test Reporting:
 #   - Results are recorded in JUnit XML format
 #   - JUnit XML is generated on exit (via trap) regardless of test results
-#   - Script always exits 0 to allow subsequent Prow test steps to run
+#   - Script exits nonzero when any test case is marked failed (the
+#     preflight failure paths and the end-of-script status check); a
+#     fully skipped report exits 0 unless the lane sets
+#     QUAY_EXPECTATION=required. The ref is best_effort and the
+#     consuming jobs allow best-effort post steps, so later steps in
+#     the lane still run after a nonzero exit
 #   - Individual test failures are visible in Prow UI via JUnit reporting
 #
 ################################################################################
