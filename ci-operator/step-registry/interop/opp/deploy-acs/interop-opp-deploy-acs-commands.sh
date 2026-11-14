@@ -470,7 +470,10 @@ if [[ "${_op_crd_state}" == "present" ]]; then
   _op_query_ok=false
   _op_status=""
   for _op_attempt in 1 2 3; do
-    if _op_status=$(oc get operatorpolicy -A -o json 2>&1); then
+    # Fully-qualified group and kind, the form the CRD probe above uses: a bare
+    # kind resolves by name alone, so any other registered group serving an
+    # OperatorPolicy would answer for this one.
+    if _op_status=$(oc get operatorpolicies.policy.open-cluster-management.io -A -o json 2>&1); then
       _op_query_ok=true
       break
     fi
