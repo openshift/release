@@ -246,7 +246,8 @@ function IsMcpProgressing () {
     #     progressing (run 2115458776726245376: 179 polls, ready 4-8). The
     #     veto sets _vetoStreakHit for the poll loop's fail-fast exit;
     #  4. ready count recovering within the window with bounded regression
-    #     (a healthy rolling update dips by up to maxUnavailable reboots).
+    #     (a healthy rolling update dips by up to maxUnavailable reboots),
+    #     and no single-poll updated-machine drop beyond that same bound.
     _vetoStreakHit=0
     # Optional args pin the phase-0 self-test to the reviewed default
     # thresholds regardless of runtime env tuning (fixture verdicts must
@@ -307,6 +308,20 @@ function IsMcpProgressing () {
         return 0
     fi
     (( _vetoStreakHit )) && return 1
+    # The tolerated bound covers the updated-machine count too (deep review:
+    # this branch returned success for an unbounded updated regression while
+    # the ready count climbed). The rising branch above already rejects every
+    # decrease, so the bound only has to guard this branch: machines losing
+    # the updated state by more than the concurrent-reboot bound is a
+    # re-render or a state regression, not convergence.
+    typeset -i maxUpdDrop=0 _udrop=0
+    for (( i = windowStart + 1; i < len; ++i )); do
+        (( _udrop = updatedHistory[i-1] - updatedHistory[i] )) || true
+        (( _udrop > maxUpdDrop )) && maxUpdDrop=${_udrop} || true
+    done
+    if (( maxUpdDrop > _maxUnavail )); then
+        return 1
+    fi
     # Ready-count recovery within the window with bounded regression: the
     # bound is the maximum single-poll drop (machines concurrently
     # unavailable, mirroring MCO maxUnavailable), not the number of polls
