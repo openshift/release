@@ -8,6 +8,7 @@ import re
 import stat
 import sys
 import tempfile
+import unicodedata
 
 # Publication audit manifest. Artifacts uploaded to GCS pass a post-upload
 # pattern scanner that replaces a whole matching object with a short notice, so
@@ -117,14 +118,15 @@ UNRECOGNIZED_STATE = "unrecognized"
 #
 # A label is the tag on its own, with or without the @. In text the tag must
 # stand alone: no word character - \w, so non-ASCII letters and digits count -
-# and no second @ may touch either end, so @id_123abc, x@id_12, @@id_12,
-# @id_1\u0660, @id_12@id_13 and @id_0123 contribute nothing rather than a
-# prefix of themselves, which would pin a failure on a case that did not fail. Only a
-# canonical unpadded decimal run of at most nine digits is accepted, and ASCII
-# digits only, so a padded, overlong or non-ASCII form is refused. A JSON
-# true, a number or a nested list is not a string and never matches.
+# no combining mark, and no second @ may touch either end, so @id_123abc,
+# x@id_12, @@id_12, "e" + U+0301 + @id_12, @id_1٠, @id_12@id_13 and @id_0123
+# contribute nothing rather than a prefix of themselves, which would pin a
+# failure on a case that did not fail. Only a canonical unpadded decimal run
+# of at most nine ASCII digits is accepted; a JSON true, a number or a nested
+# list is not a string and never matches. The bounded slice of the text is
+# composed to NFC, so one character's two spellings read alike.
 SUMMARY_LABEL_CASE = re.compile(r"@?id_([1-9][0-9]{0,8})")
-SUMMARY_TEXT_CASE = re.compile(r"(?<![\w@])@id_([1-9][0-9]{0,8})(?![\w@])")
+SUMMARY_TEXT_CASE = re.compile(r"@id_([1-9][0-9]{0,8})")
 # No source location is emitted. A Ginkgo report carries LeafNodeLocation, but
 # its file name comes from the private test repository: no public vocabulary
 # fixes which basenames are legitimate, so any basename copied from a report
@@ -433,7 +435,9 @@ def handle_metadata(arguments):
                     # it is the one name that tells "never collected" from
                     # "collected and replaced", and the phase names now
                     # matched here can fill the list before it is reached.
-                    if index == 128 or (not merged and len(children) ==
+                    # The >= test keeps the record it adds past the cap from
+                    # reopening the list to the entries after it.
+                    if index == 128 or (not merged and len(children) >=
                                         (32 if result_directory else 16)):
                         result["truncated"] = True
                         if not merged:
@@ -507,6 +511,27 @@ def summary_strings(spec, fields, budget):
                     budget[1] = True
 
 
+def summary_text_cases(text):
+    """Yield the case numbers of the standalone @id_<number> tags in a text.
+
+    A tag is a token only when neither neighbour is a word character, an
+    @ or a combining mark, which modifies the character before it.
+    """
+    # Composition neither makes nor moves an @, an ASCII letter or an
+    # underscore, so a slice without the literal holds no tag in any spelling.
+    if "@id_" not in text:
+        return
+    composed = unicodedata.normalize("NFC", text)
+    for match in SUMMARY_TEXT_CASE.finditer(composed):
+        start, end = match.span()
+        neighbours = (composed[start - 1] if start else "") + composed[end:end + 1]
+        if any(char in "@_" or char.isalnum()
+               or unicodedata.category(char).startswith("M")
+               for char in neighbours):
+            continue
+        yield int(match.group(1))
+
+
 def summary_tags(spec):
     """Collect the case tags of one spec, and whether the scan was complete.
 
@@ -525,8 +550,7 @@ def summary_tags(spec):
         # A tag past the character cap, or straddling it, is not read, so a
         # longer name leaves the scan incomplete rather than half read.
         truncated = truncated or len(text) > SUMMARY_MAX_TEXT_CHARS
-        found.update(int(number) for number
-                     in SUMMARY_TEXT_CASE.findall(text[:SUMMARY_MAX_TEXT_CHARS]))
+        found.update(summary_text_cases(text[:SUMMARY_MAX_TEXT_CHARS]))
     return found, truncated or texts[1]
 
 
@@ -628,8 +652,9 @@ def summary_read(parent, name):
     return "parsed", collected[0], collected[1]
 
 
-def summary_fold(phase, record, specs, failures, budget):
-    """Fold one parsed report into its phase counts and the failure list."""
+def summary_fold(phase, record, specs, failures):
+    """Fold one report into its counts and the phase's own failure list,
+    which the whole tree's budget is shared out between afterwards."""
     counts = record["counts"]
     for spec in specs:
         state = summary_state(spec)
@@ -637,12 +662,8 @@ def summary_fold(phase, record, specs, failures, budget):
         if state not in FAILURE_STATES:
             continue
         record["failed"] += 1
-        if len(failures) == SUMMARY_MAX_FAILURES:
-            # Phases are folded in run order, so the budget reaches the test
-            # phases before a teardown that fails every spec can exhaust it,
-            # and each phase reports what it lost on its own record.
-            record["dropped"] += 1
-            budget["failures_dropped"] += 1
+        if len(failures) >= SUMMARY_MAX_FAILURES:
+            # What a phase lost is counted on its record when it is shared.
             continue
         identified, case = summary_case(spec)
         failure = {"phase": phase, "state": state, "identified": identified}
@@ -709,7 +730,7 @@ def summary_result(parent, name, phases, failures, budget):
             record["parsed_reports"] += 1
             record["specs"] += len(specs)
             record["specs_truncated"] = record["specs_truncated"] or truncated
-            summary_fold(phase, record, specs, failures, budget)
+            summary_fold(phase, record, specs, failures[phase])
     except OSError:
         budget["results_unreadable"] += 1
     finally:
@@ -767,16 +788,25 @@ def handle_summary(arguments):
                       "dropped": 0, "dropped_reports": 0, "specs_truncated": False,
                       "unusable": set(), "counts": {}}
               for phase in PHASES}
-    failures = []
+    collected = {phase: [] for phase in PHASES}
     budget = {"results": 0, "results_dropped": 0, "results_unreadable": 0,
               "failures_dropped": 0, "truncated": False}
     try:
-        output = summary_scan(arguments[1], phases, failures, budget)
+        output = summary_scan(arguments[1], phases, collected, budget)
     except Exception:  # pylint: disable=broad-except
         # Like the audit manifest: an artifact that says the tree could not be
         # read is worth more than no artifact, because "never written" and
         # "replaced after upload" look alike to a reader.
         output = "unreadable"
+    # Shared out in run order across the whole scan rather than as each
+    # directory is read: the test phases take their slots first, wherever
+    # the teardown that failed every spec was found.
+    failures = []
+    for phase in PHASES:
+        kept = collected[phase][:max(0, SUMMARY_MAX_FAILURES - len(failures))]
+        failures.extend(kept)
+        phases[phase]["dropped"] = phases[phase]["failed"] - len(kept)
+        budget["failures_dropped"] += phases[phase]["dropped"]
     failures.sort(key=lambda failure: (PHASES.index(failure["phase"]), failure["state"],
                                        failure.get("case", 0), failure["identified"]))
     summary = {

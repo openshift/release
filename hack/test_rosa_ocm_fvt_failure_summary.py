@@ -155,6 +155,17 @@ class SummaryFixture(unittest.TestCase):
     def phase(self, data, phase):
         return next(record for record in data["phases"] if record["phase"] == phase)
 
+    def collect_metadata(self, artifact="ocm-fvt-artifact-metadata.json"):
+        """Run the metadata phase, returning its artifact text and parsed JSON."""
+        collected = subprocess.run(
+            [sys.executable, "-I", str(HELPER), "metadata", str(self.output),
+             str(self.artifacts / artifact)],
+            capture_output=True, text=True, timeout=120, check=False)
+        self.assertEqual(collected.returncode, 0, collected.stderr)
+        contents = (self.artifacts / artifact).read_text(encoding="utf-8")
+        self.assertNotIn(SECRET, contents)
+        return contents, json.loads(contents)
+
 
 class SummaryProjectionTests(SummaryFixture):
     def test_failed_cases_are_identified_by_label(self):
@@ -294,15 +305,9 @@ class SummaryProjectionTests(SummaryFixture):
         self.report("other", "<testsuites/>", result=result,
                     name="fixture-job-stage_000606.xml")
         (self.output / result / "report.xml").write_text("<testsuites/>", encoding="utf-8")
-        collected = subprocess.run(
-            [sys.executable, "-I", str(HELPER), "metadata", str(self.output),
-             str(self.artifacts / "ocm-fvt-artifact-metadata.json")],
-            capture_output=True, text=True, timeout=60, check=False)
-        self.assertEqual(collected.returncode, 0, collected.stderr)
-        contents = (self.artifacts / "ocm-fvt-artifact-metadata.json").read_text(
-            encoding="utf-8")
+        contents, data = self.collect_metadata()
         self.assertNotIn("fixture-job-stage", contents)
-        reports = json.loads(contents)["output"]["results"][0]["reports"]
+        reports = data["output"]["results"][0]["reports"]
         self.assertEqual(sorted(report["label"] for report in reports),
                          ["Day2CH-json", "merged-xml", "other-json", "other-xml"])
 
@@ -342,6 +347,24 @@ class SummaryProjectionTests(SummaryFixture):
         self.assertEqual(len(data["failures"]), len(rejected))
         self.assertEqual({record["identified"] for record in data["failures"]}, {"none"})
         self.assertTrue(all("case" not in record for record in data["failures"]))
+
+    def test_canonically_equivalent_spellings_are_refused_alike(self):
+        # "e" + U+0301 and the precomposed U+00E9 are one text under NFC, so a
+        # tag written against either is attached to a word in both spellings
+        # rather than accepted in one of them. A mark that composes with
+        # nothing still belongs to the letter before it, so it attaches its
+        # tag too; the same tag standing on its own is still read.
+        attached = ("e\u0301@id_128 fails", "\u00e9@id_128 fails",
+                    "q\u0301@id_128 fails")
+        for index, text in enumerate(attached):
+            self.report("post-clean", [spec("failed", LeafNodeText=text)],
+                        result=f"test-result-nfc{index:02d}")
+        self.report("post-clean", [spec("failed", LeafNodeText="the case @id_128 fails")],
+                    result="test-result-nfczz")
+        data = self.summary()
+        self.assertEqual([record["identified"] for record in data["failures"]],
+                         ["none", "none", "none", "tag"])
+        self.assertEqual(data["failures"][3]["case"], 128)
 
     def test_two_tags_in_one_spec_name_conflict(self):
         self.report("Day2CH", [spec("failed", LeafNodeText="@id_300 and @id_301 together"),
@@ -531,6 +554,49 @@ class SummaryBoundsTests(SummaryFixture):
         self.assertEqual(self.phase(data, "pre-cluster-creation")["dropped"], 0)
         self.assertEqual(self.phase(data, "post-clean")["dropped"], 7)
         self.assertEqual(data["limits"]["failures_dropped"], 7)
+
+    def test_failure_budget_is_shared_across_result_directories(self):
+        # The budget is shared out after the whole scan, so a teardown that
+        # failed every spec in the directory read first cannot take the slots
+        # of a test phase that failed in a directory read after it.
+        self.report("post-clean", [spec("failed", labels=[f"id_{900 + index}"])
+                                   for index in range(70)], result="test-result-a")
+        self.report("pre-cluster-creation", [spec("failed", labels=["id_76488"])],
+                    result="test-result-b")
+        data = self.summary()
+        self.assertEqual(len(data["failures"]), 64)
+        self.assertIn({"phase": "pre-cluster-creation", "state": "failed",
+                       "identified": "tag", "case": 76488}, data["failures"])
+        self.assertEqual(self.phase(data, "pre-cluster-creation")["dropped"], 0)
+        self.assertEqual(self.phase(data, "post-clean")["dropped"], 7)
+        self.assertEqual(data["limits"]["failures_dropped"], 7)
+
+    def test_metadata_child_cap_holds_past_the_merged_report(self):
+        # The merged report keeps its record whatever the cap did; the entries
+        # scanned after it must not get in behind it. readdir order belongs to
+        # the filesystem, so the directory grows until report.xml is past the
+        # cap in that order - the arrangement the cap has to survive.
+        result = self.output / "test-result-fixture"
+        result.mkdir()
+        (result / "report.xml").write_text("<testsuites/>", encoding="utf-8")
+        written, index = 0, 0
+        while written < 512 and index < 32:
+            for name in range(written, written + 64):
+                (result / f"post-clean_{name:06d}.json").write_text("[]", encoding="utf-8")
+            written += 64
+            with os.scandir(result) as entries:
+                index = [entry.name for entry in entries].index("report.xml")
+        # Asserted, so that an order putting the merged report first cannot
+        # turn the case below into one the unfixed collector also passes.
+        self.assertGreaterEqual(index, 32)
+        contents, data = self.collect_metadata()
+        self.assertNotIn("post-clean_0", contents)
+        collected = data["output"]["results"][0]
+        labels = [report["label"] for report in collected["reports"]]
+        self.assertEqual(labels.count("merged-xml"), 1)
+        # The cap, plus the merged record the exception adds past it.
+        self.assertEqual(len(collected["reports"]), 33)
+        self.assertTrue(collected["truncated"])
 
     def test_specs_per_report_are_bounded(self):
         self.report("post-clean", [spec("passed")] * 5000)
