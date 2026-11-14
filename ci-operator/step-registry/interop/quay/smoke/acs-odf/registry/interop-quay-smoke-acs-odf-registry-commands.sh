@@ -17,7 +17,7 @@ _opp_cleanup() {
   set +x 2>/dev/null
   # Credential hygiene: these files must not survive the step, on the
   # success and the failure path alike.
-  rm -f /tmp/quay-auth.json /tmp/quay-cookies.txt "${acsPassFile:-/tmp/acs-admin-password}"
+  rm -f /tmp/quay-auth.json /tmp/quay-cookies.txt "${acsPassFile:-/tmp/acs-admin-password}" /tmp/acs-ingress-ca.crt
   # Scrub credentials before copying
   sed -i -E \
     -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
@@ -243,9 +243,10 @@ print(len(json.load(sys.stdin).get('items',[])))
 # TLS verification for the Quay route: the route certificate is issued by
 # the Quay operator's own CA and is not trusted by step pods, so the route
 # calls use curl -k and skopeo --dest-tls-verify=false / --tls-verify=false.
-# This is the same decision as the ACS Central API block in RunAcsScan,
-# which prefers the service CA bundle and only then falls back to insecure
-# TLS; the relaxation covers certificate trust only, and the pushed image is
+# This differs from the ACS Central API block in RunAcsScan on purpose: that
+# block sends credentials, so it verifies the route against the ingress
+# router CA or the service CA bundle and never falls back to insecure TLS.
+# The relaxation here covers certificate trust only, and the pushed image is
 # still verified by pulling it back.
 function GetQuayAuth () {
     # Quay credentials are exported for downstream use in the current
@@ -809,23 +810,46 @@ function RunAcsScan () {
 
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
 
-    # TLS verification for the ACS Central API: prefer the service CA
-    # bundle mounted in the pod (pattern from interop-opp-must-gather-acs);
-    # fall back to -k with a warning when the route certificate cannot be
-    # verified with it, so an unknown certificate does not hard-fail the
-    # test.  Declared here so the helper functions called below (dynamic
-    # scoping) share the same options.
-    typeset -a acsTlsOpts=( -k )
+    # TLS verification for the ACS Central API.  The admin credential, and the
+    # Quay credential carried in the registration body, are only ever sent
+    # over a connection whose certificate is verified: resolve a CA that
+    # checks the Central route before the first such request, trying the
+    # ingress router CA (which signs .apps route certificates) and then the
+    # service CA bundle mounted in the pod (pattern from
+    # interop-opp-must-gather-acs).  There is deliberately no -k fallback: an
+    # unverifiable route is recorded failed and no credential is sent.
+    # Declared here so the helper functions called below (dynamic scoping)
+    # share the same options.
+    typeset ingressCaBundle=''
+    ingressCaBundle="$(oc get configmap default-ingress-cert -n openshift-config-managed -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null)" || ingressCaBundle=''
+    typeset -a acsCaCandidates=()
+    if [[ -n "${ingressCaBundle}" ]]; then
+        printf '%s\n' "${ingressCaBundle}" > /tmp/acs-ingress-ca.crt
+        acsCaCandidates+=( /tmp/acs-ingress-ca.crt )
+    fi
     typeset saCaBundle='/var/run/secrets/kubernetes.io/serviceaccount/ca.crt'
     if [[ -f "${saCaBundle}" ]]; then
-        typeset tlsProbe=''
-        tlsProbe="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 15 --max-time 30 --cacert "${saCaBundle}" "https://${acsHost}/v1/ping")" || tlsProbe='000'
-        if [[ -n "${tlsProbe}" && "${tlsProbe}" != '000' ]]; then
-            acsTlsOpts=( --cacert "${saCaBundle}" )
-        else
-            echo "WARNING: ACS route certificate not verifiable with the service CA bundle; falling back to insecure TLS" >&2
-        fi
+        acsCaCandidates+=( "${saCaBundle}" )
     fi
+    typeset acsCaFile=''
+    typeset candidateCa=''
+    typeset tlsProbe=''
+    if (( ${#acsCaCandidates[@]} > 0 )); then
+        for candidateCa in "${acsCaCandidates[@]}"; do
+            tlsProbe="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 15 --max-time 30 --cacert "${candidateCa}" "https://${acsHost}/v1/ping")" || tlsProbe='000'
+            if [[ -n "${tlsProbe}" && "${tlsProbe}" != '000' ]]; then
+                acsCaFile="${candidateCa}"
+                break
+            fi
+        done
+    fi
+    if [[ -z "${acsCaFile}" ]]; then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "Could not verify the ACS Central route certificate for ${acsHost} with the ingress router CA or the service CA bundle; refusing to send the admin credential over unverified TLS" "${elapsed}"
+        rm -f "${acsPassFile}" /tmp/acs-ingress-ca.crt
+        return 1
+    fi
+    typeset -a acsTlsOpts=( --cacert "${acsCaFile}" )
 
     if ! RegisterQuayInAcs "${acsHost}"; then
         elapsed=$(( $(date +%s) - start ))
