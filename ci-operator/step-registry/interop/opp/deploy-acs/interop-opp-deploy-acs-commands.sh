@@ -578,8 +578,15 @@ _api_loud
 # --- Fail-fast precondition: packagemanifest must exist, and the channel this
 #     step would create a Subscription on must be listed. Three-way classify
 #     with bounded retry; a query error is NEVER classified as catalog-missing.
+#     The precondition is a property of the CREATE path. An adopted
+#     Subscription already exists, so the current catalog listing decides
+#     nothing about it: a missing packagemanifest or a failed query is recorded
+#     as catalog_precondition and the CSV wait plus the Subscription conditions
+#     classify the outcome. Gating adoption here failed a healthy Succeeded
+#     CSV whenever the catalog listing was down or slow to populate.
 _precondition_ok=false
 _pm_raw=""
+_pm_notfound=false
 _api_quiet
 for _attempt in 1 2 3; do
   if _pm_raw=$(oc get packagemanifest rhacs-operator -n openshift-marketplace -o json 2>&1); then
@@ -592,9 +599,8 @@ for _attempt in 1 2 3; do
   # the pattern matched. A NotFound answer would then fall through to the
   # query-failed class.
   if grep -qi "not found" <<< "${_pm_raw}"; then
-    _classify "acs-catalog-missing" "packagemanifest rhacs-operator not found in openshift-marketplace (successful query)"
-    echo "ERROR: ${_class_detail}"
-    exit 1
+    _pm_notfound=true
+    break
   fi
   # No sleep after the last attempt: there is no retry left to use it, and
   # the 30s came straight out of the shared work budget on the path that was
@@ -607,7 +613,22 @@ for _attempt in 1 2 3; do
   echo ">>> precondition query failed (attempt ${_attempt}/3), retrying in ${_backoff}s: $(_api_err_class "${_pm_raw}")"
   sleep "${_backoff}"
 done
-if [[ "${_precondition_ok}" != "true" ]]; then
+_catalog_listing=false
+if [[ "${_precondition_ok}" == "true" ]]; then
+  _catalog_listing=true
+elif [[ "${_sub_existing}" == "true" ]]; then
+  if [[ "${_pm_notfound}" == "true" ]]; then
+    _prop "catalog_precondition" "missing-adopted"
+    echo ">>> NOTE: packagemanifest rhacs-operator not found in openshift-marketplace; Subscription rhacs-operator already exists - not gating adoption on the catalog listing"
+  else
+    _prop "catalog_precondition" "query-failed-adopted"
+    echo ">>> NOTE: packagemanifest query failed after 3 attempts ($(_api_err_class "${_pm_raw}")); Subscription rhacs-operator already exists - not gating adoption on the catalog listing"
+  fi
+elif [[ "${_pm_notfound}" == "true" ]]; then
+  _classify "acs-catalog-missing" "packagemanifest rhacs-operator not found in openshift-marketplace (successful query)"
+  echo "ERROR: ${_class_detail}"
+  exit 1
+else
   _classify "acs-catalog-query-failed" "packagemanifest query errored after 3 attempts (non-reverting class: $(_api_err_class "${_pm_raw}"))"
   echo "ERROR: ${_class_detail}"
   exit 1
@@ -637,11 +658,16 @@ except Exception:
 ' "${ACS_CHANNEL}" "${_sub_existing_channel}" 2>/dev/null || echo "error")
 read -r _chk _req_listed _obs_listed _req_head _chk_names <<<"${_channel_ok}"
 # The helper prints "parsed" first: a parse error, an empty answer, or a helper
-# that did not run all land here as a listing that is not usable.
+# that did not run all land here as a listing that is not usable. On the create
+# path that is a hard failure; an adopted Subscription has no listing to
+# consult, so the note above already recorded why and the wait classifies.
 if [[ "${_chk}" != "parsed" ]]; then
-  _classify "acs-catalog-query-failed" "packagemanifest channel listing unparseable (query succeeded but returned non-JSON)"
-  echo "ERROR: ${_class_detail}"
-  exit 1
+  if [[ "${_catalog_listing}" == "true" ]]; then
+    _classify "acs-catalog-query-failed" "packagemanifest channel listing unparseable (query succeeded but returned non-JSON)"
+    echo "ERROR: ${_class_detail}"
+    exit 1
+  fi
+  _chk_names=""
 fi
 if [[ "${_req_listed}" == "unlisted" ]]; then
   if [[ "${_sub_existing}" == "true" ]]; then
@@ -665,7 +691,11 @@ if [[ "${_obs_listed}" == "unlisted" ]]; then
   _prop "channel_delisted" "${_sub_existing_channel}"
 fi
 if [[ "${_sub_existing}" == "true" ]]; then
-  echo ">>> precondition: rhacs-operator present; adopted Subscription channel '${_sub_existing_channel:-empty}' (requested ${ACS_CHANNEL}, head: ${_req_head})"
+  if [[ "${_catalog_listing}" == "true" ]]; then
+    echo ">>> precondition: rhacs-operator present; adopted Subscription channel '${_sub_existing_channel:-empty}' (requested ${ACS_CHANNEL}, head: ${_req_head})"
+  else
+    echo ">>> precondition: catalog listing unavailable; adopting Subscription rhacs-operator on channel '${_sub_existing_channel:-empty}' (requested ${ACS_CHANNEL})"
+  fi
 else
   echo ">>> precondition: rhacs-operator present; channel ${ACS_CHANNEL} head: ${_req_head}"
 fi
