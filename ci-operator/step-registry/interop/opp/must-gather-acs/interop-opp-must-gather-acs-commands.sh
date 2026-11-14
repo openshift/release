@@ -166,20 +166,37 @@ collect_acs_diagnostics() {
                 if curl -sS -o /dev/null --cacert "${CENTRAL_CA_FILE}" \
                       --connect-to "${_central_connect_to}" \
                       --connect-timeout 10 --max-time 30 -w '' \
-                      "https://${_central_svc_dns}/v1/debug/diagnostics" 2>>"${TLS_PREFLIGHT_ERR}"; then
+                      "https://${_central_svc_dns}/v1/debug/diagnostics" \
+                      2>/dev/null; then
                     TLS_MODE="verified"
                     CURL_TLS_OPTS="--cacert ${CENTRAL_CA_FILE} --connect-to ${_central_connect_to}"
                     CENTRAL_URL_HOST="${_central_svc_dns}"
-                    echo "TLS verified against Central backend ${_central_addr}:${_central_port} with ${_central_svc_dns} as SNI and verified name (route host outside certificate DNS names)"
+                    # Log and artifact text name no service host, backend
+                    # address or port (INTEROP-9647 log sanitization): curl's
+                    # own stderr, which carries the service DNS name, is
+                    # discarded and the failure is recorded as its exit status.
+                    echo "TLS verified against Central's own CA through a ready backend endpoint of the route target service, with the certificate's service name as SNI and verified name (route host outside certificate DNS names)"
                 else
-                    echo "Backend-direct TLS preflight to ${_central_addr}:${_central_port} failed; see tls-preflight.err." >&2
+                    _central_direct_rc=$?
+                    echo "Backend-direct TLS preflight against a ready backend endpoint failed (curl exit ${_central_direct_rc}); see tls-preflight.err." >&2
+                    echo "backend-direct preflight failed: curl exit ${_central_direct_rc}" >>"${TLS_PREFLIGHT_ERR}"
                 fi
             else
                 # Record why the retry could not run: a missing route target and
                 # an unreadable or empty EndpointSlice both leave _central_backend
                 # empty, and tls-preflight.err would otherwise show only the
-                # route-host error.
-                echo "Backend-direct fallback not attempted: route target service='${_central_svc:-<none>}' ready backend='${_central_backend:-<none>}' (EndpointSlice lookup or oc access returned nothing)." >>"${TLS_PREFLIGHT_ERR}"
+                # route-host error. Presence only: neither the route target
+                # service name nor the ready backend address belongs in an
+                # artifact.
+                _svc_present="no"
+                _backend_present="no"
+                if [[ -n "${_central_svc}" ]]; then
+                    _svc_present="yes"
+                fi
+                if [[ -n "${_central_backend}" ]]; then
+                    _backend_present="yes"
+                fi
+                echo "Backend-direct fallback not attempted: route target service present=${_svc_present} ready backend present=${_backend_present} (EndpointSlice lookup or oc access returned nothing)." >>"${TLS_PREFLIGHT_ERR}"
             fi
         fi
     else
