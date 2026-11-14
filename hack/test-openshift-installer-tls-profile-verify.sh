@@ -256,6 +256,11 @@ case "${args}" in
         pod="${4#pod/}"
         remote="${5#:}"
         port="$(cat "${MOCK_DIR}/forward-${pod}" 2>/dev/null)" || { echo "error: pod ${pod} not found" >&2; exit 1; }
+        # Emulates a port-forward that stays up without announcing a port.
+        if [[ ! -f "${MOCK_DIR}/exit-once-${pod}" && -f "${MOCK_DIR}/stall-once-${pod}" ]]; then
+            rm -f "${MOCK_DIR}/stall-once-${pod}"
+            exec sleep 600
+        fi
         echo "Forwarding from 127.0.0.1:${port} -> ${remote}"
         echo "Forwarding from [::1]:${port} -> ${remote}"
         # Emulates client-go ending the port-forward after a failed connection.
@@ -287,7 +292,7 @@ pods_json() {
 #   $4 kube-apiserver server options key  $5 etcd server options key
 #   $6 optional modifier: no-adherence, no-install-config, naive-ingress,
 #      explicit-ingress-profile, etcd-unreachable, etcd-wrong-certificate,
-#      etcd-not-ready, port-forward-exits
+#      etcd-not-ready, port-forward-exits, port-forward-stalls
 #   $7 optional text the summary must contain
 run_scenario() {
     local name="$1" profile="$2" want_rc="$3" kas_key="$4" etcd_key="$5" modifier="${6:-}" must_contain="${7:-}"
@@ -316,6 +321,10 @@ run_scenario() {
     fi
     if [[ "${modifier}" == "port-forward-exits" ]]; then
         touch "${MOCK_DIR}/exit-once-kube-apiserver-master-0" "${MOCK_DIR}/exit-once-etcd-master-1"
+    fi
+    if [[ "${modifier}" == "port-forward-stalls" ]]; then
+        # First forward exits, the restart never announces a port, the next one works.
+        touch "${MOCK_DIR}/exit-once-etcd-master-0" "${MOCK_DIR}/stall-once-etcd-master-0"
     fi
 
     start_endpoint kube-apiserver-lb-signer "${server_options[${kas_key}]}" >"${MOCK_DIR}/external-port"
@@ -391,6 +400,14 @@ if grep -q 'port-forward to kube-apiserver-master-0 exited; restarting it' "${te
 else
     fail "exited port-forwards were not restarted"
 fi
+run_scenario port-forward-stalls Intermediate 0 kube-apiserver:Intermediate etcd:Intermediate port-forward-stalls
+if [[ ! -e "${test_dir}/scenario-port-forward-stalls/mock/stall-once-etcd-master-0" ]] \
+    && grep -q 'port-forward to etcd-master-0 exited; restarting it' "${test_dir}/scenario-port-forward-stalls/step.log"; then
+    pass "a port-forward that never announced its port was replaced"
+else
+    fail "a port-forward that never announced its port was replaced"
+fi
+
 run_scenario etcd-unreachable Intermediate 1 kube-apiserver:Intermediate etcd:Intermediate etcd-unreachable \
     "etcd etcd-master-0:2379 tls11-cbc handshake is rejected (protocol version) | inconclusive result CONNECT_ERROR"
 run_scenario etcd-wrong-certificate Modern 1 kube-apiserver:Modern etcd:Modern etcd-wrong-certificate \

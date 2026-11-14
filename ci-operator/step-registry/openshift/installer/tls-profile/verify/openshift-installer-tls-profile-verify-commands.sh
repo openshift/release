@@ -660,6 +660,9 @@ start_port_forward() {
     fi
     sleep 0.5
   done
+  # Do not keep a forward that never announced its port; the next attempt
+  # then starts a fresh one instead of probing an empty port.
+  stop_port_forward
   return 1
 }
 
