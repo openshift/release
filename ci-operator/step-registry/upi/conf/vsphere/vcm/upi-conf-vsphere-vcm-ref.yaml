@@ -26,10 +26,23 @@ ref:
     default: ""
     documentation: >-
       When set to "true", deletes spec.platformSpec.vsphere.vcenters and
-      spec.platformSpec.vsphere.failureDomains from the generated Infrastructure
-      manifest before ignition configs are created, simulating a cluster installed
-      without vSphere failure domain information (e.g. pre-4.13 or UPI installs that
-      never populate it, a state the installer never backfills on upgrade).
+      spec.platformSpec.vsphere.failureDomains from the generated
+      Infrastructure manifest right after `create manifests`, and rewrites
+      the generated openshift-config/cloud-provider-config ConfigMap from
+      YAML into the legacy INI format (using the server/datacenter/
+      datastore/folder values the installer resolved for the sole failure
+      domain) inside bootstrap.ign, once the bootstrap host's own render of
+      that ConfigMap has already consumed the installer's native YAML (a
+      byte-for-byte mismatch between that render and the in-cluster one
+      otherwise permanently degrades the machine-config ClusterOperator).
+      This simulates a cluster installed without vSphere failure domain
+      information (e.g. pre-4.13 or UPI installs that never populate it, a
+      state the installer never backfills on upgrade) in a form that can
+      actually occur on a real cluster: no installer version in active use
+      renders cloud-provider-config as INI anymore, so without the rewrite,
+      stripping alone leaves no source of datastore/topology data anywhere,
+      which keeps storage permanently Degraded and the install from ever
+      completing.
   credentials:
   - collection: vsphere-vmc
     group: terraform
