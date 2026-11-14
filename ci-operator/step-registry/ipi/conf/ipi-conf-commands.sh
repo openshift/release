@@ -83,3 +83,20 @@ if [ -n "${FEATURE_GATES}" ]; then
 featureGates: ${FEATURE_GATES}
 EOF
 fi
+
+# tlsProfileType selects the cluster-wide TLS security profile that the
+# installer renders into the APIServer config manifest. Only the values the
+# installer documents are accepted so a typo fails here, before installation.
+if [ -n "${INSTALL_CONFIG_TLS_PROFILE_TYPE}" ]; then
+        case "${INSTALL_CONFIG_TLS_PROFILE_TYPE}" in
+        Modern|Intermediate|Old) ;;
+        *)
+                echo "ERROR: INSTALL_CONFIG_TLS_PROFILE_TYPE must be Modern, Intermediate or Old, got '${INSTALL_CONFIG_TLS_PROFILE_TYPE}'"
+                exit 1
+                ;;
+        esac
+        echo "Adding 'tlsProfileType: ${INSTALL_CONFIG_TLS_PROFILE_TYPE}' to install-config.yaml"
+        cat >> "${out}" << EOF
+tlsProfileType: ${INSTALL_CONFIG_TLS_PROFILE_TYPE}
+EOF
+fi
