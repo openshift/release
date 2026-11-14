@@ -325,7 +325,22 @@ ACS_CSV_WAIT_TIMEOUT="${ACS_CSV_WAIT_TIMEOUT:-600}"
 ACS_NAMESPACE="${ACS_NAMESPACE:-rhacs-operator}"
 ACS_REPORT_ONLY="${ACS_REPORT_ONLY:-0}"
 
-# Input validation: channel name and integer-second timeouts (1..900).
+# Input validation: namespace (DNS-1123 label), channel name, and
+# integer-second timeouts (1..900). Each rejection classifies acs-invalid-input
+# and exits 2 before any oc call.
+#
+# ACS_NAMESPACE is interpolated literally into `oc create namespace`, the
+# OperatorGroup manifest, and the CSV label selector
+# `operators.coreos.com/rhacs-operator.${ACS_NAMESPACE}=`, so a malformed value
+# is an input error rather than an API error: unchecked, a bad create surfaces
+# as acs-namespace-error and a selector that matches nothing surfaces as "no
+# CSV". Apply the DNS-1123 label rule up front: lowercase alphanumerics and
+# hyphens, alphanumeric at both ends, at most 63 characters.
+if ! [[ "${ACS_NAMESPACE}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]] || (( ${#ACS_NAMESPACE} > 63 )); then
+  echo "ERROR: invalid ACS_NAMESPACE '${ACS_NAMESPACE}' (DNS-1123 label: lowercase alphanumerics and hyphens, alphanumeric at both ends, at most 63 characters)"
+  _classify "acs-invalid-input" "ACS_NAMESPACE failed validation"
+  exit 2
+fi
 if ! [[ "${ACS_CHANNEL}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
   echo "ERROR: invalid ACS_CHANNEL '${ACS_CHANNEL}'"
   _classify "acs-invalid-input" "ACS_CHANNEL failed validation"
