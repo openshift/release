@@ -147,7 +147,7 @@ print(len(json.load(sys.stdin).get('items',[])))
     true
 }
 
-function GetQuayAuth () {
+function GetQuayAuthOnce () {
     QUAY_USER=""
     QUAY_PASSWORD=""
     QUAY_TOKEN=""
@@ -200,6 +200,27 @@ function GetQuayAuth () {
     echo "ERROR: Could not obtain Quay credentials from any source" >&2
     export QUAY_USER QUAY_PASSWORD QUAY_TOKEN
     return 1
+}
+
+function GetQuayAuth () {
+    # The quayadmin secret is provisioned by the create-admin-user Job from
+    # the policy-config-quay policy, which can still be running (or waiting
+    # on its compliance wait) when the smoke starts. Retry the credential
+    # sources within a bounded budget instead of failing on the first miss;
+    # healthy lanes succeed on the first attempt with no added delay.
+    typeset -i authAttempts=0
+    typeset -i authMaxAttempts=20
+    while true; do
+        if GetQuayAuthOnce; then
+            return 0
+        fi
+        authAttempts=$(( authAttempts + 1 ))
+        if (( authAttempts >= authMaxAttempts )); then
+            echo "ERROR: Could not obtain Quay credentials from any source after ${authMaxAttempts} attempts (30s apart)" >&2
+            return 1
+        fi
+        sleep 30
+    done
 }
 
 function PreflightCheck () {
