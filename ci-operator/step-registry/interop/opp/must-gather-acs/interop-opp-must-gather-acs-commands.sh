@@ -810,6 +810,32 @@ if rhacs_op:
         for c in conds
     )
 
+# Enforcement gate (finding deep-3-f1): compliance alone does not make the
+# policy the owner of the subscription. An OperatorPolicy with
+# remediationAction: inform reports compliance and never re-creates a removed
+# Subscription, and a mustnothave policy would work against the object's
+# existence rather than restoring it, so neither can satisfy the removal
+# precondition. Only a declared enforcing action with a re-creating
+# compliance type counts. An unset field reads unknown (fail closed) instead
+# of assuming a default: the captured artifact records the policy spec only,
+# and a PlacementBinding can override enforcement at a level this step does
+# not capture.
+op_remediation = None
+op_compliance = None
+if rhacs_op and ops_s in ("ok", "absent"):
+    op_remediation = (
+        str(op_spec.get("remediationAction") or "").strip().lower() or None
+    )
+    op_compliance = (
+        str(op_spec.get("complianceType") or "").strip().lower() or None
+    )
+op_enforcing = None
+if op_remediation is not None:
+    op_enforcing = op_remediation == "enforce"
+op_recreates = None
+if op_compliance is not None:
+    op_recreates = op_compliance in ("musthave", "mustonlyhave")
+
 # Central presence: unknown (not absent) when the capture failed —
 # distinct report values for query-failed vs resource-absent (follow-up 1).
 if central_s == "ok":
@@ -875,6 +901,12 @@ terms = {
     "operatorpolicy_spec_channel": op_channel or "unknown",
     "operatorpolicy_targets_subscription": (
         str(op_owns_sub).lower() if op_owns_sub is not None else "unknown"),
+    "operatorpolicy_remediation_action": op_remediation or "unknown",
+    "operatorpolicy_enforcing": (
+        str(op_enforcing).lower() if op_enforcing is not None else "unknown"),
+    "operatorpolicy_compliance_type": op_compliance or "unknown",
+    "operatorpolicy_recreates_subscription": (
+        str(op_recreates).lower() if op_recreates is not None else "unknown"),
     "acm_csv_version": acm_version or "unknown",
     "addon_controller_image": (addon_images[0].get("image")
                                 if addon_images else "unknown"),
@@ -883,12 +915,16 @@ terms = {
 # Per-run removal precondition: the OperatorPolicy owns the rhacs
 # subscription (its spec.subscription targets that subscription) with a
 # matching channel, a non-copied CSV in the subscription namespace, and the
-# package resolvable in the subscription's effective catalog source. The
-# two-run aggregation and the named-build comparison live in the ticket rule.
+# package resolvable in the subscription's effective catalog source, and the
+# policy actually enforces a re-creating state (a compliant inform or
+# mustnothave policy would not restore the subscription). The two-run
+# aggregation and the named-build comparison live in the ticket rule.
 terms["removal_preconditions_met"] = str(
     inputs_classified
     and terms["operatorpolicy_compliant"] == "true"
     and terms["operatorpolicy_targets_subscription"] == "true"
+    and terms["operatorpolicy_enforcing"] == "true"
+    and terms["operatorpolicy_recreates_subscription"] == "true"
     and terms["rhacs_subscription_count"] == "1"
     and terms["rhacs_csv_count"] == "1"
     and terms["rhacs_subscription_channel"] != "unknown"
@@ -1180,11 +1216,59 @@ FIXTURE
   _expect operatorpolicy_targets_subscription true
   _expect removal_preconditions_met true
 
+  # Enforcement gate (finding deep-3-f1): a compliant policy that only
+  # reports does not re-create a removed subscription, so compliance plus a
+  # correct target is not enough on its own.
+  cat > "${tmp}/01-operatorpolicy.json" <<'FIXTURE'
+[{"name": "operatorpolicy-rhacs-operator", "namespace": "policies",
+  "spec": {"subscriptionName": "rhacs-operator",
+           "subscriptionNamespace": "rhacs-operator",
+           "channel": "stable", "remediationAction": "inform",
+           "complianceType": "musthave"},
+  "conditions": [{"type": "Compliant", "status": "True"}]}]
+FIXTURE
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect operatorpolicy_remediation_action inform
+  _expect operatorpolicy_enforcing false
+  _expect operatorpolicy_targets_subscription true
+  _expect removal_preconditions_met false
+
+  # A mustnothave policy works against the object's existence instead of
+  # restoring it, so it cannot own the removal precondition either.
+  cat > "${tmp}/01-operatorpolicy.json" <<'FIXTURE'
+[{"name": "operatorpolicy-rhacs-operator", "namespace": "policies",
+  "spec": {"subscriptionName": "rhacs-operator",
+           "subscriptionNamespace": "rhacs-operator",
+           "channel": "stable", "remediationAction": "enforce",
+           "complianceType": "mustnothave"},
+  "conditions": [{"type": "Compliant", "status": "True"}]}]
+FIXTURE
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect operatorpolicy_enforcing true
+  _expect operatorpolicy_recreates_subscription false
+  _expect removal_preconditions_met false
+
+  # An unset enforcement field is unknown, not true by default: the capture
+  # records the policy spec only, and enforcement can be overridden at a
+  # level this step does not read.
+  cat > "${tmp}/01-operatorpolicy.json" <<'FIXTURE'
+[{"name": "operatorpolicy-rhacs-operator", "namespace": "policies",
+  "spec": {"subscriptionName": "rhacs-operator",
+           "subscriptionNamespace": "rhacs-operator",
+           "channel": "stable", "remediationAction": null,
+           "complianceType": null},
+  "conditions": [{"type": "Compliant", "status": "True"}]}]
+FIXTURE
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect operatorpolicy_enforcing unknown
+  _expect operatorpolicy_recreates_subscription unknown
+  _expect removal_preconditions_met false
+
   if [[ ${_st_failed} -ne 0 ]]; then
     rm -rf "${tmp}"
     return 22
   fi
-  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, target-mismatch, unset-target, no-OperatorPolicy, and FALSE fixtures all classified correctly"
+  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, target-mismatch, unset-target, no-OperatorPolicy, non-enforcing, removal-blocking, unspecified-enforcement, and FALSE fixtures all classified correctly"
   rm -rf "${tmp}"
   return 0
 }
