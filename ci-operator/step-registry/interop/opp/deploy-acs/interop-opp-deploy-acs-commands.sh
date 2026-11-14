@@ -456,9 +456,17 @@ try:
     # OperatorPolicy is namespaced and the list above is cluster-wide, so the
     # name alone does not identify the policy that owns this install. Bind the
     # match to spec.subscription.namespace, the namespace this step manages.
+    # The OperatorPolicy controller defaults an omitted subscription namespace
+    # to the namespace the policy itself lives in, so a strict equality test
+    # would miss a policy that omits the field and install a second
+    # Subscription for an operator that policy already owns. Compare against
+    # the effective target.
+    def effective_ns(item):
+        sub = item.get("spec", {}).get("subscription", {}) or {}
+        return sub.get("namespace") or item.get("metadata", {}).get("namespace")
     matches = [i for i in items
                if i.get("metadata", {}).get("name") == "operatorpolicy-rhacs-operator"
-               and (i.get("spec", {}).get("subscription", {}) or {}).get("namespace") == target_ns]
+               and effective_ns(i) == target_ns]
     if not matches:
         # No policy owns this namespace: the install path runs.
         print("false")
