@@ -18,6 +18,7 @@ _opp_cleanup() {
   # Credential hygiene: these files must not survive the step, on the
   # success and the failure path alike.
   rm -f /tmp/quay-auth.json /tmp/quay-cookies.txt "${acsPassFile:-/tmp/acs-admin-password}" /tmp/acs-ingress-ca.crt
+  rm -rf /tmp/quay-ca-candidates
   # Scrub credentials before copying
   sed -i -E \
     -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
@@ -242,12 +243,10 @@ print(len(json.load(sys.stdin).get('items',[])))
 
 # TLS verification for the Quay route: the route certificate is issued by
 # the Quay operator's own CA and is not trusted by step pods, so the route
-# calls use curl -k and skopeo --dest-tls-verify=false / --tls-verify=false.
-# This differs from the ACS Central API block in RunAcsScan on purpose: that
-# block sends credentials, so it verifies the route against the ingress
-# router CA or the service CA bundle and never falls back to insecure TLS.
-# The relaxation here covers certificate trust only, and the pushed image is
-# still verified by pulling it back.
+# certificate is resolved from cluster state (route object, operator-owned
+# secrets, ingress CA, image trust store) and used as an explicit trust
+# anchor for every credential-bearing request; see ResolveQuayTlsTrust.  The
+# pushed image is still verified by pulling it back.
 function GetQuayAuth () {
     # Quay credentials are exported for downstream use in the current
     # shell (Best Practices exception for variables needed downstream);
@@ -290,7 +289,7 @@ function GetQuayAuth () {
         # The payload is piped in via stdin so the generated password is
         # never part of the curl argv.
         initResult="$(printf '%s' "{\"username\":\"quayadmin\",\"password\":\"${initPassword}\",\"email\":\"quayadmin@example.com\",\"access_token\":true}" | \
-            curl -fsSLk --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" \
+            curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" \
                 -H "Content-Type: application/json" \
                 -d @-)" || initResult=""
 
@@ -313,6 +312,102 @@ function GetQuayAuth () {
     return 1
 }
 
+# Quay route TLS trust.  Every credential-bearing request in this step runs
+# over a connection whose certificate is verified, so the trust anchor is
+# resolved before the first such request.  Only cluster state supplies it: the
+# certificate the route publishes for QUAY_HOST, certificates the Quay
+# operator owns for this QuayRegistry, the ingress CA, and the image's own
+# trust store.  Each candidate is proved against the registry endpoint and the
+# first that verifies wins.  There is no -k fallback: when no candidate
+# verifies the route, the step fails before a password, token or session
+# cookie is sent.
+typeset quayCaFile=''
+typeset -a quayTlsOpts=()
+typeset quayCaDir='/tmp/quay-ca-candidates'
+
+function ResolveQuayTlsTrust () {
+    rm -rf "${quayCaDir}"
+    mkdir -p "${quayCaDir}"
+
+    # The route that serves QUAY_HOST: a re-encrypt or edge route carries the
+    # certificate the cluster publishes for that host.
+    typeset routeCert=''
+    routeCert="$(oc get routes -n "${QUAY_NS}" -o json 2>/dev/null | \
+        QUAY_HOST_NAME="${QUAY_HOST}" python3 -c "
+import json, os, sys
+try:
+    items = json.load(sys.stdin).get('items', [])
+except Exception:
+    items = []
+for r in items:
+    if ((r.get('spec') or {}).get('host')) != os.environ['QUAY_HOST_NAME']:
+        continue
+    sys.stdout.write(((r.get('spec') or {}).get('tls') or {}).get('certificate') or '')
+    break
+")" || routeCert=''
+    if [[ -n "${routeCert}" ]]; then
+        printf '%s\n' "${routeCert}" > "${quayCaDir}/10-route.pem"
+    fi
+
+    # Certificates the Quay operator publishes for this QuayRegistry: any
+    # secret it owns that carries a ca.crt or tls.crt payload.
+    oc get secrets -n "${QUAY_NS}" -o json 2>/dev/null | \
+        QUAY_OWNER="${QUAY_REGISTRY}" CA_DIR="${quayCaDir}" python3 -c "
+import base64, json, os, sys
+try:
+    items = json.load(sys.stdin).get('items', [])
+except Exception:
+    items = []
+n = 0
+for s in items:
+    refs = (s.get('metadata') or {}).get('ownerReferences') or []
+    if not any((r.get('name') or '') == os.environ['QUAY_OWNER'] for r in refs):
+        continue
+    for key in ('ca.crt', 'tls.crt'):
+        val = (s.get('data') or {}).get(key)
+        if not val:
+            continue
+        n += 1
+        with open(os.path.join(os.environ['CA_DIR'], '20-owned-%02d.pem' % n), 'wb') as fh:
+            fh.write(base64.b64decode(val))
+" || true
+
+    # The ingress CA signs route certificates that no operator issued.
+    typeset ingressCa=''
+    ingressCa="$(oc get configmap default-ingress-cert -n openshift-config-managed -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null)" || ingressCa=''
+    if [[ -n "${ingressCa}" ]]; then
+        printf '%s\n' "${ingressCa}" > "${quayCaDir}/30-ingress.pem"
+    fi
+
+    # The image trust store covers a route with a publicly trusted
+    # certificate.
+    typeset systemBundle=''
+    for systemBundle in /etc/pki/tls/certs/ca-bundle.crt /etc/ssl/certs/ca-certificates.crt; do
+        if [[ -f "${systemBundle}" ]]; then
+            cp "${systemBundle}" "${quayCaDir}/40-system.pem"
+            break
+        fi
+    done
+
+    typeset candidate=''
+    typeset probe=''
+    for candidate in "${quayCaDir}"/*.pem; do
+        [[ -f "${candidate}" ]] || continue
+        probe="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 15 --max-time 30 --cacert "${candidate}" "https://${QUAY_HOST}/v2/")" || probe='000'
+        if [[ -n "${probe}" && "${probe}" != '000' ]]; then
+            quayCaFile="${candidate}"
+            break
+        fi
+    done
+    if [[ -z "${quayCaFile}" ]]; then
+        echo "ERROR: no cluster-published certificate verifies the Quay route at ${QUAY_HOST}; refusing to send credentials over unverified TLS" >&2
+        return 1
+    fi
+    quayTlsOpts=( --cacert "${quayCaFile}" )
+    echo "INFO: Quay route TLS verified against ${quayCaFile}"
+    return 0
+}
+
 function PreflightCheck () {
     # Capture the body first, then grep: grep -q closes the pipe on the
     # first match while curl (streaming, --max-time 30) can still be
@@ -320,7 +415,7 @@ function PreflightCheck () {
     # SIGPIPE under pipefail even when the endpoint answered (the
     # INTEROP-9670 hazard class, fixed repo-wide for `jq | head`).
     typeset probe=''
-    if ! probe="$(curl -fsSLk --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/api/v1/discovery")" \
+    if ! probe="$(curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/api/v1/discovery")" \
         || ! grep -qi "quay" <<< "${probe}"; then
         echo "ERROR: Quay registry endpoint not reachable" >&2
         return 1
@@ -350,7 +445,7 @@ function CreateTestOrg () {
         # Password-only auth: exchange the password for a session via the
         # signin endpoint.  The payload is piped in via stdin so the
         # password is never part of the curl argv.
-        csrf="$(curl -fsSLk --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/csrf_token" -c "${cookieFile}" | \
+        csrf="$(curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/csrf_token" -c "${cookieFile}" | \
             python3 -c "import sys,json; print(json.load(sys.stdin).get('csrf_token',''))" 2>/dev/null)" || csrf=""
 
         if [[ -n "${csrf}" ]]; then
@@ -362,7 +457,7 @@ function CreateTestOrg () {
             signinResult="$(python3 -c "
 import json, os
 print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['QUAY_PASSWORD']}))
-" | curl -fsSLk --connect-timeout 15 --max-time 30 -X POST "https://${QUAY_HOST}/api/v1/signin" \
+" | curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 -X POST "https://${QUAY_HOST}/api/v1/signin" \
                 -H "Content-Type: application/json" \
                 -H "X-CSRF-Token: ${csrf}" \
                 -b "${cookieFile}" -c "${cookieFile}" \
@@ -383,7 +478,7 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
                 # and the push would run without an organization.  Read the
                 # token that belongs to the session signin just created, over
                 # the same cookie jar, and send that one.
-                csrf="$(curl -fsSLk --connect-timeout 15 --max-time 30 \
+                csrf="$(curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 \
                     -b "${cookieFile}" -c "${cookieFile}" \
                     "https://${QUAY_HOST}/csrf_token" | \
                     python3 -c "import sys,json; print(json.load(sys.stdin).get('csrf_token',''))" 2>/dev/null)" || csrf=""
@@ -420,7 +515,7 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
         # session cookie and the CSRF token refreshed for that session,
         # otherwise this request goes out with an empty bearer header and the
         # push below has no organization.
-        orgRaw="$(curl -sSLk --connect-timeout 15 --max-time 60 -X POST \
+        orgRaw="$(curl -sSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
             -w '\n%{http_code}' \
             "https://${QUAY_HOST}/api/v1/organization/" \
             -b "${cookieFile}" \
@@ -429,7 +524,7 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
     else
         # The bearer token is handed to curl through a process-substitution
         # config, so it never appears in the curl argv.
-        orgRaw="$(curl -sSLk --connect-timeout 15 --max-time 60 -X POST \
+        orgRaw="$(curl -sSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
             -w '\n%{http_code}' \
             "https://${QUAY_HOST}/api/v1/organization/" \
             --config <(printf 'header = "Authorization: Bearer %s"\n' "${QUAY_TOKEN}") \
@@ -455,12 +550,12 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
         # text, so only a genuinely missing organization is reported.
         typeset orgPresentHttp=''
         if [[ -z "${QUAY_TOKEN}" && -f "${cookieFile}" && -n "${csrf}" ]]; then
-            orgPresentHttp="$(curl -sSLk --connect-timeout 15 --max-time 30 -o /dev/null \
+            orgPresentHttp="$(curl -sSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 -o /dev/null \
                 -w '%{http_code}' \
                 -b "${cookieFile}" \
                 "https://${QUAY_HOST}/api/v1/organization/interop-smoke-test" 2>/dev/null)" || orgPresentHttp=''
         else
-            orgPresentHttp="$(curl -sSLk --connect-timeout 15 --max-time 30 -o /dev/null \
+            orgPresentHttp="$(curl -sSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 -o /dev/null \
                 -w '%{http_code}' \
                 --config <(printf 'header = "Authorization: Bearer %s"\n' "${QUAY_TOKEN}") \
                 "https://${QUAY_HOST}/api/v1/organization/interop-smoke-test" 2>/dev/null)" || orgPresentHttp=''
@@ -516,7 +611,7 @@ function RunPushPull () {
       printf '{"auths":{"%s":{"auth":"%s"}}}\n' "${QUAY_HOST}" "${registryAuth}" >"${authFile}"
     true )
 
-    if ! skopeo copy --dest-tls-verify=false \
+    if ! SSL_CERT_FILE="${quayCaFile}" skopeo copy --dest-tls-verify=true \
         --dest-authfile="${authFile}" \
         docker://registry.access.redhat.com/ubi9-minimal:latest \
         "docker://${pushTarget}" 2>&1; then
@@ -531,7 +626,7 @@ function RunPushPull () {
     # still pass.  Copy the image into a local dir transport instead.
     typeset pullDir='/tmp/quay-pull-verify'
     rm -rf "${pullDir}"
-    if ! skopeo copy --src-tls-verify=false \
+    if ! SSL_CERT_FILE="${quayCaFile}" skopeo copy --src-tls-verify=true \
         --src-authfile="${authFile}" \
         "docker://${pushTarget}" \
         "dir:${pullDir}"; then
@@ -960,6 +1055,12 @@ function Main () {
     elif (( discoverRc != 0 )); then
         for t in "${allTests[@]}"; do
             RecordResult "${t}" "failed" "Quay discovery failed (rc=${discoverRc})"
+        done
+        exit 1
+    fi
+    if ! ResolveQuayTlsTrust; then
+        for t in "${allTests[@]}"; do
+            RecordResult "${t}" "failed" "Quay route TLS could not be verified; no credential was sent"
         done
         exit 1
     fi
