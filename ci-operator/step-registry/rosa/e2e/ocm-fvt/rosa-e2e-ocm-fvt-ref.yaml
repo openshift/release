@@ -148,6 +148,36 @@ ref:
     private-state carries its directory and the matching rule instead of its
     name, so refusing one never discloses what excluding it withholds.
 
+    Before publication the step also writes ocm-fvt-failure-summary.json from
+    the per-phase Ginkgo JSON reports in the private output tree. The verbose
+    reports and the merged junit are the only record of which cases failed,
+    and a whole one of them can be replaced after upload, so the summary keeps
+    that one question answerable. It is a projection, not a copy: for each of
+    the four known phases it reports a fixed state - parsed, partial,
+    unavailable, unreadable, oversized, malformed or ambiguous - how many
+    reports were seen, read and dropped by a cap, a spec count per Ginkgo
+    state, and one record per failed, aborted, panicked, interrupted or timed
+    out spec carrying the phase, that state, and the numeric case id when the
+    spec's Ginkgo labels name exactly one id_<number> - identified as label,
+    none or conflicting. Phases are read in run order and every limit is
+    applied per phase, so a teardown that fails every spec cannot push the
+    test phases out of the summary; what a limit did drop is counted on the
+    phase that lost it.
+
+    Every field is a member of a vocabulary fixed in the helper or a bounded
+    integer. No spec text, label, author tag, failure message, stack trace,
+    resource identifier, file name, timestamp or URL is emitted, and no source
+    location: a report's file name comes from the private test repository and
+    no public vocabulary says which basenames are legitimate, so the summary
+    omits the location rather than copying arbitrary text out of an object
+    that censoring may have removed. Reading is bounded and fails closed -
+    symlinks are not followed, only the per-phase JSON names are opened, and
+    an oversized, malformed - including a report the run never finished
+    writing - or unexpectedly shaped report is reported as that state rather
+    than parsed. Summarising is best effort and
+    runs after the test container has exited, so it cannot change the suite's
+    exit status, its teardown or its reports.
+
     Uploaded artifacts are pattern-scanned after upload as well, and a whole
     matching object is then replaced with a short notice, which makes a report
     that was never produced indistinguishable from one that was published and
