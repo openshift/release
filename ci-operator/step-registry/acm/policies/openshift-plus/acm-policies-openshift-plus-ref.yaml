@@ -12,16 +12,22 @@ ref:
     documentation: |-
       Comma- or newline-separated list of policy names to skip during
       enforcement.
-      Non-existent policies produce a warning, not a failure. Entries are
-      normalized (whitespace trimmed, empty and duplicate entries dropped
-      with a warning). While any entry remains, the step writes one failing
-      JUnit result per configured entry to
+      Non-existent policies produce a warning, not a failure. The value is
+      split on commas and on newlines, then each entry is normalized: every
+      whitespace character is removed wherever it appears, so "a b"
+      becomes "ab" and any CR padding disappears. Blank lines and a
+      trailing comma contribute no entry and are dropped silently. Entries
+      that are empty after whitespace removal (a whitespace-only line, or a
+      leading or interior empty comma field) and duplicate entries are
+      dropped with one summary warning. While any entry remains, the step
+      writes one failing JUnit result per normalized entry to
       ${ARTIFACT_DIR}/junit_skip_policies.xml (suite and classname
       lp-interop--OPP--policies; presence in the cluster is recorded in
       each failure message) so the skip state is countable instead of
-      invisible; the step still exits 0 on every path that exists today
-      (exit 1 remains only for the pre-existing policy-list fetch and
-      compliance-wait failure classes).
+      invisible. The row count is the normalized entry count, never the raw
+      field count: SKIP_POLICIES='a,a' yields tests="1". The step still
+      exits 0 on every path that exists today (exit 1 remains only for the
+      pre-existing policy-list fetch and compliance-wait failure classes).
   - name: QUAY_OPERATOR_CHANNEL
     default: ""
     documentation: |-
@@ -38,7 +44,7 @@ ref:
     Setup and apply the openshift-plus policyset.
     While SKIP_POLICIES is non-empty, the step also emits
     ${ARTIFACT_DIR}/junit_skip_policies.xml with one failing JUnit result
-    per configured skip entry (INTEROP-9677 interim visibility). The
+    per normalized skip entry (INTEROP-9677 interim visibility). The
     artifact is deliberately NOT propagated to ${SHARED_DIR}/junit:
     interop-opp-skip-ratio-gate counts <skipped> results, and propagating
     failure rows would inflate the gate denominator and mask real

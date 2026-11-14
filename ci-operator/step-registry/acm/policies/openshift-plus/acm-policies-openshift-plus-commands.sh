@@ -76,8 +76,11 @@ done
 # Non-existent policy names produce a warning, not a failure.
 typeset -a skipPoliciesArr=()
 if [[ -n "${SKIP_POLICIES:-}" ]]; then
-  # Normalize: trim whitespace (incl \r), drop empty and duplicate entries
-  # with one summary warning.  No rejection: warn-only semantics preserved.
+  # Normalize: strip every whitespace character wherever it appears in an
+  # entry (so \r padding goes too), keep the first occurrence of each name,
+  # and drop empty and duplicate entries with one summary warning.  A blank
+  # line contributes no entry at all, so it is dropped without a warning.
+  # No rejection: warn-only semantics preserved.
   typeset -a _rawSkipArr=()
   typeset _seenSkips='|'
   # `read` is line-oriented: splitting the whole value at once would keep
@@ -92,6 +95,7 @@ if [[ -n "${SKIP_POLICIES:-}" ]]; then
     _rawSkipArr+=(${_lineSkipArr[@]+"${_lineSkipArr[@]}"})
   done <<< "${SKIP_POLICIES}"
   typeset -a _droppedArr=()
+  typeset _p=''
   for _p in "${_rawSkipArr[@]}"; do
     _p="${_p//[[:space:]]/}"
     if [[ -z "${_p}" ]]; then
@@ -109,7 +113,7 @@ if [[ -n "${SKIP_POLICIES:-}" ]]; then
     printf '[%s] WARNING: dropped %d SKIP_POLICIES entr(ies): %s\n' \
       "$(date -u +%FT%TZ)" "${#_droppedArr[@]}" "${_droppedArr[*]}"
   fi
-  printf '[%s] SKIP_POLICIES set — will skip %d polic(ies):\n' \
+  printf '[%s] SKIP_POLICIES set, will skip %d polic(ies):\n' \
     "$(date -u +%FT%TZ)" "${#skipPoliciesArr[@]}"
   for p in "${skipPoliciesArr[@]}"; do
     printf '  - %s\n' "${p}"
@@ -121,7 +125,7 @@ fi
 # newlines that fabricate manifest lines; only normalized entries are
 # recorded, one per line.
 {
-  printf '# skip-policies manifest — generated %s\n' "$(date -u +%FT%TZ)"
+  printf '# skip-policies manifest, generated %s\n' "$(date -u +%FT%TZ)"
   printf '# Total policies to skip: %d\n' "${#skipPoliciesArr[@]}"
   for p in "${skipPoliciesArr[@]}"; do
     printf '%s\n' "${p}"
@@ -140,13 +144,15 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
     exit 1
   }
 
-  # Classify each configured entry by exact suffix compare and build the
+  # Classify each normalized skip entry by exact suffix compare and build the
   # wait list by the same exact-match filter (no regex construction: a
   # regex built from env-derived names is an injection sink, and BRE/ERE
   # engines disagree).  The wait list keeps the original -o name lines.
   typeset -a applyPoliciesArr=()
   typeset -a skipPresentArr=()
   typeset _found=false
+  typeset _line=''
+  typeset _skip=false
   for p in "${skipPoliciesArr[@]}"; do
     _found=false
     while IFS= read -r _line; do
@@ -180,9 +186,9 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
     "$(printf '%s\n' "${skipPresentArr[@]}" | grep -c '|true$' || true)" \
     "${#skipPoliciesArr[@]}" >> "${ARTIFACT_DIR}/skip-policies.txt"
 
-  # Emit one failing JUnit testcase per configured skip entry
+  # Emit one failing JUnit testcase per normalized skip entry
   # (INTEROP-9677): while any skip remains, the skip state must be
-  # countable instead of invisible.  Rows are keyed to the CONFIGURED
+  # countable instead of invisible.  Rows are keyed to the NORMALIZED
   # list (presence only informs the message), sorted for run-to-run
   # determinism, and carry no timestamps.  The step still exits 0;
   # these are visibility failures, not step failures.
@@ -192,11 +198,11 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
   # counts <skipped> (not failures); propagating failure rows would
   # inflate the gate denominator and mask real skip-ratio breaches.
   # Policy skips are counted via this per-step artifact instead.
-  _skip_xml_escape() {
+  _skipXmlEscape() {
     # Same idiom as interop-tests-opp-quay-smoke (& first)
     sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g' <<< "${1}"
   }
-  _skip_junit_emit() (
+  _skipJunitEmit() (
     # Subshell body: set +e is scoped here so emission trouble can never
     # change the step's exit semantics.
     set +e
@@ -211,12 +217,14 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
     _tmp="$(mktemp "${_f}.XXXXXX")" || return 0
     chmod 0644 "${_tmp}"
     typeset _n=${#skipPresentArr[@]}
+    typeset _p=''
+    typeset _present=''
     {
       printf '<?xml version="1.0" encoding="UTF-8"?>\n'
       printf '<testsuite name="lp-interop--OPP--policies" tests="%d" failures="%d" skipped="0">\n' "${_n}" "${_n}"
       printf '%s\n' "${skipPresentArr[@]}" | LC_ALL=C sort -t'|' -k1,1 | while IFS='|' read -r _p _present; do
         typeset _esc=''
-        _esc="$(_skip_xml_escape "${_p}")"
+        _esc="$(_skipXmlEscape "${_p}")"
         printf '  <testcase classname="lp-interop--OPP--policies" name="[sig-interop][Jira:INTEROP][Feature:OPP] %s skipped by SKIP_POLICIES" time="0">\n' "${_esc}"
         printf '    <failure message="policy skipped by SKIP_POLICIES">%s skipped by SKIP_POLICIES; state=skipped-configured; present in cluster: %s; see skip-policies.txt</failure>\n' "${_esc}" "${_present}"
         printf '  </testcase>\n'
@@ -251,7 +259,7 @@ PY
     fi
     return 0
   )
-  _skip_junit_emit || printf '[%s] WARNING: skip-visibility JUnit emission degraded\n' "$(date -u +%FT%TZ)" >&2
+  _skipJunitEmit || printf '[%s] WARNING: skip-visibility JUnit emission degraded\n' "$(date -u +%FT%TZ)" >&2
 
   if (( ${#applyPoliciesArr[@]} > 0 )); then
     printf '[%s] Waiting for %d non-skipped polic(ies) to become Compliant…\n' \
