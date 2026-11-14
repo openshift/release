@@ -526,6 +526,18 @@ def test_ocp_channel_only_valid_for_upgrade() -> None:
         expand_cells(matrix)
 
 
+@pytest.mark.parametrize(
+    ("source", "test", "value"),
+    [("nightly", "upgrade", "nightly"), ("stable", "upgrade", "stable"), ("stable", "e2e-install", "nightly")],
+)
+def test_upgrade_target_rejected_outside_stable_upgrade(source: str, test: str, value: str) -> None:
+    job = {"cron": "weekly", "source": source, "clouds": ["aws"], "ocp": ["4.22"], "test": test, "upgrade_target": value}
+    if test == "upgrade":
+        job["upgrade_from"] = "3.17"
+    with pytest.raises(ValueError, match="upgrade_target: nightly is only valid"):
+        expand_cells(_matrix_with_job(job))
+
+
 def test_upgrade_rejects_unknown_ocp_channel() -> None:
     matrix = _matrix_with_job(
         {
@@ -562,6 +574,82 @@ def test_upgrade_nightlies() -> None:
         assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == f"stable-{source}"
         assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == f"stable-{target}"
         assert env["QUAY_INDEX_IMAGE_TAG"] == f"quay-{target}__v{ocp}__quay-rhel9-operator"
+
+
+def test_upgrade_stable_flavour() -> None:
+    # source: stable upgrades the released operator from redhat-operators. Without
+    # upgrade_target it seeds and verifies through the API refs, no Playwright.
+    # upgrade_target: nightly (3.16) adds the ART catalog step and index env for
+    # the n target and runs n's Playwright suite in every phase, the seed included.
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    (released_cell,) = expand_cells(
+        _matrix_with_job(
+            {
+                "cron": "daily",
+                "source": "stable",
+                "clouds": ["aws"],
+                "ocp": ["4.18"],
+                "test": "upgrade",
+                "upgrade_from": "3.14",
+            },
+            {"branch": "redhat-3.15"},
+        )
+    )
+    cases = [
+        (by_name["quay-quay-redhat-3.16__aws-ocp419-s3-upgrade.yaml"], "from-315", "4.19", "3.15", "3.16", True),
+        (build_config(released_cell, GENERATOR_DIR / "templates"), "from-314", "4.18", "3.14", "3.15", False),
+    ]
+    for config, as_name, ocp, source, target, art_target in cases:
+        if art_target:
+            # The Playwright refs run from the runner image built from the branch.
+            assert config["images"] == {
+                "items": [
+                    {"dockerfile_path": "web/Containerfile.playwright", "to": "quay-playwright-runner"}
+                ]
+            }
+        else:
+            assert "images" not in config
+        assert config["releases"]["latest"] == {
+            "release": {"architecture": "amd64", "channel": "stable", "version": ocp}
+        }
+        test = config["tests"][0]
+        assert test["as"] == as_name
+        assert test["cron"] == "@daily"
+        env = test["steps"]["env"]
+        assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == f"stable-{source}"
+        assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == f"stable-{target}"
+        assert env["QUAY_UPGRADE_CATALOG_SOURCE"] == "redhat-operators"
+        assert "QUAY_OPERATOR_SOURCE" not in env
+        refs = [s.get("ref") or s.get("chain") for s in test["steps"]["test"]]
+        tail = refs[refs.index("quay-operator-upgrade-prepare-e2e") + 1 :]
+        if art_target:
+            assert env["QUAY_INDEX_IMAGE_TAG"] == f"quay-{target}__v{ocp}__quay-rhel9-operator"
+            assert refs[:2] == ["merge-stage-registry-credentials", "quay-enable-catalogsource-art"]
+            # Both Playwright phases use the n branch: redhat-3.15 has no suite.
+            assert env["PLAYWRIGHT_N_GIT_BRANCH"] == f"redhat-{target}"
+            assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == f"redhat-{target}"
+            assert env["PLAYWRIGHT_REF_MODE"] == "strict"
+            assert env["PLAYWRIGHT_GIT_REPO"] == "https://github.com/quay/quay.git"
+            assert "QUAY_EXTRA_CONFIG" in env
+            assert tail == [
+                "quay-operator-upgrade-seed",
+                "quay-operator-upgrade-channel",
+                "quay-operator-upgrade-verify",
+                "quay-operator-upgrade-functional",
+                "quay-operator-upgrade-report",
+            ]
+        else:
+            assert "QUAY_INDEX_IMAGE_TAG" not in env
+            assert "quay-enable-catalogsource-art" not in refs
+            assert not [key for key in env if key.startswith("PLAYWRIGHT_")]
+            assert "QUAY_EXTRA_CONFIG" not in env
+            assert tail == [
+                "quay-create-admin-user",
+                "quay-operator-upgrade-seed-api",
+                "quay-operator-upgrade-channel",
+                "quay-operator-upgrade-verify-api",
+            ]
 
 
 def test_redhat_318_aws_upgrade_cell() -> None:
