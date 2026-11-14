@@ -275,13 +275,36 @@ json.dump(bc,sys.stdout,indent=2)
     # a later build while ACS still holds the older build's record under that
     # tag, so the ACS match anchors on this digest: the deployment spec alone
     # carries the reference that was requested, not the build that is running.
+    # The selector comes from matchLabels, so it matches the pods of every
+    # ReplicaSet of the deployment, and an Available deployment can still have
+    # older pods running mid-rollout: wait for the rollout to finish and then
+    # require a single digest, instead of taking the first digest listed.
     typeset -g deployedImageDigest=''
+    typeset -g deployedDigestNote=''
     typeset podSelector=''
     podSelector="$(oc get deployment httpd-example -n e2e-opp -o jsonpath='{range $k, $v := .spec.selector.matchLabels}{$k}={$v},{end}' 2>/dev/null)" || podSelector=''
     podSelector="${podSelector%,}"
-    if [[ -n "${podSelector}" ]]; then
-        deployedImageDigest="$(oc get pods -n e2e-opp -l "${podSelector}" -o jsonpath='{range .items[*].status.containerStatuses[*]}{.imageID}{"\n"}{end}' 2>/dev/null \
-            | sed -n 's/.*\(sha256:[0-9a-f]\{64\}\).*/\1/p' | head -n 1)" || deployedImageDigest=''
+    typeset -i rolloutRc=0
+    typeset digestList=''
+    typeset -i digestCount=0
+    if [[ -z "${podSelector}" ]]; then
+        deployedDigestNote="the pod selector could not be read"
+    else
+        oc rollout status deployment/httpd-example -n e2e-opp --timeout=10m >/dev/null 2>&1 || rolloutRc=$?
+        if (( rolloutRc != 0 )); then
+            deployedDigestNote="the rollout had not completed (oc rollout status exited ${rolloutRc})"
+        else
+            digestList="$(oc get pods -n e2e-opp -l "${podSelector}" -o jsonpath='{range .items[?(@.status.phase=="Running")].status.containerStatuses[*]}{.imageID}{"\n"}{end}' 2>/dev/null \
+                | sed -n 's/.*\(sha256:[0-9a-f]\{64\}\).*/\1/p' | sort -u)" || digestList=''
+            digestCount=$(printf '%s\n' "${digestList}" | sed '/^$/d' | wc -l)
+            if (( digestCount == 1 )); then
+                deployedImageDigest="${digestList}"
+            elif (( digestCount > 1 )); then
+                deployedDigestNote="the running pods report ${digestCount} different image digests (${digestList//$'\n'/ })"
+            else
+                deployedDigestNote="no running pod reports an image digest"
+            fi
+        fi
     fi
 
     # Collect final status
@@ -360,7 +383,7 @@ function RunTestCase2 () {
         deployedDigest="${deployedImageDigest}"
     fi
     if [[ -z "${deployedDigest}" ]]; then
-        acsFailureMsg="Could not resolve the digest of the running image in deployment e2e-opp/httpd-example; a tag alone cannot anchor the ACS image match"
+        acsFailureMsg="Could not resolve the digest of the running image in deployment e2e-opp/httpd-example: ${deployedDigestNote:-no digest observed}; a tag alone cannot anchor the ACS image match"
         printf '%s\n' "ERROR: ${acsFailureMsg}" >&2
         RecordTestResult "test-acs-integration" "failed" "${acsFailureMsg}" "0"
         return 1
