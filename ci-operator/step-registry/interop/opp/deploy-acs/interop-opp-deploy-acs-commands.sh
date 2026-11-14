@@ -535,7 +535,14 @@ for _attempt in 1 2 3; do
     echo "ERROR: ${_class_detail}"
     exit 1
   fi
-  _backoff=$(( _attempt == 1 ? 5 : _attempt == 2 ? 15 : 30 ))
+  # No sleep after the last attempt: there is no retry left to use it, and
+  # the 30s came straight out of the shared work budget on the path that was
+  # already failing. The sibling OperatorGroup ladder ends the same way.
+  if (( _attempt >= 3 )); then
+    echo ">>> precondition query failed (attempt ${_attempt}/3), no attempts left: $(_api_err_class "${_pm_raw}")"
+    break
+  fi
+  _backoff=$(( _attempt == 1 ? 5 : 15 ))
   echo ">>> precondition query failed (attempt ${_attempt}/3), retrying in ${_backoff}s: $(_api_err_class "${_pm_raw}")"
   sleep "${_backoff}"
 done
