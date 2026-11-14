@@ -397,10 +397,93 @@ fi
 # the first policies can appear and become compliant long before the rest
 # of the set is created, so a single wait can succeed on a partial set.
 # Re-run the compliance wait whenever new policies appeared during the
-# previous pass; succeed only after a pass completes with a stable policy
-# count.
+# previous pass.  An equal count across one pass only proves that the count
+# stopped moving for the duration of that pass, not that GitOps finished
+# creating the set: the set can stall below its final size for longer than
+# a pass, and a pass over an already-compliant partial set returns at once.
+# Succeed only after a pass ran against a set of the same size that then
+# stayed unchanged across several spaced polls.
+typeset -i compliancePollTarget=3
+typeset -i compliancePollIntervalSeconds=30
+typeset complianceStableSet=''
+typeset -i complianceStableCount=0
+
+# Read the policy name set, sorted so that two reads compare equal
+# regardless of the order the API returns list items in.  A read that fails
+# is not an unchanged set, so it returns non-zero instead of printing an
+# empty set.
+PolicyNameSet () {
+  typeset namesJson=''
+  typeset -i namesRc=0
+  namesJson="$(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}')" || namesRc=$?
+  if (( namesRc != 0 )) || [[ -z "${namesJson}" ]]; then
+    printf '[%s] ERROR: failed to read the policy name set (rc=%d)\n' \
+      "$(date -u +%FT%TZ)" "${namesRc}" >&2
+    return 1
+  fi
+  printf '%s' "${namesJson}" | jq -r '.[]' | LC_ALL=C sort
+}
+
+# Policy count, with the read failure surfaced: a failed query is not a
+# stable count.
+PolicyCount () {
+  typeset countJson=''
+  typeset -i countRc=0
+  countJson="$(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || countRc=$?
+  if (( countRc != 0 )) || [[ -z "${countJson}" ]]; then
+    return 1
+  fi
+  printf '%s' "${countJson}"
+}
+
+# Poll until the policy name set has not changed across
+# compliancePollTarget consecutive polls spaced by
+# compliancePollIntervalSeconds, so a GitOps set that is still propagating is
+# not accepted as complete.  On success complianceStableSet and
+# complianceStableCount carry the observation.  Returns 1 when a poll fails
+# and 2 when the step budget runs out while polling.
+ReadStablePolicySet () {
+  typeset phase="${1}"
+  typeset nextSet=''
+  typeset -i unchangedPolls=0
+  complianceStableSet=''
+  complianceStableCount=0
+  while (( unchangedPolls < compliancePollTarget )); do
+    if ! nextSet="$(PolicyNameSet)"; then
+      printf '[%s] ERROR: could not read the policy name set while proving set stability %s\n' \
+        "$(date -u +%FT%TZ)" "${phase}" >&2
+      return 1
+    fi
+    if [[ -z "${nextSet}" ]]; then
+      printf '[%s] ERROR: the policy name set is empty while proving set stability %s\n' \
+        "$(date -u +%FT%TZ)" "${phase}" >&2
+      return 1
+    fi
+    if [[ "${nextSet}" == "${complianceStableSet}" ]]; then
+      unchangedPolls=$(( unchangedPolls + 1 ))
+    else
+      # A changed set restarts the count: the earlier observations say
+      # nothing about the set that exists now.
+      complianceStableSet="${nextSet}"
+      unchangedPolls=1
+    fi
+    if (( unchangedPolls < compliancePollTarget )); then
+      typeset -i pollNow=0
+      pollNow=$(date +%s)
+      if (( pollNow + compliancePollIntervalSeconds > stepDeadline )); then
+        printf '[%s] ERROR: the step time budget ran out while proving the policy set stable %s\n' \
+          "$(date -u +%FT%TZ)" "${phase}" >&2
+        return 2
+      fi
+      sleep "${compliancePollIntervalSeconds}"
+    fi
+  done
+  complianceStableCount=$(printf '%s\n' "${complianceStableSet}" | wc -l)
+  return 0
+}
+
 typeset -i policyCount=0
-typeset -i prevCount=-1
+typeset -i prevCount=0
 typeset -i complianceStart=0
 complianceStart=$(date +%s)
 typeset complianceAllSkipped=false
@@ -411,7 +494,27 @@ typeset complianceSkipNote=''
 if (( ${#skipPoliciesArr[@]} > 0 )); then
   complianceSkipNote=" (skipped by SKIP_POLICIES: ${skipPoliciesArr[*]})"
 fi
-while (( policyCount != prevCount )); do
+# The stability evidence that let the compliance row pass is carried into the
+# row itself, so a green run records which observation it was accepted on.
+typeset complianceStabilityNote=''
+
+# Require the set to stop growing before the first compliance pass, and
+# start the pass loop from the count observed there instead of -1: a pass
+# against an already-stable set must be able to finish the phase on its own,
+# and forcing a second pass by seeding prevCount with a sentinel charged the
+# step budget for a pass the stability evidence already covered.
+typeset -i stableRc=0
+ReadStablePolicySet "before the first compliance pass" || stableRc=$?
+if (( stableRc != 0 )); then
+  RecordResult "policies-compliant" "failed" "Could not observe a stable policy set before the first compliance pass (rc=${stableRc}): the set may still be growing, so compliance cannot be accepted${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
+  exit 1
+fi
+policyCount="${complianceStableCount}"
+prevCount="${policyCount}"
+printf '[%s] Policy set stable at %d policies before the first compliance pass\n' \
+  "$(date -u +%FT%TZ)" "${policyCount}"
+
+while :; do
   # Hard deadline: two 40m passes plus the earlier phases have to fit inside
   # the step timeout.  Without this check an overrunning compliance phase
   # leaves the pod to be terminated mid-wait, and the EXIT trap that writes
@@ -472,12 +575,12 @@ while (( policyCount != prevCount )); do
     fi
   fi
 
-  # Count after the pass.  A failed query is not a stable count: branch on
-  # the exit status and fail the row, so a broken API cannot record a pass
-  # for a policy set that was never observed.
+  # Count after the pass.  A failed query is not a stable count: fail the
+  # row, so a broken API cannot record a pass for a policy set that was
+  # never observed.
   typeset policyCountOut=""
   typeset -i countRc=0
-  policyCountOut="$(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || countRc=$?
+  policyCountOut="$(PolicyCount)" || countRc=$?
   if (( countRc != 0 )) || [[ -z "${policyCountOut}" ]]; then
     printf '[%s] ERROR: failed to count policies in namespace "policies" (rc=%d)\n' \
       "$(date -u +%FT%TZ)" "${countRc}" >&2
@@ -487,12 +590,40 @@ while (( policyCount != prevCount )); do
   policyCount="${policyCountOut}"
   printf '[%s] Compliance pass complete: %d policies in the set\n' \
     "$(date -u +%FT%TZ)" "${policyCount}"
+
+  # A pass is the final one only when it ran against a set of the same size
+  # and that set then stopped changing across the spaced polls.  Either
+  # signal alone is not completion: a growing set means the pass never
+  # covered the policies that appeared, and an equal count over one pass can
+  # be a set that stalled below its final size.
+  if (( policyCount != prevCount )); then
+    printf '[%s] Policy set changed during the pass (%d -> %d policies); re-running the compliance wait\n' \
+      "$(date -u +%FT%TZ)" "${prevCount}" "${policyCount}"
+    continue
+  fi
+  typeset -i passStableRc=0
+  ReadStablePolicySet "after the compliance pass" || passStableRc=$?
+  if (( passStableRc != 0 )); then
+    RecordResult "policies-compliant" "failed" "Could not observe a stable policy set after the compliance pass (rc=${passStableRc}): the set may still be growing, so compliance cannot be accepted${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
+    exit 1
+  fi
+  if (( complianceStableCount != prevCount )); then
+    printf '[%s] Policy set changed while proving stability (%d -> %d policies); re-running the compliance wait\n' \
+      "$(date -u +%FT%TZ)" "${prevCount}" "${complianceStableCount}"
+    policyCount="${complianceStableCount}"
+    continue
+  fi
+  policyCount="${complianceStableCount}"
+  complianceStabilityNote="${policyCount} policies, set unchanged across ${compliancePollTarget} consecutive ${compliancePollIntervalSeconds}s polls"
+  break
 done
 
 if [[ "${complianceAllSkipped}" == "true" ]]; then
   RecordResult "policies-compliant" "skipped" "All policies are in the skip list: ${skipPoliciesArr[*]}" "$(( $(date +%s) - complianceStart ))"
 else
-  RecordResult "policies-compliant" "passed" "" "$(( $(date +%s) - complianceStart ))"
+  printf '[%s] Policy set complete: %s%s\n' \
+    "$(date -u +%FT%TZ)" "${complianceStabilityNote}" "${complianceSkipNote}"
+  RecordResult "policies-compliant" "passed" "${complianceStabilityNote}${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
 fi
 
 true
