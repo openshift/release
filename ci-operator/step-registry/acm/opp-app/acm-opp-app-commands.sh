@@ -244,6 +244,12 @@ json.dump(bc,sys.stdout,indent=2)
 ################################################################################
 # Test Case 2: Test ACS Integration
 ################################################################################
+# The skip and failure reasons are declared at script scope because
+# RunTestCase2 sets them as a side channel: the caller reads them after the
+# call to tell a skip from a failure. A typeset inside the function would
+# make them local and silently empty the channel.
+typeset _acs_skip_reason=""
+typeset _acs_fail_reason=""
 function RunTestCase2 () {
     : "====== Test Case 2: Test ACS Integration ======"
     : "NOTE: Waiting for ACS to scan the httpd-example image built in Test Case 1."
@@ -298,9 +304,12 @@ function RunTestCase2 () {
     typeset -i attempt=0
     for ((attempt = 1; attempt <= retries; ++attempt)); do
         : "Attempt ${attempt}/${retries}: Querying ACS for httpd-example image..."
-        # Disable xtrace to protect ACS password in curl arguments
+        # Disable xtrace to protect ACS password in curl arguments. -f makes
+        # an HTTP error fail the fetch so the retry loop can act on it, -L
+        # follows redirects; `|| true` keeps a failed fetch from aborting the
+        # step under errexit/pipefail instead of retrying.
         set +x
-        httpdImageJson=$(curl -s -k -u "admin:${acsPassword}" "https://${acsHost}/v1/images" | /tmp/jq "${jqFilter}")
+        httpdImageJson=$(curl -fskSL -u "admin:${acsPassword}" "https://${acsHost}/v1/images" | /tmp/jq "${jqFilter}") || true
         set -x
         imageId=$(echo "${httpdImageJson}" | /tmp/jq .id)
         if [ "${imageId}" != "" ]; then
