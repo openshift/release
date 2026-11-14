@@ -5,6 +5,22 @@ set -o pipefail
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
+# ─── oc error classification (shared) ───────────────────────────────────────
+# A non-zero `oc get` exit means the query failed; what it failed with is read
+# from the error text, because a registered resource type that the API server
+# cannot answer for and an unregistered one are both non-zero exits. Only the
+# API server's NotFound error shape counts as absence. A substring test on
+# "not found" also matches a missing helper (`bash: oc: command not found`), a
+# wrapper failure, or any client-side message carrying the phrase, which turns
+# a broken capture path into confirmed absence and hides it from the capture
+# assertion (reviewer rows 8 and 9). Callers keep their own three-way
+# classification: notfound -> absent, no resource type -> absent, anything
+# else -> probe_error/QUERY FAILED.
+oc_notfound() { # oc_notfound <rc> <stderr-text>
+  [[ ${1:-0} -ne 0 ]] || return 1
+  grep -qE '(^|: )Error from server \(NotFound\)' <<< "${2:-}"
+}
+
 # ─── ACS Diagnostic Collection ──────────────────────────────────────────────
 # Wrapped in a function so early returns (when ACS is not available) do not
 # prevent the OLM evidence capture section from running.  This is critical
@@ -247,7 +263,7 @@ for i in data.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/01-operatorpolicy.json" 2>&1 || \
     echo "probe_error: operatorpolicy query failed" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
-elif echo "${OP_CRD_OUTPUT}" | grep -qi "not found"; then
+elif oc_notfound "${OP_CRD_RC}" "${OP_CRD_OUTPUT}"; then
   echo "CRD_ABSENT: operatorpolicies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
 else
   echo "probe_error: operatorpolicy CRD lookup failed (rc=${OP_CRD_RC}): ${OP_CRD_OUTPUT}" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
@@ -363,7 +379,7 @@ print(json.dumps({
 ' < "${CRD_TMP}" > "${EVIDENCE_DIR}/06-central-crd.json" 2>&1 || \
     echo "probe_error: central crd parse failed" > "${EVIDENCE_DIR}/06-central-crd.json"
 else
-  if echo "${CRD_ERR}" | grep -qi "not found"; then
+  if oc_notfound "${CRD_RC}" "${CRD_ERR}"; then
     echo "CRD centrals.platform.stackrox.io NOT FOUND" > "${EVIDENCE_DIR}/06-central-crd.json"
   else
     echo "QUERY FAILED (rc=${CRD_RC}): ${CRD_ERR}" > "${EVIDENCE_DIR}/06-central-crd.json"
@@ -400,7 +416,7 @@ print(json.dumps(result, indent=2))
 ' < "${CR_TMP}" > "${EVIDENCE_DIR}/07-central-cr.json" 2>&1 || \
     echo "probe_error: central cr parse failed" > "${EVIDENCE_DIR}/07-central-cr.json"
 else
-  if echo "${CR_ERR}" | grep -qi "not found"; then
+  if oc_notfound "${CR_RC}" "${CR_ERR}"; then
     echo "No Central CR found (CRD may not exist)" > "${EVIDENCE_DIR}/07-central-cr.json"
   elif echo "${CR_ERR}" | grep -qi "doesn't have a resource type"; then
     echo "CRD_ABSENT: centrals.platform.stackrox.io not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/07-central-cr.json"
@@ -437,7 +453,7 @@ print(json.dumps(result, indent=2))
 ' < "${SC_TMP}" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json" 2>&1 || \
     echo "probe_error: securedcluster parse failed" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
 else
-  if echo "${SC_ERR}" | grep -qi "not found"; then
+  if oc_notfound "${SC_RC}" "${SC_ERR}"; then
     echo "No SecuredCluster CR found (CRD may not exist)" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
   elif echo "${SC_ERR}" | grep -qi "doesn't have a resource type"; then
     echo "CRD_ABSENT: securedclusters.platform.stackrox.io not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
@@ -586,7 +602,7 @@ PYEOF
   fi
 else
   # One query drives both artifacts, so both take the same classification.
-  if echo "${PM_LIST_ERR}" | grep -qi "not found" || \
+  if oc_notfound "${PM_LIST_RC}" "${PM_LIST_ERR}" || \
      echo "${PM_LIST_ERR}" | grep -qi "doesn't have a resource type"; then
     echo "CRD_ABSENT: packagemanifests.packages.operators.coreos.com not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json"
     echo "CRD_ABSENT: packagemanifests.packages.operators.coreos.com not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/08-all-packagemanifests.txt"
@@ -634,7 +650,7 @@ for i in data.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/09-policies.json" 2>&1 || \
     echo "probe_error: policy query failed" > "${EVIDENCE_DIR}/09-policies.json"
-elif echo "${POLICY_CRD_OUTPUT}" | grep -qi "not found"; then
+elif oc_notfound "${POLICY_CRD_RC}" "${POLICY_CRD_OUTPUT}"; then
   echo "CRD_ABSENT: policies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/09-policies.json"
 else
   echo "probe_error: policy CRD lookup failed (rc=${POLICY_CRD_RC}): ${POLICY_CRD_OUTPUT}" > "${EVIDENCE_DIR}/09-policies.json"
@@ -658,7 +674,7 @@ for i in data.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/10-configpolicies.json" 2>&1 || \
     echo "probe_error: configurationpolicy query failed" > "${EVIDENCE_DIR}/10-configpolicies.json"
-elif echo "${CONFIGPOLICY_CRD_OUTPUT}" | grep -qi "not found"; then
+elif oc_notfound "${CONFIGPOLICY_CRD_RC}" "${CONFIGPOLICY_CRD_OUTPUT}"; then
   echo "CRD_ABSENT: configurationpolicies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/10-configpolicies.json"
 else
   echo "probe_error: configurationpolicy CRD lookup failed (rc=${CONFIGPOLICY_CRD_RC}): ${CONFIGPOLICY_CRD_OUTPUT}" > "${EVIDENCE_DIR}/10-configpolicies.json"
@@ -1374,11 +1390,36 @@ FIXTURE
   _expect rhacs_csv_phase Installing
   _expect removal_preconditions_met false
 
+  # Error classification (reviewer rows 8 and 9): only the API server's
+  # NotFound error shape counts as absence, so a missing helper, a wrapper
+  # failure, or a denied request can never be read as a confirmed absence.
+  _st_check_class() { # _st_check_class <label> <expected> <rc> <text>
+    local got=false
+    oc_notfound "$3" "$4" && got=true
+    if [[ "${got}" != "$2" ]]; then
+      echo "SELF-TEST FAILURE (22): oc_notfound[$1]=${got}, expected $2"
+      _st_failed=1
+    fi
+  }
+  _st_check_class notfound-shape true 1 \
+    'Error from server (NotFound): customresourcedefinitions.apiextensions.k8s.io "centrals.platform.stackrox.io" not found'
+  _st_check_class list-notfound-shape true 1 \
+    'Error from server (NotFound): the server could not find the requested resource'
+  _st_check_class missing-helper false 127 \
+    'bash: line 1: oc: command not found'
+  _st_check_class wrapper-failure false 127 \
+    'oc-wrapper: dependency not found in PATH'
+  _st_check_class forbidden false 1 \
+    'Error from server (Forbidden): centrals.platform.stackrox.io is forbidden: User "x" cannot list resource'
+  _st_check_class unavailable false 1 \
+    'Error from server (ServiceUnavailable): the server is currently unable to handle the request'
+  _st_check_class zero-exit false 0 ''
+
   if [[ ${_st_failed} -ne 0 ]]; then
     rm -rf "${tmp}"
     return 22
   fi
-  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, target-mismatch, unset-target, no-OperatorPolicy, non-enforcing, removal-blocking, unspecified-enforcement, upgrade-pending, non-Succeeded-phase, and FALSE fixtures all classified correctly"
+  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, target-mismatch, unset-target, no-OperatorPolicy, non-enforcing, removal-blocking, unspecified-enforcement, upgrade-pending, non-Succeeded-phase, and FALSE fixtures all classified correctly, and only the API server NotFound error shape classifies as absence"
   rm -rf "${tmp}"
   return 0
 }
@@ -1583,7 +1624,7 @@ CRD_RC=$?
 if [[ ${CRD_RC} -eq 0 ]]; then
   CRD_EXISTS="YES"
 else
-  if echo "${CRD_CHECK}" | grep -qi "not found"; then
+  if oc_notfound "${CRD_RC}" "${CRD_CHECK}"; then
     CRD_EXISTS="NO"
   else
     CRD_EXISTS="ERROR"
@@ -1595,7 +1636,8 @@ CR_RC=$?
 if [[ ${CR_RC} -eq 0 ]] && echo "${CR_CHECK}" | grep -q .; then
   CENTRAL_EXISTS="YES"
 else
-  if [[ ${CR_RC} -eq 0 ]] || echo "${CR_CHECK}" | grep -qi "not found\|no resources"; then
+  if [[ ${CR_RC} -eq 0 ]] || oc_notfound "${CR_RC}" "${CR_CHECK}" || \
+     echo "${CR_CHECK}" | grep -qi "no resources"; then
     CENTRAL_EXISTS="NO"
   else
     CENTRAL_EXISTS="ERROR"
