@@ -484,6 +484,44 @@ ReadStablePolicySet () {
   return 0
 }
 
+# Count-based gates cannot see a bundle that stalls below its final size, so
+# the expected membership comes from the applied PolicySets: every policy a
+# PolicySet lists has to be present before compliance is accepted.  The list
+# is read once per acceptance check; a PolicySet-as-read failure or an older
+# bundle without PolicySet objects leaves the count and stability evidence as
+# the only signal, and the run says so.
+ExpectedPolicyNames () {
+  typeset setsJson=''
+  setsJson="$(oc get policysets.policy.open-cluster-management.io -n policies -o json 2>/dev/null)" || return 1
+  if [[ -z "${setsJson}" ]]; then
+    return 1
+  fi
+  printf '%s' "${setsJson}" | jq -r '
+    [ .items[]?.spec.policies[]?
+      | select(.kind == "Policy")
+      | select((.namespace // "policies") == "policies")
+      | .name ]
+    | unique
+    | .[]
+  '
+}
+
+# Membership the observed set is missing: expected names (minus the skip list)
+# that the observed set does not carry.  Both lists are passed as arguments
+# and compared as sorted name sets.
+MissingExpectedPolicies () {
+  typeset expectedRaw="${1}"
+  typeset observedRaw="${2}"
+  typeset expectedFiltered=''
+  expectedFiltered="$(printf '%s\n' "${expectedRaw}" | sed 's|^|policy/|' | FilterSkippedPolicies | sed 's|^policy/||')" || expectedFiltered=''
+  if [[ -z "${expectedFiltered}" ]]; then
+    return 0
+  fi
+  LC_ALL=C comm -23 \
+    <(printf '%s\n' "${expectedFiltered}" | LC_ALL=C sort) \
+    <(printf '%s\n' "${observedRaw}" | LC_ALL=C sort) | sed '/^$/d'
+}
+
 typeset -i policyCount=0
 typeset -i prevCount=0
 typeset prevSet=''
@@ -500,6 +538,10 @@ fi
 # The stability evidence that let the compliance row pass is carried into the
 # row itself, so a green run records which observation it was accepted on.
 typeset complianceStabilityNote=''
+# Carried into the budget-exhaustion row: a set that stabilized below the
+# applied PolicySet membership is a different failure from a set that never
+# stabilized, and the row has to say which one it was.
+typeset missingExpectedNote=''
 
 # Require the set to stop growing before the first compliance pass, and
 # start the pass loop from the count observed there instead of -1: a pass
@@ -527,10 +569,19 @@ while :; do
   if (( passNow + compliancePassBudget > stepDeadline )); then
     printf '[%s] ERROR: no time left in the step budget for another compliance pass\n' \
       "$(date -u +%FT%TZ)" >&2
-    RecordResult "policies-compliant" "failed" "Compliance wait stopped after $(( (passNow - complianceStart) / 60 )) minutes: the step time budget was exhausted before the policy set stabilized${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
+    RecordResult "policies-compliant" "failed" "Compliance wait stopped after $(( (passNow - complianceStart) / 60 )) minutes: the step time budget was exhausted before the policy set stabilized${missingExpectedNote}${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
     exit 1
   fi
   prevCount="${policyCount}"
+  # Expected bundle membership, read before the pass: a set that is stable at
+  # a smaller size than the applied PolicySets list is not a complete
+  # deployment, whatever its count.
+  typeset expectedPolicies=''
+  if ! expectedPolicies="$(ExpectedPolicyNames)"; then
+    expectedPolicies=''
+    printf '[%s] WARNING: could not read PolicySet membership; accepting on the count and stability evidence only\n' \
+      "$(date -u +%FT%TZ)" >&2
+  fi
   # Names the pass below actually covers.  `oc wait --all` and the explicit
   # name list both only consider policies that exist when the wait starts, so
   # a policy replaced by another during the pass leaves the count unchanged
@@ -626,7 +677,22 @@ while :; do
     continue
   fi
   policyCount="${complianceStableCount}"
-  complianceStabilityNote="${policyCount} policies, same name set as the compliance pass, unchanged across ${compliancePollTarget} consecutive ${compliancePollIntervalSeconds}s polls"
+  # The gate is complete only when the set is stable, covers the names the
+  # pass covered, and carries every policy the applied PolicySets list.
+  typeset missingPolicies=''
+  missingPolicies="$(MissingExpectedPolicies "${expectedPolicies}" "${complianceStableSet}")" || missingPolicies=''
+  if [[ -n "${missingPolicies}" ]]; then
+    printf '[%s] Policy set stable at %d policies but incomplete: %d expected polic(ies) absent (%s); re-running the compliance wait\n' \
+      "$(date -u +%FT%TZ)" "${complianceStableCount}" "$(printf '%s\n' "${missingPolicies}" | wc -l)" "$(printf '%s' "${missingPolicies}" | tr '\n' ' ')"
+    missingExpectedNote="; the set stayed stable at ${complianceStableCount} policies without $(printf '%s\n' "${missingPolicies}" | wc -l) expected polic(ies): $(printf '%s' "${missingPolicies}" | tr '\n' ' ')"
+    policyCount="${complianceStableCount}"
+    continue
+  fi
+  if [[ -n "${expectedPolicies}" ]]; then
+    complianceStabilityNote="${policyCount} policies, same name set as the compliance pass, expected PolicySet membership covered, unchanged across ${compliancePollTarget} consecutive ${compliancePollIntervalSeconds}s polls"
+  else
+    complianceStabilityNote="${policyCount} policies, same name set as the compliance pass, unchanged across ${compliancePollTarget} consecutive ${compliancePollIntervalSeconds}s polls, PolicySet membership unavailable"
+  fi
   break
 done
 
