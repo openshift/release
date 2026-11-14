@@ -498,9 +498,12 @@ ExpectedPolicyNames () {
   fi
   printf '%s' "${setsJson}" | jq -r '
     [ .items[]?.spec.policies[]?
-      | select(.kind == "Policy")
-      | select((.namespace // "policies") == "policies")
-      | .name ]
+      | if type == "string"
+          then .
+          else (select(.kind == "Policy")
+                | select((.namespace // "policies") == "policies")
+                | .name)
+        end ]
     | unique
     | .[]
   '
