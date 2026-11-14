@@ -370,24 +370,32 @@ function RunTestCase2 () {
     # image id) and a tag-pinned deployment must find that tag: a
     # repository-only match also accepts an older build of the same
     # application, which is a record ACS may have scanned long ago.
+    # The matches are wrapped in an array so the caller always sees how many
+    # records the filter produced.  The single record is read out of that
+    # array only when its length is exactly one: reading `.id` and `.cves`
+    # from a stream of records concatenated them, so two records could satisfy
+    # the guard below between them even when neither carried a CVE count.
     # The jq programs are single-quoted on purpose: they are not shell
     # expansions, and every value reaches jq as an argument.
     # shellcheck disable=SC2016
     typeset jqFilter='
 def repopath: sub("@.*$"; "") | sub(":[^/]*$"; "");
 def lastn($d): split("/") | .[-$d:] | join("/");
-.images[]
-| select((((.name // "") | repopath | lastn($depth)) == $repo))
+[ .images[]
+  | select((((.name // "") | repopath | lastn($depth)) == $repo))
 '
     if [[ -n "${deployedDigest}" ]]; then
         # shellcheck disable=SC2016
-        jqFilter+='| select(((.name // "") | contains("@" + $digest)) or ((.id // "") == $digest))
+        jqFilter+='  | select(((.name // "") | contains("@" + $digest)) or ((.id // "") == $digest))
 '
     else
         # shellcheck disable=SC2016
-        jqFilter+='| select(((.name // "") | endswith(":" + $tag)))
+        jqFilter+='  | select(((.name // "") | endswith(":" + $tag)))
 '
     fi
+    # shellcheck disable=SC2016
+    jqFilter+=']
+'
 
     # TLS verification for the ACS Central API: prefer the service CA
     # bundle mounted in the pod (pattern from interop-opp-must-gather-acs);
@@ -410,6 +418,8 @@ def lastn($d): split("/") | .[-$d:] | join("/");
     typeset -i retryInterval=30
     typeset isImageFound=false
     typeset httpdImageJson="" imageId="" cves="" image=""
+    typeset -i matchCount=0
+    typeset -i multiMatchCount=0
 
     : "Waiting for httpd-example image to appear in ACS (max $((retries * retryInterval))s)..."
     typeset -i attempt=0
@@ -425,17 +435,29 @@ def lastn($d): split("/") | .[-$d:] | join("/");
                 "https://${acsHost}/v1/images" | /tmp/jq --arg repo "${deployedRepo}" --argjson depth "${deployedRepoDepth}" \
                     --arg digest "${deployedDigest}" --arg tag "${deployedTag}" "${jqFilter}"
         )"
-        imageId=$(echo "${httpdImageJson}" | /tmp/jq .id)
-        cves=$(echo "${httpdImageJson}" | /tmp/jq .cves)
-        # A matching record only proves ACS ingested the image once it carries
-        # both a real image id and a numeric CVE count: jq renders a missing
-        # field as the literal `null`, which is neither.  A completed scan
-        # with zero CVEs is accepted (0 is a number).
-        if [ "${imageId}" != "" ] && [ "${imageId}" != "null" ] && [ "${cves}" != "" ] && [ "${cves}" != "null" ]; then
-            image=$(echo "${httpdImageJson}" | /tmp/jq .name)
-            : "Success: Found ${cves} CVEs for image ${image}"
-            isImageFound=true
-            break
+        # Read the record only out of a single-element answer.  Two or more
+        # matching records are named and retried instead of being read: jq
+        # would otherwise concatenate their fields, and a record whose cves is
+        # null could satisfy the guard below through a sibling record.
+        matchCount=$(echo "${httpdImageJson}" | /tmp/jq 'length')
+        if (( matchCount > 1 )); then
+            multiMatchCount="${matchCount}"
+            imageId=''
+            cves=''
+            : "Attempt ${attempt}/${retries}: ${matchCount} ACS records match ${deployedRepo}; waiting for a single matching record"
+        elif (( matchCount == 1 )); then
+            imageId=$(echo "${httpdImageJson}" | /tmp/jq '.[0].id // ""')
+            cves=$(echo "${httpdImageJson}" | /tmp/jq '.[0].cves')
+            # A matching record only proves ACS ingested the image once it
+            # carries both a real image id and a numeric CVE count: jq renders
+            # a missing field as the literal `null`, which is neither.  A
+            # completed scan with zero CVEs is accepted (0 is a number).
+            if [ "${imageId}" != "" ] && [ "${imageId}" != "null" ] && [ "${cves}" != "" ] && [ "${cves}" != "null" ]; then
+                image=$(echo "${httpdImageJson}" | /tmp/jq '.[0].name // ""')
+                : "Success: Found ${cves} CVEs for image ${image}"
+                isImageFound=true
+                break
+            fi
         fi
 
         [ "${attempt}" -lt "${retries}" ] && sleep "${retryInterval}"
@@ -443,7 +465,16 @@ def lastn($d): split("/") | .[-$d:] | join("/");
 
     rm -f "${acsPassFile}"
 
-    [ "${isImageFound}" = true ] || return 1
+    if [ "${isImageFound}" != true ]; then
+        # Name the multi-match condition on exhaustion: a registry that keeps
+        # answering with several records is a different fault from a scan that
+        # never happened, and the row has to say which one it was.
+        if (( multiMatchCount > 1 )); then
+            acsFailureMsg="ACS returned ${multiMatchCount} matching records for ${deployedRepo} after $((retries * retryInterval))s; the check accepts exactly one record"
+            printf '%s\n' "ERROR: ${acsFailureMsg}" >&2
+        fi
+        return 1
+    fi
 
     return 0
 }
