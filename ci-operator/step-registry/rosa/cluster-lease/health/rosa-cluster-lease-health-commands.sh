@@ -59,12 +59,17 @@ log "Lease health check: ${TOTAL} cluster(s) in inventory"
 
 # Summary counters:
 #   HEALTHY       clusters that passed the checks below, plus in-use clusters.
-#   PROVISIONING  clusters still being built, which skip the checks below and
-#                 are counted apart from HEALTHY so in-flight capacity is not
-#                 reported as usable.
-#   UNHEALTHY     clusters moved to error by this run.
+#   PROVISIONING  clusters labelled provisioning, which skip the checks below
+#                 and are counted apart from HEALTHY so in-flight capacity is
+#                 not reported as usable. This bucket comes from the lease
+#                 label alone; the controller, not this script, reconciles that
+#                 label against the state OCM reports.
+#   UNHEALTHY     clusters that failed a check this run, and are marked error
+#                 unless they already were.
 #   RECOVERED     stale leases force-released; such a cluster is re-checked
-#                 afterwards and so is also counted in one of the buckets above.
+#                 afterwards as available.
+# HEALTHY, PROVISIONING and UNHEALTHY partition the inventory; RECOVERED
+# overlaps HEALTHY and UNHEALTHY.
 HEALTHY=0
 PROVISIONING=0
 UNHEALTHY=0

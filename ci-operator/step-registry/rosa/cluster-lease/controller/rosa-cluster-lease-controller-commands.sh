@@ -642,16 +642,26 @@ ACTUAL_CMS=$(lease_oc get configmap -n "${LEASE_NAMESPACE}" -l "rosa-cluster-lea
 ACTUAL_COUNT=$(echo "${ACTUAL_CMS}" | jq '.items | length')
 
 # Summary counters:
-#   HEALTHY       clusters this run left serving or ready to serve: available,
-#                 in-use, maintenance (mid-upgrade, pre-existing behaviour) and
-#                 clusters that finished installing during this run.
+#   HEALTHY       clusters the run leaves usable: available ones that passed
+#                 every check below, in-use ones OCM reports ready, clusters
+#                 that finished installing during the run, and clusters
+#                 restored from error. Also maintenance clusters (upgrading or
+#                 being refreshed), unconditionally: they are not leasable, but
+#                 folding them into HEALTHY is pre-existing behaviour this
+#                 change does not alter.
 #   PROVISIONING  clusters OCM is still building (pending/installing/waiting),
 #                 counted apart from HEALTHY so in-flight capacity is not
 #                 reported as usable.
-#   UNHEALTHY     clusters moved to error, or whose ConfigMap was removed.
+#   UNHEALTHY     clusters the run found or left unusable: the ones it marks
+#                 error, in-use ones with a bad OCM status (reported only, no
+#                 action while a job holds them), provisioning ones that are
+#                 gone from OCM, and clusters already in error whose restore
+#                 this run defers.
 #   RECOVERED     stale leases released back to the pool.
-# Clusters skipped because OCM was unreachable or returned an unexpected state
-# are counted in none of these, so the totals may be lower than the inventory.
+# Clusters left for the next reconcile are counted in none of these -- OCM
+# unreachable, an unexpected OCM state, or a ready cluster whose data was
+# incomplete or whose patch failed -- so the totals may be lower than the
+# inventory.
 HEALTHY=0
 PROVISIONING=0
 UNHEALTHY=0

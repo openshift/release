@@ -93,7 +93,9 @@ cleanup_materialized_tests() {
 trap cleanup_materialized_tests EXIT
 
 for test_path in "${registry_command_tests[@]}"; do
-  test_file="${base_dir}/${test_path}"
+  # The job passes "./" as the base directory, so trim the trailing slash to
+  # keep the paths in shellcheck diagnostics and test output readable.
+  test_file="${base_dir%/}/${test_path}"
   test_dir=$(dirname "${test_file}")
 
   if ! git -C "${base_dir}" cat-file -e "HEAD:${test_path}"; then
@@ -113,13 +115,19 @@ for test_path in "${registry_command_tests[@]}"; do
     chmod 0755 "${test_file}"
   fi
 
-  shellcheck -S warning "${test_file}"
-  # Run every test even when an earlier one fails, so a single PR sees the
-  # complete picture instead of only the first failure.
+  # Report every test's result even when an earlier one fails, so a single PR
+  # sees the complete picture instead of only the first failure. That applies to
+  # the lint of each test too, which would otherwise abort the loop under set -e.
+  if ! shellcheck -S warning "${test_file}"; then
+    echo "ERROR: shellcheck failed for ${test_path}" >&2
+    test_failures=$((test_failures + 1))
+    continue
+  fi
+
   "${test_file}" || test_failures=$((test_failures + 1))
 done
 
 if (( test_failures > 0 )); then
-  echo "ERROR: ${test_failures} registry command test(s) failed" >&2
+  echo "ERROR: ${test_failures} registry command test(s) failed lint or execution" >&2
   exit 1
 fi
