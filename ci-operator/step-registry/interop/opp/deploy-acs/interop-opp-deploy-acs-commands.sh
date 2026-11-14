@@ -36,7 +36,8 @@ shopt -u patsub_replacement 2>/dev/null || true
 #       default -> acs-unclassified:<type>/<reason> (JUnit error, never pass)
 #   * Self-disable: when the operatorpolicy-rhacs-operator that owns THIS
 #     step's namespace (spec.subscription.namespace) is Compliant with a
-#     matching channel and the CSV is Succeeded, emit
+#     matching channel and the CSV the Subscription names (status.currentCSV)
+#     is Succeeded, emit
 #     workaround_removal_ready=true and exit 0 without installing. A failed
 #     cluster-wide OperatorPolicy list is never read as "no policy": it
 #     retries, then fails closed as acs-operatorpolicy-query-failed (an RBAC,
@@ -538,13 +539,32 @@ except Exception:
     print("false")
 ' "${ACS_CHANNEL}" "${ACS_NAMESPACE}" 2>/dev/null || echo "false")
     if [[ "${_self_disable}" == "true" ]]; then
-      _existing_csv=$(oc get csv -n "${ACS_NAMESPACE}" -l "operators.coreos.com/rhacs-operator.${ACS_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _existing_csv=""
+      # A Compliant policy says the policy is satisfied; it does not name the
+      # CSV the operator is progressing to. Selecting the first CSV that
+      # carries the rhacs-operator label answers with whichever name the API
+      # lists first, so during an upgrade that can be an older CSV still in
+      # Succeeded phase while status.currentCSV points at one that is Pending
+      # or Failed, and the step would claim workaround_removal_ready and exit
+      # 0 on an operator that is not up. Name the CSV the way the wait below
+      # does, from status.currentCSV, and require that CSV to be Succeeded.
+      # An empty or unreadable name withholds the self-disable instead of
+      # claiming readiness: the install path adopts the existing Subscription
+      # (it never creates over one) and the CSV wait classifies the outcome.
+      _sd_csv=""
+      _existing_csv=""
+      if _sd_csv=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.status.currentCSV}' 2>/dev/null) && [[ -n "${_sd_csv}" ]]; then
+        _existing_csv=$(oc get csv "${_sd_csv}" -n "${ACS_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null) || _existing_csv=""
+      fi
       if [[ "${_existing_csv}" == "Succeeded" ]]; then
-        echo ">>> workaround_removal_ready=true (OperatorPolicy Compliant, CSV Succeeded) — not installing"
+        echo ">>> workaround_removal_ready=true (OperatorPolicy Compliant, current CSV ${_sd_csv} Succeeded) — not installing"
         _prop "workaround_removal_ready" "true"
         _prop "acs_subscription" "adopted"
+        _prop "csv_name" "${_sd_csv}"
+        _prop "csv_phase" "Succeeded"
         exit 0
       fi
+      echo ">>> NOTE: OperatorPolicy Compliant, but current CSV '${_existing_csv:-unresolved}' (Subscription currentCSV '${_sd_csv:-empty}') is not Succeeded: self-disable withheld, installing"
+      _prop "csv_self_disable_withheld" "${_existing_csv:-unresolved}"
     elif [[ "${_self_disable}" == "ambiguous" ]]; then
       echo ">>> NOTE: more than one OperatorPolicy claims subscription namespace ${ACS_NAMESPACE}: self-disable withheld, installing"
       _prop "operatorpolicy_match" "ambiguous"
