@@ -51,22 +51,40 @@ _opp_cleanup() {
   set +x 2>/dev/null
   if [[ ${_jrc} -ne 0 && -n "${ARTIFACT_DIR:-}" && -s "${_xtrace_log}" ]]; then
     local _scrub="/tmp/xtrace-scrub-$$.log"
+    local _scrubrc=0 _trace_state=""
     # tail -c cuts at a byte offset that can fall between a key and its
     # value (after `token=` or `Bearer `); the partial first line would
     # begin with a bare credential fragment no sed pattern can match.
     # Drop it before scrubbing (preflight review).
-    tail -c 5242880 "${_xtrace_log}" 2>/dev/null | tail -n +2 > "${_scrub}" 2>/dev/null || true
-    # Scrub credentials before copying
-    sed -i -E \
-      -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
-      -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
-      -e 's/password=[^ &]+/password=[REDACTED]/g' \
-      -e 's/token=[^ &]+/token=[REDACTED]/g' \
-      -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
-      "${_scrub}" 2>/dev/null || true
-    cp "${_scrub}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    # Fail closed (CodeRabbit review 5810009192): a failed truncation leaves
+    # a partial UNSCRUBBED file, so it is dropped and nothing is published.
+    if tail -c 5242880 "${_xtrace_log}" 2>/dev/null | tail -n +2 > "${_scrub}"; then
+      # Scrub credentials before copying. The status is checked, not
+      # discarded: a failed scrub leaves the credentials in place, so it
+      # must drop the trace rather than publish it.
+      sed -i -E \
+        -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+        -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
+        -e 's/password=[^ &]+/password=[REDACTED]/g' \
+        -e 's/token=[^ &]+/token=[REDACTED]/g' \
+        -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
+        "${_scrub}" || _scrubrc=$?
+      if (( _scrubrc != 0 )); then
+        _trace_state="DROPPED: scrub failed (rc=${_scrubrc}), no trace published"
+      elif [[ ! -s "${_scrub}" ]]; then
+        _trace_state="DROPPED: scrub produced an empty file, no trace published"
+      elif cp "${_scrub}" "${ARTIFACT_DIR}/"; then
+        _trace_state="saved to artifacts (scrubbed)"
+      else
+        _scrubrc=$?
+        _trace_state="DROPPED: copy to artifacts failed (rc=${_scrubrc}), no trace published"
+      fi
+    else
+      _scrubrc=$?
+      _trace_state="DROPPED: truncation failed (rc=${_scrubrc}), no trace published"
+    fi
     rm -f "${_scrub}" 2>/dev/null || true
-    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_jrc})"
+    echo ">>> TRACE: xtrace log ${_trace_state} (exit code ${_jrc})"
   fi
 }
 
