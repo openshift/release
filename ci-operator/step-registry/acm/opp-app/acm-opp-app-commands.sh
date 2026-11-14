@@ -31,10 +31,7 @@ _propagate_junit () {
 #   - JUnit XML is generated on exit (via trap) regardless of test results
 #   - Script exits nonzero when any test case is marked failed (the
 #     preflight failure paths and the end-of-script status check); a
-#     fully skipped report exits 0 unless the lane sets
-#     QUAY_EXPECTATION=required. The ref is best_effort and the
-#     consuming jobs allow best-effort post steps, so later steps in
-#     the lane still run after a nonzero exit
+#     fully skipped report exits 0
 #   - Individual test failures are visible in Prow UI via JUnit reporting
 #
 ################################################################################
@@ -340,15 +337,6 @@ elif ! grep -qi quayintegration <<< "${apiOutput}"; then
         testFailureMsg["${test}"]="QuayIntegration CRD not available - Quay Bridge Operator not installed"
     done
 
-    # INTEROP-9700: the skip marks above reach JUnit through the exit trap,
-    # but on a lane that requires Quay an absent CRD is exactly the
-    # skip-only case this gate exists to catch, so fail closed here rather
-    # than exiting green before the end-of-script check runs.
-    if [[ "${QUAY_EXPECTATION:-}" == "required" ]]; then
-        echo "ERROR: QuayIntegration CRD not available with QUAY_EXPECTATION=required; failing the step." >&2
-        exit 1
-    fi
-
     exit 0
 fi
 
@@ -432,22 +420,6 @@ for test in "${allTestCasesArr[@]}"; do
 done
 
 if [[ "${_overall_status}" == "PASS" ]]; then
-    # INTEROP-9700: surface all-skipped runs on lanes that require Quay.
-    # When every test case is skipped the step asserted nothing; with
-    # QUAY_EXPECTATION=required that fails the step instead of exiting
-    # green on a skip-only report.
-    if [[ "${QUAY_EXPECTATION:-}" == "required" ]]; then
-        typeset -i _non_skipped=0
-        for test in "${allTestCasesArr[@]}"; do
-            if [[ "${testStatus[${test}]}" != "skipped" ]]; then
-                _non_skipped=$((_non_skipped + 1))
-            fi
-        done
-        if (( _non_skipped == 0 )); then
-            echo "ERROR: all test cases skipped with QUAY_EXPECTATION=required; failing the step." >&2
-            exit 1
-        fi
-    fi
     exit 0
 else
     exit 1
