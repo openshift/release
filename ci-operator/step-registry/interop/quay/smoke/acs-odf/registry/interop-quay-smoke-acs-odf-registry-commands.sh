@@ -883,7 +883,17 @@ function RunAcsScan () {
     start=$(date +%s)
 
     typeset acsHost=''
-    acsHost="$(oc get route -n stackrox central -o jsonpath='{.spec.host}')" || acsHost=""
+    # Only an explicit not-found may record the ACS test as skipped: a route
+    # read that fails on a timeout or an authorization error leaves the
+    # deployment state unknown, and treating it as absent would let the step
+    # pass without scanning an installed ACS.
+    typeset -i routeRc=0
+    acsHost="$(oc get route -n stackrox central -o jsonpath='{.spec.host}' --ignore-not-found 2>/dev/null)" || routeRc=$?
+    if (( routeRc != 0 )); then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "Could not read the Central route (rc=${routeRc}); the ACS deployment state is unknown, so the scan cannot be classified as skipped" "${elapsed}"
+        return 1
+    fi
     if [[ -z "${acsHost}" ]]; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "skipped" "ACS not deployed (Central route not found)" "${elapsed}"
