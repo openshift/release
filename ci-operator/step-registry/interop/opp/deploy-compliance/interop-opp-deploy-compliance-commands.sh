@@ -355,14 +355,24 @@ if [[ "${COMPLIANCE_REPORT_ONLY}" == "1" ]]; then
   # packagemanifest precondition on purpose (detection must work when the
   # catalog is absent or erroring) and before the self-disable check so the
   # full property set is recorded even when an OperatorPolicy owns the install.
-  _sub=$(oc get subscription.operators.coreos.com compliance-operator -n "${COMPLIANCE_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null) || _sub=""
-  _csvp=$(oc get csv -n "${COMPLIANCE_NAMESPACE}" -l "operators.coreos.com/compliance-operator.${COMPLIANCE_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _csvp=""
-  _pm=$(oc get packagemanifest compliance-operator -n openshift-marketplace -o name 2>/dev/null) || _pm=""
+  # A failed read is kept as its own state (undecided), never folded into the
+  # absent/empty answer: detection output must not report an API or RBAC error
+  # as an object state.
+  _sub=$(oc get subscription.operators.coreos.com compliance-operator -n "${COMPLIANCE_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null) || _sub="undecided"
+  _csvp=$(oc get csv -n "${COMPLIANCE_NAMESPACE}" -l "operators.coreos.com/compliance-operator.${COMPLIANCE_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _csvp="undecided"
+  _pm=$(oc get packagemanifest compliance-operator -n openshift-marketplace -o name 2>/dev/null) || _pm="undecided"
+  if [[ "${_pm}" == "undecided" ]]; then
+    _pm_state="undecided"
+  elif [[ -n "${_pm}" ]]; then
+    _pm_state="present"
+  else
+    _pm_state="absent"
+  fi
   _prop "report_only" "true"
   _prop "channel_observed" "${_sub:-absent}"
   _prop "csv_phase" "${_csvp:-absent}"
-  _prop "packagemanifest" "$([[ -n "${_pm}" ]] && echo present || echo absent)"
-  echo ">>> REPORT_ONLY: channel=${_sub:-absent} csv=${_csvp:-absent} packagemanifest=$([[ -n "${_pm}" ]] && echo present || echo absent)"
+  _prop "packagemanifest" "${_pm_state}"
+  echo ">>> REPORT_ONLY: channel=${_sub:-absent} csv=${_csvp:-absent} packagemanifest=${_pm_state}"
   exit 0
 fi
 
@@ -373,8 +383,13 @@ fi
 # cluster namespace, local-cluster) and the observed namespace is recorded.
 _prop "channel_requested" "${COMPLIANCE_OPERATOR_CHANNEL}"
 if oc get crd operatorpolicies.policy.open-cluster-management.io >/dev/null 2>&1; then
-  _op_status=$(oc get operatorpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null) || _op_status=""
-  if [[ -n "${_op_status}" ]]; then
+  _op_status=$(oc get operatorpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null) || _op_status="undecided"
+  if [[ "${_op_status}" == "undecided" ]]; then
+    # A failed read is not "no policy". The self-disable verdict is withheld
+    # (the install path runs and the policy is never patched) and the state is
+    # reported instead of read as an absence.
+    echo ">>> NOTE: operatorpolicy list read failed (API/RBAC error); self-disable withheld, install path runs"
+  elif [[ -n "${_op_status}" ]]; then
     typeset _sd_policy="operatorpolicy-comp-operator"
     _sd_out=$(printf '%s' "${_op_status}" | python3 -c '
 import json, sys
@@ -423,13 +438,18 @@ except Exception:
     fi
     _prop "live_subscription_channel" "${_live_ch:-unknown}"
     if [[ "${_sd_ok}" == "true" && ( -z "${_live_ch}" || "${_live_ch}" == "${COMPLIANCE_OPERATOR_CHANNEL}" ) ]]; then
-      _existing_csv=$(oc get csv -n "${COMPLIANCE_NAMESPACE}" -l "operators.coreos.com/compliance-operator.${COMPLIANCE_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _existing_csv=""
+      _existing_csv=$(oc get csv -n "${COMPLIANCE_NAMESPACE}" -l "operators.coreos.com/compliance-operator.${COMPLIANCE_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _existing_csv="undecided"
       if [[ "${_existing_csv}" == "Succeeded" ]]; then
         echo ">>> workaround_removal_ready=true (OperatorPolicy Compliant, channel ${_sd_ch}, CSV Succeeded) - not installing"
         _prop "workaround_removal_ready" "true"
         _prop "compliance_subscription" "adopted"
         _prop "csv_phase" "Succeeded"
         exit 0
+      elif [[ "${_existing_csv}" == "undecided" ]]; then
+        # A failed read is not "not Succeeded": the self-disable is withheld
+        # (the install path below is create-if-absent) and the state is reported
+        # instead of read as a definite negative.
+        echo ">>> NOTE: CSV phase read failed (API/RBAC error); self-disable withheld, install path runs"
       fi
     elif [[ "${_sd_ok}" == "true" ]]; then
       # Policy Compliant on the requested channel, but the live Subscription
@@ -606,7 +626,7 @@ if _poll_jsonpath subscription.operators.coreos.com compliance-operator "${COMPL
   _prop "csv_name" "${csvName}"
 else
   _prc=$?
-  _cond=$(oc get subscription.operators.coreos.com compliance-operator -n "${COMPLIANCE_NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason} {end}' 2>/dev/null) || _cond=""
+  _cond=$(oc get subscription.operators.coreos.com compliance-operator -n "${COMPLIANCE_NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason} {end}' 2>/dev/null) || _cond="undecided"
   if (( _prc == 2 )); then
     _classify "compliance-subscription-query-failed" "3 consecutive subscription queries failed (rc captured; API/RBAC error, not absence)"
   else
