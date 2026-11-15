@@ -437,7 +437,7 @@ except Exception:
     print("absent - -")
 ' "${_sd_policy}" "${QUAY_OPERATOR_CHANNEL}" 2>/dev/null) || _sd_out="absent - -"
     _sd_ok="absent" _sd_ns="-" _sd_ch="-"
-    read -r _sd_ok _sd_ns _sd_ch <<<"${_sd_out}" || true
+    read -r _sd_ok _sd_ns _sd_ch <<<"${_sd_out}"
     _prop "operatorpolicy_namespace" "${_sd_ns:-unknown}"
     _prop "operatorpolicy_channel" "${_sd_ch:-unknown}"
     # The policy's spec channel is the REQUESTED channel, not the live one, so
