@@ -4775,6 +4775,51 @@ tests:
     test:
     - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-vsphere-upi-zones
+- as: ocpbugs-137974-vsphere-ipi-debug
+  # This is intentionally disabled as a periodic. Rehearse it from a PR when
+  # a diagnostic investigation cluster is needed.
+  cron: 0 0 31 2 *
+  timeout: 6h0m0s
+  steps:
+    cluster_profile: vsphere-elastic
+    test:
+    - as: collect-ocpbugs-137974
+      commands: |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        artifact_dir="${ARTIFACT_DIR:-/tmp/artifacts}/ocpbugs-137974"
+        mkdir -p "${artifact_dir}"
+
+        collect() {
+          local name="$1"
+          shift
+          "$@" >"${artifact_dir}/${name}" 2>&1 || true
+        }
+
+        for iteration in $(seq 1 60); do
+          date -Is >"${artifact_dir}/timestamp-${iteration}.txt"
+          collect "clusterversion-${iteration}.yaml" oc get clusterversion -o yaml
+          collect "infrastructure-${iteration}.yaml" oc get infrastructure cluster -o yaml
+          collect "clusteroperators-${iteration}.yaml" oc get co baremetal kube-apiserver -o yaml
+          collect "webhook-endpoints-${iteration}.yaml" oc -n openshift-machine-api get endpoints cluster-baremetal-webhook-service -o yaml
+          collect "webhook-endpointslices-${iteration}.yaml" oc -n openshift-machine-api get endpointslice -l kubernetes.io/service-name=cluster-baremetal-webhook-service -o yaml
+          collect "webhook-service-${iteration}.yaml" oc -n openshift-machine-api get svc cluster-baremetal-webhook-service -o yaml
+          collect "cbo-pods-${iteration}.yaml" oc -n openshift-machine-api get pods -l k8s-app=cluster-baremetal-operator -o wide
+          collect "validating-webhooks-${iteration}.yaml" oc get validatingwebhookconfiguration -o yaml
+          collect "kube-apiserver-operator-logs-${iteration}.txt" oc -n openshift-kube-apiserver-operator logs deploy/openshift-kube-apiserver-operator --since=10m
+          sleep 30
+        done
+
+        # Keep the cluster alive for three hours for manual inspection.
+        sleep 10800
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: cucushift-installer-rehearse-vsphere-ipi
 - as: metal-ipi-ovn-vmedia-disk-encryption-f28
   capabilities:
   - intranet
