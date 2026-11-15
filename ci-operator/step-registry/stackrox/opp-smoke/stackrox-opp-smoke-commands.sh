@@ -286,7 +286,13 @@ _centralNs="$(cat "${SHARED_DIR}/CENTRAL_NS" 2>/dev/null || true)"
 if [[ -z "${_centralNs}" ]]; then
     _centralNs="stackrox"
 fi
-if ! oc get deployment -n "${_centralNs}" -o name 2>/dev/null | grep -q 'scanner-v4-matcher'; then
+# Capture first, then match: grep -q closes the pipe as soon as it matches, and
+# under pipefail that SIGPIPE fails the read (same cure as the sensor-state
+# greps later in this step). The capture keeps the read's status out of the
+# pipe.
+typeset _deps=""
+_deps="$(oc get deployment -n "${_centralNs}" -o name 2>/dev/null)" || _deps=""
+if ! grep -q 'scanner-v4-matcher' <<< "${_deps}"; then
     echo "[smoke] Scanner V4 matcher not deployed in ${_centralNs}; skipping scanner readiness gate"
     _add_case "scanner-v4-ready" skipped "ScannerGate" "no scanner-v4-matcher deployment in ${_centralNs}; scan-dependent results follow suite behavior"
 else
