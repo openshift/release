@@ -510,6 +510,34 @@ ExpectedPolicyNames () {
   '
 }
 
+# Membership read with retries.  A read that cannot be completed fails the
+# row instead of falling back to count and stability alone: a partial set that
+# stops changing is indistinguishable from a complete one, which is the race
+# this membership check exists to close.
+ExpectedPolicyNamesRetry () {
+  typeset phase="${1}"
+  typeset names=''
+  typeset -i try=0 rc=0
+  for try in 1 2 3; do
+    if names="$(ExpectedPolicyNames)"; then
+      printf '%s' "${names}"
+      return 0
+    else
+      # $? here is the failed condition's status; after the fi it would be the
+      # if compound's own (successful) status.
+      rc=$?
+    fi
+    if (( try < 3 )); then
+      printf '[%s] WARNING: could not read PolicySet membership %s (attempt %d/3), retrying\n' \
+        "$(date -u +%FT%TZ)" "${phase}" "${try}" >&2
+      sleep 10
+    fi
+  done
+  printf '[%s] ERROR: could not read PolicySet membership %s (rc=%d)\n' \
+    "$(date -u +%FT%TZ)" "${phase}" "${rc}" >&2
+  return "${rc}"
+}
+
 # Membership the observed set is missing: expected names (minus the skip list)
 # that the observed set does not carry.  Both lists are passed as arguments
 # and compared as sorted name sets.
@@ -584,24 +612,8 @@ while :; do
   # exactly the race this membership check exists to close, because a partial
   # set that stops changing is indistinguishable from a complete one.
   typeset expectedPolicies=''
-  typeset -i expectedRc=0 expectedTry=0
-  for expectedTry in 1 2 3; do
-    if expectedPolicies="$(ExpectedPolicyNames)"; then
-      expectedRc=0
-      break
-    else
-      # $? here is the failed condition's status; after the fi it would be the
-      # if compound's own (successful) status.
-      expectedRc=$?
-    fi
-    if (( expectedTry < 3 )); then
-      printf '[%s] WARNING: could not read PolicySet membership (attempt %d/3), retrying\n' \
-        "$(date -u +%FT%TZ)" "${expectedTry}" >&2
-      sleep 10
-    fi
-  done
-  if (( expectedRc != 0 )); then
-    RecordResult "policies-compliant" "failed" "Could not read PolicySet membership before the compliance pass (rc=${expectedRc}); the stable set cannot be compared against the applied PolicySets${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
+  if ! expectedPolicies="$(ExpectedPolicyNamesRetry "before the compliance pass")"; then
+    RecordResult "policies-compliant" "failed" "Could not read PolicySet membership before the compliance pass; the stable set cannot be compared against the applied PolicySets${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
     exit 1
   fi
   # Names the pass below actually covers.  `oc wait --all` and the explicit
@@ -699,6 +711,20 @@ while :; do
     continue
   fi
   policyCount="${complianceStableCount}"
+  # The membership the coverage check uses was read before the pass, so a
+  # PolicySet applied during the pass is not in it: its policies could stay
+  # absent through the stability window and the row would be accepted with them
+  # missing.  Re-read the membership, and wait again when it changed.
+  typeset refreshedPolicies=''
+  if ! refreshedPolicies="$(ExpectedPolicyNamesRetry "after the compliance pass")"; then
+    RecordResult "policies-compliant" "failed" "Could not re-read PolicySet membership after the compliance pass; the pass may have run against an older bundle${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
+    exit 1
+  fi
+  if [[ "${refreshedPolicies}" != "${expectedPolicies}" ]]; then
+    printf '[%s] PolicySet membership changed during the pass; re-running the compliance wait\n' \
+      "$(date -u +%FT%TZ)"
+    continue
+  fi
   # The gate is complete only when the set is stable, covers the names the
   # pass covered, and carries every policy the applied PolicySets list.
   typeset missingPolicies=''

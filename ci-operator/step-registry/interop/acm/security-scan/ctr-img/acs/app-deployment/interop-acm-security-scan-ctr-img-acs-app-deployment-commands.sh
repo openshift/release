@@ -284,20 +284,32 @@ json.dump(bc,sys.stdout,indent=2)
     typeset -g deployedImageDigest=''
     typeset -g deployedDigestNote=''
     typeset podSelector=''
+    typeset appContainer=''
     # The selector is read as JSON and rendered here: JSONPath has no
     # `$k, $v :=` form, and an oc call that cannot parse its own output would
-    # leave the selector empty and silently skip the digest read.
-    podSelector="$(oc get deployment httpd-example -n e2e-opp -o json 2>/dev/null | python3 -c "
+    # leave the selector empty and silently skip the digest read.  The
+    # application container's name is read in the same call, because the digest
+    # has to come from that container: an injected sidecar runs a different
+    # image, and reading every container status would make a single-digest
+    # deployment report two.
+    typeset deploymentFacts=''
+    deploymentFacts="$(oc get deployment httpd-example -n e2e-opp -o json 2>/dev/null | python3 -c "
 import json, sys
 
 try:
-    labels = ((json.load(sys.stdin).get('spec') or {}).get('selector') or {}).get('matchLabels') or {}
+    spec = json.load(sys.stdin).get('spec') or {}
+    containers = ((spec.get('template') or {}).get('spec') or {}).get('containers') or []
+    labels = (spec.get('selector') or {}).get('matchLabels') or {}
 except Exception:
     sys.exit(1)
-if not labels:
+if not labels or not containers:
     sys.exit(1)
-sys.stdout.write(','.join('%s=%s' % (k, labels[k]) for k in sorted(labels)))
-")" || podSelector=''
+sys.stdout.write('%s\t%s' % ((containers[0].get('name') or ''),
+                             ','.join('%s=%s' % (k, labels[k]) for k in sorted(labels))))
+")" || deploymentFacts=''
+    appContainer="${deploymentFacts%%$'\t'*}"
+    podSelector="${deploymentFacts#*$'\t'}"
+    [[ "${deploymentFacts}" == *$'\t'* ]] || { appContainer=''; podSelector=''; }
     typeset -i rolloutRc=0
     typeset digestList=''
     typeset -i digestCount=0
@@ -322,6 +334,7 @@ sys.stdout.write(','.join('%s=%s' % (k, labels[k]) for k in sorted(labels)))
         digestList="$(oc get pods -n e2e-opp -l "${podSelector}" -o json 2>/dev/null | python3 -c "
 import json, re, sys
 
+application = sys.argv[1] if len(sys.argv) > 1 else ''
 try:
     items = (json.load(sys.stdin).get('items') or [])
 except Exception:
@@ -334,11 +347,13 @@ for pod in items:
     if status.get('phase') != 'Running':
         continue
     for containerStatus in status.get('containerStatuses') or []:
+        if application and containerStatus.get('name') != application:
+            continue
         match = re.search(r'sha256:[0-9a-f]{64}', containerStatus.get('imageID') or '')
         if match:
             digests.add(match.group(0))
 sys.stdout.write('\n'.join(sorted(digests)))
-")" || digestList=''
+" "${appContainer}")" || digestList=''
         digestCount=$(printf '%s\n' "${digestList}" | sed '/^$/d' | wc -l)
         if (( digestCount == 1 )); then
             deployedImageDigest="${digestList}"
