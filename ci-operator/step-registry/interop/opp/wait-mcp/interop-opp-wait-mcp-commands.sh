@@ -590,19 +590,31 @@ for m in data.get('items', []):
 }
 
 function FirstDegradedCondition () {
-    # Echo the first Degraded/NodeDegraded condition message (verbatim) from
-    # the given MCP JSON, or nothing. Never fails.
+    # Echo one Degraded/NodeDegraded condition message (verbatim) from the
+    # given MCP JSON, or nothing. Never fails. A condition carrying the
+    # non-self-healing ENOSPC signature wins over plain pool order: an
+    # unrelated Degraded reason on an earlier pool must not mask a worker's
+    # persistent ENOSPC signature and turn the documented
+    # storage-capacity-enospc class (and its in-loop fail-fast) into
+    # mcp-degraded. The signature is the same one both call sites test.
     echo "${1}" | timeout 10s python3 -c "
-import sys, json
+import re, sys, json
+enospc = re.compile(r'no space left on device|disk full|could not write image pull secret')
+lines = []
 data = json.load(sys.stdin)
 for m in data.get('items', []):
     if m.get('spec', {}).get('paused', False):
         continue
     for c in m.get('status', {}).get('conditions', []):
         if c.get('type') in ('Degraded', 'NodeDegraded') and c.get('status') == 'True':
-            print(f'{m[\"metadata\"][\"name\"]}: {c.get(\"type\")} reason={c.get(\"reason\")!r} message={c.get(\"message\")!r}')
-            sys.exit(0)
-sys.exit(1)
+            lines.append(f'{m[\"metadata\"][\"name\"]}: {c.get(\"type\")} reason={c.get(\"reason\")!r} message={c.get(\"message\")!r}')
+if not lines:
+    sys.exit(1)
+for line in lines:
+    if enospc.search(line):
+        print(line)
+        sys.exit(0)
+print(lines[0])
 " 2>/dev/null || true
     true
 }
