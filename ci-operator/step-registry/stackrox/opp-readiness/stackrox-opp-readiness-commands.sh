@@ -829,10 +829,10 @@ else:
     not_ready = ["%s(Ready=%s)" % (name, ready) for name, ready in live if ready != "True"]
     print("NOT_READY: " + " ".join(not_ready))
 ' 2>/dev/null)" || return 1
-    if printf '%s\n' "${sensorStatus}" | grep -q '^OOMKilled:'; then
+    if grep -q '^OOMKilled:' <<< "${sensorStatus}"; then
         echo "[readiness] WARNING: OOMKilled detected in sensor containers: $(printf '%s\n' "${sensorStatus}" | sed -n 's/^OOMKilled: //p')"
     fi
-    if printf '%s\n' "${sensorStatus}" | grep -q '^NO_LIVE_PODS$'; then
+    if grep -q '^NO_LIVE_PODS$' <<< "${sensorStatus}"; then
         echo "[readiness]   no live sensor pods found yet (terminal pods ignored)"
         return 1
     fi
