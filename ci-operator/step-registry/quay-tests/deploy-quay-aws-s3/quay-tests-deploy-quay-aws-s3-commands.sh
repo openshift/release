@@ -31,7 +31,7 @@ function archive_pod_info() {
   done < <(oc get pods -n "${ns}" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | tr ' ' '\n')
 }
 
-# S3 bucket cleanup on failure — invoked by EXIT trap after bucket creation
+# S3 bucket cleanup on failure: invoked by the EXIT trap after bucket creation
 QUAY_S3_CLEANUP_NEEDED=false
 QUAY_AWS_DIR=""
 
@@ -141,7 +141,7 @@ while (( retry < max_retries )); do
 done
 
 # Verify the bucket exists before proceeding (terraform-native: the step
-# container has no aws CLI — rehearsal build 2115841047585099776 failed with
+# container has no aws CLI: rehearsal build 2115841047585099776 failed with
 # 'aws: command not found' at the original head-bucket check)
 echo "Verifying S3 bucket ${QUAY_AWS_S3_BUCKET} in terraform state..."
 # Compare the bucket name stored in terraform state (not just resource
