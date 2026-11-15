@@ -236,7 +236,10 @@ _classify() {
 }
 
 # ---------------------------------------------------------------------------
-# Budget-bounded wait (D6): global in-script budget across all waits
+# Budget-bounded wait (D6): global in-script budget across all waits.
+# Every read a check callback makes carries --request-timeout (OC_READ_TIMEOUT,
+# default 10s): the budget is only re-evaluated after a call returns, so an
+# unbounded read could overrun the cap it is meant to respect.
 # ---------------------------------------------------------------------------
 _budget_remaining() {
     typeset -i rem=$(( _budgetDeadline - $(date +%s) ))
@@ -426,12 +429,12 @@ else:
 # Summarize matching operator Subscriptions, falling back on empty selectors.
 function SubscriptionStatus () {
     typeset output=""
-    if output="$(oc get sub -A -l 'operators.coreos.com/rhacs-operator.rhacs-operator' -o json 2>/dev/null \
+    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get sub -A -l 'operators.coreos.com/rhacs-operator.rhacs-operator' -o json 2>/dev/null \
         | FormatDiagnosticStatus subscription)" && [[ -n "${output}" ]]; then
         echo "${output}"
         return 0
     fi
-    if output="$(oc get sub -A -o json 2>/dev/null \
+    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get sub -A -o json 2>/dev/null \
         | FormatDiagnosticStatus subscription 'stackrox,rhacs')" && [[ -n "${output}" ]]; then
         echo "${output}"
         return 0
@@ -442,7 +445,7 @@ function SubscriptionStatus () {
 # Summarize StackRox/RHACS CSV state without printing CSV identifiers.
 function CsvStatus () {
     typeset output=""
-    output="$(oc get csv -A -o json 2>/dev/null \
+    output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get csv -A -o json 2>/dev/null \
         | FormatDiagnosticStatus csv 'stackrox,rhacs')" && [[ -n "${output}" ]] || return 1
     echo "${output}"
 }
@@ -450,12 +453,12 @@ function CsvStatus () {
 # Summarize matching operator pods, falling back on empty selectors.
 function OperatorPodStatus () {
     typeset output=""
-    if output="$(oc get pods -A -l app=rhacs-operator -o json 2>/dev/null \
+    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -A -l app=rhacs-operator -o json 2>/dev/null \
         | FormatDiagnosticStatus pod)" && [[ -n "${output}" ]]; then
         echo "${output}"
         return 0
     fi
-    if output="$(oc get pods -A -o json 2>/dev/null \
+    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -A -o json 2>/dev/null \
         | FormatDiagnosticStatus pod rhacs)" && [[ -n "${output}" ]]; then
         echo "${output}"
         return 0
@@ -466,7 +469,7 @@ function OperatorPodStatus () {
 # Summarize StackRox/RHACS InstallPlan state without printing identifiers.
 function InstallPlanStatus () {
     typeset output=""
-    output="$(oc get installplan -A -o json 2>/dev/null \
+    output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get installplan -A -o json 2>/dev/null \
         | FormatDiagnosticStatus installplan 'stackrox,rhacs')" && [[ -n "${output}" ]] || return 1
     echo "${output}"
 }
@@ -474,7 +477,7 @@ function InstallPlanStatus () {
 # Summarize Central conditions without printing condition content.
 function CentralStatus () {
     typeset output=""
-    output="$(oc get centrals.platform.stackrox.io -A -o json 2>/dev/null \
+    output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json 2>/dev/null \
         | FormatDiagnosticStatus central)" && [[ -n "${output}" ]] || return 1
     echo "${output}"
 }
@@ -486,14 +489,14 @@ function PreFlightDiagnostics () {
     echo "[readiness] === Pre-flight operator diagnostics ==="
 
     echo "[readiness] Checking Central CRD registration..."
-    if oc get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
+    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
         echo "[readiness]   Central CRD registered"
     else
         echo "[readiness]   Central CRD NOT found"
     fi
 
     echo "[readiness] Checking SecuredCluster CRD registration..."
-    if oc get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
+    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
         echo "[readiness]   SecuredCluster CRD registered"
     else
         echo "[readiness]   SecuredCluster CRD NOT found"
@@ -539,8 +542,8 @@ function PeriodicOperatorDiagnostics () {
 # ---------------------------------------------------------------------------
 function CheckCentralPresent () {
     typeset out="" items=""
-    oc get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1 || return 1
-    out="$(oc get centrals.platform.stackrox.io -A -o json 2>/dev/null)" || return 1
+    oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1 || return 1
+    out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json 2>/dev/null)" || return 1
     items="$(printf '%s' "${out}" | JsonLength items)" || return 1
     (( items > 0 ))
 }
@@ -620,7 +623,7 @@ PreFlightDiagnostics
 # Namespace discovery via CRs (never hardcode)
 # ---------------------------------------------------------------------------
 function DiscoverCentralNs () {
-    centralNs="$(oc get centrals.platform.stackrox.io --all-namespaces \
+    centralNs="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io --all-namespaces \
         -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
         || return 1
     [[ -n "${centralNs}" ]] || return 1
@@ -628,7 +631,7 @@ function DiscoverCentralNs () {
 }
 
 function DiscoverScNs () {
-    scNs="$(oc get securedclusters.platform.stackrox.io --all-namespaces \
+    scNs="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedclusters.platform.stackrox.io --all-namespaces \
         -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
         || return 1
     [[ -n "${scNs}" ]] || return 1
@@ -680,7 +683,7 @@ echo "[readiness] SecuredCluster namespace: ${scNs}"
 typeset centralUrl=""
 
 function CheckCentralRoute () {
-    centralUrl="$(oc get route central -n "${centralNs}" \
+    centralUrl="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get route central -n "${centralNs}" \
         -o jsonpath='{.spec.host}' 2>/dev/null)" || return 1
     [[ -n "${centralUrl}" ]] || return 1
     true
@@ -801,7 +804,7 @@ function CheckSensorPods () {
     # whole run while Central reported the replacement sensor HEALTHY;
     # rehearsal build 2118028576879022080). Only live pods gate readiness.
     typeset sensorStatus=""
-    sensorStatus="$(oc get pods -n "${scNs}" -l app=sensor -o json 2>/dev/null | python3 -c '
+    sensorStatus="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${scNs}" -l app=sensor -o json 2>/dev/null | python3 -c '
 import json, sys
 
 d = json.load(sys.stdin)
