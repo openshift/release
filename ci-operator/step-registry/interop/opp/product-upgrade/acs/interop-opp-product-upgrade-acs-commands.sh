@@ -172,7 +172,6 @@ function VersionCompare () {
         if (( 10#${av} > 10#${bv} )); then echo 1; return 0; fi
     done
     echo 0
-    true
 }
 
 function ResolveTargetChannel () {
