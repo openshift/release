@@ -418,7 +418,7 @@ print(json.dumps(result, indent=2))
 else
   if oc_notfound "${CR_RC}" "${CR_ERR}"; then
     echo "No Central CR found (CRD may not exist)" > "${EVIDENCE_DIR}/07-central-cr.json"
-  elif echo "${CR_ERR}" | grep -qi "doesn't have a resource type"; then
+  elif grep -qi "doesn't have a resource type" <<< "${CR_ERR}"; then
     echo "CRD_ABSENT: centrals.platform.stackrox.io not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/07-central-cr.json"
   else
     echo "QUERY FAILED (rc=${CR_RC}): ${CR_ERR}" > "${EVIDENCE_DIR}/07-central-cr.json"
@@ -454,7 +454,7 @@ print(json.dumps(result, indent=2))
 else
   if oc_notfound "${SC_RC}" "${SC_ERR}"; then
     echo "No SecuredCluster CR found (CRD may not exist)" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
-  elif echo "${SC_ERR}" | grep -qi "doesn't have a resource type"; then
+  elif grep -qi "doesn't have a resource type" <<< "${SC_ERR}"; then
     echo "CRD_ABSENT: securedclusters.platform.stackrox.io not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
   else
     echo "QUERY FAILED (rc=${SC_RC}): ${SC_ERR}" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
@@ -602,7 +602,7 @@ PYEOF
 else
   # One query drives both artifacts, so both take the same classification.
   if oc_notfound "${PM_LIST_RC}" "${PM_LIST_ERR}" || \
-     echo "${PM_LIST_ERR}" | grep -qi "doesn't have a resource type"; then
+     grep -qi "doesn't have a resource type" <<< "${PM_LIST_ERR}"; then
     echo "CRD_ABSENT: packagemanifests.packages.operators.coreos.com not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json"
     echo "CRD_ABSENT: packagemanifests.packages.operators.coreos.com not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/08-all-packagemanifests.txt"
   else
