@@ -443,7 +443,6 @@ import json, sys
 data = json.load(sys.stdin)
 result = []
 for i in data.get("items", []):
-    conds = i.get("status", {}).get("conditions", [])
     result.append({
         "name": i["metadata"]["name"],
         "namespace": i["metadata"].get("namespace", ""),
