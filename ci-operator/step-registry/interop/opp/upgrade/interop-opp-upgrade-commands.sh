@@ -156,7 +156,6 @@ rhacs-operator-controller-7f6d8b9c-t9m4c      1/2     Running     3     20m"
         return 1
     fi
     echo ">>> selftest: pod-readiness predicate OK (installer/bootstrap excluded, real failures kept, partially ready Running pods kept)"
-    true
 }
 
 function DebugOnExit () {
