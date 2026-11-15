@@ -710,7 +710,17 @@ while :; do
     policyCount="${complianceStableCount}"
     continue
   fi
-  complianceStabilityNote="${policyCount} policies, same name set as the compliance pass, expected PolicySet membership covered, unchanged across ${compliancePollTarget} consecutive ${compliancePollIntervalSeconds}s polls"
+  if [[ -n "${expectedPolicies}" ]]; then
+    complianceStabilityNote="${policyCount} policies, same name set as the compliance pass, expected PolicySet membership covered, unchanged across ${compliancePollTarget} consecutive ${compliancePollIntervalSeconds}s polls"
+  else
+    # The read succeeded and listed no PolicySets: some bundles deliver policies
+    # without a PolicySet, and this is where the membership signal is simply
+    # absent. The note says so instead of claiming a coverage that did not
+    # happen; a read that failed already failed the row above.
+    complianceStabilityNote="${policyCount} policies, same name set as the compliance pass, unchanged across ${compliancePollTarget} consecutive ${compliancePollIntervalSeconds}s polls, no PolicySet objects to compare against"
+    printf '[%s] WARNING: no PolicySet objects in namespace policies; the compliance pass rests on the count and stability evidence only\n' \
+      "$(date -u +%FT%TZ)" >&2
+  fi
   break
 done
 
