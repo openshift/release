@@ -306,10 +306,17 @@ function RunTestCase2 () {
         : "Attempt ${attempt}/${retries}: Querying ACS for httpd-example image..."
         # Disable xtrace to protect ACS password in curl arguments. -f makes
         # an HTTP error fail the fetch so the retry loop can act on it, -L
-        # follows redirects; `|| true` keeps a failed fetch from aborting the
-        # step under errexit/pipefail instead of retrying.
+        # follows redirects. The `if !` capture keeps that failure status
+        # visible to the loop instead of discarding it, so a failed query is
+        # reported and retried instead of being read as "image not present".
         set +x
-        httpdImageJson=$(curl -fskSL -u "admin:${acsPassword}" "https://${acsHost}/v1/images" | /tmp/jq "${jqFilter}") || true
+        if ! httpdImageJson=$(curl -fskSL -u "admin:${acsPassword}" \
+                "https://${acsHost}/v1/images" | /tmp/jq "${jqFilter}"); then
+            set -x
+            : "Attempt ${attempt}/${retries}: ACS image query failed"
+            sleep 5
+            continue
+        fi
         set -x
         imageId=$(echo "${httpdImageJson}" | /tmp/jq .id)
         if [ "${imageId}" != "" ]; then
