@@ -10,8 +10,13 @@ set -euo pipefail; shopt -s inherit_errexit
 #   own query (the image ships oc): present / absent (0-exit read, 0 items)
 #   / unknown (read failure after 3 attempts => FAILED, exit != 0).
 #   Carrier junit lp-interop--OPP--acs-smoke is emitted on every exit path.
-#   Exit codes: 0 pass / absent-by-design; 1 acs-required-but-absent or
-#   test failure; 2 invalid input; 3 acs-state-indeterminate.
+#   A recorded failed case row gates the step, so the exit status always
+#   agrees with the carrier: a row recorded as skipped never gates (the
+#   scanner-v4-matcher absent path), a row recorded as failed always does
+#   (the Environment-typed scanner-v4-ready timeout included).
+#   Exit codes: 0 pass / absent-by-design with no failed case row; 1
+#   acs-required-but-absent, test failure, or any recorded failed case row;
+#   2 invalid input; 3 acs-state-indeterminate.
 # ---------------------------------------------------------------------------
 
 if [[ -f "${SHARED_DIR:-}/kubeconfig" ]]; then
@@ -411,4 +416,8 @@ if [[ -d build/reports/tests/testSMOKE ]]; then
 fi
 
 echo "[smoke] Test run finished with exit code: ${testExit}"
-exit "${testExit}"
+# Fail-closed: a recorded failed case row gates the step even when the suite
+# itself exited 0, so a red scanner-v4-ready row can never report a green step.
+if (( testExit != 0 )); then exit "${testExit}"; fi
+if (( _N_FAILURES > 0 )); then exit 1; fi
+exit 0
