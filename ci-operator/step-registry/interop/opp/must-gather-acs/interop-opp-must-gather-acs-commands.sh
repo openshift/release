@@ -199,11 +199,11 @@ collect_acs_diagnostics || true
 # ASSERTION EXIT CODES (this step is best_effort, so the exit code is
 # surfaced in the step's finished.json and the properties file carries
 # the detail; Prow job color is NOT the signal):
-#   20 — cross-artifact agreement assertion failed (captures disagree)
-#   21 — evidence probe sanity assertion failed (a required artifact is
+#   20: cross-artifact agreement assertion failed (captures disagree)
+#   21: evidence probe sanity assertion failed (a required artifact is
 #        missing or unparseable)
 #        (when several assertions fail, the highest code is reported)
-#   22 — removal-predicate fixture self-test failed (self-test mode only)
+#   22: removal-predicate fixture self-test failed (self-test mode only)
 
 set +e
 
@@ -218,7 +218,7 @@ echo "Cluster ID: $(oc get clusterversion version -o jsonpath='{.spec.clusterID}
 
 echo "[${TIMESTAMP}] Starting OLM evidence capture..."
 
-# 1. OperatorPolicy — capture name, spec (subscription target + channel),
+# 1. OperatorPolicy: capture name, spec (subscription target + channel),
 #    and status.conditions. The spec is required by the removal predicate
 #    (adopt-vs-duplicate and channel comparison); conditions alone cannot
 #    distinguish "CRD absent" from "zero objects", so the CRD is probed
@@ -236,7 +236,7 @@ echo "[${TIMESTAMP}] Starting OLM evidence capture..."
 echo "[1/10] OperatorPolicy..."
 # Three-way CRD guard (capture contract): the CRD exists → capture;
 # lookup fails NotFound → CRD_ABSENT; fails for any other reason →
-# probe_error — a permission or API error must never render as absence.
+# probe_error: a permission or API error must never render as absence.
 OP_CRD_OUTPUT=$(oc get crd operatorpolicies.policy.open-cluster-management.io 2>&1)
 OP_CRD_RC=$?
 if [[ ${OP_CRD_RC} -eq 0 ]]; then
@@ -286,7 +286,7 @@ print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/02-catalogsource.json" 2>&1 || \
   echo "probe_error: catalogsource query failed" > "${EVIDENCE_DIR}/02-catalogsource.json"
 
-# 3. Subscription — capture name, spec, status.currentCSV/state, and
+# 3. Subscription: capture name, spec, status.currentCSV/state, and
 #    status.conditions (the classification table keys on conditions).
 #    Fully-qualified resource type: with ACM installed, the bare
 #    `subscription` resolves to ACM's subscriptions.apps.open-cluster-
@@ -387,7 +387,7 @@ else
 fi
 rm -f "${CRD_TMP}"
 
-# 7. Central CR — capture name, namespace, spec.name, full status, and the
+# 7. Central CR: capture name, namespace, spec.name, full status, and the
 #    Available condition explicitly (the acceptance verdict keys on it).
 echo "[7/10] Central CR..."
 # Stdout to the parser, stderr to the classifier (see [6/10]).
@@ -426,7 +426,7 @@ else
 fi
 rm -f "${CR_TMP}"
 
-# 7b. SecuredCluster CR — same three-way classification as Central; the
+# 7b. SecuredCluster CR: same three-way classification as Central; the
 #     SecuredCluster gap is tracked separately (see INTEROP-9525 child) and
 #     its presence/phase must be observable from the evidence bundle.
 echo "[7b/10] SecuredCluster CR..."
@@ -462,7 +462,7 @@ else
 fi
 rm -f "${SC_TMP}"
 
-# 8. PackageManifest for rhacs-operator — three-way classify (present |
+# 8. PackageManifest for rhacs-operator: three-way classify (present |
 #    absent | probe_error); both files are ALWAYS written. The selection is
 #    scoped to the catalog the subscription actually uses: with the package
 #    offered by more than one catalog, `oc get packagemanifest
@@ -612,7 +612,7 @@ else
 fi
 rm -f "${PM_LIST_TMP}"
 
-# 9/10. ACM policies — capture name, status.conditions, and the compliance
+# 9/10. ACM policies: capture name, status.conditions, and the compliance
 #      verdicts (status.compliant, status.status[]). Conditions alone are
 #      always null on these objects; the compliance verdict is the field
 #      that answers "was the policy reconciled".
@@ -679,7 +679,7 @@ else
   echo "probe_error: configurationpolicy CRD lookup failed (rc=${CONFIGPOLICY_CRD_RC}): ${CONFIGPOLICY_CRD_OUTPUT}" > "${EVIDENCE_DIR}/10-configpolicies.json"
 fi
 
-# 10. ACM CSV version and governance-policy-addon-controller image ref —
+# 10. ACM CSV version and governance-policy-addon-controller image ref:
 #     the removal predicate keys on the ACM build carrying
 #     stolostron/governance-policy-addon-controller#1397.
 echo "[10/10] ACM CSV + addon-controller image..."
@@ -723,11 +723,11 @@ def probe(name):
     """Classify an evidence file without collapsing failure into absence.
 
     Returns (status, data) with status one of:
-      ok            — parsed JSON (data carries it)
-      absent        — successful query, resource/type genuinely absent
-      query_failed  — QUERY FAILED / probe_error marker
-      unparseable   — neither of the above and not valid JSON
-      missing       — file not written
+      ok           : parsed JSON (data carries it)
+      absent       : successful query, resource/type genuinely absent
+      query_failed : QUERY FAILED / probe_error marker
+      unparseable  : neither of the above and not valid JSON
+      missing      : file not written
     A failed query must never read as an empty capture: the report then
     says unknown, not absent."""
     p = ev / name
@@ -775,7 +775,7 @@ if effective_source is None and sub is not None and pm_ok:
             break
 
 # CSVs: exclude OLM copies (reason Copied) and bind to the subscription
-# namespace — name-only counting accepted same-named packages from
+# namespace: name-only counting accepted same-named packages from
 # another catalog.
 rhacs_csvs = [
     c for c in csvs
@@ -870,7 +870,7 @@ op_recreates = None
 if op_compliance is not None:
     op_recreates = op_compliance in ("musthave", "mustonlyhave")
 
-# Central presence: unknown (not absent) when the capture failed —
+# Central presence: unknown (not absent) when the capture failed:
 # distinct report values for query-failed vs resource-absent.
 if central_s == "ok":
     central_present = bool(central) and len(central) > 0
@@ -893,7 +893,7 @@ for a in acm:
 
 # Catalog binding: the packagemanifest that provides the
 # package must live in the subscription's effective catalog source. With
-# no packagemanifest at all, a CSV's catalog origin is unverifiable —
+# no packagemanifest at all, a CSV's catalog origin is unverifiable:
 # fail closed rather than accept it on name alone.
 if pm_ok and effective_source is not None:
     csv_catalog_matches_subscription = pm.get("catalogSource") == effective_source
@@ -1015,9 +1015,9 @@ write_status_properties
 # ─── Cross-artifact agreement assertions ────────────────────────────────────
 # A query failure must never read as absence, and captures that describe the
 # same cluster state must agree. These assertions fail the step (exit 20/21)
-# so the disagreement is visible in finished.json — job color is not the
+# so the disagreement is visible in finished.json: job color is not the
 # signal (this step is best_effort). Failure aggregation: the highest
-# failure code is reported — a later failing check never overwrites an
+# failure code is reported: a later failing check never overwrites an
 # earlier one, and an unexpected python exit is normalized to 21 so it
 # cannot masquerade as a disagreement (20).
 run_assertions() {
@@ -1028,7 +1028,7 @@ run_assertions() {
   #     write no marker, so this check does not cover them.
   for f in "${EVIDENCE_DIR}"/*.json "${EVIDENCE_DIR}"/*.txt; do
     if grep -qE "^(probe_error:|QUERY FAILED)" "${f}" 2>/dev/null; then
-      echo "ASSERTION FAILURE (21): ${f} carries a probe_error/QUERY FAILED marker — evidence incomplete"
+      echo "ASSERTION FAILURE (21): ${f} carries a probe_error/QUERY FAILED marker, evidence incomplete"
       failed=21
     fi
   done
@@ -1200,7 +1200,7 @@ FIXTURE
   _expect predicate_inputs_classified true
 
   # Failed-query classification (a): a failed Central query must not read as
-  # absence — distinct report values for denied vs absent.
+  # absence: distinct report values for denied vs absent.
   echo "QUERY FAILED (rc=1): simulated API denial" > "${tmp}/07-central-cr.json"
   EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
   _expect central_query query_failed
@@ -1208,7 +1208,7 @@ FIXTURE
   _expect removal_preconditions_met false
 
   # Failed-query classification (b): a genuinely absent resource type reports
-  # absence — a different value from the denied case.
+  # absence: a different value from the denied case.
   echo "CRD_ABSENT: centrals.platform.stackrox.io not registered on this cluster (successful query, resource type absent)" > "${tmp}/07-central-cr.json"
   EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
   _expect central_query absent
@@ -1241,7 +1241,7 @@ FIXTURE
   _expect removal_preconditions_met false
 
   # Per-term gating: a failed ops/subs/csvs query must not
-  # read as confirmed absence in the report terms — unknown, not false/0.
+  # read as confirmed absence in the report terms: unknown, not false/0.
   # A genuinely absent (CRD not registered) OperatorPolicy still reads false.
   echo "probe_error: subscription query failed" > "${tmp}/03-subscription.json"
   echo "probe_error: csv query failed" > "${tmp}/05-csv.json"
@@ -1651,7 +1651,7 @@ cat "${EVIDENCE_DIR}/acs-central-status.properties" || true
 run_assertions
 ASSERT_RC=$?
 if [[ ${ASSERT_RC} -ne 0 ]]; then
-  echo "EVIDENCE ASSERTIONS FAILED (rc=${ASSERT_RC}) — see messages above"
+  echo "EVIDENCE ASSERTIONS FAILED (rc=${ASSERT_RC}): see messages above"
   exit ${ASSERT_RC}
 fi
 echo "EVIDENCE ASSERTIONS PASSED"
