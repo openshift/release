@@ -418,18 +418,28 @@ function RunTestCase2 () {
     if [[ "${deployedImage}" == *@* ]]; then
         deployedDigest="${deployedImage#*@}"
     fi
-    # A tag is not evidence of which build was scanned: the deployment may run
-    # a tag whose earlier build ACS already holds, so a tag-pinned deployment
-    # anchors on the digest the running container pulled.
-    if [[ -z "${deployedDigest}" && -n "${deployedImageDigest:-}" ]]; then
-        deployedDigest="${deployedImageDigest}"
-    fi
-    if [[ -z "${deployedDigest}" ]]; then
-        acsFailureMsg="Could not resolve the digest of the running image in deployment e2e-opp/httpd-example: ${deployedDigestNote:-no digest observed}; a tag alone cannot anchor the ACS image match"
+    # The running digest is required for both reference forms: a tag is not
+    # evidence of which build was scanned (the deployment may run a tag whose
+    # earlier build ACS already holds), and a digest-pinned reference is only
+    # what was requested, so it is the running container that shows which build
+    # is deployed.  The rollout completed above and its pods reported a single
+    # digest, so an empty digest here means the read failed, not that the
+    # deployment is unusual.
+    if [[ -z "${deployedImageDigest:-}" ]]; then
+        acsFailureMsg="Could not read the digest of the running image in deployment e2e-opp/httpd-example: ${deployedDigestNote:-no digest observed}; a tag alone cannot anchor the ACS image match"
         printf '%s\n' "ERROR: ${acsFailureMsg}" >&2
         RecordTestResult "test-acs-integration" "failed" "${acsFailureMsg}" "0"
         return 1
     fi
+    # A digest-pinned reference that does not match the running build means the
+    # ACS check would verify a different image than the one deployed.
+    if [[ -n "${deployedDigest}" && "${deployedDigest}" != "${deployedImageDigest}" ]]; then
+        acsFailureMsg="Deployment e2e-opp/httpd-example requests digest ${deployedDigest} but its running pods report ${deployedImageDigest}"
+        printf '%s\n' "ERROR: ${acsFailureMsg}" >&2
+        RecordTestResult "test-acs-integration" "failed" "${acsFailureMsg}" "0"
+        return 1
+    fi
+    deployedDigest="${deployedImageDigest}"
     # Compare the repository by its last two path components on both sides
     # (or the whole path when it is shorter): the same application seen from a
     # registry host, a namespace or a route host has the same trailing path,
@@ -528,7 +538,7 @@ def lastn($d): split("/") | .[-$d:] | join("/");
     typeset -i retries=10
     typeset -i retryInterval=30
     typeset isImageFound=false
-    typeset httpdImageJson="" imageId="" cves="" image=""
+    typeset httpdImageJson="" imageId="" cves="" image="" recordValid=""
     typeset -i matchCount=0
     typeset -i multiMatchCount=0
 
