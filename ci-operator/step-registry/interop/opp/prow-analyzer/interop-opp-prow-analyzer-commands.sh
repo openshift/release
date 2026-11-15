@@ -631,7 +631,7 @@ _IDEMPOTENCY_KEY="${BUILD_ID}:${RESPONSE_SHA}"
 PAYLOAD_FILE="$(mktemp /tmp/prow-analyzer-payload.XXXXXX)"
 _CLEANUP_FILES+=("${PAYLOAD_FILE}")
 {
-    printf '*Prow Analyzer* — %s — build %s\n`%s`\n\n' "${JOB_NAME}" "${BUILD_ID}" "${_IDEMPOTENCY_KEY}"
+    printf '*Prow Analyzer*: %s, build %s\n`%s`\n\n' "${JOB_NAME}" "${BUILD_ID}" "${_IDEMPOTENCY_KEY}"
     cat "${ANALYSIS_BLOCK}"
 } > "${PAYLOAD_FILE}"
 PAYLOAD_CHARS="$(wc -c < "${PAYLOAD_FILE}" | tr -d ' ')"
