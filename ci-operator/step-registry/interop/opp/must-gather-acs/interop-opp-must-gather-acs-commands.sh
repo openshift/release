@@ -1637,7 +1637,7 @@ if [[ ${CR_RC} -eq 0 ]] && echo "${CR_CHECK}" | grep -q .; then
   CENTRAL_EXISTS="YES"
 else
   if [[ ${CR_RC} -eq 0 ]] || oc_notfound "${CR_RC}" "${CR_CHECK}" || \
-     echo "${CR_CHECK}" | grep -qi "no resources"; then
+     grep -qi "no resources" <<< "${CR_CHECK}"; then
     CENTRAL_EXISTS="NO"
   else
     CENTRAL_EXISTS="ERROR"
