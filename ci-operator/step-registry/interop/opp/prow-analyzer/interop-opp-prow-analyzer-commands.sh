@@ -294,14 +294,14 @@ gate_evaluate() {
         for step_dir in "${ARTIFACT_BASE_DIR}"/*/; do
             [ -d "${step_dir}" ] || continue
             if [ -f "${step_dir}finished.json" ]; then
-                saw_marker=1; saw_step_like=1
+                saw_marker=1
                 if grep -q '"passed":[[:space:]]*false' "${step_dir}finished.json"; then
                     all_markers_passed=0
                 fi
             fi
             while IFS= read -r junit; do
                 [ -f "${junit}" ] || continue
-                any_junit=1; saw_step_like=1
+                any_junit=1
                 tally="$(sum_junit_failures "${junit}")"
                 if [ "${tally}" = "unparseable" ]; then
                     any_unparseable=1
