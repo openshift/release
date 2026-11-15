@@ -588,7 +588,7 @@ attempt_loop() {
             _OUTCOME="rate_limited"
             return 0
         fi
-        sleep "${ANALYZER_BACKOFF_SECONDS}"
+        [ "${attempt}" -lt "${ANALYZER_MAX_ATTEMPTS}" ] && sleep "${ANALYZER_BACKOFF_SECONDS}"
     done
     # Self-diagnosing note line on CLI failure (metadata-only: toolchain and
     # transport errors, never analysis prose or credentials). Rehearsal
