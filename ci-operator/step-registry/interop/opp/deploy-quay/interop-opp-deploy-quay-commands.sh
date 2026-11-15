@@ -1141,4 +1141,3 @@ done
 
 _prop "quay_deployed" "true"
 echo ">>> PHASE: Quay deployed (operator + registry + admin secrets)"
-true

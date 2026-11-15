@@ -650,4 +650,3 @@ fi
 
 _prop "compliance_deployed" "true"
 echo ">>> PHASE: compliance-operator deployed (CSV Succeeded; the policy creates no CRs, so this step creates none)"
-true
