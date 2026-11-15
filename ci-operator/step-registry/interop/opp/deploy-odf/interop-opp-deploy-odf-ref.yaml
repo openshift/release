@@ -14,11 +14,22 @@ ref:
     Every object is created only if absent (oc create, never apply): when the
     ACM policy set (policy-odf, policy-odf-cluster, policy-odf-noobaa) already
     owns the install, the step adopts what it finds and never overwrites a
-    live operator policy. When operatorpolicy-odf-operator is Compliant, the
-    live odf-operator Subscription runs the same channel, the CSV is
-    Succeeded and the StorageCluster is Ready, the step records
-    workaround_removal_ready=true and exits 0 without installing
-    (workaround self-disable).
+    live operator policy. An existing Subscription is adopted exactly as it
+    stands, including one that runs a different channel than
+    ODF_OPERATOR_CHANNEL: it is not patched, channel_observed records the
+    channel it runs and channel_mismatch records the difference. The step then
+    reports the storage layer that Subscription produces as working
+    (odf_deployed=true), not the requested channel as installed.
+
+    When operatorpolicy-odf-operator is Compliant, the live odf-operator
+    Subscription runs the requested channel, the CSV is Succeeded and the
+    StorageCluster is Ready, the step records workaround_removal_ready=true
+    and exits 0 without installing (workaround self-disable). A live
+    Subscription channel that cannot be read is recorded as
+    live_subscription_channel=unknown and does not withhold the self-disable:
+    workaround_removal_ready then rests on the Policy being Compliant, the CSV
+    Succeeded and the StorageCluster Ready, which shows the installed operator
+    works whatever channel it runs.
 
     Emits one JUnit testcase, lp-interop--OPP--odf-deploy, and a properties
     file for the skip-ratio/evidence gates.

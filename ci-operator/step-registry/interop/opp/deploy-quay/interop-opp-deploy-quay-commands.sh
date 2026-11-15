@@ -371,6 +371,17 @@ _dump_diagnostics() {
   echo
 }
 
+# Backstop for the create-admin-user Job log. The Job prints method and path
+# only, never a request or response body, but its log is copied into the
+# artifact directory with the trace, so a credential-shaped field or
+# authorization header that does reach it is redacted before it is printed.
+_scrub_job_log() {
+  sed -E \
+    -e 's/("(password|access_token|token|basic)"[[:space:]]*:[[:space:]]*")[^"]*/\1REDACTED/g' \
+    -e 's/(Authorization: (Bearer|Basic) )[^[:space:]]+/\1REDACTED/g' \
+    -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi'
+}
+
 if [[ "${QUAY_REPORT_ONLY}" == "1" ]]; then
   # Detection, not gating: report object states and exit 0. Runs before the
   # packagemanifest precondition on purpose (detection must work when the
@@ -918,7 +929,11 @@ spec:
                 if [ ! -z "$4" ]; then
                   DATA=$4
                 fi
-                echo "[$1] $2 $3 --data $DATA" 1>&2
+                # Method and path only: the request body can carry account
+                # fields and the response body API payloads, and both the Job
+                # log and the step's diagnostics copy are readable in
+                # artifacts.
+                echo "[$1] $2 $3" 1>&2
                 AUTH="Fake: dummy"
                 if [ $1 = "Basic" ]; then
                   COUNT=$(oc -n $QUAY_NAMESPACE get --ignore-not-found=true secret $QUAY_USER_SECRET | wc -l)
@@ -937,6 +952,19 @@ spec:
                   return "${QRC}"
                 fi
                 echo "[INFO] Success" 1>&2
+              }
+
+              # A required mutation. The Job runs without errexit, so an
+              # unchecked call leaves it free to reach the final "Job
+              # finished" line and report success for an organization, an
+              # application, a repository or a permission that was never
+              # created. The response body is discarded: nothing in it is used
+              # here, and it would land in the Job log.
+              function quay_required() {
+                if ! quay_cmd "$@" > /dev/null; then
+                  echo "[ERROR] required mutation failed: $1 $2 $3" 1>&2
+                  exit 1
+                fi
               }
               echo -n "Waiting for the Quay Registry CR to be available ."
               RC=$(oc wait QuayRegistry -n local-quay registry --for=condition=Available=true > /dev/null 2>&1;echo $?)
@@ -1012,8 +1040,8 @@ spec:
               if [ $COUNT = 0 ]; then
                 echo "[INFO] Creating $QUAY_ORG org ..."
                 # Email cannot be shared with the initial user
-                quay_cmd Bearer POST /api/v1/organization/ "{\"name\": \"$QUAY_ORG\", \"email\": \"$QUAY_ORG_EMAIL\" }"
-                quay_cmd Basic GET /api/v1/organization/$QUAY_ORG
+                quay_required Bearer POST /api/v1/organization/ "{\"name\": \"$QUAY_ORG\", \"email\": \"$QUAY_ORG_EMAIL\" }"
+                quay_cmd Basic GET /api/v1/organization/$QUAY_ORG > /dev/null
               fi
 
               echo "[INFO] Looking for org application ..."
@@ -1023,28 +1051,28 @@ spec:
               COUNT=$(quay_cmd Bearer GET /api/v1/organization/$QUAY_ORG/applications | grep $APPLICATION | wc -l)
               if [ $COUNT = 0 ]; then
                 echo "[INFO] Creating $APPLICATION application..."
-                quay_cmd Bearer POST /api/v1/organization/$QUAY_ORG/applications "{\"name\": \"$QUAY_ORG-automation\", \"description\": \"automation app\" }"
+                quay_required Bearer POST /api/v1/organization/$QUAY_ORG/applications "{\"name\": \"$QUAY_ORG-automation\", \"description\": \"automation app\" }"
               fi
 
               echo "[INFO] Looking for initial repo ..."
               COUNT=$(quay_cmd Bearer GET /api/v1/repository/$QUAY_ORG/$QUAY_REPO | grep -v not_found | wc -l)
               if [ $COUNT = 0 ]; then
                 echo "[INFO] Creating $QUAY_REPO repo..."
-                quay_cmd Bearer POST /api/v1/repository "{\"namespace\":\"$QUAY_ORG\", \"repository\":\"$QUAY_REPO\", \"visibility\":\"public\", \"description\":\"Development Repo\", \"repo_kind\":\"image\"}"
+                quay_required Bearer POST /api/v1/repository "{\"namespace\":\"$QUAY_ORG\", \"repository\":\"$QUAY_REPO\", \"visibility\":\"public\", \"description\":\"Development Repo\", \"repo_kind\":\"image\"}"
               fi
 
               echo "[INFO] Looking for $QUAY_ORG members ..."
               COUNT=$(quay_cmd Bearer GET /api/v1/organization/$QUAY_ORG/team/owners/members | grep "name\": \"$QUAY_USER\"" | wc -l)
               if [ $COUNT = 0 ]; then
                 echo "[INFO] Associating $QUAY_USER with $QUAY_ORG ..."
-                quay_cmd Bearer PUT /api/v1/organization/$QUAY_ORG/team/owners/members/$QUAY_USER '{}'
+                quay_required Bearer PUT /api/v1/organization/$QUAY_ORG/team/owners/members/$QUAY_USER '{}'
               fi
 
               echo "[INFO] Looking for $QUAY_REPO admins ..."
               COUNT=$(quay_cmd Bearer GET /api/v1/repository/$QUAY_ORG/$QUAY_REPO/permissions/user/$QUAY_USER | grep '"role": "admin"' | wc -l)
               if [ $COUNT = 0 ]; then
                 echo "[INFO] Give $QUAY_USER admin rights to the repo ..."
-                quay_cmd Bearer PUT /api/v1/repository/$QUAY_ORG/$QUAY_REPO/permissions/user/$QUAY_USER '{ "role": "admin"}'
+                quay_required Bearer PUT /api/v1/repository/$QUAY_ORG/$QUAY_REPO/permissions/user/$QUAY_USER '{ "role": "admin"}'
               fi
 
               echo "[INFO] Job finished"
@@ -1078,8 +1106,13 @@ JOBEOF
   _prop "quay_admin_job_state" "${_job_state}"
   if [[ "${_job_state}" != "complete" ]]; then
     _job_failed=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" -o jsonpath='{.status.failed}' 2>/dev/null) || _job_failed=""
-    echo ">>> DIAG: create-admin-user Job logs (tail 200):"
-    oc logs job/create-admin-user -n "${QUAY_NAMESPACE}" --tail=200 2>&1 | head -c 65536 || true
+    # The Job prints method and path only, never a request or response body (see
+    # quay_cmd); this filter is the backstop for a credential field or bearer
+    # token that reaches the pod log, since that log is copied into the
+    # artifact directory together with the trace.
+    echo ">>> DIAG: create-admin-user Job logs (tail 200, credential-shaped values scrubbed):"
+    oc logs job/create-admin-user -n "${QUAY_NAMESPACE}" --tail=200 2>&1 \
+      | _scrub_job_log | head -c 65536 || true
     if [[ "${_job_state}" == "failed" ]]; then
       _classify "quay-admin-job-failed" "create-admin-user Job reported condition Failed=True (failed pods=${_job_failed:-none})"
     else
@@ -1090,8 +1123,9 @@ JOBEOF
     exit 1
   fi
   if ! _quay_admin_secrets_present; then
-    echo ">>> DIAG: create-admin-user Job logs (tail 200):"
-    oc logs job/create-admin-user -n "${QUAY_NAMESPACE}" --tail=200 2>&1 | head -c 65536 || true
+    echo ">>> DIAG: create-admin-user Job logs (tail 200, credential-shaped values scrubbed):"
+    oc logs job/create-admin-user -n "${QUAY_NAMESPACE}" --tail=200 2>&1 \
+      | _scrub_job_log | head -c 65536 || true
     _classify "quay-admin-secrets-missing" "Job create-admin-user completed but quayadmin/quaydevel/quay-pull-secret are not all present"
     echo "ERROR: ${_class_detail}"
     _dump_diagnostics

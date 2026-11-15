@@ -10,14 +10,32 @@ ref:
     creates the quayadmin/quaydevel/quay-pull-secret secrets plus the devel
     organization and devel/example repository.
 
+    The create-admin-user Job runs without errexit, so every required mutation
+    (organization, application, repository, team membership, repository
+    permission) is checked and stops the Job on failure: a Job that reports
+    completion has created all of them. The Job logs method and path only,
+    never a request or response body, and the step redacts
+    credential-shaped values from the pod log it copies into the artifacts.
+
     Every object is created only if absent (oc create, never apply): when the
     ACM policy set (policy-install-quay, policy-config-quay) already owns the
     install, the step adopts what it finds and never overwrites a live
-    operator policy. When operatorpolicy-quay-operator is Compliant, the
-    live quay-operator Subscription runs the same channel, the CSV is
-    Succeeded and the QuayRegistry is Available, the step records
-    workaround_removal_ready=true and exits 0 without installing
-    (workaround self-disable).
+    operator policy. An existing Subscription is adopted exactly as it stands,
+    including one that runs a different channel than QUAY_OPERATOR_CHANNEL: it
+    is not patched, channel_observed records the channel it runs and
+    channel_mismatch records the difference. The step then reports the
+    registry that Subscription produces as working (quay_deployed=true), not
+    the requested channel as installed.
+
+    When operatorpolicy-quay-operator is Compliant, the live quay-operator
+    Subscription runs the requested channel, the CSV is Succeeded and the
+    QuayRegistry is Available, the step records workaround_removal_ready=true
+    and exits 0 without installing (workaround self-disable). A live
+    Subscription channel that cannot be read is recorded as
+    live_subscription_channel=unknown and does not withhold the self-disable:
+    workaround_removal_ready then rests on the Policy being Compliant, the CSV
+    Succeeded and the QuayRegistry Available, which shows the installed
+    operator works whatever channel it runs.
 
     Emits one JUnit testcase, lp-interop--OPP--quay-deploy, and a properties
     file for the skip-ratio/evidence gates.

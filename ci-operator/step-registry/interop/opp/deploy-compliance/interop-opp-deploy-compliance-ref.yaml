@@ -10,11 +10,21 @@ ref:
 
     Every object is created only if absent (oc create, never apply): when the
     ACM policy set already owns the install, the step adopts what it finds and
-    never overwrites a live operator policy. When operatorpolicy-comp-operator
-    is Compliant, the live compliance-operator Subscription runs the same
-    channel and the CSV is Succeeded, the step records
-    workaround_removal_ready=true and exits 0 without installing
-    (workaround self-disable).
+    never overwrites a live operator policy. An existing Subscription is
+    adopted exactly as it stands, including one that runs a different channel
+    than COMPLIANCE_OPERATOR_CHANNEL: it is not patched, channel_observed
+    records the channel it runs and channel_mismatch records the difference.
+    The step then reports the operator that Subscription produces as working
+    (compliance_deployed=true), not the requested channel as installed.
+
+    When operatorpolicy-comp-operator is Compliant, the live
+    compliance-operator Subscription runs the requested channel and the CSV is
+    Succeeded, the step records workaround_removal_ready=true and exits 0
+    without installing (workaround self-disable). A live Subscription channel
+    that cannot be read is recorded as live_subscription_channel=unknown and
+    does not withhold the self-disable: workaround_removal_ready then rests on
+    the Policy being Compliant and the CSV Succeeded, which shows the
+    installed operator works whatever channel it runs.
 
     Emits one JUnit testcase, lp-interop--OPP--compliance-deploy, and a
     properties file for the skip-ratio/evidence gates.
