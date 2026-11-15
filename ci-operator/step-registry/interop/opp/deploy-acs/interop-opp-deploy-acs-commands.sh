@@ -600,8 +600,8 @@ except Exception:
       _prop "channel_self_disable_withheld" "${_policy_ch}!=${ACS_CHANNEL}"
     fi
   fi
-  _api_loud
 fi
+_api_loud
 _prop "workaround_removal_ready" "false"
 
 # --- Subscription state, resolved BEFORE the catalog precondition.
