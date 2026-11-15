@@ -239,7 +239,9 @@ function IsMcpProgressing () {
     # window, evaluated on the parallel per-poll histories.
     #  1. no extension while any pool is Degraded (all three failing runs
     #     were extended while Degraded=True, burning 60 min of lane quota);
-    #  2. updated-machine count rising monotonically within the window;
+    #  2. updated-machine count rising monotonically within the window
+    #     (the histories are cluster-wide sums over the non-paused pools,
+    #     not per-pool series: a pool's drop can cancel another's gain);
     #  3. sustained cycling vetoes extension: the pool not ready for >=
     #     MCP_PINNED_UPDATED_POLLS consecutive polls without Degraded means
     #     the rollout is cycling (re-rendering and re-rebooting), not

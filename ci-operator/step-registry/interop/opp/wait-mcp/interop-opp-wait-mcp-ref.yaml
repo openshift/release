@@ -20,13 +20,18 @@ ref:
     an unreverted SUT mutation; the serialized rollout fits the budget).
 
     Progress-based timeout extension (INTEROP-9646 rewrite): the deadline
-    is extended only when the per-pool updated-machine count is rising
+    is extended only when the updated-machine count is rising
     monotonically, or the ready count is recovering with bounded
     regression and the updated-machine count does not drop by more than
     the tolerated bound - never while any pool is Degraded, and never
-    once the pool has failed to converge for MCP_PINNED_UPDATED_POLLS
+    once the cluster has failed to converge for MCP_PINNED_UPDATED_POLLS
     consecutive polls with machines updated and not ready (sustained
     cycling; a Degraded poll is neither counted nor resets the streak).
+    The trend, the regression bound and the streak all read cluster-wide
+    totals summed over the non-paused pools - the pinned self-test
+    fixtures and the cycling streak are defined on those totals - so a
+    single pool's regression can cancel against another pool's gain and
+    no series is tracked per pool.
     The trend window resets on MachineConfig generation change (render
     churn).
 
