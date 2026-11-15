@@ -5,13 +5,20 @@ set -euxo pipefail; shopt -s inherit_errexit
 # owner-only.
 umask 077
 
+# Put this step's report where CI-operator collects it.  CI-operator supports
+# a flat SHARED_DIR only: its state collector reads the files directly under
+# it and skips directories, so a raw copy into ${SHARED_DIR}/junit/ is never
+# picked up.  On success the post-processing helper has already written the
+# merged report to the SHARED_DIR root and this returns without copying; when
+# the helper was unavailable or failed, the raw report goes to that root
+# instead, so a failing run still carries its evidence.
 # shellcheck disable=SC2317
 _propagate_junit () {
     [[ -n "${SHARED_DIR:-}" ]] || return 0
-    mkdir -p "${SHARED_DIR}/junit"
-    # Error suppression justified: _propagate_junit is best-effort cleanup on EXIT trap.
-    # If no XML files exist or ARTIFACT_DIR is unset, we want the trap to succeed (not fail the entire test).
-    find "${ARTIFACT_DIR:-}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; || true
+    if [[ -s "${SHARED_DIR}/${mergedJunitFile}" ]]; then
+        return 0
+    fi
+    cp "${junitFile}" "${SHARED_DIR}/" || true
 }
 
 # Suite naming for the JUnit post-processing library: compose its suite-name
@@ -57,6 +64,18 @@ fi
 # cd to writable directory
 cd /tmp/ || { echo "ERROR: Cannot cd to /tmp" >&2; exit 1; }
 
+# --- JUnit carrier ---------------------------------------------------
+# Artifact directory the raw report is written to; CI-operator sets it.
+ARTIFACT_DIR="${ARTIFACT_DIR:=/tmp/artifacts}"
+mkdir -p "${ARTIFACT_DIR}"
+# Raw suite name and file name carry the step identity; ExitTrap
+# post-processing renames the suite and merges this file into
+# junit--interop-acm-security-scan-ctr-img-acs-app-deployment.xml.
+typeset junitFile="${ARTIFACT_DIR}/junit_interop-acm-security-scan-ctr-img-acs-app-deployment.xml"
+# Report name the post-processing helper merges into and writes to the
+# SHARED_DIR root; the EXIT-trap fallback copy looks for it there.
+typeset mergedJunitFile='junit--interop-acm-security-scan-ctr-img-acs-app-deployment.xml'
+
 # Define all test cases with initial "skipped" status
 typeset -A testStatus
 typeset -A testDuration
@@ -99,7 +118,6 @@ function RecordTestResult () {
 
 # Function to generate JUnit XML
 function GenerateJunitXml () {
-    typeset junitFile="${ARTIFACT_DIR}/junit_interop-acm-security-scan-ctr-img-acs-app-deployment.xml"
     typeset -i totalDuration=0
     totalDuration=$(( $(date +%s) - startTime ))
 
@@ -267,31 +285,50 @@ json.dump(bc,sys.stdout,indent=2)
 
     : "Deployment is available"
 
-    # Capture the exact image reference the deployment runs, so the ACS
-    # query in Test Case 2 matches this deployment's image and not any
-    # other image with a similar name.
-    typeset -g deployedImage=''
-    deployedImage="$(oc get deployment httpd-example -n e2e-opp -o jsonpath='{.spec.template.spec.containers[0].image}')" || deployedImage=''
+    # Wait for the rollout to finish before reading the deployment.  The
+    # Available wait above is satisfied by the previous ReplicaSet, so an
+    # Available deployment can still be mid-rollout; reading the image
+    # reference first and the running digest later would compare a pre-rollout
+    # reference against a post-rollout digest and fail a healthy deployment.
+    # A rollout that did not finish is a deployment failure, not a detail to
+    # record: continuing would report a completed deployment whose own rollout
+    # check failed.
+    typeset -i rolloutRc=0
+    oc rollout status deployment/httpd-example -n e2e-opp --timeout=10m 1>/dev/null || rolloutRc=$?
+    if (( rolloutRc != 0 )); then
+        case1FailureMsg="Deployment e2e-opp/httpd-example did not complete its rollout (oc rollout status exited ${rolloutRc})"
+        printf '%s\n' "ERROR: ${case1FailureMsg}" >&2
+        return 1
+    fi
 
-    # The digest the running container actually pulled.  A tag can be reused by
-    # a later build while ACS still holds the older build's record under that
-    # tag, so the ACS match anchors on this digest: the deployment spec alone
+    # Capture the exact image reference the deployment runs, the application
+    # container's identity and the pod selector in one read, taken after the
+    # rollout completed, so all three belong to the same finished revision: a
+    # digest that moves from build A to build B during the rollout cannot be
+    # paired with a pre-rollout reference any more.  The reference anchors the
+    # ACS query in Test Case 2 on this deployment's image and not any other
+    # image with a similar name.
+    #
+    # The digest the running container actually pulled is what the ACS match
+    # anchors on: a tag can be reused by a later build while ACS still holds
+    # the older build's record under that tag, and the deployment spec alone
     # carries the reference that was requested, not the build that is running.
     # The selector comes from matchLabels, so it matches the pods of every
-    # ReplicaSet of the deployment, and an Available deployment can still have
-    # older pods running mid-rollout: wait for the rollout to finish and then
-    # require a single digest, instead of taking the first digest listed.
-    typeset -g deployedImageDigest=''
-    typeset -g deployedDigestNote=''
-    typeset podSelector=''
-    typeset appContainer=''
-    # The selector is read as JSON and rendered here: JSONPath has no
+    # ReplicaSet of the deployment; the digest is required to be single instead
+    # of taking the first digest listed.
+    #
+    # The values are read as JSON and rendered here: JSONPath has no
     # `$k, $v :=` form, and an oc call that cannot parse its own output would
     # leave the selector empty and silently skip the digest read.  The
     # application container's name is read in the same call, because the digest
     # has to come from that container: an injected sidecar runs a different
     # image, and reading every container status would make a single-digest
     # deployment report two.
+    typeset -g deployedImage=''
+    typeset -g deployedImageDigest=''
+    typeset -g deployedDigestNote=''
+    typeset podSelector=''
+    typeset appContainer=''
     typeset deploymentFacts=''
     deploymentFacts="$(oc get deployment httpd-example -n e2e-opp -o json 2>/dev/null | python3 -c "
 import json, sys
@@ -304,28 +341,18 @@ except Exception:
     sys.exit(1)
 if not labels or not containers:
     sys.exit(1)
-sys.stdout.write('%s\t%s' % ((containers[0].get('name') or ''),
-                             ','.join('%s=%s' % (k, labels[k]) for k in sorted(labels))))
+sys.stdout.write('%s\t%s\t%s' % ((containers[0].get('image') or ''),
+                                 (containers[0].get('name') or ''),
+                                 ','.join('%s=%s' % (k, labels[k]) for k in sorted(labels))))
 ")" || deploymentFacts=''
-    appContainer="${deploymentFacts%%$'\t'*}"
-    podSelector="${deploymentFacts#*$'\t'}"
-    [[ "${deploymentFacts}" == *$'\t'* ]] || { appContainer=''; podSelector=''; }
-    typeset -i rolloutRc=0
+    if [[ -n "${deploymentFacts}" ]]; then
+        IFS=$'\t' read -r deployedImage appContainer podSelector <<< "${deploymentFacts}"
+    fi
     typeset digestList=''
     typeset -i digestCount=0
     if [[ -z "${podSelector}" ]]; then
         deployedDigestNote="the pod selector could not be read"
     else
-        oc rollout status deployment/httpd-example -n e2e-opp --timeout=10m >/dev/null 2>&1 || rolloutRc=$?
-        if (( rolloutRc != 0 )); then
-            # A rollout that did not finish is a deployment failure, not a
-            # detail to record: the Available wait above is satisfied by the
-            # previous ReplicaSet, so continuing would report a completed
-            # deployment whose own rollout check failed.
-            case1FailureMsg="Deployment e2e-opp/httpd-example did not complete its rollout (oc rollout status exited ${rolloutRc})"
-            printf '%s\n' "ERROR: ${case1FailureMsg}" >&2
-            return 1
-        fi
         # Terminating pods are left out of the digest snapshot: Kubernetes
         # removes them from the Deployment replica counts before they exit, so
         # a pod that still reports Running with the previous build's digest
@@ -369,6 +396,64 @@ sys.stdout.write('\n'.join(sorted(digests)))
     oc get is -n e2e-opp httpd-example -o yaml --ignore-not-found | awk '/status:/{n=6} n>0{print; n--}'
 
     return 0
+}
+
+################################################################################
+# List the ACS image records that match the deployed repository and digest
+################################################################################
+# StackRox caps one /v1/images answer at 1000 records, so a single unpaginated
+# request silently truncates the listing and the deployed image is never seen in
+# a registry that holds more than that.  The listing is walked with
+# pagination.limit/pagination.offset instead, and the walk stops when a page
+# comes back short (end of the listing) or when two records match (enough for
+# the single-record guard in Test Case 2 to fail).  The matching records are
+# written as one JSON array; a failed request returns nonzero without output.
+AcsListMatchingImages () {
+    typeset host="${1}"; shift
+    typeset passFile="${1}"; shift
+    typeset filter="${1}"; shift
+    typeset repo="${1}"; shift
+    typeset depth="${1}"; shift
+    typeset digest="${1}"; shift
+    typeset -a tlsOpts=( "$@" )
+    typeset -i pageLimit=1000
+    typeset -i page=0
+    typeset -i offset=0
+    typeset -i pageRecords=0
+    typeset -i matchTotal=0
+    typeset -i fetchRc=0
+    typeset pageJson=''
+    typeset pageMatches=''
+    typeset matches='[]'
+    # The walk is bounded by the listing, not by a fixed page count: a cap
+    # would end the loop silently and answer [] with success for an image past
+    # the last page reviewed, and every retry would repeat that truncation.
+    while :; do
+        offset=$(( page * pageLimit ))
+        # Each page runs in a command-substitution subshell with xtrace
+        # disabled and curl reads the password from a process-substitution
+        # config, so the credential appears in neither the trace nor argv.
+        pageJson="$(
+            set +x
+            curl -fsSL "${tlsOpts[@]}" --connect-timeout 15 --max-time 60 \
+                --config <(printf 'user = "admin:%s"\n' "$(cat "${passFile}")") \
+                "https://${host}/v1/images?pagination.limit=${pageLimit}&pagination.offset=${offset}"
+        )" || { fetchRc=$?; break; }
+        pageRecords=$(printf '%s' "${pageJson}" | /tmp/jq '.images | length') || { fetchRc=1; break; }
+        pageMatches=$(printf '%s' "${pageJson}" | /tmp/jq --arg repo "${repo}" \
+            --argjson depth "${depth}" --arg digest "${digest}" "${filter}") || { fetchRc=1; break; }
+        matches=$(/tmp/jq -c --argjson matched "${pageMatches}" '. + $matched' <<< "${matches}") || { fetchRc=1; break; }
+        matchTotal=$(/tmp/jq 'length' <<< "${matches}") || { fetchRc=1; break; }
+        if (( matchTotal >= 2 )); then
+            break
+        fi
+        if (( pageRecords < pageLimit )); then
+            break
+        fi
+        page+=1
+    done
+    (( fetchRc == 0 )) || return "${fetchRc}"
+    printf '%s\n' "${matches}"
 }
 
 ################################################################################
@@ -561,16 +646,13 @@ def lastn($d): split("/") | .[-$d:] | join("/");
     typeset -i attempt=0
     for ((attempt = 1; attempt <= retries; ++attempt)); do
         : "Attempt ${attempt}/${retries}: Querying ACS for httpd-example image..."
-        # The query runs in a command-substitution subshell with xtrace
-        # disabled and curl reads the password from a process-substitution
-        # config, so the credential appears in neither the trace nor argv.
-        httpdImageJson="$(
-            set +x
-            curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 60 \
-                --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
-                "https://${acsHost}/v1/images" | /tmp/jq --arg repo "${deployedRepo}" --argjson depth "${deployedRepoDepth}" \
-                    --arg digest "${deployedDigest}" "${jqFilter}"
-        )"
+        # The listing is paged inside the helper: one request answers at most
+        # 1000 records, so a single unpaginated query misses the image in a
+        # large registry.  A failed listing is retried like an empty answer.
+        httpdImageJson='[]'
+        httpdImageJson="$(AcsListMatchingImages "${acsHost}" "${acsPassFile}" "${jqFilter}" \
+            "${deployedRepo}" "${deployedRepoDepth}" "${deployedDigest}" "${acsTlsOpts[@]}")" \
+            || httpdImageJson='[]'
         # Read the record only out of a single-element answer.  Two or more
         # matching records are named and retried instead of being read: jq
         # would otherwise concatenate their fields, and a record whose cves is
@@ -632,18 +714,23 @@ eval "$(
         https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
 )"
 
-# Post-process the JUnit XML for Component Readiness routing.  Guarded on
-# purpose: this runs from the EXIT trap, and an unloaded helper (download
-# failure) or a post-processing failure must not overwrite the script's
-# exit status (the unguarded call fails the trap with 127 and turns a
-# passing run into a failure).  The merged file name is passed explicitly:
-# the library default (jUnit.xml) is not picked up by the prow JUnit viewer
-# (lowercase junit prefix required) and collides with other steps in
-# shared storage.
+# Post-process the JUnit XML for Component Readiness routing.  This runs from
+# the EXIT trap, which clears errexit first, so the helper is called unguarded:
+# `helper ... || warn` would disable errexit inside the helper and let a failed
+# merge continue into its archive and shared-copy steps.  The status is
+# inspected instead, and an unloaded helper (download failure) or a
+# post-processing failure is warned about without overwriting the script's
+# exit status.  The merged file name is passed explicitly: the library default
+# (jUnit.xml) is not picked up by the prow JUnit viewer (lowercase junit prefix
+# required) and collides with other steps in shared storage.
 PostProcessJunit () {
+    typeset -i postProcessRc=0
     if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
-        ExitTrap--PostProcessPrep junit--interop-acm-security-scan-ctr-img-acs-app-deployment.xml ||
-            printf '%s\n' "WARNING: junit post-processing failed" >&2
+        ExitTrap--PostProcessPrep junit--interop-acm-security-scan-ctr-img-acs-app-deployment.xml
+        postProcessRc=$?
+        if (( postProcessRc != 0 )); then
+            printf '%s\n' "WARNING: junit post-processing failed (rc=${postProcessRc})" >&2
+        fi
     else
         printf '%s\n' "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping" >&2
     fi
@@ -658,8 +745,8 @@ PostProcessJunit () {
 trap '{(
     set +e
     GenerateJunitXml
-    _propagate_junit
     PostProcessJunit
+    _propagate_junit
     rm -f /tmp/acs-admin-password
     true
 )}' EXIT

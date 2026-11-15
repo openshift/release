@@ -28,6 +28,9 @@ mkdir -p "${ARTIFACT_DIR}"
 # post-processing renames the suite and merges this file into
 # junit--interop-acm-policy-set-opp-bundle-deployment.xml.
 typeset junitFile="${ARTIFACT_DIR}/junit_interop-acm-policy-set-opp-bundle-deployment.xml"
+# Report name the post-processing helper merges into and writes to the
+# SHARED_DIR root; the EXIT-trap fallback copy looks for it there.
+typeset mergedJunitFile='junit--interop-acm-policy-set-opp-bundle-deployment.xml'
 
 # Suite naming for the JUnit post-processing library: compose its suite-name
 # template from the component-suffixed prefix variable the consuming job sets.
@@ -115,11 +118,20 @@ EOF
     true
 }
 
+# Put this step's report where CI-operator collects it.  CI-operator supports
+# a flat SHARED_DIR only: its state collector reads the files directly under
+# it and skips directories, so a raw copy into ${SHARED_DIR}/junit/ is never
+# picked up.  On success the post-processing helper has already written the
+# merged report to the SHARED_DIR root and this returns without copying; when
+# the helper was unavailable or failed, the raw report goes to that root
+# instead, so a failing run still carries its evidence.
 # shellcheck disable=SC2317
 _propagate_junit () {
     [[ -n "${SHARED_DIR:-}" ]] || return 0
-    mkdir -p "${SHARED_DIR}/junit"
-    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; || true
+    if [[ -s "${SHARED_DIR}/${mergedJunitFile}" ]]; then
+        return 0
+    fi
+    cp "${junitFile}" "${SHARED_DIR}/" || true
 }
 
 # Load ExitTrap library for JUnit XML post-processing at script level
@@ -131,25 +143,33 @@ eval "$(
         https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
 )"
 
-# Post-process the JUnit XML for Component Readiness routing.  Guarded on
-# purpose: this runs from the EXIT trap, and an unloaded helper (download
-# failure) or a post-processing failure must not overwrite the script's
-# exit status (the unguarded call fails the trap with 127 and turns a
-# passing run into a failure).  The merged file name is passed explicitly:
-# the library default (jUnit.xml) is not picked up by the prow JUnit viewer
-# (lowercase junit prefix required) and collides with other steps in
-# shared storage.
+# Post-process the JUnit XML for Component Readiness routing.  This runs from
+# the EXIT trap, which clears errexit first, so the helper is called
+# unguarded: `helper ... || warn` would disable errexit inside the helper and
+# let a failed merge continue into its archive and shared-copy steps.  The
+# status is inspected instead, and an unloaded helper (download failure) or a
+# post-processing failure is warned about without overwriting the script's
+# exit status.  The merged file name is passed explicitly: the library default
+# (jUnit.xml) is not picked up by the prow JUnit viewer (lowercase junit
+# prefix required) and collides with other steps in shared storage.
 PostProcessJunit () {
+    typeset -i postProcessRc=0
     if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
-        ExitTrap--PostProcessPrep junit--interop-acm-policy-set-opp-bundle-deployment.xml ||
-            echo "WARNING: junit post-processing failed" >&2
+        ExitTrap--PostProcessPrep "${mergedJunitFile}"
+        postProcessRc=$?
+        if (( postProcessRc != 0 )); then
+            echo "WARNING: junit post-processing failed (rc=${postProcessRc})" >&2
+        fi
     else
         echo "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping" >&2
     fi
     true
 }
 
-trap '_opp_test_status=$?; set +e; GenerateJunit; _propagate_junit; PostProcessJunit; exit ${_opp_test_status}' EXIT
+# Order matters: the raw report is generated first, the helper merges it and
+# writes the merged report to the SHARED_DIR root, and the fallback copy runs
+# last so it can tell whether that merged report is there.
+trap '_opp_test_status=$?; set +e; GenerateJunit; PostProcessJunit; _propagate_junit; exit ${_opp_test_status}' EXIT
 
 cd /tmp/
 # A re-run in the same pod leaves the clone behind and a shallow clone
@@ -221,19 +241,12 @@ until (( $(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.
 done
 RecordResult "openshift-plus-policy-set-deployed" "passed" "" "$(( $(date +%s) - policyGateStart ))"
 
-# Apply requested channel overrides to the deployed OLM subscriptions.
-if [[ -n "${QUAY_OPERATOR_CHANNEL:-}" ]]; then
-  typeset -i quayPinStart=0
-  quayPinStart=$(date +%s)
-  if PinSubscriptionChannel local-quay quay-operator "${QUAY_OPERATOR_CHANNEL}"; then
-    RecordResult "subscription-channel-pin-local-quay-quay-operator" "passed" "" "$(( $(date +%s) - quayPinStart ))"
-  else
-    RecordResult "subscription-channel-pin-local-quay-quay-operator" "failed" "Could not pin subscription local-quay/quay-operator to channel ${QUAY_OPERATOR_CHANNEL}" "$(( $(date +%s) - quayPinStart ))"
-    exit 1
-  fi
-else
-  RecordResult "subscription-channel-pin-local-quay-quay-operator" "skipped" "QUAY_OPERATOR_CHANNEL not set"
-fi
+# Apply requested channel overrides to the deployed OLM subscriptions.  The
+# ODF pin runs before the Quay pin on purpose: an ODF subscription installed
+# from the catalog default channel has to be corrected before the Quay pin
+# (whose wait can take up to ten minutes and exits on failure) and before the
+# Quay readiness wait below, so a default-channel ODF install failure cannot
+# hold the ODF correction behind either of them.
 if [[ -n "${ODF_OPERATOR_CHANNEL:-}" ]]; then
   typeset -i odfPinStart=0
   odfPinStart=$(date +%s)
@@ -245,6 +258,18 @@ if [[ -n "${ODF_OPERATOR_CHANNEL:-}" ]]; then
   fi
 else
   RecordResult "subscription-channel-pin-openshift-storage-odf-operator" "skipped" "ODF_OPERATOR_CHANNEL not set"
+fi
+if [[ -n "${QUAY_OPERATOR_CHANNEL:-}" ]]; then
+  typeset -i quayPinStart=0
+  quayPinStart=$(date +%s)
+  if PinSubscriptionChannel local-quay quay-operator "${QUAY_OPERATOR_CHANNEL}"; then
+    RecordResult "subscription-channel-pin-local-quay-quay-operator" "passed" "" "$(( $(date +%s) - quayPinStart ))"
+  else
+    RecordResult "subscription-channel-pin-local-quay-quay-operator" "failed" "Could not pin subscription local-quay/quay-operator to channel ${QUAY_OPERATOR_CHANNEL}" "$(( $(date +%s) - quayPinStart ))"
+    exit 1
+  fi
+else
+  RecordResult "subscription-channel-pin-local-quay-quay-operator" "skipped" "QUAY_OPERATOR_CHANNEL not set"
 fi
 
 # Remove the local-cluster exclusion from the clusters placement in-cluster

@@ -6,9 +6,11 @@ This directory contains **true interop tests** that test interaction between 2 o
 
 Pattern: `ci-operator/step-registry/interop/<main-operator>/<test-functional-group-1>[/.../<test-functional-group-n>]/<target-operators>/<test-name>`
 
-Every path component, at every level, is a lowercase RFC 1123 label: lowercase
-alphanumerics, with `-` as the only separator. No uppercase and no underscore
-or plus characters anywhere in a path, doubled or not.
+Every path component, at every level, strictly matches
+`^[a-z]([-a-z0-9]*[a-z0-9])?$`: it starts with a lowercase letter, continues
+with lowercase alphanumerics or `-`, and never ends with `-`. Parent
+directories separate words with `-` (`policy-set`, `opp-bundle`). No uppercase
+and no underscore or plus characters anywhere in a path, doubled or not.
 
 CI Operator joins the directory path with `/` replaced by `-` to form the step
 name, and that step name becomes the pod name verbatim. Only characters valid in
@@ -39,6 +41,8 @@ ci-operator/step-registry/interop/
   - Or explicit names like `acs` for a single product, `acs-odf` for specific combinations
   - Combined target operators are joined with `-`
 - **`<test-name>`**: Concise name describing the test action, words separated with `-`
+  - The Step Stub separates words with `-` and functional components with `--`,
+    following `stub-component-1[--...[--stub-component-N]]`
   - Example: `deployment` = deploys and verifies the resource
   - Example: `app-deployment` = deploys application
   - Example: `registry` = tests registry functionality
