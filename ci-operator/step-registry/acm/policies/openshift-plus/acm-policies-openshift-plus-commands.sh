@@ -91,7 +91,7 @@ if [[ -n "${SKIP_POLICIES:-}" ]]; then
   typeset _skipLine=''
   while IFS= read -r _skipLine; do
     typeset -a _lineSkipArr=()
-    IFS=',' read -ra _lineSkipArr <<< "${_skipLine}" || true
+    IFS=',' read -ra _lineSkipArr <<< "${_skipLine}"
     _rawSkipArr+=(${_lineSkipArr[@]+"${_lineSkipArr[@]}"})
   done <<< "${SKIP_POLICIES}"
   typeset -a _droppedArr=()
