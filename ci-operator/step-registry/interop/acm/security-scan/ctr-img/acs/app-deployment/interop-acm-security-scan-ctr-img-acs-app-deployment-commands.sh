@@ -164,6 +164,8 @@ EOF
 ################################################################################
 function RunTestCase1 () {
     : "====== Test Case 1: Deploy OPP Application ======"
+    # Raised to the caller so the deploy row names the failure it recorded.
+    typeset -g case1FailureMsg=''
 
     # Download jq
     curl -fsSL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq || return 1
@@ -304,18 +306,46 @@ sys.stdout.write(','.join('%s=%s' % (k, labels[k]) for k in sorted(labels)))
     else
         oc rollout status deployment/httpd-example -n e2e-opp --timeout=10m >/dev/null 2>&1 || rolloutRc=$?
         if (( rolloutRc != 0 )); then
-            deployedDigestNote="the rollout had not completed (oc rollout status exited ${rolloutRc})"
+            # A rollout that did not finish is a deployment failure, not a
+            # detail to record: the Available wait above is satisfied by the
+            # previous ReplicaSet, so continuing would report a completed
+            # deployment whose own rollout check failed.
+            case1FailureMsg="Deployment e2e-opp/httpd-example did not complete its rollout (oc rollout status exited ${rolloutRc})"
+            printf '%s\n' "ERROR: ${case1FailureMsg}" >&2
+            return 1
+        fi
+        # Terminating pods are left out of the digest snapshot: Kubernetes
+        # removes them from the Deployment replica counts before they exit, so
+        # a pod that still reports Running with the previous build's digest
+        # would otherwise make the snapshot ambiguous and fail the digest read
+        # of a rollout that did complete.
+        digestList="$(oc get pods -n e2e-opp -l "${podSelector}" -o json 2>/dev/null | python3 -c "
+import json, re, sys
+
+try:
+    items = (json.load(sys.stdin).get('items') or [])
+except Exception:
+    sys.exit(1)
+digests = set()
+for pod in items:
+    if (pod.get('metadata') or {}).get('deletionTimestamp'):
+        continue
+    status = pod.get('status') or {}
+    if status.get('phase') != 'Running':
+        continue
+    for containerStatus in status.get('containerStatuses') or []:
+        match = re.search(r'sha256:[0-9a-f]{64}', containerStatus.get('imageID') or '')
+        if match:
+            digests.add(match.group(0))
+sys.stdout.write('\n'.join(sorted(digests)))
+")" || digestList=''
+        digestCount=$(printf '%s\n' "${digestList}" | sed '/^$/d' | wc -l)
+        if (( digestCount == 1 )); then
+            deployedImageDigest="${digestList}"
+        elif (( digestCount > 1 )); then
+            deployedDigestNote="the running pods report ${digestCount} different image digests (${digestList//$'\n'/ })"
         else
-            digestList="$(oc get pods -n e2e-opp -l "${podSelector}" -o jsonpath='{range .items[?(@.status.phase=="Running")].status.containerStatuses[*]}{.imageID}{"\n"}{end}' 2>/dev/null \
-                | sed -n 's/.*\(sha256:[0-9a-f]\{64\}\).*/\1/p' | sort -u)" || digestList=''
-            digestCount=$(printf '%s\n' "${digestList}" | sed '/^$/d' | wc -l)
-            if (( digestCount == 1 )); then
-                deployedImageDigest="${digestList}"
-            elif (( digestCount > 1 )); then
-                deployedDigestNote="the running pods report ${digestCount} different image digests (${digestList//$'\n'/ })"
-            else
-                deployedDigestNote="no running pod reports an image digest"
-            fi
+            deployedDigestNote="no running pod reports an image digest"
         fi
     fi
 
@@ -527,13 +557,18 @@ def lastn($d): split("/") | .[-$d:] | join("/");
             cves=''
             : "Attempt ${attempt}/${retries}: ${matchCount} ACS records match ${deployedRepo}; waiting for a single matching record"
         elif (( matchCount == 1 )); then
-            imageId=$(echo "${httpdImageJson}" | /tmp/jq '.[0].id // ""')
-            cves=$(echo "${httpdImageJson}" | /tmp/jq '.[0].cves')
-            # A matching record only proves ACS ingested the image once it
-            # carries both a real image id and a numeric CVE count: jq renders
-            # a missing field as the literal `null`, which is neither.  A
-            # completed scan with zero CVEs is accepted (0 is a number).
-            if [ "${imageId}" != "" ] && [ "${imageId}" != "null" ] && [ "${cves}" != "" ] && [ "${cves}" != "null" ]; then
+            # The record is validated on its own fields, by type: an id must
+            # be a non-empty JSON string (a `// ""` read turned a missing id
+            # into text that no longer says what it is) and the CVE count must
+            # be a JSON number, so a value such as "pending" cannot stand in
+            # for a completed scan.  A completed scan with zero CVEs is
+            # accepted, because 0 is a number.
+            recordValid=$(echo "${httpdImageJson}" | /tmp/jq -r '
+                .[0]
+                | ((.id | type) == "string") and ((.id | length) > 0) and ((.cves | type) == "number")')
+            if [ "${recordValid}" = "true" ]; then
+                imageId=$(echo "${httpdImageJson}" | /tmp/jq -r '.[0].id')
+                cves=$(echo "${httpdImageJson}" | /tmp/jq -r '.[0].cves')
                 image=$(echo "${httpdImageJson}" | /tmp/jq '.[0].name // ""')
                 : "Success: Found ${cves} CVEs for image ${image}"
                 isImageFound=true
@@ -692,7 +727,7 @@ else
     case1Duration=$(( $(date +%s) - case1Start ))
     : "Test Case 1 (Deploy OPP Application) Result: FAILED"
     : "Test Case 1 failed, skipping remaining test cases..."
-    RecordTestResult "deploy-opp-application" "failed" "OPP application deployment failed" "${case1Duration}"
+    RecordTestResult "deploy-opp-application" "failed" "${case1FailureMsg:-OPP application deployment failed}" "${case1Duration}"
     RecordTestResult "test-acs-integration" "skipped" "Skipped: prerequisite Test Case 1 (deploy) failed" "0"
 fi
 
