@@ -269,7 +269,7 @@ _poll_jsonpath() {
       if [[ -n "${_failval}" && "${_out}" == "${_failval}" ]]; then return 3; fi
     else
       _poll_last=""
-      if printf '%s' "${_out}" | grep -qiE 'not ?found'; then
+      if grep -qiE 'not ?found' <<<"${_out}"; then
         : # object absent yet: wait, do not count as a query failure
       else
         (( _fails += 1 )) || true
@@ -460,7 +460,7 @@ except Exception:
       _existing_csv=$(oc get csv -n "${QUAY_NAMESPACE}" -l "operators.coreos.com/quay-operator.${QUAY_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _existing_csv=""
       if [[ "${_existing_csv}" == "Succeeded" ]]; then
         _qr_avail=$(oc get quayregistries.quay.redhat.com registry -n "${QUAY_NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\n"}{end}' 2>/dev/null) || _qr_avail=""
-        if printf '%s' "${_qr_avail}" | grep -qx 'Available=True'; then
+        if grep -qx 'Available=True' <<<"${_qr_avail}"; then
           echo ">>> workaround_removal_ready=true (OperatorPolicy Compliant, channel ${_sd_ch}, CSV Succeeded, QuayRegistry Available) - not installing"
           _prop "workaround_removal_ready" "true"
           _prop "quay_subscription" "adopted"
@@ -500,7 +500,7 @@ for _attempt in 1 2 3; do
     _precondition_ok=true
     break
   fi
-  if printf '%s' "${_pm_raw}" | grep -qi "not found"; then
+  if grep -qi "not found" <<<"${_pm_raw}"; then
     _classify "quay-catalog-missing" "packagemanifest quay-operator not found in openshift-marketplace (successful query)"
     echo "ERROR: ${_class_detail}"
     exit 1

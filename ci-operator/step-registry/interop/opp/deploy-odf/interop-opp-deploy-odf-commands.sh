@@ -269,7 +269,7 @@ _poll_jsonpath() {
       if [[ -n "${_failval}" && "${_out}" == "${_failval}" ]]; then return 3; fi
     else
       _poll_last=""
-      if printf '%s' "${_out}" | grep -qiE 'not ?found'; then
+      if grep -qiE 'not ?found' <<<"${_out}"; then
         : # object absent yet: wait, do not count as a query failure
       else
         (( _fails += 1 )) || true
@@ -484,7 +484,7 @@ for _attempt in 1 2 3; do
     _precondition_ok=true
     break
   fi
-  if printf '%s' "${_pm_raw}" | grep -qi "not found"; then
+  if grep -qi "not found" <<<"${_pm_raw}"; then
     _classify "odf-catalog-missing" "packagemanifest odf-operator not found in openshift-marketplace (successful query)"
     echo "ERROR: ${_class_detail}"
     exit 1
