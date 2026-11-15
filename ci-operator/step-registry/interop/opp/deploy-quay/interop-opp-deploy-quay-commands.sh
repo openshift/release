@@ -26,8 +26,10 @@ shopt -u patsub_replacement 2>/dev/null || true
 #     replaced in place at completion (atomic mktemp+mv), so a SIGKILL still
 #     leaves a failing case (missing JUnit reads as unknown, never green).
 #   * Self-disable: when operatorpolicy-quay-operator is Compliant with a
-#     matching channel, the CSV is Succeeded AND the existing QuayRegistry is
-#     Available, emit workaround_removal_ready=true and exit 0.
+#     matching channel, the live quay-operator Subscription runs that same
+#     channel (an unreadable/absent Subscription is unknown and does not block
+#     the self-disable on its own), the CSV is Succeeded AND the existing
+#     QuayRegistry is Available, emit workaround_removal_ready=true and exit 0.
 #   * Create-if-absent only: an existing object is adopted, never overwritten
 #     (the OperatorPolicy owns it once ACM 2.17.z carrying
 #     stolostron/governance-policy-addon-controller#1397 ships).
@@ -397,6 +399,7 @@ _prop "channel_requested" "${QUAY_OPERATOR_CHANNEL}"
 if oc get crd operatorpolicies.policy.open-cluster-management.io >/dev/null 2>&1; then
   _op_status=$(oc get operatorpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null) || _op_status=""
   if [[ -n "${_op_status}" ]]; then
+    typeset _sd_policy="operatorpolicy-quay-operator"
     _sd_out=$(printf '%s' "${_op_status}" | python3 -c '
 import json, sys
 name, requested = sys.argv[1], sys.argv[2]
@@ -421,12 +424,28 @@ try:
         print("absent - -")
 except Exception:
     print("absent - -")
-' operatorpolicy-quay-operator "${QUAY_OPERATOR_CHANNEL}" 2>/dev/null) || _sd_out="absent - -"
+' "${_sd_policy}" "${QUAY_OPERATOR_CHANNEL}" 2>/dev/null) || _sd_out="absent - -"
     _sd_ok="absent" _sd_ns="-" _sd_ch="-"
     read -r _sd_ok _sd_ns _sd_ch <<<"${_sd_out}" || true
     _prop "operatorpolicy_namespace" "${_sd_ns:-unknown}"
     _prop "operatorpolicy_channel" "${_sd_ch:-unknown}"
-    if [[ "${_sd_ok}" == "true" ]]; then
+    # The policy's spec channel is the REQUESTED channel, not the live one, so
+    # a cluster whose Subscription already runs a different channel must not
+    # self-disable (that would leave the requested channel uninstalled). The
+    # Subscription is named for the package, not derivable from the policy name
+    # in general, so the name is literal here and matches the create-if-absent
+    # and REPORT_ONLY reads. It is read in the operator namespace the
+    # OperatorPolicy places it in, falling back to the policy namespace.
+    # Absent/unreadable is recorded as unknown and does not withhold the
+    # self-disable on its own.
+    typeset _sd_sub="quay-operator"
+    typeset _live_ch=""
+    _live_ch=$(oc get subscription.operators.coreos.com "${_sd_sub}" -n "${QUAY_NAMESPACE}" -o jsonpath='{.spec.channel}') || _live_ch=""
+    if [[ -z "${_live_ch}" && "${_sd_ns}" != "-" && "${_sd_ns}" != "${QUAY_NAMESPACE}" ]]; then
+      _live_ch=$(oc get subscription.operators.coreos.com "${_sd_sub}" -n "${_sd_ns}" -o jsonpath='{.spec.channel}') || _live_ch=""
+    fi
+    _prop "live_subscription_channel" "${_live_ch:-unknown}"
+    if [[ "${_sd_ok}" == "true" && ( -z "${_live_ch}" || "${_live_ch}" == "${QUAY_OPERATOR_CHANNEL}" ) ]]; then
       _existing_csv=$(oc get csv -n "${QUAY_NAMESPACE}" -l "operators.coreos.com/quay-operator.${QUAY_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _existing_csv=""
       if [[ "${_existing_csv}" == "Succeeded" ]]; then
         _qr_avail=$(oc get quayregistries.quay.redhat.com registry -n "${QUAY_NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\n"}{end}' 2>/dev/null) || _qr_avail=""
@@ -440,6 +459,15 @@ except Exception:
         fi
         echo ">>> NOTE: OperatorPolicy Compliant and CSV Succeeded but QuayRegistry is not Available yet - installing"
       fi
+    elif [[ "${_sd_ok}" == "true" ]]; then
+      # Policy Compliant on the requested channel, but the live Subscription
+      # runs a different one: the CSV below would be another channel's, so it
+      # must not stand in for this channel's install. The install path is
+      # create-if-absent, so an existing Subscription is adopted as-is (never
+      # patched: a live OperatorPolicy owns it) and the mismatch is recorded as
+      # channel_self_disable_withheld; the requested channel is not installed over it.
+      echo ">>> NOTE: live Subscription channel '${_live_ch}' != requested '${QUAY_OPERATOR_CHANNEL}': self-disable withheld, install path runs (existing Subscription adopted, not patched)"
+      _prop "channel_self_disable_withheld" "${_live_ch}!=${QUAY_OPERATOR_CHANNEL}"
     elif [[ "${_sd_ch}" != "-" && "${_sd_ch}" != "${QUAY_OPERATOR_CHANNEL}" ]]; then
       echo ">>> NOTE: OperatorPolicy channel '${_sd_ch}' != requested '${QUAY_OPERATOR_CHANNEL}': self-disable withheld, installing"
       _prop "channel_self_disable_withheld" "${_sd_ch}!=${QUAY_OPERATOR_CHANNEL}"
@@ -903,6 +931,11 @@ spec:
                   AUTH="Authorization: Bearer $TOKEN"
                 fi
                 curl -X $2 $CURL_OPTS -H 'Content-Type: application/json'  -H "$AUTH" https://$QUAY_HOST$3 --data "$DATA"
+                typeset -i QRC="${?}"
+                if [ "${QRC}" -ne 0 ]; then
+                  echo "[ERROR] $1 $2 $3 failed (curl rc=${QRC})" 1>&2
+                  return "${QRC}"
+                fi
                 echo "[INFO] Success" 1>&2
               }
               echo -n "Waiting for the Quay Registry CR to be available ."
@@ -915,20 +948,16 @@ spec:
               done
               echo "done"
 
-              CURL_OPTS="-fsk"
+              CURL_OPTS="-fsSLk"
               QUAY_ADMIN=quayadmin
               QUAY_USER=quaydevel
               QUAY_USER_SECRET=$QUAY_USER
               QUAY_NAMESPACE=local-quay
-              QUAY_HOST=$(oc get route -n $QUAY_NAMESPACE registry-quay -o jsonpath='{.spec.host}')
+              QUAY_HOST=$(oc get route -n $QUAY_NAMESPACE registry-quay -o jsonpath='{.spec.host}') || { echo "Quay route does not exist yet, please wait and try again."; exit 1; }
               QUAY_ORG=devel
               QUAY_ORG_EMAIL=devel@myorg.com
               QUAY_USER_EMAIL=devel-user@myorg.com
               QUAY_REPO=example
-              if [ $? -ne 0 ]; then
-                echo "Quay route does not exist yet, please wait and try again."
-                exit 1
-              fi
               RESULT=$(oc get secret -n $QUAY_NAMESPACE $QUAY_USER_SECRET)
               if [ $? -eq 0 ]; then
                 echo "Quay user configuration secret already exists: $QUAY_USER_SECRET in namespace $QUAY_NAMESPACE"
@@ -936,7 +965,6 @@ spec:
               fi
 
               ADMINPASS=`head -c 8 /dev/urandom | base64 | sed 's/=//'`
-              BASE64AUTH=`echo -n $QUAY_USER:$QUAY_PASSWORD | base64 -w0`
               RESULT=$(curl -fsSLk -X POST https://$QUAY_HOST/api/v1/user/initialize --header 'Content-Type: application/json' --data "{ \"username\": \"quayadmin\", \"password\":\"${ADMINPASS}\", \"email\": \"quayadmin@example.com\", \"access_token\": true}")
               CURL_RC=$?
               if [ $CURL_RC -ne 0 ]; then
@@ -953,10 +981,18 @@ spec:
 
                 echo "[INFO] Creating quay admin secret quayadmin ..."
                 TOKEN=$(echo "$RESULT" | tr ',' '\n' | grep access_token | awk -F: '{print $2}' | sed 's/"//g')
-                oc -n $QUAY_NAMESPACE create secret generic quayadmin --from-literal=token=$TOKEN --from-literal=password=$ADMINPASS --from-literal=basic="$BASE64AUTH"
+                oc -n $QUAY_NAMESPACE create secret generic quayadmin \
+                  --from-file=token=<(printf '%s' "${TOKEN}") \
+                  --from-file=password=<(printf '%s' "${ADMINPASS}") \
+                  --from-file=basic=<(printf '%s' "${QUAY_ADMIN}:${ADMINPASS}" | base64 -w0)
 
                 echo "[INFO] Creating $QUAY_USER user ..."
                 RESPONSE=$(quay_cmd Bearer POST /api/v1/superuser/users/ "{ \"username\": \"$QUAY_USER\", \"email\": \"$QUAY_USER_EMAIL\", \"access_token\": true}")
+                typeset -i URC="${?}"
+                if [ "${URC}" -ne 0 ]; then
+                  echo "[ERROR] failed to create Quay user $QUAY_USER (curl rc=${URC}); user secrets not created." 1>&2
+                  exit 1
+                fi
 
                 QUAY_PASSWORD=$(echo $RESPONSE | tr ',' '\n' | grep '"password"' | cut -d \" -f 4)
                 BASE64AUTH=`echo -n $QUAY_USER:$QUAY_PASSWORD | base64 -w0`

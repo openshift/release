@@ -24,7 +24,9 @@ shopt -u patsub_replacement 2>/dev/null || true
 #     replaced in place at completion (atomic mktemp+mv), so a SIGKILL still
 #     leaves a failing case (missing JUnit reads as unknown, never green).
 #   * Self-disable: when operatorpolicy-comp-operator is Compliant with a
-#     matching channel AND the CSV is Succeeded, emit
+#     matching channel, the live compliance-operator Subscription runs that same
+#     channel (an unreadable/absent Subscription is unknown and does not block
+#     the self-disable on its own) AND the CSV is Succeeded, emit
 #     workaround_removal_ready=true and exit 0.
 #   * Create-if-absent only: an existing object is adopted, never overwritten
 #     (the OperatorPolicy owns it once ACM 2.17.z carrying
@@ -373,6 +375,7 @@ _prop "channel_requested" "${COMPLIANCE_OPERATOR_CHANNEL}"
 if oc get crd operatorpolicies.policy.open-cluster-management.io >/dev/null 2>&1; then
   _op_status=$(oc get operatorpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null) || _op_status=""
   if [[ -n "${_op_status}" ]]; then
+    typeset _sd_policy="operatorpolicy-comp-operator"
     _sd_out=$(printf '%s' "${_op_status}" | python3 -c '
 import json, sys
 name, requested = sys.argv[1], sys.argv[2]
@@ -397,12 +400,29 @@ try:
         print("absent - -")
 except Exception:
     print("absent - -")
-' operatorpolicy-comp-operator "${COMPLIANCE_OPERATOR_CHANNEL}" 2>/dev/null) || _sd_out="absent - -"
+' "${_sd_policy}" "${COMPLIANCE_OPERATOR_CHANNEL}" 2>/dev/null) || _sd_out="absent - -"
     _sd_ok="absent" _sd_ns="-" _sd_ch="-"
     read -r _sd_ok _sd_ns _sd_ch <<<"${_sd_out}" || true
     _prop "operatorpolicy_namespace" "${_sd_ns:-unknown}"
     _prop "operatorpolicy_channel" "${_sd_ch:-unknown}"
-    if [[ "${_sd_ok}" == "true" ]]; then
+    # The policy's spec channel is the REQUESTED channel, not the live one, so
+    # a cluster whose Subscription already runs a different channel must not
+    # self-disable (that would leave the requested channel uninstalled). The
+    # Subscription is named for the package, not derivable from the policy name
+    # (operatorpolicy-comp-operator manages the compliance-operator
+    # Subscription), so the name is literal here and matches the
+    # create-if-absent and REPORT_ONLY reads. It is read in the operator
+    # namespace the OperatorPolicy places it in, falling back to the policy
+    # namespace. Absent/unreadable is recorded as unknown and does not withhold
+    # the self-disable on its own.
+    typeset _sd_sub="compliance-operator"
+    typeset _live_ch=""
+    _live_ch=$(oc get subscription.operators.coreos.com "${_sd_sub}" -n "${COMPLIANCE_NAMESPACE}" -o jsonpath='{.spec.channel}') || _live_ch=""
+    if [[ -z "${_live_ch}" && "${_sd_ns}" != "-" && "${_sd_ns}" != "${COMPLIANCE_NAMESPACE}" ]]; then
+      _live_ch=$(oc get subscription.operators.coreos.com "${_sd_sub}" -n "${_sd_ns}" -o jsonpath='{.spec.channel}') || _live_ch=""
+    fi
+    _prop "live_subscription_channel" "${_live_ch:-unknown}"
+    if [[ "${_sd_ok}" == "true" && ( -z "${_live_ch}" || "${_live_ch}" == "${COMPLIANCE_OPERATOR_CHANNEL}" ) ]]; then
       _existing_csv=$(oc get csv -n "${COMPLIANCE_NAMESPACE}" -l "operators.coreos.com/compliance-operator.${COMPLIANCE_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _existing_csv=""
       if [[ "${_existing_csv}" == "Succeeded" ]]; then
         echo ">>> workaround_removal_ready=true (OperatorPolicy Compliant, channel ${_sd_ch}, CSV Succeeded) - not installing"
@@ -411,6 +431,15 @@ except Exception:
         _prop "csv_phase" "Succeeded"
         exit 0
       fi
+    elif [[ "${_sd_ok}" == "true" ]]; then
+      # Policy Compliant on the requested channel, but the live Subscription
+      # runs a different one: the CSV below would be another channel's, so it
+      # must not stand in for this channel's install. The install path is
+      # create-if-absent, so an existing Subscription is adopted as-is (never
+      # patched: a live OperatorPolicy owns it) and the mismatch is recorded as
+      # channel_self_disable_withheld; the requested channel is not installed over it.
+      echo ">>> NOTE: live Subscription channel '${_live_ch}' != requested '${COMPLIANCE_OPERATOR_CHANNEL}': self-disable withheld, install path runs (existing Subscription adopted, not patched)"
+      _prop "channel_self_disable_withheld" "${_live_ch}!=${COMPLIANCE_OPERATOR_CHANNEL}"
     elif [[ "${_sd_ch}" != "-" && "${_sd_ch}" != "${COMPLIANCE_OPERATOR_CHANNEL}" ]]; then
       echo ">>> NOTE: OperatorPolicy channel '${_sd_ch}' != requested '${COMPLIANCE_OPERATOR_CHANNEL}': self-disable withheld, installing"
       _prop "channel_self_disable_withheld" "${_sd_ch}!=${COMPLIANCE_OPERATOR_CHANNEL}"
