@@ -77,9 +77,6 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
     # shellcheck source=/dev/null
     source "${WORKDIR}/${SETUP_SCRIPT}"
 
-    echo "Installing Claude Code..."
-    curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
-    export PATH="${HOME}/.local/bin:${PATH}"
 fi
 START_BRANCH=$(git branch --show-current)
 START_COMMIT=$(git rev-parse HEAD)
