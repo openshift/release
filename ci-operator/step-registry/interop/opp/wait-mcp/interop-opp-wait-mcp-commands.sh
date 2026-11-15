@@ -1077,11 +1077,11 @@ case "${classification}" in
         else
             if (( ${#updatedHistory[@]} > 0 )) && (( updatedHistory[${#updatedHistory[@]}-1] == machineCountHistory[${#machineCountHistory[@]}-1] )); then
                 echo "FAILURE CLASS: mcp-rollout-not-converging"
-                echo "All machines updated (updated==machineCount) but the pool never went ready; ready count oscillated without Degraded — cycling, not progressing"
+                echo "All machines updated (updated==machineCount) but the pool never went ready; ready count oscillated without Degraded: cycling, not progressing"
                 _junit_class="mcp-rollout-not-converging"
             else
                 echo "FAILURE CLASS: Potential interop issue"
-                echo "MCP is updating but neither updated nor ready counts are progressing — nodes may be cycling"
+                echo "MCP is updating but neither updated nor ready counts are progressing: nodes may be cycling"
                 _junit_class="UPDATING-oscillating"
             fi
             echo ""
