@@ -966,6 +966,21 @@ spec:
                   exit 1
                 fi
               }
+
+              # A read whose result decides whether a create runs. quay_cmd
+              # cannot serve that: under -f an expected 404 (the object does not
+              # exist yet) and a transport, auth, or server failure all come back
+              # as one nonzero status, so a failed read would collapse into the
+              # same branch as a definite absence and the branch would write.
+              # Prints the response body, then a final line carrying the HTTP
+              # status. -s -k without -f and without -L: this is a direct
+              # endpoint status probe, not a redirect-following body fetch.
+              function quay_api_get() {
+                curl -s -k -w '\n%{http_code}' \
+                  --connect-timeout 10 --max-time 30 \
+                  -H "Authorization: Bearer $TOKEN" "https://$QUAY_HOST$1"
+              }
+
               echo -n "Waiting for the Quay Registry CR to be available ."
               RC=$(oc wait QuayRegistry -n local-quay registry --for=condition=Available=true > /dev/null 2>&1;echo $?)
 
@@ -1036,8 +1051,27 @@ spec:
               fi
 
               echo "[INFO] Looking for initial organization ..."
-              COUNT=$(quay_cmd Bearer GET /api/v1/organization/$QUAY_ORG | grep -v not_found | wc -l)
-              if [ $COUNT = 0 ]; then
+              _ORG_READ="$(quay_api_get "/api/v1/organization/${QUAY_ORG}")"
+              _ORG_STATUS="${_ORG_READ##*$'\n'}"
+              _ORG_BODY="${_ORG_READ%$'\n'*}"
+              _ORG_ABSENT=0
+              case "${_ORG_STATUS}" in
+                2[0-9][0-9])
+                  # A successful read that still says not_found is a definite
+                  # absence; any other successful body means the org is there.
+                  if printf '%s\n' "${_ORG_BODY}" | grep -q not_found; then
+                    _ORG_ABSENT=1
+                  fi
+                  ;;
+                404)
+                  _ORG_ABSENT=1
+                  ;;
+                *)
+                  echo "[ERROR] GET organization ${QUAY_ORG} failed (HTTP ${_ORG_STATUS:-no response}); refusing to create it" 1>&2
+                  exit 1
+                  ;;
+              esac
+              if [ "${_ORG_ABSENT}" -eq 1 ]; then
                 echo "[INFO] Creating $QUAY_ORG org ..."
                 # Email cannot be shared with the initial user
                 quay_required Bearer POST /api/v1/organization/ "{\"name\": \"$QUAY_ORG\", \"email\": \"$QUAY_ORG_EMAIL\" }"
@@ -1048,29 +1082,77 @@ spec:
               # The only way to get another OAuth token is to go to: Organization -> Applications -> {app} -> Generate Token
               # If there was a programatic way to do it here, we could avoid the problem with the bearer token expiring after 150min
               APPLICATION=automation
-              COUNT=$(quay_cmd Bearer GET /api/v1/organization/$QUAY_ORG/applications | grep $APPLICATION | wc -l)
-              if [ $COUNT = 0 ]; then
+              _APPS_READ="$(quay_api_get "/api/v1/organization/${QUAY_ORG}/applications")"
+              _APPS_STATUS="${_APPS_READ##*$'\n'}"
+              _APPS_BODY="${_APPS_READ%$'\n'*}"
+              if [ "${_APPS_STATUS}" != "200" ]; then
+                echo "[ERROR] GET applications for ${QUAY_ORG} failed (HTTP ${_APPS_STATUS:-no response}); refusing to create ${APPLICATION}" 1>&2
+                exit 1
+              fi
+              # grep -c exits 1 on zero matches, so the count alone is the
+              # verdict here; the read above already carried the failure.
+              COUNT="$(printf '%s\n' "${_APPS_BODY}" | grep -c -- "${APPLICATION}" || true)"
+              if [ "${COUNT}" -eq 0 ]; then
                 echo "[INFO] Creating $APPLICATION application..."
                 quay_required Bearer POST /api/v1/organization/$QUAY_ORG/applications "{\"name\": \"$QUAY_ORG-automation\", \"description\": \"automation app\" }"
               fi
 
               echo "[INFO] Looking for initial repo ..."
-              COUNT=$(quay_cmd Bearer GET /api/v1/repository/$QUAY_ORG/$QUAY_REPO | grep -v not_found | wc -l)
-              if [ $COUNT = 0 ]; then
+              _REPO_READ="$(quay_api_get "/api/v1/repository/${QUAY_ORG}/${QUAY_REPO}")"
+              _REPO_STATUS="${_REPO_READ##*$'\n'}"
+              _REPO_BODY="${_REPO_READ%$'\n'*}"
+              _REPO_ABSENT=0
+              case "${_REPO_STATUS}" in
+                2[0-9][0-9])
+                  if printf '%s\n' "${_REPO_BODY}" | grep -q not_found; then
+                    _REPO_ABSENT=1
+                  fi
+                  ;;
+                404)
+                  _REPO_ABSENT=1
+                  ;;
+                *)
+                  echo "[ERROR] GET repository ${QUAY_ORG}/${QUAY_REPO} failed (HTTP ${_REPO_STATUS:-no response}); refusing to create it" 1>&2
+                  exit 1
+                  ;;
+              esac
+              if [ "${_REPO_ABSENT}" -eq 1 ]; then
                 echo "[INFO] Creating $QUAY_REPO repo..."
                 quay_required Bearer POST /api/v1/repository "{\"namespace\":\"$QUAY_ORG\", \"repository\":\"$QUAY_REPO\", \"visibility\":\"public\", \"description\":\"Development Repo\", \"repo_kind\":\"image\"}"
               fi
 
               echo "[INFO] Looking for $QUAY_ORG members ..."
-              COUNT=$(quay_cmd Bearer GET /api/v1/organization/$QUAY_ORG/team/owners/members | grep "name\": \"$QUAY_USER\"" | wc -l)
-              if [ $COUNT = 0 ]; then
+              _MEMB_READ="$(quay_api_get "/api/v1/organization/${QUAY_ORG}/team/owners/members")"
+              _MEMB_STATUS="${_MEMB_READ##*$'\n'}"
+              _MEMB_BODY="${_MEMB_READ%$'\n'*}"
+              if [ "${_MEMB_STATUS}" != "200" ]; then
+                echo "[ERROR] GET owners team members for ${QUAY_ORG} failed (HTTP ${_MEMB_STATUS:-no response}); refusing to add ${QUAY_USER}" 1>&2
+                exit 1
+              fi
+              COUNT="$(printf '%s\n' "${_MEMB_BODY}" | grep -c -- "\"name\": \"${QUAY_USER}\"" || true)"
+              if [ "${COUNT}" -eq 0 ]; then
                 echo "[INFO] Associating $QUAY_USER with $QUAY_ORG ..."
                 quay_required Bearer PUT /api/v1/organization/$QUAY_ORG/team/owners/members/$QUAY_USER '{}'
               fi
 
               echo "[INFO] Looking for $QUAY_REPO admins ..."
-              COUNT=$(quay_cmd Bearer GET /api/v1/repository/$QUAY_ORG/$QUAY_REPO/permissions/user/$QUAY_USER | grep '"role": "admin"' | wc -l)
-              if [ $COUNT = 0 ]; then
+              _ADMIN_READ="$(quay_api_get "/api/v1/repository/${QUAY_ORG}/${QUAY_REPO}/permissions/user/${QUAY_USER}")"
+              _ADMIN_STATUS="${_ADMIN_READ##*$'\n'}"
+              _ADMIN_BODY="${_ADMIN_READ%$'\n'*}"
+              case "${_ADMIN_STATUS}" in
+                200)
+                  COUNT="$(printf '%s\n' "${_ADMIN_BODY}" | grep -c -- '"role": "admin"' || true)"
+                  ;;
+                404)
+                  # No permission row for this user yet: a definite negative.
+                  COUNT=0
+                  ;;
+                *)
+                  echo "[ERROR] GET repository permission for ${QUAY_USER} failed (HTTP ${_ADMIN_STATUS:-no response}); refusing to grant admin" 1>&2
+                  exit 1
+                  ;;
+              esac
+              if [ "${COUNT}" -eq 0 ]; then
                 echo "[INFO] Give $QUAY_USER admin rights to the repo ..."
                 quay_required Bearer PUT /api/v1/repository/$QUAY_ORG/$QUAY_REPO/permissions/user/$QUAY_USER '{ "role": "admin"}'
               fi
