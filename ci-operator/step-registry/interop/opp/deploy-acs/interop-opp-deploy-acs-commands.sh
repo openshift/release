@@ -134,7 +134,7 @@ _diag_reserve=120
 _oc_overrun_reserve=25
 _work_deadline=$(( _junit_start + _work_budget ))
 
-# _classify <type> <detail> — record the failure classification (first
+# _classify <type> <detail>: record the failure classification (first
 # match wins; called in precedence order by the detection code).
 _classify() {
   if [[ "${_class}" == "acs-unclassified:no-classification" ]]; then
@@ -184,7 +184,7 @@ _api_err_class() {
   esac
 }
 
-# _diag_get <command...> — run one diagnostic query with stderr contained.
+# _diag_get <command...>: run one diagnostic query with stderr contained.
 # The caller's jsonpath keeps API-controlled fields out of the log; stderr
 # carries the raw API error, which is API-controlled text as well, so a failed
 # query contributes only its classification and never the error body.
@@ -199,7 +199,7 @@ _diag_get() {
   return 0
 }
 
-# _junit_seed — write the default-FAILING case before any work, atomically.
+# _junit_seed: write the default-FAILING case before any work, atomically.
 _junit_seed() {
   mkdir -p "$(dirname "${_jfile}")" 2>/dev/null || true
   local _tmp
@@ -215,7 +215,7 @@ JUNITEOF
   mv -f "${_tmp}" "${_jfile}"
 }
 
-# _xml_escape <string> — escape XML special characters for attribute/body
+# _xml_escape <string>: escape XML special characters for attribute/body
 # interpolation (raw oc error output can contain quotes and ampersands).
 _xml_escape() {
   local s="$1"
@@ -296,7 +296,7 @@ PYEOF
   return 0
 }
 
-# _on_exit <recorded-status> — once-flagged handler; TERM/INT variants pass
+# _on_exit <recorded-status>: once-flagged handler; TERM/INT variants pass
 # an explicit signal and ignore $?.
 _on_exit() {
   local _rc="${1:-0}"
@@ -405,7 +405,7 @@ done
 # Budget invariant (ref.yaml: timeout 30m (1800s) − grace 150s = 1650s
 # work; overhead 180s + precondition ≤120s + diagnostics ≤120s): the two
 # waits are sequential and each independently bounded, so the SUM must
-# multiply out — per-variable 1..900 alone admits 900s + 900s = 1800s of
+# multiply out: per-variable 1..900 alone admits 900s + 900s = 1800s of
 # waits, overrunning the budget so TERM records StepTerminated instead
 # of the acs-csv-timeout classification. This check is the fail-fast half
 # of the contract (reject absurd configs with exit 2); the runtime half is
@@ -437,7 +437,7 @@ echo ">>> PHASE: Deploy ACS Operator (channel: ${ACS_CHANNEL}, csv-name wait: ${
 
 if [[ "${ACS_REPORT_ONLY}" == "1" ]]; then
   # Detection, not gating: report object states and exit 0. Runs before the
-  # packagemanifest precondition on purpose — detection must work when the
+  # packagemanifest precondition on purpose: detection must work when the
   # catalog is absent or erroring. It also runs before the self-disable
   # check so the full property set is recorded even when an OperatorPolicy
   # owns the install. Subscription presence is queried independently of
@@ -582,7 +582,7 @@ except Exception:
         _existing_csv=$(oc get csv "${_sd_csv}" -n "${ACS_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null) || _existing_csv=""
       fi
       if [[ "${_existing_csv}" == "Succeeded" ]]; then
-        echo ">>> workaround_removal_ready=true (OperatorPolicy Compliant, current CSV ${_sd_csv} Succeeded) — not installing"
+        echo ">>> workaround_removal_ready=true (OperatorPolicy Compliant, current CSV ${_sd_csv} Succeeded) - not installing"
         _prop "workaround_removal_ready" "true"
         _prop "acs_subscription" "adopted"
         _prop "csv_name" "${_sd_csv}"
@@ -924,12 +924,12 @@ if oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}"
   _prop "acs_subscription" "adopted"
   _prop "channel_observed" "${_existing_ch}"
   if [[ "${_existing_ch}" != "${ACS_CHANNEL}" ]]; then
-    echo ">>> NOTE: existing Subscription channel '${_existing_ch}' != requested '${ACS_CHANNEL}' — adopting, not overwriting (a live OperatorPolicy is the owner)"
+    echo ">>> NOTE: existing Subscription channel '${_existing_ch}' != requested '${ACS_CHANNEL}' - adopting, not overwriting (a live OperatorPolicy is the owner)"
     _prop "channel_mismatch" "${_existing_ch}!=${ACS_CHANNEL}"
   fi
 else
   # oc create (not apply): if a second writer (a live OperatorPolicy) wins
-  # the race, create fails AlreadyExists and we adopt — never overwrite.
+  # the race, create fails AlreadyExists and we adopt, never overwrite.
   if ! cat <<EOF | oc create -f - 2>&1
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -947,7 +947,7 @@ EOF
     if oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" >/dev/null 2>&1; then
       _prop "acs_subscription" "race-tolerated"
       _prop "channel_observed" "$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null || echo unknown)"
-      echo ">>> NOTE: Subscription created concurrently by another writer — adopting"
+      echo ">>> NOTE: Subscription created concurrently by another writer: adopting"
     else
       _classify "acs-subscription-create-error" "failed to create Subscription rhacs-operator"
       _dump_diagnostics
