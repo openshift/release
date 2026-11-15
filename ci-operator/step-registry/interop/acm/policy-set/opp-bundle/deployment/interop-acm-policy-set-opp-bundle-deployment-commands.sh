@@ -487,9 +487,10 @@ ReadStablePolicySet () {
 # Count-based gates cannot see a bundle that stalls below its final size, so
 # the expected membership comes from the applied PolicySets: every policy a
 # PolicySet lists has to be present before compliance is accepted.  The list
-# is read once per acceptance check; a PolicySet-as-read failure or an older
-# bundle without PolicySet objects leaves the count and stability evidence as
-# the only signal, and the run says so.
+# is read once per acceptance check, and a PolicySet-as-read failure retries and
+# then fails the row: without the membership the stable set cannot be compared
+# against the applied PolicySets, which is the only signal that closes the
+# stall-below-final-size race.
 ExpectedPolicyNames () {
   typeset setsJson=''
   setsJson="$(oc get policysets.policy.open-cluster-management.io -n policies -o json 2>/dev/null)" || return 1
@@ -578,12 +579,30 @@ while :; do
   prevCount="${policyCount}"
   # Expected bundle membership, read before the pass: a set that is stable at
   # a smaller size than the applied PolicySets list is not a complete
-  # deployment, whatever its count.
+  # deployment, whatever its count.  A read that cannot be completed is
+  # retried and then fails the row: accepting on count and stability alone is
+  # exactly the race this membership check exists to close, because a partial
+  # set that stops changing is indistinguishable from a complete one.
   typeset expectedPolicies=''
-  if ! expectedPolicies="$(ExpectedPolicyNames)"; then
-    expectedPolicies=''
-    printf '[%s] WARNING: could not read PolicySet membership; accepting on the count and stability evidence only\n' \
-      "$(date -u +%FT%TZ)" >&2
+  typeset -i expectedRc=0 expectedTry=0
+  for expectedTry in 1 2 3; do
+    if expectedPolicies="$(ExpectedPolicyNames)"; then
+      expectedRc=0
+      break
+    else
+      # $? here is the failed condition's status; after the fi it would be the
+      # if compound's own (successful) status.
+      expectedRc=$?
+    fi
+    if (( expectedTry < 3 )); then
+      printf '[%s] WARNING: could not read PolicySet membership (attempt %d/3), retrying\n' \
+        "$(date -u +%FT%TZ)" "${expectedTry}" >&2
+      sleep 10
+    fi
+  done
+  if (( expectedRc != 0 )); then
+    RecordResult "policies-compliant" "failed" "Could not read PolicySet membership before the compliance pass (rc=${expectedRc}); the stable set cannot be compared against the applied PolicySets${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
+    exit 1
   fi
   # Names the pass below actually covers.  `oc wait --all` and the explicit
   # name list both only consider policies that exist when the wait starts, so
@@ -691,11 +710,7 @@ while :; do
     policyCount="${complianceStableCount}"
     continue
   fi
-  if [[ -n "${expectedPolicies}" ]]; then
-    complianceStabilityNote="${policyCount} policies, same name set as the compliance pass, expected PolicySet membership covered, unchanged across ${compliancePollTarget} consecutive ${compliancePollIntervalSeconds}s polls"
-  else
-    complianceStabilityNote="${policyCount} policies, same name set as the compliance pass, unchanged across ${compliancePollTarget} consecutive ${compliancePollIntervalSeconds}s polls, PolicySet membership unavailable"
-  fi
+  complianceStabilityNote="${policyCount} policies, same name set as the compliance pass, expected PolicySet membership covered, unchanged across ${compliancePollTarget} consecutive ${compliancePollIntervalSeconds}s polls"
   break
 done
 
