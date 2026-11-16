@@ -761,7 +761,11 @@ fi
 # uncounted so an unexpected value fails closed instead of passing.
 function CheckClustersConnected () {
     typeset verdict=""
-    verdict="$(curl -sk -K "${_curlCfg}" \
+    # Body fetch: -f so an HTTP error response fails the pipeline (curl's
+    # exit status reaches the `|| return 1`) instead of parsing the error
+    # body into a misleading "no connected sensor yet" verdict that burns
+    # the whole budget on a credential or routing fault.
+    verdict="$(curl -fskSL -K "${_curlCfg}" \
         "https://${centralUrl}/v1/clusters" --max-time 10 \
         | python3 -c '
 import json, sys
@@ -874,7 +878,9 @@ fi
 # ---------------------------------------------------------------------------
 function CheckPoliciesLoaded () {
     typeset policyCount=""
-    policyCount="$(curl -sk -K "${_curlCfg}" \
+    # Body fetch: -f for the same reason as CheckClustersConnected - an HTTP
+    # error response must fail the check, not read as an empty policy list.
+    policyCount="$(curl -fskSL -K "${_curlCfg}" \
         "https://${centralUrl}/v1/policies?query=" --max-time 10 \
         | JsonLength policies)" || return 1
     echo "[readiness]   policy count: ${policyCount}"
