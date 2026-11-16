@@ -1,0 +1,23 @@
+workflow:
+  as: tls-install-aws-ovn-modern
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-conf-aws
+    - ref: tls-conf-install-config
+    - chain: aws-provision-iam-user-minimal-permission
+    - ref: ovn-conf
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install
+    - ref: tls-install-check
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-aws-post 
+    env:
+      FAIL_ON_CORE_DUMP: "false"
+  documentation: |-
+    Explicitly sets Modern in install-config.yaml, verifies the installer generated Modern
+    and StrictAllComponents on APIServer/cluster, and executes the common AWS OVN e2e suite.
