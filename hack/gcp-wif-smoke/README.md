@@ -42,6 +42,54 @@ explicit trust/authorization rejection. Then test token renewal and a narrowly
 authorized harmless resource read. Enabling issuers on build02/04/08 and migrating
 cert-manager are separate follow-ups; this test changes no existing consumers.
 
+## Authorization and renewal checks
+
+`test_manifest.py` renders separately named Jobs and a new ConfigMap, preserving
+prior runs. It requires a dedicated test bucket containing the following harmless
+objects, uploaded without overwriting any existing generation:
+
+- `smoke/allowed.txt`: `build13 direct WIF allowed test object` followed by a newline.
+- `smoke/denied.txt`: a separate harmless test file.
+
+The test GCP service account gets `roles/storage.objectViewer` on this bucket with
+an IAM condition matching only the exact allowed object's `resource.name`.
+It receives no project-wide storage role. The bucket uses uniform access and
+public access prevention.
+
+Create a separate external-account config using the original provider/account
+and `--service-account-token-lifetime-seconds=600`. Then render the test resources:
+
+```sh
+python3 hack/gcp-wif-smoke/test_manifest.py \
+  /path/to/external-account-600.json \
+  abc123 \
+  openshift-ci-build13-wif-smoke-20261116-70628c > /tmp/build13-wif-tests.json
+oc --context="$BUILD13_CONTEXT" create --dry-run=server -f /tmp/build13-wif-tests.json
+oc --context="$BUILD13_CONTEXT" create -f /tmp/build13-wif-tests.json
+```
+
+Choose a fresh six-character hexadecimal run suffix instead of `abc123` for each
+run. All Jobs are additive and have no automatic expiry.
+
+The Jobs run these checks:
+
+- **Denied identity:** a new Kubernetes ServiceAccount with no IAM grant must
+  receive an explicit IAM 403 denying `iam.serviceAccounts.getAccessToken`.
+  Network errors and unrelated failures do not count as a pass.
+- **Resource access:** the allowed file must return its exact expected contents.
+  Reading the other file and listing the bucket must receive explicit storage
+  permission denials. GCS media errors can be HTML; metadata/list errors are JSON.
+- **Renewal:** the Google auth library reads the allowed file every 30 seconds for
+  15 minutes with 10-minute GCP credentials and a 10-minute projected Kubernetes
+  token. It must automatically refresh target credentials after initial issuance,
+  continue beyond the first credential expiry, and observe projected-token
+  rotation. A separate fresh client must then exchange the rotated pod token and
+  read the object. Only counters are logged, never token values or fingerprints.
+
+The pinned Google CLI image supplies its own Python and Google auth library;
+the test discovers those paths with `gcloud info`. It does not install packages
+or use personal ADC, AWS credentials, or a service-account private key.
+
 ## Verified run, 2026-11-16
 
 Job `gcp-wif-smoke-2` in build13 project `gcp-wif-smoke-nirichar` completed
@@ -61,6 +109,24 @@ expiry was removed. New Jobs have no automatic expiry.
 The test account had no user-managed keys. No project resource roles were granted.
 This verifies authentication and impersonation only, not access to storage/DNS,
 credential renewal, other build clusters, or migration of existing consumers.
+
+## Follow-up run, 2026-11-16
+
+- `gcp-wif-denied-70628c` completed successfully: the unbound Kubernetes identity
+  received IAM 403 for `iam.serviceAccounts.getAccessToken`.
+- `gcp-wif-resource-70628d` completed successfully: the exact allowed object was
+  read, while the other object and bucket listing were explicitly denied.
+- `gcp-wif-renewal-70628c` is running the 15-minute renewal check. Its first
+  automatic credential refresh has succeeded; final expiry/rotation checks are
+  still pending.
+
+The dedicated private bucket is
+`gs://openshift-ci-build13-wif-smoke-20261116-70628c`. Only the exact allowed object
+is included in the test account's conditional, bucket-scoped viewer grant.
+The earlier resource run `gcp-wif-resource-70628c` is retained: it failed in the
+test's JSON parsing of an expected HTML permission denial, not because access
+was granted. The separately named retry accepts explicit permission denials in
+either response format.
 
 ## Retention
 
