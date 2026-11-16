@@ -659,6 +659,188 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- always_run: false
+  as: e2e-gcp-osd-workload-identity-operator
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: rosa-e2e-03
+    env:
+      CHANNEL_GROUP: stable
+      COMPUTE_NODES: "3"
+      ENABLE_WIF: "yes"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.22"
+      REGION: us-east1
+      SUBSCRIPTION_TYPE: marketplace-gcp
+    post:
+    - as: operator-identity-cleanup
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # operator-identity-record writes these before operator-identity
+        # creates anything, so the identity can go even when the cluster
+        # API has. With no record, operator-identity never ran and there
+        # is nothing to remove; checked first, as ci_bootstrap needs a
+        # kubeconfig a run that failed to provision does not have. Not
+        # best effort: a run passes only if the identity it created is
+        # gone, and the script treats an identity that is already gone as
+        # removed.
+        if [[ ! -f "${SHARED_DIR}/operator-identity-infra" ]]; then
+          echo "no operator identity recorded; nothing to remove"
+          exit 0
+        fi
+        # This profile carries the GCP key as osd-ccs-gcp.json, where
+        # ci_bootstrap looks for gce.json.
+        profile="$(mktemp -d)"
+        ln -s "${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json" "${profile}/gce.json"
+        export CLUSTER_PROFILE_DIR="${profile}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        INFRA="$(<"${SHARED_DIR}/operator-identity-infra")"
+        GCP_PROJECT="$(<"${SHARED_DIR}/operator-identity-project")"
+        export INFRA GCP_PROJECT
+        hack/gcp/delete-operator-identity.sh
+      from: e2e-runner
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - chain: gather
+    - ref: osd-ccs-cluster-deprovision
+    - ref: osd-ccs-gcp-wif-config-deprovision
+    pre:
+    - ref: osd-ccs-gcp-wif-config-provision
+    - ref: osd-ccs-cluster-provision-gcp
+    - ref: osd-ccs-conf-idp-htpasswd
+    - ref: osd-ccs-cluster-operators-wait-ready
+    - as: wif-pool
+      commands: |
+        set -euo pipefail
+        # The operator's identity binds to the wif-config's pool and
+        # provider, and osd-ccs-gcp-wif-config-provision records only
+        # the wif-config's id.
+        token="$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)"
+        if [[ -n "${token}" ]]; then
+          ocm login --url "${OCM_LOGIN_ENV}" --token "${token}"
+        else
+          ocm login --url "${OCM_LOGIN_ENV}" \
+            --client-id "$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id")" \
+            --client-secret "$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret")"
+        fi
+        wif="$(ocm get "/api/clusters_mgmt/v1/gcp/wif_configs/$(cat "${SHARED_DIR}/wif-config-id")")"
+        [[ "$(jq -r '.kind' <<<"${wif}")" == WifConfig ]] || { echo "could not read the wif-config"; exit 1; }
+        pool="$(jq -r '.gcp.workload_identity_pool.pool_id | select(type == "string" and length > 0)' <<<"${wif}")"
+        provider="$(jq -r '.gcp.workload_identity_pool.identity_provider.identity_provider_id | select(type == "string" and length > 0)' <<<"${wif}")"
+        [[ -n "${pool}" ]] || { echo "the wif-config has no pool id"; exit 1; }
+        [[ -n "${provider}" ]] || { echo "the wif-config has no identity provider id"; exit 1; }
+        printf '%s' "${pool}" > "${SHARED_DIR}/wif-pool-id"
+        printf '%s' "${provider}" > "${SHARED_DIR}/wif-provider-id"
+        echo "pool ${pool}, provider ${provider}"
+      env:
+      - default: staging
+        name: OCM_LOGIN_ENV
+      from: ocm-cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: hack/enable-frr.sh
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # The CSV supports OwnNamespace and SingleNamespace only. The
+        # manager scopes no caches, so it watches cluster-wide either
+        # way.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace "${OO_BUNDLE}"
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      dependencies:
+      - env: OO_BUNDLE
+        name: bgp-cloud-connector-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity-record
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # For operator-identity-cleanup, which may run after the cluster
+        # API has gone. A step of its own, so the record is in SHARED_DIR
+        # before operator-identity creates anything, however that step
+        # ends. The project id stays out of the log.
+        source hack/gcp/ci.sh
+        ci_use_shared_kubeconfig
+        gcp_cluster_facts
+        printf '%s' "${infra}" > "${SHARED_DIR}/operator-identity-infra"
+        printf '%s' "${project}" > "${SHARED_DIR}/operator-identity-project"
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # This profile carries the GCP key as osd-ccs-gcp.json, where
+        # ci_bootstrap looks for gce.json.
+        profile="$(mktemp -d)"
+        ln -s "${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json" "${profile}/gce.json"
+        export CLUSTER_PROFILE_DIR="${profile}"
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        # Separate assignments, so a failed read stops the step under
+        # errexit; wif-pool has already checked both are non-empty.
+        POOL_ID="$(<"${SHARED_DIR}/wif-pool-id")"
+        PROVIDER_ID="$(<"${SHARED_DIR}/wif-provider-id")"
+        export POOL_ID PROVIDER_ID
+        hack/gcp/create-operator-identity.sh
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # This profile carries the GCP key as osd-ccs-gcp.json, where
+        # ci_bootstrap looks for gce.json.
+        profile="$(mktemp -d)"
+        ln -s "${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json" "${profile}/gce.json"
+        export CLUSTER_PROFILE_DIR="${profile}"
+        # exec, so Prow's TERM on timeout or abort reaches the script,
+        # whose trap tears down the hub and the client VM.
+        exec hack/ci-e2e-gcp.sh
+      from: e2e-runner
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: e2e-gcp-workload-identity-operator
   skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
