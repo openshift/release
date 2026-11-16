@@ -1,10 +1,52 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+# Pin policy-collection to immutable SHA (INTEROP-9691)
+# Verified via: git ls-remote https://github.com/stolostron/policy-collection.git HEAD => 6d80aff5dda558516fced50640d028bce8dd2341
+# and byte-check: policygenerator/policy-sets/stable/openshift-plus/ exists at this SHA
+if [[ -z "${POLICY_COLLECTION_REF:-}" ]]; then
+  echo "ERROR: POLICY_COLLECTION_REF is not set" >&2
+  exit 1
+fi
+if [[ ! "${POLICY_COLLECTION_REF}" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "ERROR: POLICY_COLLECTION_REF must be a 40-char SHA, got '${POLICY_COLLECTION_REF}'" >&2
+  exit 1
+fi
+# Single-channel assertion guard: fail closed if more than one ref is resolved
+typeset -i _pc_ref_count
+_pc_ref_count=$(git ls-remote https://github.com/stolostron/policy-collection.git "${POLICY_COLLECTION_REF}" 2>/dev/null | wc -l)
+if (( _pc_ref_count > 1 )); then
+  echo "ERROR: POLICY_COLLECTION_REF '${POLICY_COLLECTION_REF}' matches ${_pc_ref_count} refs (expected 0 or 1 for SHA) — failing closed" >&2
+  exit 1
+fi
+
 cd /tmp/
 git clone https://github.com/stolostron/policy-collection.git
+cd policy-collection
+git fetch --depth 1 origin "${POLICY_COLLECTION_REF}"
+git checkout "${POLICY_COLLECTION_REF}"
+# Verify checkout matches pinned SHA
+typeset _pc_checked_sha
+_pc_checked_sha=$(git rev-parse HEAD)
+if [[ "${_pc_checked_sha}" != "${POLICY_COLLECTION_REF}" ]]; then
+  echo "ERROR: checked out SHA '${_pc_checked_sha}' != expected '${POLICY_COLLECTION_REF}'" >&2
+  exit 1
+fi
+# Byte-check: ensure expected policy set path exists at this SHA
+if [[ ! -f "policygenerator/policy-sets/stable/openshift-plus/policyGenerator.yaml" ]]; then
+  echo "ERROR: policygenerator/policy-sets/stable/openshift-plus/ not found at ${POLICY_COLLECTION_REF}" >&2
+  exit 1
+fi
+if [[ ! -f "policygenerator/policy-sets/stable/openshift-plus/input-quay/policy-install-quay.yaml" ]]; then
+  echo "ERROR: input-quay/policy-install-quay.yaml not found at ${POLICY_COLLECTION_REF}" >&2
+  exit 1
+fi
+if [[ ! -f "policygenerator/policy-sets/stable/openshift-plus/input-odf/policy-odf.yaml" ]]; then
+  echo "ERROR: input-odf/policy-odf.yaml not found at ${POLICY_COLLECTION_REF}" >&2
+  exit 1
+fi
 
-cd policy-collection/deploy/
+cd deploy/
 
 # If QUAY_OPERATOR_CHANNEL is set, patch the Quay operator subscription to pin the channel
 if [[ -n "${QUAY_OPERATOR_CHANNEL}" ]]; then
@@ -36,7 +78,7 @@ fi
 sed -i '/local-cluster.*NotIn/d' \
   ../policygenerator/policy-sets/stable/openshift-plus/input/clusters-placement.yaml
 
-echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
+echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -b "${POLICY_COLLECTION_REF}" -a openshift-plus
 
 # openshift-plus generates ~25 policies; require 4+ before oc wait to avoid
 # racing the GitOps Subscription propagation (stolostron/policy-collection#174)
