@@ -1,0 +1,25 @@
+ref:
+  as: openshift-qe-cudn-density-midterm-patch-ovn
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: OVN_IMAGE
+    default: "quay.io/vkommadi/ovn-kubernetes:PR3430OVN4"
+    documentation: Patched OVN-K image with disable-udn-arp-ndp-flood fix
+  - name: CNO_IMAGE
+    default: "quay.io/vkommadi/cluster-network-operator:PR3085OVN4"
+    documentation: Patched CNO image with disable-udn-arp-ndp-flood config knob
+  commands: openshift-qe-cudn-density-midterm-patch-ovn-commands.sh
+  timeout: 30m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    Applies vkommadi OVN patch (PR3430/PR3085) to cluster for UDN macbinding
+    midterm testing. Scales CVO to 0, sets patched OVN/CNO images on
+    network-operator, enables disable-udn-arp-ndp-flood ConfigMap override,
+    waits for all ovnkube-node pods to roll out.
