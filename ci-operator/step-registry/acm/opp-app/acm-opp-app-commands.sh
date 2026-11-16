@@ -280,10 +280,18 @@ function RunTestCase2 () {
     typeset acsHost=""
     typeset -i acsCredsMissing=0
     set +x
-    acsPassword=$(oc get secret -n stackrox central-htpasswd -o json | /tmp/jq -r '.data.password' | base64 -d)
-    acsHost=$(oc get secret -n stackrox sensor-tls -o json | /tmp/jq -r '.data."acs-host"' | base64 -d)
-    if [[ -z "${acsPassword}" ]] || [[ -z "${acsHost}" ]]; then
+    typeset acsPasswordB64="" acsHostB64=""
+    typeset -i acsPasswordRc=0 acsHostRc=0
+    acsPasswordB64=$(oc get secret -n stackrox central-htpasswd -o json | /tmp/jq -r '.data.password') || acsPasswordRc=$?
+    acsHostB64=$(oc get secret -n stackrox sensor-tls -o json | /tmp/jq -r '.data."acs-host"') || acsHostRc=$?
+    if (( acsPasswordRc != 0 )) || (( acsHostRc != 0 )) || [[ -z "${acsPasswordB64}" ]] || [[ "${acsPasswordB64}" == "null" ]] || [[ -z "${acsHostB64}" ]] || [[ "${acsHostB64}" == "null" ]]; then
         acsCredsMissing=1
+    else
+        acsPassword=$(printf '%s' "${acsPasswordB64}" | base64 -d)
+        acsHost=$(printf '%s' "${acsHostB64}" | base64 -d)
+        if [[ -z "${acsPassword}" ]] || [[ -z "${acsHost}" ]]; then
+            acsCredsMissing=1
+        fi
     fi
     set -x
     if (( acsCredsMissing )); then
