@@ -958,18 +958,21 @@ spec:
                 # log and the step's diagnostics copy are readable in
                 # artifacts.
                 echo "[$1] $2 $3" 1>&2
-                AUTH="Fake: dummy"
                 if [ $1 = "Basic" ]; then
                   COUNT=$(oc -n $QUAY_NAMESPACE get --ignore-not-found=true secret $QUAY_USER_SECRET | wc -l)
                   if [ $COUNT -gt 1 ]; then
                       BASIC=$(oc -n $QUAY_NAMESPACE extract secret/$QUAY_USER_SECRET --keys=basic --to=-)
                   fi
-                  AUTH="Authorization: Basic $BASIC"
+                  # The header value is a credential read by curl from a process
+                  # substitution (curl -H @file), so no secret appears in the
+                  # process list while curl runs.
+                  curl -X $2 $CURL_OPTS -H 'Content-Type: application/json' -H @<( set +x; printf 'Authorization: Basic %s\n' "$BASIC" ) https://$QUAY_HOST$3 --data "$DATA"
 
                 elif [ $1 = "Bearer" ]; then
-                  AUTH="Authorization: Bearer $TOKEN"
+                  curl -X $2 $CURL_OPTS -H 'Content-Type: application/json' -H @<( set +x; printf 'Authorization: Bearer %s\n' "$TOKEN" ) https://$QUAY_HOST$3 --data "$DATA"
+                else
+                  curl -X $2 $CURL_OPTS -H 'Content-Type: application/json' -H 'Fake: dummy' https://$QUAY_HOST$3 --data "$DATA"
                 fi
-                curl -X $2 $CURL_OPTS -H 'Content-Type: application/json'  -H "$AUTH" https://$QUAY_HOST$3 --data "$DATA"
                 typeset -i QRC="${?}"
                 if [ "${QRC}" -ne 0 ]; then
                   echo "[ERROR] $1 $2 $3 failed (curl rc=${QRC})" 1>&2
@@ -1002,7 +1005,7 @@ spec:
               function quay_api_get() {
                 curl -s -k -w '\n%{http_code}' \
                   --connect-timeout 10 --max-time 30 \
-                  -H "Authorization: Bearer $TOKEN" "https://$QUAY_HOST$1"
+                  -H @<( set +x; printf 'Authorization: Bearer %s\n' "$TOKEN" ) "https://$QUAY_HOST$1"
               }
 
               # One bounded wait, no polling loop: a loop of oc wait calls
