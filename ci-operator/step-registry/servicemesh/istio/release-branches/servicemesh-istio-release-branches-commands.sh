@@ -102,8 +102,8 @@ find_cut_point() {
   return 1
 }
 
-# merge_tag opens a PR merging the upstream tag into the z-stream branch. Conflicts
-# are never resolved here: the automator reports them in a draft PR instead.
+# merge_tag opens a PR merging the upstream tag into the z-stream branch.
+# Conflicts are never resolved here.
 merge_tag() {
   local target=$1 tag=$2 branch_point=$3 y_branch=$4
   (
@@ -118,7 +118,6 @@ merge_tag() {
       --modifier="merge_upstream_istio_${tag}" \
       --merge-repository=https://github.com/istio/istio \
       --merge-tag="${tag}" \
-      --merge-failure-pr \
       --post-merge-hook="${workdir}/post-merge.sh"
   )
 }
