@@ -2,7 +2,7 @@ ref:
   as: p2p-mtv-execute-live-migration
   from: cli
   commands: p2p-mtv-execute-live-migration-commands.sh
-  timeout: 6h0m0s
+  timeout: 30m0s
   grace_period: 15m0s
   resources:
     requests:
@@ -10,6 +10,9 @@ ref:
       memory: 400Mi
   documentation: |-
     Execute MTV cross-cluster live migration (CCLM) from source spoke to destination spoke.
+
+    Recent two-spoke runs finish this step in 3–6 minutes. The 30m step timeout
+    covers preflight plus the 15m migration deadline.
 
     Runs on the ACM hub (KUBECONFIG). Creates Plan and Migration CRs, waits for Succeeded,
     and verifies the VM is Running on the destination spoke. Requires p2p-mtv-wait-acm-providers
@@ -102,8 +105,8 @@ ref:
     default: "15m"
     documentation: Timeout for Provider/Map/Plan Ready waits.
   - name: MTV_MIGRATION_TIMEOUT
-    default: "2h"
-    documentation: Max duration to wait for Migration Succeeded.
+    default: "15m"
+    documentation: Max duration to wait for Migration Succeeded. Successful two-spoke runs finish in 3–6 minutes; 15m leaves headroom inside the 30m step timeout.
   - name: MTV_MIGRATION_POLL_INTERVAL_SECONDS
     default: "30"
     documentation: Sleep between Migration status polls.
