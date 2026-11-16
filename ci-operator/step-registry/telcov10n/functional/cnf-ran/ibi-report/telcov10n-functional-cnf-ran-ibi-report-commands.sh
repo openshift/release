@@ -299,20 +299,12 @@ def main():
                     raise ValueError("Expected one raw suite report")
                 normalize(reports[0], lane, ready / (lane + "-" + reports[0].name))
                 if lane == "ibbf":
-                    gate = source / "junit_ibbf_policy_gate.xml"
-                    try:
+                    outcome = json.loads((shared / "ibi-ibbf-status.json").read_text())
+                    if outcome["policy"] is not None:
+                        gate = source / "junit_ibbf_policy_gate.xml"
                         command(["scp", "-q", *opts,
                                  host + ":" + directory + "/" + gate.name,
                                  str(gate)], "IBBF policy report collection")
-                    except RuntimeError:
-                        hardware = ET.parse(reports[0])
-                        passed = any("78333" in c.get("name", "") and
-                                     not any(c.find(tag) is not None
-                                             for tag in ("failure", "error", "skipped"))
-                                     for c in hardware.iter("testcase"))
-                        if passed:
-                            raise ValueError("Policy report missing after passing IBBF")
-                    else:
                         normalize(gate, lane, ready / (lane + "-" + gate.name))
                 summary["stages"][lane] = "collected"
             except Exception:
