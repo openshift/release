@@ -1,0 +1,36 @@
+workflow:
+  as: openshift-topology-transition-sno-sno-to-ha
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      EC2_INSTANCE_TYPE: c5n.metal
+      EC2_REGION: us-west-2
+      NODE_ROLE: control-plane
+      ADDITIONAL_NODES: '2'
+      TARGET_CONTROL_PLANE_TOPOLOGY: HighlyAvailable
+      TARGET_INFRASTRUCTURE_TOPOLOGY: HighlyAvailable
+      TARGET_CONTROL_PLANE_NODES: '3'
+      TARGET_COMPUTE_NODES: '0'
+      TARGET_ARBITER_NODES: '0'
+      TARGET_CONTROL_PLANE_NODES_SCHEDULABLE: '3'
+      NODE_INVENTORY: inventory.json
+      EXPECTED_NODES: '3'
+      ETCD_VOTING_MEMBERS: '3'
+      CONTROL_PLANE_AS_WORKERS: 'true'
+    pre:
+    - ref: ipi-install-rbac
+    - chain: openshift-image-based-infra-aws-ec2
+    - ref: openshift-topology-transition-sno-install-sno
+    - ref: openshift-topology-transition-test-preflight
+    test:
+    - ref: openshift-topology-transition-scaling-add-nodes
+    - ref: openshift-topology-transition-sno-configure-compact
+    - ref: openshift-topology-transition-scaling-check-scaling
+    - ref: openshift-topology-transition-test
+    post:
+    - ref: openshift-topology-transition-gather
+      best_effort: true
+    - ref: openshift-image-based-infra-aws-deprovision
+  documentation: Install SNO on one EC2 metal host, run preflight, add two control-plane
+    VMs, check compact HA scaling, and run the origin topology transition suite. Always
+    collect diagnostics and deprovision the EC2 stack.
