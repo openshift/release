@@ -108,6 +108,7 @@ mirror_operators() {
     log "Mirroring directly from source to ${MIRROR_REGISTRY_HOST}..."
     /tmp/oc-mirror --v2 \
         --config="${TMP_DIR}/isc-acm-mce.yaml" \
+        --workspace "file://${TMP_DIR}" \
         "docker://${MIRROR_REGISTRY_HOST}" \
         --src-tls-verify=false \
         --dest-tls-verify=false \
