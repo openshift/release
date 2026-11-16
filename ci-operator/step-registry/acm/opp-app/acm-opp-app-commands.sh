@@ -314,7 +314,7 @@ function RunTestCase2 () {
                 "https://${acsHost}/v1/images" | /tmp/jq "${jqFilter}"); then
             set -x
             : "Attempt ${attempt}/${retries}: ACS image query failed"
-            sleep 5
+            [ "${attempt}" -lt "${retries}" ] && sleep "${retryInterval}"
             continue
         fi
         set -x
