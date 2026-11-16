@@ -78,6 +78,11 @@ main() {
         process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/host_vars/"$(basename "${dir}")"
     done
 
+    # shared hypervisor helilx47
+    if [[ "${CLUSTER_NAME}" == "kni-qe-135" ]]; then
+        process_inventory "/var/host_variables/helix47" /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
+    fi
+
     echo "Store inventory in SHARED_DIR"
     copy_to_shared_dir /eco-ci-cd/inventories/ocp-deployment/host_vars
     copy_to_shared_dir /eco-ci-cd/inventories/ocp-deployment/group_vars
