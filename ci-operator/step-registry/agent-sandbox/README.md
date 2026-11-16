@@ -36,9 +36,9 @@ repository (built into the `src` image). The test binary uses `oc` (injected via
 
 | Env var | Default | Description |
 |---|---|---|
-| `SANDBOX_RUNTIME_CLASS` | `"kata"` | RuntimeClass to test (`kata` or `kata-remote`) |
-| `SANDBOX_TEST_TIMEOUT` | `"45m"` | Test timeout |
-| `SANDBOX_TEST_PATTERN` | `""` | Go test `-run` pattern filter |
+| `SANDBOX_RUNTIME_CLASS` | `"kata"` | RuntimeClass to test (`kata`, `kata-remote`, or `default`) |
+| `SANDBOX_TEST_TIMEOUT` | `"30m"` | Go test timeout |
+| `SANDBOX_TEST_PATTERN` | `"TestRuntimeClassLifecycle\|TestRuntimeClassStartupComparison"` | Go test `-run` pattern filter |
 
 ## Workflows
 

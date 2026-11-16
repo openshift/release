@@ -73,7 +73,7 @@ All jobs run at 06:00 UTC. Cron format: `0 6 * * <day>` where day is 1-5.
 | `aws-sandboxed-containers-operator` | Peerpods AWS tests | Shared with SCO; has IAM/SG permissions |
 
 The peerpods profiles are shared quota pools with the sandboxed-containers-operator
-team. The repo is registered as an owner in `cluster-profiles-config.yaml`.
+team. Profile ownership for this repo is pending approval in a separate PR.
 
 ## Adding a New OCP Version
 
