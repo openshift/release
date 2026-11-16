@@ -177,12 +177,15 @@ _classify() {
         # observed in rehearsal build 2116735878033313792. A successful read
         # with an EMPTY list is the same deterministic absence (the CRD is
         # simply not there), so only the read's success is gated here.
-        if crdlist="$(oc get crd -o name 2>/dev/null)"; then
+        # Every read carries --request-timeout (OC_READ_TIMEOUT, default 10s):
+        # a poll loop only re-evaluates its deadline after the call returns, so
+        # an unbounded read would overrun the cap it is meant to respect.
+        if crdlist="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd -o name 2>/dev/null)"; then
             if ! grep -q '^customresourcedefinition\.apiextensions\.k8s\.io/centrals\.platform\.stackrox\.io$' <<< "${crdlist}"; then
                 _ACS_STATE="absent"
                 return 0
             fi
-            if out="$(oc get centrals.platform.stackrox.io -A -o json 2>/dev/null)"; then
+            if out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json 2>/dev/null)"; then
                 items="$(printf '%s' "${out}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("items",[])))' 2>/dev/null)" || rc=1
                 if (( rc == 0 )); then
                     if (( items > 0 )); then
@@ -296,7 +299,7 @@ fi
 # 0-exit read that lists the matcher enters the bounded wait loop.
 typeset _deps=""
 typeset -i _deps_rc=0
-_deps="$(oc get deployment -n "${_centralNs}" -o name 2>/dev/null)" || _deps_rc=$?
+_deps="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get deployment -n "${_centralNs}" -o name 2>/dev/null)" || _deps_rc=$?
 if (( _deps_rc != 0 )); then
     echo "[smoke] Deployment read failed in ${_centralNs} (status ${_deps_rc}); scanner readiness gate not evaluated"
     _add_case "scanner-v4-ready" failed "Environment" "deployment read failed in ${_centralNs} (oc get deployment status ${_deps_rc}); the scanner readiness gate was not evaluated"
@@ -308,7 +311,7 @@ else
     typeset -i _scan_elapsed=0
     typeset _scan_ready=""
     while (( _scan_elapsed < ACS_SCANNER_WAIT_S )); do
-        _scan_ready="$(oc get pods -n "${_centralNs}" -l app=scanner-v4-matcher -o json 2>/dev/null | python3 -c '
+        _scan_ready="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${_centralNs}" -l app=scanner-v4-matcher -o json 2>/dev/null | python3 -c '
 import json, sys
 
 d = json.load(sys.stdin)
@@ -333,7 +336,7 @@ for pod in d.get("items", []):
         _add_case "scanner-v4-ready" passed
     else
         echo "[smoke] Scanner V4 matcher pods not Ready within ${ACS_SCANNER_WAIT_S}s:"
-        oc get pods -n "${_centralNs}" -l app=scanner-v4-matcher -o wide 2>/dev/null || true
+        oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${_centralNs}" -l app=scanner-v4-matcher -o wide 2>/dev/null || true
         _add_case "scanner-v4-ready" failed "Environment" "no Ready scanner-v4-matcher pod in ${_centralNs} within ${ACS_SCANNER_WAIT_S}s; scan-dependent test results may report MISSING_SCAN_DATA for environment reasons"
     fi
 fi

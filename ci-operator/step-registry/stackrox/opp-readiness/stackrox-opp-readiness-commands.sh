@@ -211,12 +211,12 @@ _classify() {
         # Absence classified here is PROVISIONAL on a required lane: the main
         # flow holds it for a bounded window before finalizing (provisional-
         # hold block below), and it is final only for absent-by-design.
-        if crdlist="$(oc get crd -o name 2>/dev/null)"; then
+        if crdlist="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd -o name 2>/dev/null)"; then
             if ! grep -q '^customresourcedefinition\.apiextensions\.k8s\.io/centrals\.platform\.stackrox\.io$' <<< "${crdlist}"; then
                 _ACS_STATE="absent"
                 return 0
             fi
-            if out="$(oc get centrals.platform.stackrox.io -A -o json 2>/dev/null)"; then
+            if out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json 2>/dev/null)"; then
                 items="$(printf '%s' "${out}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("items",[])))' 2>/dev/null)" || rc=1
                 if (( rc == 0 )); then
                     if (( items > 0 )); then
@@ -643,14 +643,14 @@ typeset scNs=""
 
 typeset -i _assert_rc=0
 
-if oc get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
+if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
     _add_case "central-crd" passed
 else
     _add_case "central-crd" failed "Assertion" "Central CRD not registered"
     _assert_rc=1
 fi
 
-if oc get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
+if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
     _add_case "securedcluster-crd" passed
 else
     _add_case "securedcluster-crd" failed "Assertion" "SecuredCluster CRD not registered"
@@ -706,7 +706,7 @@ set +x
 
 typeset roxAdminPassword=""
 echo "[readiness] Extracting roxAdminPassword..."
-roxAdminPassword="$(oc get secret -n "${centralNs}" central-htpasswd \
+roxAdminPassword="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get secret -n "${centralNs}" central-htpasswd \
     -o jsonpath='{.data.password}' | base64 -d)" || true
 
 if [[ -z "${roxAdminPassword}" ]]; then
@@ -856,8 +856,8 @@ else
     # shows counters (observed in rehearsal build 2118028576879022080, where
     # the diagnosis had to come from a later must-gather).
     echo "[readiness] Sensor pod states at timeout:"
-    oc get pods -n "${scNs}" -l app=sensor -o wide 2>/dev/null || true
-    oc get pods -n "${scNs}" -l app=sensor -o json 2>/dev/null | python3 -c '
+    oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${scNs}" -l app=sensor -o wide 2>/dev/null || true
+    oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${scNs}" -l app=sensor -o json 2>/dev/null | python3 -c '
 import json, sys
 
 d = json.load(sys.stdin)
