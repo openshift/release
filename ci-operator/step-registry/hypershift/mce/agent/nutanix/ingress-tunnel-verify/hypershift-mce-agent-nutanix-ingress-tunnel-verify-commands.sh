@@ -212,6 +212,38 @@ printf 'ClusterOperator: %s; CanaryChecksSucceeding: %s\n' \
   "$ingress_conditions" "$canary_condition" \
   > "$ARTIFACT_DIR/nutanix-ingress-operator-condition.txt"
 
+# Verify the generated ingress certificate against the guest CA from the CI
+# test container, using the same client-facing Squid endpoint as conformance.
+if [[ -z "${PROXYPORT:-}" ]]; then
+  echo "The client-facing Squid proxy port is unavailable."
+  exit 1
+fi
+ingress_ca=$(mktemp)
+trap 'rm -f "$ingress_ca"' EXIT
+trust_deadline=$((SECONDS + 120))
+while :; do
+  if oc -n openshift-config-managed get configmap default-ingress-cert \
+       -o jsonpath='{.data.ca-bundle\.crt}' > "$ingress_ca" 2>/dev/null &&
+     [[ -s "$ingress_ca" ]] &&
+     trusted_result=$(curl -fsS --connect-timeout 5 --max-time 12 \
+       --proxy "http://$IP:$PROXYPORT" --noproxy '' --cacert "$ingress_ca" \
+       -o /dev/null -w '%{http_code}' "https://$canary_host/") &&
+     [[ "$trusted_result" =~ ^[23][0-9][0-9]$ ]]; then
+    printf 'proxy-squid with guest ingress CA: HTTP %s\n' "$trusted_result" \
+      >> "$ARTIFACT_DIR/nutanix-ingress-canary-http.txt"
+    break
+  fi
+  if (( SECONDS >= trust_deadline )); then
+    if [[ ! -s "$ingress_ca" ]]; then
+      echo "The guest default ingress CA is unavailable."
+    else
+      echo "The canary Route did not validate through Squid with the guest ingress CA."
+    fi
+    exit 1
+  fi
+  sleep 15
+done
+
 # The shared MetalLB step defers this guest readiness gate until the VIP tunnel
 # and ingress canary are healthy.
 record_clusterversion_conditions() {
