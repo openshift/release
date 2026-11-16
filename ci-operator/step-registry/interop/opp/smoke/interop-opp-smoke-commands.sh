@@ -364,13 +364,13 @@ TestAcmConnectivity() {
     fi
     typeset failMsg=""
 
-    # Check if ManagedCluster resources exist. An absent CRD (no
-    # ClusterManager on this lane) is a skip, not a failure (INTEROP-9670).
+    # Check if ManagedCluster resources exist. A resource type the API
+    # server does not serve is a skip, not a failure (INTEROP-9670).
     typeset -i mcCount=0
     if ! mcCount="$(oc get managedclusters -o json 2>"${_opp_smoke_tmp}/mc.err" | jq '.items | length')"; then
         if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/mc.err"; then
-            : "SKIP: managedclusters CRD not present (no ClusterManager on this lane)"
-            AddResult "acm-connectivity" "skip" "managedclusters CRD not present (no ClusterManager on this lane)"
+            : "SKIP: managedclusters CRD not served by this cluster"
+            AddResult "acm-connectivity" "skip" "managedclusters CRD not served by this cluster"
             return
         fi
         AddResult "acm-connectivity" "fail" "Failed to query ManagedClusters"
@@ -423,8 +423,8 @@ TestAcsSensors() {
     fi
     typeset failMsg=""
 
-    # Check SecuredCluster CR status first. An absent CRD (no ACS install on
-    # this lane) is a skip; the jq array + `first` form keeps the query
+    # Check SecuredCluster CR status first. A resource type the API server
+    # does not serve is a skip; the jq array + `first` form keeps the query
     # pipefail-safe (INTEROP-9670).
     typeset scStatus=""
     if ! scStatus="$(oc get securedclusters.platform.stackrox.io --all-namespaces -o json 2>"${_opp_smoke_tmp}/sc.err" | jq -r '
@@ -433,8 +433,8 @@ TestAcsSensors() {
         | first // empty
     ')"; then
         if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/sc.err"; then
-            : "SKIP: securedclusters CRD not present (ACS operator not installed on this lane)"
-            AddResult "acs-sensors" "skip" "securedclusters CRD not present (ACS operator not installed on this lane)"
+            : "SKIP: securedclusters CRD not served by this cluster"
+            AddResult "acs-sensors" "skip" "securedclusters CRD not served by this cluster"
             return
         fi
         AddResult "acs-sensors" "fail" "Failed to query SecuredCluster resources"
@@ -524,7 +524,7 @@ TestQuayPull() {
     if [[ -z "${quayRoute}" ]]; then
         # Try looking for QuayRegistry CR to find the route
         set +x  # suppress xtrace — registry endpoint URLs are sensitive
-        if ! quayRoute="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json | jq -r '
+        if ! quayRoute="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json 2>"${_opp_smoke_tmp}/qr.err" | jq -r '
             .items[0].status.registryEndpoint // empty
         ' | sed 's|^https://||')"; then
             : "QuayRegistry CR query failed"
