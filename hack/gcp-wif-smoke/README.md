@@ -140,4 +140,36 @@ Retain both test runs and the isolated test resources until cleanup is explicitl
 requested. The existing `build13` pool/provider belongs to the cluster and must
 not be removed as part of test cleanup.
 
+## Read-only rollout inventory, 2026-11-16
+
+[Recorded observations](inventory-20261116.json) distinguish source configuration
+from live, publicly observable state. No rollout configuration has been applied.
+
+Build02, build04, and build08 each return OIDC discovery with issuer
+`https://kubernetes.default.svc`. Their conventional `buildNN-oidc` bucket URLs
+return 404, and no same-named cluster pools were found in the two checked projects,
+`openshift-ci-build-farm` and `openshift-ci-infra`. This does not rule out pools in
+other projects or mirrors at other URLs. Public signing-key retrieval could not
+be verified from this session; authenticated contexts for those clusters are not
+available.
+
+The next isolated pilot should be build02, after cluster-owner review of the trust
+setup. Google's Kubernetes guide supports supplying a cluster's public JWKS to an
+OIDC provider, which can avoid changing a control-plane issuer for a smoke test.
+Verified JWKS retrieval and a signing-key rotation plan are prerequisites. A
+stable public issuer is another approach, but no cluster-wide issuer change is
+included here. Use a separate pool per cluster, or an equally strong
+cluster-qualified principal binding, and grant only the exact pilot identity.
+Repeat the successful build13 checks before progressing to build04 and build08.
+
+Cert-manager is a later consumer canary. The checked-in ClusterIssuers still
+reference `key.json` for `openshift-ci-infra` and
+`openshift-ci-build-farm-cert-issuer.json` for the build-farm project. The build13
+account cannot read the deployed cert-manager controller, so its installed
+version and supported Operator configuration for projected-token/external-account
+ADC must be confirmed by maintainers first. The upstream GKE annotation examples
+are not a recipe for these OpenShift clusters. Start with a separate canary
+issuer and test DNS scope; keep existing issuers, certificates and key Secrets
+until a separately reviewed migration succeeds. No deletion is part of this plan.
+
 Reference: https://cloud.google.com/iam/docs/workload-identity-federation-with-kubernetes

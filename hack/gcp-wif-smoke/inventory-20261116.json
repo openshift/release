@@ -1,0 +1,97 @@
+{
+  "observed_on": "2026-11-16",
+  "method": "Read-only public OIDC discovery, GCP IAM list/describe, and checked-in release manifests. No issuer/provider/consumer changes.",
+  "projects_checked": [
+    "openshift-ci-build-farm",
+    "openshift-ci-infra"
+  ],
+  "clusters": {
+    "build02": {
+      "discovery_url": "https://api.build02.gcp.ci.openshift.org:6443/.well-known/openid-configuration",
+      "discovery_http_status": 200,
+      "advertised_issuer": "https://kubernetes.default.svc",
+      "advertised_jwks_uri": "https://api.build02.gcp.ci.openshift.org:6443/openid/v1/jwks",
+      "public_jwks_fetch": "Not verified; unauthenticated curl returned connection error 56. No TLS/authentication bypass attempted.",
+      "conventional_public_mirror": {
+        "url": "https://storage.googleapis.com/build02-oidc/.well-known/openid-configuration",
+        "http_status": 404,
+        "interpretation": "Only this conventional URL was checked; this does not establish that all possible mirrors are absent."
+      },
+      "same_named_wif_pool_in_projects_checked": false,
+      "cert_manager_source_uses_service_account_secret_ref": true,
+      "cert_manager_source": "clusters/build-clusters/build02/cert-manager/cert-issuer-ci-build-farm_clusterissuer.yaml",
+      "authenticated_cluster_context_available": false
+    },
+    "build04": {
+      "discovery_url": "https://api.build04.gcp.ci.openshift.org:6443/.well-known/openid-configuration",
+      "discovery_http_status": 200,
+      "advertised_issuer": "https://kubernetes.default.svc",
+      "advertised_jwks_uri": "https://api.build04.gcp.ci.openshift.org:6443/openid/v1/jwks",
+      "public_jwks_fetch": "Not verified; unauthenticated curl returned connection error 56. No TLS/authentication bypass attempted.",
+      "conventional_public_mirror": {
+        "url": "https://storage.googleapis.com/build04-oidc/.well-known/openid-configuration",
+        "http_status": 404,
+        "interpretation": "Only this conventional URL was checked; this does not establish that all possible mirrors are absent."
+      },
+      "same_named_wif_pool_in_projects_checked": false,
+      "cert_manager_source_uses_service_account_secret_ref": true,
+      "cert_manager_source": "clusters/build-clusters/build04/cert-manager/cert-issuer-ci-build-farm_clusterissuer.yaml",
+      "authenticated_cluster_context_available": false
+    },
+    "build08": {
+      "discovery_url": "https://api.build08.gcp.ci.openshift.org:6443/.well-known/openid-configuration",
+      "discovery_http_status": 200,
+      "advertised_issuer": "https://kubernetes.default.svc",
+      "advertised_jwks_uri": "https://api.build08.gcp.ci.openshift.org:6443/openid/v1/jwks",
+      "public_jwks_fetch": "Not verified; unauthenticated curl returned connection error 56. No TLS/authentication bypass attempted.",
+      "conventional_public_mirror": {
+        "url": "https://storage.googleapis.com/build08-oidc/.well-known/openid-configuration",
+        "http_status": 404,
+        "interpretation": "Only this conventional URL was checked; this does not establish that all possible mirrors are absent."
+      },
+      "same_named_wif_pool_in_projects_checked": false,
+      "cert_manager_source_uses_service_account_secret_ref": true,
+      "cert_manager_source": "clusters/build-clusters/build08/cert-manager/cert-issuer-ci-build-farm_clusterissuer.yaml",
+      "authenticated_cluster_context_available": false
+    },
+    "build13": {
+      "advertised_issuer": "https://storage.googleapis.com/build13-oidc",
+      "pool_provider": "projects/263120870185/locations/global/workloadIdentityPools/build13/providers/build13",
+      "provider_state": "ACTIVE",
+      "provider_allowed_audiences": [
+        "openshift"
+      ],
+      "mapping": {
+        "google.subject": "assertion.sub"
+      },
+      "tests": "results-20261116.json",
+      "cert_manager_source_uses_service_account_secret_ref": true,
+      "cert_manager_source": "clusters/build-clusters/build13/cert-manager/cert-issuer-ci-build-farm_clusterissuer.yaml",
+      "cert_manager_live_deployment_read_permission": false
+    }
+  },
+  "cert_manager": {
+    "installation_source": "clusters/build-clusters/build-shared/cert-manager-operator/operator.yaml",
+    "installation": "OpenShift cert-manager Operator subscription; deployed version not verified.",
+    "build_farm_dns_project": "openshift-ci-build-farm",
+    "build_farm_zone": "gcp-ci-openshift-org",
+    "build_farm_secret_key_reference": "openshift-ci-build-farm-cert-issuer.json",
+    "shared_dns_project": "openshift-ci-infra",
+    "shared_dns_zone": "origin-ci-ocp-public-dns",
+    "shared_secret_key_reference": "key.json",
+    "live_secret_contents_read": false,
+    "warning": "Source references establish intended configuration only; no live consumer credentials or deployment were inspected."
+  },
+  "next_review": [
+    "Review build13 test code/results first.",
+    "For build02 choose the supported trust-publication path with cluster owners; uploaded JWKS is supported by Google and can avoid a control-plane issuer change for an isolated pilot, but requires verified key retrieval and rotation handling.",
+    "Use a separate pool per cluster or an equally strong cluster-qualified principal binding. Bind only the pilot namespace/service account.",
+    "Repeat positive, negative, scoped-resource and renewal tests one cluster at a time.",
+    "Before a cert-manager canary, obtain deployed Operator/controller version, service-account identity and supported ADC projection configuration through maintainers.",
+    "Keep existing issuers, certificates and key Secrets until a separate reviewed consumer migration and renewal test succeeds. No deletion is authorized by this plan."
+  ],
+  "references": [
+    "https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-kubernetes",
+    "https://cert-manager.io/docs/configuration/acme/dns01/google/"
+  ]
+}
