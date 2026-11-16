@@ -12,18 +12,24 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 # _central_backend_target <namespace> <service>
 # Prints "<address> <port>" for one ready backend of the service, taken from
-# the EndpointSlices the endpoint controller maintains for it. Prints nothing
-# when the service has no ready backend or the EndpointSlices cannot be read.
+# the EndpointSlices the endpoint controller maintains for it.
+# Exit status: 0 with output for a ready backend; 0 with no output when the
+# EndpointSlices were read and list no ready backend; 2 when the read fails;
+# 3 when the read returns a body that cannot be parsed. The two error states
+# stay distinct from "no ready backend" so a caller cannot record a read
+# failure as a definite negative.
 _central_backend_target() {
-    oc get endpointslices -n "$1" \
-      -l "kubernetes.io/service-name=$2" -o json 2>/dev/null | \
+    local _slice_json _backend_target
+    _slice_json="$(oc get endpointslices -n "$1" \
+      -l "kubernetes.io/service-name=$2" -o json 2>/dev/null)" || return 2
+    _backend_target="$(printf '%s\n' "${_slice_json}" | \
       python3 -c '
 import json, sys
 
 try:
     data = json.load(sys.stdin)
 except ValueError:
-    sys.exit(0)
+    sys.exit(3)
 
 for item in data.get("items", []):
     ports = [p for p in item.get("ports", []) or [] if p.get("port")]
@@ -39,7 +45,8 @@ for item in data.get("items", []):
         if addresses:
             print(addresses[0], ports[0]["port"])
             sys.exit(0)
-' || true
+')" || return 3
+    printf '%s\n' "${_backend_target}"
 }
 
 # collect_acs_diagnostics — downloads ACS/StackRox diagnostic bundle
@@ -153,10 +160,14 @@ collect_acs_diagnostics() {
             _central_svc="$(oc get route central -n "${WORKLOAD_NS}" \
               -o jsonpath='{.spec.to.name}' 2>/dev/null || true)"
             _central_backend=""
+            _central_backend_rc=0
             if [[ -n "${_central_svc}" ]]; then
-                _central_backend="$(_central_backend_target "${WORKLOAD_NS}" "${_central_svc}")"
+                _central_backend="$(
+                  _central_backend_target "${WORKLOAD_NS}" "${_central_svc}"
+                )" || _central_backend_rc=$?
             fi
-            if [[ -n "${_central_svc}" && -n "${_central_backend}" ]]; then
+            if [[ "${_central_backend_rc}" -eq 0 &&
+                  -n "${_central_svc}" && -n "${_central_backend}" ]]; then
                 _central_svc_dns="${_central_svc}.${WORKLOAD_NS}.svc"
                 read -r _central_addr _central_port <<<"${_central_backend}"
                 if [[ "${_central_addr}" == *:* ]]; then
@@ -182,12 +193,13 @@ collect_acs_diagnostics() {
                     echo "backend-direct preflight failed: curl exit ${_central_direct_rc}" >>"${TLS_PREFLIGHT_ERR}"
                 fi
             else
-                # Record why the retry could not run: a missing route target and
-                # an unreadable or empty EndpointSlice both leave _central_backend
-                # empty, and tls-preflight.err would otherwise show only the
-                # route-host error. Presence only: neither the route target
-                # service name nor the ready backend address belongs in an
-                # artifact.
+                # Record why the retry could not run: a missing route target, a
+                # failed or unparseable EndpointSlice read, and a read that
+                # shows no ready backend all leave _central_backend empty, and
+                # tls-preflight.err would otherwise show only the route-host
+                # error. The read states stay apart from the definite negative.
+                # Presence only: neither the route target service name nor the
+                # ready backend address belongs in an artifact.
                 _svc_present="no"
                 _backend_present="no"
                 if [[ -n "${_central_svc}" ]]; then
@@ -196,7 +208,16 @@ collect_acs_diagnostics() {
                 if [[ -n "${_central_backend}" ]]; then
                     _backend_present="yes"
                 fi
-                echo "Backend-direct fallback not attempted: route target service present=${_svc_present} ready backend present=${_backend_present} (EndpointSlice lookup or oc access returned nothing)." >>"${TLS_PREFLIGHT_ERR}"
+                if [[ -z "${_central_svc}" ]]; then
+                    _lookup_state="the route target service is absent, so no EndpointSlice lookup ran"
+                elif [[ "${_central_backend_rc}" -eq 2 ]]; then
+                    _lookup_state="the EndpointSlice read failed, so a ready backend cannot be ruled out"
+                elif [[ "${_central_backend_rc}" -eq 3 ]]; then
+                    _lookup_state="the EndpointSlice read returned an unparseable body, so a ready backend cannot be ruled out"
+                else
+                    _lookup_state="the EndpointSlices read cleanly and list no ready backend"
+                fi
+                echo "Backend-direct fallback not attempted: route target service present=${_svc_present} ready backend present=${_backend_present} (${_lookup_state})." >>"${TLS_PREFLIGHT_ERR}"
             fi
         fi
     else
