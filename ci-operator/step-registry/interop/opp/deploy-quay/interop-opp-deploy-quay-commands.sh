@@ -947,6 +947,7 @@ spec:
             - -c
             - |
               #!/usr/bin/env bash
+              set -eo pipefail
 
               function quay_cmd() {
                 DATA='{}'
@@ -981,12 +982,13 @@ spec:
                 echo "[INFO] Success" 1>&2
               }
 
-              # A required mutation. The Job runs without errexit, so an
-              # unchecked call leaves it free to reach the final "Job
-              # finished" line and report success for an organization, an
-              # application, a repository or a permission that was never
-              # created. The response body is discarded: nothing in it is used
-              # here, and it would land in the Job log.
+              # A required mutation. errexit is suspended where quay_cmd's
+              # status is tested, so a required call needs its own check:
+              # otherwise it is free to reach the final "Job finished" line
+              # and report success for an organization, an application, a
+              # repository or a permission that was never created. The
+              # response body is discarded: nothing in it is used here, and it
+              # would land in the Job log.
               function quay_required() {
                 if ! quay_cmd "$@" > /dev/null; then
                   echo "[ERROR] required mutation failed: $1 $2 $3" 1>&2
@@ -1017,8 +1019,8 @@ spec:
               # rather than the job timeout; the ref-declared QUAY_REGISTRY_TIMEOUT
               # governs the outer step wait, not this inner re-run guard.
               echo -n "Waiting for the Quay Registry CR to be available ."
-              _REG_WAIT_OUT=$(oc wait QuayRegistry -n local-quay registry --for=condition=Available=true --timeout=300s 2>&1)
-              _REG_WAIT_RC=$?
+              _REG_WAIT_RC=0
+              _REG_WAIT_OUT=$(oc wait QuayRegistry -n local-quay registry --for=condition=Available=true --timeout=300s 2>&1) || _REG_WAIT_RC=$?
               if [ "${_REG_WAIT_RC}" -ne 0 ]; then
                 echo
                 echo "[ERROR] QuayRegistry registry in local-quay did not report Available=True within 300s (oc wait rc=${_REG_WAIT_RC}): ${_REG_WAIT_OUT}" 1>&2
@@ -1036,8 +1038,7 @@ spec:
               QUAY_ORG_EMAIL=devel@myorg.com
               QUAY_USER_EMAIL=devel-user@myorg.com
               QUAY_REPO=example
-              RESULT=$(oc get secret -n $QUAY_NAMESPACE $QUAY_USER_SECRET)
-              if [ $? -eq 0 ]; then
+              if RESULT=$(oc get secret -n $QUAY_NAMESPACE $QUAY_USER_SECRET); then
                 echo "Quay user configuration secret already exists: $QUAY_USER_SECRET in namespace $QUAY_NAMESPACE"
                 exit 1
               fi
@@ -1046,14 +1047,13 @@ spec:
               # The initialize body carries the generated admin password, so it
               # is built in an assignment and streamed on stdin: never in argv.
               typeset INIT_JSON="{ \"username\": \"quayadmin\", \"password\": \"${ADMINPASS}\", \"email\": \"quayadmin@example.com\", \"access_token\": true}"
-              RESULT=$(printf '%s' "${INIT_JSON}" | curl -fsSLk -X POST https://$QUAY_HOST/api/v1/user/initialize --header 'Content-Type: application/json' --data @-)
-              CURL_RC=$?
+              CURL_RC=0
+              RESULT=$(printf '%s' "${INIT_JSON}" | curl -fsSLk -X POST https://$QUAY_HOST/api/v1/user/initialize --header 'Content-Type: application/json' --data @-) || CURL_RC=$?
               if [ $CURL_RC -ne 0 ]; then
                 echo "Quay user initialization call failed (curl rc=${CURL_RC}); no secrets created." 1>&2
                 exit 1
               fi
-              echo "$RESULT" | grep -q "non-empty database"
-              if [ $? -eq 0 ]; then
+              if echo "$RESULT" | grep -q "non-empty database"; then
                 echo "Quay user configuration failed, the database has been initialized."
                 exit 1
               else
@@ -1071,8 +1071,8 @@ spec:
                 unset INIT_JSON
 
                 echo "[INFO] Creating $QUAY_USER user ..."
-                RESPONSE=$(quay_cmd Bearer POST /api/v1/superuser/users/ "{ \"username\": \"$QUAY_USER\", \"email\": \"$QUAY_USER_EMAIL\", \"access_token\": true}")
-                typeset -i URC="${?}"
+                typeset -i URC=0
+                RESPONSE=$(quay_cmd Bearer POST /api/v1/superuser/users/ "{ \"username\": \"$QUAY_USER\", \"email\": \"$QUAY_USER_EMAIL\", \"access_token\": true}") || URC=$?
                 if [ "${URC}" -ne 0 ]; then
                   echo "[ERROR] failed to create Quay user $QUAY_USER (curl rc=${URC}); user secrets not created." 1>&2
                   exit 1
@@ -1087,7 +1087,7 @@ spec:
                 # readable in artifacts). Two keys cannot both read stdin, so
                 # each gets its own process-substitution stream, byte-exact:
                 # same form as the quayadmin secret above.
-                oc -n $QUAY_NAMESPACE create secret generic $QUAY_USER_SECRET \
+                oc -n "${QUAY_NAMESPACE}" create secret generic "${QUAY_USER_SECRET}" \
                   --from-file=password=<( set +x; printf '%s' "${QUAY_PASSWORD}" ) \
                   --from-file=basic=<( set +x; printf '%s' "${BASE64AUTH}" )
 
