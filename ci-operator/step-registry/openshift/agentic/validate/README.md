@@ -43,6 +43,8 @@ supervisor.
    trusted source metadata, validates every check, and computes the plan hash.
    Ready plans rejected by validation receive at most two correction attempts.
    Plans declaring unresolved gaps remain fatal and are not forced into readiness.
+   Readiness means that the plan is executable; installation and runtime
+   prerequisites are verified by execution, not by planning.
 4. `write_plan` writes `validation.json`, `validation.md` and public source
    references to SHARED_DIR and the artifact directory. Private source bodies and
    unchecked model-supplied gaps are not published.
@@ -53,6 +55,14 @@ CI artifacts even though the raw issue bodies are not published.
 Jira requirements take precedence over PR inferences. Each check identifies its
 requirement source, prerequisites, actions, expected observation and evidence.
 Empty plans, ambiguous scope and incomplete issue coverage stop preparation.
+
+`VALIDATION_SCOPE` can explicitly select a public deliverable within a broader
+issue or epic. Requirements within that deliverable remain mandatory. The scope
+is captured in trusted source metadata, included in the plan hash, and rendered
+in both the plan and result report. A scoped pass does not establish completion
+of the entire epic. Without this setting, preparation covers the whole issue.
+Rejection reports distinguish unsupported fields, a plan not marked ready, and
+unresolved gaps without publishing private rejected source text.
 
 ## Execution and reporting
 
@@ -119,6 +129,8 @@ captured separately by the supervisor.
 
 Generated commands run in a networkless, read-only nested container with dropped
 capabilities, no-new-privileges, resource limits, and bounded writable tmpfs mounts.
+The 512 MiB `/work` mount accommodates the router extension's compressed archive
+and extracted executable; the command container remains limited to 1 GiB memory.
 Only the target kubeconfig and API-broker Unix socket are mounted. The supervisor
 retains model and registry credentials; preparation alone receives Jira credentials.
 Registry authentication is passed explicitly to payload inspection and image pulls.
@@ -134,12 +146,28 @@ infrastructure-level egress isolation for privileged or host-networked workloads
 The manual, optional `aws-ipi` job in
 `ci-operator/config/openshift/release/openshift-release-main__agentic-rehearsal.yaml`
 installs an OpenShift 5.1 nightly on AWS with `ipi-aws` and the
-`openshift-org-aws` cluster profile. After installation it runs the actual
+`openshift-org-aws` cluster profile. Its current case is NE-2126 / router PR #867:
+the router test extension must be a raw gzip-compressed executable.
+`openshift-agentic-test-extension` first finds a ready container running the
+payload's `haproxy-router` digest and reads `/usr/bin/router-tests-ext.gz` from
+that container through the target API. It checks gzip integrity, raw ELF format,
+host architecture and nonempty `list tests -o json` metadata with source
+`openshift:payload:router`. It publishes deployment evidence and JUnit. The raw
+format check rejects the former tar.gz packaging even when renamed to `.gz`.
+After that deterministic product check, the job runs the actual
 `openshift-agentic-prepare-validation` and `openshift-agentic-validate` references.
 Execution uses the installed cluster's kubeconfig and verifies the deployed
 `haproxy-router` payload digest. The inherited `ipi-aws` post chain gathers and
 destroys the cluster, including when validation fails.
 
+The job's explicit scope selects PR #867's packaging deliverable within NE-2126;
+it does not attempt to certify every goal of the automation epic.
+The optional `prepare` job runs the real Jira preparation reference with the same
+scope and no cluster allocation. Use
+`/pj-rehearse pull-ci-openshift-release-main-agentic-rehearsal-prepare` to inspect
+the plan before starting the full AWS job. A passing preparation job establishes
+source capture and plan generation only. The AWS job independently runs both
+agentic references against its installed cluster.
 Temporarily put a suitable cluster issue's Jira key in the release PR title and
 trigger `/pj-rehearse pull-ci-openshift-release-main-agentic-rehearsal-aws-ipi`.
 Inspect `sources.json`, `validation.md`, deployment verification, command evidence,
