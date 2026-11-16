@@ -132,6 +132,34 @@ tests:
                   tag: IMAGE_TAG
     workflow: rosa-seaplane-ephemeral-e2e
 - always_run: false
+  as: on-demand-e2e-v2
+  steps:
+    dependencies:
+      CI_IMAGE_1: platform-api
+      CI_IMAGE_2: seaplane-operator
+    env:
+      E2E_SUITES: api zoa rosa-cli monitoring
+      ROSA_REGIONAL_COMPONENTS: |
+        - image: CI_IMAGE_1
+          repo: quay.io/rrp-dev-ci/platform-api
+          target: argocd/config/regional-cluster/platform-api/values.yaml
+          override:
+            platformApi:
+              app:
+                image:
+                  repository: IMAGE_REPO
+                  tag: IMAGE_TAG
+        - image: CI_IMAGE_2
+          repo: quay.io/rrp-dev-ci/seaplane-operator
+          target: argocd/config/regional-cluster/hyperfleet/values.yaml
+          override:
+            seaplane:
+              helmValues:
+                image:
+                  repository: IMAGE_REPO
+                  tag: IMAGE_TAG
+    workflow: rosa-seaplane-ephemeral-e2e-v2
+- always_run: false
   as: on-demand-e2e-rosa
   steps:
     dependencies:

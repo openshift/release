@@ -86,9 +86,12 @@ source "${REPO_ROOT}/ci/e2e-hooks/before-suites.sh"
 
 # ---------------------------------------------------------------------------
 # 3. Check out suite repos and discover suites (ci/e2e/<suite>/run).
+#    The runner names NO suite repos: e2e.env carries
+#    E2E_SRC_<suite>=<url>@<sha> for every registered suite (from the pin
+#    registry), and the repo-under-test identity comes from JOB_SPEC (with a
+#    Prow-env fallback), so any repo whose CI runs this job gets its own
+#    source checked out for its suites.
 # ---------------------------------------------------------------------------
-API_REPO_URL="https://github.com/openshift-online/rosa-seaplane-api.git"
-ZOA_REPO_URL="https://github.com/openshift-online/rosa-seaplane-zoa.git"
 
 # Checks out the PR merged into its base — the same source ci-operator builds
 # the images under test from. refs/pull/N/head lives on the upstream repo, so
@@ -101,7 +104,7 @@ checkout_merged_pr() { # <dir> <repo-url>
   git -C "${dir}" checkout -q -b e2e-under-test "${PULL_BASE_SHA}"
   git -C "${dir}" -c user.name=ci -c user.email=ci@openshift.io \
     merge -q --no-ff --no-edit "${PULL_PULL_SHA}"
-  echo "Testing ${REPO_NAME} PR #${PULL_NUMBER} (${PULL_PULL_SHA}) merged into ${PULL_BASE_REF} (${PULL_BASE_SHA})"
+  echo "Testing PR #${PULL_NUMBER} (${PULL_PULL_SHA}) merged into ${PULL_BASE_REF} (${PULL_BASE_SHA})"
 }
 
 checkout_at() { # <dir> <repo-url> <sha>
@@ -112,34 +115,67 @@ checkout_at() { # <dir> <repo-url> <sha>
   echo "${url}@${sha} -> ${dir}"
 }
 
-# The repo whose CI runs the job uses its own source; all others their pins.
-if [[ -n "${PULL_NUMBER:-}" && "${REPO_NAME:-}" == "rosa-seaplane-api" ]]; then
-  checkout_merged_pr "${WORK_DIR}/rosa-seaplane-api" "${API_REPO_URL}"
-elif [[ -n "${E2E_SRC_API:-}" ]]; then
-  checkout_at "${WORK_DIR}/rosa-seaplane-api" "${API_REPO_URL}" "${E2E_SRC_API}"
-else
-  echo "ERROR: no E2E_SRC_API in e2e.env and no rosa-seaplane-api PR context" >&2
+# Repo whose CI runs this job: prefer JOB_SPEC (.refs.org/.refs.repo), fall
+# back to the Prow REPO_OWNER/REPO_NAME env pair.
+_under_test_url=""
+_under_test_repo=""
+if [[ -n "${JOB_SPEC:-}" ]]; then
+  _under_test_repo="$(python3 -c \
+    "import json,os; r=json.loads(os.environ['JOB_SPEC'])['refs']; print(r.get('org','')+'/'+r.get('repo',''))" \
+    2>/dev/null || true)"
+fi
+if [[ -z "${_under_test_repo}" || "${_under_test_repo}" == "/" ]]; then
+  _under_test_repo="${REPO_OWNER:-}/${REPO_NAME:-}"
+fi
+if [[ -n "${_under_test_repo}" && "${_under_test_repo}" != "/" ]]; then
+  _under_test_url="https://github.com/${_under_test_repo}.git"
+  echo "Repo under test: ${_under_test_repo}"
+fi
+
+# Suite pins from e2e.env: E2E_SRC_<suite>=<url>@<sha>. The rosa-cli suite's
+# entry point lives in rosa-seaplane-api (which clones/builds rosa itself),
+# so its pin is exported as the rosa ref instead of checked out here.
+# Env-var suffixes use underscores (bash identifiers cannot contain
+# hyphens); map back to the hyphenated suite names used by E2E_SUITES and
+# the ci/e2e folder layout (rosa-cli -> E2E_SRC_ROSA_CLI -> rosa-cli).
+declare -A SUITE_URL SUITE_SHA
+while IFS='=' read -r _src_var _src_val; do
+  [[ "${_src_var}" =~ ^E2E_SRC_([a-z0-9_]+)$ ]] || continue
+  _suite="${BASH_REMATCH[1]//_/-}"
+  SUITE_URL["${_suite}"]="${_src_val%@*}"
+  SUITE_SHA["${_suite}"]="${_src_val##*@}"
+done < <(env | grep '^E2E_SRC_')
+
+if [[ ${#SUITE_SHA[@]} -eq 0 ]]; then
+  echo "ERROR: no E2E_SRC_* entries in e2e.env — nothing to check out" >&2
   exit 1
 fi
 
-if [[ -n "${PULL_NUMBER:-}" && "${REPO_NAME:-}" == "rosa-seaplane-zoa" ]]; then
-  checkout_merged_pr "${WORK_DIR}/rosa-seaplane-zoa" "${ZOA_REPO_URL}"
-elif [[ -n "${E2E_SRC_ZOA:-}" ]]; then
-  checkout_at "${WORK_DIR}/rosa-seaplane-zoa" "${ZOA_REPO_URL}" "${E2E_SRC_ZOA}"
-else
-  echo "ERROR: no E2E_SRC_ZOA in e2e.env and no rosa-seaplane-zoa PR context" >&2
-  exit 1
-fi
-
-# The rosa-cli suite (entry point in rosa-seaplane-api) clones the rosa repo
-# itself; hand it the pinned ref from e2e.env.
-if [[ -n "${E2E_SRC_ROSA_CLI:-}" ]]; then
-  export ROSA_REPO_BRANCH="${E2E_SRC_ROSA_CLI}"
-fi
+for _suite in "${!SUITE_SHA[@]}"; do
+  _url="${SUITE_URL[${_suite}]}"
+  _sha="${SUITE_SHA[${_suite}]}"
+  if [[ -z "${_url}" || -z "${_sha}" ]]; then
+    echo "ERROR: malformed E2E_SRC_${_suite} (want <url>@<sha>, got '${_url}@${_sha}')" >&2
+    exit 1
+  fi
+  if [[ "${_suite}" == "rosa-cli" ]]; then
+    export ROSA_REPO_URL="${_url}" ROSA_REPO_BRANCH="${_sha}"
+    continue
+  fi
+  _dir="${WORK_DIR}/${_suite}"
+  # The repo under test uses its own source (PR merged into base); every
+  # other suite repo its pinned commit.
+  if [[ -n "${PULL_NUMBER:-}" && "${_url}" == "${_under_test_url}" ]]; then
+    checkout_merged_pr "${_dir}" "${_url}"
+  else
+    checkout_at "${_dir}" "${_url}" "${_sha}"
+  fi
+done
 
 # Discovery: every executable ci/e2e/<suite>/run in every suite repo.
 declare -A SUITE_REPO
-for repo_dir in "${WORK_DIR}/rosa-seaplane-api" "${WORK_DIR}/rosa-seaplane-zoa"; do
+for repo_dir in "${WORK_DIR}"/*/; do
+  [[ -d "${repo_dir}ci/e2e" ]] || continue
   for run in "${repo_dir}"/ci/e2e/*/run; do
     [[ -x "${run}" ]] || continue
     suite="$(basename "$(dirname "${run}")")"
@@ -195,7 +231,7 @@ echo "Suites (available): ${AVAILABLE:-none}"
 
 # A selected suite whose pin is missing must fail loudly: falling back to a
 # Makefile default would test an unrelated version (misleading results).
-if [[ " ${SELECTED[*]} " == *" rosa-cli "* && -z "${E2E_SRC_ROSA_CLI:-}" ]]; then
+if [[ " ${SELECTED[*]} " == *" rosa-cli "* && -z "${ROSA_REPO_BRANCH:-}" ]]; then
   echo "ERROR: suite 'rosa-cli' selected but E2E_SRC_ROSA_CLI is not set — refusing to fall back to an unpinned rosa ref" >&2
   exit 1
 fi
