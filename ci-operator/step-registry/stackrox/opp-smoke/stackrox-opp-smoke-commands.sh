@@ -289,10 +289,18 @@ fi
 # Capture first, then match: grep -q closes the pipe as soon as it matches, and
 # under pipefail that SIGPIPE fails the read (same cure as the sensor-state
 # greps later in this step). The capture keeps the read's status out of the
-# pipe.
+# pipe, so the three outcomes stay distinct: a failed deployment read records
+# a failed case row, which increments the failure count so the exit block
+# below gates the step (a skip row would let a transient API error exit 0); a
+# 0-exit read that lists no matcher deployment records the skip row; and a
+# 0-exit read that lists the matcher enters the bounded wait loop.
 typeset _deps=""
-_deps="$(oc get deployment -n "${_centralNs}" -o name 2>/dev/null)" || _deps=""
-if ! grep -q 'scanner-v4-matcher' <<< "${_deps}"; then
+typeset -i _deps_rc=0
+_deps="$(oc get deployment -n "${_centralNs}" -o name 2>/dev/null)" || _deps_rc=$?
+if (( _deps_rc != 0 )); then
+    echo "[smoke] Deployment read failed in ${_centralNs} (status ${_deps_rc}); scanner readiness gate not evaluated"
+    _add_case "scanner-v4-ready" failed "Environment" "deployment read failed in ${_centralNs} (oc get deployment status ${_deps_rc}); the scanner readiness gate was not evaluated"
+elif ! grep -q 'scanner-v4-matcher' <<< "${_deps}"; then
     echo "[smoke] Scanner V4 matcher not deployed in ${_centralNs}; skipping scanner readiness gate"
     _add_case "scanner-v4-ready" skipped "ScannerGate" "no scanner-v4-matcher deployment in ${_centralNs}; scan-dependent results follow suite behavior"
 else
