@@ -197,7 +197,11 @@ if [[ "${DPF_SKIP_CI_PAYLOAD:-false}" == "true" ]]; then
 else
   PAYLOAD_URL="${RELEASE_IMAGE_LATEST:-}"
 fi
-echo "PAYLOAD_URL is ${PAYLOAD_URL:+set}${PAYLOAD_URL:-unset}"
+if [[ -n "${PAYLOAD_URL}" ]]; then
+  echo "PAYLOAD_URL is set"
+else
+  echo "PAYLOAD_URL is unset"
+fi
 
 # Merge CI registry credentials into the pull secret so the cluster can
 # access the Prow-internal registry (registry.buildXX.ci.openshift.org).
