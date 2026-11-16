@@ -52,7 +52,15 @@ trap _on_exit EXIT
 echo "Waiting for cluster API to become reachable..."
 REQUIRED_CONSECUTIVE_SUCCESSES=5
 CONSECUTIVE_SUCCESSES=0
-for i in $(seq 1 "${API_WAIT_RETRIES}"); do
+# Bound the wait by the clock as well as by the attempt count. Each attempt
+# can spend a 30s request timeout plus a 15s delay, so an attempt-only bound
+# outruns the step's 10m0s timeout and the run is killed mid-wait, recording a
+# step timeout instead of this step's own failure. The budget leaves room for
+# one in-flight request and one sleep inside the gate; the attempt count stays
+# a hard cap on top of it (12 x 45s = 540s with the ref.yaml default).
+: "${API_WAIT_BUDGET_S:=480}"
+_deadline=$(( SECONDS + API_WAIT_BUDGET_S ))
+for (( i = 1; i <= API_WAIT_RETRIES && SECONDS < _deadline; i++ )); do
     if oc get --raw=/version --request-timeout=30s &>/dev/null; then
         CONSECUTIVE_SUCCESSES=$((CONSECUTIVE_SUCCESSES + 1))
         if [[ "${CONSECUTIVE_SUCCESSES}" -ge "${REQUIRED_CONSECUTIVE_SUCCESSES}" ]]; then
@@ -65,5 +73,5 @@ for i in $(seq 1 "${API_WAIT_RETRIES}"); do
     fi
     sleep "${API_WAIT_DELAY}"
 done
-echo "ERROR: Cluster API not reachable after $((API_WAIT_RETRIES * API_WAIT_DELAY))s"
+echo "ERROR: Cluster API not reachable after ${SECONDS}s (budget ${API_WAIT_BUDGET_S}s, at most ${API_WAIT_RETRIES} attempt(s))"
 exit 1
