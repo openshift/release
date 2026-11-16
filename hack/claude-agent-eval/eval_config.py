@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
-"""Resolve eval configuration through the pinned agent-eval-harness loader."""
+"""Resolve eval configuration and the harness revision through the harness's own APIs."""
 
 import argparse
 import importlib
 import json
+import re
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 import sys
@@ -15,13 +18,75 @@ except ImportError:
     from eval_plan import EvalError, relative_path, repo_directory, repo_file, validate_eval_name, validate_thresholds
 
 
-HARNESS_URL = "https://github.com/opendatahub-io/agent-eval-harness.git"
-HARNESS_REVISION = "e4b0f24bdbaa33bb07e0d723dfd834e90b655b5f"
-RESULT_SCHEMA_VERSION = 2
+HARNESS_URL = "https://github.com/fullsend-ai/agent-eval-harness.git"
+# The public GitHub releases API for HARNESS_URL's repository. The endpoint
+# needs no token; GITHUB_TOKEN is attached when the environment provides one
+# only to lift shared-IP rate limits.
+HARNESS_LATEST_RELEASE = "https://api.github.com/repos/fullsend-ai/agent-eval-harness/releases/latest"
+# Set to an exact release tag to stop following the latest release, e.g. to
+# bisect a harness regression; empty or unset means latest.
+REVISION_OVERRIDE = "EVAL_HARNESS_REVISION"
+RELEASE_TAG = re.compile(r"v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.-]+)?")
+RESULT_SCHEMA_VERSION = 3
+
+
+def validate_harness_revision(revision):
+    """Accept only a release tag, never a moving branch or a bare commit.
+
+    The value reaches git clone --branch and rev-parse arguments, so anything
+    that is not exactly a release tag is rejected outright.
+    """
+    if RELEASE_TAG.fullmatch(revision):
+        return revision
+    raise EvalError(f"harness revision must be a release tag like v1.62.0, "
+                    f"never a branch or commit SHA: {revision!r}")
+
+
+def expected_commit_ref(revision):
+    """The ref naming the pinned commit: the release tag's commit."""
+    return f"refs/tags/{revision}^{{commit}}"
+
+
+def latest_release_tag(document):
+    """Validate a GitHub releases/latest document and return its tag name."""
+    tag = document.get("tag_name") if isinstance(document, dict) else None
+    if not isinstance(tag, str) or not RELEASE_TAG.fullmatch(tag):
+        raise EvalError(f"{HARNESS_LATEST_RELEASE} returned an unusable release tag: {tag!r}")
+    return tag
+
+
+def resolve_latest_release(env, timeout):
+    """Ask the public GitHub releases API for the latest published release tag."""
+    headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
+               "User-Agent": "openshift-release-manifest-eval-runner"}
+    token = env.get("GITHUB_TOKEN", "").strip()
+    if token:  # The endpoint is public; the token only lifts rate limits.
+        headers["Authorization"] = f"Bearer {token}"
+    request = urllib.request.Request(HARNESS_LATEST_RELEASE, headers=headers)
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            document = json.load(response)
+    except (urllib.error.URLError, OSError, ValueError) as error:
+        raise EvalError(f"cannot resolve the latest harness release from "
+                        f"{HARNESS_LATEST_RELEASE}: {type(error).__name__}: {error}") from error
+    return latest_release_tag(document)
+
+
+def resolve_harness_revision(env, timeout):
+    """Return the revision this run uses and where it came from.
+
+    REVISION_OVERRIDE pins an exact release tag when set (bisecting a
+    harness regression); otherwise the latest published release is resolved,
+    so the step never runs the moving main branch, which may be broken.
+    """
+    override = env.get(REVISION_OVERRIDE, "").strip()
+    if override:
+        return validate_harness_revision(override), f"{REVISION_OVERRIDE} override"
+    return resolve_latest_release(env, timeout), "latest release"
 
 
 @dataclass(frozen=True)
-class ResolvedConfig:
+class ResolvedConfig:  # pylint: disable=too-many-instance-attributes
     """The minimal resolved runner settings and structured harness config."""
 
     config: str
@@ -30,6 +95,7 @@ class ResolvedConfig:
     settings: dict
     dataset_path: Optional[str]
     config_chain: tuple
+    skill: Optional[str]
     harness_config: object
 
     def as_dict(self):
@@ -42,6 +108,7 @@ class ResolvedConfig:
             "settings": self.settings,
             "dataset_path": self.dataset_path,
             "config_chain": list(self.config_chain),
+            "skill": self.skill,
         }
 
 
@@ -102,6 +169,24 @@ def _normalize_chain(repo, config_path, chain):
     return tuple(normalized)
 
 
+def _resolve_skill(identity, harness_config):
+    """The skill the harness records as run_result.json eval_params.skill.
+
+    That is the value without a --skill override; None for prompt and
+    multi-step configs, which run no single skill.
+    """
+    resolver = getattr(harness_config, "resolve_skill", None)
+    if not callable(resolver):
+        raise EvalError(f"{identity}: pinned harness EvalConfig is missing resolve_skill()")
+    try:
+        skill = resolver()
+    except Exception as error:
+        raise EvalError(f"{identity}: harness resolve_skill() failed: {type(error).__name__}: {error}") from error
+    if skill is not None and (not isinstance(skill, str) or not skill.strip()):
+        raise EvalError(f"{identity}: harness resolve_skill() must return a nonempty string or None")
+    return skill
+
+
 def resolve_config(harness, repo, config):
     """Resolve and validate one original config path using the harness APIs."""
     repo = Path(repo).resolve()
@@ -149,6 +234,7 @@ def resolve_config(harness, repo, config):
         raise EvalError(f"{identity}: harness eval_name() failed: {type(error).__name__}: {error}") from error
     eval_name = validate_eval_name(eval_name, f"{identity}: harness eval_name()")
     config_chain = _normalize_chain(repo, config_path, chain)
+    skill = _resolve_skill(identity, harness_config)
 
     dataset = getattr(harness_config, "dataset", None)
     dataset_value = getattr(dataset, "path", None)
@@ -166,7 +252,7 @@ def resolve_config(harness, repo, config):
             raise EvalError(f"{identity}: harness could not resolve dataset.path: {error}") from error
 
     resolved = ResolvedConfig(identity, model, eval_name, {"thresholds": thresholds},
-                              dataset_path, config_chain, harness_config)
+                              dataset_path, config_chain, skill, harness_config)
     try:
         encoded = json.dumps(resolved.as_dict(), ensure_ascii=False, allow_nan=False)
         if json.loads(encoded) != resolved.as_dict():
@@ -179,7 +265,8 @@ def resolve_config(harness, repo, config):
 def validate_resolution_result(document, repo, config, eval_cases_dir=""):
     """Validate the child's result file before it enters an eval plan."""
     if not isinstance(document, dict) or set(document) != {
-            "schema_version", "config", "model", "eval_name", "settings", "dataset_path", "config_chain"}:
+            "schema_version", "config", "model", "eval_name", "settings", "dataset_path", "config_chain",
+            "skill"}:
         raise EvalError("config resolver returned an incompatible result schema")
     version = document["schema_version"]
     if not isinstance(version, int) or isinstance(version, bool) or version != RESULT_SCHEMA_VERSION:
@@ -218,8 +305,11 @@ def validate_resolution_result(document, repo, config, eval_cases_dir=""):
         if resolved_dataset != cases_path:
             raise EvalError(f"{config}: eval_cases_dir must point to the same directory "
                             "as the harness-resolved dataset.path")
+    skill = document["skill"]
+    if skill is not None and (not isinstance(skill, str) or not skill.strip()):
+        raise EvalError("config resolver returned an invalid skill")
     return {"model": model, "eval_name": eval_name, "settings": {"thresholds": thresholds},
-            "dataset_path": dataset_path, "config_chain": tuple(chain)}
+            "dataset_path": dataset_path, "config_chain": tuple(chain), "skill": skill}
 
 
 def _write_result(destination, document):

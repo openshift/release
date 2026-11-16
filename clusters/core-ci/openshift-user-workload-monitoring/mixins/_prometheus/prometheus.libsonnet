@@ -8,6 +8,7 @@
 (import 'sinker_alerts.libsonnet') +
 (import 'job_failures_alerts.libsonnet') +
 (import 'prow_alerts.libsonnet') +
+(import 'prow_config_alerts.libsonnet') +
 (import 'ci_chat_bot_alerts.libsonnet') +
 (import 'release_controller_alerts.libsonnet') +
 (import 'tide_alerts.libsonnet')

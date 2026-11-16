@@ -35,6 +35,7 @@ export REGION="${LOCATION}"
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 
 unset GOFLAGS
+export TEMPLATIZE_USE_PREBUILT=1
 
 # This block prepares the environment to run the tests in.
 # It runs against INFRA_SUBSCRIPTION.

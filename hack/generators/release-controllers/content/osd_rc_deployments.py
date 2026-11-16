@@ -1,5 +1,5 @@
 from job_definition_paths import PLUGIN_CONFIG_DIR
-from content.utils import GIT_SYNC_SPARSE_CHECKOUT_ARG, get_git_sync_sparse_checkout_volume_mounts, get_rc_volumes, get_rc_volume_mounts, get_rcapi_volume_mounts, get_rcapi_volumes, get_oc_volume_mounts
+from content.utils import GIT_SYNC_SPARSE_CHECKOUT_ARG, get_git_sync_sparse_checkout_volume_mounts, get_rc_volumes, get_rc_volume_mounts, get_rcapi_volume_mounts, get_rcapi_volumes, get_oc_volume_mounts, get_rc_runtime_env_vars, RC_MEMORY_REQUEST, RC_CPU_REQUEST, GIT_SYNC_MEMORY_REQUEST, GIT_SYNC_CPU_REQUEST
 
 
 def _add_osd_rc_bootstrap(gendoc):
@@ -364,6 +364,7 @@ def _add_osd_rc_deployment(gendoc):
                     "containers": [
                         {
                             "name": "git-sync",
+                            "resources": {"requests": {"memory": GIT_SYNC_MEMORY_REQUEST, "cpu": GIT_SYNC_CPU_REQUEST}},
                             "command": ["/git-sync"],
                             "args": [
                                 "--repo=https://github.com/openshift/release.git",
@@ -381,18 +382,13 @@ def _add_osd_rc_deployment(gendoc):
                                     "mountPath": "/tmp/git-sync"
                                 }
                             ] + get_git_sync_sparse_checkout_volume_mounts(),
-                            "resources": {
-                                "requests": {
-                                    "memory": "1Gi",
-                                    "cpu": "0.5",
-                                }
-                            }
                         },
                         *_get_osd_rc_deployment_sidecars(context),
                         {
                             "resources": {
                                 "requests": {
-                                    "memory": "11Gi"
+                                    "memory": RC_MEMORY_REQUEST,
+                                    "cpu": RC_CPU_REQUEST
                                 },
                             },
                             'command': ['/usr/bin/release-controller',
@@ -424,7 +420,7 @@ def _add_osd_rc_deployment(gendoc):
                             'imagePullPolicy': 'Always',
                             'name': 'controller',
                             'volumeMounts': get_rc_volume_mounts(),
-                            'env': get_oc_env_vars(),
+                            'env': get_oc_env_vars() + get_rc_runtime_env_vars(),
                             'livenessProbe': {
                                 'httpGet': {
                                     'path': '/healthz',

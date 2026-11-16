@@ -154,6 +154,28 @@ function wait_until() {
   return 1
 }
 
+# Dump the cluster state needed to diagnose an OLM resolution stall, where a
+# CatalogSource reports READY and its gRPC endpoint then refuses connections.
+# Catalog pod age and restart counts show whether the pod was replaced; node and
+# MachineConfigPool state shows whether a rollout drained it; the catalog-operator
+# log shows what the resolver itself hit.
+function dump_olm_diagnostics() {
+  echo ">>> CatalogSources in openshift-marketplace:" >&2
+  oc get catalogsource -n openshift-marketplace -o wide || true
+  oc get catalogsource -n openshift-marketplace -o yaml || true
+  echo ">>> Catalog pods in openshift-marketplace:" >&2
+  oc get pods -n openshift-marketplace -o wide || true
+  oc describe pods -n openshift-marketplace -l olm.catalogSource | tail -120 || true
+  echo ">>> Recent events in openshift-marketplace:" >&2
+  oc get events -n openshift-marketplace --sort-by=.lastTimestamp | tail -50 || true
+  echo ">>> MachineConfigPools:" >&2
+  oc get mcp || true
+  echo ">>> Nodes:" >&2
+  oc get nodes || true
+  echo ">>> OLM catalog-operator log:" >&2
+  oc logs -n openshift-operator-lifecycle-manager deploy/catalog-operator --tail=200 || true
+}
+
 
 # Usage: oc_with_retry [--retries N] [--interval S] command [args...]
 function oc_with_retry() {
@@ -560,9 +582,7 @@ function install_osc_operator() {
   oc_with_retry oc apply -f "${operator_yaml}"
 
   # The helm chart creates osc-operator-dev-catalog unconditionally regardless of dev.enabled
-  # (helm chart bug).  When using the GA redhat-operators catalog the dev catalog has no valid
-  # image and will never become READY, blocking Stage 0 of wait_for_operator().  Delete it so
-  # the wait only covers catalogs that are actually needed.
+  # (helm chart bug). Delete the invalid dev catalog when using a GA or mirrored catalog.
   if [[ "${CATALOG_SOURCE_NAME}" == "redhat-operators" || -n "${MIRROR_CATALOG_SOURCE}" ]]; then
     echo ">>> redhat-operators catalog in use; deleting spurious ${OSC_DEV_CATALOG_NAME} CatalogSource (helm chart bug)"
     oc delete catalogsource "${OSC_DEV_CATALOG_NAME}" -n openshift-marketplace --ignore-not-found=true || true
@@ -570,48 +590,13 @@ function install_osc_operator() {
 }
 
 function wait_for_operator_olmv0() {
-  # Stage 0: Wait for ALL CatalogSources to be READY (600s)
-  echo ">>> Waiting for all CatalogSources to be READY..."
-  local all_catalogs_ready=false
-  for i in {1..120}; do
-    local catalog_states
-    catalog_states=$(oc get catalogsource -n openshift-marketplace -o jsonpath='{range .items[*]}{.metadata.name}={.status.connectionState.lastObservedState}{"\n"}{end}' 2>/dev/null || echo "")
-
-    if [[ -z "${catalog_states}" ]]; then
-      [[ ${i} -lt 120 ]] && sleep 5
-      continue
-    fi
-
-    local total_catalogs ready_catalogs
-    total_catalogs=$(echo "${catalog_states}" | wc -l)
-    ready_catalogs=$(echo "${catalog_states}" | grep -c "=READY" || true)
-    ready_catalogs=${ready_catalogs:-0}
-
-    if [[ ${ready_catalogs} -eq ${total_catalogs} && ${ready_catalogs} -gt 0 ]]; then
-      echo ">>> All CatalogSources are READY (${ready_catalogs}/${total_catalogs})"
-      all_catalogs_ready=true
-      break
-    fi
-
-    if [[ $((i % 6)) -eq 0 ]]; then
-      echo ">>> CatalogSources ready: ${ready_catalogs}/${total_catalogs} ($((i*5))s elapsed)..."
-    fi
-
-    [[ ${i} -lt 120 ]] && sleep 5
-  done
-
-  if [[ "${all_catalogs_ready}" != "true" ]]; then
-    echo ">>> ERROR: Not all CatalogSources are READY after 600s"
-    oc get catalogsource -n openshift-marketplace -o custom-columns=NAME:.metadata.name,STATE:.status.connectionState.lastObservedState || true
-    return 1
-  fi
-
-  # Stage 1: Wait for the dev CatalogSource created by the helm chart
-  if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
-    if ! wait_until "CatalogSource ${OSC_DEV_CATALOG_NAME} READY" 300 5 \
+  # Wait only for the dev CatalogSource created by this step. GA and disconnected
+  # installs use existing catalogs; the mirror step waits for its own catalog.
+  if [[ -n "${CATALOG_SOURCE_IMAGE}" && "${CATALOG_SOURCE_NAME}" != "redhat-operators" && -z "${MIRROR_CATALOG_SOURCE}" ]]; then
+    if ! wait_until "CatalogSource ${OSC_DEV_CATALOG_NAME} READY" 600 5 \
       "[[ \"\$(oc get catalogsource -n openshift-marketplace '${OSC_DEV_CATALOG_NAME}' -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null)\" == \"READY\" ]]"; then
-      oc get catalogsource -n openshift-marketplace || true
       oc describe catalogsource -n openshift-marketplace "${OSC_DEV_CATALOG_NAME}" || true
+      dump_olm_diagnostics
       return 1
     fi
   fi
@@ -621,6 +606,7 @@ function wait_for_operator_olmv0() {
     "oc get subscription -n '${OSC_NAMESPACE}' sandboxed-containers-operator -o jsonpath='{.status.installplan.name}' 2>/dev/null | grep -q '^install-'"; then
     echo ">>> ERROR: Subscription has no InstallPlan reference" >&2
     oc get subscription -n "${OSC_NAMESPACE}" sandboxed-containers-operator -o yaml || true
+    dump_olm_diagnostics
     return 1
   fi
 

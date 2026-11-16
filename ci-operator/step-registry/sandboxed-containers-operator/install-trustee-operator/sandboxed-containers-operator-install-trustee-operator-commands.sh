@@ -134,6 +134,28 @@ function wait_until() {
   return 1
 }
 
+# Dump the cluster state needed to diagnose an OLM resolution stall, where a
+# CatalogSource reports READY and its gRPC endpoint then refuses connections.
+# Catalog pod age and restart counts show whether the pod was replaced; node and
+# MachineConfigPool state shows whether a rollout drained it; the catalog-operator
+# log shows what the resolver itself hit.
+function dump_olm_diagnostics() {
+  echo ">>> CatalogSources in openshift-marketplace:" >&2
+  oc get catalogsource -n openshift-marketplace -o wide || true
+  oc get catalogsource -n openshift-marketplace -o yaml || true
+  echo ">>> Catalog pods in openshift-marketplace:" >&2
+  oc get pods -n openshift-marketplace -o wide || true
+  oc describe pods -n openshift-marketplace -l olm.catalogSource | tail -120 || true
+  echo ">>> Recent events in openshift-marketplace:" >&2
+  oc get events -n openshift-marketplace --sort-by=.lastTimestamp | tail -50 || true
+  echo ">>> MachineConfigPools:" >&2
+  oc get mcp || true
+  echo ">>> Nodes:" >&2
+  oc get nodes || true
+  echo ">>> OLM catalog-operator log:" >&2
+  oc logs -n openshift-operator-lifecycle-manager deploy/catalog-operator --tail=200 || true
+}
+
 # Fetch trustee helm charts (from git repository)
 function fetch_trustee_charts() {
   local charts_dir="${SCRATCH}/charts"
@@ -303,74 +325,16 @@ function install_trustee_operator() {
 }
 
 # Wait for operator installation through all OLM stages
-# Stages: All CatalogSources READY → Subscription → InstallPlan → CSV → Deployment
+# Stages: Trustee CatalogSource READY → Subscription → InstallPlan → CSV → Deployment
 function wait_for_operator() {
-  # Stage 0: Wait for ALL CatalogSources to be READY (600s / 10 minutes)
-  # This prevents Subscription failures due to missing/unavailable catalogs
-  echo ">>> Waiting for all CatalogSources to be READY..."
-  local all_catalogs_ready=false
-  for i in {1..120}; do
-    # Get all catalogs and their states
-    local catalog_states
-    catalog_states=$(oc get catalogsource -n openshift-marketplace -o jsonpath='{range .items[*]}{.metadata.name}={.status.connectionState.lastObservedState}{"\n"}{end}' 2>/dev/null || echo "")
-
-    if [[ -z "${catalog_states}" ]]; then
-      echo ">>> WARNING: Unable to get catalog states (attempt ${i}/120)"
-      [[ ${i} -lt 120 ]] && sleep 5
-      continue
-    fi
-
-    # Count total vs ready catalogs
-    local total_catalogs
-    total_catalogs=$(echo "${catalog_states}" | wc -l)
-    local ready_catalogs
-    ready_catalogs=$(echo "${catalog_states}" | grep -c "=READY" || echo "0")
-
-    if [[ ${ready_catalogs} -eq ${total_catalogs} && ${ready_catalogs} -gt 0 ]]; then
-      echo ">>> All CatalogSources are READY (${ready_catalogs}/${total_catalogs})"
-      all_catalogs_ready=true
-      break
-    fi
-
-    # Show progress every 6 iterations (30 seconds)
-    if [[ $((i % 6)) -eq 0 ]]; then
-      echo ">>> CatalogSources ready: ${ready_catalogs}/${total_catalogs} (checking ${i}/120, $((i*5))s elapsed)..."
-      echo "${catalog_states}" | grep -v "=READY" | head -5 || true
-    fi
-
-    [[ ${i} -lt 120 ]] && sleep 5
-  done
-
-  if [[ "${all_catalogs_ready}" != "true" ]]; then
-    echo ">>> ERROR: Not all CatalogSources are READY after 600s"
-    echo ">>> Current CatalogSource states:"
-    oc get catalogsource -n openshift-marketplace -o custom-columns=NAME:.metadata.name,STATE:.status.connectionState.lastObservedState || true
-    echo ">>> CatalogSource pods:"
-    oc get pods -n openshift-marketplace || true
-    return 1
-  fi
-
-  # Stage 1: Wait for Trustee CatalogSource to be READY (60s)
-  # Skip if using existing catalog (no TRUSTEE_CATALOG_SOURCE_IMAGE provided)
+  # Wait only for the dev CatalogSource created by this step, not the existing GA catalog.
   if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
     # Helm chart hardcodes the CatalogSource name to trustee-operator-dev-catalog
-    # Auto-discover in case the helm chart changes this in the future
-    local actual_catalog_name
-    actual_catalog_name=$(oc get catalogsource -n openshift-marketplace -l olm.catalogSource!=redhat-operators -o name 2>/dev/null | grep -i trustee | head -1 | cut -d/ -f2 || echo "")
+    local actual_catalog_name="trustee-operator-dev-catalog"
 
-    if [[ -z "$actual_catalog_name" ]]; then
-      # Fallback: use the hardcoded name from the helm chart
-      actual_catalog_name="trustee-operator-dev-catalog"
-    fi
-
-    if ! wait_until "Trustee CatalogSource ${actual_catalog_name} READY" 60 5 \
+    if ! wait_until "Trustee CatalogSource ${actual_catalog_name} READY" 600 5 \
       "[[ \"\$(oc get catalogsource -n openshift-marketplace '${actual_catalog_name}' -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null)\" == \"READY\" ]]"; then
-      echo ">>> All CatalogSources in openshift-marketplace:" >&2
-      oc get catalogsource -n openshift-marketplace || true
-      echo ">>> Details of ${actual_catalog_name}:" >&2
-      oc get catalogsource -n openshift-marketplace "${actual_catalog_name}" -o yaml || true
-      oc get pods -n openshift-marketplace -l olm.catalogSource="${actual_catalog_name}" || true
-      oc describe pods -n openshift-marketplace -l olm.catalogSource="${actual_catalog_name}" | tail -50 || true
+      dump_olm_diagnostics
       return 1
     fi
   else
@@ -383,6 +347,7 @@ function wait_for_operator() {
     "installplan_ref=\$(oc get subscription -n '${TRUSTEE_NAMESPACE}' trustee-operator -o jsonpath='{.status.installplan.name}' 2>/dev/null); [[ -n \"\${installplan_ref}\" ]]"; then
     echo ">>> ERROR: Subscription has no InstallPlan reference" >&2
     oc get subscription -n "${TRUSTEE_NAMESPACE}" trustee-operator -o yaml || true
+    dump_olm_diagnostics
     return 1
   fi
 

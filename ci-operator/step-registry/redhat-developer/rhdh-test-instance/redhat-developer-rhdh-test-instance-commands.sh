@@ -41,13 +41,20 @@ done
 
 # Install & login to gh cli
 GH_VERSION=2.49.0
-echo "Installing GitHub CLI version ${GH_VERSION}..."
-curl -sL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" | tar xz -C /tmp
-if [ ! -f "/tmp/gh_${GH_VERSION}_linux_amd64/bin/gh" ]; then
+# The step pod can land on either architecture on multi-arch build clusters.
+case "$(uname -m)" in
+    x86_64) GH_ARCH=amd64 ;;
+    aarch64|arm64) GH_ARCH=arm64 ;;
+    *) echo "Unsupported architecture: $(uname -m)"; exit 1 ;;
+esac
+echo "Installing GitHub CLI version ${GH_VERSION} for linux_${GH_ARCH}..."
+GH_DIR="/tmp/gh_${GH_VERSION}_linux_${GH_ARCH}"
+curl -sL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_${GH_ARCH}.tar.gz" | tar xz -C /tmp
+if [ ! -f "${GH_DIR}/bin/gh" ]; then
     echo "Failed to install GitHub CLI"
     exit 1
 fi
-export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:$PATH"
+export PATH="${GH_DIR}/bin:$PATH"
 echo "GitHub CLI installed successfully. Version: $(gh --version)"
 echo "$(cat /tmp/secrets/GH_BOT_PAT)" | gh auth login --with-token
 
@@ -111,9 +118,13 @@ oc patch oauth cluster --type=merge --patch='{"spec":{"identityProviders":[{"nam
 oc wait --for=condition=Ready pod --all -n openshift-authentication --timeout=400s
 oc adm policy add-cluster-role-to-user cluster-admin "$(cat /tmp/secrets/CLUSTER_ADMIN_USERNAME)"
 
-# Extract and parse the comment
+# Extract and parse the comment. Take the newest comment whose first non-empty
+# line is a deploy command: GitHub keeps the leading blank line of the editor
+# content, and an anchored match would skip the new request and replay the
+# previous one instead (for example an older duration or version).
 comment_body=$(gh pr view "$GIT_PR_NUMBER" --repo "$REPO" --json comments |
-jq -r '.comments | reverse | map(select(.body | test("^(/pj-rehearse|/test)"))) | .[0].body')
+jq -r '[.comments[].body | gsub("\r"; "") | sub("^\\s+"; "") | split("\n")[0]
+    | select(test("^/(pj-rehearse|test)\\s+(deploy|redeploy)(\\s|$)"))] | last // empty')
 echo "Found comment: $comment_body"
 
 if [[ -n "$comment_body" && "$comment_body" != "null" ]]; then
@@ -208,13 +219,15 @@ fi
 
 comment="🚀 Deployed RHDH version: $rhdh_version using $install_type${plugins_info}
 
+⚙️ **Command:** \`/test ${action} ${install_type} ${rhdh_version} ${time}\`
+
 🌐 **RHDH URL:** $RHDH_BASE_URL
 
 🖥️ **OpenShift Console:** [Open Console]($(oc whoami --show-console))
 
-🔑 **Cluster Credentials:** Available in [vault](https://vault.ci.openshift.org/ui/vault/secrets/kv/kv/list/selfservice/rhdh-test-instance) under \`ocp-cluster-creds\` with keys:
-   • Username: \`CLUSTER_ADMIN_USERNAME\`
-   • Password: \`CLUSTER_ADMIN_PASSWORD\`
+🔑 **Cluster Credentials:** Bitwarden collection \`Rhdh Test Instance Ci Secrets\`:
+   • Username: \`ocp-cluster-creds/CLUSTER_ADMIN_USERNAME\`
+   • Password: \`ocp-cluster-creds/CLUSTER_ADMIN_PASSWORD\`
 
 ⏰ **Cluster Availability:** Next $time
 "

@@ -394,6 +394,45 @@ in 3.11).''')
                 }
             })
 
+            gendoc.append_all([{
+                'apiVersion': 'rbac.authorization.k8s.io/v1',
+                'kind': 'Role',
+                'metadata': {
+                    'name': 'art-publish-read-jobs',
+                    'namespace': f'ci-release{config.get_suffix(arch, private)}'
+                },
+                'rules': [{
+                    'apiGroups': ['batch'],
+                    'resources': ['jobs'],
+                    'verbs': ['get', 'list', 'watch']
+                }, {
+                    'apiGroups': [''],
+                    'resources': ['pods'],
+                    'verbs': ['get', 'list', 'watch']
+                }, {
+                    'apiGroups': [''],
+                    'resources': ['pods/log'],
+                    'verbs': ['get']
+                }]
+            }, {
+                'apiVersion': 'rbac.authorization.k8s.io/v1',
+                'kind': 'RoleBinding',
+                'metadata': {
+                    'name': 'art-publish-read-jobs',
+                    'namespace': f'ci-release{config.get_suffix(arch, private)}'
+                },
+                'roleRef': {
+                    'apiGroup': 'rbac.authorization.k8s.io',
+                    'kind': 'Role',
+                    'name': 'art-publish-read-jobs'
+                },
+                'subjects': [{
+                    'kind': 'ServiceAccount',
+                    'name': 'art-publish',
+                    'namespace': 'ocp'
+                }]
+            }], comment='Allow ART to read jobs, pods, and pod logs in the CI jobs namespace')
+
             for major_minor in config.releases:
                 gendoc.append({
                     'apiVersion': 'image.openshift.io/v1',

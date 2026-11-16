@@ -84,13 +84,13 @@ images:
         as:
         - upi-installer
     to: e2e-runner
-  skip_if_only_changed: ^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/
+  skip_if_only_changed: ^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|^renovate\.json$
 operator:
   bundles:
   - as: bgp-cloud-connector-bundle
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
-    skip_if_only_changed: ^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/
+    skip_if_only_changed: ^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|^renovate\.json$
   substitutions:
   - pullspec: controller:latest
     with: pipeline:bgp-cloud-connector
@@ -116,17 +116,17 @@ tests:
     make lint
   container:
     from: src
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
 - as: unit
   commands: make test test-aws
   container:
     from: src
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
 - as: verify
   commands: make verify
   container:
     from: src
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
 - as: e2e-runner-image
   commands: |
     # Proves the image the e2e jobs run in actually carries the tools
@@ -222,16 +222,16 @@ tests:
     check --peer-asn           network routeserver peering create
   container:
     from: e2e-runner
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
 - as: fips-image-scan
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
     dependencies:
       SCAN_IMAGE: bgp-cloud-connector
     test:
     - ref: fips-check-image-scan
 - as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -320,7 +320,7 @@ tests:
           memory: 200Mi
     workflow: ipi-aws
 - as: e2e-aws-fips-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -411,7 +411,7 @@ tests:
           memory: 200Mi
     workflow: ipi-aws
 - as: e2e-azure-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
     cluster_profile: openshift-org-azure
     test:
@@ -458,7 +458,7 @@ tests:
           memory: 200Mi
     workflow: ipi-azure
 - as: e2e-azure-workload-identity-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
     cluster_profile: openshift-org-azure
     test:
@@ -661,7 +661,7 @@ tests:
           memory: 200Mi
     workflow: ipi-gcp
 - as: e2e-rosa-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
     cluster_profile: rosa-e2e-01
     env:
@@ -913,7 +913,7 @@ tests:
     workflow: rosa-aws-sts-hcp
 - always_run: false
   as: e2e-aro-classic-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: azure-qe

@@ -406,6 +406,19 @@ function prepare_next_steps() {
   fi
 }
 
+# download_fcct downloads the fcct binary from ${1} to ${2}. It is meant to be
+# wrapped by retry-ipi-install-command: every attempt starts from an empty
+# destination so a partial or failed earlier attempt is never kept. errexit is
+# suppressed inside that helper, so keep the explicit && chain.
+function download_fcct() {
+  local url="${1}"
+  local output="${2}"
+
+  rm -f "${output}" &&
+    curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 -o "${output}" "${url}" &&
+    [[ -s "${output}" ]]
+}
+
 function inject_promtail_service() {
   export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
   export PROMTAIL_IMAGE="quay.io/openshift-logging/promtail"
@@ -551,7 +564,21 @@ EOF
 
   cp "${dir}/bootstrap.ign" "${config_dir}/bootstrap_initial.ign"
   # We're using ancient fcct as glibc in installer container is 1.28
-  curl -sL https://github.com/coreos/butane/releases/download/v0.7.0/fcct-"$(uname -m)"-unknown-linux-gnu >/tmp/fcct && chmod ug+x /tmp/fcct
+  local fcct_url
+  fcct_url="https://github.com/coreos/butane/releases/download/v0.7.0/fcct-$(uname -m)-unknown-linux-gnu"
+  local -r fcct_download=/tmp/fcct.download
+  # Never run, or leave behind, a stale, partial, or error-page download.
+  rm -f /tmp/fcct "${fcct_download}"
+  if ! retry-ipi-install-command "fcct v0.7.0 download" download_fcct "${fcct_url}" "${fcct_download}"; then
+    rm -f "${fcct_download}" || true
+    echo "ERROR: failed to download fcct from ${fcct_url}; cannot inject promtail into bootstrap.ign" >&2
+    exit 1
+  fi
+  if ! chmod ug+x "${fcct_download}" || ! mv "${fcct_download}" /tmp/fcct; then
+    rm -f "${fcct_download}" /tmp/fcct || true
+    echo "ERROR: failed to install the downloaded fcct binary" >&2
+    exit 1
+  fi
   /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
 }
 
@@ -658,7 +685,11 @@ function get_yq() {
     echo "WARNING: Failed to remove stale yq download ${yq_download}" >&2
     return 1
   fi
-  if ! retry-ipi-install-command "yq download" curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 \
+  # SSL_CERT_FILE may be set to a platform-specific, narrowed CA bundle
+  # earlier in this script (vsphere sets it to a vCenter-only bundle), which
+  # breaks TLS verification of this public download. Use the system trust
+  # store for this call instead, same as the butane download above.
+  if ! retry-ipi-install-command "yq download" env -u SSL_CERT_FILE curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 \
     "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(get_arch)" -o "${yq_download}"; then
     rm -f "${yq_download}" || echo "WARNING: Failed to clean up ${yq_download}" >&2
     return 1
@@ -675,6 +706,29 @@ function get_yq() {
   fi
 
   return 0
+}
+
+# strip_vsphere_failure_domains deletes vcenters/failureDomains from the
+# generated Infrastructure manifest, simulating a cluster installed without
+# vSphere failure domain information (SPLAT-3028). Per the openshift/api
+# VSpherePlatformSpec/VSpherePlatformStatus types, both fields only exist
+# under spec.platformSpec.vsphere; status carries neither, so nothing else
+# needs touching. Unlike the other optional yq-based tweaks below, failing to
+# apply this is fatal: the whole point of a job setting
+# STRIP_VSPHERE_FAILURE_DOMAINS is to produce a legacy-shaped cluster, so
+# silently continuing without it would validate the wrong state instead.
+function strip_vsphere_failure_domains() {
+  local dir=${1}
+
+  if ! get_yq; then
+    echo "ERROR: yq is unavailable; cannot strip vcenters/failureDomains from the Infrastructure manifest" >&2
+    exit 1
+  fi
+
+  local infra_manifest="${dir}/manifests/cluster-infrastructure-02-config.yml"
+  echo "$(date -u --rfc-3339=seconds) - stripping vcenters/failureDomains from the Infrastructure manifest"
+  /tmp/yq d -i "${infra_manifest}" "spec.platformSpec.vsphere.vcenters"
+  /tmp/yq d -i "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains"
 }
 
 # inject_boot_diagnostics is an azure specific function for enabling boot diagnostics on Azure workers.
@@ -1077,6 +1131,10 @@ spec:
   skippedImagestreams:
   - openliberty
 EOF
+    fi
+
+    if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
+      strip_vsphere_failure_domains "${dir}"
     fi
     ;;
 esac

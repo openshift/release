@@ -6,7 +6,7 @@
 |-------|-------|
 | **Alert** | `ghproxy-too-many-pending-alerts` |
 | **Cluster** | `app.ci` |
-| **Rules** | [`ci-alerts_prometheusrule.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml); source [`ghproxy_alerts.libsonnet`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/_prometheus/ghproxy_alerts.libsonnet) |
+| **Rules** | [`ci-alerts_prometheusrule.yaml`](../../clusters/core-ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml); source [`ghproxy_alerts.libsonnet`](../../clusters/core-ci/openshift-user-workload-monitoring/mixins/_prometheus/ghproxy_alerts.libsonnet) |
 | **Severity** | `critical` |
 
 This SOP covers `ghproxy-too-many-pending-alerts` on `app.ci`.

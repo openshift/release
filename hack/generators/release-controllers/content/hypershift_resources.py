@@ -1,4 +1,4 @@
-from content.utils import GIT_SYNC_SPARSE_CHECKOUT_ARG, get_git_sync_sparse_checkout_volume_mounts, get_rc_volumes, get_rc_volume_mounts, get_rcapi_volumes, get_rcapi_volume_mounts
+from content.utils import GIT_SYNC_SPARSE_CHECKOUT_ARG, get_git_sync_sparse_checkout_volume_mounts, get_rc_volumes, get_rc_volume_mounts, get_rcapi_volumes, get_rcapi_volume_mounts, get_rc_runtime_env_vars, RC_MEMORY_REQUEST, RC_CPU_REQUEST, GIT_SYNC_MEMORY_REQUEST, GIT_SYNC_CPU_REQUEST
 
 
 def _add_hypershift_rbac(gendoc):
@@ -179,6 +179,7 @@ def _add_hypershift_resources(gendoc):
                         "containers": [
                             {
                                 "name": "git-sync",
+                                "resources": {"requests": {"memory": GIT_SYNC_MEMORY_REQUEST, "cpu": GIT_SYNC_CPU_REQUEST}},
                                 "command": ["/git-sync"],
                                 "args": [
                                     "--repo=https://github.com/openshift/release.git",
@@ -201,17 +202,12 @@ def _add_hypershift_resources(gendoc):
                                         "mountPath": "/tmp/git-sync"
                                     }
                                 ] + get_git_sync_sparse_checkout_volume_mounts(),
-                                "resources": {
-                                    "requests": {
-                                        "memory": "1Gi",
-                                        "cpu": "0.5",
-                                    }
-                                }
                             },
                             {
                                 "resources": {
                                     "requests": {
-                                        "memory": "13Gi"
+                                        "memory": RC_MEMORY_REQUEST,
+                                        "cpu": RC_CPU_REQUEST
                                     },
                                 },
                                 "command": [
@@ -231,6 +227,7 @@ def _add_hypershift_resources(gendoc):
                                 'imagePullPolicy': 'Always',
                                 "name": "controller",
                                 "volumeMounts": get_rc_volume_mounts(),
+                                'env': get_rc_runtime_env_vars(),
                                 'livenessProbe': {
                                     'httpGet': {
                                         'path': '/healthz',

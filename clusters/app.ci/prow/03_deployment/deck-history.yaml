@@ -120,11 +120,12 @@ objects:
               # Upstream Deck: this instance serves the archive directly, so it
               # must not be the forked image the public Deck runs, whose
               # --history-bucket guard exists precisely to withhold these bytes.
-              image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20261103-43ed23400
+              image: us-docker.pkg.dev/k8s-infra-prow/images/deck:v20261107-86b2c4908
               args:
                 - --config-path=/etc/config/config.yaml
                 - --supplemental-prow-config-dir=/etc/config
                 - --job-config-path=/var/repo/release/ci-operator/jobs
+                - --job-config-path=/etc/jobs/efs
                 - --plugin-config=/var/repo/release/core-services/prow/02_config/_plugins.yaml
                 - --supplemental-plugin-config-dir=/var/repo/release/core-services/prow/02_config
                 - --github-oauth-config-file=/etc/oauth/config.json
@@ -193,6 +194,9 @@ objects:
                   readOnly: true
                 - name: release
                   mountPath: /var/repo
+                - name: job-configs
+                  mountPath: /etc/jobs/efs
+                  readOnly: true
                 - mountPath: /etc/build-farm-credentials
                   name: build-farm-credentials
                   readOnly: true
@@ -281,6 +285,9 @@ objects:
                 secretName: deck-history-tls
             - name: release
               emptyDir: {}
+            - name: job-configs
+              persistentVolumeClaim:
+                claimName: job-configs-nfs
             - name: build-farm-credentials
               secret:
                 secretName: deck

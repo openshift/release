@@ -18,7 +18,7 @@ registry, so build pods pull only CI-registry images. The existing
 `ci/deck:latest` tag is not changed.
 
 The Go builder is
-`registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.26-openshift-4.22`.
+`registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.26-openshift-5.0`.
 It reads `vcs.revision` from the upstream binary using `go version -m`, checks out
 that exact revision, applies the patch, runs Deck's Go tests, and builds the
 replacement binary. The runtime reuses the same upstream image, including its

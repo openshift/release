@@ -95,11 +95,28 @@ get_version() {
   local versions
   versions=$(rosa list versions --channel-group "${channel}" --hosted-cp -o json | jq -r '.[].raw_id')
 
+  local candidates
   if [[ -n "$target" ]]; then
-    echo "$versions" | grep -E "^${target}" | tail -n +$((offset + 1)) | head -1
+    candidates=$(echo "$versions" | grep -E "^${target}" || true)
   else
-    echo "$versions" | tail -n +$((offset + 1)) | head -1
+    candidates="$versions"
   fi
+
+  local candidate_count
+  candidate_count=$(echo "$candidates" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')
+  if [[ "${candidate_count}" -eq 0 ]]; then
+    return 0
+  fi
+
+  # New Y-streams may have only one or two published z-streams. Do not fail
+  # the job just because the default offset is larger than the stream; use the
+  # oldest available release in that case.
+  if [[ "${offset}" -ge "${candidate_count}" ]]; then
+    log "Requested version offset ${offset}, but only ${candidate_count} matching release(s) are available; using the oldest available release"
+    offset=$((candidate_count - 1))
+  fi
+
+  echo "$candidates" | tail -n +$((offset + 1)) | head -1
 }
 
 # Find version across channel groups

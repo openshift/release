@@ -6,7 +6,7 @@
 |-------|-------|
 | **Alerts** | `ProbeFailing` (≥1m), `ProbeFailing-Lenient` (≥5m) |
 | **Cluster** | `app.ci` |
-| **Rules** | [`ci-alerts_prometheusrule.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — `blackbox` group |
+| **Rules** | [`ci-alerts_prometheusrule.yaml`](../../clusters/core-ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — `blackbox` group |
 | **Severity** | `critical` |
 | **Prober** | Deployment **`blackbox-prober`** in namespace **`ci`** ([`blackbox_prober.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/blackbox_prober.yaml)); Prometheus probes call **`blackbox-prober.ci.svc`**. |
 
@@ -60,7 +60,7 @@ oc --context "$CTX" delete pod -n ci bb-debug-<suffix>
 
 - **Connection refused / no route**: target Service endpoints down, Route missing, or NetworkPolicy—inspect target namespace.
 - **HTTP 5xx**: application degraded—engage service owners.
-- **TLS verify errors**: cert mismatch or expired cert—check Route **`spec.tls`** / cert secrets; correlate with alert **`SSLCertExpiringSoon`** on the same target ([`ci-alerts_prometheusrule.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml)).
+- **TLS verify errors**: cert mismatch or expired cert—check Route **`spec.tls`** / cert secrets; correlate with alert **`SSLCertExpiringSoon`** on the same target ([`ci-alerts_prometheusrule.yaml`](../../clusters/core-ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml)).
 
 ### 4) Map URL → OpenShift Route / Service (when host is `*.apps.ci…`)
 

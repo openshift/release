@@ -17,6 +17,11 @@ run_tls_scan() {
     true|false) ;;
     *) echo "Invalid SCANNER_POD_MODE: expected true or false" >&2; exit 1 ;;
   esac
+  local pqc_report_only="${PQC_REPORT_ONLY:-false}"
+  case "${pqc_report_only}" in
+    true|false) ;;
+    *) echo "Invalid PQC_REPORT_ONLY: expected true or false" >&2; exit 1 ;;
+  esac
   if [[ "${scanner_pod_mode}" == "true" && ( -n "${SCANNER_NAMESPACE:-}" || -n "${TLS_SCANNER_CLUSTER_LABEL:-}" ) ]]; then
       echo "SCANNER_POD_MODE requires the scanner-owned namespace and no cluster label" >&2
       exit 1
@@ -118,9 +123,34 @@ run_tls_scan() {
       echo "Limiting scan to ${SCAN_LIMIT_IPS} IPs (smoke testing)."
   fi
 
+  # tls-scanner only accepts Old, Intermediate and Modern for
+  # --tls-profile-type: a Custom profile has no predefined cipher list, so the
+  # CLI override cannot express it (the scanner exits before scanning). For a
+  # cluster running a Custom profile (e.g. after tls-groups-configure or
+  # hypershift-tls-groups), omit the flag and let the scanner read the
+  # effective profile from APIServer/cluster instead. Note that the CLI
+  # override implies StrictAllComponents enforcement, while reading from the
+  # API honours the cluster's tlsAdherence setting.
   if [[ -n "${TLS_PROFILE_TYPE:-}" ]]; then
-      SCANNER_ARGS="${SCANNER_ARGS} --tls-profile-type ${TLS_PROFILE_TYPE}"
-      echo "Using expected TLS profile type for compliance checks: ${TLS_PROFILE_TYPE}"
+      # Trim surrounding whitespace so validation accepts exactly what the
+      # scanner itself accepts (its CLI normalizes case and whitespace).
+      local tls_profile_type="${TLS_PROFILE_TYPE}"
+      tls_profile_type="${tls_profile_type#"${tls_profile_type%%[![:space:]]*}"}"
+      tls_profile_type="${tls_profile_type%"${tls_profile_type##*[![:space:]]}"}"
+      case "${tls_profile_type,,}" in
+        old|intermediate|modern)
+          SCANNER_ARGS="${SCANNER_ARGS} --tls-profile-type ${tls_profile_type}"
+          echo "Using expected TLS profile type for compliance checks: ${tls_profile_type}"
+          ;;
+        custom)
+          echo "TLS_PROFILE_TYPE=Custom: no --tls-profile-type override, scanner reads the effective profile from APIServer/cluster"
+          echo "Note: on HyperShift management passes that profile comes from the shared management cluster's own APIServer CR and is informational only; the expected-groups assertion is profile-independent"
+          ;;
+        *)
+          echo "Invalid TLS_PROFILE_TYPE '${TLS_PROFILE_TYPE}' (supported: Old, Intermediate, Modern, Custom)"
+          exit 1
+          ;;
+      esac
   fi
 
   # SCANNER_CPU / SCANNER_MEMORY are deprecated but still honoured as fallback
@@ -325,10 +355,10 @@ EOF
 
   wait $LOGS_PID 2>/dev/null || true
 
-  # Check final pod status. The scanner exits non-zero when TLS findings are
-  # detected — this is expected and not an infrastructure failure. Propagate
-  # the scanner's exit code so CI marks the job accordingly, but do not treat
-  # it as a timeout or describe the pod as failed when artifacts were collected.
+  # Check final pod status. The scanner exits non-zero when compliance findings
+  # are detected. Keep that fatal by default; in PQC report-only mode, suppress
+  # only an explicit PQC compliance result after its artifacts were collected.
+  # Startup, execution, and artifact-collection failures remain fatal.
   local pod_phase
   pod_phase="$(oc get pod/tls-scanner -n "${NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")"
   local pod_exit_code
@@ -338,6 +368,11 @@ EOF
       echo "Scanner pod exited with phase=${pod_phase} code=${pod_exit_code}"
       if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
           echo "Artifacts were collected — scanner found TLS compliance issues."
+          if [[ "${pqc_report_only}" == "true" && "${PQC_CHECK:-false}" == "true" && -f "${SCANNER_ARTIFACT_DIR}/output.log" ]] && \
+              grep -Fq "PQC COMPLIANCE CHECK: FAILED" "${SCANNER_ARTIFACT_DIR}/output.log"; then
+              echo "PQC report-only mode: recording findings without failing this step."
+              return 0
+          fi
       else
           echo "No artifacts found — scanner may have crashed."
           oc describe pod/tls-scanner -n "${NAMESPACE}"
@@ -361,6 +396,11 @@ EOF
           echo "Scanner pod exited with phase=${pod_phase} code=${pod_exit_code}"
           if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
               echo "Artifacts were collected — scanner found TLS compliance issues."
+              if [[ "${pqc_report_only}" == "true" && "${PQC_CHECK:-false}" == "true" && -f "${SCANNER_ARTIFACT_DIR}/output.log" ]] && \
+                  grep -Fq "PQC COMPLIANCE CHECK: FAILED" "${SCANNER_ARTIFACT_DIR}/output.log"; then
+                  echo "PQC report-only mode: recording findings without failing this step."
+                  return 0
+              fi
           else
               echo "No artifacts found — scanner may have crashed."
               oc describe pod/tls-scanner -n "${NAMESPACE}"

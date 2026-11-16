@@ -180,6 +180,44 @@ cat > "${SHARED_DIR}/trt-telemetry.sh" << 'HEREDOC_EOF'
 #   source "${SHARED_DIR}/trt-telemetry.sh"
 
 EXTRACT_METRICS="/opt/ai-helpers/plugins/prow-agent/scripts/extract_metrics.py"
+
+# Verify the extractor's public behavior before any paid agent work. A valid
+# zero-cost row intentionally returns nonzero, so capability is determined by
+# the emitted autodl row rather than the process status.
+verify_session_metrics_extractor() {
+    local probe_dir status=0
+    if [[ ! -r "${EXTRACT_METRICS}" ]]; then
+        echo "ERROR: session metrics extractor is unavailable" >&2
+        return 1
+    fi
+    if ! probe_dir=$(mktemp -d "${TMPDIR:-/tmp}/trt-extractor-probe.XXXXXX"); then
+        echo "ERROR: unable to create session metrics extractor probe directory" >&2
+        return 1
+    fi
+    printf '%s\n' '{"path":"/v1/metrics","payload":{"resourceMetrics":[{"scopeMetrics":[{"metrics":[{"name":"agentic_ci.codex.cost.usage","sum":{"aggregationTemporality":2,"dataPoints":[{"asDouble":0,"startTimeUnixNano":"1","timeUnixNano":"2","attributes":[{"key":"model","value":{"stringValue":"capability-probe"}}]}]}}]}]}]}}' \
+        > "${probe_dir}/otel.jsonl" || status=1
+    printf '%s' capability-probe > "${probe_dir}/prompt" || status=1
+    if [[ "${status}" -eq 0 ]]; then
+        python3 "${EXTRACT_METRICS}" "${probe_dir}/otel.jsonl" \
+            "${probe_dir}/output.json" --prompt-file "${probe_dir}/prompt" \
+            >/dev/null 2>&1 || true
+        jq -e '
+            .table_name == "claude_session_metrics"
+            and .rows[0].model == "capability-probe"
+            and .rows[0].total_cost_usd == "0.000000"
+            and .rows[0].prompt == "capability-probe"
+        ' "${probe_dir}/output.json" >/dev/null 2>&1 || status=1
+    fi
+    rm -rf "${probe_dir}" || status=1
+    if [[ "${status}" -ne 0 ]]; then
+        echo "ERROR: session metrics extractor lacks Codex or --prompt-file support" >&2
+    fi
+    return "${status}"
+}
+
+verify_session_metrics_extractor
+SESSION_PROMPT_FILE=$(mktemp "${TMPDIR:-/tmp}/trt-session-initial-prompt.XXXXXX")
+
 if [[ "${EVAL_MODE:-}" == "true" ]]; then
     OTEL_LOG="${SHARED_DIR}/claude-otel.jsonl"
 else
@@ -372,12 +410,11 @@ codex_home_cleanup() {
 }
 
 prepare_codex_home() {
-    if [[ -n "${CODEX_HOME:-}" && -d "${CODEX_HOME}" ]]; then
+    if [[ -n "${CODEX_HOME_CLEANUP_INSTALLED:-}" && -n "${CODEX_HOME:-}" && -d "${CODEX_HOME}" ]]; then
         return 0
     fi
     CODEX_HOME=$(mktemp -d /tmp/codex-home.XXXXXX) || return 1
     export CODEX_HOME
-    [[ -n "${CODEX_HOME_CLEANUP_INSTALLED:-}" ]] && return 0
     CODEX_HOME_CLEANUP_INSTALLED=1
     local previous quoted
     previous=$(trap -p EXIT || true)
@@ -388,6 +425,370 @@ prepare_codex_home() {
         CODEX_HOME_PREVIOUS_EXIT_CMD=$(eval "printf '%s' ${quoted}")
     fi
     trap codex_home_cleanup EXIT
+}
+
+configure_codex_project_plugins() {
+    local settings="${WORKDIR}/.claude/settings.json"
+    local github_enabled=false
+    unset CLAUDE_PLUGIN_ROOT
+    if [[ -e "${settings}" || -L "${settings}" ]]; then
+        if [[ ! -r "${settings}" ]]; then
+            echo "ERROR: project plugin settings are unreadable: ${settings}" >&2
+            return 1
+        fi
+        if ! github_enabled=$(jq -er '
+          if type != "object" then error("settings must be an object")
+          elif (has("enabledPlugins") | not) then false
+          elif (.enabledPlugins | type) != "object" then error("enabledPlugins must be an object")
+          elif (.enabledPlugins | has("github@ai-helpers") | not) then false
+          elif (.enabledPlugins["github@ai-helpers"] | type) != "boolean" then error("plugin state must be boolean")
+          else .enabledPlugins["github@ai-helpers"]
+          end
+          | tostring
+        ' "${settings}"); then
+            echo "ERROR: invalid project plugin settings: ${settings}" >&2
+            return 1
+        fi
+    fi
+
+    if [[ "${github_enabled}" == true ]]; then
+        if ! codex plugin marketplace add /opt/ai-helpers >/dev/null 2>&1; then
+            echo "ERROR: failed to add the ai-helpers Codex plugin marketplace" >&2
+            return 1
+        fi
+        local plugin_json plugin_root cache_root script
+        if ! plugin_json=$(codex plugin add github@ai-helpers --json 2>/dev/null); then
+            echo "ERROR: failed to install the github@ai-helpers Codex plugin" >&2
+            return 1
+        fi
+        if ! plugin_root=$(jq -er '
+          select(.pluginId == "github@ai-helpers")
+          | .installedPath
+          | select(type == "string" and length > 0)
+        ' <<<"${plugin_json}"); then
+            echo "ERROR: Codex did not report the installed github@ai-helpers plugin path" >&2
+            return 1
+        fi
+        if ! plugin_root=$(realpath -e -- "${plugin_root}") \
+            || ! cache_root=$(realpath -e -- "${CODEX_HOME}/plugins/cache"); then
+            echo "ERROR: Codex reported an invalid github@ai-helpers plugin path" >&2
+            return 1
+        fi
+        case "${plugin_root}" in
+            "${cache_root}"/*) ;;
+            *)
+                echo "ERROR: Codex installed github@ai-helpers outside its native plugin cache" >&2
+                return 1
+                ;;
+        esac
+        script="${plugin_root}/skills/upload-screenshot/upload_screenshot.sh"
+        if [[ ! -f "${script}" || ! -x "${script}" ]]; then
+            echo "ERROR: installed github@ai-helpers is missing the upload-screenshot helper" >&2
+            return 1
+        fi
+        # Codex shell tools inherit this process environment. The compatibility
+        # variable is required by the existing Claude-authored skill command.
+        export CLAUDE_PLUGIN_ROOT="${plugin_root}"
+    elif ! codex plugin remove github@ai-helpers >/dev/null 2>&1; then
+        echo "ERROR: failed to disable the github@ai-helpers Codex plugin" >&2
+        return 1
+    fi
+}
+
+codex_project_mcp_is_allowed() {
+    local server=$1
+    [[ " ${ALLOWED_TOOLS:-} " == *" mcp__${server}__"* ]]
+}
+
+codex_project_mcp_url_is_safe() {
+    python3 - "$1" <<'PY'
+import sys
+from urllib.parse import urlsplit
+
+try:
+    url = urlsplit(sys.argv[1])
+except ValueError:
+    sys.exit(1)
+if url.scheme not in {"http", "https"} or not url.hostname:
+    sys.exit(1)
+if url.username is not None or url.password is not None or url.query or url.fragment:
+    sys.exit(1)
+PY
+}
+
+# Codex does not consume the Claude-compatible project .mcp.json directly.
+# Register only servers already allowed by the job's ALLOWED_TOOLS contract;
+# this keeps unrelated or interactive project servers disabled.
+codex_project_mcp_server_type() {
+    local config=$1 server=$2
+    jq -r --arg server "${server}" \
+        '.mcpServers[$server].type // (if .mcpServers[$server].url then "http" else "stdio" end)' \
+        "${config}"
+}
+
+codex_project_mcp_validate_server() {
+    local config=$1 server=$2 type url
+    type=$(codex_project_mcp_server_type "${config}" "${server}") || {
+        echo "ERROR: failed to read MCP server ${server}" >&2
+        return 1
+    }
+    case "${type}" in
+        stdio)
+            if ! jq -e --arg server "${server}" '
+              (.mcpServers[$server].command // null) as $command
+              | (.mcpServers[$server].args // []) as $args
+              | (.mcpServers[$server].env // {}) as $env
+              | ($command | type == "string" and length > 0 and index("\u0000") == null)
+                and ($args | type == "array"
+                  and all(.[]; type == "string" and index("\u0000") == null))
+                and ($env | type == "object"
+                  and all(to_entries[];
+                    (.key | test("^[A-Za-z_][A-Za-z0-9_]*$"))
+                    and (.value | type == "string" and index("\u0000") == null)))
+            ' "${config}" >/dev/null; then
+                echo "ERROR: invalid stdio configuration for MCP server ${server}" >&2
+                return 1
+            fi
+            ;;
+        http)
+            if ! jq -e --arg server "${server}" \
+                '.mcpServers[$server].url | type == "string"' "${config}" >/dev/null; then
+                echo "ERROR: invalid HTTP configuration for MCP server ${server}" >&2
+                return 1
+            fi
+            url=$(jq -r --arg server "${server}" '.mcpServers[$server].url' "${config}") || return 1
+            if [[ -z "${url}" ]] || ! codex_project_mcp_url_is_safe "${url}"; then
+                echo "ERROR: invalid or credential-bearing URL for MCP server ${server}" >&2
+                return 1
+            fi
+            ;;
+        *)
+            echo "ERROR: unsupported transport for MCP server ${server}" >&2
+            return 1
+            ;;
+    esac
+}
+
+codex_project_mcp_collect_servers() {
+    local config=$1 output_name=$2 server names rc=0
+    local -n output=${output_name}
+    output=()
+    names=$(mktemp "${CODEX_HOME}/.trt-project-mcp-names.XXXXXX") || return 1
+    if [[ -f "${config}" ]] && ! python3 - "${config}" > "${names}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    servers = json.load(handle)["mcpServers"]
+for name in sorted(servers):
+    sys.stdout.buffer.write(name.encode() + b"\0")
+PY
+    then
+        rm -f "${names}"
+        echo "ERROR: failed to read project MCP server names" >&2
+        return 1
+    fi
+    while IFS= read -r -d '' server; do
+        if [[ ! "${server}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "ERROR: unsafe MCP server name in ${config}" >&2
+            rc=1
+            continue
+        fi
+        codex_project_mcp_is_allowed "${server}" || continue
+        if codex_project_mcp_validate_server "${config}" "${server}"; then
+            output+=("${server}")
+        else
+            rc=1
+        fi
+    done < "${names}"
+    rm -f "${names}"
+    return "${rc}"
+}
+
+codex_project_mcp_remove_servers() {
+    local action=$1 server rc=0
+    shift
+    for server in "$@"; do
+        if ! codex mcp remove "${server}" </dev/null >/dev/null 2>&1; then
+            echo "ERROR: failed to ${action} MCP server ${server}" >&2
+            rc=1
+        fi
+    done
+    return "${rc}"
+}
+
+codex_project_mcp_remove_managed() {
+    local state=$1
+    [[ -f "${state}" ]] || return 0
+    if ! jq -e '
+      .servers | type == "array"
+        and all(.[]; type == "string" and test("^[A-Za-z0-9._-]+$"))
+    ' "${state}" >/dev/null 2>&1; then
+        echo "ERROR: invalid managed MCP state" >&2
+        return 1
+    fi
+    local -a previous=()
+    mapfile -t previous < <(jq -r '.servers[]' "${state}")
+    codex_project_mcp_remove_servers "remove managed" "${previous[@]}"
+}
+
+codex_project_mcp_parse_stdio() {
+    local config=$1 server=$2 command_name=$3 args_name=$4 env_name=$5
+    local -n command_output=${command_name}
+    local -n args_output=${args_name}
+    local -n env_output=${env_name}
+    local parsed kind key value complete=false rc=0
+    command_output=""
+    args_output=()
+    env_output=()
+    parsed=$(mktemp "${CODEX_HOME}/.trt-project-mcp-server.XXXXXX") || return 1
+    if ! python3 - "${config}" "${server}" > "${parsed}" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    server = json.load(handle)["mcpServers"][sys.argv[2]]
+
+def emit(kind, key, value):
+    for field in (kind, key, value):
+        sys.stdout.buffer.write(field.encode() + b"\0")
+
+emit("command", "", server["command"])
+for value in server.get("args", []):
+    emit("arg", "", value)
+for key, value in server.get("env", {}).items():
+    emit("env", key, value)
+emit("done", "", "")
+PY
+    then
+        rm -f "${parsed}"
+        echo "ERROR: failed to parse stdio MCP server ${server}" >&2
+        return 1
+    fi
+    while IFS= read -r -d '' kind \
+        && IFS= read -r -d '' key \
+        && IFS= read -r -d '' value; do
+        case "${kind}" in
+            command) command_output=${value} ;;
+            arg) args_output+=("${value}") ;;
+            env) env_output+=(--env "${key}=${value}") ;;
+            done) complete=true; break ;;
+            *) rc=1 ;;
+        esac
+    done < "${parsed}"
+    rm -f "${parsed}"
+    if [[ "${complete}" != true || "${rc}" -ne 0 ]]; then
+        echo "ERROR: invalid parsed data for stdio MCP server ${server}" >&2
+        return 1
+    fi
+}
+
+codex_project_mcp_register_stdio() {
+    local config=$1 server=$2 command
+    local -a args=() env_args=()
+    codex_project_mcp_parse_stdio "${config}" "${server}" command args env_args || return 1
+    if ! codex mcp add "${server}" "${env_args[@]}" -- "${command}" "${args[@]}" \
+        >/dev/null 2>&1; then
+        echo "ERROR: failed to register stdio MCP server ${server}" >&2
+        return 1
+    fi
+}
+
+codex_project_mcp_register_http() {
+    local config=$1 server=$2 url
+    url=$(jq -r --arg server "${server}" '.mcpServers[$server].url' "${config}") || return 1
+    if ! timeout --kill-after=5s 60s codex mcp add "${server}" --url "${url}" \
+        </dev/null >/dev/null 2>&1; then
+        echo "ERROR: failed to register HTTP MCP server ${server}" >&2
+        return 1
+    fi
+}
+
+codex_project_mcp_register_server() {
+    local config=$1 server=$2 type
+    type=$(codex_project_mcp_server_type "${config}" "${server}") || return 1
+    case "${type}" in
+        stdio) codex_project_mcp_register_stdio "${config}" "${server}" ;;
+        http) codex_project_mcp_register_http "${config}" "${server}" ;;
+        *)
+            echo "ERROR: unsupported transport for MCP server ${server}" >&2
+            return 1
+            ;;
+    esac
+}
+
+codex_project_mcp_register_servers() {
+    local config=$1 server rc=0
+    shift
+    local -a servers=("$@")
+    for server in "${servers[@]}"; do
+        codex_project_mcp_register_server "${config}" "${server}" || rc=1
+    done
+    if [[ "${rc}" -ne 0 ]]; then
+        codex_project_mcp_remove_servers "clean up" "${servers[@]}" || true
+        return 1
+    fi
+}
+
+codex_project_mcp_persist_state() {
+    local state=$1 fingerprint=$2
+    shift 2
+    local servers_json='[]' state_tmp
+    local -a servers=("$@")
+    if [[ ${#servers[@]} -gt 0 ]]; then
+        servers_json=$(printf '%s\n' "${servers[@]}" | jq -R . | jq -s .) || return 1
+    fi
+    state_tmp=$(mktemp "${CODEX_HOME}/.trt-project-mcp-state.XXXXXX") || return 1
+    if ! jq -n --arg fingerprint "${fingerprint}" --argjson servers "${servers_json}" \
+        '{fingerprint: $fingerprint, servers: $servers}' > "${state_tmp}"; then
+        rm -f "${state_tmp}"
+        return 1
+    fi
+    mv "${state_tmp}" "${state}"
+}
+
+_configure_codex_project_mcp() {
+    local config="${WORKDIR}/.mcp.json"
+    local state="${CODEX_HOME}/.trt-project-mcp-state.json"
+    local config_hash="absent" fingerprint
+    local -a servers=()
+    if [[ -f "${config}" ]]; then
+        config_hash=$(sha256sum "${config}" | cut -d' ' -f1) || return 1
+    fi
+    fingerprint=$(printf '%s\0%s' "${config_hash}" "${ALLOWED_TOOLS:-}" | sha256sum | cut -d' ' -f1) || return 1
+    if [[ -f "${state}" ]] && jq -e --arg fingerprint "${fingerprint}" '
+      .fingerprint == $fingerprint
+        and (.servers | type == "array")
+        and all(.servers[]; type == "string" and test("^[A-Za-z0-9._-]+$"))
+    ' "${state}" >/dev/null 2>&1; then
+        return 0
+    fi
+    if [[ -f "${config}" ]] && ! jq -e '.mcpServers | type == "object"' "${config}" >/dev/null 2>&1; then
+        echo "ERROR: invalid project MCP configuration: ${config}" >&2
+        return 1
+    fi
+    codex_project_mcp_collect_servers "${config}" servers || return 1
+    # Do not register anything while a stale managed server may remain.
+    codex_project_mcp_remove_managed "${state}" || return 1
+    codex_project_mcp_register_servers "${config}" "${servers[@]}" || return 1
+    if ! codex_project_mcp_persist_state "${state}" "${fingerprint}" "${servers[@]}"; then
+        echo "ERROR: failed to persist managed MCP state" >&2
+        codex_project_mcp_remove_servers "clean up" "${servers[@]}" || true
+        return 1
+    fi
+}
+
+configure_codex_project_mcp() {
+    local restore_xtrace=false rc=0
+    if [[ $- == *x* ]]; then
+        restore_xtrace=true
+        set +x
+    fi
+    _configure_codex_project_mcp || rc=$?
+    if ${restore_xtrace}; then
+        set -x
+    fi
+    return "${rc}"
 }
 
 agentic_ci() {
@@ -404,6 +805,11 @@ agentic_ci() {
         esac
     done
     local prompt="$1"; shift
+    # Codex may redact prompt text in OTEL. Preserve the initial harness prompt
+    # privately for extraction; resumed/nudge prompts must not replace it.
+    if [[ "${EVAL_MODE:-}" != "true" && ! -s "${SESSION_PROMPT_FILE}" ]]; then
+        (umask 077 && printf '%s' "${prompt}" > "${SESSION_PROMPT_FILE}")
+    fi
     if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL:-}" ]]; then
         echo "Applying Gangway override: AGENT_MODEL=${MULTISTAGE_PARAM_OVERRIDE_AGENT_MODEL}"
     fi
@@ -461,6 +867,8 @@ agentic_ci() {
         prepare_codex_home || return 1
         exclude_codex_from_worktree
         ensure_codex || return 1
+        configure_codex_project_plugins || return 1
+        configure_codex_project_mcp || return 1
         load_openai_api_key || return 1
         if [[ -n "${settings_file}" ]]; then
             if [[ ! -r "${settings_file}" ]]; then
@@ -526,10 +934,9 @@ agentic_ci() {
     return $rc
 }
 
-# Token totals come from Codex response.completed events. Dollar amounts come
-# from codex.cost.usage when agentic-ci has written that metric. Prints JSON:
-#   {"version","session_id","cost_from_metric","models":{model:{input,output,cache_read,cache_create,turns,cost?}}}
-codex_otel_usage() {
+# Fallback usage and cost-observation metadata for evals. The authoritative
+# session totals still come from extract_metrics whenever it produces a row.
+otel_usage() {
     local otel_path=$1
     python3 - "${otel_path}" << 'PY'
 import json
@@ -548,6 +955,17 @@ models = defaultdict(lambda: {
 version = ""
 session_id = ""
 cost_from_metric = False
+cumulative_costs = {}
+claude_cost_models = set()
+claude_token_models = set()
+malformed_token_events = 0
+
+CODEX_COST_ALIASES = {
+    "codex.cost.usage": "agentic_ci.codex.cost.usage",
+}
+CODEX_COST_METRIC = "agentic_ci.codex.cost.usage"
+CLAUDE_COST_METRIC = "claude_code.cost.usage"
+CLAUDE_TOKEN_METRIC = "claude_code.token.usage"
 
 
 def attribute_value(value):
@@ -559,37 +977,85 @@ def attribute_value(value):
     return None
 
 
-def as_int(attrs, key):
+def canonical_structure(value):
+    """Return a stable representation of structured OTLP producer identity."""
+    if isinstance(value, dict):
+        return {key: canonical_structure(value[key]) for key in sorted(value)}
+    if isinstance(value, list):
+        items = [canonical_structure(item) for item in value]
+        return sorted(items, key=lambda item: json.dumps(
+            item, sort_keys=True, separators=(",", ":"), ensure_ascii=True,
+        ))
+    return value
+
+
+def producer_key(value):
+    """Serialize resource or instrumentation-scope identity deterministically."""
+    return json.dumps(
+        canonical_structure(value or {}),
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+
+
+def token_count(attrs, key):
+    """Return a nonnegative integral token count, or None when malformed."""
     raw = attrs.get(key)
     if raw is None or raw == "":
         return 0
+    if isinstance(raw, bool):
+        return None
     try:
-        return int(float(raw))
-    except (TypeError, ValueError):
-        return 0
+        value = float(raw)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not math.isfinite(value) or value < 0 or not value.is_integer():
+        return None
+    return int(value)
 
 
 def point_attributes(point):
     attrs = {}
-    for attr in point.get("attributes", []):
+    for attr in point.get("attributes", []) or []:
+        if not isinstance(attr, dict):
+            continue
         key = attr.get("key")
-        if key:
-            attrs[key] = attribute_value(attr.get("value"))
+        if not isinstance(key, str) or not key:
+            return None
+        attrs[key] = attribute_value(attr.get("value"))
+    attrs_key = tuple(sorted(attrs.items()))
+    try:
+        hash(attrs_key)
+    except TypeError:
+        return None
     return attrs
 
 
 def point_number(point):
     if "asDouble" in point:
         raw = point["asDouble"]
+        if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+            return None
     elif "asInt" in point:
         raw = point["asInt"]
+        if isinstance(raw, bool):
+            return None
+        if isinstance(raw, str):
+            # OTLP JSON maps int64 values to decimal strings. Keep that public
+            # encoding while rejecting floats and arbitrary numeric strings.
+            if not raw.isascii() or not raw.isdigit():
+                return None
+            raw = int(raw, 10)
+        elif not isinstance(raw, int):
+            return None
     else:
         return None
     try:
         value = float(raw)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
-    if not math.isfinite(value):
+    if not math.isfinite(value) or value < 0:
         return None
     return value
 
@@ -603,34 +1069,92 @@ with open(path) as handle:
             record = json.loads(line)
         except json.JSONDecodeError:
             continue
-        record_path = record.get("path", "")
+        if not isinstance(record, dict):
+            continue
+        record_path = str(record.get("path") or "")
         payload = record.get("payload") or {}
+        if not isinstance(payload, dict):
+            continue
         if "/v1/metrics" in record_path:
-            for resource in payload.get("resourceMetrics", []):
-                for scope in resource.get("scopeMetrics", []):
-                    for metric in scope.get("metrics", []):
-                        if metric.get("name") != "codex.cost.usage":
+            for resource in payload.get("resourceMetrics", []) or []:
+                if not isinstance(resource, dict):
+                    continue
+                for scope in resource.get("scopeMetrics", []) or []:
+                    if not isinstance(scope, dict):
+                        continue
+                    for metric in scope.get("metrics", []) or []:
+                        if not isinstance(metric, dict):
+                            continue
+                        raw_name = metric.get("name", "")
+                        if not isinstance(raw_name, str):
+                            continue
+                        name = CODEX_COST_ALIASES.get(raw_name, raw_name)
+                        if name not in (CODEX_COST_METRIC,
+                                        CLAUDE_COST_METRIC,
+                                        CLAUDE_TOKEN_METRIC):
                             continue
                         data = metric.get("sum", metric.get("gauge", {}))
-                        for point in data.get("dataPoints", []):
+                        if not isinstance(data, dict):
+                            continue
+                        for point in data.get("dataPoints", []) or []:
+                            if not isinstance(point, dict):
+                                continue
                             amount = point_number(point)
                             if amount is None:
                                 continue
                             attrs = point_attributes(point)
+                            if attrs is None:
+                                continue
                             model = str(attrs.get("model") or "unknown")
-                            models[model]["cost"] = round(models[model].get("cost", 0) + amount, 6)
+                            if name == CLAUDE_COST_METRIC:
+                                claude_cost_models.add(model)
+                                continue
+                            if name == CLAUDE_TOKEN_METRIC:
+                                claude_token_models.add(model)
+                                continue
+                            if ("sum" in metric
+                                    and data.get("aggregationTemporality") == 2):
+                                resource_identity = {
+                                    "resource": resource.get("resource", {}),
+                                    "schemaUrl": resource.get("schemaUrl", ""),
+                                }
+                                scope_identity = {
+                                    "scope": scope.get("scope", {}),
+                                    "schemaUrl": scope.get("schemaUrl", ""),
+                                }
+                                key = (
+                                    name,
+                                    producer_key(resource_identity),
+                                    producer_key(scope_identity),
+                                    model,
+                                    str(point.get("startTimeUnixNano", "")),
+                                )
+                                try:
+                                    timestamp = int(point.get("timeUnixNano", 0) or 0)
+                                except (TypeError, ValueError):
+                                    timestamp = 0
+                                previous = cumulative_costs.get(key)
+                                if previous is None or timestamp >= previous[0]:
+                                    cumulative_costs[key] = (timestamp, amount)
+                            else:
+                                models[model]["cost"] = round(
+                                    models[model].get("cost", 0) + amount, 6)
                             cost_from_metric = True
             continue
         if "/v1/logs" not in record_path:
             continue
-        for resource in payload.get("resourceLogs", []):
-            for scope in resource.get("scopeLogs", []):
-                for item in scope.get("logRecords", []):
-                    attrs = {}
-                    for attr in item.get("attributes", []):
-                        key = attr.get("key")
-                        if key:
-                            attrs[key] = attribute_value(attr.get("value"))
+        for resource in payload.get("resourceLogs", []) or []:
+            if not isinstance(resource, dict):
+                continue
+            for scope in resource.get("scopeLogs", []) or []:
+                if not isinstance(scope, dict):
+                    continue
+                for item in scope.get("logRecords", []) or []:
+                    if not isinstance(item, dict):
+                        continue
+                    attrs = point_attributes(item)
+                    if attrs is None:
+                        continue
                     if not version and attrs.get("app.version"):
                         version = str(attrs["app.version"])
                     if not session_id and attrs.get("conversation.id"):
@@ -641,29 +1165,62 @@ with open(path) as handle:
                         continue
                     if not model:
                         model = "unknown"
+                    counts = {
+                        key: token_count(attrs, key)
+                        for key in (
+                            "input_token_count",
+                            "output_token_count",
+                            "cached_token_count",
+                            "cache_write_token_count",
+                        )
+                    }
+                    if any(value is None for value in counts.values()):
+                        malformed_token_events += 1
+                        continue
                     fresh = max(
-                        as_int(attrs, "input_token_count")
-                        - as_int(attrs, "cached_token_count")
-                        - as_int(attrs, "cache_write_token_count"),
+                        counts["input_token_count"]
+                        - counts["cached_token_count"]
+                        - counts["cache_write_token_count"],
                         0,
                     )
                     models[model]["turns"] += 1
                     models[model]["input"] += fresh
-                    models[model]["output"] += as_int(attrs, "output_token_count")
-                    models[model]["cache_read"] += as_int(attrs, "cached_token_count")
-                    models[model]["cache_create"] += as_int(attrs, "cache_write_token_count")
+                    models[model]["output"] += counts["output_token_count"]
+                    models[model]["cache_read"] += counts["cached_token_count"]
+                    models[model]["cache_create"] += counts["cache_write_token_count"]
+
+for (_name, _resource, _scope, model, _start), (_timestamp, amount) in cumulative_costs.items():
+    models[model]["cost"] = round(models[model].get("cost", 0) + amount, 6)
+
+if malformed_token_events:
+    print(
+        f"WARNING: skipped {malformed_token_events} Codex response events "
+        "with malformed token counts",
+        file=sys.stderr,
+    )
 
 print(json.dumps({
-    "version": version,
-    "session_id": session_id,
-    "cost_from_metric": cost_from_metric,
-    "models": models,
+    "codex": {
+        "version": version,
+        "session_id": session_id,
+        "cost_from_metric": cost_from_metric,
+        "models": models,
+    },
+    "claude_cost": {
+        "present": bool(claude_cost_models or claude_token_models),
+        "observed": bool(claude_cost_models),
+        "complete": bool(
+            claude_cost_models
+            and claude_token_models.issubset(claude_cost_models)
+        ),
+    },
 }))
 PY
 }
 
 finalize_session_metrics() {
     if [[ "${EVAL_MODE:-}" == "true" ]]; then
+        rm -f "${SESSION_PROMPT_FILE}"
         return 0
     fi
     # phase is "solve" or "review". Each step writes its own artifact so a
@@ -672,63 +1229,66 @@ finalize_session_metrics() {
     rm -f "${SHARED_DIR}/claude-otel.jsonl" "${SHARED_DIR}/claude-session-metrics-autodl.json"
     if [[ "${phase}" != "solve" && "${phase}" != "review" ]]; then
         echo "Warning: finalize_session_metrics requires phase solve or review, skipping session metrics"
+        rm -f "${SESSION_PROMPT_FILE}"
         return 0
     fi
     if [[ ! -f "${EXTRACT_METRICS}" ]]; then
         echo "Warning: extract_metrics.py not found, skipping session metrics"
+        rm -f "${SESSION_PROMPT_FILE}"
         return 0
     fi
     if [[ ! -s "${OTEL_LOG}" ]]; then
         echo "Warning: No OTEL data collected, skipping session metrics"
+        rm -f "${SESSION_PROMPT_FILE}"
         return 0
     fi
-    local metrics_tmp dest usage
+    local metrics_tmp dest metadata_file session_id
     metrics_tmp=$(mktemp)
     dest="${ARTIFACT_DIR}/claude-session-metrics-${phase}-autodl.json"
     local extract_rc=0
-    python3 "${EXTRACT_METRICS}" "${OTEL_LOG}" "${metrics_tmp}" 2>&1 || extract_rc=$?
+    python3 "${EXTRACT_METRICS}" "${OTEL_LOG}" "${metrics_tmp}" \
+        --prompt-file "${SESSION_PROMPT_FILE}" 2>&1 || extract_rc=$?
     if [[ ! -s "${metrics_tmp}" ]]; then
         echo "Warning: Failed to extract session metrics"
-        rm -f "${metrics_tmp}"
+        rm -f "${metrics_tmp}" "${SESSION_PROMPT_FILE}"
         return 0
     fi
-    if ! usage=$(codex_otel_usage "${OTEL_LOG}"); then
-        echo "Warning: Failed to read Codex usage, keeping extracted session metrics"
-        usage=""
+    if [[ "${extract_rc}" -ne 0 ]]; then
+        echo "Warning: session metrics extractor returned ${extract_rc}; validating emitted row"
     fi
-    if [[ -n "${usage}" ]] && jq -e '(.models // {}) | length > 0' <<<"${usage}" >/dev/null 2>&1; then
-        local patched
-        patched=$(mktemp)
-        if jq --argjson usage "${usage}" '
-          .rows[0] as $r
-          | ($usage.models | to_entries | max_by(.value.input + .value.cache_read + .value.cache_create)) as $top
-          | ($top.key) as $model
-          | ($usage.models[$model]) as $tokens
-          | .rows[0] = ($r + {
-              model: (if ($r.model | length) > 0 then $r.model else $model end),
-              session_id: (if ($r.session_id | length) > 0 then $r.session_id else $usage.session_id end),
-              claude_code_version: (if ($r.claude_code_version | length) > 0 then $r.claude_code_version else $usage.version end),
-              num_turns: (if ($r.num_turns | tonumber) > 0 then $r.num_turns else ($tokens.turns | tostring) end),
-              input_tokens: (if ($r.input_tokens | tonumber) > 0 then $r.input_tokens else ($tokens.input | tostring) end),
-              output_tokens: (if ($r.output_tokens | tonumber) > 0 then $r.output_tokens else ($tokens.output | tostring) end),
-              cache_read_input_tokens: (if ($r.cache_read_input_tokens | tonumber) > 0 then $r.cache_read_input_tokens else ($tokens.cache_read | tostring) end),
-              cache_creation_input_tokens: (if ($r.cache_creation_input_tokens | tonumber) > 0 then $r.cache_creation_input_tokens else ($tokens.cache_create | tostring) end),
-              total_cost_usd: (if $usage.cost_from_metric then (([$usage.models[] | .cost // 0] | add // 0) | tostring) else $r.total_cost_usd end)
-            })
-        ' "${metrics_tmp}" > "${patched}"; then
-            mv "${patched}" "${metrics_tmp}"
+    # Carry the real session identity into the domain row used by dashboards.
+    # An atomic rewrite avoids leaving malformed metadata if jq fails.
+    metadata_file="${SHARED_DIR}/metrics-metadata-${phase}.json"
+    if ! session_id=$(jq -er '
+        select(type == "object")
+        | select(.table_name == "claude_session_metrics")
+        | select((.schema | type) == "object" and .schema.session_id == "string")
+        | select((.rows | type) == "array" and (.rows | length) == 1)
+        | .rows[0]
+        | select(type == "object")
+        | select([.[] | type] | all(. == "string"))
+        | .session_id
+        | select(type == "string" and length > 0)
+    ' "${metrics_tmp}" 2>/dev/null); then
+        echo "Warning: Extracted session metrics are invalid, skipping publication"
+        rm -f "${metrics_tmp}" "${SESSION_PROMPT_FILE}"
+        return 0
+    fi
+    if [[ -n "${session_id}" && -f "${metadata_file}" ]]; then
+        local metadata_tmp
+        if ! metadata_tmp=$(mktemp "${metadata_file}.tmp.XXXXXX"); then
+            echo "Warning: Failed to create temporary metadata file next to ${metadata_file##*/}"
+        elif jq --arg session_id "${session_id}" '.session_id = $session_id' \
+            "${metadata_file}" > "${metadata_tmp}" \
+            && mv "${metadata_tmp}" "${metadata_file}"; then
+            :
         else
-            echo "Warning: Failed to apply Codex usage to session metrics"
-            rm -f "${patched}"
+            rm -f "${metadata_tmp}"
+            echo "Warning: Failed to propagate session identity to ${metadata_file##*/}"
         fi
     fi
-    if [[ "${extract_rc}" -ne 0 ]] && ! jq -e '(.rows[0].input_tokens | tonumber) > 0 or (.rows[0].output_tokens | tonumber) > 0' "${metrics_tmp}" >/dev/null 2>&1; then
-        echo "Warning: Failed to extract session metrics"
-        rm -f "${metrics_tmp}"
-        return 0
-    fi
     cp "${metrics_tmp}" "${dest}"
-    rm -f "${metrics_tmp}"
+    rm -f "${metrics_tmp}" "${SESSION_PROMPT_FILE}"
     echo "Session metrics autodl written to ${dest}"
 }
 HEREDOC_EOF

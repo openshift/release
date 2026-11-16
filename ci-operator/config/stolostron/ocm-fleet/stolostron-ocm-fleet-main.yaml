@@ -27,15 +27,18 @@ images:
         as:
         - ${WEB_IMAGE}
     to: ocm-fleet
+  run_if_changed: (^|/)(Dockerfile[^/]*|Containerfile[^/]*|\.dockerignore|\.containerignore|\.npmrc|go\.(mod|sum)|package(-lock)?\.json|nx\.json|project\.json|tsconfig[^/]*\.json|[^/]*\.config\.[cm]?[jt]s)$|^(\.github/(actions|workflows)/|deploy/aio/|sdk/(build-utils|node-plugin)/|tools/)|_(amd64|arm64)(_test)?\.(go|s|S)$
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: pr-image-mirror-server
+- always_run: false
+  as: pr-image-mirror-server
   capabilities:
   - arm64
+  optional: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: ocm-fleet-server
@@ -43,9 +46,11 @@ tests:
       IMAGE_REPO: ocm-fleet-server
       REGISTRY_ORG: stolostron
     workflow: ocm-fleet-ci-image-mirror
-- as: pr-image-mirror-local
+- always_run: false
+  as: pr-image-mirror-local
   capabilities:
   - arm64
+  optional: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: ocm-fleet-server-local
@@ -53,9 +58,11 @@ tests:
       IMAGE_REPO: ocm-fleet-server-local
       REGISTRY_ORG: stolostron
     workflow: ocm-fleet-ci-image-mirror
-- as: pr-image-mirror-web
+- always_run: false
+  as: pr-image-mirror-web
   capabilities:
   - arm64
+  optional: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: ocm-fleet-web
@@ -63,9 +70,11 @@ tests:
       IMAGE_REPO: ocm-fleet-web
       REGISTRY_ORG: stolostron
     workflow: ocm-fleet-ci-image-mirror
-- as: pr-image-mirror-aio
+- always_run: false
+  as: pr-image-mirror-aio
   capabilities:
   - arm64
+  optional: true
   steps:
     dependencies:
       SOURCE_IMAGE_REF: ocm-fleet

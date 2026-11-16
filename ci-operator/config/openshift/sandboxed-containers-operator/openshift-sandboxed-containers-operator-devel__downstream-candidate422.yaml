@@ -1,8 +1,4 @@
 base_images:
-  tests-private:
-    name: tests-private
-    namespace: ci
-    tag: "4.22"
   tls-scanner-tool:
     name: tls-scanner
     namespace: tls-scanner
@@ -55,7 +51,6 @@ tests:
       INITDATA: ""
       INSTALL_KATA_RPM: "true"
       KATA_RPM_VERSION: 4.2.0-2.rhaos4.22.el9
-      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       OSC_INSTALL: "true"
       RUNTIMECLASS: kata
@@ -93,7 +88,6 @@ tests:
       INITDATA: ""
       INSTALL_KATA_RPM: "true"
       KATA_RPM_VERSION: 4.2.0-2.rhaos4.22.el9
-      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       OSC_INSTALL: "true"
       RUNTIMECLASS: kata-remote
@@ -130,7 +124,6 @@ tests:
       ENABLEPEERPODS: "true"
       INSTALL_KATA_RPM: "true"
       KATA_RPM_VERSION: 4.2.0-2.rhaos4.22.el9
-      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       OSC_INSTALL: "true"
       RUNTIMECLASS: kata-remote
@@ -163,9 +156,8 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       ENABLE_MUST_GATHER: "true"
       EXTRA_IMAGES_TO_MIRROR: ghcr.io/nginxinc/nginx-unprivileged:alpine,registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest,quay.io/prometheus/busybox:latest
-      INSTALL_KATA_RPM: "false"
-      KATA_RPM_VERSION: ""
-      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
+      INSTALL_KATA_RPM: "true"
+      KATA_RPM_VERSION: 4.2.0-2.rhaos4.22.el9
       MUST_GATHER_ON_FAILURE_ONLY: "true"
       OPENSHIFT_INSTALL_PRESERVE_BOOTSTRAP: "true"
       OSC_INSTALL: "true"
@@ -177,82 +169,6 @@ tests:
       TESTS_SANITY_ENABLE: "false"
       WORKLOAD_TO_TEST: kata
     workflow: sandboxed-containers-operator-e2e-azure-isolation-restricted-proxy-mirror
-  timeout: 24h0m0s
-- as: aro-ipi-peerpods
-  capabilities:
-  - intranet
-  cron: 0 0 31 2 1
-  reporter_config:
-    channel: '#kata-ocp-ci-reports'
-    job_states_to_report:
-    - success
-    - failure
-    - error
-    report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
-      {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
-      <{{.Status.URL}}|View logs>'
-  restrict_network_access: false
-  steps:
-    cluster_profile: azure-qe
-    env:
-      ARO_CLUSTER_VERSION: "4.17"
-      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
-      CATALOG_SOURCE_NAME: brew-catalog
-      ENABLE_MUST_GATHER: "true"
-      ENABLEPEERPODS: "true"
-      HYPERSHIFT_AZURE_LOCATION: eastus
-      INITDATA: ""
-      INSTALL_KATA_RPM: "true"
-      KATA_RPM_VERSION: 4.2.0-2.rhaos4.22.el9
-      LOCATION: eastus
-      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
-      MUST_GATHER_ON_FAILURE_ONLY: "false"
-      OSC_INSTALL: "true"
-      RUNTIMECLASS: kata-remote
-      SLEEP_DURATION: 0h
-      TEST_RELEASE_TYPE: Pre-GA
-      TESTS_OSC_ENABLE: "true"
-      TRUSTEE_URL: ""
-      WORKLOAD_TO_TEST: peer-pods
-    workflow: sandboxed-containers-operator-e2e-aro
-  timeout: 24h0m0s
-- as: aro-ipi-coco
-  capabilities:
-  - intranet
-  cron: 0 0 31 2 1
-  reporter_config:
-    channel: '#kata-ocp-ci-reports'
-    job_states_to_report:
-    - success
-    - failure
-    - error
-    report_template: '{{if eq .Status.State "success"}}SUCCESS{{else}}ERROR{{end}}
-      {{trimPrefix "periodic-ci-openshift-sandboxed-containers-operator-" .Spec.Job}}
-      <{{.Status.URL}}|View logs>'
-  restrict_network_access: false
-  steps:
-    cluster_profile: azure-qe
-    env:
-      ARO_CLUSTER_VERSION: "4.17"
-      CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
-      CATALOG_SOURCE_NAME: brew-catalog
-      ENABLE_MUST_GATHER: "true"
-      ENABLEPEERPODS: "true"
-      HYPERSHIFT_AZURE_LOCATION: eastus
-      INSTALL_KATA_RPM: "true"
-      KATA_RPM_VERSION: 4.2.0-2.rhaos4.22.el9
-      LOCATION: eastus
-      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
-      MUST_GATHER_ON_FAILURE_ONLY: "false"
-      OSC_INSTALL: "true"
-      RUNTIMECLASS: kata-remote
-      SLEEP_DURATION: 0h
-      TEST_RELEASE_TYPE: Pre-GA
-      TESTS_SANITY_IMAGE: ghcr.io/confidential-containers/test-container-image-rs:cosign-signed
-      TRUSTEE_CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/trustee-test-fbc:latest
-      TRUSTEE_INSTALL: "true"
-      WORKLOAD_TO_TEST: coco
-    workflow: sandboxed-containers-operator-e2e-aro
   timeout: 24h0m0s
 - as: aws-ipi-peerpods
   capabilities:
@@ -279,7 +195,6 @@ tests:
       INITDATA: ""
       INSTALL_KATA_RPM: "true"
       KATA_RPM_VERSION: 4.2.0-2.rhaos4.22.el9
-      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       OSC_INSTALL: "true"
       RUNTIMECLASS: kata-remote
@@ -317,7 +232,6 @@ tests:
       INITDATA: ""
       INSTALL_KATA_RPM: "false"
       KATA_RPM_VERSION: 4.2.0-2.rhaos4.22.el9
-      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "true"
       OSC_INSTALL: "true"
       RUNTIMECLASS: kata-remote
@@ -353,7 +267,6 @@ tests:
       INITDATA: ""
       INSTALL_KATA_RPM: "false"
       KATA_RPM_VERSION: 4.2.0-2.rhaos4.22.el9
-      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "true"
       OSC_INSTALL: "true"
       RUNTIMECLASS: kata-remote
@@ -388,7 +301,6 @@ tests:
       INITDATA: ""
       INSTALL_KATA_RPM: "true"
       KATA_RPM_VERSION: 4.2.0-2.rhaos4.22.el9
-      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       OSC_INSTALL: "true"
       PQC_CHECK: "false"
@@ -402,54 +314,9 @@ tests:
       TRUSTEE_URL: ""
       WORKLOAD_TO_TEST: peer-pods
     test:
-    - as: create-peer-pod
-      cli: latest
-      commands: |
-        cat <<'EOF' | oc apply -f -
-        apiVersion: v1
-        kind: Pod
-        metadata:
-          name: tls-scan-peerpod
-          namespace: openshift-sandboxed-containers-operator
-        spec:
-          runtimeClassName: kata-remote
-          automountServiceAccountToken: false
-          containers:
-            - name: pause
-              image: registry.access.redhat.com/ubi9/ubi-minimal:latest
-              command: ["sleep", "infinity"]
-              resources:
-                requests:
-                  cpu: 10m
-                  memory: 32Mi
-                limits:
-                  cpu: 100m
-                  memory: 64Mi
-              securityContext:
-                runAsNonRoot: true
-                runAsUser: 1000
-                readOnlyRootFilesystem: true
-                allowPrivilegeEscalation: false
-                capabilities:
-                  drop:
-                    - ALL
-        EOF
-        oc wait pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --for=condition=Ready --timeout=10m
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: sandboxed-containers-operator-peerpods-create
     - ref: tls-scanner-run
-    - as: delete-peer-pod
-      cli: latest
-      commands: |
-        oc delete pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --ignore-not-found --timeout=5m
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: sandboxed-containers-operator-peerpods-delete
     workflow: sandboxed-containers-operator-e2e-azure
   timeout: 24h0m0s
 - as: tls-scanner-pqc
@@ -477,7 +344,6 @@ tests:
       INITDATA: ""
       INSTALL_KATA_RPM: "true"
       KATA_RPM_VERSION: 4.2.0-2.rhaos4.22.el9
-      MUST_GATHER_IMAGE: registry.redhat.io/openshift-sandboxed-containers/osc-must-gather-rhel9:latest
       MUST_GATHER_ON_FAILURE_ONLY: "false"
       OSC_INSTALL: "true"
       PQC_CHECK: "true"
@@ -513,54 +379,9 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - as: create-peer-pod
-      cli: latest
-      commands: |
-        cat <<'EOF' | oc apply -f -
-        apiVersion: v1
-        kind: Pod
-        metadata:
-          name: tls-scan-peerpod
-          namespace: openshift-sandboxed-containers-operator
-        spec:
-          runtimeClassName: kata-remote
-          automountServiceAccountToken: false
-          containers:
-            - name: pause
-              image: registry.access.redhat.com/ubi9/ubi-minimal:latest
-              command: ["sleep", "infinity"]
-              resources:
-                requests:
-                  cpu: 10m
-                  memory: 32Mi
-                limits:
-                  cpu: 100m
-                  memory: 64Mi
-              securityContext:
-                runAsNonRoot: true
-                runAsUser: 1000
-                readOnlyRootFilesystem: true
-                allowPrivilegeEscalation: false
-                capabilities:
-                  drop:
-                    - ALL
-        EOF
-        oc wait pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --for=condition=Ready --timeout=10m
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: sandboxed-containers-operator-peerpods-create
     - ref: tls-scanner-run
-    - as: delete-peer-pod
-      cli: latest
-      commands: |
-        oc delete pod/tls-scan-peerpod -n openshift-sandboxed-containers-operator --ignore-not-found --timeout=5m
-      from: cli
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+    - ref: sandboxed-containers-operator-peerpods-delete
     workflow: sandboxed-containers-operator-e2e-azure
   timeout: 24h0m0s
 zz_generated_metadata:

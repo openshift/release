@@ -148,7 +148,8 @@ def _controller_rbac(gendoc):
             _namespaced_jobs_rbac_resources(gendoc, namespace)
 
     # OKD Resources
-    _namespaced_releasepayloads_rbac_resources(gendoc, 'origin')
+    for arch in config.okd.arches:
+        _namespaced_releasepayloads_rbac_resources(gendoc, f'{config.okd.namespace_prefix}{config.get_arch_suffix(arch)}')
 
     # HyperShift Resources
     _namespaced_releasepayloads_rbac_resources(gendoc, 'hypershift')

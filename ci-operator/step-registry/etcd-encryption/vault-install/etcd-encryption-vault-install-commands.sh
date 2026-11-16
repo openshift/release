@@ -457,6 +457,173 @@ pick_vault_node() {
   echo "${node}"
 }
 
+# Number of replicas for the primary Vault instance. HA is opt-in via
+# VAULT_HA_REPLICAS: upgrade jobs set 3 so the Service backing the apiserver
+# etcd encryption survives the loss of any single node (node reboots during
+# the upgrade otherwise take the KMS backend down). The default is a single
+# replica. The secondary instance only serves rotation tests and stays
+# single-replica. Bare metal has no per-ordinal local PV provisioning for a
+# raft cluster and stays single-replica regardless.
+resolve_vault_ha_replicas() {
+  local release_name="$1"
+  if [[ "${release_name}" != "vault" ]]; then
+    echo 1
+    return
+  fi
+  if [[ "${CLUSTER_TYPE:-}" == "equinix-ocp-metal" ]]; then
+    echo 1
+    return
+  fi
+  if [[ -n "${VAULT_HA_REPLICAS:-}" ]]; then
+    echo "${VAULT_HA_REPLICAS}"
+    return
+  fi
+  echo 1
+}
+
+# kube-apiserver runs host-network and cannot resolve Service names; standby
+# nodes redirect clients to the active node's api_addr, so HA mode must
+# advertise the Service ClusterIP to keep redirects routable from the plugin.
+vault_service_cluster_ip_address() {
+  local namespace="$1"
+  local service_name="$2"
+  local cluster_ip port
+
+  cluster_ip="$(oc get svc "${service_name}" -n "${namespace}" -o jsonpath='{.spec.clusterIP}')"
+  if [[ -z "${cluster_ip}" || "${cluster_ip}" == "None" ]]; then
+    echo "Error: Service ${service_name} in ${namespace} has no ClusterIP" >&2
+    return 1
+  fi
+  port="$(oc get svc "${service_name}" -n "${namespace}" -o jsonpath='{.spec.ports[?(@.name=="https")].port}')"
+  if [[ -z "${port}" ]]; then
+    echo "Error: Service ${service_name} in ${namespace} has no port named https" >&2
+    return 1
+  fi
+  # Bracket IPv6 so https://fd02::1:8200 becomes https://[fd02::1]:8200 (valid URL).
+  if [[ "${cluster_ip}" == *:* ]]; then
+    cluster_ip="[${cluster_ip}]"
+  fi
+  echo "https://${cluster_ip}:${port}"
+}
+
+# Join via the HTTP API: the CLI has -leader-ca-cert but no
+# -leader-tls-servername, and the joining Vault server verifies the leader
+# TLS independently of VAULT_SKIP_VERIFY on the local CLI. The serving cert is
+# issued for the client Service DNS name, while the join URL uses the pod's
+# headless DNS name, so both the service-CA bundle and an explicit server name
+# are required.
+vault_raft_join() {
+  local namespace="$1"
+  local pod_name="$2"
+  local leader_addr="$3"
+  local leader_ca_cert="$4"
+  local leader_tls_servername="$5"
+  local out rc=0
+
+  out="$(
+    oc exec -i -c vault "${pod_name}" -n "${namespace}" -- \
+      env VAULT_ADDR=https://127.0.0.1:8200 VAULT_SKIP_VERIFY=true \
+      vault write sys/storage/raft/join \
+        leader_api_addr="${leader_addr}" \
+        leader_ca_cert=- \
+        leader_tls_servername="${leader_tls_servername}" \
+      <<< "${leader_ca_cert}" 2>&1
+  )" || rc=$?
+
+  if [[ "${rc}" -ne 0 ]]; then
+    VAULT_RAFT_JOIN_LAST_ERROR="${out}"
+    return "${rc}"
+  fi
+  return 0
+}
+
+wait_for_vault_raft_join() {
+  local namespace="$1"
+  local pod_name="$2"
+  local leader_addr="$3"
+  local leader_ca_cert="$4"
+  local leader_tls_servername="$5"
+
+  VAULT_RAFT_JOIN_LAST_ERROR=""
+  if ! wait_until "raft join of ${pod_name} to ${leader_addr}" 30 10 \
+    vault_raft_join "${namespace}" "${pod_name}" "${leader_addr}" \
+      "${leader_ca_cert}" "${leader_tls_servername}"; then
+    echo "Last raft join error on ${pod_name}: ${VAULT_RAFT_JOIN_LAST_ERROR:-unknown}" >&2
+    return 1
+  fi
+}
+
+vault_raft_has_peer() {
+  local namespace="$1"
+  local pod_name="$2"
+  local node_id="$3"
+
+  vault_exec "${namespace}" "${pod_name}" vault operator raft list-peers -format=json 2>/dev/null \
+    | jq -e --arg node "${node_id}" '.data.config.servers[] | select(.node_id == $node)' >/dev/null
+}
+
+vault_raft_peer_count() {
+  local namespace="$1"
+  local pod_name="$2"
+
+  vault_exec "${namespace}" "${pod_name}" vault operator raft list-peers -format=json 2>/dev/null | jq '.data.config.servers | length'
+}
+
+wait_for_vault_raft_peers() {
+  local namespace="$1"
+  local pod_name="$2"
+  local expected="$3"
+
+  raft_peer_count_ok() {
+    [[ "$(vault_raft_peer_count "${namespace}" "${pod_name}")" == "${expected}" ]]
+  }
+  wait_until "${expected} raft peers visible on ${pod_name}" 60 10 raft_peer_count_ok
+}
+
+# Wait for data volume and Running phase of every HA replica.
+wait_for_vault_ha_pods() {
+  local namespace="$1"
+  local release_name="$2"
+  local replicas="$3"
+  local storage_class="$4"
+  local ordinal
+
+  for ordinal in $(seq 0 $((replicas - 1))); do
+    wait_for_vault_data_volume "${namespace}" "${release_name}-${ordinal}" "${storage_class}" || return 1
+  done
+}
+
+# Join replicas 1..N-1 to the raft cluster initialized on ${release_name}-0.
+# Joining is idempotent: members already present in the peer list are skipped.
+join_vault_raft_members() {
+  local namespace="$1"
+  local release_name="$2"
+  local replicas="$3"
+  local leader_ca_cert="$4"
+  local ordinal leader_addr leader_tls_servername
+
+  leader_tls_servername="${release_name}.${namespace}.svc"
+
+  for ordinal in $(seq 1 $((replicas - 1))); do
+    if vault_raft_has_peer "${namespace}" "${release_name}-0" "${release_name}-${ordinal}"; then
+      echo "${release_name}-${ordinal} is already a raft peer, skipping join"
+      continue
+    fi
+    leader_addr="https://${release_name}-0.${release_name}-internal.${namespace}.svc:8200"
+    echo "Joining ${release_name}-${ordinal} to the raft cluster at ${leader_addr} (tlsServerName=${leader_tls_servername})..."
+    wait_for_vault_raft_join "${namespace}" "${release_name}-${ordinal}" "${leader_addr}" \
+      "${leader_ca_cert}" "${leader_tls_servername}"
+    # The joining node comes back sealed with the cluster's data; the
+    # auto-unseal sidecar unseals it with the shared unseal key.
+    wait_for_vault_unsealed "${namespace}" "${release_name}-${ordinal}"
+  done
+
+  wait_for_vault_raft_peers "${namespace}" "${release_name}-0" "${replicas}"
+  echo "Vault raft cluster in ${namespace}:"
+  vault_exec "${namespace}" "${release_name}-0" vault operator raft list-peers || true
+  oc get pods -n "${namespace}" -o wide || true
+}
+
 vault_scc_name() {
   # hostPath volumes on RHCOS bare metal need hostmount-anyuid so the Vault
   # pod (uid 100, fsGroup 1000) can write through a hostPath mount.
@@ -941,8 +1108,10 @@ install_vault() {
   local vault_service_fqdn="${release_name}.${namespace}.svc"
   local values_file="/tmp/vault-values-${namespace}.yaml"
   local vault_image="${VAULT_IMAGE_REPOSITORY}:${VAULT_VERSION}"
-  local vault_storage_class data_storage_block server_platform_block
+  local vault_storage_class data_storage_block server_platform_block mode_block
+  local ha_replicas
 
+  ha_replicas="$(resolve_vault_ha_replicas "${release_name}")"
   vault_storage_class="$(resolve_vault_storage_class)"
   server_platform_block="$(vault_server_platform_values_block)"
   if [[ "${CLUSTER_TYPE:-}" == "equinix-ocp-metal" ]]; then
@@ -971,6 +1140,54 @@ EOF
 )"
   fi
 
+  if [[ "${ha_replicas}" -ge 2 ]]; then
+    # HA raft mode: replicas spread across nodes (chart default anti-affinity)
+    # and the chart's default PodDisruptionBudget (maxUnavailable (n/2)-1 = 1)
+    # keep the Service serving through a single-node drain or reboot.
+    echo "Vault mode: HA raft with ${ha_replicas} replicas"
+    mode_block="$(cat <<EOF
+  ha:
+    enabled: true
+    replicas: ${ha_replicas}
+    apiAddr: ${vault_api_addr}
+    raft:
+      enabled: true
+      setNodeId: true
+      config: |
+        listener "tcp" {
+          address = "[::]:8200"
+          cluster_address = "[::]:8201"
+          tls_cert_file = "/var/run/tls/tls.crt"
+          tls_key_file = "/var/run/tls/tls.key"
+        }
+        storage "raft" {
+          path = "/vault/data"
+        }
+EOF
+)"
+  else
+    # Keep ha.apiAddr even in standalone: the Vault chart sets VAULT_API_ADDR
+    # from server.ha.apiAddr and otherwise falls back to https://$(POD_IP):8200,
+    # which is an invalid URL on IPv6 (needs brackets). Service DNS works for
+    # both stacks; metal ipv6 jobs use this path (HA is forced off on metal).
+    mode_block="$(cat <<EOF
+  standalone:
+    enabled: true
+    config: |
+      listener "tcp" {
+        address = "[::]:8200"
+        tls_cert_file = "/var/run/tls/tls.crt"
+        tls_key_file = "/var/run/tls/tls.key"
+      }
+      storage "file" {
+        path = "/vault/data"
+      }
+  ha:
+    apiAddr: ${vault_api_addr}
+EOF
+)"
+  fi
+
   cat > "${values_file}" <<EOF
 global:
   enabled: true
@@ -983,20 +1200,8 @@ server:
     repository: ${VAULT_IMAGE_REPOSITORY}
     tag: "${VAULT_VERSION}"
 ${server_platform_block}
-  standalone:
-    enabled: true
-    config: |
-      listener "tcp" {
-        address = "[::]:8200"
-        tls_cert_file = "/var/run/tls/tls.crt"
-        tls_key_file = "/var/run/tls/tls.key"
-      }
-      storage "file" {
-        path = "/vault/data"
-      }
+${mode_block}
 ${data_storage_block}
-  ha:
-    apiAddr: "${vault_api_addr}"
   extraEnvironmentVars:
     VAULT_DISABLE_USER_LOCKOUT: "true"
   extraSecretEnvironmentVars:
@@ -1101,17 +1306,8 @@ EOF
     exit 1
   fi
 
-  # Helm references the serving cert before the service is annotated. Mark the volume
-  # optional so the StatefulSet pod is created and can act as the WaitForFirstConsumer
-  # for cloud PVCs, then restart once the service-CA certificate is present.
-  restart_vault_statefulset "${namespace}" "${release_name}"
-  wait_for_vault_data_volume "${namespace}" "${pod_name}" "${vault_storage_class}" || exit 1
-
-  echo "Initializing and unsealing Vault..."
-  initialize_or_unseal_vault "${namespace}" "${pod_name}"
-  oc wait --for=condition=ready "pod/${pod_name}" -n "${namespace}" --timeout=5m
-
-  # Publish the stable service-CA bundle as the trust anchor.
+  # Read the service-CA bundle once for Raft joins and the published trust anchor.
+  local service_ca_bundle
   echo "Waiting for service-CA bundle ConfigMap..."
   service_ca_bundle_ready() {
     [[ -n "$(oc get configmap openshift-service-ca.crt -n "${namespace}" \
@@ -1119,25 +1315,60 @@ EOF
   }
   wait_until "service-ca.crt data in ${namespace}" 60 5 service_ca_bundle_ready
 
-  CA_CERT_TMP="/tmp/vault-ca-${namespace}.pem"
-  oc get configmap openshift-service-ca.crt -n "${namespace}" -o jsonpath='{.data.service-ca\.crt}' > "${CA_CERT_TMP}"
-  if [[ ! -s "${CA_CERT_TMP}" ]]; then
+  service_ca_bundle="$(oc get configmap openshift-service-ca.crt -n "${namespace}" \
+    -o jsonpath='{.data.service-ca\.crt}')"
+  if [[ -z "${service_ca_bundle}" ]]; then
     echo "Error: extracted service-CA bundle is empty"
     exit 1
   fi
   echo "  ✓ service-CA bundle extracted"
 
-  # Create or update ConfigMap with CA certificate in openshift-config
+  # Helm references the serving cert before the service is annotated. Mark the volume
+  # optional so the StatefulSet pod is created and can act as the WaitForFirstConsumer
+  # for cloud PVCs, then restart once the service-CA certificate is present.
+  if [[ "${ha_replicas}" -ge 2 ]]; then
+    # Advertise the Service ClusterIP as api_addr: standby nodes answer requests
+    # with a 307 redirect to the active node's api_addr, and the KMS plugin runs
+    # next to a host-network kube-apiserver that cannot resolve Service DNS. With
+    # the ClusterIP here, redirects route back through this Service and the
+    # plugin's client retries until it reaches the active node.
+    local cluster_ip_api_addr
+    cluster_ip_api_addr="$(vault_service_cluster_ip_address "${namespace}" "${release_name}")"
+    echo "Setting apiAddr to the Service ClusterIP (${cluster_ip_api_addr}) and rolling the StatefulSet..."
+    sed -i "s|^    apiAddr: .*|    apiAddr: ${cluster_ip_api_addr}|" "${values_file}"
+    helm upgrade --install "${release_name}" "${VAULT_CHART_ARCHIVE}" \
+      --namespace "${namespace}" \
+      --version "${VAULT_CHART_VERSION}" \
+      -f "${values_file}" \
+      --timeout 10m
+    restart_vault_statefulset "${namespace}" "${release_name}"
+
+    wait_for_vault_ha_pods "${namespace}" "${release_name}" "${ha_replicas}" "${vault_storage_class}" || exit 1
+
+    echo "Initializing and unsealing Vault..."
+    initialize_or_unseal_vault "${namespace}" "${pod_name}"
+
+    echo "Forming the raft cluster..."
+    join_vault_raft_members "${namespace}" "${release_name}" "${ha_replicas}" "${service_ca_bundle}"
+
+    oc wait --for=condition=ready "pod/${pod_name}" -n "${namespace}" --timeout=5m
+  else
+    restart_vault_statefulset "${namespace}" "${release_name}"
+    wait_for_vault_data_volume "${namespace}" "${pod_name}" "${vault_storage_class}" || exit 1
+
+    echo "Initializing and unsealing Vault..."
+    initialize_or_unseal_vault "${namespace}" "${pod_name}"
+    oc wait --for=condition=ready "pod/${pod_name}" -n "${namespace}" --timeout=5m
+  fi
+
+  # Publish the stable service-CA bundle as the trust anchor.
   echo ""
   echo "Creating ConfigMap ${ca_configmap} in openshift-config..."
   oc create configmap "${ca_configmap}" \
-    --from-file=ca-bundle.crt="${CA_CERT_TMP}" \
+    --from-literal=ca-bundle.crt="${service_ca_bundle}" \
     -n openshift-config \
     --dry-run=client -o yaml | oc apply -f -
   echo "  ✓ ConfigMap ${ca_configmap} created/updated"
-
-  # Clean up temporary CA file
-  rm -f "${CA_CERT_TMP}"
 
   echo ""
   echo "========================================="
@@ -1148,11 +1379,16 @@ EOF
   echo "  - Namespace: ${namespace}"
   echo "  - Image: ${VAULT_ENTERPRISE_IMAGE}"
   echo "  - Service: https://${release_name}.${namespace}.svc:8200"
-  echo "  - Pod: ${pod_name} (Ready)"
+  if [[ "${ha_replicas}" -ge 2 ]]; then
+    echo "  - Pods: ${release_name}-0..$((ha_replicas - 1)) (raft HA, Ready)"
+    echo "  - Storage: raft backend on pvc/data-${release_name}-0..$((ha_replicas - 1)) (transit keys persist across restarts)"
+  else
+    echo "  - Pod: ${pod_name} (Ready)"
+    echo "  - Storage: file backend on pvc/data-${pod_name} (transit keys persist across restarts)"
+  fi
   echo "  - TLS: Enabled (OpenShift service-CA serving certificate)"
   echo "  - TLS cert: /var/run/tls/tls.crt (inside pod)"
   echo "  - TLS SAN: ${vault_service_fqdn}"
-  echo "  - Storage: file backend on pvc/data-${pod_name} (transit keys persist across restarts)"
   echo "  - Auto-unseal sidecar using vault-unseal-key secret"
   echo "  - Enterprise License: Configured"
   echo "  - CA ConfigMap: ${ca_configmap} (openshift-config namespace)"

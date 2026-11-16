@@ -138,6 +138,18 @@ scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   -i "${PROJECT_DIR}/temp_ssh_key" \
   "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests/report/*.xml" \
   "${ARTIFACT_DIR}/junit_eco_gotests/" || true
+# Package non-XML reports, including console.log and k8sreporter files, on the bastion.
+ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+  "${BASTION_USER}@${BASTION_IP}" -i "${PROJECT_DIR}/temp_ssh_key" \
+  "rm -f /tmp/k8sreporter_ibu_seed.zip && cd /tmp/eco_gotests/report && \
+   find . -mindepth 1 ! -name '*.xml' -type f \
+   | zip /tmp/k8sreporter_ibu_seed.zip -@ 2>/dev/null || true" \
+  2>/dev/null || echo "Unable to package IBU seed k8sreporter artifacts — skipping"
+scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+  -i "${PROJECT_DIR}/temp_ssh_key" \
+  "${BASTION_USER}@${BASTION_IP}:/tmp/k8sreporter_ibu_seed.zip" \
+  "${ARTIFACT_DIR}/junit_eco_gotests/" \
+  2>/dev/null || echo "No k8sreporter artifacts in eco_gotests seed — skipping"
 rm -f "${PROJECT_DIR}/temp_ssh_key"
 
 # ibu-report sends polarion_* files to Report Portal (POLARION_REPORT_PATH)

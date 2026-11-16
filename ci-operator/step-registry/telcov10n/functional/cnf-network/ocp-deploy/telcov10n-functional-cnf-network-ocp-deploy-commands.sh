@@ -57,9 +57,16 @@ done
 echo "Create host_vars directory"
 mkdir /eco-ci-cd/inventories/ocp-deployment/host_vars
 
+HYPERVISOR_SOURCE_CLUSTER=""
 if [[ "$CLUSTER_NAME" == "hlxcl3" || "$CLUSTER_NAME" == "hlxcl7" ]]; then
+  HYPERVISOR_SOURCE_CLUSTER="hlxcl2"
+elif [[ "$CLUSTER_NAME" == "kni-qe-98" ]]; then
+  HYPERVISOR_SOURCE_CLUSTER="kni-qe-92"
+fi
+
+if [[ -n "$HYPERVISOR_SOURCE_CLUSTER" ]]; then
   mkdir /tmp/"${CLUSTER_NAME}"
-  cp -r "${MOUNTED_HOST_INVENTORY}"/hlxcl2/hypervisor /tmp/"${CLUSTER_NAME}"/hypervisor
+  cp -r "${MOUNTED_HOST_INVENTORY}/${HYPERVISOR_SOURCE_CLUSTER}"/hypervisor /tmp/"${CLUSTER_NAME}"/hypervisor
   cp -r "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/"* /tmp/"${CLUSTER_NAME}"/
   ls -l /tmp/"${CLUSTER_NAME}"/
   MOUNTED_HOST_INVENTORY="/tmp"

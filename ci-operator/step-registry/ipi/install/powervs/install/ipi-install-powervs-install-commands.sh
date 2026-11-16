@@ -220,8 +220,36 @@ EOF
 
   cp "${dir}/bootstrap.ign" "${config_dir}/bootstrap_initial.ign"
   # We're using ancient fcct as glibc in installer container is 1.28
-  curl -sL https://github.com/coreos/butane/releases/download/v0.7.0/fcct-x86_64-unknown-linux-gnu >/tmp/fcct && chmod ug+x /tmp/fcct
-  /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
+  local -r fcct_url="https://github.com/coreos/butane/releases/download/v0.7.0/fcct-x86_64-unknown-linux-gnu"
+  local -r fcct_download=/tmp/fcct.download
+  local -r max_attempts=3
+  local attempt
+  local delay
+  # Never run, or leave behind, a stale, partial, or error-page download.
+  rm -f /tmp/fcct "${fcct_download}"
+  for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+    if curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 -o "${fcct_download}" "${fcct_url}" &&
+      [[ -s "${fcct_download}" ]]; then
+      break
+    fi
+    rm -f "${fcct_download}"
+    if (( attempt == max_attempts )); then
+      echo "ERROR: failed to download fcct from ${fcct_url} after ${max_attempts} attempts; cannot inject promtail into bootstrap.ign" >&2
+      exit 1
+    fi
+    delay=$((2 ** attempt))
+    echo "WARNING: fcct download failed (attempt ${attempt}/${max_attempts}); retrying in ${delay}s" >&2
+    sleep "${delay}"
+  done
+  if ! chmod ug+x "${fcct_download}" || ! mv "${fcct_download}" /tmp/fcct; then
+    rm -f "${fcct_download}" /tmp/fcct
+    echo "ERROR: failed to install the downloaded fcct binary" >&2
+    exit 1
+  fi
+  if ! /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"; then
+    echo "ERROR: fcct failed to render bootstrap.ign with promtail" >&2
+    exit 1
+  fi
 }
 
 function install_required_tools() {

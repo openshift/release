@@ -5,6 +5,32 @@ from job_definition_paths import PLUGIN_CONFIG_DIR, cone_sparse_checkout_pattern
 GIT_SYNC_SPARSE_CHECKOUT_CONFIGMAP = 'release-controller-sparse-checkout'
 GIT_SYNC_SPARSE_CHECKOUT_ARG = '--sparse-checkout-file=/etc/git-sync/sparse-checkout'
 
+# Go runtime settings for the release-controller containers. The soft memory limit is kept
+# below the memory request so the garbage collector runs more aggressively before the pod
+# grows into its request, and GOMAXPROCS is pinned so parallelism does not depend on the
+# number of CPUs on the node.
+RC_MEMORY_REQUEST = '4Gi'
+RC_CPU_REQUEST = '300m'
+RC_GOMEMLIMIT = '3584MiB'  # 3.5GiB
+RC_GOMAXPROCS = '2'
+
+# Requests for the git-sync sidecar, sized to its observed usage (~36Mi memory, ~0.055 CPU peak).
+GIT_SYNC_MEMORY_REQUEST = '50Mi'
+GIT_SYNC_CPU_REQUEST = '50m'
+
+
+def get_rc_runtime_env_vars():
+    return [
+        {
+            'name': 'GOMEMLIMIT',
+            'value': RC_GOMEMLIMIT,
+        },
+        {
+            'name': 'GOMAXPROCS',
+            'value': RC_GOMAXPROCS,
+        },
+    ]
+
 
 class _LiteralString(str):
     pass

@@ -86,8 +86,9 @@ git clone --depth 1 --branch main https://github.com/openshift/distributed-traci
 rm -rf tests/e2e-otel
 mv /tmp/distributed-tracing-qe/tests/e2e-otel tests/
 
-# Set the OpAMP bridge server image of the tests to the image built in this CI run.
-find . -path ./.git -prune -o -type f -exec sed -i "s|ghcr.io/open-telemetry/opentelemetry-operator/e2e-test-app-bridge-server:ve2e|${OPAMP_BRIDGE_SERVER}|g" {} +
+# Set the OpAMP bridge server image of the tests to the image built in this CI run. Any tag is replaced: the tests used
+# the ve2e tag, and use main since the e2e test apps were moved to tests/test-e2e-apps.
+find . -path ./.git -prune -o -type f -exec sed -i -E "s|ghcr.io/open-telemetry/opentelemetry-operator/e2e-test-app-bridge-server:[A-Za-z0-9._-]+|${OPAMP_BRIDGE_SERVER}|g" {} +
 
 # The tests to run: exactly RUN_TESTS, or the full suite minus SKIP_TESTS.
 if [[ -n "${RUN_TESTS:-}" ]]; then
@@ -183,14 +184,17 @@ done
 # Returns once OLM rolled out the patched deployments: each must carry exactly one entry of every variable with
 # the requested value, and must be Available.
 function set_operator_env() {
-  local names='[]' entries='[]' pair csv_name patch deployment patched
+  local names='[]' entries='[]' pair csv_list csv_name patch deployment patched
   for pair in "$@"; do
     names=$(jq -c --arg n "${pair%%=*}" '. + [$n]' <<< "${names}")
     entries=$(jq -c --arg n "${pair%%=*}" --arg v "${pair#*=}" '. + [{"name": $n, "value": $v}]' <<< "${entries}")
   done
   echo "Setting the operator environment variables: $(jq -r 'map(.name) | join(" ")' <<< "${entries}")"
 
-  if ! csv_name=$(oc get csv -n "${OPERATOR_NAMESPACE}" -o name | grep -m1 "opentelemetry-operator" | cut -d/ -f2); then
+  # List the CSVs first: with pipefail, "grep -m1" closing the pipe early can fail "oc get" with SIGPIPE while the CSV exists.
+  csv_list=$(oc get csv -n "${OPERATOR_NAMESPACE}" -o name)
+  csv_name=$(grep -m1 "opentelemetry-operator" <<< "${csv_list}" | cut -d/ -f2 || true)
+  if [[ -z "${csv_name}" ]]; then
     echo "ERROR: no opentelemetry-operator CSV found in namespace ${OPERATOR_NAMESPACE}."
     exit 1
   fi

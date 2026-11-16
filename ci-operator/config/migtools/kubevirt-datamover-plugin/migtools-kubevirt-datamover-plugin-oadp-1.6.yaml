@@ -42,6 +42,9 @@ tests:
   steps:
     cluster_profile: openshift-org-aws
     env:
+      DEPENDS_ON_CANDIDATES: |-
+        migtools/kubevirt-datamover-controller RELATED_IMAGE_KUBEVIRT_DATAMOVER_CONTROLLER
+        openshift/velero RELATED_IMAGE_VELERO Dockerfile.ubi
       OADP_BRANCH: oadp-1.6
       OO_BUNDLE: quay-proxy.ci.openshift.org/openshift/ci:konveyor_oadp-operator-bundle_oadp-1.6
       OO_INSTALL_MODE: OwnNamespace
@@ -57,6 +60,7 @@ tests:
     - chain: ipi-aws-pre
     - ref: oadp-operator-sdk-bundle-image
     test:
+    - ref: oadp-depends-on-build
     - as: set-related-image
       cli: latest
       commands: |
@@ -84,15 +88,41 @@ tests:
         # freshly created Subscription in this ephemeral, single-purpose
         # namespace has no pre-existing config.env entries to lose; this
         # would need a read-modify-write if that ever stops being true.
-        PATCH=$(printf '{"spec":{"config":{"env":[{"name":"RELATED_IMAGE_KUBEVIRT_DATAMOVER_PLUGIN","value":"%s"}]}}}' "${KDM_PLUGIN_IMAGE}")
+        #
+        # This job's own dependency (KDM_PLUGIN_IMAGE, built by ci-operator
+        # natively from this PR) is always applied. Any cross-repo
+        # dependency resolved by the oadp-depends-on-build step above (per
+        # a Depends-On: line in this PR's description, e.g. naming an
+        # unmerged kubevirt-datamover-controller PR) is folded in from its
+        # manifest file, if present -- see openshift/oadp-operator#2389.
+        ALL_ENV_LINES="RELATED_IMAGE_KUBEVIRT_DATAMOVER_PLUGIN ${KDM_PLUGIN_IMAGE}"
+        if [ -s "${SHARED_DIR}/depends-on-images.txt" ]; then
+          ALL_ENV_LINES="${ALL_ENV_LINES}
+        $(cat "${SHARED_DIR}/depends-on-images.txt")"
+        fi
+        ENTRIES=()
+        while read -r ENV_NAME ENV_VALUE; do
+          [ -z "${ENV_NAME}" ] && continue
+          ENTRIES+=("{\"name\":\"${ENV_NAME}\",\"value\":\"${ENV_VALUE}\"}")
+        done <<< "${ALL_ENV_LINES}"
+        JOINED=$(IFS=,; echo "${ENTRIES[*]}")
+        PATCH=$(printf '{"spec":{"config":{"env":[%s]}}}' "${JOINED}")
         oc patch subscription "${SUB}" -n "${OO_INSTALL_NAMESPACE}" --type merge -p "${PATCH}"
-        echo "Waiting for Deployment to observe RELATED_IMAGE_KUBEVIRT_DATAMOVER_PLUGIN=${KDM_PLUGIN_IMAGE}"
+        echo "Waiting for Deployment to observe:"
+        while read -r ENV_NAME _; do
+          [ -n "${ENV_NAME}" ] && echo "  ${ENV_NAME}"
+        done <<< "${ALL_ENV_LINES}"
         for _ in $(seq 1 60); do
-          CURRENT=$(oc get deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" -o jsonpath="{.spec.template.spec.containers[?(@.name==\"manager\")].env[?(@.name==\"RELATED_IMAGE_KUBEVIRT_DATAMOVER_PLUGIN\")].value}" 2>/dev/null || true)
-          [ "${CURRENT}" = "${KDM_PLUGIN_IMAGE}" ] && break
+          ALL_OK=true
+          while read -r ENV_NAME ENV_VALUE; do
+            [ -z "${ENV_NAME}" ] && continue
+            CURRENT=$(oc get deployment/openshift-adp-controller-manager -n "${OO_INSTALL_NAMESPACE}" -o jsonpath="{.spec.template.spec.containers[?(@.name==\"manager\")].env[?(@.name==\"${ENV_NAME}\")].value}" 2>/dev/null || true)
+            [ "${CURRENT}" != "${ENV_VALUE}" ] && ALL_OK=false
+          done <<< "${ALL_ENV_LINES}"
+          [ "${ALL_OK}" = "true" ] && break
           sleep 5
         done
-        if [ "${CURRENT}" != "${KDM_PLUGIN_IMAGE}" ]; then
+        if [ "${ALL_OK}" != "true" ]; then
           echo "Timed out waiting for Deployment spec to reflect the Subscription.spec.config.env override" >&2
           oc get subscription "${SUB}" -n "${OO_INSTALL_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/subscription-${SUB}.yaml" || true
           oc get csv -n "${OO_INSTALL_NAMESPACE}" -o yaml > "${ARTIFACT_DIR}/csvs.yaml" || true

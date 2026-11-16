@@ -1,0 +1,33 @@
+ref:
+  as: telcov10n-functional-cnf-ran-arm-ibx-seedgeneration
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  timeout: 150m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: CLUSTER_NAME
+    default: kni-qe-133
+    documentation: Hub managing the ARM seed spoke before pruning.
+  - name: SEED_SPOKE_CLUSTER
+    default: helix95
+    documentation: ARM spoke used to generate the seed image.
+  - name: MIRROR_REGISTRY
+    default: disconnected.registry.local:5000
+    documentation: Disconnected registry where the seed image is pushed.
+  - name: VERSION
+    default: "4.20"
+    documentation: OCP version used to tag the seed image.
+  commands: telcov10n-functional-cnf-ran-arm-ibx-seedgeneration-commands.sh
+  documentation: |-
+    Prepare the spoke while its kubeconfig is available in ACM, then prune
+    its ArgoCD applications and detach its ManagedCluster from the hub.
+    Generate the eco-gotests script with seed image destination
+    <MIRROR_REGISTRY>/arm-ibx/seed:<VERSION>, then run ibu-run-seedgeneration.yml
+    using the kubeconfig saved by preparation and pruning. Collect JUnit reports,
+    console logs, and k8sreporter artifacts even when tests fail.
+    Does not shut down the spoke.

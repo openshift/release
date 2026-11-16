@@ -80,6 +80,9 @@ yq eval -n "
 unset _YQ_HO_REGISTRY _YQ_HO_REPOSITORY _YQ_HO_DIGEST
 unset _YQ_SHARED_INGRESS_REGISTRY _YQ_SHARED_INGRESS_REPOSITORY _YQ_SHARED_INGRESS_DIGEST
 
+CI_RP_ALLOWED_SOURCE=$(./test/aro-hcp-tests infra discover-public-ip)
+export CI_RP_ALLOWED_SOURCE
+
 # shellcheck source=hack/ci/build-config-override.sh
 source hack/ci/build-config-override.sh
 
@@ -87,13 +90,15 @@ cp "${OVERRIDE_CONFIG_FILE}" "${SHARED_DIR}/config-override-upgrade.yaml"
 export OVERRIDE_CONFIG_FILE="${SHARED_DIR}/config-override-upgrade.yaml"
 
 unset GOFLAGS
+export TEMPLATIZE_USE_PREBUILT=1
 
 # Prepare svc cluster access for the test harness (customer tests run below).
 az account set --subscription "${INFRA_SUBSCRIPTION_ID}"
 make -C dev-infrastructure/ svc.aks.kubeconfig.pipeline SVC_KUBECONFIG_FILE=../kubeconfig DEPLOY_ENV="${DEPLOY_ENV}"
 export KUBECONFIG=kubeconfig
 FRONTEND_ADDRESS="https://$(kubectl get virtualservice -n aro-hcp aro-hcp-vs-frontend -o jsonpath='{.spec.hosts[0]}')"
-make frontend-grant-ingress DEPLOY_ENV="${DEPLOY_ENV}"
+# Bootstrap ingress on the old baseline; Bicep preserves this source during the upgrade.
+make frontend-grant-ingress DEPLOY_ENV="${DEPLOY_ENV}" CI_RP_ALLOWED_SOURCE="${CI_RP_ALLOWED_SOURCE}"
 
 make -C dev-infrastructure/ mgmt.aks.kubeconfig MGMT_KUBECONFIG_FILE=../mgmt-kubeconfig DEPLOY_ENV="${DEPLOY_ENV}"
 export KUBECONFIG=mgmt-kubeconfig

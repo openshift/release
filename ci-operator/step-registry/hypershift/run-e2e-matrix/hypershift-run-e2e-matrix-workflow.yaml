@@ -1,0 +1,25 @@
+workflow:
+  as: hypershift-run-e2e-matrix
+  documentation: |-
+    Runs HyperShift release-matrix testing while preserving the normal v2
+    management cluster and PR operator setup. Currently supports release
+    selection only from the PR description and only for AWS amd64: the first
+    checked release minor supplies guest/test inputs for one context, without
+    multi-release fanout. See README.md.
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - ref: hypershift-write-test-plan
+    - ref: hypershift-resolve-pr-releases
+    - chain: hypershift-aws-create-guests
+    test:
+    - chain: hypershift-run-e2e-matrix-from-pr
+    post:
+    - chain: hypershift-aws-dump-guests
+    - chain: hypershift-aws-destroy-guests
+    - chain: hypershift-destroy-nested-management-cluster
+    env:
+      HYPERSHIFT_PLATFORM: aws
+      HYPERSHIFT_STORAGE_KMS_KEY_ALIAS: alias/hypershift-ci

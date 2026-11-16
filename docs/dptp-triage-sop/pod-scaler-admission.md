@@ -6,7 +6,7 @@
 |-------|-------|
 | **Alert** | `pod-scaler-admission-resource-warning` |
 | **Cluster** | `app.ci` (admission metrics); hub producer/UI on `core-ci` |
-| **Rules** | [`ci-alerts_prometheusrule.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — group `pod-scaler-admission-resource-warning` |
+| **Rules** | [`ci-alerts_prometheusrule.yaml`](../../clusters/core-ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — group `pod-scaler-admission-resource-warning` |
 | **Severity** | `critical` |
 
 This alert fires when **pod-scaler admission** observes a workload using roughly **10×** the **CPU or memory** declared in CI configuration—usually wrong limits, a leak, or an undersized declaration. **Do not** scale cluster capacity as the first response; notify **job/config owners**.
