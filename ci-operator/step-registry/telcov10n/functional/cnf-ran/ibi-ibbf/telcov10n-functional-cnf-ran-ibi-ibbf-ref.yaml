@@ -5,7 +5,7 @@ ref:
     name: eco-ci-cd
     tag: eco-ci-cd
   commands: telcov10n-functional-cnf-ran-ibi-ibbf-commands.sh
-  timeout: 5h
+  timeout: 6h
   grace_period: 5m
   resources:
     requests:
@@ -14,7 +14,7 @@ ref:
   env:
   - name: IBI_IBBF_ENABLED
     default: "false"
-    documentation: Enable hardware replacement tests after replacement preinstall. Completed test failures are enforced after reporting; setup and execution errors remain blocking.
+    documentation: Enable hardware replacement tests after replacement preinstall. Runner exit 1 is enforced after reporting; playbook setup, transport and collection errors remain blocking.
   - name: IBI_REPLACEMENT_PREINSTALL_ENABLED
     default: "false"
     documentation: Must be enabled so replacement hardware is preinstalled before IBBF.
@@ -47,29 +47,15 @@ ref:
     name: telcov10n-ansible-group-all
     mount_path: /var/group_variables/common/all
   documentation: |-
-    Restore target inventory and run hardware test 78333 from the original
-    eco-gotests image with gitopsztp using deploy-run-eco-gotests.yaml.
-    Discover the ready SiteConfig controller namespace and require the target
-    hub ImportAndSync strategy before allowing original-node power-off.
-    Read original BMC credentials privately and verify they authenticate both
-    the original and replacement BMC. Capture the expected target policies.
-    Require hardware replacement to execute; remediate policies only after it passes. When a replacement policy
-    path is configured, check its YAML identities at the recorded seed revision
-    before the test. After replacement, verify original fencing, switch policies
-    to that path and revision, and require Argo synchronization and propagation
-    of the new policy specifications before accepting fresh evaluations.
-    Create a new target-only TALM remediation for common-config-policy and
-    common-subscriptions-policy, followed by group and site policies when the
-    replacement policy path is enabled. Validator policies remain inform.
-    Require remediation success and all expected policies to be Compliant within
-    a shared 50-minute policy-recovery deadline, or 75 minutes when switching
-    hardware policies so synchronization does not consume TALM's budget.
-    Record this independent check in its own JUnit report; image policy spec
-    87996 is deliberately not selected
-    because some images repeat the changed Git path in that spec's BeforeEach.
-    Stream output and collect reports even on failure. Setup, execution, cleanup,
-    and report collection errors stop the workflow. Completed hardware or policy
-    assertion failures are saved in SHARED_DIR/ibi-ibbf-exit-code and deferred
-    until final verification after reporting. Missing or skipped hardware tests
-    remain blocking; a failed hardware test skips dependent policy remediation.
+    Invoke playbooks/ran/ibi-ibbf.yml to validate prerequisites before power-off,
+    run eco-gotests hardware test 78333, collect reports and clean up private files.
+    After runner exit 0, optionally activate replacement policies pinned to the
+    recorded seed Git revision and run target-only TALM remediation. Require fresh
+    policy compliance within 50 minutes, or 75 minutes when switching policies.
+    Retain hardware and policy JUnit reports and print collected execution logs.
+    Playbook setup, transport, cleanup, collection errors and missing reports
+    stop the workflow. Runner exit 1, including suite setup/teardown failures, is saved in
+    SHARED_DIR/ibi-ibbf-exit-code for final verification after reporting.
+    Share ibbf-status.json so reporting collects the policy report only when recovery ran.
+    The step timeout includes additional time for preparation and report collection.
     Leave hardware and Argo in their resulting state for investigation.

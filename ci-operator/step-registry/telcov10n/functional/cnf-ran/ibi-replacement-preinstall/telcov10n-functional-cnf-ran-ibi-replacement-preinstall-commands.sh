@@ -194,7 +194,7 @@ if addresses != {expected}:
     raise SystemExit("Replacement DNS does not resolve only to the configured address")
 '"'"' {{ replacement_ip | quote }} "$resolved"
 content=$(curl --fail --silent --show-error --max-time 30 \
-  "http://{{ ('[' ~ ansible_host ~ ']') if ':' in ansible_host else ansible_host }}:{{ share_http_iso_port }}/{{ ibi_http_subdir }}/.write-check")
+  "http://{{ ("[" ~ ansible_host ~ "]") if ":" in ansible_host else ansible_host }}:{{ share_http_iso_port }}/{{ ibi_http_subdir }}/.write-check")
 test "$content" = {{ ibi_http_subdir | quote }}
 ' 2>&1 | redact_bastion | tee "${REPORT_DIR}/preflight.log"
 }
