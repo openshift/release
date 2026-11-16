@@ -1,0 +1,223 @@
+base_images:
+  aro-hcp-e2e-tests:
+    name: aro-hcp-e2e-tests
+    namespace: aro-hcp
+    tag: latest
+  aro-hcp-e2e-tools:
+    name: aro-hcp-e2e-tools
+    namespace: aro-hcp
+    tag: latest
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+  cli:
+    name: "5.1"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator-init:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
+  manila-csi-driver-operator-test:
+    name: "5.1"
+    namespace: ocp
+    tag: manila-csi-driver-operator-test
+  openstack-cinder-csi-driver-operator-test:
+    name: "5.1"
+    namespace: ocp
+    tag: openstack-cinder-csi-driver-operator-test
+build_root:
+  from_repository: true
+  use_build_cache: true
+images:
+  items:
+  - additional_architectures:
+    - arm64
+    to: hypershift-operator
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.control-plane
+    to: hypershift
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile.e2e
+    to: hypershift-tests
+  - dockerfile_literal: |
+      FROM base
+      RUN dnf install -y python3-pip
+    from: src
+    to: custom-verify-src
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "5.1"
+  initial-420:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.20"
+  initial-421:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.21"
+  initial-422:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.22"
+  initial-50:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "5.0"
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.1"
+      namespace: ocp
+  latest-50:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "5.0"
+  latest-420:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.20"
+  latest-421:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
+  latest-422:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit:
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+    requests:
+      cpu: 4000m
+      memory: 8Gi
+  verify:
+    limits:
+      cpu: 4000m
+      memory: 8Gi
+    requests:
+      cpu: 4000m
+      memory: 8Gi
+tests:
+- as: verify
+  capabilities:
+  - arm64
+  commands: make verify-ci
+  container:
+    from: custom-verify-src
+  timeout: 1h0m0s
+- as: unit
+  capabilities:
+  - arm64
+  commands: make test
+  container:
+    from: src
+- always_run: false
+  as: e2e-v2-aws
+  capabilities:
+  - arm64
+  optional: true
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      NODEPOOL_N1_VERSION: "5.0"
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-aws-e2e-v2
+- always_run: false
+  as: e2e-v2-aws-5-0
+  capabilities:
+  - arm64
+  optional: true
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      E2E_PREVIOUS_RELEASE_IMAGE: release:initial-50
+      OCP_IMAGE_N1: release:latest-50
+      RELEASE_IMAGE_LATEST: release:latest-50
+    env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-aws-e2e-v2
+- always_run: false
+  as: e2e-v2-aws-4-22
+  capabilities:
+  - arm64
+  optional: true
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      E2E_PREVIOUS_RELEASE_IMAGE: release:initial-422
+      OCP_IMAGE_N1: release:latest-422
+      RELEASE_IMAGE_LATEST: release:latest-422
+    env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-aws-e2e-v2
+- always_run: false
+  as: e2e-v2-aws-4-21
+  capabilities:
+  - arm64
+  optional: true
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      E2E_PREVIOUS_RELEASE_IMAGE: release:initial-421
+      OCP_IMAGE_N1: release:latest-421
+      RELEASE_IMAGE_LATEST: release:latest-421
+    env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-aws-e2e-v2
+- always_run: false
+  as: e2e-v2-aws-4-20
+  capabilities:
+  - arm64
+  optional: true
+  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)
+  steps:
+    cluster_profile: hypershift-aws
+    dependencies:
+      E2E_PREVIOUS_RELEASE_IMAGE: release:initial-420
+      OCP_IMAGE_N1: release:latest-420
+      RELEASE_IMAGE_LATEST: release:latest-420
+    env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
+    workflow: hypershift-aws-e2e-v2
+zz_generated_metadata:
+  branch: omni-hypershift
+  org: openshift
+  repo: hypershift
