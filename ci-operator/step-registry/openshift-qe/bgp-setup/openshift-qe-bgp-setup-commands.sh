@@ -471,6 +471,37 @@ case "${NETWORK_WORKLOAD}" in
     setup_external_frr_udn_bgp
     finalize_bgp_setup
     write_frr_peer_address
+
+    # Debug: Print AWS network configuration details
+    if [[ "${BASTION_PLATFORM}" == "aws" ]]; then
+      echo "=== AWS Network Debug Information ==="
+      echo "Bastion Private IP: ${BASTION_PRIVATE_IP:-not set}"
+      echo "Node Subnet CIDR: ${NODE_SUBNET_CIDR:-not set}"
+      echo "FRR Peer Address: $(cat ${SHARED_DIR}/frr-peer-address)"
+
+      echo "=== Bastion Network Interfaces ==="
+      bastion_ssh "ip addr show" || true
+
+      echo "=== Bastion Routing Table ==="
+      bastion_ssh "ip route show" || true
+
+      echo "=== FRR BGP Summary ==="
+      bastion_ssh "podman exec frr vtysh -c 'show bgp summary'" || true
+
+      echo "=== FRR Received Routes ==="
+      bastion_ssh "podman exec frr vtysh -c 'show bgp ipv4'" || true
+
+      echo "=== FRR Running Config ==="
+      bastion_ssh "podman exec frr vtysh -c 'show running-config'" || true
+
+      echo "=== Cluster FRR Configuration ==="
+      oc get frrconfigurations -n openshift-frr-k8s -o yaml || true
+
+      echo "=== Test connectivity from bastion to first worker node ==="
+      FIRST_WORKER=$(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+      echo "First worker IP: ${FIRST_WORKER}"
+      bastion_ssh "ping -c 3 ${FIRST_WORKER}" || echo "WARNING: Cannot ping worker from bastion"
+    fi
     ;;
   *)
     echo "ERROR: Unsupported NETWORK_WORKLOAD '${NETWORK_WORKLOAD}'" >&2

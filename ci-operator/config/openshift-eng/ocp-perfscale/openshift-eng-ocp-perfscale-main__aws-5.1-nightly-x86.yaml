@@ -797,7 +797,7 @@ tests:
     test:
     - ref: openshift-qe-cudn-density
   timeout: 16h0m0s
-- as: evpn
+- as: network-workloads
   cron: 0 4 * * 2,4
   reporter_config:
     channel: '#ocp-qe-scale-ci-results'
@@ -813,11 +813,13 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: m6a.4xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
       EXTERNAL_WEBSERVER_IP: 172.27.187.82
-      ITERATIONS: "72"
+      ITERATIONS: "5"
+      KUBE_BURNER_VERSION: 1.13.1
+      LOG_LEVEL: debug
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
     post:
     - ref: openshift-qe-installer-aws-deprovision-bastion
@@ -828,9 +830,12 @@ tests:
     - chain: create-infra-move-ingress-monitoring-registry
     - ref: openshift-qe-installer-aws-provision-bastion
     test:
+    - ref: openshift-qe-bgp-setup-udn-bgp
+    - ref: openshift-qe-udn-bgp
+    - ref: openshift-qe-bgp-setup-evpn
     - ref: openshift-qe-evpn
     workflow: openshift-qe-installer-aws
-  timeout: 6h0m0s
+  timeout: 14h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
