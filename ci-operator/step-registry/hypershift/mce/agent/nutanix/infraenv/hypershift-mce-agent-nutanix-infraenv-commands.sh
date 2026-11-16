@@ -115,6 +115,43 @@ EOF
   oc create -f "${temp_dir}/nmstateconfig.yaml"
 done
 
+nmstateconfigs=$(oc get nmstateconfigs -n "${AGENT_NAMESPACE}" \
+  -l "${NETWORK_CONFIG_LABEL_KEY}=${INFRAENV_NAME}" -o json)
+if ! jq -e --slurpfile reserved "$worker_macs_file" \
+  --arg cluster "$CLUSTER_NAME" --arg infraenv "$INFRAENV_NAME" \
+  --arg namespace "$AGENT_NAMESPACE" --arg run_label "$RUN_LABEL_KEY" \
+  --arg network_label "$NETWORK_CONFIG_LABEL_KEY" --argjson count "$NUTANIX_WORKERS" '
+  $reserved[0] as $workers | .items as $configs |
+  ($workers | length) == $count and ($configs | length) == $count and
+  all($workers | to_entries[]; . as $worker |
+    [$configs[] | select(.metadata.name == ($infraenv + "-worker-" + ($worker.key | tostring)))] as $matches |
+    ($matches | length) == 1 and
+    ($matches[0] |
+      .metadata.namespace == $namespace and
+      .metadata.labels[$run_label] == $cluster and
+      .metadata.labels[$network_label] == $infraenv and
+      (.spec.interfaces | length) == 1 and
+      .spec.interfaces[0].name == "eth0" and
+      .spec.interfaces[0].macAddress == $worker.value.mac and
+      (.spec.config.interfaces | length) == 1 and
+      .spec.config.interfaces[0].name == "eth0" and
+      .spec.config.interfaces[0].type == "ethernet" and
+      .spec.config.interfaces[0].state == "up" and
+      .spec.config.interfaces[0]["mac-address"] == $worker.value.mac and
+      .spec.config.interfaces[0].ipv4.enabled == true and
+      .spec.config.interfaces[0].ipv4.dhcp == true and
+      .spec.config.interfaces[0].ipv4["auto-dns"] != false and
+      ((.spec.config.interfaces[0].ipv4.address // []) | length) == 0 and
+      .spec.config.interfaces[0].ipv6.enabled == false and
+      .spec.config["dns-resolver"] == null))
+' <<<"$nmstateconfigs" >/dev/null; then
+  echo "The selected NMStateConfigs do not match the reserved worker MACs and DHCP network configuration."
+  exit 1
+fi
+mkdir -p "$ARTIFACT_DIR"
+printf 'Verified %s run-owned NMStateConfigs with reserved MACs, IPv4 DHCP for address and DNS, no static resolver, and IPv6 disabled.\n' \
+  "$NUTANIX_WORKERS" > "$ARTIFACT_DIR/nutanix-nmstateconfig-summary.txt"
+
 cat > "${temp_dir}/nodepool-selector.yaml" <<EOF
 spec:
   replicas: 0
@@ -152,6 +189,22 @@ $(sed 's/^/    /' "${ssh_key_file}")
     noProxy: "${no_proxy}"
 EOF
 oc apply -f "${temp_dir}/infraenv.yaml"
+infraenv_json=$(oc get infraenv "${INFRAENV_NAME}" -n "${AGENT_NAMESPACE}" -o json)
+if ! jq -e --arg cluster "$CLUSTER_NAME" --arg infraenv "$INFRAENV_NAME" \
+  --arg pull_secret "$PULL_SECRET_NAME" --arg run_label "$RUN_LABEL_KEY" \
+  --arg network_label "$NETWORK_CONFIG_LABEL_KEY" --arg proxy "$PROXY_URL" \
+  --arg no_proxy "$no_proxy" '
+  .metadata.labels[$run_label] == $cluster and
+  .spec.cpuArchitecture == "x86_64" and
+  .spec.pullSecretRef.name == $pull_secret and
+  .spec.agentLabels[$run_label] == $cluster and
+  .spec.nmStateConfigLabelSelector.matchLabels[$network_label] == $infraenv and
+  .spec.proxy.httpProxy == $proxy and .spec.proxy.httpsProxy == $proxy and
+  .spec.proxy.noProxy == $no_proxy
+' <<<"$infraenv_json" >/dev/null; then
+  echo "The InfraEnv did not retain the expected NMStateConfig selector, architecture, and proxy settings."
+  exit 1
+fi
 oc wait --namespace "${AGENT_NAMESPACE}" --for=condition=ImageCreated "infraenv/${INFRAENV_NAME}" --timeout=30m
 
 iso_url=$(oc get infraenv "${INFRAENV_NAME}" -n "${AGENT_NAMESPACE}" -o go-template='{{with .status.isoDownloadURL}}{{.}}{{end}}')

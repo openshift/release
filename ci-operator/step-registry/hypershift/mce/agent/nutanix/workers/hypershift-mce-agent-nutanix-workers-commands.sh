@@ -214,6 +214,9 @@ fi
 
 map_file="$SHARED_DIR/nutanix_worker_vms.tsv"
 : > "$map_file"
+mkdir -p "$ARTIFACT_DIR"
+shape_file="$ARTIFACT_DIR/nutanix-worker-vm-shapes.jsonl"
+: > "$shape_file"
 while IFS=$'\t' read -r name expected_mac && IFS= read -r uuid <&3; do
   vm_json=$(curl --silent --show-error --fail --insecure --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
     "$NUTANIX_PC_URL/api/nutanix/v3/vms/$uuid")
@@ -225,6 +228,18 @@ while IFS=$'\t' read -r name expected_mac && IFS= read -r uuid <&3; do
     echo "Nutanix VM $name did not receive its reserved NIC MAC $expected_mac."
     exit 1
   fi
+  shape=$(jq -c '{sockets:.status.resources.num_sockets,
+    coresPerSocket:.status.resources.num_vcpus_per_socket,
+    memoryMiB:.status.resources.memory_size_mib,
+    diskMiB:[.status.resources.disk_list[]? |
+      select(.device_properties.device_type == "DISK") | .disk_size_mib]}' <<<"$vm_json")
+  if ! jq -e '.sockets == 8 and .coresPerSocket == 1 and
+    .memoryMiB == 16384 and .diskMiB == [122880]' <<<"$shape" >/dev/null; then
+    printf 'Nutanix VM %s has an unexpected CPU, memory, or disk shape: %s\n' "$name" "$shape"
+    exit 1
+  fi
+  jq -cn --arg name "$name" --arg uuid "$uuid" --arg mac "$mac" --argjson shape "$shape" \
+    '$shape + {name:$name,uuid:$uuid,mac:$mac}' >> "$shape_file"
   printf '%s\t%s\t%s\n' "$name" "$uuid" "$mac" >> "$map_file"
 done 3< "$SHARED_DIR/vm_uuids.txt" < <(jq -r '.[] | [.name, .mac] | @tsv' "$reserved_macs_file")
 
