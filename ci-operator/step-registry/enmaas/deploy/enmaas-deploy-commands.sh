@@ -340,6 +340,22 @@ echo "Rendering and applying enmaas manifests..."
 make print ENV="${ENMAAS_ENV}" PROJECT=enmaas > /tmp/enmaas.yaml
 oc apply -f /tmp/enmaas.yaml
 
+# Override node selector for enmaas-monitoring (stage uses dedicated enmaas=true nodes that don't exist in CI)
+echo "Patching enmaas-monitoring params with CI node selector..."
+MONITORING_PARAMS_DIR="clusters/${ENMAAS_ENV}/params/enmaas-monitoring"
+if [[ -d "${MONITORING_PARAMS_DIR}" ]]; then
+  for pfile in "${MONITORING_PARAMS_DIR}"/*.params; do
+    [[ -f "${pfile}" ]] || continue
+    if grep -q '^NODE_LABEL_KEY=' "${pfile}"; then
+      sed -i 's|^NODE_LABEL_KEY=.*|NODE_LABEL_KEY=kubernetes.io/os|' "${pfile}"
+      sed -i 's|^NODE_LABEL_VALUE=.*|NODE_LABEL_VALUE=linux|' "${pfile}"
+      echo "Patched node selector in ${pfile}"
+    fi
+  done
+else
+  echo "WARNING: ${MONITORING_PARAMS_DIR} not found, skipping monitoring node selector patching."
+fi
+
 echo "Rendering and applying enmaas-monitoring manifests..."
 make print ENV="${ENMAAS_ENV}" PROJECT=enmaas-monitoring > /tmp/enmaas-monitoring.yaml
 oc apply --server-side --field-manager=enmaas-opps --force-conflicts -f /tmp/enmaas-monitoring.yaml
