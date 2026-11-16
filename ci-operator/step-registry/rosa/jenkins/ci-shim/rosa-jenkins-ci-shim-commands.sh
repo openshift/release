@@ -49,10 +49,10 @@ log_success() {
 
 log "Configuring AWS credentials..."
 
-AWSCRED="/tmp/s3-creds/.awscred"
+AWSCRED="/tmp/s3-creds/awscred"
 if [[ ! -f "${AWSCRED}" ]]; then
     log_error "AWS credentials file not found at ${AWSCRED}"
-    log_error "Expected secret 'rosa-govcloud-s3-creds' mounted at /tmp/s3-creds"
+    log_error "Expected GSM group srep-fedramp/prow-ci-shim-ro mounted at /tmp/s3-creds"
     exit 1
 fi
 

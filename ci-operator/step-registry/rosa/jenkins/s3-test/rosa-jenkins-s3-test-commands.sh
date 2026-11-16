@@ -12,10 +12,10 @@ log() {
 log "Starting ROSA GovCloud S3 integration test..."
 
 # Configure AWS credentials
-AWSCRED="/tmp/s3-creds/.awscred"
+AWSCRED="/tmp/s3-creds/awscred"
 if [[ ! -f "${AWSCRED}" ]]; then
   log "ERROR: AWS credentials file not found at ${AWSCRED}"
-  log "Expected secret 'rosa-govcloud-s3-creds' to be mounted at /tmp/s3-creds"
+  log "Expected GSM group srep-fedramp/prow-ci-shim-ro to be mounted at /tmp/s3-creds"
   exit 1
 fi
 
