@@ -406,7 +406,9 @@ sys.stdout.write('\n'.join(sorted(digests)))
 # a registry that holds more than that.  The listing is walked with
 # pagination.limit/pagination.offset instead, and the walk stops when a page
 # comes back short (end of the listing) or when two records match (enough for
-# the single-record guard in Test Case 2 to fail).  The matching records are
+# the single-record guard in Test Case 2 to fail).  A server that ignores
+# pagination.offset answers a full page forever, so the walk also stops at a
+# page cap and reports that as a failed request.  The matching records are
 # written as one JSON array; a failed request returns nonzero without output.
 AcsListMatchingImages () {
     typeset host="${1}"; shift
@@ -417,6 +419,7 @@ AcsListMatchingImages () {
     typeset digest="${1}"; shift
     typeset -a tlsOpts=( "$@" )
     typeset -i pageLimit=1000
+    typeset -i pageCap=100
     typeset -i page=0
     typeset -i offset=0
     typeset -i pageRecords=0
@@ -425,10 +428,17 @@ AcsListMatchingImages () {
     typeset pageJson=''
     typeset pageMatches=''
     typeset matches='[]'
-    # The walk is bounded by the listing, not by a fixed page count: a cap
-    # would end the loop silently and answer [] with success for an image past
-    # the last page reviewed, and every retry would repeat that truncation.
+    # The walk is bounded by the listing and by a page cap.  The cap fails
+    # closed: a bare break would end the loop silently and answer [] with
+    # success for an image past the last page reviewed, so the capped walk
+    # records a failed request that the caller retries and finally reports as
+    # a failed test.  Without the cap a server that ignores pagination.offset
+    # spins here until the step timeout.
     while :; do
+        if (( page >= pageCap )); then
+            fetchRc=1
+            break
+        fi
         offset=$(( page * pageLimit ))
         # Each page runs in a command-substitution subshell with xtrace
         # disabled and curl reads the password from a process-substitution
