@@ -212,9 +212,22 @@ printf 'ClusterOperator: %s; CanaryChecksSucceeding: %s\n' \
   "$ingress_conditions" "$canary_condition" \
   > "$ARTIFACT_DIR/nutanix-ingress-operator-condition.txt"
 
-# The shared MetalLB step skips its original waits for this workflow until the
-# VIP tunnel and the ingress canary are healthy. Restore its MCE readiness gate
-# before the conformance chain starts.
+# The shared MetalLB step defers this guest readiness gate until the VIP tunnel
+# and ingress canary are healthy.
+record_clusterversion_conditions() {
+  oc get clusterversion/version -o json |
+    jq -r '"desiredVersion=\(.status.desired.version // "unknown")",
+      (.status.conditions[]? | "\(.type)=\(.status) reason=\(.reason // "unknown")")' \
+      > "$ARTIFACT_DIR/nutanix-clusterversion-conditions.txt"
+}
+if ! oc wait clusterversion/version --for='condition=Available=True' --timeout=10m; then
+  record_clusterversion_conditions || true
+  echo "Guest ClusterVersion did not become Available after ingress was verified."
+  exit 1
+fi
+record_clusterversion_conditions
+
+# Restore the shared MetalLB step's MCE readiness gate before conformance.
 if [[ -z "${PROW_JOB_ID:-}" ]]; then
   echo "PROW_JOB_ID is required to identify the hosted ManagedCluster."
   exit 1
@@ -238,6 +251,6 @@ while :; do
 done
 oc get "managedcluster/$managed_cluster_name" -o jsonpath='{.status.conditions}' \
   > "$ARTIFACT_DIR/nutanix-managedcluster-conditions.txt" 2>/dev/null || true
-printf 'Verified %s through the gateway, proxy-host route, and Squid; ingress canary and ManagedCluster are healthy.\n' \
+printf 'Verified %s through the gateway, proxy-host route, and Squid; ingress canary, guest ClusterVersion, and ManagedCluster are healthy.\n' \
   "$canary_host"
 if [[ "$tracing_enabled" == true ]]; then set -x; fi
