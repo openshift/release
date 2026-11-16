@@ -128,6 +128,14 @@ run_tests() {
   # Pre-flight check to ensure cluster is stable before running tests
   check_cluster_operators
 
+  # Branch-scoped tag: see IMAGE_TAG_SUFFIX in the step reference. The test suite
+  # builds its image tag as pr-${PR_NUMBER}-${COMMIT_HASH}-${TARGET_ARCH}, so the
+  # suffix is carried on PR_NUMBER to stay in sync with the build-image step.
+  local pr_number="${PULL_NUMBER:-}"
+  if [[ -n "${pr_number}" && -n "${IMAGE_TAG_SUFFIX:-}" ]]; then
+    pr_number="${pr_number}-${IMAGE_TAG_SUFFIX}"
+  fi
+
   oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
     sh -c "
     docker login -u=\"${QUAY_USERNAME}\" -p=\"${QUAY_PASSWORD}\" quay.io
@@ -136,7 +144,7 @@ run_tests() {
     export CI=\"${CI:-true}\"
     export HUB=\"${HUB:-quay.io/sail-dev}\"
     export USE_INTERNAL_REGISTRY=\"false\"
-    export PR_NUMBER=\"${PULL_NUMBER:-}\"
+    export PR_NUMBER=\"${pr_number}\"
     export OLM=\"${OLM:-true}\"
     export GINKGO_LABEL_FILTER=\"${GINKGO_LABEL_FILTER:-}\"
     export EXPECTED_REGISTRY=\"${EXPECTED_REGISTRY:-}\"
@@ -181,7 +189,15 @@ run_tests_local() {
   export TAG="${tag}"
   export SKIP_BUILD="true"
   export USE_INTERNAL_REGISTRY="false"
-  export PR_NUMBER="${PULL_NUMBER:-}"
+  # Branch-scoped tag: see IMAGE_TAG_SUFFIX in the step reference. The test suite
+  # derives its own tag as pr-${PR_NUMBER}-${COMMIT_HASH}-${TARGET_ARCH}, so the
+  # suffix must travel on PR_NUMBER to match the build-image step. Periodic jobs
+  # (no PULL_NUMBER) keep PR_NUMBER empty and use the suite's commit-based tag.
+  if [[ -n "${PULL_NUMBER:-}" && -n "${IMAGE_TAG_SUFFIX:-}" ]]; then
+    export PR_NUMBER="${PULL_NUMBER}-${IMAGE_TAG_SUFFIX}"
+  else
+    export PR_NUMBER="${PULL_NUMBER:-}"
+  fi
   export OLM="${OLM:-true}"
   export GINKGO_LABEL_FILTER="${GINKGO_LABEL_FILTER:-}"
   export EXPECTED_REGISTRY="${EXPECTED_REGISTRY:-}"

@@ -11,10 +11,10 @@
 # 1. Detects the target architecture: OCP_ARCH if set (for ARM clusters), else
 #    the CI build node's native arch via `go env GOARCH`.
 # 2. Derives a unique image tag from Prow build metadata.
-#    Tag format: pr-${PULL_NUMBER}-${COMMIT_HASH}-${ARCH} for presubmit jobs,
-#    or ${BUILD_ID} for periodic/postsubmit jobs.
-#    Matches what common-operator-integ-suite.sh computes so the test suite
-#    can pull the correct image.
+#    Tag format: pr-${PULL_NUMBER}${IMAGE_TAG_SUFFIX}-${COMMIT_HASH}-${ARCH} for
+#    presubmit jobs, or ci-test-${COMMIT_HASH}-${ARCH} for periodic/postsubmit
+#    jobs. Matches what common-operator-integ-suite.sh computes so the test
+#    suite can pull the correct image.
 # 3. Creates an OCP Secret with the quay.io push credentials.
 # 4. Pre-compiles the operator binary with `make build`. When the target arch
 #    differs from the build node arch (ARM clusters), cross-compiles by passing
@@ -50,21 +50,40 @@ ARCH="${OCP_ARCH:-$(go env GOARCH)}"
 echo "Target architecture: ${ARCH} (build node: $(go env GOARCH))"
 
 # --- Tag derivation ---
+# The tag must match the one tests/e2e/common-operator-integ-suite.sh computes
+# internally, because that script derives its own TAG from PULL_NUMBER /
+# COMMIT_HASH / TARGET_ARCH and ignores the tag exported by the e2e step.
+#   presubmit: pr-<PULL_NUMBER><IMAGE_TAG_SUFFIX>-<commit>-<arch>
+#   periodic:  ci-test-<commit>-<arch>
 # For presubmit (PR) jobs, include the commit SHA and target arch so that:
 #   - concurrent amd64 and arm64 builds push to distinct tags
 #   - retries on different commits push to distinct tags
 # PULL_PULL_SHA is the actual PR head SHA (not the Prow merge commit).
-# Downstream test steps read BUILD_TAG from SHARED_DIR and deploy using this value.
-# For periodic/postsubmit jobs (no PULL_NUMBER) fall back to BUILD_ID.
+# IMAGE_TAG_SUFFIX additionally scopes the tag to a branch. Without it, every
+# branch job rehearsed from the same openshift/release PR shares PULL_NUMBER and
+# PULL_PULL_SHA (the release PR number and head), and the parallel builds would
+# overwrite each other in the registry.
+TAG_SUFFIX=""
+if [[ -n "${IMAGE_TAG_SUFFIX:-}" ]]; then
+  TAG_SUFFIX="-${IMAGE_TAG_SUFFIX}"
+fi
+
 if [[ -n "${PULL_NUMBER:-}" ]]; then
   if [[ -z "${PULL_PULL_SHA:-}" ]]; then
     echo "ERROR: PULL_PULL_SHA is not set for a presubmit job." >&2
     exit 1
   fi
   COMMIT_HASH="${PULL_PULL_SHA:0:8}"
-  COMPUTED_TAG="pr-${PULL_NUMBER}-${COMMIT_HASH}-${ARCH}"
+  COMPUTED_TAG="pr-${PULL_NUMBER}${TAG_SUFFIX}-${COMMIT_HASH}-${ARCH}"
 else
-  COMPUTED_TAG="${BUILD_ID}"
+  # Periodic/postsubmit jobs carry no PR metadata. The test suite then falls
+  # back to the checked out source revision, so mirror 'git rev-parse --short
+  # HEAD' exactly (the short length is repository dependent).
+  if ! COMMIT_HASH=$(git rev-parse --short HEAD 2>/dev/null); then
+    echo "ERROR: could not resolve the source commit for the periodic image tag." >&2
+    exit 1
+  fi
+  COMPUTED_TAG="ci-test-${COMMIT_HASH}-${ARCH}"
 fi
 readonly COMPUTED_TAG
 echo "Image tag: ${COMPUTED_TAG}"
