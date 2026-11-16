@@ -1040,7 +1040,10 @@ spec:
               fi
 
               ADMINPASS=`head -c 8 /dev/urandom | base64 | sed 's/=//'`
-              RESULT=$(curl -fsSLk -X POST https://$QUAY_HOST/api/v1/user/initialize --header 'Content-Type: application/json' --data "{ \"username\": \"quayadmin\", \"password\":\"${ADMINPASS}\", \"email\": \"quayadmin@example.com\", \"access_token\": true}")
+              # The initialize body carries the generated admin password, so it
+              # is built in an assignment and streamed on stdin: never in argv.
+              typeset INIT_JSON="{ \"username\": \"quayadmin\", \"password\": \"${ADMINPASS}\", \"email\": \"quayadmin@example.com\", \"access_token\": true}"
+              RESULT=$(printf '%s' "${INIT_JSON}" | curl -fsSLk -X POST https://$QUAY_HOST/api/v1/user/initialize --header 'Content-Type: application/json' --data @-)
               CURL_RC=$?
               if [ $CURL_RC -ne 0 ]; then
                 echo "Quay user initialization call failed (curl rc=${CURL_RC}); no secrets created." 1>&2
@@ -1060,6 +1063,9 @@ spec:
                   --from-file=token=<(printf '%s' "${TOKEN}") \
                   --from-file=password=<(printf '%s' "${ADMINPASS}") \
                   --from-file=basic=<(printf '%s' "${QUAY_ADMIN}:${ADMINPASS}" | base64 -w0)
+                # The password-bearing body has been consumed; drop it so it
+                # does not outlive its use.
+                unset INIT_JSON
 
                 echo "[INFO] Creating $QUAY_USER user ..."
                 RESPONSE=$(quay_cmd Bearer POST /api/v1/superuser/users/ "{ \"username\": \"$QUAY_USER\", \"email\": \"$QUAY_USER_EMAIL\", \"access_token\": true}")
