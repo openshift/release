@@ -152,15 +152,22 @@ function RunTestCase1 () {
     # The e2e-opp namespace and the httpd-example buildconfig are created
     # by policy remediation, which can lag well past a minute on loaded
     # clusters (observed: policies still Pending after the previous fixed
-    # 60s sleep, so the build trigger hit a missing buildconfig). Wait for
-    # both within one bounded budget instead of racing a fixed sleep.
-    typeset -i remediationDeadline=$(( $(date +%s) + 600 ))
+    # 60s sleep, so the build trigger hit a missing buildconfig). A
+    # rehearsal of this step then showed roughly 11 minutes from policy
+    # landing to the dependent ConfigurationPolicy creating the
+    # buildconfig, which arrived 60s after a 600s budget had expired even
+    # though the rest of the pipeline completed once it existed. Wait for
+    # both within one bounded budget instead of racing a fixed sleep; the
+    # 1200s budget covers that gate latency with margin and leaves the
+    # case well inside the step's 1h timeout next to the fixed 10m
+    # deployment wait that follows.
+    typeset -i remediationDeadline=$(( $(date +%s) + 1200 ))
     # Best Practices: oc wait --for=create for a not-yet-created object
     # (an existence poll with sleep is the fixed-sleep violation). Both
     # waits below charge the one shared deadline.
     typeset -i _waitBudget=$(( remediationDeadline - $(date +%s) ))
     if ! oc wait namespace/e2e-opp --for=create --timeout="${_waitBudget}s"; then
-        : "ERROR: e2e-opp namespace was not created within 10m of deploy"
+        : "ERROR: e2e-opp namespace was not created within 20m of deploy"
         : "=== Policy Status ==="
         oc get policies -n policies | sed -n '/example/p' || true
         return 1
@@ -178,7 +185,7 @@ function RunTestCase1 () {
     # build; oc start-build fails when the buildconfig does not exist yet.
     _waitBudget=$(( remediationDeadline - $(date +%s) ))
     if (( _waitBudget <= 0 )) || ! oc wait buildconfig/httpd-example -n e2e-opp --for=create --timeout="${_waitBudget}s"; then
-        : "ERROR: buildconfig httpd-example was not created within 10m of deploy"
+        : "ERROR: buildconfig httpd-example was not created within 20m of deploy"
         : "=== Policy Status ==="
         oc get policies -n policies | sed -n '/example/p' || true
         return 1
