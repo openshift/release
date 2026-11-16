@@ -1,0 +1,1 @@
+../operatorhub-subscribe-odf-operator-commands.sh

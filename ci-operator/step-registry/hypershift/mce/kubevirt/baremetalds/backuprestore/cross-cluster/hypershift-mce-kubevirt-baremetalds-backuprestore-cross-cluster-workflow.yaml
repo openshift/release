@@ -1,0 +1,86 @@
+workflow:
+  as: hypershift-mce-kubevirt-baremetalds-backuprestore-cross-cluster
+  documentation: |-
+    Backs up a KubeVirt HostedCluster on a source MCE management cluster and
+    restores it on a target MCE management cluster. Each management cluster is
+    provisioned on a separate OFCIR bare metal host. Both OADP installations
+    use MinIO on the source host; each virthost resolves guest names locally.
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: hypershift-mce-kubevirt-baremetalds-context-select-source
+    - ref: baremetalds-devscripts-conf-extranetwork
+    - chain: baremetalds-ofcir-pre
+    - ref: enable-qe-catalogsource
+    - ref: deploy-konflux-operator
+    - chain: hypershift-kubevirt-baremetalds-lvm
+    - chain: hypershift-kubevirt-baremetalds-metallb
+    - chain: hypershift-kubevirt-baremetalds-odf
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-mce-install
+    - ref: hypershift-kubevirt-create
+    - ref: hypershift-mce-kubevirt-baremetalds-backuprestore-cross-cluster-dns
+    - ref: hypershift-mce-kubevirt-baremetalds-backuprestore-cross-cluster-source-kubeconfig
+    - ref: hypershift-kubevirt-baremetalds-proxy
+    - ref: hypershift-kubevirt-health-check
+    - ref: hypershift-mce-kubevirt-baremetalds-minio-shared
+    - ref: operatorhub-subscribe-oadp-operator
+    - ref: hypershift-mce-agent-oadp-v2-setup
+    - ref: hypershift-mce-kubevirt-baremetalds-context-activate-target
+    - ref: baremetalds-devscripts-conf-extranetwork-target
+    - chain: baremetalds-ofcir-pre-target
+    - ref: hypershift-mce-kubevirt-baremetalds-context-save-target
+    - ref: enable-qe-catalogsource-target
+    - ref: deploy-konflux-operator-target
+    - chain: hypershift-kubevirt-baremetalds-lvm-target
+    - chain: hypershift-kubevirt-baremetalds-metallb-target
+    - chain: hypershift-kubevirt-baremetalds-odf-target
+    - ref: hypershift-kubevirt-install-target
+    - ref: hypershift-mce-install-target
+    - ref: operatorhub-subscribe-oadp-operator-target
+    - ref: hypershift-mce-agent-oadp-v2-setup-target
+    test:
+    - ref: hypershift-mce-kubevirt-baremetalds-backuprestore-cross-cluster-test
+    - ref: hypershift-mce-kubevirt-baremetalds-backuprestore-cross-cluster-target-kubeconfig
+    - ref: hypershift-kubevirt-baremetalds-proxy-target
+    - chain: hypershift-conformance
+    post:
+    - ref: hypershift-mce-kubevirt-baremetalds-context-post-target
+    - ref: hypershift-mce-dump
+    - chain: gather-core-dump
+    - chain: hypershift-mce-kubevirt-destroy
+    - chain: baremetalds-ofcir-post-target
+    - ref: hypershift-mce-kubevirt-baremetalds-context-activate-source
+    - ref: hypershift-mce-kubevirt-baremetalds-minio-destroy
+    - chain: baremetalds-ofcir-post
+    env:
+      HYPERSHIFT_NODE_COUNT: "2"
+      KUBEVIRT_CROSS_CLUSTER_STABLE_DNS: "true"
+      CLUSTERTYPE: host_384gb_el9
+      E2E_HOSTED_CLUSTER_NAMESPACE: local-cluster
+      TEST_SKIPS: etcd leader changes are not excessive \| StatefulSet Basic \| StatefulSet Non-retain
+      KONFLUX_DEPLOY_OPERATORS: "false"
+      KONFLUX_TARGET_OPERATORS: metallb,local-storage
+      METALLB_OPERATOR_SUB_SOURCE: qe-app-registry
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      LVM_SUB_TARGET_NAMESPACES: openshift-lvm-storage
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-lvm-storage
+      ETCD_STORAGE_CLASS: lvms-vg1
+      HYPERSHIFT_NP_AUTOREPAIR: "true"
+      LOCAL_STORAGE_OPERATOR_SUB_SOURCE: qe-app-registry
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="nmstate1 nmstate2"
+        NMSTATE1_NETWORK_SUBNET_V4="192.168.221.0/24"
+        NMSTATE1_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:ca56::/120"
+        NMSTATE2_NETWORK_SUBNET_V4="192.168.222.0/24"
+        NMSTATE2_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:cc56::/120"
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        NUM_WORKERS=0
+        NUM_MASTERS=3
+        MASTER_VCPU=16
+        MASTER_MEMORY=81920
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=250G

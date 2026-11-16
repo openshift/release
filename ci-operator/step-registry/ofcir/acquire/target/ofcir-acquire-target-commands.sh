@@ -1,0 +1,1 @@
+../ofcir-acquire-commands.sh

@@ -21,6 +21,14 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     set -x
 fi
 
+if [[ "${KUBEVIRT_CROSS_CLUSTER_STABLE_DNS:-false}" == "true" ]]; then
+  # The API URL and certificate must retain this name after the management
+  # cluster changes. Each virthost resolves it to its own LoadBalancer IP.
+  MANAGEMENT_BASE_DOMAIN="$(oc get dns cluster -o jsonpath='{.spec.baseDomain}')"
+  [[ -n "${MANAGEMENT_BASE_DOMAIN}" ]] || { echo "Management base domain is empty" >&2; exit 1; }
+  EXTRA_ARGS="${EXTRA_ARGS} --kas-dns-name=api.${CLUSTER_NAME}.apps.${MANAGEMENT_BASE_DOMAIN}"
+fi
+
 if [[ -n ${MCE} ]] ; then
   arch=$(arch)
   if [ "$arch" == "x86_64" ]; then
@@ -234,6 +242,13 @@ else
     --generate-ssh \
     --control-plane-availability-policy ${CONTROL_PLANE_AVAILABILITY} \
     --infra-availability-policy ${INFRA_AVAILABILITY} $(support_np_skew)"
+fi
+
+if [[ "${KUBEVIRT_CROSS_CLUSTER_STABLE_DNS:-false}" == "true" ]]; then
+  # The API address is allocated by MetalLB only after creation. Let the next
+  # step install DNS before waiting for the guest to become Available.
+  echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+  exit 0
 fi
 
 echo "Waiting for cluster to become available"

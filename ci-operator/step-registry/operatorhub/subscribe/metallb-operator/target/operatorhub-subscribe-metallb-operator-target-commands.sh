@@ -1,0 +1,1 @@
+../operatorhub-subscribe-metallb-operator-commands.sh

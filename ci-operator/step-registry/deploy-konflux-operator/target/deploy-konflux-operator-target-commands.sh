@@ -1,0 +1,1 @@
+../deploy-konflux-operator-commands.sh

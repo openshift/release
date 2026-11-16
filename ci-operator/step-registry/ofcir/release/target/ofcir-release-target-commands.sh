@@ -1,0 +1,1 @@
+../ofcir-release-commands.sh
