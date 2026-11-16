@@ -45,6 +45,10 @@ supervisor.
    Plans declaring unresolved gaps remain fatal and are not forced into readiness.
    Readiness means that the plan is executable; installation and runtime
    prerequisites are verified by execution, not by planning.
+   Response-schema constraints require nonempty check fields and HTTPS source
+   citations. The validator independently rejects missing or malformed citations.
+   PR Git revisions identify CI source; deployed image identities are supplied by
+   the execution supervisor and must not be invented during planning.
 4. `write_plan` writes `validation.json`, `validation.md` and public source
    references to SHARED_DIR and the artifact directory. Private source bodies and
    unchecked model-supplied gaps are not published.
