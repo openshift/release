@@ -53,6 +53,10 @@ ENABLEPEERPODS=${ENABLEPEERPODS:-false}
 WORKLOAD_TO_TEST=${WORKLOAD_TO_TEST:-kata}
 USE_OLMV1=${USE_OLMV1:-false}
 OSC_DEV_CATALOG_NAME="osc-operator-dev-catalog"
+# Marker telling later steps that mirror_konflux already applied the mirror sets
+# published by the operator and trustee-fbc repositories. Those are the
+# authoritative ones, so a chart carrying its own copy must not recreate it.
+KONFLUX_MIRRORS_MARKER="${SHARED_DIR}/konflux-mirrors-applied"
 
 OC_RETRY_COUNT=${OC_RETRY_COUNT:-3}
 OC_RETRY_INTERVAL=${OC_RETRY_INTERVAL:-20}
@@ -232,6 +236,8 @@ function mirror_konflux() {
     oc get mcp || true
     return 1
   fi
+
+  touch "${KONFLUX_MIRRORS_MARKER}"
 }
 
 # Resolve the newest immutable "<X.Y.Z>-<unix_epoch>" release tag of a Quay
@@ -366,6 +372,17 @@ function render_osc_operator_chart() {
     "--namespace" "${OSC_NAMESPACE}"
     "--set" "namespaceOverride=${OSC_NAMESPACE}"
   )
+
+  # The chart ships an ImageTagMirrorSet/ImageDigestMirrorSet of its own, named
+  # "osc-registry" just like the one mirror_konflux applied from the operator
+  # repository. Letting the chart create it would overwrite the authoritative
+  # set with a narrower copy that covers neither the per-release osc-*-vN-M
+  # repositories nor every component, breaking digest pulls for the bundle and
+  # operands. Keep the mirrors already on the cluster.
+  if [[ -f "${KONFLUX_MIRRORS_MARKER}" ]]; then
+    helm_args+=("--set" "dev.createMirrorSets=false")
+    echo ">>> Helm: dev.createMirrorSets=false (konflux mirror sets already applied)" >&2
+  fi
 
   if [[ "${CATALOG_SOURCE_NAME}" == "redhat-operators" ]]; then
     helm_args+=("--set" "dev.enabled=false")

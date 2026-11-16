@@ -234,6 +234,16 @@ function render_trustee_operator_chart() {
     "--set" "namespaceOverride=${TRUSTEE_NAMESPACE}"
   )
 
+  # The chart ships an ImageTagMirrorSet/ImageDigestMirrorSet named
+  # "trustee-registry", the same name used by the mirror set the OSC install
+  # step applies from the trustee-fbc repository. Letting the chart create it
+  # would overwrite that authoritative set with its own copy, so skip it
+  # whenever those mirrors are already on the cluster.
+  if [[ -f "${SHARED_DIR}/konflux-mirrors-applied" ]]; then
+    helm_args+=("--set" "dev.createMirrorSets=false")
+    echo ">>> Helm parameters: dev.createMirrorSets=false (konflux mirror sets already applied)" >&2
+  fi
+
   # Add catalog source configuration if custom image provided
   if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
     helm_args+=(
