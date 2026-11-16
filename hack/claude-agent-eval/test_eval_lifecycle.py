@@ -470,6 +470,34 @@ class RunIdentityTests(support.Fixture):
             "substituted_config", "harness evaluated config chain ['tmp/eval-foo-fixed.yaml'], "
             "but the runner planned ['evals/eval-foo.yaml']", "not a copied or edited file")
 
+    def test_config_chain_mismatch_is_reported_before_a_missing_thresholded_judge(self):
+        config = yaml.safe_load((self.repo / self.entry["config"]).read_text())
+        self.put(self.entry["config"], yaml.safe_dump(
+            {**config, "thresholds": {**config["thresholds"], "missing": {"min_pass_rate": 1.0}}}))
+        self.change_skill()  # Both checks fail; the run identity is verified first.
+        failure = self.assert_identity_failure(
+            "substituted_config", "harness evaluated config chain ['tmp/eval-foo-fixed.yaml'], "
+            "but the runner planned ['evals/eval-foo.yaml']",
+            "run_result.json recorded eval_params.config_chain ['tmp/eval-foo-fixed.yaml']")
+        self.assertNotIn("missing thresholded judge", failure)
+
+    def test_config_chain_mismatch_reports_the_raw_recorded_chain(self):
+        run = self.root / "run"
+        run.mkdir()
+        raw = [str(self.repo / "tmp/../tmp/eval-foo-fixed.yaml")]  # Normalizes to tmp/eval-foo-fixed.yaml.
+        (run / "run_result.json").write_text(json.dumps({
+            "execution_mode": "case", "model": "m",
+            "eval_params": {"execution_mode": "case", "config_chain": raw}}))
+        (run / "summary.yaml").write_text("judges: {}\n")
+        plan = runner.EvalPlan("evals/eval-foo.yaml", {}, "m", 1, 1,
+                               config_chain=("evals/eval-foo.yaml",))
+        with self.assertRaises(runner.EvalError) as raised:
+            runner.verify_run_identity(run, plan, frozenset({"case-001"}), self.repo)
+        message = str(raised.exception)
+        self.assertIn("harness evaluated config chain ['tmp/eval-foo-fixed.yaml'], but the runner "
+                      "planned ['evals/eval-foo.yaml']", message)
+        self.assertIn(f"run_result.json recorded eval_params.config_chain {raw}", message)
+
     def test_extra_extends_chain_file_fails(self):
         self.change_skill()
         self.assert_identity_failure(
