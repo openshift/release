@@ -377,7 +377,7 @@ _dump_diagnostics() {
 # authorization header that does reach it is redacted before it is printed.
 _scrub_job_log() {
   sed -E \
-    -e 's/("(password|access_token|token|basic)"[[:space:]]*:[[:space:]]*")[^"]*/\1REDACTED/g' \
+    -e 's/("(client_secret|password|access_token|token|basic)"[[:space:]]*:[[:space:]]*")[^"]*/\1REDACTED/g' \
     -e 's/(Authorization: (Bearer|Basic) )[^[:space:]]+/\1REDACTED/g' \
     -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi'
 }
