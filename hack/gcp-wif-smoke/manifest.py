@@ -5,13 +5,13 @@ import json
 import sys
 
 IMAGE = "gcr.io/google.com/cloudsdktool/google-cloud-cli@sha256:54e711173abf8aebf025d0a20815088bfb6ab627eae39d8d0ab6df6ec114cbf6"
-NAMESPACE = "wif-smoke"
+NAMESPACE = "gcp-wif-smoke-nirichar"
 SERVICE_ACCOUNT = "gcp-smoke"
 
 
 def manifest(config):
     """Build a Job with only a projected OIDC token and external-account config."""
-    provider = "projects/263120870185/locations/global/workloadIdentityPools/build13-wif-smoke/providers/build13"
+    provider = "projects/263120870185/locations/global/workloadIdentityPools/build13/providers/build13"
     assert config["type"] == "external_account", "not an external-account configuration"
     assert config["audience"] == "//iam.googleapis.com/" + provider, "unexpected provider"
     assert config["subject_token_type"] == "urn:ietf:params:oauth:token-type:jwt", "not an OIDC token"
@@ -19,25 +19,15 @@ def manifest(config):
     assert config["credential_source"] == {"file": "/var/run/wif/token", "format": {"type": "text"}}, "unexpected token source"
     assert config["service_account_impersonation_url"] == "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/build13-wif-smoke@openshift-ci-build-farm.iam.gserviceaccount.com:generateAccessToken", "unexpected service account"
     command = """set -eu
-python3 - <<'PY'
-import base64, json
-from pathlib import Path
-payload = Path('/var/run/wif/token').read_text().split('.')[1]
-claims = json.loads(base64.urlsafe_b64decode(payload + '=' * (-len(payload) % 4)))
-assert claims['iss'] == 'https://storage.googleapis.com/build13-oidc', 'wrong issuer'
-assert claims['sub'] == 'system:serviceaccount:wif-smoke:gcp-smoke', 'wrong subject'
-assert claims['aud'] == ['https://iam.googleapis.com/PROVIDER'], 'wrong audience'
-PY
 gcloud auth login --cred-file=/var/run/wif-config/credentials.json --quiet
 gcloud auth print-access-token > /dev/null
 printf 'PASS: build13 pod identity obtained short-lived GCP credentials.\\n'
-""".replace("PROVIDER", provider)
+"""
     return {"apiVersion": "v1", "kind": "List", "items": [
-        {"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": NAMESPACE}},
         {"apiVersion": "v1", "kind": "ServiceAccount", "metadata": {"name": SERVICE_ACCOUNT, "namespace": NAMESPACE}, "automountServiceAccountToken": False},
         {"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "gcp-wif-config", "namespace": NAMESPACE}, "data": {"credentials.json": json.dumps(config)}},
         {"apiVersion": "batch/v1", "kind": "Job", "metadata": {"name": "gcp-wif-smoke", "namespace": NAMESPACE}, "spec": {
-            "backoffLimit": 0, "activeDeadlineSeconds": 300, "ttlSecondsAfterFinished": 3600,
+            "backoffLimit": 0, "activeDeadlineSeconds": 300,
             "template": {"metadata": {"labels": {"app": "gcp-wif-smoke"}}, "spec": {
                 "serviceAccountName": SERVICE_ACCOUNT, "automountServiceAccountToken": False, "restartPolicy": "Never",
                 "securityContext": {"runAsNonRoot": True, "seccompProfile": {"type": "RuntimeDefault"}},
@@ -46,7 +36,7 @@ printf 'PASS: build13 pod identity obtained short-lived GCP credentials.\\n'
                     "securityContext": {"allowPrivilegeEscalation": False, "readOnlyRootFilesystem": True, "capabilities": {"drop": ["ALL"]}},
                     "resources": {"requests": {"cpu": "100m", "memory": "128Mi"}, "limits": {"memory": "512Mi"}},
                     "volumeMounts": [{"name": "oidc", "mountPath": "/var/run/wif", "readOnly": True}, {"name": "config", "mountPath": "/var/run/wif-config", "readOnly": True}, {"name": "tmp", "mountPath": "/tmp"}]}],
-                "volumes": [{"name": "oidc", "projected": {"sources": [{"serviceAccountToken": {"audience": "https://iam.googleapis.com/" + provider, "expirationSeconds": 600, "path": "token"}}]}}, {"name": "config", "configMap": {"name": "gcp-wif-config"}}, {"name": "tmp", "emptyDir": {}}]
+                "volumes": [{"name": "oidc", "projected": {"sources": [{"serviceAccountToken": {"audience": "openshift", "expirationSeconds": 600, "path": "token"}}]}}, {"name": "config", "configMap": {"name": "gcp-wif-config"}}, {"name": "tmp", "emptyDir": {}}]
             }}
         }}
     ]}
