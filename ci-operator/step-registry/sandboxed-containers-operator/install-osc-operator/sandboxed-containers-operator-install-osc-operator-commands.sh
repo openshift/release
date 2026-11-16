@@ -9,7 +9,9 @@
 # Environment Variables:
 #   OSC_INSTALL                   - "true" to install, "false" to skip (default: false)
 #   OSC_NAMESPACE                 - Namespace for operator (default: openshift-sandboxed-containers-operator)
-#   CATALOG_SOURCE_IMAGE      - Custom catalog image (optional)
+#   CATALOG_SOURCE_IMAGE      - Custom catalog image (optional). A quay.io image
+#                               tagged :latest is resolved at runtime to the
+#                               newest <X.Y.Z>-<unix_epoch> build tag.
 #   OSC_CHARTS_REPO               - Charts repo URL
 #   OSC_CHARTS_REF                - Charts git ref (default: main)
 #   CREDENTIALS_MODE                 - Credentials mode when peer-pods enabled (default: cco)
@@ -232,8 +234,14 @@ function mirror_konflux() {
   fi
 }
 
+# Resolve the newest immutable "<X.Y.Z>-<unix_epoch>" release tag of a Quay
+# repository. The Quay tag API lists tags newest-first, so the first regex
+# match in page order is the newest release build.
+# Args: $1 - repository path on quay.io (e.g. redhat-user-workloads/ose-osc-tenant/osc-test-fbc-v1-14)
+# Echoes: the newest matching tag, or "latest" as a fallback when none is found.
 function latest_catsrc_image_tag() {
-    local api_url="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc/tag/"
+    local quay_repo="$1"
+    local api_url="https://quay.io/api/v1/repository/${quay_repo}/tag/"
     local page=1
     local max_pages=20
 
@@ -275,11 +283,16 @@ function setup_catalog_source() {
 
   mirror_konflux
 
-  local default_catsrc_image="quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc"
-  if [[ "${CATALOG_SOURCE_IMAGE}" = "${default_catsrc_image}:latest" ]]; then
+  # Resolve a floating :latest tag to the newest immutable <X.Y.Z>-<unix_epoch>
+  # build tag of whatever quay.io repository is configured, so the exact catalog
+  # tested is recorded (catalog-source-image.env) and reproducible. Works for
+  # any quay.io repository (e.g. the per-release osc-test-fbc-vN-M catalogs).
+  # Digest references, specific tags and non-quay.io images are used as-is.
+  if [[ "${CATALOG_SOURCE_IMAGE}" =~ ^quay\.io/([^@]+):latest$ ]]; then
+    local catsrc_repo_path="${BASH_REMATCH[1]}"
     local catsrc_image_tag
-    catsrc_image_tag=$(latest_catsrc_image_tag)
-    CATALOG_SOURCE_IMAGE="${default_catsrc_image}:${catsrc_image_tag}"
+    catsrc_image_tag=$(latest_catsrc_image_tag "${catsrc_repo_path}")
+    CATALOG_SOURCE_IMAGE="quay.io/${catsrc_repo_path}:${catsrc_image_tag}"
     echo ">>> Resolved :latest to tag: ${catsrc_image_tag}"
   else
     echo ">>> Using provided catalog image: ${CATALOG_SOURCE_IMAGE}"
