@@ -1,20 +1,19 @@
 #!/bin/bash
-set -euo pipefail; shopt -s inherit_errexit
+set -euxo pipefail; shopt -s inherit_errexit
 
 # Restrictive default permissions: the credential files this step writes
 # under /tmp are owner-only, whatever the image's default umask was.
 umask 077
 
 # --- Trace-to-file: always capture, dump on failure only ---
-_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+typeset _xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
 exec {_xtrace_fd}>"${_xtrace_log}"
 BASH_XTRACEFD=${_xtrace_fd}
-set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
-  _exit_code="${1:-0}"
-  set +x 2>/dev/null
+  typeset -i _exit_code="${1:-0}"
+  set +x
   # Credential hygiene: these files must not survive the step, on the
   # success and the failure path alike.
   rm -f /tmp/quay-auth.json /tmp/quay-cookies.txt "${acsPassFile:-/tmp/acs-admin-password}" /tmp/acs-ingress-ca.crt /tmp/acs-central-ca.crt
@@ -26,10 +25,10 @@ _opp_cleanup() {
     -e 's/password=[^ &]+/password=[REDACTED]/g' \
     -e 's/token=[^ &]+/token=[REDACTED]/g' \
     -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
-    "${_xtrace_log}" 2>/dev/null || true
+    "${_xtrace_log}" || true
   if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
-    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
-    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" || true
+    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})" >&2
   fi
 }
 
@@ -48,7 +47,7 @@ _opp_trap_handler() {
 }
 trap '_opp_trap_handler' EXIT
 
-echo ">>> PHASE: initialization"
+: "PHASE: initialization"
 
 ARTIFACT_DIR="${ARTIFACT_DIR:=/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
@@ -199,7 +198,7 @@ function DiscoverQuay () {
         return 2
     fi
     if ! grep -qi quayregistry <<< "${apiOutput}"; then
-        echo "INFO: QuayRegistry CRD absent; Quay is not deployed"
+        : "INFO: QuayRegistry CRD absent; Quay is not deployed"
         return 1
     fi
 
@@ -223,7 +222,7 @@ print(len(json.load(sys.stdin).get('items',[])))
         return 2
     fi
     if (( itemCount == 0 )); then
-        echo "INFO: No QuayRegistry found; Quay is not deployed"
+        : "INFO: No QuayRegistry found; Quay is not deployed"
         return 1
     fi
 
@@ -247,6 +246,7 @@ print(len(json.load(sys.stdin).get('items',[])))
 # secrets, ingress CA, image trust store) and used as an explicit trust
 # anchor for every credential-bearing request; see ResolveQuayTlsTrust.  The
 # pushed image is still verified by pulling it back.
+typeset QUAY_USER='' QUAY_PASSWORD='' QUAY_TOKEN=''
 function GetQuayAuth () {
     # Quay credentials are exported for downstream use in the current
     # shell (Best Practices exception for variables needed downstream);
@@ -267,7 +267,7 @@ function GetQuayAuth () {
         QUAY_USER="quayadmin"
         if [[ -n "${QUAY_TOKEN}" || -n "${QUAY_PASSWORD}" ]]; then
             authOk=true
-            echo "INFO: Quay credentials obtained from quayadmin secret"
+            echo "INFO: Quay credentials obtained from quayadmin secret" >&2
         fi
     fi
 
@@ -277,7 +277,7 @@ function GetQuayAuth () {
             QUAY_USER="quaydevel"
             if [[ -n "${QUAY_PASSWORD}" ]]; then
                 authOk=true
-                echo "INFO: Quay credentials obtained from quaydevel secret"
+                echo "INFO: Quay credentials obtained from quaydevel secret" >&2
             fi
         fi
     fi
@@ -286,19 +286,21 @@ function GetQuayAuth () {
         typeset initPassword=''
         initPassword="$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(20)))")"
         typeset initResult=''
-        # The payload is piped in via stdin so the generated password is
-        # never part of the curl argv.
-        initResult="$(printf '%s' "{\"username\":\"quayadmin\",\"password\":\"${initPassword}\",\"email\":\"quayadmin@example.com\",\"access_token\":true}" | \
-            curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" \
+        # The payload is built by json.dumps and piped in via stdin, so the
+        # generated password is safely escaped and never part of any argv.
+        initResult="$(printf '%s' "${initPassword}" | python3 -c "
+import json, sys
+print(json.dumps({'username': 'quayadmin', 'password': sys.stdin.read().strip(), 'email': 'quayadmin@example.com', 'access_token': True}))
+" | curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" \
                 -H "Content-Type: application/json" \
                 -d @-)" || initResult=""
 
-        QUAY_TOKEN="$(printf '%s' "${initResult}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)" || QUAY_TOKEN=""
+        QUAY_TOKEN="$(printf '%s' "${initResult}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")" || QUAY_TOKEN=""
         if [[ -n "${QUAY_TOKEN}" ]]; then
             QUAY_USER="quayadmin"
             QUAY_PASSWORD="${initPassword}"
             authOk=true
-            echo "INFO: Quay admin user initialized via /api/v1/user/initialize"
+            echo "INFO: Quay admin user initialized via /api/v1/user/initialize" >&2
         fi
     fi
 
@@ -332,7 +334,7 @@ function ResolveQuayTlsTrust () {
     # The route that serves QUAY_HOST: a re-encrypt or edge route carries the
     # certificate the cluster publishes for that host.
     typeset routeCert=''
-    routeCert="$(oc get routes -n "${QUAY_NS}" -o json 2>/dev/null | \
+    routeCert="$(oc get routes -n "${QUAY_NS}" -o json | \
         QUAY_HOST_NAME="${QUAY_HOST}" python3 -c "
 import json, os, sys
 try:
@@ -356,7 +358,7 @@ for r in items:
     # route, so the route carries no certificate and only these payloads can
     # verify it; each candidate is proved against the endpoint below, so
     # widening the sources cannot admit an anchor that does not fit.
-    oc get secrets -n "${QUAY_NS}" -o json 2>/dev/null | \
+    oc get secrets -n "${QUAY_NS}" -o json | \
         QUAY_OWNER="${QUAY_REGISTRY}" CA_DIR="${quayCaDir}" python3 -c "
 import base64, json, os, sys
 
@@ -394,7 +396,7 @@ for s in items:
 
     # The ingress CA signs route certificates that no operator issued.
     typeset ingressCa=''
-    ingressCa="$(oc get configmap default-ingress-cert -n openshift-config-managed -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null)" || ingressCa=''
+    ingressCa="$(oc get configmap default-ingress-cert -n openshift-config-managed -o jsonpath='{.data.ca-bundle\.crt}')" || ingressCa=''
     if [[ -n "${ingressCa}" ]]; then
         printf '%s\n' "${ingressCa}" > "${quayCaDir}/30-ingress.pem"
     fi
@@ -424,7 +426,7 @@ for s in items:
         return 1
     fi
     quayTlsOpts=( --cacert "${quayCaFile}" )
-    echo "INFO: Quay route TLS verified against ${quayCaFile}"
+    : "INFO: Quay route TLS verified against ${quayCaFile}"
     return 0
 }
 
@@ -466,7 +468,7 @@ function CreateTestOrg () {
         # signin endpoint.  The payload is piped in via stdin so the
         # password is never part of the curl argv.
         csrf="$(curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/csrf_token" -c "${cookieFile}" | \
-            python3 -c "import sys,json; print(json.load(sys.stdin).get('csrf_token',''))" 2>/dev/null)" || csrf=""
+            python3 -c "import sys,json; print(json.load(sys.stdin).get('csrf_token',''))")" || csrf=""
 
         if [[ -n "${csrf}" ]]; then
             typeset signinResult=''
@@ -486,11 +488,11 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
             # cookie; it does not return a token.  Read the success flag too,
             # and keep the cookie jar for the organization request.
             QUAY_TOKEN="$(printf '%s' "${signinResult}" | \
-                python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null)" || QUAY_TOKEN=""
+                python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))")" || QUAY_TOKEN=""
             export QUAY_TOKEN
             typeset signinOk=''
             signinOk="$(printf '%s' "${signinResult}" | \
-                python3 -c "import sys,json; print(json.load(sys.stdin).get('success',''))" 2>/dev/null)" || signinOk=""
+                python3 -c "import sys,json; print(json.load(sys.stdin).get('success',''))")" || signinOk=""
             if [[ "${signinOk}" == "True" ]]; then
                 # Signin rotates the session CSRF token (Quay replaces it from
                 # common_login), so the token read before signin is stale: the
@@ -501,7 +503,7 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
                 csrf="$(curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 \
                     -b "${cookieFile}" -c "${cookieFile}" \
                     "https://${QUAY_HOST}/csrf_token" | \
-                    python3 -c "import sys,json; print(json.load(sys.stdin).get('csrf_token',''))" 2>/dev/null)" || csrf=""
+                    python3 -c "import sys,json; print(json.load(sys.stdin).get('csrf_token',''))")" || csrf=""
                 if [[ -z "${csrf}" ]]; then
                     echo "ERROR: the CSRF token refresh after signin returned no token; skipping the organization request" >&2
                     RecordResult "${testNamePushPull}" "failed" "Could not refresh the Quay CSRF token after signin; the organization request would send a stale token" "0"
@@ -540,7 +542,7 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
             "https://${QUAY_HOST}/api/v1/organization/" \
             -b "${cookieFile}" \
             -H "X-CSRF-Token: ${csrf}" \
-            "${orgPayloadOpts[@]}" 2>/dev/null)" || orgRc=$?
+            "${orgPayloadOpts[@]}")" || orgRc=$?
     else
         # The bearer token is handed to curl through a process-substitution
         # config, so it never appears in the curl argv.
@@ -548,7 +550,7 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
             -w '\n%{http_code}' \
             "https://${QUAY_HOST}/api/v1/organization/" \
             --config <(printf 'header = "Authorization: Bearer %s"\n' "${QUAY_TOKEN}") \
-            "${orgPayloadOpts[@]}" 2>/dev/null)" || orgRc=$?
+            "${orgPayloadOpts[@]}")" || orgRc=$?
     fi
     typeset -a orgRawLines=()
     mapfile -t orgRawLines <<< "${orgRaw}"
@@ -562,7 +564,7 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
 
     typeset orgSuccess=''
     orgSuccess="$(printf '%s' "${orgResponse}" | \
-        python3 -c "import sys,json; print(json.load(sys.stdin).get('success',''))" 2>/dev/null)" || orgSuccess=''
+        python3 -c "import sys,json; print(json.load(sys.stdin).get('success',''))")" || orgSuccess=''
     if (( orgRc != 0 )) || [[ ! "${orgHttp}" =~ ^2[0-9]{2}$ ]] || [[ "${orgSuccess}" != "True" ]]; then
         # A re-run against an existing organization answers with an HTTP
         # error, and that must not fail the step: the organization the push
@@ -573,17 +575,17 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
             orgPresentHttp="$(curl -sSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 -o /dev/null \
                 -w '%{http_code}' \
                 -b "${cookieFile}" \
-                "https://${QUAY_HOST}/api/v1/organization/interop-smoke-test" 2>/dev/null)" || orgPresentHttp=''
+                "https://${QUAY_HOST}/api/v1/organization/interop-smoke-test")" || orgPresentHttp=''
         else
             orgPresentHttp="$(curl -sSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 -o /dev/null \
                 -w '%{http_code}' \
                 --config <(printf 'header = "Authorization: Bearer %s"\n' "${QUAY_TOKEN}") \
-                "https://${QUAY_HOST}/api/v1/organization/interop-smoke-test" 2>/dev/null)" || orgPresentHttp=''
+                "https://${QUAY_HOST}/api/v1/organization/interop-smoke-test")" || orgPresentHttp=''
         fi
         if [[ "${orgPresentHttp}" != "200" ]]; then
             typeset orgError=''
             orgError="$(printf '%s' "${orgResponse}" | \
-                python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('error') or d.get('error_message') or d.get('message') or '')" 2>/dev/null)" || orgError=''
+                python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('error') or d.get('error_message') or d.get('message') or '')")" || orgError=''
             echo "ERROR: organization creation failed (http ${orgHttp}, curl rc=${orgRc}${orgError:+: ${orgError}}); the push test has no organization" >&2
             RecordResult "${testNamePushPull}" "failed" "Could not create the interop-smoke-test organization (http ${orgHttp}, curl rc=${orgRc}): ${orgError:-the response carried no error field}" "0"
             rm -f "${cookieFile}"
@@ -830,10 +832,10 @@ for i in data.get('integrations', []):
         print(i['id'])
         sys.exit(0)
 sys.exit(1)
-" 2>/dev/null) || existing=""
+") || existing=""
 
       if [[ -n "${existing}" ]]; then
-          echo "INFO: Quay integration already registered in ACS"
+          : "INFO: Quay integration already registered in ACS"
           exit 0
       fi
 
@@ -873,13 +875,13 @@ print(json.dumps(payload))
           -X POST "https://${acsHost}/v1/imageintegrations" \
           --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
           -H "Content-Type: application/json" \
-          -d @- 2>/dev/null) || regCode="000"
+          -d @-) || regCode="000"
       if [[ "${regCode}" != 2* ]]; then
           echo "ERROR: Failed to register Quay in ACS (HTTP ${regCode})" >&2
           exit 1
       fi
 
-      echo "INFO: Registered Quay as ACS image integration"
+      : "INFO: Registered Quay as ACS image integration"
     )
 }
 
@@ -902,13 +904,13 @@ print(json.dumps(payload))
           -X POST "https://${acsHost}/v1/images/scan" \
           --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
           -H "Content-Type: application/json" \
-          -d "${scanPayload}" 2>/dev/null) || scanCode="000"
+          -d "${scanPayload}") || scanCode="000"
       if [[ "${scanCode}" != 2* ]]; then
           echo "ERROR: ACS scan request failed (HTTP ${scanCode})" >&2
           exit 1
       fi
 
-      echo "INFO: Requested ACS scan for pushed image"
+      : "INFO: Requested ACS scan for pushed image"
     )
 }
 
@@ -923,7 +925,7 @@ function RunAcsScan () {
     # deployment state unknown, and treating it as absent would let the step
     # pass without scanning an installed ACS.
     typeset -i routeRc=0
-    acsHost="$(oc get route -n stackrox central -o jsonpath='{.spec.host}' --ignore-not-found 2>/dev/null)" || routeRc=$?
+    acsHost="$(oc get route -n stackrox central -o jsonpath='{.spec.host}' --ignore-not-found)" || routeRc=$?
     if (( routeRc != 0 )); then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "Could not read the Central route (rc=${routeRc}); the ACS deployment state is unknown, so the scan cannot be classified as skipped" "${elapsed}"
@@ -964,14 +966,14 @@ function RunAcsScan () {
     # Declared here so the helper functions called below (dynamic scoping)
     # share the same options.
     typeset centralCa=''
-    centralCa="$(oc get secret central-tls -n stackrox -o jsonpath='{.data.ca\.pem}' 2>/dev/null | base64 -d 2>/dev/null)" || centralCa=''
+    centralCa="$(oc get secret central-tls -n stackrox -o jsonpath='{.data.ca\.pem}' | base64 -d)" || centralCa=''
     typeset -a acsCaCandidates=()
     if [[ -n "${centralCa}" ]]; then
         printf '%s\n' "${centralCa}" > /tmp/acs-central-ca.crt
         acsCaCandidates+=( /tmp/acs-central-ca.crt )
     fi
     typeset ingressCaBundle=''
-    ingressCaBundle="$(oc get configmap default-ingress-cert -n openshift-config-managed -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null)" || ingressCaBundle=''
+    ingressCaBundle="$(oc get configmap default-ingress-cert -n openshift-config-managed -o jsonpath='{.data.ca-bundle\.crt}')" || ingressCaBundle=''
     if [[ -n "${ingressCaBundle}" ]]; then
         printf '%s\n' "${ingressCaBundle}" > /tmp/acs-ingress-ca.crt
         acsCaCandidates+=( /tmp/acs-ingress-ca.crt )
@@ -1053,7 +1055,7 @@ sys.exit(0 if data.get('images') else 1)
         if (( scanRc == 0 && parseRc == 1 )); then
             answeredAttempts=$(( answeredAttempts + 1 ))
         else
-            lastQueryError=$(cat "${scanErrFile}" 2>/dev/null) || lastQueryError=''
+            lastQueryError=$(cat "${scanErrFile}") || lastQueryError=''
             if [[ -z "${lastQueryError}" ]]; then
                 if (( scanRc != 0 )); then
                     lastQueryError="curl exited ${scanRc} without error output"

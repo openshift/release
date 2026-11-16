@@ -251,8 +251,8 @@ for t in bc.get('spec',{}).get('triggers',[]):
         if 'generic' in t: t['generic'].pop(k,None)
         if 'github' in t: t['github'].pop(k,None)
 json.dump(bc,sys.stdout,indent=2)
-" 2>/dev/null) || true
-                (oc describe buildconfig httpd-example -n e2e-opp 2>/dev/null | sed -E 's#(/webhooks/)[^/[:space:]]+#\1REDACTED#g') || true
+" ) || true
+                (oc describe buildconfig httpd-example -n e2e-opp | sed -E 's#(/webhooks/)[^/[:space:]]+#\1REDACTED#g') || true
             fi
         fi
 
@@ -330,7 +330,7 @@ json.dump(bc,sys.stdout,indent=2)
     typeset podSelector=''
     typeset appContainer=''
     typeset deploymentFacts=''
-    deploymentFacts="$(oc get deployment httpd-example -n e2e-opp -o json 2>/dev/null | python3 -c "
+    deploymentFacts="$(oc get deployment httpd-example -n e2e-opp -o json | python3 -c "
 import json, sys
 
 try:
@@ -358,7 +358,7 @@ sys.stdout.write('%s\t%s\t%s' % ((containers[0].get('image') or ''),
         # a pod that still reports Running with the previous build's digest
         # would otherwise make the snapshot ambiguous and fail the digest read
         # of a rollout that did complete.
-        digestList="$(oc get pods -n e2e-opp -l "${podSelector}" -o json 2>/dev/null | python3 -c "
+        digestList="$(oc get pods -n e2e-opp -l "${podSelector}" -o json | python3 -c "
 import json, re, sys
 
 application = sys.argv[1] if len(sys.argv) > 1 else ''
@@ -598,14 +598,14 @@ def lastn($d): split("/") | .[-$d:] | join("/");
     # connection would hand the admin password to an on-path attacker, and an
     # unverifiable route fails the case instead.
     typeset centralCa=''
-    centralCa="$(oc get secret central-tls -n stackrox -o jsonpath='{.data.ca\.pem}' 2>/dev/null | base64 -d 2>/dev/null)" || centralCa=''
+    centralCa="$(oc get secret central-tls -n stackrox -o jsonpath='{.data.ca\.pem}' | base64 -d)" || centralCa=''
     typeset -a acsCaCandidates=()
     if [[ -n "${centralCa}" ]]; then
         printf '%s\n' "${centralCa}" > /tmp/acs-central-ca.crt
         acsCaCandidates+=( /tmp/acs-central-ca.crt )
     fi
     typeset ingressCaBundle=''
-    ingressCaBundle="$(oc get configmap default-ingress-cert -n openshift-config-managed -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null)" || ingressCaBundle=''
+    ingressCaBundle="$(oc get configmap default-ingress-cert -n openshift-config-managed -o jsonpath='{.data.ca-bundle\.crt}')" || ingressCaBundle=''
     if [[ -n "${ingressCaBundle}" ]]; then
         printf '%s\n' "${ingressCaBundle}" > /tmp/acs-ingress-ca.crt
         acsCaCandidates+=( /tmp/acs-ingress-ca.crt )

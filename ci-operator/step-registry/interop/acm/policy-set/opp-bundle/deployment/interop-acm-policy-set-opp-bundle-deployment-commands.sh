@@ -183,8 +183,8 @@ cd policy-collection/deploy/
 # in-cluster (see PinSubscriptionChannel below).  Patching the local clone
 # has no effect: deploy.sh creates a GitOps Subscription that syncs the
 # upstream repository content, so local edits never reach the cluster.
-for _channelVar in QUAY_OPERATOR_CHANNEL ODF_OPERATOR_CHANNEL; do
-  typeset _channelVal="${!_channelVar:-}"
+for _channelVar in LPC_LP_OPP__QUAY__OPERATOR_CHANNEL LPC_LP_OPP__ODF__OPERATOR_CHANNEL; do
+  typeset _channelVal="${!_channelVar}"
   if [[ -n "${_channelVal}" ]] && [[ ! "${_channelVal}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
     echo "Invalid ${_channelVar}: ${_channelVal}" >&2
     exit 1
@@ -207,12 +207,11 @@ PinSubscriptionChannel () {
     return 1
   fi
   if ! oc patch subscription "${subName}" -n "${subNamespace}" --type merge \
-    -p "{\"spec\":{\"channel\":\"${channel}\"}}"; then
+    -p "$(jq -cn --arg ch "${channel}" '{spec:{channel:$ch}}')"; then
     printf '%s\n' "Error: failed to patch subscription ${subNamespace}/${subName} to channel ${channel}" >&2
     return 1
   fi
-  printf '[%s] Pinned subscription %s/%s to channel %s\n' \
-    "$(date -u +%FT%TZ)" "${subNamespace}" "${subName}" "${channel}"
+  : "Pinned subscription ${subNamespace}/${subName} to channel ${channel}"
 }
 
 # A nonzero deploy.sh status exits here under errexit, before the deployment
@@ -247,29 +246,29 @@ RecordResult "openshift-plus-policy-set-deployed" "passed" "" "$(( $(date +%s) -
 # (whose wait can take up to ten minutes and exits on failure) and before the
 # Quay readiness wait below, so a default-channel ODF install failure cannot
 # hold the ODF correction behind either of them.
-if [[ -n "${ODF_OPERATOR_CHANNEL:-}" ]]; then
+if [[ -n "${LPC_LP_OPP__ODF__OPERATOR_CHANNEL}" ]]; then
   typeset -i odfPinStart=0
   odfPinStart=$(date +%s)
-  if PinSubscriptionChannel openshift-storage odf-operator "${ODF_OPERATOR_CHANNEL}"; then
+  if PinSubscriptionChannel openshift-storage odf-operator "${LPC_LP_OPP__ODF__OPERATOR_CHANNEL}"; then
     RecordResult "subscription-channel-pin-openshift-storage-odf-operator" "passed" "" "$(( $(date +%s) - odfPinStart ))"
   else
-    RecordResult "subscription-channel-pin-openshift-storage-odf-operator" "failed" "Could not pin subscription openshift-storage/odf-operator to channel ${ODF_OPERATOR_CHANNEL}" "$(( $(date +%s) - odfPinStart ))"
+    RecordResult "subscription-channel-pin-openshift-storage-odf-operator" "failed" "Could not pin subscription openshift-storage/odf-operator to channel ${LPC_LP_OPP__ODF__OPERATOR_CHANNEL}" "$(( $(date +%s) - odfPinStart ))"
     exit 1
   fi
 else
-  RecordResult "subscription-channel-pin-openshift-storage-odf-operator" "skipped" "ODF_OPERATOR_CHANNEL not set"
+  RecordResult "subscription-channel-pin-openshift-storage-odf-operator" "skipped" "LPC_LP_OPP__ODF__OPERATOR_CHANNEL not set"
 fi
-if [[ -n "${QUAY_OPERATOR_CHANNEL:-}" ]]; then
+if [[ -n "${LPC_LP_OPP__QUAY__OPERATOR_CHANNEL}" ]]; then
   typeset -i quayPinStart=0
   quayPinStart=$(date +%s)
-  if PinSubscriptionChannel local-quay quay-operator "${QUAY_OPERATOR_CHANNEL}"; then
+  if PinSubscriptionChannel local-quay quay-operator "${LPC_LP_OPP__QUAY__OPERATOR_CHANNEL}"; then
     RecordResult "subscription-channel-pin-local-quay-quay-operator" "passed" "" "$(( $(date +%s) - quayPinStart ))"
   else
-    RecordResult "subscription-channel-pin-local-quay-quay-operator" "failed" "Could not pin subscription local-quay/quay-operator to channel ${QUAY_OPERATOR_CHANNEL}" "$(( $(date +%s) - quayPinStart ))"
+    RecordResult "subscription-channel-pin-local-quay-quay-operator" "failed" "Could not pin subscription local-quay/quay-operator to channel ${LPC_LP_OPP__QUAY__OPERATOR_CHANNEL}" "$(( $(date +%s) - quayPinStart ))"
     exit 1
   fi
 else
-  RecordResult "subscription-channel-pin-local-quay-quay-operator" "skipped" "QUAY_OPERATOR_CHANNEL not set"
+  RecordResult "subscription-channel-pin-local-quay-quay-operator" "skipped" "LPC_LP_OPP__QUAY__OPERATOR_CHANNEL not set"
 fi
 
 # Remove the local-cluster exclusion from the clusters placement in-cluster
@@ -344,36 +343,36 @@ if [[ "${quayFound}" == "false" ]]; then
   RecordResult "quay-registry-available" "skipped" "No QuayRegistry found in namespaces: ${quayNamespacesArr[*]}" "$(( $(date +%s) - quayStart ))"
 fi
 
-# ── SKIP_POLICIES handling ──────────────────────────────────────────
-# SKIP_POLICIES: comma-separated policy names to exclude from the
-# compliance wait.  Empty (default) means wait for ALL policies.
+# ── LPC_LP_OPP__ACM_PS__SKIP_POLICIES handling ──────────────────────────────────────────
+# LPC_LP_OPP__ACM_PS__SKIP_POLICIES: comma-separated policy names to exclude
+# from the compliance wait.  Empty (default) means wait for ALL policies.
 # Non-existent policy names produce a warning, not a failure.
 typeset -a skipPoliciesArr=()
-if [[ -n "${SKIP_POLICIES:-}" ]]; then
-  IFS=',' read -ra _skipRawArr <<< "${SKIP_POLICIES}"
+if [[ -n "${LPC_LP_OPP__ACM_PS__SKIP_POLICIES}" ]]; then
+  IFS=',' read -ra _skipRawArr <<< "${LPC_LP_OPP__ACM_PS__SKIP_POLICIES}"
   for _skipEntry in "${_skipRawArr[@]}"; do
     # Trim surrounding whitespace: an untrimmed entry ("a, b" yields " b")
     # would never match a policy name and would silently skip nothing.
     _skipEntry="${_skipEntry#"${_skipEntry%%[![:space:]]*}"}"
     _skipEntry="${_skipEntry%"${_skipEntry##*[![:space:]]}"}"
     if [[ -z "${_skipEntry}" ]]; then
-      printf '[%s] WARNING: ignoring empty entry in SKIP_POLICIES\n' \
+      printf '[%s] WARNING: ignoring empty entry in LPC_LP_OPP__ACM_PS__SKIP_POLICIES\n' \
         "$(date -u +%FT%TZ)" >&2
       continue
     fi
     skipPoliciesArr+=("${_skipEntry}")
   done
-  printf '[%s] SKIP_POLICIES set: will skip %d polic(ies):\n' \
-    "$(date -u +%FT%TZ)" "${#skipPoliciesArr[@]}"
+  printf '[%s] LPC_LP_OPP__ACM_PS__SKIP_POLICIES set: will skip %d polic(ies):\n' \
+    "$(date -u +%FT%TZ)" "${#skipPoliciesArr[@]}" >&2
   for p in "${skipPoliciesArr[@]}"; do
-    printf '  - %s\n' "${p}"
+    printf '  - %s\n' "${p}" >&2
   done
 fi
 
 # Write the full skip manifest for auditing / artifact collection
 {
   printf '# skip-policies manifest: generated %s\n' "$(date -u +%FT%TZ)"
-  printf '# SKIP_POLICIES=%s\n' "${SKIP_POLICIES:-}"
+  printf '# LPC_LP_OPP__ACM_PS__SKIP_POLICIES=%s\n' "${LPC_LP_OPP__ACM_PS__SKIP_POLICIES}"
   printf '# Total policies to skip: %d\n' "${#skipPoliciesArr[@]}"
   for p in "${skipPoliciesArr[@]}"; do
     printf '%s\n' "${p}"
@@ -410,7 +409,7 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
   allPolicies="$(oc get policies -n policies -o name)" || true
   for p in "${skipPoliciesArr[@]}"; do
     if ! PolicyExists "${p}" <<< "${allPolicies}"; then
-      printf '[%s] WARNING: policy "%s" from SKIP_POLICIES not found in cluster (ignoring)\n' \
+      printf '[%s] WARNING: policy "%s" from LPC_LP_OPP__ACM_PS__SKIP_POLICIES not found in cluster (ignoring)\n' \
         "$(date -u +%FT%TZ)" "${p}" >&2
     fi
   done
@@ -518,7 +517,7 @@ ReadStablePolicySet () {
 # stall-below-final-size race.
 ExpectedPolicyNames () {
   typeset setsJson=''
-  setsJson="$(oc get policysets.policy.open-cluster-management.io -n policies -o json 2>/dev/null)" || return 1
+  setsJson="$(oc get policysets.policy.open-cluster-management.io -n policies -o json)" || return 1
   if [[ -z "${setsJson}" ]]; then
     return 1
   fi
@@ -590,7 +589,7 @@ typeset complianceAllSkipped=false
 # manifest stays in skip-policies.txt).
 typeset complianceSkipNote=''
 if (( ${#skipPoliciesArr[@]} > 0 )); then
-  complianceSkipNote=" (skipped by SKIP_POLICIES: ${skipPoliciesArr[*]})"
+  complianceSkipNote=" (skipped by LPC_LP_OPP__ACM_PS__SKIP_POLICIES: ${skipPoliciesArr[*]})"
 fi
 # The stability evidence that let the compliance row pass is carried into the
 # row itself, so a green run records which observation it was accepted on.
@@ -613,8 +612,7 @@ if (( stableRc != 0 )); then
 fi
 policyCount="${complianceStableCount}"
 prevCount="${policyCount}"
-printf '[%s] Policy set stable at %d policies before the first compliance pass\n' \
-  "$(date -u +%FT%TZ)" "${policyCount}"
+: "Policy set stable at ${policyCount} policies before the first compliance pass"
 
 while :; do
   # Hard deadline: two 40m passes plus the earlier phases have to fit inside
@@ -665,8 +663,7 @@ while :; do
     mapfile -t applyPoliciesArr < <(printf '%s\n' "${policyList}" | FilterSkippedPolicies)
 
     if (( ${#applyPoliciesArr[@]} > 0 )); then
-      printf '[%s] Waiting for %d non-skipped polic(ies) to become Compliant…\n' \
-        "$(date -u +%FT%TZ)" "${#applyPoliciesArr[@]}"
+      : "Waiting for ${#applyPoliciesArr[@]} non-skipped polic(ies) to become Compliant…"
       if ! oc wait -n policies \
         --for jsonpath='{.status.compliant}'=Compliant \
         --timeout=40m "${applyPoliciesArr[@]}"; then
@@ -678,13 +675,11 @@ while :; do
         exit 1
       fi
     else
-      printf '[%s] All policies are in the skip list: no policies to wait for\n' \
-        "$(date -u +%FT%TZ)"
+      : "All policies are in the skip list: no policies to wait for"
       complianceAllSkipped=true
     fi
   else
-    printf '[%s] No policies to skip: waiting for ALL policies to become Compliant…\n' \
-      "$(date -u +%FT%TZ)"
+    : "No policies to skip: waiting for ALL policies to become Compliant…"
     if ! oc wait policies --all -n policies \
       --for jsonpath='{.status.compliant}'=Compliant \
       --timeout=40m; then
@@ -710,8 +705,7 @@ while :; do
     exit 1
   fi
   policyCount="${policyCountOut}"
-  printf '[%s] Compliance pass complete: %d policies in the set\n' \
-    "$(date -u +%FT%TZ)" "${policyCount}"
+  : "Compliance pass complete: ${policyCount} policies in the set"
 
   # A pass is the final one only when it ran against a set of the same size
   # and that set then stopped changing across the spaced polls.  Either
@@ -719,8 +713,7 @@ while :; do
   # covered the policies that appeared, and an equal count over one pass can
   # be a set that stalled below its final size.
   if (( policyCount != prevCount )); then
-    printf '[%s] Policy set changed during the pass (%d -> %d policies); re-running the compliance wait\n' \
-      "$(date -u +%FT%TZ)" "${prevCount}" "${policyCount}"
+    : "Policy set changed during the pass (${prevCount} -> ${policyCount} policies); re-running the compliance wait"
     continue
   fi
   typeset -i passStableRc=0
@@ -730,8 +723,7 @@ while :; do
     exit 1
   fi
   if [[ "${complianceStableSet}" != "${prevSet}" ]] || (( complianceStableCount != prevCount )); then
-    printf '[%s] Policy set changed while proving stability (%d -> %d policies, or the names differ from the set the pass covered); re-running the compliance wait\n' \
-      "$(date -u +%FT%TZ)" "${prevCount}" "${complianceStableCount}"
+    : "Policy set changed while proving stability (${prevCount} -> ${complianceStableCount} policies, or the names differ from the set the pass covered); re-running the compliance wait"
     policyCount="${complianceStableCount}"
     continue
   fi
@@ -746,8 +738,7 @@ while :; do
     exit 1
   fi
   if [[ "${refreshedPolicies}" != "${expectedPolicies}" ]]; then
-    printf '[%s] PolicySet membership changed during the pass; re-running the compliance wait\n' \
-      "$(date -u +%FT%TZ)"
+    : "PolicySet membership changed during the pass; re-running the compliance wait"
     continue
   fi
   # The gate is complete only when the set is stable, covers the names the
@@ -755,8 +746,7 @@ while :; do
   typeset missingPolicies=''
   missingPolicies="$(MissingExpectedPolicies "${expectedPolicies}" "${complianceStableSet}")" || missingPolicies=''
   if [[ -n "${missingPolicies}" ]]; then
-    printf '[%s] Policy set stable at %d policies but incomplete: %d expected polic(ies) absent (%s); re-running the compliance wait\n' \
-      "$(date -u +%FT%TZ)" "${complianceStableCount}" "$(printf '%s\n' "${missingPolicies}" | wc -l)" "$(printf '%s' "${missingPolicies}" | tr '\n' ' ')"
+    : "Policy set stable at ${complianceStableCount} policies but incomplete: $(printf '%s\n' "${missingPolicies}" | wc -l) expected polic(ies) absent ($(printf '%s' "${missingPolicies}" | tr '\n' ' ')); re-running the compliance wait"
     missingExpectedNote="; the set stayed stable at ${complianceStableCount} policies without $(printf '%s\n' "${missingPolicies}" | wc -l) expected polic(ies): $(printf '%s' "${missingPolicies}" | tr '\n' ' ')"
     policyCount="${complianceStableCount}"
     continue
@@ -778,8 +768,7 @@ done
 if [[ "${complianceAllSkipped}" == "true" ]]; then
   RecordResult "policies-compliant" "skipped" "All policies are in the skip list: ${skipPoliciesArr[*]}" "$(( $(date +%s) - complianceStart ))"
 else
-  printf '[%s] Policy set complete: %s%s\n' \
-    "$(date -u +%FT%TZ)" "${complianceStabilityNote}" "${complianceSkipNote}"
+  : "Policy set complete: ${complianceStabilityNote}${complianceSkipNote}"
   RecordResult "policies-compliant" "passed" "${complianceStabilityNote}${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
 fi
 
