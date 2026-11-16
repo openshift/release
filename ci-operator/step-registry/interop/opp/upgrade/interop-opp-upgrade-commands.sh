@@ -99,18 +99,21 @@ function NotReadyOppPods () {
 # --- Offline predicate self-test (phase 0) ----------------------------------
 # Pins the readiness predicate on fixtures so a later edit that changes the
 # step semantics fails loudly instead of silently re-reding or re-greening
-# lanes. Installer/bootstrap lines below are verbatim from the pinned runs
-# cited above; control lines are synthetic inputs.
+# lanes. The installer/bootstrap lines reproduce the not-ready shape of the
+# pinned runs cited above (numeric batch id, optional -retry-N, the
+# -ip-<node hostname> suffix); the node hostnames are synthetic example.internal
+# names, not the ones from those runs, so no internal hostname is published
+# here or traced below. Control lines are synthetic inputs too.
 # shellcheck disable=SC2317  # invoked from Main
 function PredicateSelfTest () {
     local fixture expected got failures=0
 
-    fixture="installer-2-ip-10-0-23-27.us-east-2.compute.internal                      0/1   Error       0     65m
-installer-2-retry-1-ip-10-0-23-27.us-east-2.compute.internal              0/1   Error       0     64m
-installer-2-retry-2-ip-10-0-23-27.us-east-2.compute.internal              0/1   Error       0     63m
-installer-3-ip-10-0-3-205.us-east-2.compute.internal                      0/1   Error       0     58m
-installer-3-retry-1-ip-10-0-3-205.us-east-2.compute.internal              0/1   Error       0     57m
-installer-3-retry-2-ip-10-0-3-205.us-east-2.compute.internal              0/1   Error       0     56m"
+    fixture="installer-2-ip-10-0-0-11.example.internal                                 0/1   Error       0     65m
+installer-2-retry-1-ip-10-0-0-11.example.internal                         0/1   Error       0     64m
+installer-2-retry-2-ip-10-0-0-11.example.internal                         0/1   Error       0     63m
+installer-3-ip-10-0-0-12.example.internal                                 0/1   Error       0     58m
+installer-3-retry-1-ip-10-0-0-12.example.internal                         0/1   Error       0     57m
+installer-3-retry-2-ip-10-0-0-12.example.internal                         0/1   Error       0     56m"
     expected=""
     got="$(NotReadyOppPods "${fixture}")"
     if [[ "${got}" != "${expected}" ]]; then
@@ -123,7 +126,7 @@ installer-3-retry-2-ip-10-0-3-205.us-east-2.compute.internal              0/1   
 bootstrap-1234567-deploy-pod                 0/1     Completed         0     58m
 quay-operator-v4-9d8f7c6b5-x2k9l              0/1     CrashLoopBackOff   6     12m
 rhacs-operator-controller-7f6d8b9c-pqrst      1/1     Running            0     60m
-installer-3-ip-10-0-3-205.us-east-2.compute.internal                      0/1   Error       0     58m
+installer-3-ip-10-0-0-12.example.internal     0/1   Error       0     58m
 installer-quay-helper-7c4d8e9f2-abcde         0/1     CrashLoopBackOff   3     21m
 bootstrap-controller-5f8d2c6b9-pqrst          0/1     Error             2     9m"
     expected="quay-operator-v4-9d8f7c6b5-x2k9l              0/1     CrashLoopBackOff   6     12m
@@ -561,7 +564,12 @@ function ValidateOppOperators () {
 
 function Main () {
     echo ">>> PHASE: phase 0 - offline predicate self-test"
+    # xtrace stays off around the self-test: the trace log is copied to
+    # ARTIFACT_DIR when the step fails, and fixture content must not ride
+    # along in it.
+    set +x
     PredicateSelfTest
+    set -x
 
     if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
