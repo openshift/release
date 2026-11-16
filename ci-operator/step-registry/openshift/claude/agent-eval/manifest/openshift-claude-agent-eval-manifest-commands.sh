@@ -1164,9 +1164,11 @@ def verify_result(directory, settings):
 def planned_cases(plan):
     """Return the case IDs the harness must execute for this plan.
 
-    Mirrors agent-eval-harness skills/eval-run/scripts/workspace.py (v1.62.3,
-    lines 70-83): every immediate subdirectory of the resolved dataset.path is
-    a case, ``sorted(d for d in cases_dir.iterdir() if d.is_dir())``, so
+    Mirrors the case-selection rule in the agent-eval-harness skill's
+    skills/eval-run/scripts/workspace.py, which real_harness_contract.py's
+    test_planned_cases_match_the_harness_workspace_selection covers: every
+    immediate subdirectory of the resolved dataset.path is a case,
+    ``sorted(d for d in cases_dir.iterdir() if d.is_dir())``, so
     dot-directories and links to directories count and files do not. A
     nonempty --cases keeps matching names and silently drops unknown IDs; the
     runner passes only IDs it selected, so that request is the expected set.
@@ -1239,7 +1241,8 @@ def verify_run_identity(directory, plan, expected_cases, repo):
     if executed_chain != list(plan.config_chain):
         raise EvalError(f"harness evaluated config chain {executed_chain}, but the runner planned "
                         f"{list(plan.config_chain)}; the orchestrator must run the original --config "
-                        "from the repository root, not a copied or edited file")
+                        "from the repository root, not a copied or edited file (run_result.json "
+                        f"recorded eval_params.config_chain {chain})")
     if result.get("model") != plan.model:
         raise EvalError(f"harness ran model {result.get('model')!r}, but the runner planned "
                         f"{plan.model!r} from models.skill; the orchestrator must pass --model unchanged")
@@ -1595,8 +1598,8 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
                     if status:
                         raise EvalError(f"Claude orchestrator failed (exit {status}); see {stream_log.name}")
                     directory = run_directory(runs, run_id, plan.eval_name)
-                    verify_result(directory, plan.settings)
                     verify_run_identity(directory, plan, expected_cases, repo)
+                    verify_result(directory, plan.settings)
                     if remaining(deadline) <= 0:
                         raise EvalError("step time limit reached before regression scoring")
                     # Score the verified physical run through the same harness
