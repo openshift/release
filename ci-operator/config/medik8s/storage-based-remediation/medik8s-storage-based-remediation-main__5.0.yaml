@@ -116,7 +116,7 @@ tests:
       ECO_IS_DOWNSTREAM: "false"
       ECO_TEST_FEATURES: sbr-operator
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
-        && !tier:upgrade-cluster && !tier:interop'
+        && !tier:upgrade-cluster && !tier:interop && !tier:preview'
       ECO_TEST_VERBOSE: "true"
       ODF_OPERATOR_CHANNEL: stable-5.0
       ODF_VERSION_MAJOR_MINOR: "5.0"
@@ -159,6 +159,77 @@ tests:
         mkdir -p "$ECO_REPORTS_DUMP_DIR"
 
         echo '==> Run system-tests (sbr-operator)'
+        make -C /tmp/system-tests run-tests
+      env:
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: ECO_IS_DOWNSTREAM
+      from: pr-test-runner
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-system-tests-sbr-pr-aws-odf-block-per-node
+  capabilities:
+  - nested-podman
+  - intranet
+  optional: true
+  skip_branches:
+  - ^main$
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+      ECO_IS_DOWNSTREAM: "false"
+      ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_LABELS: feature:block-per-node && tier:preview
+      ECO_TEST_VERBOSE: "true"
+      ODF_OPERATOR_CHANNEL: stable-5.0
+      ODF_VERSION_MAJOR_MINOR: "5.0"
+      SOURCE_OPERATOR: sbr
+      TEST_NAME: e2e-system-tests-sbr-pr-aws-odf-block-per-node
+      TEST_STEPS: e2e-test
+    post:
+    - ref: medik8s-analyze-e2e-failure
+    test:
+    - ref: medik8s-source-build-and-install
+    - ref: medik8s-deploy-odf-dev-catalog
+    - ref: medik8s-sbr-nfs-dynamic-provisioner
+    - as: e2e-test
+      cli: latest
+      commands: |
+        set -o errexit -o nounset -o pipefail
+
+        : "${ARTIFACT_DIR:?ci-operator must provide ARTIFACT_DIR}"
+        exec > >(tee "$ARTIFACT_DIR/e2e-test.log") 2>&1
+
+        export GOPATH=/tmp/sbr-go
+        export GOMODCACHE="$GOPATH/pkg/mod"
+        export GOCACHE=/tmp/sbr-go-build-cache
+        mkdir -p "$GOMODCACHE" "$GOCACHE"
+
+        if [[ -f "${SHARED_DIR}/workload_image" ]]; then
+          export WORKLOAD_IMAGE=$(cat "${SHARED_DIR}/workload_image")
+        else
+          # medik8s-lib (part of medik8s-setup) normally writes this; this job skips that chain.
+          export WORKLOAD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
+        fi
+
+        echo '==> Clone openshift/rhwa-system-tests main'
+        git clone --depth=1 --branch main \
+          https://github.com/openshift/rhwa-system-tests.git /tmp/system-tests
+        git -C /tmp/system-tests show --no-patch --format=fuller HEAD
+        git -C /tmp/system-tests rev-parse HEAD > "$ARTIFACT_DIR/system-tests-commit.txt"
+
+        export ECO_REPORTS_DUMP_DIR="${ARTIFACT_DIR}/reports"
+        mkdir -p "$ECO_REPORTS_DUMP_DIR"
+
+        echo '==> Run system-tests (sbr-operator block-per-node preview)'
         make -C /tmp/system-tests run-tests
       env:
       - name: ECO_TEST_FEATURES
