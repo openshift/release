@@ -710,6 +710,69 @@ tests:
     test:
     - chain: openshift-qe-cudn-density
 - always_run: false
+  as: cudn-density-midterm-scenario-b-postmerge-120nodes-aws
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "117"
+      AWS_INSTANCE_TYPE: m5.4xlarge
+      AWS_MAX_TARGETS: "25"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BURST: "5"
+      COMPUTE_NODE_TYPE: r5.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.32xlarge
+      GC: "false"
+      ITERATIONS: "200"
+      KUBE_BURNER_OCP_COMMIT: af05adea3871be8054fe5a62d100ccdc38b247c2
+      KUBE_BURNER_OCP_REPO: https://github.com/SachinNinganure/kube-burner-ocp.git
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      POD_READY_THRESHOLD: 3600s
+      QPS: "5"
+      SET_ENV_BY_PLATFORM: custom
+      TIMEOUT: 4h
+      ZONES_COUNT: "1"
+    post:
+    - ref: openshift-qe-cudn-density-midterm-b-aws-teardown
+    - ref: openshift-qe-cudn-density-midterm-collect-logs
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-workers-scale
+    - ref: openshift-qe-cudn-density-midterm-enable-arp-flood-fix
+    test:
+    - ref: openshift-qe-cudn-density-midterm-b-aws
+- always_run: false
+  as: cudn-density-midterm-scenario-a-postmerge-120nodes-aws
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      ADDITIONAL_WORKER_NODES: "117"
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BURST: "5"
+      COMPUTE_NODE_TYPE: r5.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6i.32xlarge
+      GC: "false"
+      ITERATIONS: "100"
+      JOB_PAUSE: 10m
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+      POD_READY_THRESHOLD: 1400s
+      QPS: "5"
+      SET_ENV_BY_PLATFORM: custom
+      ZONES_COUNT: "1"
+    post:
+    - ref: openshift-qe-cudn-density-midterm-collect-logs
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-workers-scale
+    - ref: openshift-qe-cudn-density-midterm-enable-arp-flood-fix
+    test:
+    - ref: openshift-qe-cudn-density-midterm-a
+- always_run: false
   as: e2e-aws-ovn-techpreview
   optional: true
   steps:
