@@ -1,0 +1,32 @@
+ref:
+  as: kubevirt-ssp-cluster-provision
+  from: tools
+  commands: kubevirt-ssp-cluster-provision-commands.sh
+  timeout: 3h
+  grace_period: 1m
+  credentials:
+  - collection: libvirt-s390x-vpn-virt
+    group: cluster-api
+    mount_path: /var/run/cluster-api
+  env:
+  - name: CLUSTER_API_REBUILD_ENABLED
+    default: "false"
+    documentation: Enable only after confirming the API contract and dedicated rebuild targets. The operation replaces the leased cluster.
+  - name: CLUSTER_API_OPENSHIFT_VERSION
+    default: ""
+    documentation: Exact approved OpenShift version; no default release is selected.
+  - name: CLUSTER_API_TIMEOUT_SECONDS
+    default: "9000"
+    documentation: Overall API provisioning budget, allowing a two-hour server deadline plus polling and handoff.
+  - name: CLUSTER_API_POLL_SECONDS
+    default: "30"
+    documentation: Interval between build status requests.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Provision the exclusively leased HA slot through the infrastructure API and
+    retrieve a generation-specific kubeconfig. Implements the proposed v1 contract
+    documented in README.md, not Kubernetes Cluster API. Disabled until the service
+    contract, credentials and server-side exclusion/recovery behavior are confirmed.
