@@ -27,6 +27,30 @@ chain:
           --namespace local-cluster \
           --cluster-grace-period 60m || true
 
+        wait_for_removal() {
+          local resource=$1 display_name=$2 current
+          echo "$(date) Waiting for ${display_name} ${CLUSTER_NAME} to be removed"
+          while :; do
+            if ! current=$(oc get "${resource}" "${CLUSTER_NAME}" -n local-cluster \
+              --ignore-not-found -o name --request-timeout=20s); then
+              echo "Could not verify removal of ${display_name} ${CLUSTER_NAME}"
+              return 1
+            fi
+            if [[ -z "${current}" ]]; then
+              return 0
+            fi
+            if (( SECONDS >= deletion_deadline )); then
+              echo "Timed out waiting for ${display_name} ${CLUSTER_NAME} to be removed"
+              return 1
+            fi
+            sleep 15
+          done
+        }
+
+        deletion_deadline=$((SECONDS + 1200))
+        wait_for_removal hostedcluster HostedCluster
+        wait_for_removal nodepool NodePool
+
         echo "$(date) Finished deleting cluster"
         
         oc delete managedcluster ${CLUSTER_NAME} --ignore-not-found
