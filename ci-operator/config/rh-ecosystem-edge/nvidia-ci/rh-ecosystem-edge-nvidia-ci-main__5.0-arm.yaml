@@ -11,7 +11,7 @@ releases:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -21,24 +21,22 @@ resources:
       memory: 2Gi
 tests:
 - always_run: false
-  as: e2e-aws-arm-rhcos10-check
+  as: e2e-aws-arm-check
   steps:
     cluster_profile: aws-edge-infra
     env:
       BASE_DOMAIN: edge-sro.rhecoeng.com
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "1"
-      FEATURE_SET: TechPreviewNoUpgrade
       OCP_ARCH: arm64
-      OS_IMAGE_STREAM: rhel-10
     test:
-    - as: verify-rhcos10-arm
+    - as: verify-arm-rhcos10
       cli: latest
       commands: |
-        # Step 1 of the ovs-doca el10/arm plan: prove the cluster itself.
-        # Verify every node booted the requested combination: arm64
-        # architecture and RHCOS 10 (via the osImageStream: rhel-10
-        # install-config parameter consumed by ipi-conf as OS_IMAGE_STREAM).
+        # Cluster-only baseline for the ovs-doca el10/arm plan on OCP 5.0:
+        # verify every node is arm64 running RHCOS 10. Unlike 4.21/4.22,
+        # RHCOS 10 is the DEFAULT node OS in 5.0 -- no osImageStream install
+        # parameter and no TechPreviewNoUpgrade feature gate are needed.
         # Counts only -- node names are never printed
         # (No-Sensitive-Data-In-Logs). All oc calls are wrapped in timeout so
         # a hung API connection can never wedge the whole job (prow's default
@@ -63,4 +61,4 @@ zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
   repo: nvidia-ci
-  variant: 4.22-arm-rhcos10
+  variant: 5.0-arm

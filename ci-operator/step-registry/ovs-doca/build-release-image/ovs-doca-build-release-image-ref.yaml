@@ -11,8 +11,11 @@ ref:
   - name: OVS_DOCA_LAYERED_IMAGE
     default: "doca-rhcos-10"
     documentation: |-
-      Name of the image target (and thus the imagestream in the job namespace)
-      holding the DOCA-layered RHCOS image built by this job's images phase.
+      The DOCA-layered RHCOS image, in one of two forms: a full pullspec
+      (e.g. quay.io/.../ovs-doca-el10-rhcos:tag) of a pre-built image --
+      required for arm64, since the x86_64 build farm cannot produce arm64
+      images -- or the bare name of an image target (imagestream in the
+      job namespace) built by this job's images phase.
   - name: OVS_DOCA_RELEASE_IS
     default: "ovs-doca-release"
     documentation: |-
@@ -26,12 +29,14 @@ ref:
     architectures where include_built_images is unavailable (arm64 candidate
     payloads have no integration stream).
 
-    Resolves the layered image from the job's imagestream (named after the
-    image target, OVS_DOCA_LAYERED_IMAGE), assembles a new payload from the
-    current release image with `oc adm release new ... rhel-coreos=<layered>`,
-    pushes it to an imagestream in the job namespace (the same registry the
-    default payload lives in), and writes the digest-pinned pullspec to
-    ${SHARED_DIR}/custom-release-image.
+    Resolves the layered image either from a full pullspec (OVS_DOCA_LAYERED_IMAGE
+    containing '/', e.g. a quay-hosted pre-built image -- the required mode for
+    arm64, since the x86_64 build farm cannot produce arm64 images) or from the
+    job's imagestream (bare name, image built by this job's images phase).
+    Assembles a new payload from the current release image with
+    `oc adm release new ... rhel-coreos=<layered>`, pushes it to an imagestream
+    in the job namespace (the same registry the default payload lives in), and
+    writes the digest-pinned pullspec to ${SHARED_DIR}/custom-release-image.
 
     The ipi-install step picks the file up and installs the cluster from the
     rebuilt payload, so nodes boot the DOCA layer from the first boot. Must

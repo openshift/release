@@ -18,16 +18,24 @@ set -o pipefail
 
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
 
-# 1. Resolve the layered image built by this job's images phase: the image is
-#    tagged into an imagestream named after the image target. KUBECONFIG=""
-#    makes oc use this pod's service account against the build cluster, and
-#    the pod's namespace is the job namespace.
-LAYERED_REF=$(KUBECONFIG="" oc get is "${OVS_DOCA_LAYERED_IMAGE}" -o jsonpath='{.status.tags[0].items[0].image}')
-if [[ -z "${LAYERED_REF}" ]]; then
-  echo "ERROR: imagestream ${OVS_DOCA_LAYERED_IMAGE} has no built image tag"
-  exit 1
+# 1. Resolve the DOCA-layered RHCOS image. Two modes:
+#    - full pullspec (contains '/'): use as-is -- e.g. a quay-hosted image
+#      built outside CI (the arm64 build farm cannot produce arm64 images,
+#      so the layered image is pre-built and hosted; see the variant docs)
+#    - bare name: an imagestream in this job's namespace (an image built by
+#      this job's images phase). KUBECONFIG="" makes oc use this pod's
+#      service account against the build cluster.
+if [[ "${OVS_DOCA_LAYERED_IMAGE}" == */* ]]; then
+  LAYERED_REF="${OVS_DOCA_LAYERED_IMAGE}"
+  echo "layered image (direct pullspec): ${LAYERED_REF}"
+else
+  LAYERED_REF=$(KUBECONFIG="" oc get is "${OVS_DOCA_LAYERED_IMAGE}" -o jsonpath='{.status.tags[0].items[0].image}')
+  if [[ -z "${LAYERED_REF}" ]]; then
+    echo "ERROR: imagestream ${OVS_DOCA_LAYERED_IMAGE} has no built image tag"
+    exit 1
+  fi
+  echo "layered image (job imagestream): ${LAYERED_REF}"
 fi
-echo "layered image: ${LAYERED_REF}"
 
 # 2. Destination: same registry and namespace as the default payload, under a
 #    dedicated imagestream. The external form of this address is exactly what
