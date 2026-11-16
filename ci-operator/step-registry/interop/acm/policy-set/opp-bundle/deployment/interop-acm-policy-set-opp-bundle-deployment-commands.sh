@@ -169,7 +169,13 @@ PostProcessJunit () {
 # Order matters: the raw report is generated first, the helper merges it and
 # writes the merged report to the SHARED_DIR root, and the fallback copy runs
 # last so it can tell whether that merged report is there.
-trap '_opp_test_status=$?; set +e; GenerateJunit; PostProcessJunit; _propagate_junit; exit ${_opp_test_status}' EXIT
+trap '{(
+    set +e
+    GenerateJunit
+    PostProcessJunit
+    _propagate_junit
+    true
+)}' EXIT
 
 cd /tmp/
 # A re-run in the same pod leaves the clone behind and a shallow clone

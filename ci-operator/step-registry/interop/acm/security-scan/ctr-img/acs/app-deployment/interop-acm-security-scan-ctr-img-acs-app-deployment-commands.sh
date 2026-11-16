@@ -638,7 +638,7 @@ def lastn($d): split("/") | .[-$d:] | join("/");
     typeset -i retries=10
     typeset -i retryInterval=30
     typeset isImageFound=false
-    typeset httpdImageJson="" imageId="" cves="" image="" recordValid=""
+    typeset httpdImageJson="" cves="" image="" recordValid=""
     typeset -i matchCount=0
     typeset -i multiMatchCount=0
 
@@ -660,7 +660,6 @@ def lastn($d): split("/") | .[-$d:] | join("/");
         matchCount=$(echo "${httpdImageJson}" | /tmp/jq 'length')
         if (( matchCount > 1 )); then
             multiMatchCount="${matchCount}"
-            imageId=''
             cves=''
             : "Attempt ${attempt}/${retries}: ${matchCount} ACS records match ${deployedRepo}; waiting for a single matching record"
         elif (( matchCount == 1 )); then
@@ -674,7 +673,6 @@ def lastn($d): split("/") | .[-$d:] | join("/");
                 .[0]
                 | ((.id | type) == "string") and ((.id | length) > 0) and ((.cves | type) == "number")')
             if [ "${recordValid}" = "true" ]; then
-                imageId=$(echo "${httpdImageJson}" | /tmp/jq -r '.[0].id')
                 cves=$(echo "${httpdImageJson}" | /tmp/jq -r '.[0].cves')
                 image=$(echo "${httpdImageJson}" | /tmp/jq '.[0].name // ""')
                 : "Success: Found ${cves} CVEs for image ${image}"

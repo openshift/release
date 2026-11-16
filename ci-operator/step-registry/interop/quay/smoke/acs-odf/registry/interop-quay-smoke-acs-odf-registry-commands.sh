@@ -6,7 +6,7 @@ set -euxo pipefail; shopt -s inherit_errexit
 umask 077
 
 # --- Trace-to-file: always capture, dump on failure only ---
-typeset _xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
 exec {_xtrace_fd}>"${_xtrace_log}"
 BASH_XTRACEFD=${_xtrace_fd}
 
