@@ -441,18 +441,36 @@ if [[ "${ACS_REPORT_ONLY}" == "1" ]]; then
   # catalog is absent or erroring. It also runs before the self-disable
   # check so the full property set is recorded even when an OperatorPolicy
   # owns the install. Subscription presence is queried independently of
-  # spec.channel (OLM permits an omitted channel).
+  # spec.channel (OLM permits an omitted channel). The named reads carry
+  # --ignore-not-found, so a missing object stays a determinate absence. A
+  # read that fails for any other reason is kept as its own state
+  # (undecided) instead of being folded into the absent/adopted answer:
+  # detection output must not report an API or RBAC error as an object state.
   _api_quiet
-  _subname=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.name}' 2>/dev/null) || _subname=""
-  _sub=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null) || _sub=""
-  _csvp=$(oc get csv -n "${ACS_NAMESPACE}" -l "operators.coreos.com/rhacs-operator.${ACS_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _csvp=""
-  _pm=$(oc get packagemanifest rhacs-operator -n openshift-marketplace -o name 2>/dev/null) || _pm=""
+  _subname=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" --ignore-not-found -o jsonpath='{.metadata.name}' 2>/dev/null) || _subname="undecided"
+  _sub=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" --ignore-not-found -o jsonpath='{.spec.channel}' 2>/dev/null) || _sub="undecided"
+  _csvp=$(oc get csv -n "${ACS_NAMESPACE}" -l "operators.coreos.com/rhacs-operator.${ACS_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _csvp="undecided"
+  _pm=$(oc get packagemanifest rhacs-operator -n openshift-marketplace --ignore-not-found -o name 2>/dev/null) || _pm="undecided"
+  if [[ "${_subname}" == "undecided" ]]; then
+    _subname_state="undecided"
+  elif [[ -n "${_subname}" ]]; then
+    _subname_state="adopted"
+  else
+    _subname_state="absent"
+  fi
+  if [[ "${_pm}" == "undecided" ]]; then
+    _pm_state="undecided"
+  elif [[ -n "${_pm}" ]]; then
+    _pm_state="present"
+  else
+    _pm_state="absent"
+  fi
   _prop "report_only" "true"
-  _prop "acs_subscription" "$([[ -n "${_subname}" ]] && echo adopted || echo absent)"
-  _prop "channel_observed" "$([[ -n "${_subname}" ]] && echo "${_sub:-empty}" || echo absent)"
+  _prop "acs_subscription" "${_subname_state}"
+  _prop "channel_observed" "$([[ "${_subname_state}" == "adopted" ]] && echo "${_sub:-empty}" || echo "${_subname_state}")"
   _prop "csv_phase" "${_csvp:-absent}"
   _prop "packagemanifest" "${_pm:-absent}"
-  echo ">>> REPORT_ONLY: subscription=${_sub:-absent} csv=${_csvp:-absent} packagemanifest=$([[ -n "${_pm}" ]] && echo present || echo absent)"
+  echo ">>> REPORT_ONLY: subscription=${_sub:-absent} csv=${_csvp:-absent} packagemanifest=${_pm_state}"
   _api_loud
   exit 0
 fi
