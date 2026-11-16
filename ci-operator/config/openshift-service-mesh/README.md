@@ -1,10 +1,10 @@
 # OSSM Service Mesh automation
 
-`supported-istio-versions.txt` lists the supported upstream Istio minor versions,
-one `major.minor` version per line, with no comments or blank lines.
+The weekday Istio z-stream release-branch job processes only the latest stable
+patch tag for upstream Istio minor versions 1.30 and 1.31. These versions are
+hard-coded in the `supported_versions` array in
+`ci-operator/step-registry/servicemesh/istio/release-branches/servicemesh-istio-release-branches-commands.sh`.
 
-When a new minor version becomes supported, add it and remove the version that
-has dropped out of support. The weekday Istio z-stream release-branch job reads
-this file from the default branch of `openshift/release` and processes only the
-latest stable patch tag for each listed version. See the
+When a new minor version becomes supported, update that array and remove the
+version that has dropped out of support. See the
 `servicemesh-istio-release-branches` step for how branch points are chosen.

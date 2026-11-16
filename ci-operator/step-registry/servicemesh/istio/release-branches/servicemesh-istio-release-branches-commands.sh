@@ -6,13 +6,10 @@ set -euo pipefail
 export GH_TOKEN
 GH_TOKEN=$(< /creds-github/token)
 repo=openshift-service-mesh/istio
+supported_versions=(1.30 1.31)
 
 workdir=$(mktemp -d)
 trap 'rm -rf "${workdir}"' EXIT
-# This job checks out istio, not openshift/release; read policy from its default branch.
-gh api repos/openshift/release/contents/ci-operator/config/openshift-service-mesh/supported-istio-versions.txt \
-  -H 'Accept: application/vnd.github.raw+json' > "${workdir}/supported-istio-versions.txt"
-mapfile -t supported_versions < "${workdir}/supported-istio-versions.txt"
 
 # Requires --merge-tag support in maistra/test-infra's automator.
 git clone --quiet --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git "${workdir}/test-infra"
