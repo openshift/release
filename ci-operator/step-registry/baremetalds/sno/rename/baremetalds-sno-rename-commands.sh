@@ -81,6 +81,11 @@ if ! virsh net-info "${SECONDARY_NETWORK}" &>/dev/null; then
     <dnsmasq:option value="address=/apps.${NEW_CLUSTER_NAME}.${NEW_BASE_DOMAIN}/${ADDITIONAL_NODE_IP}"/>
     <dnsmasq:option value="address=/api.${NEW_CLUSTER_NAME}.${NEW_BASE_DOMAIN}/${ADDITIONAL_NODE_IP}"/>
     <dnsmasq:option value="address=/api-int.${NEW_CLUSTER_NAME}.${NEW_BASE_DOMAIN}/${ADDITIONAL_NODE_IP}"/>
+    <!-- Answer NXDOMAIN for every other name under the new domain. Without
+         local=, this dnsmasq sends those names to its upstream, the
+         hypervisor's NetworkManager dnsmasq, which forwards the new domain
+         back here (recert-rename.conf, below): a loop that hangs the lookup. -->
+    <dnsmasq:option value="local=/${NEW_CLUSTER_NAME}.${NEW_BASE_DOMAIN}/"/>
   </dnsmasq:options>
 </network>
 NETXML
@@ -690,6 +695,29 @@ fi
 sed -i -e "s/${PREVIOUS_CLUSTER_NAME}/${NEW_CLUSTER_NAME}/g" -e "s/${PREVIOUS_BASE_DOMAIN}/${NEW_BASE_DOMAIN}/g" ${KUBECONFIG}
 echo "${ADDITIONAL_NODE_IP} api.${NEW_CLUSTER_NAME}.${NEW_BASE_DOMAIN}" | tee --append /etc/hosts
 info "Replaced server field in ${KUBECONFIG} to reflect recert cluster rename and base domain changes"
+
+# dev-scripts configured DNS on the dev-scripts hypervisor (the machine running
+# this script) for the pre-rename cluster domain only, in the NetworkManager
+# dnsmasq on 127.0.0.1. Without the forward below, openshift-tests on the
+# hypervisor cannot resolve routes under <NEW_CLUSTER_NAME>.<NEW_BASE_DOMAIN>,
+# e.g. thanos-querier for the monitor tests. The recert-secondary libvirt
+# network created at the top of this script (the network carrying the SNO
+# node's post-recert IP, <ADDITIONAL_NODE_IP>) runs a dnsmasq on the
+# recert-secondary gateway address, which already holds the api, api-int and
+# *.apps records for the new domain. Forward the new domain from the
+# NetworkManager dnsmasq to the recert-secondary dnsmasq. Read the gateway
+# address from libvirt, because a pre-existing recert-secondary network skips
+# the network definition above.
+SECONDARY_NETWORK_GATEWAY=$(virsh net-dumpxml "${SECONDARY_NETWORK}" | \
+  xmllint --xpath "string(//ip/@address)" -)
+if [[ -z "${SECONDARY_NETWORK_GATEWAY}" ]]; then
+  info "ERROR: could not read the ${SECONDARY_NETWORK} gateway address from libvirt"
+  exit 1
+fi
+echo "server=/${NEW_CLUSTER_NAME}.${NEW_BASE_DOMAIN}/${SECONDARY_NETWORK_GATEWAY}" \
+  > /etc/NetworkManager/dnsmasq.d/recert-rename.conf
+systemctl reload NetworkManager
+info "Forwarding hypervisor DNS for ${NEW_CLUSTER_NAME}.${NEW_BASE_DOMAIN} to the ${SECONDARY_NETWORK} network dnsmasq (${SECONDARY_NETWORK_GATEWAY})"
 
 info "Waiting for master MachineConfigPool to have condition=updated..."
 MCP_DEADLINE=$((SECONDS + 1800))
