@@ -79,26 +79,48 @@ if ! az graph query -q "
     | order by type asc, name asc
 " --first 1000 -o json | jq '
     # Remove credential and bootstrap-data fields before writing the inventory.
-    .data |= map(del(
-        .properties.osProfile.adminPassword,
-        .properties.osProfile.customData,
-        .properties.osProfile.secrets,
-        .properties.osProfile.linuxConfiguration.ssh,
-        .properties.osProfile.windowsConfiguration.additionalUnattendContent,
-        .properties.userData,
-        .properties.protectedSettings,
-        .properties.protectedSettingsFromKeyVault,
-        .properties.extensions[]?.properties.protectedSettings,
-        .properties.extensions[]?.properties.protectedSettingsFromKeyVault,
-        .properties.virtualMachineProfile.osProfile.adminPassword,
-        .properties.virtualMachineProfile.osProfile.customData,
-        .properties.virtualMachineProfile.osProfile.secrets,
-        .properties.virtualMachineProfile.osProfile.linuxConfiguration.ssh,
-        .properties.virtualMachineProfile.osProfile.windowsConfiguration.additionalUnattendContent,
-        .properties.virtualMachineProfile.userData,
-        .properties.virtualMachineProfile.extensionProfile.extensions[]?.properties.protectedSettings,
-        .properties.virtualMachineProfile.extensionProfile.extensions[]?.properties.protectedSettingsFromKeyVault
-    ))
+    .data |= map(
+        del(
+            .properties.osProfile.adminPassword,
+            .properties.osProfile.customData,
+            .properties.osProfile.secrets,
+            .properties.osProfile.linuxConfiguration.ssh,
+            .properties.osProfile.windowsConfiguration.additionalUnattendContent,
+            .properties.userData,
+            .properties.protectedSettings,
+            .properties.protectedSettingsFromKeyVault,
+            .properties.extensions[]?.properties.protectedSettings,
+            .properties.extensions[]?.properties.protectedSettingsFromKeyVault,
+            .properties.virtualMachineProfile.osProfile.adminPassword,
+            .properties.virtualMachineProfile.osProfile.customData,
+            .properties.virtualMachineProfile.osProfile.secrets,
+            .properties.virtualMachineProfile.osProfile.linuxConfiguration.ssh,
+            .properties.virtualMachineProfile.osProfile.windowsConfiguration.additionalUnattendContent,
+            .properties.virtualMachineProfile.userData,
+            .properties.virtualMachineProfile.extensionProfile.extensions[]?.properties.protectedSettings,
+            .properties.virtualMachineProfile.extensionProfile.extensions[]?.properties.protectedSettingsFromKeyVault
+        )
+        # Redact public addresses and prefixes, including copies in public DNS records.
+        | ((.type // "") | ascii_downcase) as $resource_type
+        | if $resource_type == "microsoft.network/publicipaddresses"
+            and .properties.ipAddress? != null
+          then .properties.ipAddress = "REDACTED"
+          elif $resource_type == "microsoft.network/publicipprefixes"
+            and .properties.ipPrefix? != null
+          then .properties.ipPrefix = "REDACTED"
+          elif $resource_type == "microsoft.network/dnszones/a"
+            and .properties.ARecords? != null
+          then .properties.ARecords |= map(
+            if .ipv4Address? != null then .ipv4Address = "REDACTED" else . end
+          )
+          elif $resource_type == "microsoft.network/dnszones/aaaa"
+            and .properties.AAAARecords? != null
+          then .properties.AAAARecords |= map(
+            if .ipv6Address? != null then .ipv6Address = "REDACTED" else . end
+          )
+          else .
+          end
+    )
 ' > "${JSON_FILE}"; then
     echo "Failed to query or redact Azure resource inventory" >&2
     echo "{}" > "${JSON_FILE}"
@@ -174,7 +196,7 @@ echo "Raw JSON written to ${JSON_FILE}"
 
     # --- Public IPs ---
     echo "--- Public IPs ---"
-    jq -r '.data[] | select(.type == "microsoft.network/publicipaddresses") |
+    jq -r '.data[] | select(((.type // "") | ascii_downcase) == "microsoft.network/publicipaddresses") |
         "  \(.name)  address=\(.properties.ipAddress // "unassigned")  allocation=\(.properties.publicIPAllocationMethod)  version=\(.properties.publicIPAddressVersion)"' "${JSON_FILE}" \
         || echo "  (none)"
     echo ""
