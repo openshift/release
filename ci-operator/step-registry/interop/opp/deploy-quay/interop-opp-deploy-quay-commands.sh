@@ -1005,14 +1005,22 @@ spec:
                   -H "Authorization: Bearer $TOKEN" "https://$QUAY_HOST$1"
               }
 
+              # One bounded wait, no polling loop: a loop of oc wait calls
+              # reports nothing when the budget runs out and hides a hung API
+              # call. The outer step already waited for Available=True, so this
+              # only covers a Job re-run against a registry that regressed.
+              # 300s is deliberate: it stays below the enclosing QUAY_ADMIN_JOB_TIMEOUT
+              # (default 420s), so a regressed registry surfaces as the registry diagnosis
+              # rather than the job timeout; the ref-declared QUAY_REGISTRY_TIMEOUT
+              # governs the outer step wait, not this inner re-run guard.
               echo -n "Waiting for the Quay Registry CR to be available ."
-              RC=$(oc wait QuayRegistry -n local-quay registry --for=condition=Available=true > /dev/null 2>&1;echo $?)
-
-              while [ $RC -ne 0 ]; do
-                sleep 2
-                echo -n "."
-                RC=$(oc wait QuayRegistry -n local-quay registry --for=condition=Available=true > /dev/null 2>&1;echo $?)
-              done
+              _REG_WAIT_OUT=$(oc wait QuayRegistry -n local-quay registry --for=condition=Available=true --timeout=300s 2>&1)
+              _REG_WAIT_RC=$?
+              if [ "${_REG_WAIT_RC}" -ne 0 ]; then
+                echo
+                echo "[ERROR] QuayRegistry registry in local-quay did not report Available=True within 300s (oc wait rc=${_REG_WAIT_RC}): ${_REG_WAIT_OUT}" 1>&2
+                exit 1
+              fi
               echo "done"
 
               CURL_OPTS="-fsSLk"
@@ -1065,13 +1073,21 @@ spec:
                 BASE64AUTH=`echo -n $QUAY_USER:$QUAY_PASSWORD | base64 -w0`
 
                 echo "[INFO] Creating $QUAY_USER_SECRET secret ..."
-                oc -n $QUAY_NAMESPACE create secret generic $QUAY_USER_SECRET --from-literal=password="$QUAY_PASSWORD" --from-literal=basic="$BASE64AUTH"
+                # Secret values arrive on their own streams, never in argv
+                # (process listings and the Job manifest's command line are
+                # readable in artifacts). Two keys cannot both read stdin, so
+                # each gets its own process-substitution stream, byte-exact:
+                # same form as the quayadmin secret above.
+                oc -n $QUAY_NAMESPACE create secret generic $QUAY_USER_SECRET \
+                  --from-file=password=<( set +x; printf '%s' "${QUAY_PASSWORD}" ) \
+                  --from-file=basic=<( set +x; printf '%s' "${BASE64AUTH}" )
 
                 echo "[INFO] Creating quay-pull-secret ..."
                 echo -e "{ \"auths\": { \"$QUAY_HOST\": { \"auth\": \"$BASE64AUTH\" } }}" | oc -n $QUAY_NAMESPACE create secret generic quay-pull-secret --from-file=.dockerconfigjson=/dev/stdin --type=kubernetes.io/dockerconfigjson
 
                 echo "[INFO] Creating quay integration token secret ..."
-                oc -n $QUAY_NAMESPACE create secret generic quay-integration --from-literal=token=$TOKEN
+                oc -n $QUAY_NAMESPACE create secret generic quay-integration \
+                  --from-file=token=<( set +x; printf '%s' "${TOKEN}" )
               fi
 
               echo "[INFO] Looking for initial organization ..."
