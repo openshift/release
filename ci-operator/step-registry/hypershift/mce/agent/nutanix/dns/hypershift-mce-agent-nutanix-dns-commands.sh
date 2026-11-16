@@ -93,5 +93,21 @@ jq --arg change "$change_id" '.phase="created" | .changeID=$change' \
   "$state_file" > "$state_file.tmp"
 mv "$state_file.tmp" "$state_file"
 aws route53 wait resource-record-sets-changed --id "$change_id"
+zone_records=$(aws route53 list-resource-record-sets --hosted-zone-id "$zone_id" --output json)
+# Route53 escapes wildcard names as \052 in readback responses.
+if ! jq -e --slurpfile state "$state_file" '
+  [.ResourceRecordSets[] | .Name |= gsub("\\\\052"; "*")] as $actual |
+  all($state[0].records[]; . as $wanted |
+    [$actual[] | select(.Name == $wanted.Name and .Type == $wanted.Type)] as $matches |
+    ($matches | length) == 1 and $matches[0] == $wanted)
+' <<<"$zone_records" >/dev/null; then
+  echo "The Route53 record sets do not match this run's expected values; retaining state for guarded cleanup."
+  exit 1
+fi
+mkdir -p "$ARTIFACT_DIR"
+jq -r --arg zone "$zone_id" '
+  "zoneID=\($zone)", "recordCount=\(.records | length)",
+  (.records[] | "\(.Name) \(.Type) TTL=\(.TTL) verified")
+' "$state_file" > "$ARTIFACT_DIR/nutanix-route53-records.txt"
 printf 'Created run-owned Route53 records for %s.%s in zone %s.\n' \
   "$cluster" "$domain" "$zone_id"
