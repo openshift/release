@@ -61,19 +61,17 @@ typeset isForceUpdate="false"
 #
 # Single-shot CVO upgrade artifacts -- installer-N / installer-N-retry-N pods
 # -- exit (often to Error) once their upgrade batch completes and are not OPP
-# operator workload. They must not count against readiness: the 5.0/5.1
+# operator workload. They must not count against readiness: the 5.0 and 5.1
 # upgrade lanes failed ValidateOppOperators on exactly these pods while CVO,
-# ClusterOperators and MachineConfigPools were all healthy (runs
-# 2118373032635404288 and 2118380423871467520; pinned witnesses
-# 2116725542353899520 installer-3 x3, 2116930868332204032 installer-4).
+# ClusterOperators and MachineConfigPools were all healthy.
 #
 # The exclusion is keyed to the CVO artifacts' structural naming - a numeric
 # batch id, an optional -retry-N, and the node hostname (installer-N
 # [-retry-N]-ip-<host>) - NOT to the bare installer-/bootstrap- prefix: a
 # genuinely failing OPP pod that merely starts with those words (e.g.
-# installer-quay-helper) must stay visible to readiness (CodeRabbit review
-# of this PR). Bootstrap pods follow the same tightened shape when they
-# carry it; a bootstrap-named pod without the hostname suffix stays visible.
+# installer-quay-helper) must stay visible to readiness. Bootstrap pods
+# follow the same tightened shape when they carry it; a bootstrap-named pod
+# without the hostname suffix stays visible.
 # ---------------------------------------------------------------------------
 function NotReadyOppPods () {
     # $1: `oc get pods --no-headers` output; prints the not-ready lines.
@@ -98,12 +96,13 @@ function NotReadyOppPods () {
 
 # --- Offline predicate self-test (phase 0) ----------------------------------
 # Pins the readiness predicate on fixtures so a later edit that changes the
-# step semantics fails loudly instead of silently re-reding or re-greening
-# lanes. The installer/bootstrap lines reproduce the not-ready shape of the
-# pinned runs cited above (numeric batch id, optional -retry-N, the
-# -ip-<node hostname> suffix); the node hostnames are synthetic example.internal
-# names, not the ones from those runs, so no internal hostname is published
-# here or traced below. Control lines are synthetic inputs too.
+# step semantics reports a FATAL log line and a failing JUnit row instead of
+# silently re-reding or re-greening lanes. The installer/bootstrap lines
+# reproduce the observed not-ready shape (numeric batch id, optional -retry-N,
+# the -ip-<node hostname> suffix); the node hostnames are synthetic
+# example.internal names, not the ones seen in those lanes, so no internal
+# hostname is published here or traced below. Control lines are synthetic
+# inputs too.
 # shellcheck disable=SC2317  # invoked from Main
 function PredicateSelfTest () {
     local fixture expected got failures=0
