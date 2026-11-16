@@ -985,12 +985,14 @@ class ExecutionTests(Fixture):
         self.assertEqual(summary["status"], "failed")
         self.assertIn("disk error", summary["errors"][0])
 
-    def test_run_artifacts_are_kept_without_global_session_archive(self):
+    def test_run_artifacts_and_claude_sessions_are_archived(self):
         sessions = Path(self.env["CLAUDE_CONFIG_DIR"]) / "projects"
-        sessions.mkdir(parents=True)
-        (sessions / "unrelated-session.jsonl").write_text("existing session")
+        (sessions / "-repo").mkdir(parents=True)
+        (sessions / "-repo/session.jsonl").write_text("existing session")
+        shared = self.root / "shared"
+        shared.mkdir()
         self.change_skill()
-        result = self.run_step()
+        result = self.run_step(SHARED_DIR=str(shared))
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         archive_path = self.eval_artifacts() / "eval-run.tar"
         with tarfile.open(archive_path, "r:") as archive:
@@ -999,8 +1001,12 @@ class ExecutionTests(Fixture):
         self.assertNotIn("eval-run.tar.gz", self.index())
         self.assertTrue((self.eval_artifacts() / "report-summary.html").is_file())
         self.assertTrue((self.eval_artifacts() / "claude-eval.log").is_file())
-        self.assertFalse((self.artifacts / "claude-sessions.tar.gz").exists())
-        self.assertEqual((sessions / "unrelated-session.jsonl").read_text(), "existing session")
+        # One plain tar matching /ci:continue-session's claude-session*.tar* search.
+        with tarfile.open(self.artifacts / "claude-sessions.tar", "r:") as archive:
+            member = archive.extractfile("projects/-repo/session.jsonl")
+            self.assertEqual(member.read(), b"existing session")
+        self.assertTrue((shared / "claude-session-available").is_file())
+        self.assertEqual((sessions / "-repo/session.jsonl").read_text(), "existing session")
 
     def test_distributed_commands_run_without_sibling_sources_and_clean_up(self):
         standalone = self.root / "commands.sh"
@@ -1231,7 +1237,8 @@ class PackagingTests(unittest.TestCase):
         workflow = yaml.safe_load((directory / "openshift-claude-agent-eval-manifest-workflow.yaml").read_text())
         self.assertEqual(workflow["workflow"]["steps"]["test"],
                          [{"ref": "openshift-claude-agent-eval-manifest"}])
-        self.assertNotIn("post", workflow["workflow"]["steps"])
+        # The post step renders the continue-session page for claude-sessions.tar.
+        self.assertEqual(workflow["workflow"]["steps"]["post"], [{"ref": "openshift-claude-post"}])
         legacy = yaml.safe_load((directory.parent / "openshift-claude-agent-eval-workflow.yaml").read_text())
         self.assertEqual(legacy["workflow"]["steps"]["test"], [{"ref": "openshift-claude-agent-eval"}])
 

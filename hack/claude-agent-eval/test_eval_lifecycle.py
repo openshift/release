@@ -5,6 +5,7 @@ import dataclasses
 import json
 from pathlib import Path
 import sys
+import tarfile
 from unittest import mock
 
 import yaml
@@ -207,6 +208,60 @@ class LifecycleTests(support.Fixture):
         failure = self.junit().find("testcase/failure").attrib["message"]
         self.assertIn("step time limit reached before regression scoring", failure)
         self.assertNotIn("0.01 seconds", failure)
+
+
+class SessionArchiveTests(support.Fixture):
+    def setUp(self):
+        super().setUp()
+        self.shared = self.root / "shared"
+        self.shared.mkdir()
+        self.env["SHARED_DIR"] = str(self.shared)
+        self.change_skill()
+
+    def run_selected(self):
+        entries, files = self.select_entries()
+        return runner.run_evals(self.repo, entries, files, self.artifacts, self.env)
+
+    def test_missing_or_empty_sessions_write_nothing(self):
+        self.assertEqual(self.run_selected(), 0)
+        (Path(self.env["CLAUDE_CONFIG_DIR"]) / "projects").mkdir(parents=True)
+        self.assertEqual(self.run_selected(), 0)
+        self.assertFalse((self.artifacts / "claude-sessions.tar").exists())
+        self.assertFalse((self.shared / "claude-session-available").exists())
+
+    def test_home_is_used_without_claude_config_dir(self):
+        del self.env["CLAUDE_CONFIG_DIR"]
+        (self.root / ".claude/projects/-repo").mkdir(parents=True)
+        (self.root / ".claude/projects/-repo/session.jsonl").write_text("home session")
+        self.assertEqual(self.run_selected(), 0)
+        with tarfile.open(self.artifacts / "claude-sessions.tar", "r:") as archive:
+            self.assertIn("projects/-repo/session.jsonl", archive.getnames())
+        self.assertTrue((self.shared / "claude-session-available").is_file())
+
+    def test_claude_config_dir_wins_over_home(self):
+        for root, name in ((self.root / ".claude", "home"), (Path(self.env["CLAUDE_CONFIG_DIR"]), "config")):
+            (root / "projects").mkdir(parents=True)
+            (root / "projects" / f"{name}.jsonl").write_text(name)
+        self.assertEqual(self.run_selected(), 0)
+        with tarfile.open(self.artifacts / "claude-sessions.tar", "r:") as archive:
+            self.assertEqual(sorted(archive.getnames()), ["projects", "projects/config.jsonl"])
+
+    def test_archive_failure_does_not_change_the_result(self):
+        (Path(self.env["CLAUDE_CONFIG_DIR"]) / "projects").mkdir(parents=True)
+        (Path(self.env["CLAUDE_CONFIG_DIR"]) / "projects/session.jsonl").write_text("session")
+        original = tarfile.open
+
+        def fail_sessions(name, *args, **kwargs):
+            if Path(name).name.startswith("claude-sessions"):
+                raise OSError("disk full")
+            return original(name, *args, **kwargs)
+
+        with mock.patch.object(runner.tarfile, "open", side_effect=fail_sessions):
+            self.assertEqual(self.run_selected(), 0)
+            self.assertEqual(list(self.artifacts.glob("claude-sessions.*")), [])
+            self.assertFalse((self.shared / "claude-session-available").exists())
+            self.env["BEHAVIORS"] = json.dumps({self.entry["config"]: "case_failure"})
+            self.assertEqual(self.run_selected(), 1)
 
 
 class HarnessPreparationTests(support.Fixture):
