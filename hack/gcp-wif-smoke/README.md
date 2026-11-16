@@ -116,9 +116,15 @@ credential renewal, other build clusters, or migration of existing consumers.
   received IAM 403 for `iam.serviceAccounts.getAccessToken`.
 - `gcp-wif-resource-70628d` completed successfully: the exact allowed object was
   read, while the other object and bucket listing were explicitly denied.
-- `gcp-wif-renewal-70628c` is running the 15-minute renewal check. Its first
-  automatic credential refresh has succeeded; final expiry/rotation checks are
-  still pending.
+- `gcp-wif-renewal-70628c` completed successfully after 900 seconds and 31
+  successful reads. It observed three GCP access-token generations, two projected
+  Kubernetes-token generations, and three automatic IAM refreshes. A separate
+  fresh client completed another STS exchange using the rotated pod token.
+
+All three Jobs completed with `1/1` success. Detailed non-secret evidence is
+recorded in [results-20261116.json](results-20261116.json). Resource access is scoped
+to the test object; DNS access, other clusters, and consumer migrations remain
+outside this test's scope.
 
 The dedicated private bucket is
 `gs://openshift-ci-build13-wif-smoke-20261116-70628c`. Only the exact allowed object
