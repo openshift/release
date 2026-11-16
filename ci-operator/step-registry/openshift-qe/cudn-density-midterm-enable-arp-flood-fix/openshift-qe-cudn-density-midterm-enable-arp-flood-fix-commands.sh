@@ -23,8 +23,24 @@ data:
   disable-udn-arp-ndp-flood: "true"
 EOF
 
-echo "ConfigMap applied. Waiting for CNO to process and ovnkube-node to roll out..."
-sleep 30
+echo "ConfigMap applied. Waiting for CNO to reconcile and trigger ovnkube-node rollout..."
+
+# Wait for network-operator to restart (CNO picks up ConfigMap and restarts)
+echo "Waiting for network-operator to process ConfigMap..."
+for i in $(seq 1 30); do
+  sleep 10
+  # Check if ovnkube-node DaemonSet has an updated rollout (generation > 1 or observed changes)
+  DESIRED=$(oc -n openshift-ovn-kubernetes get daemonset/ovnkube-node     -o jsonpath='{.status.desiredNumberScheduled}' 2>/dev/null || echo "0")
+  UPDATED=$(oc -n openshift-ovn-kubernetes get daemonset/ovnkube-node     -o jsonpath='{.status.updatedNumberScheduled}' 2>/dev/null || echo "0")
+  READY=$(oc -n openshift-ovn-kubernetes get daemonset/ovnkube-node     -o jsonpath='{.status.numberReady}' 2>/dev/null || echo "0")
+  echo "Attempt ${i}/30: desired=${DESIRED} updated=${UPDATED} ready=${READY}"
+  if [ "${DESIRED}" -gt 0 ] && [ "${UPDATED}" = "${DESIRED}" ] && [ "${READY}" = "${DESIRED}" ]; then
+    # Check if the rollout includes our config (observed generation matches)
+    OBS=$(oc -n openshift-ovn-kubernetes get daemonset/ovnkube-node       -o jsonpath='{.status.observedGeneration}' 2>/dev/null || echo "0")
+    CUR=$(oc -n openshift-ovn-kubernetes get daemonset/ovnkube-node       -o jsonpath='{.metadata.generation}' 2>/dev/null || echo "0")
+    [ "${OBS}" = "${CUR}" ] && echo "Rollout complete" && break
+  fi
+done
 
 oc rollout status daemonset/ovnkube-node -n openshift-ovn-kubernetes --timeout=10m
 
