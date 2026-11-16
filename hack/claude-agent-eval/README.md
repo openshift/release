@@ -358,7 +358,11 @@ make registry-metadata
 
 Container tests default to the promoted `claude-ai-helpers:latest` CI image;
 set `EVAL_TEST_IMAGE` to an immutable digest to reproduce a particular run.
-Set `CONTAINER_ENGINE=docker` to use Docker instead of Podman. The tests run
+Set `CONTAINER_ENGINE=docker` to use Docker instead of Podman.
+`test-container.sh` runs `run-tests.sh` in that image. The
+`claude-agent-eval-unit` presubmit runs the same script, in the same image,
+on openshift/release pull requests that change this directory or the
+manifest step. The tests run
 with network disabled, fake Claude/harness executables, no mounted credentials,
 and real Python; they make no model calls and need no fake GNU `timeout`.
 The entry point runs from a workdir without `.git`. Its GitHub API calls are
