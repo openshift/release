@@ -18,6 +18,7 @@ rather than an invented result or a changed exit status.
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -49,6 +50,10 @@ HELPER_PATTERN = re.compile(r"<<'PYTHON_HELPER'\n(.*?)\nPYTHON_HELPER\n", re.S)
 # directory at that point is the third-party checkout the step just cloned and
 # pip installed into, where a json.py would otherwise shadow a stdlib import.
 INVOCATION_PATTERN = re.compile(r'^\s*"\$\{PYTHON\}" -I - ', re.M)
+# The block that runs the test suite and decides the step's exit status. Taken
+# between markers rather than by line number so the tests follow the block if
+# it moves, and fail loudly rather than quietly testing the wrong text.
+STATUS_PATTERN = re.compile(r"^(PIPE_STATUS=\(0 0\)\n(?:.*\n)*?fi)$", re.M)
 
 
 def extract_helper(directory):
@@ -59,6 +64,20 @@ def extract_helper(directory):
     helper = Path(directory) / "capa_result_summary.py"
     helper.write_text(found.group(1) + "\n", encoding="utf-8")
     return helper
+
+
+def extract_status_block():
+    """Return the step's own runner-status block."""
+    found = STATUS_PATTERN.search(STEP.read_text(encoding="utf-8"))
+    if not found:
+        raise AssertionError(f"the runner-status block is missing from {STEP}")
+    block = found.group(1)
+    for required in ('| tee "${ARTIFACT_DIR}/rosa-hcp-e2e-test.log"',
+                     'PIPE_STATUS=("${PIPESTATUS[@]}")',
+                     "RUN_STATUS=${PIPE_STATUS[0]}"):
+        if required not in block:
+            raise AssertionError(f"{required!r} is missing from the extracted block")
+    return block
 
 
 def junit_document(cases, root="testsuites", suites=1):
@@ -386,12 +405,101 @@ class SummaryStatusBoundaryTests(SummaryFixture):
         # A hard file-size limit makes the write fail after several flushes,
         # which is how a full artifact directory would truncate it in CI.
         completed = subprocess.run(
-            ["bash", "-c", f"ulimit -f 20; exec {sys.executable} {self.helper} "
-                           f"{self.results} {self.summary}"],
+            ["bash", "-c", f"ulimit -f 20; exec {shlex.quote(sys.executable)} "
+                           f"{shlex.quote(str(self.helper))} "
+                           f"{shlex.quote(str(self.results))} "
+                           f"{shlex.quote(str(self.summary))}"],
             capture_output=True, text=True, check=False, timeout=120)
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertFalse(self.summary.exists())
         self.assertIn("WARNING", completed.stdout)
+
+
+class RunnerStatusTests(unittest.TestCase):
+    """The step exits with the runner's status, never with tee's.
+
+    Under `set -o pipefail` a pipeline reports the rightmost non-zero status,
+    so reading $? after `runner | tee log` yields tee's status whenever tee is
+    the one that failed - failing a passing run, and masking a real failure's
+    status with tee's. The block under test is the step's own, extracted from
+    the commands script, and both ends of the pipe are mocked here.
+    """
+
+    block = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls.block = extract_status_block()
+
+    def setUp(self):
+        self.base = Path(tempfile.mkdtemp(prefix="capa-status-"))
+        self.artifacts = self.base / "artifacts"
+        self.artifacts.mkdir()
+        shim = self.base / "shim"
+        shim.mkdir()
+        # tee drains stdin before failing: a mock that exits immediately would
+        # kill the writer with SIGPIPE, and the pipeline would then report the
+        # signal rather than the statuses this test is about.
+        self.write_mock(shim / "tee",
+                        'target="${1:-/dev/null}"\ncat > "${target}"\n'
+                        'exit "${FAKE_TEE_RC:-0}"\n')
+        self.runner = self.base / "fakerunner"
+        self.write_mock(self.runner,
+                        'echo "runner output line"\nexit "${FAKE_RUN_RC:-0}"\n')
+        self.shim = shim
+
+    def tearDown(self):
+        shutil.rmtree(self.base, ignore_errors=True)
+
+    def write_mock(self, path, body):
+        """Write an executable bash mock."""
+        path.write_text("#!/bin/bash\n" + body, encoding="utf-8")
+        path.chmod(0o755)
+
+    def drive(self, runner_status, tee_status):
+        """Run the extracted block with both ends of the pipe mocked."""
+        script = (
+            "set -euo pipefail\n"
+            f"PYTHON={shlex.quote(str(self.runner))}\n"
+            'TEST_SUITE=""\n'
+            "EXTRA_VARS=()\n"
+            f"ARTIFACT_DIR={shlex.quote(str(self.artifacts))}\n"
+            f"{self.block}\n"
+            'printf "RUN_STATUS=%s\\n" "${RUN_STATUS}"\n')
+        environment = dict(os.environ,
+                           PATH=f"{self.shim}{os.pathsep}{os.environ['PATH']}",
+                           FAKE_RUN_RC=str(runner_status),
+                           FAKE_TEE_RC=str(tee_status))
+        completed = subprocess.run(["bash", "-c", script], capture_output=True,
+                                   text=True, check=False, timeout=60,
+                                   env=environment)
+        self.assertIn("RUN_STATUS=", completed.stdout, completed.stderr)
+        reported = completed.stdout.rsplit("RUN_STATUS=", 1)[1].strip()
+        return int(reported), completed
+
+    def test_both_succeed(self):
+        self.assertEqual(self.drive(0, 0)[0], 0)
+
+    def test_failing_tee_does_not_fail_a_passing_run(self):
+        # Regression: $? under pipefail returned tee's 1, so a log write that
+        # failed turned a green suite into a failed step.
+        self.assertEqual(self.drive(0, 1)[0], 0)
+
+    def test_failing_tee_does_not_mask_the_runner_status(self):
+        # Regression: $? returned tee's 1 instead of the runner's 7, losing the
+        # real failure status the step is supposed to propagate.
+        self.assertEqual(self.drive(7, 1)[0], 7)
+
+    def test_runner_status_survives_a_successful_tee(self):
+        self.assertEqual(self.drive(7, 0)[0], 7)
+
+    def test_a_failing_tee_is_reported(self):
+        _, completed = self.drive(0, 1)
+        self.assertIn("WARNING: tee exited 1", completed.stderr)
+
+    def test_a_successful_tee_is_not_reported(self):
+        _, completed = self.drive(7, 0)
+        self.assertNotIn("WARNING: tee exited", completed.stderr)
 
 
 if __name__ == "__main__":

@@ -406,8 +406,21 @@ PYTHON_HELPER
 
 echo "Running rosa-hcp-e2e tests (name_prefix=${NAME_PREFIX})..."
 RESULTS_ROOT="${PWD}/test-results"
-RUN_STATUS=0
-"${PYTHON}" run-test-suite.py ${TEST_SUITE} --ai-agent "${EXTRA_VARS[@]}" 2>&1 | tee "${ARTIFACT_DIR}/rosa-hcp-e2e-test.log" || RUN_STATUS=$?
+# The step must exit with the runner's own status, but under pipefail a
+# pipeline reports the rightmost non-zero status - tee's, whenever tee is the
+# one that failed. A tee that cannot write the log would therefore fail an
+# otherwise passing run, and, worse, replace a real failure's status with its
+# own. Take the whole PIPESTATUS array in a single assignment: any command run
+# in between replaces it, so the two statuses cannot be read one at a time. The
+# default stands when the pipeline succeeds and the || branch is not taken.
+PIPE_STATUS=(0 0)
+"${PYTHON}" run-test-suite.py ${TEST_SUITE} --ai-agent "${EXTRA_VARS[@]}" 2>&1 | tee "${ARTIFACT_DIR}/rosa-hcp-e2e-test.log" || PIPE_STATUS=("${PIPESTATUS[@]}")
+RUN_STATUS=${PIPE_STATUS[0]}
+if [[ "${PIPE_STATUS[1]:-0}" -ne 0 ]]; then
+  # Not fatal - the runner's own status still decides the step - but the log
+  # is the artifact everything else refers to, so say that it is unreliable.
+  echo "WARNING: tee exited ${PIPE_STATUS[1]}; ${ARTIFACT_DIR}/rosa-hcp-e2e-test.log may be incomplete" >&2
+fi
 
 # Best effort, and deliberately after RUN_STATUS has been captured: the step
 # still exits with the runner's own status below, whatever the export does.
