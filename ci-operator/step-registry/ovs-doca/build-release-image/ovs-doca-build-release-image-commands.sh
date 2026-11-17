@@ -10,16 +10,19 @@ set -o pipefail
 # does for integration streams, needed here because arm64 candidate payloads
 # have no integration stream to carry built images.
 #
-# The rebuilt payload is pushed through the build cluster's integrated
-# registry via its in-cluster service DNS, authenticating as this pod's
+# The rebuilt payload is pushed through the build cluster's in-cluster
+# registry (its service DNS) authenticating as the job namespace's `builder`
 # service account: step pods cannot push through the external registry route
 # (probed in rehearsal 2122363827365351424: "unauthorized: authentication
-# required"), but the internal endpoint authorizes by in-namespace RBAC,
-# where this pod's service account can write its own job namespace. The
-# image is handed to ipi-install as the EXTERNAL pullspec of the very same
-# registry image (same registry, same blobs): the install pull-secret
-# already authorizes it, since it pulls the default payload from the same
-# registry and namespace. The digest-pinned pullspec is written to
+# required") nor as their own service account through the in-cluster endpoint
+# (probed in rehearsal 2122644178016931840, same denial after the endpoint's
+# TLS trust was fixed) -- writes to the pipeline registry are reserved for
+# build identities, and `builder` carries exactly that role
+# (system:image-builder) in every namespace. The image is handed to
+# ipi-install as the EXTERNAL pullspec of the very same registry image (same
+# registry, same blobs): the install pull-secret already authorizes it,
+# since it pulls the default payload from the same registry and namespace.
+# The digest-pinned pullspec is written to
 # ${SHARED_DIR}/custom-release-image, which the ipi-install step picks up
 # (see the SHARED_DIR/custom-release-image support in ipi-install-install-commands).
 
@@ -61,14 +64,21 @@ echo "pushing via: ${DEST_INTERNAL}"
 
 # 3. Credentials: the cluster pull-secret covers pulling the source payload
 #    and its images; oc registry login appends this pod's service-account
-#    token for the external host; and the internal-endpoint entry added
-#    below (basic auth with the same service-account token) is what
-#    authorizes the push through the in-cluster endpoint.
+#    token for the external host. The push identity is the namespace's
+#    `builder` service account: the step pod's own SA cannot push to the
+#    registry (probed: "unauthorized" through both the external route and
+#    the in-cluster endpoint -- writes into the pipeline registry are
+#    reserved for build identities), while `builder` is bound to
+#    system:image-builder, the role OpenShift builds use to push into the
+#    namespace's imagestreams. A short-lived token is minted for it via
+#    TokenRequest and used as the basic-auth password for the internal
+#    registry entry (the registry's auth middleware validates the token via
+#    TokenReview; the username is not significant).
 AUTH_FILE="${SHARED_DIR}/.ovs-doca-pushcreds"
 cp "${CLUSTER_PROFILE_DIR}/pull-secret" "${AUTH_FILE}"
 KUBECONFIG="" oc registry login --to="${AUTH_FILE}"
-SA_TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
-jq --arg auth "$(printf 'serviceaccount:%s' "${SA_TOKEN}" | base64 | tr -d '\n')" \
+BUILDER_TOKEN="$(KUBECONFIG="" oc create token builder -n "${JOB_NS}" --duration=2h)"
+jq --arg auth "$(printf 'builder:%s' "${BUILDER_TOKEN}" | base64 | tr -d '\n')" \
   ".auths[\"${INTERNAL_REGISTRY}\"] = {auth: \$auth}" \
   "${AUTH_FILE}" > "${AUTH_FILE}.tmp" && mv "${AUTH_FILE}.tmp" "${AUTH_FILE}"
 
