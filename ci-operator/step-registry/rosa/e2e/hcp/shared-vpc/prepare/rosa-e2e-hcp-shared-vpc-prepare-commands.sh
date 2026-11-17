@@ -71,6 +71,13 @@ export AWS_REGION="${REGION}"
 
 SHARED_ACCOUNT_ID="$(aws sts get-caller-identity --output text | awk '{print $1}')"
 
+# Name the RAM-shared VPC after this job's cluster: aws-provision-vpc-shared
+# tags it only with the job's stack name, which is not recognizable in the
+# shared account's console.
+aws ec2 create-tags --resources "${VPC_ID}" \
+  --tags "Key=Name,Value=rosa-e2e-shared-vpc-${CLUSTER_NAME}"
+log "Tagged shared VPC ${VPC_ID} as rosa-e2e-shared-vpc-${CLUSTER_NAME}"
+
 # Ingress private hosted zone. Hosted Control Plane records live under
 # rosa.<cluster>.<base-domain>, and OCM validates the zone name against
 # cluster_domain_prefix.base_domain, so the zone must carry that exact name.

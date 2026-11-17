@@ -5,11 +5,13 @@ workflow:
       CHANNEL_GROUP: stable
       HOSTED_CP: "true"
       REPLICAS: "3"
-      # Shared VPC row (ROSAENG-63353): the VPC is provisioned in the second
-      # AWS account by aws-provision-vpc-shared (RAM-shared to the cluster
-      # account) and rosa-e2e-hcp-shared-vpc-prepare creates the PHZ and the
-      # shared VPC roles there; every shared-VPC consumer requires
-      # ${CLUSTER_PROFILE_DIR}/.awscred_shared_account in the cluster profile.
+      # Shared VPC row (ROSAENG-63353): the rosa-e2e-shared-vpc profile
+      # leases a rosa-e2e-01 quota slice (the cluster account) and mounts
+      # rosa-e2e-03's credentials as .awscred_shared_account (the shared
+      # account). aws-provision-vpc-shared provisions the VPC there
+      # (RAM-shared to the cluster account) and
+      # rosa-e2e-hcp-shared-vpc-prepare creates the PHZ and the shared VPC
+      # roles there.
       ENABLE_SHARED_VPC: "yes"
       # Scoped to the rosa-e2e Feature:SharedVPC specs. Env on the workflow
       # step list is silently dropped by the registry resolver for ref steps;
@@ -89,7 +91,9 @@ workflow:
     (ROSAENG-63353): the rosa-CLI head provisions an HCP cluster in a shared
     VPC - rosa-e2e-hcp-shared-vpc-dnsdomain-create claims a customer-managed
     HCP-architecture base domain, aws-provision-vpc-shared creates the VPC in
-    the second AWS account (RAM-shared to the cluster account) and
+    the shared AWS account (rosa-e2e-03, whose credentials the
+    rosa-e2e-shared-vpc cluster profile mounts as .awscred_shared_account,
+    RAM-shared to the cluster account in rosa-e2e-01) and
     rosa-e2e-hcp-shared-vpc-prepare creates every other shared-account
     resource rosa create cluster needs: the ingress private hosted zone (named
     rosa.<cluster>.<base-domain>, which OCM validates the HCP cluster domain

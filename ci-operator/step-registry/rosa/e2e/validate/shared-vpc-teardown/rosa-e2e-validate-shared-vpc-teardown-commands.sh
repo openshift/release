@@ -90,6 +90,14 @@ if [[ -n "${INTERNAL_PHZ_ID}" ]]; then
     route53 get-hosted-zone --id "${INTERNAL_PHZ_ID}"
 fi
 
+# The shared VPC itself (created by aws-provision-vpc-shared, deleted with the
+# shared credentials by aws-deprovision-stacks via the CFN stack).
+VPC_ID_TO_VERIFY="$(head -n 1 "${SHARED_DIR}/vpc_id" 2>/dev/null || true)"
+if [[ -n "${VPC_ID_TO_VERIFY}" ]]; then
+  verify_absent "shared VPC ${VPC_ID_TO_VERIFY}" "InvalidVpcID.NotFound" \
+    ec2 describe-vpcs --vpc-ids "${VPC_ID_TO_VERIFY}"
+fi
+
 # Cluster-account assume-role policies (<shared-role-name>-assume-role, created
 # by rosa-e2e-hcp-shared-vpc-prepare and deleted best-effort by
 # rosa-e2e-hcp-shared-vpc-cleanup): they live in the cluster account, so verify
