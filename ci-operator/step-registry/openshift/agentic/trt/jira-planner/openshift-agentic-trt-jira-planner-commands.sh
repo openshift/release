@@ -34,7 +34,7 @@ planner_cleanup() {
             --argjson claude_exit "${CLAUDE_EXIT:-1}" \
             --argjson phase_durations "$(jq -n \
                 --argjson setup "${PHASE_SETUP_DURATION:-0}" \
-                --argjson plan "${PHASE_PLAN_DURATION:-0}" \
+                --argjson plan "$(( ${PHASE_PLAN_DURATION:-$(( $(date +%s) - ${PHASE_PLAN_START:-$(date +%s)} ))} ))" \
                 '{setup: $setup, plan: $plan, pr: 0}')" \
             '{
               agent: $agent,
@@ -223,6 +223,7 @@ CI_POLICY
 PHASE_SETUP_DURATION=$(( $(date +%s) - PHASE_SETUP_START ))
 PHASE_PLAN_START=$(date +%s)
 echo "Invoking Claude to plan ${JIRA_ISSUE_KEY} (subtask ${PLANNING_ISSUE_KEY})..."
+PLAN_PHASE_STARTED=true
 
 CLAUDE_EXIT=0
 agentic_ci --timeout 5400 \
@@ -246,7 +247,6 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         || true
 fi
 PHASE_PLAN_DURATION=$(( $(date +%s) - PHASE_PLAN_START ))
-PLAN_PHASE_STARTED=true
 
 refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
 
