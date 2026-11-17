@@ -5,6 +5,17 @@ if [[ ! "${TEST_SUITE}" =~ ^[a-zA-Z0-9][a-zA-Z0-9/_-]*$ || ! "${TEST_SUITE_TIMEO
   echo 'TEST_SUITE must be a suite name and TEST_SUITE_TIMEOUT a positive duration (s, m, or h)' >&2
   exit 1
 fi
+
+# SSH requires an entry for the random UID assigned to this container.
+if ! whoami &> /dev/null; then
+  if [[ -w /etc/passwd ]]; then
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+  else
+    echo '/etc/passwd is not writable, and no user exists for the current UID.' >&2
+    exit 1
+  fi
+fi
+
 SSHOPTS=(-o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
   -o ServerAliveInterval=30 -o ServerAliveCountMax=6 -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey")

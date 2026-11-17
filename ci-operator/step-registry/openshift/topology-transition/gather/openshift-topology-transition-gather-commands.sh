@@ -5,6 +5,17 @@ set -euo pipefail
 if [[ ! -s "${SHARED_DIR}/remote_workdir" || ! -s "${SHARED_DIR}/public_address" ]]; then
   exit 0
 fi
+
+# SSH requires an entry for the random UID assigned to this container.
+if ! whoami &> /dev/null; then
+  if [[ -w /etc/passwd ]]; then
+    echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+  else
+    echo '/etc/passwd is not writable, and no user exists for the current UID.' >&2
+    exit 1
+  fi
+fi
+
 SSHOPTS=(-o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null
   -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey")
