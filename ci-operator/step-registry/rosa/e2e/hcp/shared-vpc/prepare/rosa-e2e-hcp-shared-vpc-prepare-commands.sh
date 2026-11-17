@@ -12,26 +12,26 @@ log() {
 
 # HCP shared VPC preparation (ROSAENG-63353): creates every shared VPC
 # resource rosa create cluster needs in the shared AWS account (the second
-# account that holds the DNS, ${CLUSTER_PROFILE_DIR}/.awscred_shared_account;
-# without it the cluster account itself, same-account mode):
-# the ingress private hosted zone, the shared route53 role and policy, and
-# the HCP-only VPC endpoint role and internal communication hosted zone
+# account that holds the DNS, ${CLUSTER_PROFILE_DIR}/.awscred_shared_account):
+# the ingress private hosted zone, the shared route53 role, and the
+# HCP-only VPC endpoint role and internal communication hosted zone
 # (rosa create cluster requires --vpc-endpoint-role-arn and
 # --hcp-internal-communication-hosted-zone-id for Hosted Control Plane shared
-# VPC clusters). It also wires the cross-account trust: the shared roles trust
-# the cluster account's installer and operator roles, and the cluster-account
-# roles get the sts:AssumeRole permission policies (rosa create
-# account-roles/operator-roles attaches those when run with the shared VPC
-# flags; with pre-created roles we attach them directly).
+# VPC clusters). The shared roles carry the AWS-managed policies
+# ROSASharedVPCRoute53Policy and ROSASharedVPCEndpointPolicy, matching what a
+# real rosa shared VPC setup grants. It also wires the cross-account trust:
+# the shared roles trust the cluster account's installer and operator roles,
+# and the cluster-account roles get the sts:AssumeRole permission policies
+# (rosa create account-roles/operator-roles attaches those when run with the
+# shared VPC flags; with pre-created roles we attach them directly).
 
 REGION="${REGION:-${LEASED_RESOURCE}}"
 
 SHARED_AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
 if [[ ! -f "${SHARED_AWSCRED}" ]]; then
-  # Same-account shared VPC mode: no second AWS account in the cluster
-  # profile, so the shared resources are created in the cluster account.
-  SHARED_AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
-  log "No .awscred_shared_account in the cluster profile: creating the shared VPC resources in the cluster account (same-account mode)"
+  log "ERROR: ${SHARED_AWSCRED} not found in the cluster profile;"
+  log "       the shared VPC workflow requires a second AWS account for the shared resources"
+  exit 1
 fi
 
 VPC_ID="$(head -n 1 "${SHARED_DIR}/vpc_id")"
@@ -88,52 +88,11 @@ fi
 echo "${INGRESS_PHZ_ID}" > "${SHARED_DIR}/hosted_zone_id"
 log "Ingress private hosted zone: ${INGRESS_PHZ_ID} (${INGRESS_PHZ_NAME})"
 
-# Shared route53 policy (mirrors the policy of the classic
-# aws-provision-route53-private-hosted-zone step): route53 record access plus
-# ec2:DeleteTags on the VPC, required because aws-provision-tags-for-byo-vpc
-# tags it for the ingress operator.
-SHARED_POLICY_NAME="${CLUSTER_NAME}-shared-policy"
-SHARED_POLICY_ARN="arn:aws:iam::${SHARED_ACCOUNT_ID}:policy/${SHARED_POLICY_NAME}"
-if ! aws iam get-policy --policy-arn "${SHARED_POLICY_ARN}" >/dev/null 2>&1; then
-  SHARED_POLICY_DOC="$(mktemp)"
-  cat > "${SHARED_POLICY_DOC}" <<EOF
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": "ec2:DeleteTags",
-            "Resource": "arn:aws:ec2:${REGION}:${SHARED_ACCOUNT_ID}:vpc/${VPC_ID}"
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "route53:ChangeResourceRecordSets",
-                "route53:ListHostedZones",
-                "route53:ListHostedZonesByName",
-                "route53:ListResourceRecordSets",
-                "route53:ChangeTagsForResource",
-                "route53:GetAccountLimit",
-                "route53:GetChange",
-                "route53:GetHostedZone",
-                "route53:ListTagsForResource",
-                "route53:UpdateHostedZoneComment",
-                "tag:GetResources",
-                "tag:UntagResources"
-            ],
-            "Resource": "*"
-        }
-    ]
-}
-EOF
-  SHARED_POLICY_ARN="$(aws iam create-policy \
-    --policy-name "${SHARED_POLICY_NAME}" \
-    --query 'Policy.Arn' --output text \
-    --policy-document "$(jq -c . "${SHARED_POLICY_DOC}")")"
-  rm -f "${SHARED_POLICY_DOC}"
-fi
-echo "${SHARED_POLICY_ARN}" > "${SHARED_DIR}/shared_install_policy_arn"
-log "Shared route53 policy: ${SHARED_POLICY_ARN}"
+# The shared route53 role carries the AWS-managed policy a real rosa shared
+# VPC setup uses (route53 record changes on the rosa base-domain names, e.g.
+# *.devshift.org / *.hypershift.local, plus reads and tag changes), instead
+# of a hand-rolled customer-managed policy.
+SHARED_ROUTE53_POLICY_ARN="arn:aws:iam::aws:policy/ROSASharedVPCRoute53Policy"
 
 # Shared route53 role, trusting the installer and operator roles (in the
 # classic workflow aws-provision-route53-private-hosted-zone creates the role
@@ -170,7 +129,7 @@ aws iam update-assume-role-policy \
   --policy-document "${ROUTE53_TRUST_POLICY}"
 aws iam attach-role-policy \
   --role-name "${ROUTE53_ROLE_NAME}" \
-  --policy-arn "${SHARED_POLICY_ARN}"
+  --policy-arn "${SHARED_ROUTE53_POLICY_ARN}"
 log "Route53 role ${ROUTE53_ROLE_ARN} trusts installer, ingress-operator and control-plane-operator"
 
 # Internal communication hosted zone (<cluster>.hypershift.local), associated
@@ -189,36 +148,11 @@ fi
 echo "${INTERNAL_PHZ_ID}" > "${SHARED_DIR}/hcp_internal_communication_hosted_zone_id"
 log "Internal communication hosted zone: ${INTERNAL_PHZ_ID} (${INTERNAL_PHZ_NAME})"
 
-# VPC endpoint policy: the ec2 VPC-endpoint / security-group and route53 record
-# permissions the control plane needs to wire up the cross-account VPC
-# (mirrors rosa's PrepareSharedVPCEndPointRoleForHostedCP).
-VPC_ENDPOINT_POLICY_NAME="${CLUSTER_NAME}-sharedvpc-vpc-endpoint-policy"
-VPC_ENDPOINT_POLICY_ARN="arn:aws:iam::${SHARED_ACCOUNT_ID}:policy/${VPC_ENDPOINT_POLICY_NAME}"
-if ! aws iam get-policy --policy-arn "${VPC_ENDPOINT_POLICY_ARN}" >/dev/null 2>&1; then
-  VPC_ENDPOINT_POLICY_ARN="$(aws iam create-policy \
-    --policy-name "${VPC_ENDPOINT_POLICY_NAME}" \
-    --query 'Policy.Arn' --output text \
-    --policy-document '{
-      "Version": "2012-10-17",
-      "Statement": [
-        {
-          "Effect": "Allow",
-          "Action": [
-            "ec2:CreateVpcEndpoint", "ec2:DescribeVpcEndpoints", "ec2:ModifyVpcEndpoint",
-            "ec2:DeleteVpcEndpoints", "ec2:CreateTags", "ec2:CreateSecurityGroup",
-            "ec2:AuthorizeSecurityGroupIngress", "ec2:AuthorizeSecurityGroupEgress",
-            "ec2:DeleteSecurityGroup", "ec2:RevokeSecurityGroupIngress",
-            "ec2:RevokeSecurityGroupEgress", "ec2:DescribeSecurityGroups",
-            "ec2:DescribeVpcs", "route53:ListHostedZones",
-            "route53:ChangeResourceRecordSets", "route53:ListResourceRecordSets"
-          ],
-          "Resource": "*"
-        }
-      ]
-    }')"
-fi
-echo "${VPC_ENDPOINT_POLICY_ARN}" > "${SHARED_DIR}/vpc_endpoint_policy_arn"
-log "VPC endpoint policy: ${VPC_ENDPOINT_POLICY_ARN}"
+# The VPC endpoint role carries the AWS-managed policy for the Hosted
+# Control Plane cross-account VPC (the ec2 VPC-endpoint / security-group and
+# route53 record permissions the control plane needs to wire it up), matching
+# what rosa's PrepareSharedVPCEndPointRoleForHostedCP grants in production.
+VPC_ENDPOINT_POLICY_ARN="arn:aws:iam::aws:policy/ROSASharedVPCEndpointPolicy"
 
 # VPC endpoint role trusting the installer and control-plane-operator roles
 VPC_ENDPOINT_ROLE_NAME="${CLUSTER_NAME}-shared-vpcendpoint-role"

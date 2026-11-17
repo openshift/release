@@ -19,24 +19,23 @@ log() {
 
 HOSTED_ZONE_ID_FILE="${SHARED_DIR}/hosted_zone_id"
 ROLE_ARN_FILE="${SHARED_DIR}/hosted_zone_role_arn"
-POLICY_ARN_FILE="${SHARED_DIR}/shared_install_policy_arn"
 VPC_ENDPOINT_ROLE_ARN_FILE="${SHARED_DIR}/vpc_endpoint_role_arn"
-VPC_ENDPOINT_POLICY_ARN_FILE="${SHARED_DIR}/vpc_endpoint_policy_arn"
 INTERNAL_PHZ_ID_FILE="${SHARED_DIR}/hcp_internal_communication_hosted_zone_id"
 
-# Clusters not provisioned with a shared VPC write none of these files.
-if [[ ! -s "${HOSTED_ZONE_ID_FILE}" && ! -s "${ROLE_ARN_FILE}" && ! -s "${POLICY_ARN_FILE}" && \
-   ! -s "${VPC_ENDPOINT_ROLE_ARN_FILE}" && ! -s "${VPC_ENDPOINT_POLICY_ARN_FILE}" && ! -s "${INTERNAL_PHZ_ID_FILE}" ]]; then
+# Clusters not provisioned with a shared VPC write none of these files. The
+# shared roles carry AWS-managed policies (ROSASharedVPCRoute53Policy /
+# ROSASharedVPCEndpointPolicy), which are never deleted and so are not
+# verified here.
+if [[ ! -s "${HOSTED_ZONE_ID_FILE}" && ! -s "${ROLE_ARN_FILE}" && \
+   ! -s "${VPC_ENDPOINT_ROLE_ARN_FILE}" && ! -s "${INTERNAL_PHZ_ID_FILE}" ]]; then
   log "No shared VPC inputs in ${SHARED_DIR}; cluster was not provisioned with a shared VPC, nothing to verify"
   exit 0
 fi
 
 SHARED_AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
 if [[ ! -f "${SHARED_AWSCRED}" ]]; then
-  # Same-account shared VPC mode: the shared resources were created in the
-  # cluster account, so verify them with the cluster credentials.
-  SHARED_AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
-  log "No .awscred_shared_account in the cluster profile: verifying the shared VPC resources in the cluster account (same-account mode)"
+  log "ERROR: ${SHARED_AWSCRED} not found in the cluster profile; cannot verify the shared-account resources"
+  exit 1
 fi
 export AWS_SHARED_CREDENTIALS_FILE="${SHARED_AWSCRED}"
 export AWS_DEFAULT_REGION="${REGION:-${LEASED_RESOURCE}}"
@@ -76,25 +75,13 @@ if [[ -n "${ROLE_ARN}" ]]; then
     iam get-role --role-name "${ROLE_NAME}"
 fi
 
-POLICY_ARN="$(head -n 1 "${POLICY_ARN_FILE}" 2>/dev/null || true)"
-if [[ -n "${POLICY_ARN}" ]]; then
-  verify_absent "shared VPC policy ${POLICY_ARN}" "NoSuchEntity" \
-    iam get-policy --policy-arn "${POLICY_ARN}"
-fi
-
-# HCP shared VPC resources (rosa-e2e-hcp-shared-vpc-prepare): the VPC endpoint
-# role and policy and the internal communication hosted zone.
+# HCP shared VPC resources (rosa-e2e-hcp-shared-vpc-prepare): the VPC
+# endpoint role and the internal communication hosted zone.
 VPC_ENDPOINT_ROLE_ARN="$(head -n 1 "${VPC_ENDPOINT_ROLE_ARN_FILE}" 2>/dev/null || true)"
 if [[ -n "${VPC_ENDPOINT_ROLE_ARN}" ]]; then
   VPC_ENDPOINT_ROLE_NAME="${VPC_ENDPOINT_ROLE_ARN##*/}"
   verify_absent "VPC endpoint role ${VPC_ENDPOINT_ROLE_NAME}" "NoSuchEntity" \
     iam get-role --role-name "${VPC_ENDPOINT_ROLE_NAME}"
-fi
-
-VPC_ENDPOINT_POLICY_ARN="$(head -n 1 "${VPC_ENDPOINT_POLICY_ARN_FILE}" 2>/dev/null || true)"
-if [[ -n "${VPC_ENDPOINT_POLICY_ARN}" ]]; then
-  verify_absent "VPC endpoint policy ${VPC_ENDPOINT_POLICY_ARN}" "NoSuchEntity" \
-    iam get-policy --policy-arn "${VPC_ENDPOINT_POLICY_ARN}"
 fi
 
 INTERNAL_PHZ_ID="$(head -n 1 "${INTERNAL_PHZ_ID_FILE}" 2>/dev/null || true)"
