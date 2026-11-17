@@ -81,13 +81,19 @@ native_cli_ready() {
         [ -x "$NATIVE_PYTHON" ]
 }
 
-# release_native_lock drops the lock and disarms the EXIT trap. The trap must not
-# outlive the lock: this run continues after publishing (it runs the CLI, which
-# can be an interactive login), and by then it may have been re-acquired by
-# another run that the trap would otherwise delete on our way out.
+# release_native_lock drops the lock if this process still owns it and disarms
+# the EXIT trap. Ownership is checked rather than releasing by path alone: after
+# publishing, this run goes on to execute the CLI (possibly an interactive
+# login), and by then the lock path may have been reclaimed and re-acquired by
+# another run whose lock must not be deleted from here.
 release_native_lock() {
-    NATIVE_STAGE=""
-    rm -rf "$NATIVE_LOCK"
+    if [ -n "$NATIVE_STAGE" ]; then
+        rm -rf "$NATIVE_STAGE"
+        NATIVE_STAGE=""
+    fi
+    if [ "$(cat "$NATIVE_LOCK/pid" 2>/dev/null || true)" = "$$" ]; then
+        rm -rf "$NATIVE_LOCK"
+    fi
     trap - EXIT
 }
 
@@ -102,20 +108,40 @@ ensure_native_cli() {
         echo "Error: 'uv' is not installed. Install it with: brew install uv" >&2
         exit 1
     fi
-    local waited=0 holder=""
+    local waited=0 holder="" claimed="" reclaimable=""
     NATIVE_STAGE="$NATIVE_DIR.stage.$$"
     while ! mkdir "$NATIVE_LOCK" 2>/dev/null; do
         native_cli_ready && return 0
-        # A killed run leaves the lock behind. Reclaim it only when the recorded
-        # holder is no longer running, and only if it is still that same holder -
-        # otherwise we would delete a lock a concurrent run just acquired. Age is
-        # not a safe signal here: a slow but live holder would lose its lock and
-        # provision a second time.
+        # A killed run leaves the lock behind. A lock that names a live holder is
+        # never disturbed, however old it is: age alone would steal the lock from
+        # a slow but healthy run and make it provision twice.
         holder="$(cat "$NATIVE_LOCK/pid" 2>/dev/null || true)"
-        if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null &&
-            [ "$(cat "$NATIVE_LOCK/pid" 2>/dev/null || true)" = "$holder" ]; then
-            rm -rf "$NATIVE_LOCK"
-            continue
+        reclaimable=""
+        if [ -n "$holder" ]; then
+            kill -0 "$holder" 2>/dev/null || reclaimable=yes
+        elif [ -n "$(find "$NATIVE_LOCK" -mmin +1 2>/dev/null)" ]; then
+            # No PID recorded. That is only legitimate for the microseconds
+            # between mkdir and writing the PID, so a lock still PID-less after a
+            # minute was abandoned there and would otherwise block every later
+            # run forever. Note -mmin +1, not +0: on BSD/macOS find, +0 matches
+            # anything older than a second, which would reclaim a lock out from
+            # under a run that is still writing its PID.
+            reclaimable=yes
+        fi
+        if [ -n "$reclaimable" ]; then
+            # Claim the lock by renaming it before inspecting, so a lock that a
+            # concurrent run replaces underneath us is never deleted: we only
+            # remove what we can prove is the same holder we judged abandoned.
+            claimed="$NATIVE_LOCK.stale.$$"
+            rm -rf "$claimed"
+            if mv "$NATIVE_LOCK" "$claimed" 2>/dev/null; then
+                if [ "$(cat "$claimed/pid" 2>/dev/null || true)" = "$holder" ]; then
+                    rm -rf "$claimed"
+                    continue
+                fi
+                # A different run replaced the lock; hand it back and wait.
+                mv "$claimed" "$NATIVE_LOCK" 2>/dev/null || rm -rf "$claimed"
+            fi
         fi
         if [ "$waited" -ge 600 ]; then
             echo "Error: timed out waiting for another run to set up the CLI; remove $NATIVE_LOCK if none is running." >&2
@@ -127,10 +153,12 @@ ensure_native_cli() {
         waited=$((waited + 1))
         sleep 0.5
     done
+    # NATIVE_STAGE is deliberately not "local": the trap runs at exit, after this
+    # function has returned and its locals are gone. Arm it before the PID write
+    # so a failed write cannot leave an ownerless lock behind; if one is left
+    # anyway it is reclaimed above once it has been PID-less for a minute.
+    trap release_native_lock EXIT
     printf '%s' "$$" >"$NATIVE_LOCK/pid"
-    # NATIVE_STAGE is deliberately not "local": the trap below runs at exit,
-    # after this function has returned and its locals are gone.
-    trap 'rm -rf "$NATIVE_LOCK" "$NATIVE_STAGE"' EXIT
     # Another run may have finished provisioning while we waited for the lock.
     if native_cli_ready; then
         release_native_lock
@@ -153,8 +181,20 @@ ensure_native_cli() {
     uv pip install -q --python "$NATIVE_STAGE/venv/bin/python3" \
         -r "$NATIVE_STAGE/src/cmd/secret-manager/requirements.txt"
     printf '%s' "$NATIVE_COMMIT" >"$NATIVE_STAGE/commit"
-    rm -rf "$NATIVE_DIR"
-    mv "$NATIVE_STAGE" "$NATIVE_DIR"
+    # Publish without discarding a working cache first: move the old cache aside,
+    # install the new one, and put the old one back if that fails.
+    local previous="$NATIVE_DIR.previous.$$"
+    rm -rf "$previous"
+    if [ -d "$NATIVE_DIR" ]; then
+        mv "$NATIVE_DIR" "$previous"
+    fi
+    if mv "$NATIVE_STAGE" "$NATIVE_DIR"; then
+        rm -rf "$previous"
+    else
+        echo "Error: could not publish the native CLI cache." >&2
+        mv "$previous" "$NATIVE_DIR" 2>/dev/null || true
+        exit 1
+    fi
     release_native_lock
 }
 
@@ -166,8 +206,11 @@ ensure_native_cli() {
 # to the command and leaves the caller's environment alone.
 run_native() {
     ensure_native_cli
-    mkdir -p "$SSO_AUTH_CONFIG_PATH"
-    chmod 700 "$SSO_AUTH_CONFIG_PATH"
+    mkdir -p "$SSO_AUTH_CONFIG_PATH" "$GCLOUD_CONFIG_PATH"
+    # Both directories hold credentials (an ADC refresh token and an SSO token).
+    # The container path needs them readable by its mapped UID; natively they are
+    # only ever read by this user, so keep them private.
+    chmod 700 "$SSO_AUTH_CONFIG_PATH" "$GCLOUD_CONFIG_PATH"
     env -u SM_BROWSER_REQUEST -u SM_CALLBACK_HOST \
         CLOUDSDK_CONFIG="$GCLOUD_CONFIG_PATH" \
         SM_AUTH_DIR="$SSO_AUTH_CONFIG_PATH" \
