@@ -14,7 +14,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
-AUX_HOST="openshift-qe-metal-ci.arm.eng.rdu2.redhat.com"
+AUX_HOST="openshift-qe-metal-ci.ocp.eng.rdu2.dc.redhat.com"
 
 # IPI/UPI - MCO takes way longer than ABI to come up, 10 minutes wait not enough
 MAX_RETRY=15
@@ -283,7 +283,7 @@ function journalRecord(){
       journalctl -f | grep -E 'level=info|level=warning|level=error|level=fatal' &
 EOF
       # We can assume the host rebooted if the ssh connection gets closed by remote host
-      # Connection to openshift-qe-metal-ci.arm.eng.rdu2.redhat.com closed by remote host
+      # Connection to openshift-qe-metal-ci.ocp.eng.rdu2.dc.redhat.com closed by remote host
       trap 'handleReboot ${bmhost} &' EXIT
 }
 
