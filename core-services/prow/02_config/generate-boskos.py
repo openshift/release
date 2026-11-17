@@ -5,6 +5,9 @@ import json
 import yaml
 
 CONFIG = {
+    'gcp-aws-federation-pilot-quota-slice': {
+        'gcp-aws-federation-pilot': 1,
+    },
     'ibmcloud-perfscale-jp-quota-slice': {
         'jp-osa': 10,
     },
