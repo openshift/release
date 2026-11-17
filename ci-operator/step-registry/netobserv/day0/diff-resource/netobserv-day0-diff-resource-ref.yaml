@@ -1,0 +1,23 @@
+ref:
+  as: netobserv-day0-diff-resource
+  from: netobserv-perfscale
+  cli: latest
+  commands: netobserv-day0-diff-resource-commands.sh
+  env:
+  - name: DIFF_METRICS
+    default: "TotalClusterCPUUsage,TotalClusterMemoryUsage,TotalNetworkBytesOut,TotalNetworkBytesIn,TotalNetObservCPUUsage,TotalNetObservMemoryUsage,NetObservClusterCPUPercentUtil,NetObservClusterMemPercentUtil"
+    documentation: |-
+      Comma-separated list of metricNames to include in the diff report.
+  timeout: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Reads the without-netobserv and with-netobserv Prometheus snapshots captured by
+    netobserv-day0-measure-resource from SHARED_DIR, computes per-metric deltas
+    (absolute and percent change), and writes text and HTML reports to ARTIFACT_DIR.
+    The custom-link-day0-report.html artifact renders the diff directly in the
+    Prow Spyglass HTML lens and, when Prow job metadata is available, provides
+    full artifact links to the report, output.txt, and the dynamically named
+    output_*_viz.html files produced by the later openshift-qe-orion step.
