@@ -86,6 +86,19 @@ authorize_sg_ingress() {
     --source-group "${source_group}" 2>/dev/null || true
 }
 
+authorize_sg_ingress_cidr() {
+  local group_id=$1
+  local protocol=$2
+  local port=$3
+  local cidr=$4
+  echo "Opening ${protocol}/${port} on ${group_id} from ${cidr}..."
+  aws --region "${REGION}" ec2 authorize-security-group-ingress \
+    --group-id "${group_id}" \
+    --protocol "${protocol}" \
+    --port "${port}" \
+    --cidr "${cidr}" 2>/dev/null || true
+}
+
 configure_evpn_security_groups() {
   local node_sg=$1
   local cp_sg=$2
@@ -109,6 +122,29 @@ configure_evpn_security_groups() {
   fi
 
   echo "EVPN security group rules configured"
+}
+
+# Import probes for routed CUDNs are sourced from addresses in the import CIDR
+# that are not assigned to any AWS network interface. The installer's ICMP rule
+# is scoped to the node and control-plane security groups, and security-group
+# referencing only matches the private addresses of member ENIs, so it never
+# matches those spoofed sources. Authorize the range explicitly on both groups.
+configure_cudn_icmp_ingress() {
+  local node_sg=$1
+  local cp_sg=$2
+  local import_cidr=${UDN_BGP_IMPORT_CIDR:-20.0.0.0/12}
+
+  echo "=== Allowing CUDN import ICMP from ${import_cidr} ==="
+
+  authorize_sg_ingress_cidr "${node_sg}" icmp -1 "${import_cidr}"
+
+  if [[ -n "${cp_sg}" && "${cp_sg}" != "None" ]]; then
+    authorize_sg_ingress_cidr "${cp_sg}" icmp -1 "${import_cidr}"
+  else
+    echo "WARNING: Control-plane security group not found; CUDN import ICMP rule only applied to node SG" >&2
+  fi
+
+  echo "CUDN import ICMP rules configured"
 }
 
 echo "=== Provisioning AWS bastion instance ==="
@@ -200,11 +236,21 @@ if [[ -z "${CONTROL_PLANE_SG}" || "${CONTROL_PLANE_SG}" == "None" ]]; then
 fi
 
 configure_evpn_security_groups "${NODE_SG}" "${CONTROL_PLANE_SG}"
+configure_cudn_icmp_ingress "${NODE_SG}" "${CONTROL_PLANE_SG}"
 
 # Authorize SSH from anywhere (for CI pod access)
 aws --region "${REGION}" ec2 authorize-security-group-ingress \
   --group-id "${NODE_SG}" \
   --protocol tcp --port 22 --cidr 0.0.0.0/0 2>/dev/null || true
+
+# Every OCP node can be selected as an external BGP next hop. Disable
+# source/destination checking so the node can forward CUDN traffic that is not
+# addressed to its own ENI. This includes control-plane, infra, and worker nodes.
+for node_instance_id in "${OCP_NODE_INSTANCE_IDS[@]}"; do
+  echo "Disabling source/destination check on OCP node ${node_instance_id}..."
+  aws --region "${REGION}" ec2 modify-instance-attribute \
+    --instance-id "${node_instance_id}" --no-source-dest-check
+done
 
 # Create SSH key pair
 AWS_INSTANCE_NAME="${INFRA_ID}-bastion"
@@ -240,6 +286,13 @@ echo "Amazon Linux 2023 AMI: ${AMI_ID}"
 # Cloud-init only sets up root SSH. Packages are installed over SSH after boot.
 cat > /tmp/bastion-user-data.sh <<'USERDATA'
 #!/bin/bash
+# This bastion forwards CUDN traffic during long-running kube-burner workloads.
+# Persist the setting across reboot and apply it during first boot.
+cat > /etc/sysctl.d/99-openshift-qe-bastion.conf <<'EOF'
+net.ipv4.ip_forward = 1
+EOF
+/sbin/sysctl --system
+
 mkdir -p /root/.ssh
 chmod 700 /root/.ssh
 cp /home/ec2-user/.ssh/authorized_keys /root/.ssh/authorized_keys
@@ -297,6 +350,12 @@ WORKER_ENI_ID=$(aws --region "${REGION}" ec2 create-network-interface \
   --groups "${NODE_SG}" \
   --description "${AWS_INSTANCE_NAME}-evpn" \
   --query 'NetworkInterface.NetworkInterfaceId' --output text)
+
+# The instance-level setting does not cover a separately created ENI. This
+# interface forwards EVPN/CUDN traffic, so disable its check explicitly.
+aws --region "${REGION}" ec2 modify-network-interface-attribute \
+  --network-interface-id "${WORKER_ENI_ID}" \
+  --no-source-dest-check
 
 # Save ENI id before attach so cleanup can run if attach fails.
 jq --arg eni "${WORKER_ENI_ID}" '.worker_eni_id=$eni' \
