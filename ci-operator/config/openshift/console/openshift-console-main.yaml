@@ -174,12 +174,22 @@ tests:
   optional: true
   pipeline_skip_if_only_changed: \.md$|(?:^|/)(?:\.gitignore|OWNERS|LICENSE)$
   steps:
-    cluster_profile: openshift-org-aws
+    allow_skip_on_success: true
+    cluster_profile: hypershift-aws
     env:
-      CONTROL_PLANE_NODE_SELECTOR: kubernetes.io/arch=amd64
-      HOSTED_MANAGEMENT_CLUSTER: hosted-mgmt2
-      HYPERSHIFT_NODE_COUNT: "3"
-      HYPERSHIFT_SKIP_VERSION_VALIDATION: "true"
+      CONSOLE_FLAKE_AGENT_ENABLED: "true"
+      CONSOLE_FLAKE_DRIVER_SHA256: 1f894283dd29c7978cf2203cc8b702b7d34634a7ae1b76bd50d5780af42aeccf
+      CONSOLE_FLAKE_SKILL_REVISION: main
+      CONSOLE_FLAKE_SKILL_SHA256: 8dea3696de872902b10dd642a330dc6eb13aa4477fb2108db4cd5acbc85a8ef0
+    post:
+    - ref: openshift-console-qe-agent
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy
+    - ref: send-results-to-reportportal
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-root-management-cluster
+    - chain: hypershift-aws-create
     test:
     - as: test
       cli: latest
@@ -195,7 +205,6 @@ tests:
           cpu: "4"
           memory: 10Gi
       timeout: 2h0m0s
-    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: main
   org: openshift
