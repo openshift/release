@@ -2,10 +2,38 @@ ref:
   as: stackrox-opp-readiness
   best_effort: true
   commands: stackrox-opp-readiness-commands.sh
+  grace_period: 1m0s
   resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  env:
+  - name: ACS_EXPECTATION
+    default: ""
+    documentation: |-
+      Whether this lane expects ACS Central to be deployed: "required" or
+      "absent-by-design". Fail-closed: unset or any other value fails the
+      step (exit 2). Declared per lane stanza in the ci-operator config
+      (INTEROP-9647).
+  - name: ACS_POLL_INTERVAL_S
+    default: "30"
+    documentation: |-
+      Poll interval for readiness waits, in seconds.
+  - name: ACS_WAIT_TIMEOUT_S
+    default: "900"
+    documentation: |-
+      Per-check wait cap, in seconds (additionally bounded by the global
+      in-script budget). Also caps the provisional hold applied to an
+      absent classification on a required lane.
+  - name: ACS_BUDGET_S
+    default: "3300"
+    documentation: |-
+      Total in-script wait budget, in seconds. A static cross-file check
+      asserts budget + 600s margin < ref timeout (4500s) - grace (60s).
+  - name: ACS_SELFTEST
+    default: "true"
+    documentation: |-
+      Set to "false" to skip the acs-preflight-selftest carrier case.
   from: cli
   timeout: 1h15m0s
   documentation: |-
@@ -16,10 +44,28 @@ ref:
     ROX_ADMIN_PASSWORD, CENTRAL_URL, CENTRAL_NS, and SC_NS to SHARED_DIR
     for downstream steps.
 
+    INTEROP-9647 contract: classifies the ACS state (present / absent /
+    unknown) by its own query before any SHARED_DIR consumption, gated by
+    the fail-closed ACS_EXPECTATION env (required | absent-by-design).
+    On a required lane an absent read is held provisionally, bounded by
+    ACS_WAIT_TIMEOUT_S and the in-script budget, and is finalized as
+    acs-required-but-absent only when that hold expires, so a race with
+    ACS provisioning cannot fail the step early; absent-by-design keeps
+    the immediate verdict and never waits.
+    Emits a JUnit carrier (lp-interop--OPP--acs-readiness) on every exit
+    path: one self-describing classification case, seven assertion cases
+    (central-crd, securedcluster-crd, central-route,
+    central-api-insecure-tls, clusters-connected, policies-loaded,
+    sensor-ready), and an
+    acs-preflight-selftest case. A hard SIGKILL leaves the pre-seeded
+    failing carrier on disk. Exit codes: 0 pass or absent-by-design; 1
+    assertion failure or acs-required-but-absent; 2 invalid input; 3
+    acs-state-indeterminate.
+
     On startup, runs pre-flight diagnostics to check CRD registration,
     operator Subscription/CSV status, and RHACS operator pod health.
-    During the Central CR discovery wait (up to 900s), periodic operator
-    diagnostics are emitted every ~150s.  Diagnostic output contains only
-    fixed labels and numeric counts grouped into fixed safe status categories.
+    During the Central CR discovery wait, periodic operator diagnostics
+    are emitted every ~150s.  Diagnostic output contains only fixed labels
+    and numeric counts grouped into fixed safe status categories.
     Namespace and resource identifiers, arbitrary status or condition text,
     operator logs, events, stderr, and raw resource output are not emitted.
