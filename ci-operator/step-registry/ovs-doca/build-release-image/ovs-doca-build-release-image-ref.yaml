@@ -34,12 +34,13 @@ ref:
     arm64, since the x86_64 build farm cannot produce arm64 images) or from the
     job's imagestream (bare name, image built by this job's images phase).
     Assembles a new payload from the current release image with
-    `oc adm release new ... rhel-coreos=<layered>`, and pushes it through the
-    build cluster's in-cluster registry endpoint as the step pod's service
-    account (the external route denies pushes from step pods), fetching the
-    endpoint's served certificate for TLS trust since it is signed by the
-    cluster's own CA. Writes the digest-pinned external pullspec to
-    ${SHARED_DIR}/custom-release-image.
+    `oc adm release new ... rhel-coreos=<layered>`, and publishes it through a
+    one-shot BuildConfig whose build pod runs as the namespace's builder
+    service account -- the only identity permitted to write to the pipeline
+    registry (step service accounts are denied pushes through both the
+    external route and the in-cluster endpoint, and cannot mint builder
+    tokens; see the script header for the rehearsal evidence). Writes the
+    digest-pinned external pullspec to ${SHARED_DIR}/custom-release-image.
 
     The ipi-install step picks the file up and installs the cluster from the
     rebuilt payload, so nodes boot the DOCA layer from the first boot. Must
