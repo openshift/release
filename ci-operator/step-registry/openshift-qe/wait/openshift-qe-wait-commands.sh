@@ -37,15 +37,9 @@ function waitForReady() {
 
 echo "Reached timeout. Scaling machinesets down to 1 replica"
 worker_machine_sets=$(oc get --no-headers machinesets.m -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-role!=infra,machine.openshift.io/cluster-api-machine-role!=workload -o name | grep -v rhel )
-first_machine=""
-first_set=false
 set -x
 for machineset in $(echo $worker_machine_sets); do
     oc scale -n openshift-machine-api $machineset --replicas 1
-    if [[ "$first_set" = false ]]; then
-        first_machine=$machineset
-        first_set=true
-    fi
 done
 # Expect 4 nodes, one per machineset x 4 AZs
 waitForReady 4
