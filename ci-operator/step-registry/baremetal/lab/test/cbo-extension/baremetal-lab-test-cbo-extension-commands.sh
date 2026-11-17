@@ -8,6 +8,15 @@ export HOME=/tmp/home
 mkdir -p "${HOME}"
 mkdir -p "${ARTIFACT_DIR}/junit"
 
+# Install yq (required by CBO extension tests)
+echo "Installing yq..."
+mkdir -p /tmp/bin
+export PATH="${PATH}:/tmp/bin"
+arch="$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')"
+curl -L "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${arch}" \
+    -o /tmp/bin/yq && chmod +x /tmp/bin/yq
+yq --version
+
 # Decompress and prepare the CBO test extension binary
 echo "Preparing cluster-baremetal-operator test extension binary..."
 BINARY=/tmp/cluster-baremetal-operator-tests-ext
