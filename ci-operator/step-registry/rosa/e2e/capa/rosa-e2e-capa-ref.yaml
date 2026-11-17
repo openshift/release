@@ -49,21 +49,29 @@ ref:
     ROSA HCP e2e test suite against the management cluster with
     CAPI/CAPA controllers already installed.
 
-    Besides rosa-hcp-e2e-test.log, the step always publishes
-    rosa-hcp-e2e-test-summary.json: a bounded summary of the runner's own
-    JUnit report, holding how many testcases passed, failed, errored or were
-    skipped, plus one record per testcase giving its outcome. A failed run
-    therefore keeps structured evidence of how much of the suite ran and how
-    it ended, which the log alone does not make machine readable.
+    Besides rosa-hcp-e2e-test.log, the step makes a best-effort attempt to
+    write rosa-hcp-e2e-test-summary.json: a bounded summary of the runner's
+    own JUnit report, holding how many testcases passed, failed, errored or
+    were skipped, plus a record per testcase giving its outcome. Records stop
+    at a fixed cap; past it the totals stay complete and the surplus is
+    counted in cases_dropped. A report holding more testcases than a second,
+    much larger cap is refused outright instead. A failed run therefore keeps
+    structured evidence of how much of the suite ran and how it ended, which
+    the log alone does not make machine readable.
 
-    A record identifies its testcase by a generated ordinal, its position in
-    the report, and never by name: the runner's reports embed free-form
-    ansible output - captured playbook stdout, failure messages, feature
-    detail, local paths - and this artifact is published publicly. The log
-    remains the place to read what actually happened.
+    A record identifies its testcase by a generated ordinal - its position in
+    the report, not a key into the log - and never by name. The runner's
+    reports embed free-form ansible output - captured playbook stdout, failure
+    messages, feature detail, local paths - and this artifact is published
+    publicly, so no text from the report reaches it. The log remains the place
+    to read what actually happened.
 
-    The summary is written best effort and never changes the step's outcome.
-    When it cannot be produced - no report, more than one report, a report
-    that is malformed, oversized or not plainly UTF-8 - it records a fixed
-    reason token and no results, rather than reporting results it could not
-    establish.
+    Writing the summary never changes the step's outcome. When the report
+    cannot be summarised - none found, more than one, malformed, oversized or
+    not plainly UTF-8 - the file records a fixed reason token and no results,
+    rather than results that could not be established. Publication is not
+    unconditional and there is no placeholder: the step creates the artifact
+    with O_CREAT|O_EXCL|O_NOFOLLOW and so refuses an existing destination of
+    any kind, and it removes a partially written one. A run can therefore end
+    with no summary file at all, which is distinct from one recording a
+    reason.

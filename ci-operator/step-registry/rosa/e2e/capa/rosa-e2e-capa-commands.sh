@@ -107,11 +107,8 @@ if [[ -n "${CLUSTER_API_INSTALLER_REF:-}" ]]; then
   EXTRA_VARS+=("-e" "cluster_api_installer_ref=${CLUSTER_API_INSTALLER_REF}")
 fi
 
-# Name of the structured result artifact, and the single value published in it
-# when nothing could be summarised. Kept next to the shell fallback below so the
-# two spellings of "unavailable" cannot drift apart.
+# Name of the structured result artifact.
 SUMMARY_NAME="rosa-hcp-e2e-test-summary.json"
-SUMMARY_FALLBACK='{"schema": 1, "status": "unavailable", "reason": "exporter-failed"}'
 
 # Summarise the test runner's own reports into a publishable artifact.
 #
@@ -123,9 +120,10 @@ SUMMARY_FALLBACK='{"schema": 1, "status": "unavailable", "reason": "exporter-fai
 # stdout in <system-out>, playbook and feature names, local file paths), and
 # ARTIFACT_DIR is published publicly. So nothing is copied. The helper reads the
 # runner's JUnit report and republishes only integers and generated ordinals:
-# how many testcases ran, and for each one in report order whether it passed,
-# failed, errored or was skipped. rosa-hcp-e2e-test.log keeps the human readable
-# detail, so an ordinal is enough to find the matching test in it.
+# how many testcases ran, and for each one whether it passed, failed, errored
+# or was skipped. An ordinal is a position in the report and nothing more - it
+# is not a key into rosa-hcp-e2e-test.log, whose console output does not
+# enumerate testcases in the same granularity the JUnit report does.
 #
 # Run with -I: the working directory here is the test repository that was just
 # cloned and pip installed into, and isolated mode is what keeps a module there
@@ -136,10 +134,12 @@ export_structured_results() {
 """Summarise the rosa-hcp-e2e-test JUnit report into content-free results.
 
 Reads the single JUnit report the runner leaves under <checkout>/test-results/
-and writes a bounded JSON summary holding totals and one record per testcase.
-A record carries a generated ordinal and an outcome drawn from a fixed set -
-never a name, a classname, a message, a timestamp, a duration or a path, all of
-which are free-form text this step does not control.
+and writes a bounded JSON summary holding totals and one record per testcase,
+up to MAX_CASES_RECORDED of them. A record carries a generated ordinal - its
+position in the report, not a key into any other artifact - and an outcome
+drawn from a fixed set. It never carries a name, a classname, a message, a
+timestamp, a duration or a path, all of which are free-form text this step
+does not control.
 
 Every refusal is recorded as a fixed reason token in the summary itself and the
 process still exits 0: this is diagnostics, and it must not be able to turn a
@@ -411,12 +411,15 @@ RUN_STATUS=0
 
 # Best effort, and deliberately after RUN_STATUS has been captured: the step
 # still exits with the runner's own status below, whatever the export does.
+# The summariser is the only writer of the artifact. It creates its destination
+# with O_CREAT|O_EXCL|O_NOFOLLOW and records every refusal it can reach as a
+# reason token inside the file itself, so a shell-side placeholder would add
+# nothing except a second, weaker path to the same destination: a redirection
+# cannot be made to refuse a fifo or a device that appears underneath it, and
+# that path would be the one undoing the summariser's guarantee. There is
+# therefore no fallback, and a run whose summariser could not run at all simply
+# publishes no summary, which the step's documentation states.
 export_structured_results "${RESULTS_ROOT}" "${ARTIFACT_DIR}/${SUMMARY_NAME}" || true
-if [[ ! -f "${ARTIFACT_DIR}/${SUMMARY_NAME}" ]]; then
-  # An absent artifact and an empty one are indistinguishable after upload, so
-  # say so explicitly rather than leaving the reader to guess.
-  printf '%s\n' "${SUMMARY_FALLBACK}" > "${ARTIFACT_DIR}/${SUMMARY_NAME}" || true
-fi
 
 if [[ "${RUN_STATUS}" -eq 0 ]]; then
   echo "Tests complete. Results at ${ARTIFACT_DIR}/rosa-hcp-e2e-test.log"
