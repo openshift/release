@@ -37,6 +37,7 @@ HOSTNAME_PRIMARY="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".hostname" "${LEASE_CONF}"
 HOSTNAME_ADDITIONAL="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".\"hostname-additional\"" "${LEASE_CONF}")"
 
 # Expected infra VXLAN bridge for the lease-owned additional libvirt network.
+# Prefer lease, then SHARED_DIR, then optional env override. No hardcoded map.
 resolve_expected_additional_bridge() {
   local bridge
   bridge="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.\"additional-bridge\"" "${LEASE_CONF}" 2>/dev/null || true)"
@@ -45,20 +46,18 @@ resolve_expected_additional_bridge() {
     return 0
   fi
   if [[ -f "${SHARED_DIR}/additional-bridge-name" ]]; then
-    printf '%s\n' "$(< "${SHARED_DIR}/additional-bridge-name")"
-    return 0
+    bridge="$(< "${SHARED_DIR}/additional-bridge-name")"
+    bridge="${bridge//$'\n'/}"
+    if [[ -n "${bridge}" ]]; then
+      printf '%s\n' "${bridge}"
+      return 0
+    fi
   fi
   if [[ -n "${VXLAN_ADDITIONAL_BRIDGE:-}" ]]; then
     printf '%s\n' "${VXLAN_ADDITIONAL_BRIDGE}"
     return 0
   fi
-  # Last-resort lease→bridge map when leases.yaml / SHARED_DIR omit additional-bridge.
-  case "${LEASED_RESOURCE}" in
-    libvirt-s390x-vpn-amd64-0-0) printf '%s\n' "ocp1-amd" ;;
-    libvirt-s390x-vpn-amd64-0-1) printf '%s\n' "ocp3-amd" ;;
-    libvirt-s390x-arm64-0-0|libvirt-s390x-vpn-arm64-0-0|*-arm64-0-0) printf '%s\n' "ocp2-arm" ;;
-    *) printf '%s\n' "" ;;
-  esac
+  printf '%s\n' ""
 }
 
 if [[ -z "${HOSTNAME_PRIMARY}" || "${HOSTNAME_PRIMARY}" == "null" ]]; then

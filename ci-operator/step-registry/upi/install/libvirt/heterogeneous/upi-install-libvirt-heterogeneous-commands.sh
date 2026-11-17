@@ -161,20 +161,20 @@ HTTPD_BASE_URL="http://${HTTPD_IP}:${HTTPD_PORT}"
 # ---------------------------------------------------------------------------
 # Additional-host libvirt network — attach to the infra VXLAN bridge rather
 # than pointing guests at the primary NAT network (which only exists on Z).
-# Bridge name is published by the network step (SHARED_DIR/additional-bridge-name).
-# AMD leases use ocp1-amd / ocp3-amd; ARM leases use ocp2-arm.
+# Bridge name comes from lease via SHARED_DIR (conf/network steps).
 # ---------------------------------------------------------------------------
 ADDITIONAL_BRIDGE_FILE="${SHARED_DIR}/additional-bridge-name"
-if [[ ! -f "${ADDITIONAL_BRIDGE_FILE}" ]]; then
-  echo "ERROR: additional-bridge-name not found in SHARED_DIR; ensure the network step ran successfully"
-  exit 1
+if [[ -f "${ADDITIONAL_BRIDGE_FILE}" ]]; then
+  ADDITIONAL_BRIDGE_NAME="$(< "${ADDITIONAL_BRIDGE_FILE}")"
+  ADDITIONAL_BRIDGE_NAME="${ADDITIONAL_BRIDGE_NAME//$'\n'/}"
+else
+  ADDITIONAL_BRIDGE_NAME="$(leaseLookup 'vxlan."additional-bridge"')"
 fi
-ADDITIONAL_BRIDGE_NAME="$(< "${ADDITIONAL_BRIDGE_FILE}")"
-ADDITIONAL_BRIDGE_NAME="${ADDITIONAL_BRIDGE_NAME//$'\n'/}"
 if [[ -z "${ADDITIONAL_BRIDGE_NAME}" || "${ADDITIONAL_BRIDGE_NAME}" =~ [^a-zA-Z0-9_-] ]]; then
-  echo "ERROR: ADDITIONAL_BRIDGE_NAME '${ADDITIONAL_BRIDGE_NAME}' from SHARED_DIR is empty or has unexpected characters"
+  echo "ERROR: Could not resolve additional VXLAN bridge from SHARED_DIR or lease" >&2
   exit 1
 fi
+printf '%s\n' "${ADDITIONAL_BRIDGE_NAME}" > "${SHARED_DIR}/additional-bridge-name"
 
 # Create a lease-named libvirt network on the additional host that bridge-forwards
 # to the infra VXLAN bridge. Templates may substitute LEASED_RESOURCE / NETWORK_NAME /
@@ -189,7 +189,7 @@ if echo "${ADD_DEFINED_NETWORKS}" | grep -Fxq "${ADDITIONAL_NETWORK_NAME}"; then
   exit 1
 fi
 
-echo "Creating additional-host libvirt network XML (bridge-forward to ${ADDITIONAL_BRIDGE_NAME})..."
+echo "Creating additional-host libvirt network XML (bridge-forward to lease VXLAN bridge)..."
 cat > "${ADDITIONAL_NETWORK_XML}" <<EOF
 <network>
   <name>${ADDITIONAL_NETWORK_NAME}</name>
@@ -216,7 +216,7 @@ if [[ "${ADD_NET_BRIDGE}" != "${ADDITIONAL_BRIDGE_NAME}" ]]; then
   echo "ERROR: Additional network XML references bridge '${ADD_NET_BRIDGE}', expected '${ADDITIONAL_BRIDGE_NAME}'"
   exit 1
 fi
-echo "Additional libvirt network '${ADDITIONAL_NETWORK_NAME}' active and referencing bridge '${ADDITIONAL_BRIDGE_NAME}'."
+echo "Additional libvirt network active and referencing the lease VXLAN bridge."
 
 mkdir -p /tmp/bin
 if [ -n "${OPENSHIFT_CLIENT_VERSION_OVERRIDE:-}" ]; then
@@ -581,7 +581,7 @@ for (( idx=0; idx<ADD_COMPUTE_COUNT; idx++ )); do
   # Whitelist — cover all network var names used by cluster-profile domain templates.
   TEMPLATE_VARS='$DOMAIN_NAME $DOMAIN_UUID $DOMAIN_MEMORY $DOMAIN_VCPUS $HOST_PATH_KERNEL $HOST_PATH_INITRAMFS $DOMAIN_CMDLINE $DISK_SOURCE_PATH $MAC_ADDRESS $NETWORK_NAME $ADDITIONAL_NETWORK_NAME $LEASED_RESOURCE $DOMAIN_MAC'
 
-  echo "Rendering install domain XML for ${node_name} (network=${NETWORK_NAME}, bridge=${ADDITIONAL_BRIDGE_NAME}, memory=${DOMAIN_MEMORY}, vcpus=${DOMAIN_VCPUS})..."
+  echo "Rendering install domain XML for additional compute (memory=${DOMAIN_MEMORY}, vcpus=${DOMAIN_VCPUS})..."
   domain_install_xml=$(mktemp --tmpdir domain-"${node_name}"-install.xml.XXXXX)
   envsubst "${TEMPLATE_VARS}" < "${INSTALL_TEMPLATE}" > "${domain_install_xml}"
 
