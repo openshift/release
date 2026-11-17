@@ -116,6 +116,168 @@ retry_cmd() {
     return ${rc}
 }
 
+# DNS error chronology
+#
+# When a DNS failure shows up while polling the install log, the step keeps a bounded,
+# timestamped snapshot of the log as it looked at that moment, together with a DNS probe
+# taken from this CI pod. Otherwise an install log reaches the artifacts only when the
+# step gives up or hits its crash trap: that copy may no longer report the earlier error,
+# and a run that ends successfully keeps no install log at all. The snapshots keep that
+# chronology.
+#
+# Everything in this chronology capture is bounded and best effort: it ignores its own
+# failures, adds one timeout-bounded DNS probe and bounded local text processing to a
+# poll, leaves the step's exit status and its readiness and failure criteria untouched,
+# reads no credentials and makes no cloud API calls.
+DNS_ERROR_PATTERN="no such host|dial tcp: lookup"
+DNS_MAX_OBSERVATIONS=3
+DNS_MAX_ERROR_LINES=20
+DNS_MAX_ERROR_BYTES=8192
+DNS_MAX_SNAPSHOT_LINES=200
+DNS_MAX_SNAPSHOT_BYTES=65536
+dns_observation_count=0
+dns_errors_observed="no"
+dns_first_observed_at=""
+dns_errors_seen_file=""
+
+# Keep account identifiers out of public artifacts, as the rest of this step does.
+# Also drop the ANSI sequences this step's own log() writes, which reach the install-log
+# output through retry_cmd.
+mask_sensitive_output() {
+    local -a filters=(-e 's/\x1b\[[0-9;]*m//g')
+    if [[ -n "${AWS_ACCOUNT_ID:-}" ]]; then
+        filters+=(-e "s/${AWS_ACCOUNT_ID}/${AWS_ACCOUNT_ID_MASK:-"***"}/g")
+    fi
+    if [[ -n "${SHARED_VPC_AWS_ACCOUNT_ID:-}" ]]; then
+        filters+=(-e "s/${SHARED_VPC_AWS_ACCOUNT_ID}/${SHARED_VPC_AWS_ACCOUNT_ID_MASK:-"***"}/g")
+    fi
+    sed "${filters[@]}"
+}
+
+# Derive the API hostname from an already-fetched cluster description. No API calls.
+derive_api_host() {
+    local cluster_json="${1:-}"
+    local api_url name base_domain
+
+    [[ -n "${cluster_json}" && -f "${cluster_json}" ]] || return 0
+
+    api_url=$(jq -r '.api.url // empty' "${cluster_json}" 2>/dev/null || true)
+    if [[ -n "${api_url}" ]]; then
+        echo "${api_url}" | sed -e 's|https\?://||' -e 's|:[0-9]*$||'
+        return 0
+    fi
+
+    name=$(jq -r '.name // empty' "${cluster_json}" 2>/dev/null || true)
+    base_domain=$(jq -r '.dns.base_domain // empty' "${cluster_json}" 2>/dev/null || true)
+    if [[ -n "${name}" && -n "${base_domain}" ]]; then
+        echo "api.${name}.${base_domain}"
+    fi
+    return 0
+}
+
+# Emit a DNS lookup plus the labels needed to read it correctly: who ran it, from where
+# and when. Without those labels a successful lookup here is easily misread as evidence
+# about the client that originally failed to resolve the name.
+print_dns_probe_context() {
+    local probe_host="${1:-}"
+
+    echo "Probe origin: the ci-operator step pod running this step on the CI build farm."
+    echo "Probe time:   $(date -u '+%Y-%m-%dT%H:%M:%SZ') (UTC)"
+    cat <<'EOF'
+Probe resolver: whatever /etc/resolv.conf gives this pod, normally the DNS service of
+  the CI build-farm cluster. It is not the resolver used by the ROSA management cluster or by
+  the hosted control plane that logged the lookup failure, and seeing the same resolver
+  service IP in two clusters does not make it the same resolver.
+How to read the result: it describes resolution as seen from this CI pod at the probe
+  time printed above. It is not evidence of what the original client resolved, and it
+  does not establish when any record was created, changed or propagated.
+EOF
+    echo "--- CI pod resolver configuration (/etc/resolv.conf) ---"
+    grep -E '^[[:space:]]*(nameserver|search|options)' /etc/resolv.conf 2>/dev/null || echo "unavailable"
+    echo ""
+    if [[ -n "${probe_host}" ]]; then
+        echo "--- dig ${probe_host} (from this CI pod, via this pod's own resolver) ---"
+        timeout 10 dig +time=2 +tries=1 "${probe_host}" 2>&1 || true
+    else
+        echo "--- dig skipped: API hostname could not be derived ---"
+    fi
+    return 0
+}
+
+# Preserve the install-log context of a newly observed DNS error while the step is still
+# waiting, so a later re-fetch of the install log does not erase the chronology.
+capture_dns_observation() {
+    local fetch_output="${1:-}"
+    local cluster_state="${2:-unknown}"
+    local health_check="${3:-0}"
+    local dns_lines new_dns_lines observed_at observation_file probe_host
+    local observation_index
+
+    [[ -n "${fetch_output}" ]] || return 0
+    [[ -n "${ARTIFACT_DIR:-}" && -d "${ARTIFACT_DIR}" ]] || return 0
+
+    dns_lines=$(grep -E "${DNS_ERROR_PATTERN}" <<< "${fetch_output}" || true)
+    [[ -n "${dns_lines}" ]] || return 0
+    dns_errors_observed="yes"
+
+    if [[ -z "${dns_errors_seen_file}" ]]; then
+        dns_errors_seen_file=$(mktemp) || return 0
+    fi
+    if [[ -s "${dns_errors_seen_file}" ]]; then
+        new_dns_lines=$(grep -Fxv -f "${dns_errors_seen_file}" <<< "${dns_lines}" || true)
+    else
+        new_dns_lines="${dns_lines}"
+    fi
+    [[ -n "${new_dns_lines}" ]] || return 0
+    printf '%s\n' "${new_dns_lines}" >> "${dns_errors_seen_file}"
+
+    observed_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+    [[ -n "${dns_first_observed_at}" ]] || dns_first_observed_at="${observed_at}"
+    if (( dns_observation_count >= DNS_MAX_OBSERVATIONS )); then
+        log "New DNS-related errors observed in install-log output; keeping the first ${DNS_MAX_OBSERVATIONS} observations only."
+        return 0
+    fi
+
+    observation_index=$(( dns_observation_count + 1 ))
+    observation_file=$(printf '%s/dns-observation-%02d.txt' "${ARTIFACT_DIR}" "${observation_index}")
+    probe_host=$(derive_api_host "${cluster_info_json:-}")
+
+    {
+        echo "=== ROSA install-log DNS error observation ${observation_index} ==="
+        echo "Observed at: ${observed_at} (UTC, clock of this CI step pod)"
+        echo "Observed by: rosa-cluster-wait-ready-cluster, install-log health check after ${health_check} polls with an unchanged cluster state"
+        echo "Cluster ID:  ${CLUSTER_ID}"
+        echo "OCM cluster state at observation: ${cluster_state}"
+        echo ""
+        echo "Written while the step was still waiting for the cluster, before any fail-fast"
+        echo "path re-fetches the install log. The timestamps inside install-log lines are the"
+        echo "times recorded by whatever logged those events; the times above only say when"
+        echo "this step read them. The captured text is the output of 'rosa logs install'"
+        echo "(stdout and stderr, so it can also contain this step's own retry messages),"
+        echo "with the AWS account IDs known to this step masked."
+        echo ""
+        echo "=== DNS-related lines not seen in earlier observations (at most ${DNS_MAX_ERROR_LINES} lines, ${DNS_MAX_ERROR_BYTES} bytes) ==="
+        printf '%s\n' "${new_dns_lines}" | head -n "${DNS_MAX_ERROR_LINES}" | head -c "${DNS_MAX_ERROR_BYTES}" | mask_sensitive_output || true
+        echo ""
+        echo "=== Install-log output snapshot (last ${DNS_MAX_SNAPSHOT_LINES} lines, truncated to ${DNS_MAX_SNAPSHOT_BYTES} bytes) ==="
+        printf '%s\n' "${fetch_output}" | tail -n "${DNS_MAX_SNAPSHOT_LINES}" | tail -c "${DNS_MAX_SNAPSHOT_BYTES}" | mask_sensitive_output || true
+        echo ""
+        echo "=== DNS probe taken at this observation ==="
+        print_dns_probe_context "${probe_host}"
+        echo ""
+        echo "=== End DNS error observation ${observation_index} ==="
+    } > "${observation_file}" 2>&1 || true
+
+    if [[ -f "${observation_file}" && -s "${observation_file}" ]]; then
+        dns_observation_count=${observation_index}
+        log "DNS-related error observed in install-log output; snapshot saved to ${observation_file}"
+    else
+        rm -f "${observation_file}" 2>/dev/null || true
+        log "DNS-related error observed in install-log output, but the snapshot could not be written."
+    fi
+    return 0
+}
+
 # Record Cluster Configurations
 cluster_config_file="${SHARED_DIR}/cluster-config"
 function record_cluster() {
@@ -294,6 +456,10 @@ while true; do
       if (( loop_count % 5 == 0 )); then
         log "Checking install logs for fatal errors..."
         install_log_output=$(retry_cmd 3 10 timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
+        # Keep the DNS chronology before the fail-fast path below re-fetches the install
+        # log. Bounded and best effort: it adds at most one timeout-bounded DNS probe to
+        # this poll, and it does not change the step's exit status or failure criteria.
+        capture_dns_observation "${install_log_output}" "${CLUSTER_STATE}" "${loop_count}" || true
         fatal_pattern=$(echo "${install_log_output}" | grep -E "ProvisionFailed|failed to create|InvalidSubnet|LimitExceeded|QuotaExceeded|InsufficientFreeAddresses|UnauthorizedAccess" || true)
         # Filter known transient errors. The KMS provider x509 error (OCPBUGS-49661) is caused by
         # the admin-kubeconfig CA not trusting the Let's Encrypt CA on ROSA HCP API servers. CAPI
@@ -364,6 +530,7 @@ while true; do
     post_shared_vpc_auto ${cluster_info_json}
   fi
 done
+[[ -z "${dns_errors_seen_file}" ]] || rm -f "${dns_errors_seen_file}"
 cat $cluster_config_file | jq -r '.timers'
 
 if [[ "$FAILED_INSTALL" == "yes" ]]; then
@@ -389,17 +556,32 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
   # "dial tcp: lookup"), capture Route 53 record state and resolver output as artifacts.
   # This helps triage DNS propagation / hosted-zone issues without needing to reproduce.
   dns_pattern_found="no"
-  if [[ -f "${ARTIFACT_DIR}/.install.log" ]] && grep -qE "no such host|dial tcp: lookup" "${ARTIFACT_DIR}/.install.log" 2>/dev/null; then
+  if [[ -f "${ARTIFACT_DIR}/.install.log" ]] && grep -qE "${DNS_ERROR_PATTERN}" "${ARTIFACT_DIR}/.install.log" 2>/dev/null; then
     dns_pattern_found="yes"
-  elif echo "${status_desc}" | grep -qE "no such host|dial tcp: lookup" 2>/dev/null; then
+  elif echo "${status_desc}" | grep -qE "${DNS_ERROR_PATTERN}" 2>/dev/null; then
+    dns_pattern_found="yes"
+  elif [[ "${dns_errors_observed}" == "yes" ]]; then
+    # The error was seen earlier in the wait loop but is no longer in the final log.
     dns_pattern_found="yes"
   fi
   if [[ "${dns_pattern_found}" == "yes" ]]; then
     log "DNS-related error detected, capturing DNS diagnostics..."
     {
       echo "=== DNS Diagnostics ==="
-      echo "Captured at: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+      echo "Captured at: $(date -u '+%Y-%m-%dT%H:%M:%SZ') (UTC, after the step declared the install failed)"
+      echo "Captured by: rosa-cluster-wait-ready-cluster, running in a ci-operator step pod"
       echo "Cluster ID: ${CLUSTER_ID}"
+      echo ""
+      if [[ "${dns_errors_observed}" == "yes" ]]; then
+        echo "Earlier DNS errors were seen in install-log output while the step was still waiting."
+        echo "The first was read by this step at ${dns_first_observed_at} (UTC). ${dns_observation_count} bounded snapshot(s)"
+        echo "were saved alongside this file as dns-observation-NN.txt; at most ${DNS_MAX_OBSERVATIONS} are kept, so a"
+        echo "later observation may have been dropped."
+      else
+        echo "The wait loop's periodic install-log health checks recorded no DNS error. They run"
+        echo "only every few polls and only while the cluster state is unchanged, so this is not"
+        echo "evidence that no earlier DNS error occurred."
+      fi
       echo ""
 
       # Extract API URL and cluster DNS zone from the saved cluster description
@@ -426,15 +608,17 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
       fi
       echo ""
 
-      # Resolve the API hostname via the default resolver (CoreDNS on the management cluster)
+      # Resolve the API hostname from this CI pod. The probe is labelled with its origin
+      # and time because it only describes resolution as seen from CI once the step had
+      # already failed; it is not the view of the client that logged the lookup error.
       if [[ -n "${api_host}" ]]; then
-        echo "=== dig ${api_host} (default resolver) ==="
-        timeout 10 dig +time=2 +tries=1 "${api_host}" 2>&1 || true
+        echo "=== DNS probe from this CI step pod ==="
+        print_dns_probe_context "${api_host}" || true
         echo ""
 
         # Look up authoritative nameservers for the cluster zone and query them directly
         ns_zone="${cluster_zone:-$(echo "${api_host}" | cut -d. -f2-)}"
-        echo "=== Authoritative NS lookup for ${ns_zone} ==="
+        echo "=== Authoritative NS lookup for ${ns_zone} (queried from this CI pod) ==="
         timeout 10 dig +time=2 +tries=1 NS "${ns_zone}" +short 2>&1 || true
         echo ""
         auth_ns=$(timeout 10 dig +time=2 +tries=1 NS "${ns_zone}" +short 2>/dev/null | head -1 || true)
@@ -451,6 +635,8 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
       # Route 53: dump the hosted-zone record sets for the cluster's DNS name
       if aws sts get-caller-identity &>/dev/null; then
         echo "=== Route 53 hosted zone records ==="
+        echo "Record state as read at $(date -u '+%Y-%m-%dT%H:%M:%SZ') (UTC). The API returns no"
+        echo "history, so this says nothing about when a record was created or changed."
         if [[ -n "${cluster_zone}" ]]; then
           hz_json=$(aws route53 list-hosted-zones-by-name \
             --dns-name "${cluster_zone}" \
