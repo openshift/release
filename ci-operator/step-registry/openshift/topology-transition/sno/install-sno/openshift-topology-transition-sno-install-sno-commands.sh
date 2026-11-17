@@ -215,7 +215,7 @@ rm -f subscription-manager-org subscription-manager-act-key
 subscription-manager repos --enable=rhel-9-for-x86_64-baseos-rpms --enable=rhel-9-for-x86_64-appstream-rpms
 for attempt in 1 2 3; do
   if dnf install -y qemu-kvm libvirt virt-install edk2-ovmf jq podman haproxy \
-    policycoreutils-python-utils openssl; then
+    policycoreutils-python-utils openssl nmstate; then
     break
   fi
   [[ ${attempt} -lt 3 ]] || exit 1
