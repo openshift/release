@@ -1018,6 +1018,17 @@ fi
 # --workers flag overrides the config value; override via PLAYWRIGHT_WORKERS if needed.
 PLAYWRIGHT_WORKERS="${PLAYWRIGHT_WORKERS:-2}"
 
+# Leave the suite's per-test timeout unchanged unless the job overrides it.
+TEST_TIMEOUT_ARGS=()
+if [[ -n "${PLAYWRIGHT_TEST_TIMEOUT:-}" ]]; then
+  if [[ ! "${PLAYWRIGHT_TEST_TIMEOUT}" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: PLAYWRIGHT_TEST_TIMEOUT must be a positive integer in milliseconds" >&2
+    exit 1
+  fi
+  TEST_TIMEOUT_ARGS=(--timeout "${PLAYWRIGHT_TEST_TIMEOUT}")
+  echo "Overriding Playwright per-test timeout: ${PLAYWRIGHT_TEST_TIMEOUT} ms"
+fi
+
 # Optional override for Playwright's maxFailures. The suite's playwright.config.ts
 # stops the whole run early after a small number of failures in CI, which leaves
 # later tests reported as "did not run" and hides the full picture. Set
@@ -1131,6 +1142,7 @@ npx playwright test \
   "${GREP_ARGS[@]}" \
   "${GREP_INVERT_ARGS[@]}" \
   "${MAX_FAILURES_ARGS[@]}" \
+  "${TEST_TIMEOUT_ARGS[@]}" \
   --workers "${PLAYWRIGHT_WORKERS}" \
   --reporter="${PLAYWRIGHT_REPORTERS}" \
   2>&1 | scrub_playwright_secrets | tee "${ARTIFACT_DIR}/playwright-output.log" || playwright_rc=$?
