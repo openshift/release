@@ -86,6 +86,19 @@ authorize_sg_ingress() {
     --source-group "${source_group}" 2>/dev/null || true
 }
 
+authorize_sg_ingress_cidr() {
+  local group_id=$1
+  local protocol=$2
+  local port=$3
+  local cidr=$4
+  echo "Opening ${protocol}/${port} on ${group_id} from ${cidr}..."
+  aws --region "${REGION}" ec2 authorize-security-group-ingress \
+    --group-id "${group_id}" \
+    --protocol "${protocol}" \
+    --port "${port}" \
+    --cidr "${cidr}" 2>/dev/null || true
+}
+
 configure_evpn_security_groups() {
   local node_sg=$1
   local cp_sg=$2
@@ -111,10 +124,99 @@ configure_evpn_security_groups() {
   echo "EVPN security group rules configured"
 }
 
+# Import probes for routed CUDNs are sourced from addresses in the import CIDR
+# that are not assigned to any AWS network interface. The installer's ICMP rule
+# is scoped to the node and control-plane security groups, and security-group
+# referencing only matches the private addresses of member ENIs, so it never
+# matches those spoofed sources. Authorize the range explicitly on both groups.
+configure_cudn_icmp_ingress() {
+  local node_sg=$1
+  local cp_sg=$2
+  local import_cidr=${UDN_BGP_IMPORT_CIDR:-20.0.0.0/8}
+
+  echo "=== Allowing CUDN import ICMP from ${import_cidr} ==="
+
+  authorize_sg_ingress_cidr "${node_sg}" icmp -1 "${import_cidr}"
+
+  if [[ -n "${cp_sg}" && "${cp_sg}" != "None" ]]; then
+    authorize_sg_ingress_cidr "${cp_sg}" icmp -1 "${import_cidr}"
+  else
+    echo "WARNING: Control-plane security group not found; CUDN import ICMP rule only applied to node SG" >&2
+  fi
+
+  echo "CUDN import ICMP rules configured"
+}
+
+# Allow nodes to route ClusterUserDefinedNetwork (CUDN) traffic whose source or
+# destination addresses are not assigned to their AWS network interfaces.
+# Uses the current oc cluster and AWS credentials in REGION; takes no arguments.
+# Disables and verifies source/destination checking on each existing node's
+# primary ENI, including control-plane nodes. Nodes added later are not covered.
+# Fails on missing nodes, invalid provider IDs, missing ENIs, or failed verification;
+# API errors abort the script under errexit. Earlier updates are not rolled back.
+disable_node_source_dest_checks() {
+  local node_provider_ids node_name provider_id instance_id eni_id availability_zone source_dest_check attempt
+  node_provider_ids=$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.providerID}{"\n"}{end}')
+  if [[ -z "${node_provider_ids}" ]]; then
+    echo "ERROR: No cluster nodes found" >&2
+    return 1
+  fi
+
+  while read -r node_name provider_id; do
+    if [[ "${provider_id}" != aws://*/i-* ]]; then
+      echo "ERROR: Node ${node_name} has an invalid AWS provider ID: ${provider_id}" >&2
+      return 1
+    fi
+    # The final component of an AWS provider ID is the EC2 instance ID.
+    instance_id=${provider_id##*/}
+    availability_zone=$(aws --region "${REGION}" ec2 describe-instances \
+      --instance-ids "${instance_id}" \
+      --query 'Reservations[0].Instances[0].Placement.AvailabilityZone' --output text)
+    if [[ -z "${availability_zone}" || "${availability_zone}" == "None" ]]; then
+      echo "ERROR: Could not determine Availability Zone for node ${node_name} (${instance_id})" >&2
+      return 1
+    fi
+    # Device index 0 selects the primary ENI used for the node's machine network.
+    eni_id=$(aws --region "${REGION}" ec2 describe-network-interfaces \
+      --filters "Name=attachment.instance-id,Values=${instance_id}" "Name=attachment.device-index,Values=0" \
+      --query 'NetworkInterfaces[0].NetworkInterfaceId' --output text)
+    if [[ -z "${eni_id}" || "${eni_id}" == "None" ]]; then
+      echo "ERROR: No primary ENI found for node ${node_name} (${instance_id})" >&2
+      return 1
+    fi
+
+    echo "Disabling source/destination checking on node ${node_name} in ${availability_zone}, primary ENI ${eni_id}"
+    aws --region "${REGION}" ec2 modify-network-interface-attribute \
+      --network-interface-id "${eni_id}" --no-source-dest-check
+    # EC2 reads can briefly return the old value after a successful update.
+    # Check immediately, then retry five times with 5-second waits (25s total
+    # waiting per node, plus API call time). API errors still fail immediately.
+    for attempt in {1..6}; do
+      source_dest_check=$(aws --region "${REGION}" ec2 describe-network-interfaces \
+        --network-interface-ids "${eni_id}" \
+        --query 'NetworkInterfaces[0].SourceDestCheck' --output text)
+      if [[ "${source_dest_check,,}" == "false" ]]; then
+        break
+      fi
+      if (( attempt < 6 )); then
+        sleep 5
+      fi
+    done
+    if [[ "${source_dest_check,,}" != "false" ]]; then
+      echo "ERROR: Source/destination checking remains enabled or unknown on ${eni_id}: ${source_dest_check}" >&2
+      return 1
+    fi
+    echo "Verified node ${node_name} primary ENI ${eni_id}: SourceDestCheck=${source_dest_check}"
+  done <<< "${node_provider_ids}"
+}
+
 echo "=== Provisioning AWS bastion instance ==="
 
 INFRA_ID=$(oc get -o jsonpath='{.status.infrastructureName}' infrastructure cluster)
 echo "Cluster infra ID: ${INFRA_ID}"
+
+# Nodes route traffic for CUDN addresses that are not assigned to their ENIs.
+disable_node_source_dest_checks
 
 # Get a worker node's AWS instance ID
 WORKER_AWS_ID=$(oc get nodes -l node-role.kubernetes.io/worker \
@@ -200,6 +302,7 @@ if [[ -z "${CONTROL_PLANE_SG}" || "${CONTROL_PLANE_SG}" == "None" ]]; then
 fi
 
 configure_evpn_security_groups "${NODE_SG}" "${CONTROL_PLANE_SG}"
+configure_cudn_icmp_ingress "${NODE_SG}" "${CONTROL_PLANE_SG}"
 
 # Authorize SSH from anywhere (for CI pod access)
 aws --region "${REGION}" ec2 authorize-security-group-ingress \
@@ -240,6 +343,13 @@ echo "Amazon Linux 2023 AMI: ${AMI_ID}"
 # Cloud-init only sets up root SSH. Packages are installed over SSH after boot.
 cat > /tmp/bastion-user-data.sh <<'USERDATA'
 #!/bin/bash
+# This bastion forwards CUDN traffic during long-running kube-burner workloads.
+# Persist the setting across reboot and apply it during first boot.
+cat > /etc/sysctl.d/99-openshift-qe-bastion.conf <<'EOF'
+net.ipv4.ip_forward = 1
+EOF
+/sbin/sysctl --system
+
 mkdir -p /root/.ssh
 chmod 700 /root/.ssh
 cp /home/ec2-user/.ssh/authorized_keys /root/.ssh/authorized_keys
@@ -297,6 +407,12 @@ WORKER_ENI_ID=$(aws --region "${REGION}" ec2 create-network-interface \
   --groups "${NODE_SG}" \
   --description "${AWS_INSTANCE_NAME}-evpn" \
   --query 'NetworkInterface.NetworkInterfaceId' --output text)
+
+# The instance-level setting does not cover a separately created ENI. This
+# interface forwards EVPN/CUDN traffic, so disable its check explicitly.
+aws --region "${REGION}" ec2 modify-network-interface-attribute \
+  --network-interface-id "${WORKER_ENI_ID}" \
+  --no-source-dest-check
 
 # Save ENI id before attach so cleanup can run if attach fails.
 jq --arg eni "${WORKER_ENI_ID}" '.worker_eni_id=$eni' \
