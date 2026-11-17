@@ -966,3 +966,16 @@ fi
 CLUSTER_ID=$(cat "${CLUSTER_INFO}" | grep '^ID:' | tr -d '[:space:]' | cut -d ':' -f 2)
 echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
 echo -n "${CLUSTER_ID}" > "${SHARED_DIR}/cluster-id"
+
+# Capture cluster scope metadata for per-run analysis (ROSAENG-76176).
+# Consumed by rosa-eng-dashboard change observability (ROSAENG-76159).
+echo -n "${CLUSTER_ID}" > "${ARTIFACT_DIR}/cluster-id"
+[[ -n "${CLUSTER_SECTOR}" ]] && echo -n "${CLUSTER_SECTOR}" > "${ARTIFACT_DIR}/cluster-sector"
+echo -n "${OCM_LOGIN_ENV}" > "${ARTIFACT_DIR}/ocm-login-env"
+if [[ "${HOSTED_CP}" == "true" ]]; then
+  echo "hcp" > "${ARTIFACT_DIR}/topology"
+  ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/hypershift" 2>/dev/null \
+    | jq -r '.management_cluster // empty' > "${ARTIFACT_DIR}/management-cluster" || true
+else
+  echo "classic" > "${ARTIFACT_DIR}/topology"
+fi
