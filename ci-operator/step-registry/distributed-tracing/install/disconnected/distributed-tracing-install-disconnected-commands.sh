@@ -264,9 +264,25 @@ EOF
 
 }
 
+function disable_default_catalogsource () {
+    # The QE catalogsource step is skipped for this job (SKIP_QE_APP_REGISTRY),
+    # and that is also where the default OperatorHub sources used to be
+    # disabled. They are unreachable on a disconnected cluster and leave stale
+    # packagemanifests behind, so disable them here before creating cs-tempo
+    # and cs-otel.
+    run_command "oc patch operatorhub cluster -p '{\"spec\": {\"disableAllDefaultSources\": true}}' --type=merge"; ret=$?
+    if [[ $ret -eq 0 ]]; then
+        echo "disable default Catalog Source successfully."
+    else
+        echo "!!! fail to disable default Catalog Source"
+        return 1
+    fi
+}
+
 run_command "oc whoami"
 run_command "oc version -o yaml"
 
 check_olm_capability
 check_marketplace
+disable_default_catalogsource
 mirror_catalog_icsp
