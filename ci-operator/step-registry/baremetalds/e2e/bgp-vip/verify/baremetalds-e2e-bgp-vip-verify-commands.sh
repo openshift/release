@@ -12,6 +12,17 @@ source "${SHARED_DIR}/packet-conf.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/ds-vars.conf"
 
+# Whether the origin suites must be present comes from the caller, never from
+# what suite discovery happens to return: see BGP_VIP_ORIGIN_SUITES_REQUIRED in
+# the ref. Reject anything but true/false before spending time on the checks.
+case "${BGP_VIP_ORIGIN_SUITES_REQUIRED}" in
+    true|false) ;;
+    *)
+        echo "BGP_VIP_ORIGIN_SUITES_REQUIRED must be \"true\" or \"false\", got \"${BGP_VIP_ORIGIN_SUITES_REQUIRED}\""
+        exit 1
+        ;;
+esac
+
 # Part 1: the bash checks, run on the hypervisor. A failure here is recorded
 # but does not stop part 2, so the origin tests always report.
 verify_rc=0
@@ -278,12 +289,43 @@ if [[ -n "${BGP_VIP_ORIGIN_DISABLED_MONITORS}" ]]; then
     DISABLE_MONITOR_ARGS=(--disable-monitor "${BGP_VIP_ORIGIN_DISABLED_MONITORS}")
 fi
 
-available_suites="$(openshift-tests list suites 2>/dev/null || true)"
+# Whether a suite is required comes from BGP_VIP_ORIGIN_SUITES_REQUIRED, never
+# from discovery. Discovery only tells a suite this payload does not ship from
+# one that fails to run. A failed discovery is a failure of its own, not
+# "nothing shipped": openshift-tests has "list suites" on every release line
+# these jobs test.
+# Split on whitespace without glob expansion; read returns 1 at end of input.
+read -r -d '' -a origin_suites <<<"${BGP_VIP_ORIGIN_SUITES}" || true
+discovery_failed=false
+available_suites=""
+if [[ "${#origin_suites[@]}" -ne 0 ]]; then
+    discovery_log="${ARTIFACT_DIR}/openshift-tests-list-suites.log"
+    if ! available_suites="$(openshift-tests list suites 2>"${discovery_log}")"; then
+        discovery_failed=true
+        echo "openshift-tests list suites failed; its stderr (${discovery_log}):"
+        cat "${discovery_log}" || true
+    fi
+fi
 
-origin_rc=0
-for suite in ${BGP_VIP_ORIGIN_SUITES}; do
-    if ! grep -Fxq "${suite}" <<<"${available_suites}"; then
-        echo "openshift-tests in this payload does not ship suite ${suite} (openshift/origin#31893 not in the payload yet); skipping it"
+missing_suites=()
+failed_suites=()
+for suite in "${origin_suites[@]}"; do
+    if [[ "${discovery_failed}" == "true" ]]; then
+        if [[ "${BGP_VIP_ORIGIN_SUITES_REQUIRED}" == "false" ]]; then
+            # Which suites this payload ships is unknown, so do not run
+            # them; the discovery failure fails the step below.
+            echo "suite discovery failed; not running ${suite} (BGP_VIP_ORIGIN_SUITES_REQUIRED=false)"
+            continue
+        fi
+        # Required: run it anyway so its own result is reported; the
+        # discovery failure still fails the step below.
+    elif ! grep -Fxq -- "${suite}" <<<"${available_suites}"; then
+        if [[ "${BGP_VIP_ORIGIN_SUITES_REQUIRED}" == "false" ]]; then
+            echo "openshift-tests in this payload does not ship suite ${suite} (added by openshift/origin#31893); skipping it (BGP_VIP_ORIGIN_SUITES_REQUIRED=false)"
+        else
+            echo "ERROR: openshift-tests in this payload does not ship required suite ${suite}"
+            missing_suites+=("${suite}")
+        fi
         continue
     fi
     out="${ARTIFACT_DIR}/$(tr '/' '_' <<<"${suite}")"
@@ -295,16 +337,25 @@ for suite in ${BGP_VIP_ORIGIN_SUITES}; do
         --with-hypervisor-json "${HYPERVISOR_JSON}" \
         "${DISABLE_MONITOR_ARGS[@]}" \
         -o "${out}/e2e.log" \
-        --junit-dir "${out}/junit" || origin_rc=1
+        --junit-dir "${out}/junit" || failed_suites+=("${suite}")
     set +x
 done
 
+step_rc=0
 if [[ "${verify_rc}" -ne 0 ]]; then
     echo "BGP VIP verification checks failed (exit ${verify_rc})"
+    step_rc=1
 fi
-if [[ "${origin_rc}" -ne 0 ]]; then
-    echo "BGP VIP origin suites failed"
+if [[ "${discovery_failed}" == "true" ]]; then
+    echo "openshift-tests suite discovery failed, so the BGP VIP origin suites could not be confirmed"
+    step_rc=1
 fi
-if [[ "${verify_rc}" -ne 0 || "${origin_rc}" -ne 0 ]]; then
-    exit 1
+if [[ "${#missing_suites[@]}" -ne 0 ]]; then
+    echo "Required BGP VIP origin suites missing from the payload's openshift-tests: ${missing_suites[*]}"
+    step_rc=1
 fi
+if [[ "${#failed_suites[@]}" -ne 0 ]]; then
+    echo "BGP VIP origin suites failed: ${failed_suites[*]}"
+    step_rc=1
+fi
+exit "${step_rc}"
