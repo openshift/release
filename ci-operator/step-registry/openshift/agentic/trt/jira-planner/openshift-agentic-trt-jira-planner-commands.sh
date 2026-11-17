@@ -265,6 +265,18 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
     echo "ERROR: Uncommitted tracked changes remain. Commit the solution before publication."
     exit 1
 fi
+# Verify the diff contains a planning document (.md) and no source code changes.
+CHANGED_FILES=$(git diff --name-only "${START_COMMIT}" HEAD)
+if ! echo "${CHANGED_FILES}" | grep -qiE '\.md$'; then
+    echo "ERROR: No Markdown planning document found in the committed changes."
+    echo "Changed files: ${CHANGED_FILES}"
+    exit 1
+fi
+NON_DOC_FILES=$(echo "${CHANGED_FILES}" | grep -viE '\.(md|txt|rst)$' || true)
+if [[ -n "${NON_DOC_FILES}" ]]; then
+    echo "WARNING: Non-documentation files changed (plan-only policy):"
+    echo "${NON_DOC_FILES}"
+fi
 if [[ "${EVAL_MODE:-}" == "true" ]]; then
     BASE_BRANCH=$(cat "${SHARED_DIR}/eval-base-branch" 2>/dev/null || echo "")
     if [[ -n "${BASE_BRANCH}" && "${BRANCH_NAME}" == "${BASE_BRANCH}" ]]; then
