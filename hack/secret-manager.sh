@@ -26,8 +26,8 @@ NATIVE_COMMIT="4daba691a18147afa424be4aa288e5d853323cc0"
 # Each commit gets its own immutable directory. A newer pin provisions a new
 # directory rather than moving or deleting the one an in-flight invocation may
 # already be running from, which publishing then reduces to a single rename.
-# Directories for other commits are pruned once they are old enough that no
-# invocation can still be using them.
+# Old caches are kept: their age cannot tell us whether an invocation is using
+# them. Remove unused caches manually only when no native invocation is running.
 NATIVE_ROOT="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-native"
 NATIVE_DIR="$NATIVE_ROOT/$NATIVE_COMMIT"
 NATIVE_LOCK="$NATIVE_ROOT/.lock"
@@ -89,30 +89,10 @@ native_cli_ready() {
     [ -x "$NATIVE_PYTHON" ]
 }
 
-# prune_native_caches removes caches for other commits that are far too old for
-# a running invocation to still be using them. The current commit's directory is
-# never touched, and neither is anything that is not a commit-directory name.
-prune_native_caches() {
-    local dir base
-    for dir in "$NATIVE_ROOT"/*/; do
-        [ -d "$dir" ] || continue
-        base="${dir%/}"
-        base="${base##*/}"
-        [ "${#base}" -eq 40 ] || continue
-        case "$base" in
-            "$NATIVE_COMMIT" | *[!0-9a-f]*) continue ;;
-        esac
-        if [ -n "$(find "$dir" -maxdepth 0 -mtime +7 2>/dev/null)" ]; then
-            rm -rf "$dir"
-        fi
-    done
-}
-
 # release_native_lock drops the lock if this process still owns it and disarms
 # the EXIT trap. Ownership is checked rather than releasing by path alone: after
 # publishing, this run goes on to execute the CLI (possibly an interactive
-# login), and by then the lock path may have been reclaimed and re-acquired by
-# another run whose lock must not be deleted from here.
+# login) without retaining the provisioning lock.
 release_native_lock() {
     if [ -n "$NATIVE_STAGE" ]; then
         rm -rf "$NATIVE_STAGE"
@@ -135,7 +115,7 @@ ensure_native_cli() {
         echo "Error: 'uv' is not installed. Install it with: brew install uv" >&2
         exit 1
     fi
-    local waited=0 holder="" claimed="" reclaimable=""
+    local waited=0 holder="" abandoned=""
     mkdir -p "$NATIVE_ROOT"
     NATIVE_STAGE="$NATIVE_ROOT/.stage.$$"
     while ! mkdir "$NATIVE_LOCK" 2>/dev/null; do
@@ -144,35 +124,26 @@ ensure_native_cli() {
         # never disturbed, however old it is: age alone would steal the lock from
         # a slow but healthy run and make it provision twice.
         holder="$(cat "$NATIVE_LOCK/pid" 2>/dev/null || true)"
-        reclaimable=""
+        abandoned=""
         if [ -n "$holder" ]; then
-            kill -0 "$holder" 2>/dev/null || reclaimable=yes
+            kill -0 "$holder" 2>/dev/null || abandoned=yes
         elif [ -n "$(find "$NATIVE_LOCK" -mmin +1 2>/dev/null)" ]; then
             # No PID recorded. That is only legitimate for the microseconds
             # between mkdir and writing the PID, so a lock still PID-less after a
-            # minute was abandoned there and would otherwise block every later
-            # run forever. Note -mmin +1, not +0: on BSD/macOS find, +0 matches
-            # anything older than a second, which would reclaim a lock out from
-            # under a run that is still writing its PID.
-            reclaimable=yes
+            # minute needs manual recovery. Note -mmin +1, not +0: on BSD/macOS
+            # find, +0 matches anything older than a second, which could report
+            # an abandoned lock while a run is still writing its PID.
+            abandoned=yes
         fi
-        if [ -n "$reclaimable" ]; then
-            # Claim the lock by renaming it before inspecting, so a lock that a
-            # concurrent run replaces underneath us is never deleted: we only
-            # remove what we can prove is the same holder we judged abandoned.
-            claimed="$NATIVE_LOCK.stale.$$"
-            rm -rf "$claimed"
-            if mv "$NATIVE_LOCK" "$claimed" 2>/dev/null; then
-                if [ "$(cat "$claimed/pid" 2>/dev/null || true)" = "$holder" ]; then
-                    rm -rf "$claimed"
-                    continue
-                fi
-                # A different run replaced the lock; hand it back and wait.
-                mv "$claimed" "$NATIVE_LOCK" 2>/dev/null || rm -rf "$claimed"
-            fi
+        if [ -n "$abandoned" ]; then
+            # Checking a PID and renaming/removing its directory is not atomic:
+            # another waiter could have acquired it in between. Never reclaim
+            # by path while other invocations may be acquiring the same lock.
+            echo "Error: native CLI setup lock appears abandoned: $NATIVE_LOCK. Stop all native invocations before removing it, then retry." >&2
+            exit 1
         fi
         if [ "$waited" -ge 600 ]; then
-            echo "Error: timed out waiting for another run to set up the CLI; remove $NATIVE_LOCK if none is running." >&2
+            echo "Error: timed out waiting for native CLI setup. Stop all native invocations before removing $NATIVE_LOCK, then retry." >&2
             exit 1
         fi
         if [ "$waited" -eq 0 ]; then
@@ -184,13 +155,19 @@ ensure_native_cli() {
     # NATIVE_STAGE is deliberately not "local": the trap runs at exit, after this
     # function has returned and its locals are gone. Arm it before the PID write
     # so a failed write cannot leave an ownerless lock behind; if one is left
-    # anyway it is reclaimed above once it has been PID-less for a minute.
+    # anyway, report it above for manual recovery once it has aged.
     trap release_native_lock EXIT
     printf '%s' "$$" >"$NATIVE_LOCK/pid"
     # Another run may have finished provisioning while we waited for the lock.
     if native_cli_ready; then
         release_native_lock
         return 0
+    fi
+    # mv would nest staging inside an existing directory rather than replace
+    # it. Do not remove an invalid cache that another invocation might be using.
+    if [ -e "$NATIVE_DIR" ] || [ -L "$NATIVE_DIR" ]; then
+        echo "Error: native CLI cache is incomplete: $NATIVE_DIR. Stop all native invocations before removing it, then retry." >&2
+        exit 1
     fi
     echo "Setting up the native secret-manager CLI at ${NATIVE_COMMIT:0:12} (first run only)..." >&2
     mkdir -p "$NATIVE_STAGE/src"
@@ -212,11 +189,10 @@ ensure_native_cli() {
     # Publish with a single rename into this commit's own directory. Nothing is
     # moved or removed, so a concurrent invocation running from another commit's
     # directory is unaffected.
-    if ! mv "$NATIVE_STAGE" "$NATIVE_DIR" 2>/dev/null && ! native_cli_ready; then
+    if ! mv "$NATIVE_STAGE" "$NATIVE_DIR" 2>/dev/null || ! native_cli_ready; then
         echo "Error: could not publish the native CLI cache." >&2
         exit 1
     fi
-    prune_native_caches
     release_native_lock
 }
 
