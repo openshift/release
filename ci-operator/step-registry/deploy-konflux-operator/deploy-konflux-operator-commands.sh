@@ -101,15 +101,6 @@ function install_opm() {
         err="${out}"
     fi
 
-    # A missing opm is not fatal when operator deployment is switched off.
-    if [[ "${KONFLUX_DEPLOY_OPERATORS:-true}" == "false" ]]; then
-        echo "WARNING: could not install opm from ${OPM_IMAGE}; continuing because KONFLUX_DEPLOY_OPERATORS is false and opm is not used"
-        if [[ -n "${err}" ]]; then
-            echo "WARNING: last error was: ${err}"
-        fi
-        return 0
-    fi
-
     echo "ERROR: could not install opm from ${OPM_IMAGE}"
     if [[ -n "${err}" ]]; then
         echo "ERROR: last error was: ${err}"
@@ -133,7 +124,6 @@ trap - EXIT
 # See --operator flag for valid operators
 VALID_OPERATORS="sriov metallb nmstate ptp pfstatus local-storage"
 
-KONFLUX_DEPLOY_OPERATORS="${KONFLUX_DEPLOY_OPERATORS:-true}"
 # Env variables to control the deployment of CatalogSource and Subscription
 KONFLUX_DEPLOY_CATALOG_SOURCE="${KONFLUX_DEPLOY_CATALOG_SOURCE:-true}"
 KONFLUX_DEPLOY_SUBSCRIPTION="${KONFLUX_DEPLOY_SUBSCRIPTION:-true}"
@@ -204,11 +194,6 @@ display_metadata() {
     echo "============================================================"
 }
 
-if [[ "$KONFLUX_DEPLOY_OPERATORS" == false ]]; then
-    log "INFO" "Skipping deployment due to KONFLUX_DEPLOY_OPERATORS flag"
-    exit 0
-fi
-
 # Parse arguments
 log_step "INIT" "Starting Konflux Operator Deployment"
 log "INFO" "Using MCP timeout: ${MCP_TIMEOUT:-600s}"
@@ -236,19 +221,9 @@ while [[ $# -gt 0 ]]; do
             log "INFO" "Internal registry specified: $2"
             shift 2
             ;;
-        --internal-registry-auth)
-            INTERNAL_REGISTRY_AUTH="$2"
-            log "INFO" "Internal registry auth file specified: $2"
-            shift 2
-            ;;
         --internal-registry-proxy)
             INTERNAL_REGISTRY_PROXY="$2"
             log "INFO" "Internal registry proxy specified: $2"
-            shift 2
-            ;;
-        --internal-registry-proxy-auth)
-            INTERNAL_REGISTRY_PROXY_AUTH="$2"
-            log "INFO" "Internal registry proxy auth file specified: $2"
             shift 2
             ;;
         --mcp-timeout)
@@ -301,16 +276,6 @@ fi
 
 log_step "CONFIG" "Determining cluster mode and validating requirements"
 
-if [[ -n "${INTERNAL_REGISTRY:-}" && -z "${INTERNAL_REGISTRY_AUTH:-}" ]] || [[ -z "${INTERNAL_REGISTRY:-}" && -n "${INTERNAL_REGISTRY_AUTH:-}" ]]; then
-    log "ERROR" "Both --internal-registry and --internal-registry-auth must be provided together"
-    exit 1
-fi
-
-if [[ -n "${INTERNAL_REGISTRY_PROXY:-}" && -z "${INTERNAL_REGISTRY_PROXY_AUTH:-}" ]] || [[ -z "${INTERNAL_REGISTRY_PROXY:-}" && -n "${INTERNAL_REGISTRY_PROXY_AUTH:-}" ]]; then
-    log "ERROR" "Both --internal-registry-proxy and --internal-registry-proxy-auth must be provided together"
-    exit 1
-fi
-
 if [[ -n "${INTERNAL_REGISTRY:-}" && -n "${INTERNAL_REGISTRY_PROXY:-}" ]]; then
     log "ERROR" "Both --internal-registry and --internal-registry-proxy cannot be provided together"
     exit 1
@@ -340,22 +305,6 @@ for cmd in oc opm jq; do
 done
 
 log "SUCCESS" "All required tools are available"
-
-log "INFO" "Validating authentication files"
-
-if [[ -n "${INTERNAL_REGISTRY_AUTH:-}" ]]; then
-    log "INFO" "Validating internal registry auth file: $INTERNAL_REGISTRY_AUTH"
-    [[ ! -f "$INTERNAL_REGISTRY_AUTH" ]] && { log "ERROR" "Internal registry auth file not found"; exit 1; }
-    jq empty "$INTERNAL_REGISTRY_AUTH" 2>/dev/null || { log "ERROR" "Invalid JSON in internal auth"; exit 1; }
-    log "SUCCESS" "Internal registry auth file is valid"
-fi
-
-if [[ -n "${INTERNAL_REGISTRY_PROXY_AUTH:-}" ]]; then
-    log "INFO" "Validating internal registry proxy auth file: $INTERNAL_REGISTRY_PROXY_AUTH"
-    [[ ! -f "$INTERNAL_REGISTRY_PROXY_AUTH" ]] && { log "ERROR" "Internal registry proxy auth file not found"; exit 1; }
-    jq empty "$INTERNAL_REGISTRY_PROXY_AUTH" 2>/dev/null || { log "ERROR" "Invalid JSON in internal registry proxy auth"; exit 1; }
-    log "SUCCESS" "Internal registry proxy auth file is valid"
-fi
 
 log "INFO" "Checking cluster connectivity"
 log "INFO" "Attempting to connect to OpenShift cluster..."
@@ -970,24 +919,14 @@ function deploy_operators() {
         args+=(--fbc-tag "${KONFLUX_TARGET_FBC_TAGS}")
     fi
 
-
     if [[ "${DISCONNECTED:-false}" == "true" ]]; then
-        local mirror_registry_creds
-        mirror_registry_creds=$(head -n 1 "${MIRROR_REGISTRY_CREDS}" | base64 -w 0)
-        local mirror_registry_url
-        mirror_registry_url=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
-
-        # Configure registry proxy if enabled
+        # prepare_registry_auth already merged credentials for the selected endpoint.
         if [[ "${CI_USE_REGISTRY_PROXY:-false}" == "true" ]]; then
-            local registry_proxy_url="${ART_REGISTRY_PROXY}"
-
-            local registry_proxy_auth
-            registry_proxy_auth=$(create_registry_auth "${registry_proxy_url}" "${mirror_registry_creds}")
-            args+=(--internal-registry-proxy "${registry_proxy_url}" --internal-registry-proxy-auth "${registry_proxy_auth}")
+            args+=(--internal-registry-proxy "${ART_REGISTRY_PROXY}")
         else
-            local registry_auth
-            registry_auth=$(create_registry_auth "${mirror_registry_url}" "${mirror_registry_creds}")
-            args+=(--internal-registry "${mirror_registry_url}" --internal-registry-auth "${registry_auth}")
+            local mirror_registry_url
+            mirror_registry_url=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+            args+=(--internal-registry "${mirror_registry_url}")
         fi
     fi
 
@@ -1014,7 +953,7 @@ function prepare_registry_auth() {
     ' "${WORK_DIR}/.dockerconfigjson" > "${REGISTRY_AUTH_FILE}"
 
     if [[ "${DISCONNECTED:-false}" == "true" ]]; then
-        local registry_url registry_auth proxy_url proxy_port
+        local registry_url registry_auth registry_auth_file proxy_url proxy_port
         registry_url=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
         if [[ "${CI_USE_REGISTRY_PROXY}" == "true" ]]; then
             proxy_port="${REGISTRY_PROXY_PORT:-6003}"
@@ -1027,9 +966,9 @@ function prepare_registry_auth() {
             registry_url="${proxy_url}"
         fi
         registry_auth=$(head -n 1 "${MIRROR_REGISTRY_CREDS}" | base64 -w 0)
-        create_registry_auth "${registry_url}" "${registry_auth}" > "${WORK_DIR}/auth-path"
+        registry_auth_file=$(create_registry_auth "${registry_url}" "${registry_auth}")
         jq -s '.[0] * {auths: (.[0].auths + .[1].auths)}' \
-            "${REGISTRY_AUTH_FILE}" "$(cat "${WORK_DIR}/auth-path")" > "${WORK_DIR}/merged.json"
+            "${REGISTRY_AUTH_FILE}" "${registry_auth_file}" > "${WORK_DIR}/merged.json"
         mv "${WORK_DIR}/merged.json" "${REGISTRY_AUTH_FILE}"
         if [[ "${CI_USE_REGISTRY_PROXY}" == "true" ]]; then
             jq --arg registry "${KONFLUX_CATALOG_REGISTRY_PROXY}" --arg auth "${registry_auth}" \
