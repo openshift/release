@@ -24,6 +24,8 @@ HOST_OS="$(uname -s)"
 # from, otherwise macOS silently stays behind the container path.
 NATIVE_COMMIT="4daba691a18147afa424be4aa288e5d853323cc0"
 NATIVE_DIR="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-native"
+NATIVE_LOCK="$NATIVE_DIR.lock"
+NATIVE_STAGE=""
 NATIVE_SRC="$NATIVE_DIR/src"
 NATIVE_PYTHON="$NATIVE_DIR/venv/bin/python3"
 NATIVE_MAIN="$NATIVE_SRC/cmd/secret-manager/main.py"
@@ -74,45 +76,82 @@ update_image_if_stale() {
     fi
 }
 
-# ensure_native_cli provisions the pinned CLI source and its virtualenv.
+native_cli_ready() {
+    [ -f "$NATIVE_DIR/commit" ] && [ "$(cat "$NATIVE_DIR/commit")" = "$NATIVE_COMMIT" ] &&
+        [ -x "$NATIVE_PYTHON" ]
+}
+
+# ensure_native_cli provisions the pinned CLI source and its virtualenv. The
+# build happens in a per-process staging directory that is published with a
+# rename, and a lock keeps concurrent runs from downloading and installing
+# twice. Neither step can destroy a cache another run is using, and a failed
+# attempt leaves any previously working cache in place.
 ensure_native_cli() {
-    if [ -f "$NATIVE_DIR/commit" ] && [ "$(cat "$NATIVE_DIR/commit")" = "$NATIVE_COMMIT" ] &&
-        [ -x "$NATIVE_PYTHON" ]; then
-        return 0
-    fi
+    native_cli_ready && return 0
     if ! command -v uv &>/dev/null; then
         echo "Error: 'uv' is not installed. Install it with: brew install uv" >&2
         exit 1
     fi
+    local waited=0
+    NATIVE_STAGE="$NATIVE_DIR.stage.$$"
+    while ! mkdir "$NATIVE_LOCK" 2>/dev/null; do
+        native_cli_ready && return 0
+        # A killed run leaves the lock behind; treat a stale lock as abandoned.
+        if [ -n "$(find "$NATIVE_LOCK" -mmin +10 2>/dev/null)" ]; then
+            rm -rf "$NATIVE_LOCK"
+            continue
+        fi
+        if [ "$waited" -ge 600 ]; then
+            echo "Error: timed out waiting for another run to set up the CLI; remove $NATIVE_LOCK if none is running." >&2
+            exit 1
+        fi
+        if [ "$waited" -eq 0 ]; then
+            echo "Waiting for another run to finish setting up the CLI..." >&2
+        fi
+        waited=$((waited + 1))
+        sleep 0.5
+    done
+    # NATIVE_STAGE is deliberately not "local": the trap below runs at exit,
+    # after this function has returned and its locals are gone.
+    trap 'rm -rf "$NATIVE_LOCK" "$NATIVE_STAGE"' EXIT
+    # Another run may have finished provisioning while we waited for the lock.
+    native_cli_ready && return 0
     echo "Setting up the native secret-manager CLI at ${NATIVE_COMMIT:0:12} (first run only)..." >&2
-    rm -rf "$NATIVE_DIR"
-    mkdir -p "$NATIVE_SRC"
+    mkdir -p "$NATIVE_STAGE/src"
     if ! curl -fsSL --max-time 300 \
         "https://codeload.github.com/openshift/ci-tools-standalone/tar.gz/$NATIVE_COMMIT" |
-        tar -xz -C "$NATIVE_SRC" --strip-components=1; then
+        tar -xz -C "$NATIVE_STAGE/src" --strip-components=1; then
         echo "Error: could not download ci-tools-standalone at $NATIVE_COMMIT." >&2
-        rm -rf "$NATIVE_DIR"
         exit 1
     fi
-    if [ ! -f "$NATIVE_MAIN" ] || [ ! -f "$NATIVE_SRC/cmd/secret-manager/requirements.txt" ]; then
+    if [ ! -f "$NATIVE_STAGE/src/cmd/secret-manager/main.py" ] ||
+        [ ! -f "$NATIVE_STAGE/src/cmd/secret-manager/requirements.txt" ]; then
         echo "Error: unexpected ci-tools-standalone layout at $NATIVE_COMMIT." >&2
-        rm -rf "$NATIVE_DIR"
         exit 1
     fi
-    uv venv -q -p 3.12 "$NATIVE_DIR/venv"
-    uv pip install --python "$NATIVE_PYTHON" \
-        -r "$NATIVE_SRC/cmd/secret-manager/requirements.txt"
-    printf '%s' "$NATIVE_COMMIT" >"$NATIVE_DIR/commit"
+    uv venv -q -p 3.12 "$NATIVE_STAGE/venv"
+    uv pip install -q --python "$NATIVE_STAGE/venv/bin/python3" \
+        -r "$NATIVE_STAGE/src/cmd/secret-manager/requirements.txt"
+    printf '%s' "$NATIVE_COMMIT" >"$NATIVE_STAGE/commit"
+    rm -rf "$NATIVE_DIR"
+    mv "$NATIVE_STAGE" "$NATIVE_DIR"
+    # Published: release the lock and disarm the trap now rather than at exit.
+    NATIVE_STAGE=""
+    rm -rf "$NATIVE_LOCK"
 }
 
 # run_native executes the CLI directly. SM_CALLBACK_HOST and SM_BROWSER_REQUEST
-# are deliberately unset, so the CLI listens on loopback and opens the browser
-# itself rather than writing the URL for this wrapper to open.
+# are removed from the environment so the CLI uses its own defaults - listen on
+# loopback, open the browser itself - even if the caller exported them. They
+# must be unset rather than set to an empty string, because an empty
+# SM_CALLBACK_HOST would make the CLI bind all interfaces. `env -u` scopes this
+# to the command and leaves the caller's environment alone.
 run_native() {
     ensure_native_cli
     mkdir -p "$SSO_AUTH_CONFIG_PATH"
     chmod 700 "$SSO_AUTH_CONFIG_PATH"
-    CLOUDSDK_CONFIG="$GCLOUD_CONFIG_PATH" \
+    env -u SM_BROWSER_REQUEST -u SM_CALLBACK_HOST \
+        CLOUDSDK_CONFIG="$GCLOUD_CONFIG_PATH" \
         SM_AUTH_DIR="$SSO_AUTH_CONFIG_PATH" \
         GOOGLE_CLOUD_QUOTA_PROJECT=openshift-ci-secrets \
         "$NATIVE_PYTHON" "$NATIVE_MAIN" "$@"
