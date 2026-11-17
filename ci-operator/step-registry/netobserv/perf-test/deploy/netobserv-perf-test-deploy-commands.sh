@@ -60,6 +60,7 @@ if [[ ${FLP_CONSUMER_REPLICAS:-} ]]; then
     PARAMETERS+=" KafkaConsumerReplicas=${FLP_CONSUMER_REPLICAS}"
 fi
 
+
 createFlowCollector ${PARAMETERS}
 
 if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
@@ -67,7 +68,7 @@ if [[ $PATCH_EBPFAGENT_IMAGE == "true" && -n $EBPFAGENT_PR_IMAGE ]]; then
 fi
 
 if [[ $PATCH_FLOWLOGS_IMAGE == "true" && -n $FLP_PR_IMAGE ]]; then
-    patch_netobserv "flp" "$FLP_PR_IMAGE"
+    patch_netobserv "flp" "quay.io/rhn_support_memodi/netobserv-images:flp-wo-3001-amd64"
 fi
 
 # get NetObserv metadata
