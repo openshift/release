@@ -1,0 +1,63 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-5.1
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: dra-driver-cpu
+  - dockerfile_path: test/image/Dockerfile
+    to: dra-driver-cpu-test
+promotion:
+  to:
+  - excluded_images:
+    - dra-driver-cpu-test
+    name: "5.1"
+    namespace: ocp-kni
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.1"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: openshift-e2e
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      DRACPU_E2E_RESERVED_CPUS: "0"
+      RESERVED_CPUS: "0"
+    test:
+    - as: openshift-e2e
+      cli: latest
+      commands: |
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        echo "Using driver image ${DRIVER_IMAGE}"
+        make -f Makefile.kni ci-openshift-e2e-test \
+          IMAGE_REPOSITORY="${DRIVER_IMAGE%@*}" \
+          IMAGE_DIGEST="${DRIVER_IMAGE##*@}" \
+          IMAGE_TEST="${DRACPU_E2E_TEST_IMAGE}"
+      dependencies:
+      - env: DRACPU_E2E_TEST_IMAGE
+        name: dra-driver-cpu-test
+      - env: DRIVER_IMAGE
+        name: dra-driver-cpu
+      env:
+      - name: DRACPU_E2E_RESERVED_CPUS
+      - name: RESERVED_CPUS
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: pipeline-test
+  org: openshift-kni
+  repo: dra-driver-cpu
