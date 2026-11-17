@@ -81,6 +81,16 @@ native_cli_ready() {
         [ -x "$NATIVE_PYTHON" ]
 }
 
+# release_native_lock drops the lock and disarms the EXIT trap. The trap must not
+# outlive the lock: this run continues after publishing (it runs the CLI, which
+# can be an interactive login), and by then it may have been re-acquired by
+# another run that the trap would otherwise delete on our way out.
+release_native_lock() {
+    NATIVE_STAGE=""
+    rm -rf "$NATIVE_LOCK"
+    trap - EXIT
+}
+
 # ensure_native_cli provisions the pinned CLI source and its virtualenv. The
 # build happens in a per-process staging directory that is published with a
 # rename, and a lock keeps concurrent runs from downloading and installing
@@ -92,12 +102,18 @@ ensure_native_cli() {
         echo "Error: 'uv' is not installed. Install it with: brew install uv" >&2
         exit 1
     fi
-    local waited=0
+    local waited=0 holder=""
     NATIVE_STAGE="$NATIVE_DIR.stage.$$"
     while ! mkdir "$NATIVE_LOCK" 2>/dev/null; do
         native_cli_ready && return 0
-        # A killed run leaves the lock behind; treat a stale lock as abandoned.
-        if [ -n "$(find "$NATIVE_LOCK" -mmin +10 2>/dev/null)" ]; then
+        # A killed run leaves the lock behind. Reclaim it only when the recorded
+        # holder is no longer running, and only if it is still that same holder -
+        # otherwise we would delete a lock a concurrent run just acquired. Age is
+        # not a safe signal here: a slow but live holder would lose its lock and
+        # provision a second time.
+        holder="$(cat "$NATIVE_LOCK/pid" 2>/dev/null || true)"
+        if [ -n "$holder" ] && ! kill -0 "$holder" 2>/dev/null &&
+            [ "$(cat "$NATIVE_LOCK/pid" 2>/dev/null || true)" = "$holder" ]; then
             rm -rf "$NATIVE_LOCK"
             continue
         fi
@@ -111,11 +127,15 @@ ensure_native_cli() {
         waited=$((waited + 1))
         sleep 0.5
     done
+    printf '%s' "$$" >"$NATIVE_LOCK/pid"
     # NATIVE_STAGE is deliberately not "local": the trap below runs at exit,
     # after this function has returned and its locals are gone.
     trap 'rm -rf "$NATIVE_LOCK" "$NATIVE_STAGE"' EXIT
     # Another run may have finished provisioning while we waited for the lock.
-    native_cli_ready && return 0
+    if native_cli_ready; then
+        release_native_lock
+        return 0
+    fi
     echo "Setting up the native secret-manager CLI at ${NATIVE_COMMIT:0:12} (first run only)..." >&2
     mkdir -p "$NATIVE_STAGE/src"
     if ! curl -fsSL --max-time 300 \
@@ -135,9 +155,7 @@ ensure_native_cli() {
     printf '%s' "$NATIVE_COMMIT" >"$NATIVE_STAGE/commit"
     rm -rf "$NATIVE_DIR"
     mv "$NATIVE_STAGE" "$NATIVE_DIR"
-    # Published: release the lock and disarm the trap now rather than at exit.
-    NATIVE_STAGE=""
-    rm -rf "$NATIVE_LOCK"
+    release_native_lock
 }
 
 # run_native executes the CLI directly. SM_CALLBACK_HOST and SM_BROWSER_REQUEST
