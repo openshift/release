@@ -98,10 +98,19 @@ _props="${ARTIFACT_DIR}/quay-deploy-properties.txt"
 # leave TERM to record StepTerminated in place of a real class).
 # Reserves subtracted from the deadline when capping a phase:
 #   _diag_reserve        bounded diagnostics (4 x 20s request-timeout) + JUnit
-#   _oc_overrun_reserve  one in-flight 20s oc request at a phase deadline
+#   _oc_overrun_reserve  one in-flight state read at a phase deadline, which
+#                        retries three times (3 x 20s + 2s = 62s); oc's
+#                        --request-timeout bounds each HTTP request, so discovery
+#                        plus the resource request can exceed one timeout, which
+#                        this reserve absorbs instead of the deadline
+#   _verify_reserve      post-Job Secret re-read plus the 160s the registry
+#                        check needs at its own start, kept out of the Job wait;
+#                        the re-read retries each of the four Secrets up to three
+#                        times (4 x (3 x 20s + 2s) = 248s)
 _work_budget=2550
 _diag_reserve=120
-_oc_overrun_reserve=25
+_oc_overrun_reserve=65
+_verify_reserve=410
 _work_deadline=$(( _junit_start + _work_budget ))
 
 # _classify <type> <detail>: record the failure classification (first match
@@ -126,6 +135,16 @@ _prop() {
 _clamp_deadline() {
   local _cap=$(( _work_deadline - _diag_reserve - _oc_overrun_reserve ))
   if (( $1 > _cap )); then printf '%s' "${_cap}"; else printf '%s' "$1"; fi
+}
+
+# _left_budget <max-seconds>: cap one request's own timeout at the work time
+# left after the diagnostics reserve, so the post-Job verification cannot push
+# classification past the shared deadline. Prints at least 1.
+_left_budget() {
+  local _left=$(( _work_deadline - _diag_reserve - $(date +%s) )) _max=$1
+  if (( _left < 1 )); then _left=1; fi
+  if (( _left < _max )); then _max=${_left}; fi
+  printf '%s' "${_max}"
 }
 
 # _xml_escape <string>: escape XML special characters for attribute/body
@@ -245,7 +264,7 @@ trap '_on_exit 130 INT' INT
 # Sets _poll_last to the last observed value. Returns:
 #   0 matched | 1 deadline | 2 three consecutive query failures
 #   3 observed the <fail-value> terminal state
-# An object that does not exist yet ("not found") is absence, not an API
+# An object that does not exist yet ("(NotFound)") is absence, not an API
 # error: it is waited out and never classified as a query failure.
 _po_poll_interval=10
 _poll_jsonpath() {
@@ -269,7 +288,7 @@ _poll_jsonpath() {
       if [[ -n "${_failval}" && "${_out}" == "${_failval}" ]]; then return 3; fi
     else
       _poll_last=""
-      if grep -qiE 'not ?found' <<<"${_out}"; then
+      if printf '%s' "${_out}" | grep -qF '(NotFound)'; then
         : # object absent yet: wait, do not count as a query failure
       else
         (( _fails += 1 )) || true
@@ -377,7 +396,7 @@ _dump_diagnostics() {
 # authorization header that does reach it is redacted before it is printed.
 _scrub_job_log() {
   sed -E \
-    -e 's/("(client_secret|password|access_token|token|basic)"[[:space:]]*:[[:space:]]*")[^"]*/\1REDACTED/g' \
+    -e 's/("(client_secret|password|access_token|token|basic|encrypted_password)"[[:space:]]*:[[:space:]]*")[^"]*/\1REDACTED/g' \
     -e 's/(Authorization: (Bearer|Basic) )[^[:space:]]+/\1REDACTED/g' \
     -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi'
 }
@@ -409,6 +428,335 @@ if [[ "${QUAY_REPORT_ONLY}" == "1" ]]; then
   echo ">>> REPORT_ONLY: channel=${_sub:-absent} csv=${_csvp:-absent} packagemanifest=${_pm_state}"
   exit 0
 fi
+
+# _quay_admin_secrets_state: present|absent|query-failed for the four admin
+# Secrets the policy Job creates (quayadmin with admin token/password/basic,
+# quaydevel for the devel user, quay-pull-secret as dockerconfigjson and
+# quay-integration as an automation token), all of which must exist before the
+# Job counts as done. Defined here because the self-disable predicate records
+# this state as well. As with the Job, only NotFound reports absence: a non-zero result that
+# is an API or RBAC error must not read as "the Secrets are missing", because the
+# step would then delete a healthy finished Job and install a replacement that
+# its own quaydevel guard dooms.
+_quay_admin_secrets_state() {
+  local _s _out="" _fails
+  for _s in quayadmin quaydevel quay-pull-secret quay-integration; do
+    _fails=0
+    while :; do
+      if _out=$(oc get secret "${_s}" -n "${QUAY_NAMESPACE}" --request-timeout="$(_left_budget 20)" 2>&1); then
+        break
+      fi
+      if printf '%s' "${_out}" | grep -qF '(NotFound)'; then
+        echo absent
+        return 0
+      fi
+      (( _fails += 1 )) || true
+      if (( _fails >= 3 )); then
+        echo ">>> secret ${_s}: 3 consecutive queries failed (last: $(printf '%s' "${_out}" | head -1))" >&2
+        echo query-failed
+        return 0
+      fi
+      sleep 1
+    done
+  done
+  echo present
+  return 0
+}
+
+# _quay_admin_secrets_query_fail: three consecutive Secret queries failed, so the
+# step cannot tell a partial install from a read error and must not act.
+_quay_admin_secrets_query_fail() {
+  _classify "quay-admin-secrets-query-failed" "3 consecutive admin Secret queries failed (API or RBAC error, not absence)"
+  echo "ERROR: ${_class_detail}"
+  _dump_diagnostics
+  exit 1
+}
+
+# _quay_admin_job_snapshot: "<state> <uid>" for the create-admin-user Job, both
+# from ONE response, so the state and the identity that guards the delete can
+# never describe two different objects. States: absent|complete|failed|live|
+# query-failed, with uid "-" when the Job does not exist. One jsonpath read per
+# try as in _poll_jsonpath: NotFound is the only non-zero result that reports
+# absence, so an API or RBAC error is never read as "no Job running".
+_quay_admin_job_snapshot() {
+  local _out="" _payload="" _fails=0 _uid _conds _state _word
+  while :; do
+    _payload=""
+    if _out=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" --request-timeout="$(_left_budget 20)" \
+      -o jsonpath='__quay_job__{.metadata.uid}{" "}{range .status.conditions[?(@.status=="True")]}{.type}{" "}{end}' 2>&1); then
+      # A successful read can still write to stderr (a deprecation warning, a
+      # rate-limiter notice); the sentinel keeps that text out of the UID.
+      _payload=${_out##*__quay_job__}
+      if [[ "${_payload}" == "${_out}" ]]; then
+        _payload=""
+      fi
+    fi
+    if [[ -n "${_payload}" ]]; then
+      _payload=${_payload%%$'\n'*}
+      _uid=${_payload%% *}
+      _conds=${_payload#* }
+      # Whole tokens only: a warning that follows the payload must not supply a
+      # state word.
+      _state="live"
+      for _word in ${_conds}; do
+        case "${_word}" in
+          Complete) _state="complete" ;;
+          Failed) _state="failed" ;;
+        esac
+      done
+      echo "${_state} ${_uid}"
+      return 0
+    fi
+    if printf '%s' "${_out}" | grep -qF '(NotFound)'; then
+      echo "absent -"
+      return 0
+    fi
+    (( _fails += 1 )) || true
+    if (( _fails >= 3 )); then
+      echo ">>> create-admin-user Job: 3 consecutive queries failed (last: $(printf '%s' "${_out}" | head -1))" >&2
+      echo "query-failed -"
+      return 0
+    fi
+    sleep 1
+  done
+}
+
+# _quay_admin_job_state: the state alone, for the decision points that do not
+# need the identity.
+_quay_admin_job_state() {
+  local _line
+  _line=$(_quay_admin_job_snapshot)
+  echo "${_line%% *}"
+}
+
+# _quay_admin_job_query_fail: three consecutive Job queries failed, which is an
+# API or RBAC error and not absence, so the step must not guess a state.
+_quay_admin_job_query_fail() {
+  _classify "quay-admin-job-query-failed" "3 consecutive create-admin-user Job queries failed (API or RBAC error, not absence)"
+  echo "ERROR: ${_class_detail}"
+  _dump_diagnostics
+  exit 1
+}
+
+# _quay_admin_log: the create-admin-user Job log with credential-shaped values
+# masked. The ported Job discards the bodies it does not need, but a Job an
+# OperatorPolicy created can log the response bodies it receives, and those
+# carry the quaydevel client_secret or an access_token. The log is copied into
+# the Prow log on failure, which must not gain credentials this step never
+# printed.
+_quay_admin_log() {
+  oc logs job/create-admin-user -n "${QUAY_NAMESPACE}" --tail=200 2>&1 \
+    | sed -E 's/("(client_secret|password|access_token|token|basic|encrypted_password)"[[:space:]]*:[[:space:]]*")[^"]*/\1REDACTED/g' \
+    | head -c 65536
+}
+
+# _quay_admin_job_fail: a Failed Job is terminal and authoritative even when the
+# four Secrets exist. The Job creates quay-integration before the organization,
+# application, repository and permission calls, so a Job that stopped at one of
+# those leaves usable Secrets and no devel org or devel/example repo. Adopting
+# on secret presence alone would report success for a registry the documented
+# smoke step cannot use.
+#     The reason is recorded too: reason=DeadlineExceeded means
+#     activeDeadlineSeconds ended the Job, which is how a hang shows up at the
+#     default budgets.
+_quay_admin_job_fail() {
+  local _failed _reason
+  _failed=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" -o jsonpath='{.status.failed}' 2>/dev/null) || _failed=""
+  _reason=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" -o jsonpath='{range .status.conditions[?(@.status=="True")]}{.type}{"/"}{.reason}{" "}{end}' 2>/dev/null) || _reason=""
+  _reason=$(printf '%s' "${_reason}" | sed -n 's/.*Failed\/\([^ ]*\).*/\1/p')
+  echo ">>> DIAG: create-admin-user Job logs (tail 200):"
+  _quay_admin_log || true
+  _classify "quay-admin-job-failed" "create-admin-user Job reported condition Failed=True (reason=${_reason:-unknown}, failed pods=${_failed:-none}); existing Secrets are kept but the organization, application, repository and permission setup may not have finished"
+  echo "ERROR: ${_class_detail}"
+  _dump_diagnostics
+  exit 1
+}
+
+# _quay_auth_curl: the registry reads authenticate with the quayadmin token. The
+# token travels in a curl config on a file descriptor so it never appears in the
+# process arguments. A Basic credential cannot replace it: Quay applies its
+# OAuth decorator to every v1 resource, so a Basic header is ignored and the read
+# runs anonymous.
+_quay_auth_curl() {
+  local _cred=$1
+  shift
+  curl -sk -K <(printf 'header = "Authorization: Bearer %s"\n' "${_cred}") "$@"
+}
+
+# _quay_token_rejected <what> <kind> <code>: a 401 or 403 on a registry read.
+# On a registry whose Secrets this step did not write the token can be older than
+# its 150-minute lifetime, so there it is a warning and the caller records that
+# part as unverified; a token minted by a Job this step started that is rejected
+# is a real defect and fails the step. Sets _rejected and appends to
+# _rejected_kind in the caller, which declares both.
+_quay_token_rejected() {
+  local _what=$1 _kind=$2 _code=$3
+  if (( ${_install_adopted:-0} )); then
+    _rejected=1
+    _rejected_kind="${_rejected_kind} ${_kind}"
+    echo ">>> NOTE: ${_what} answered '${_code}' on https://${_host}; the stored quayadmin token was rejected (expired, revoked or lacking the access) and that part stays unverified (this step did not write those Secrets)"
+    return 0
+  fi
+  _classify "quay-admin-token-rejected" "${_what} answered '${_code}'; the stored quayadmin token was rejected (expired, revoked or lacking the access)"
+  echo "ERROR: ${_class_detail}"
+  _dump_diagnostics
+  exit 1
+}
+
+# _quay_devel_repo_role <direct|transitive>: the role the API reports for
+# quaydevel on devel/example. The user is named in the URL, so the answer is
+# about quaydevel and not about the token's owner (the token is quayadmin's).
+# The direct read returns the direct repository row, which is the grant the Job
+# writes; the transitive read resolves the same for a grant made through a team.
+# Echoes admin, other, rejected:<code> or unreachable:<code>.
+_quay_devel_repo_role() {
+  local _kind="${1:-direct}" _suffix="" _body _code
+  [[ "${_kind}" == "transitive" ]] && _suffix="/transitive"
+  _body=$(_quay_auth_curl "${_token}" --connect-timeout "$(_left_budget 10)" --max-time "$(_left_budget 20)" -w '\n%{http_code}' \
+    "https://${_host}/api/v1/repository/devel/example/permissions/user/quaydevel${_suffix}") || _body=""
+  _code=${_body##*$'\n'}
+  _body=${_body%$'\n'*}
+  case "${_code}" in
+    200)
+      if printf '%s' "${_body}" | grep -qE '"role"[[:space:]]*:[[:space:]]*"admin"'; then
+        echo admin
+      else
+        echo other
+      fi
+      ;;
+    401 | 403) echo "rejected:${_code}" ;;
+    404) echo "other" ;;
+    # Any non-200/404 response is treated as unreachable; a 500 does not mean "no admin row".
+    *) echo "unreachable:${_code:-no-response}" ;;
+  esac
+}
+
+# _quay_org_repo_check: the OPP lanes push to devel/example, so a registry
+# without the devel organization or that repository is not usable. The adopt
+# branches trust four Secrets and a Job that reported Complete, and the upstream
+# Job text ignores quay_cmd's status on the organization and repository calls,
+# so a policy-owned Job can be Complete with the Secrets and no organization:
+# verify both objects directly instead of trusting the Job's status.
+# The reads use the access token the initialize call returned. That token expires
+# after 150 minutes (the Job text records the same limit), so on an adopted
+# registry the stored token can be older than its lifetime: a rejected token
+# there is reported as a warning and the objects stay unverified rather than
+# failing a registry whose Secrets this step did not write. A Job started by this
+# step mints its token during the step, so a rejection on that path is a real
+# defect and fails the step.
+_quay_org_repo_check() {
+  local _token _host _path _code _grant _rejected=0 _rejected_kind=
+  if (( _work_deadline - _diag_reserve - $(date +%s) < 160 )); then
+    # The check itself costs up to 140s (two 20s oc reads, two 30s object curls
+    # and two 20s permission curls).
+    # Starting it with less would TERM the step and write StepTerminated over the
+    # real classification.
+    _classify "quay-admin-verify-timeout" "less than 160s of work budget left when the Quay registry check started; the check did not run, so the Objects may still be present"
+    echo "ERROR: ${_class_detail}"
+    _dump_diagnostics
+    exit 1
+  fi
+  _token=$(oc get secret quayadmin -n "${QUAY_NAMESPACE}" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d 2>/dev/null) || _token=""
+  _host=$(oc get route -n "${QUAY_NAMESPACE}" registry-quay -o jsonpath='{.spec.host}' 2>/dev/null) || _host=""
+  if [[ -z "${_token}" ]]; then
+    _classify "quay-admin-secrets-query-failed" "the quayadmin token is empty or unreadable, so the registry reads cannot be authenticated"
+    echo "ERROR: ${_class_detail}"
+    _dump_diagnostics
+    exit 1
+  fi
+  if [[ -z "${_host}" ]]; then
+    _classify "quay-admin-registry-unreachable" "the registry-quay route has no host, so the registry reads cannot be addressed"
+    echo "ERROR: ${_class_detail}"
+    _dump_diagnostics
+    exit 1
+  fi
+  for _path in /api/v1/organization/devel /api/v1/repository/devel/example; do
+    _code=$(_quay_auth_curl "${_token}" -o /dev/null -w '%{http_code}' --connect-timeout "$(_left_budget 10)" --max-time "$(_left_budget 30)" \
+      "https://${_host}${_path}") || _code=""
+    case "${_code}" in
+      200) ;;
+      401 | 403)
+        # A rejected token (or one that lacks the access) is not a missing
+        # object: say so, or the operator looks for an organization that is
+        # there.
+        _quay_token_rejected "${_path}" object "${_code}"
+        continue
+        ;;
+      404)
+        _classify "quay-admin-org-missing" "${_path} answered '404' on https://${_host}; the devel organization or the devel/example repository is missing"
+        echo "ERROR: ${_class_detail}"
+        _dump_diagnostics
+        exit 1
+        ;;
+      *)
+        # A 5xx or no response at all says nothing about the object: classing it
+        # as missing sends the operator after an organization that may be there.
+        _classify "quay-admin-registry-unreachable" "${_path} answered '${_code:-no-response}' on https://${_host}; the registry did not answer, so the devel organization and repository are unverified"
+        echo "ERROR: ${_class_detail}"
+        _dump_diagnostics
+        exit 1
+        ;;
+    esac
+  done
+  # Existing objects are not enough: the lanes push to devel/example as
+  # quaydevel. The Job writes a direct admin repository row for quaydevel, so the
+  # step reads that row and,
+  # when it is not admin, the transitive read, which resolves a grant made through
+  # a team. Both reads are repository scoped, so an organization admin team is
+  # invisible to them (the organization body reports only the caller's own admin
+  # status, and the caller is quayadmin here), and neither read can rule that out:
+  # when neither answers admin the grant is recorded unverified instead of
+  # failing an install whose Job write is already guarded. The bodies are read for
+  # the role only and are never echoed.
+  _grant=$(_quay_devel_repo_role)
+  case "${_grant}" in
+    admin) ;;
+    rejected:*)
+      _quay_token_rejected "the quaydevel repository permission read" grant "${_grant#rejected:}"
+      _grant=unverified
+      ;;
+    *)
+      _grant=$(_quay_devel_repo_role transitive)
+      case "${_grant}" in
+        admin) _grant=team ;;
+        rejected:*)
+          _quay_token_rejected "the quaydevel transitive permission read" grant "${_grant#rejected:}"
+          _grant=unverified
+          ;;
+        unreachable:*)
+          _classify "quay-admin-registry-unreachable" "the quaydevel transitive permission read answered '${_grant#unreachable:}' on https://${_host}; the registry did not answer, so the devel/example grant is unverified"
+          echo "ERROR: ${_class_detail}"
+          _dump_diagnostics
+          exit 1
+          ;;
+        *)
+          echo ">>> NOTE: neither the direct nor the transitive permission read reports an admin grant for quaydevel on devel/example; a grant held through an admin-role organization team is not visible to either read, so the grant stays unverified"
+          _grant=unverified
+          ;;
+      esac
+      ;;
+  esac
+  case "${_grant}" in
+    admin) _prop "quay_repo_permission" "admin" ;;
+    team) _prop "quay_repo_permission" "admin-via-team" ;;
+    *) : ;;
+  esac
+  case " ${_rejected_kind} " in
+    *" object "*) _prop "quay_org_repo" "unverified" ;;
+    *) _prop "quay_org_repo" "present" ;;
+  esac
+  case " ${_rejected_kind} " in
+    *" grant "*) _prop "quay_repo_permission" "unverified" ;;
+  esac
+  if (( _rejected )); then
+    _prop "quay_admin_token" "rejected"
+    return 0
+  fi
+  if [[ "${_grant}" == "unverified" ]]; then
+    _prop "quay_repo_permission" "unverified"
+  fi
+  return 0
+}
 
 # --- Self-disable predicate ---
 # operatorpolicy-quay-operator Compliant AND subscription channel matches AND
@@ -452,7 +800,7 @@ except Exception:
     print("absent - -")
 ' "${_sd_policy}" "${QUAY_OPERATOR_CHANNEL}" 2>/dev/null) || _sd_out="absent - -"
     _sd_ok="absent" _sd_ns="-" _sd_ch="-"
-    read -r _sd_ok _sd_ns _sd_ch <<<"${_sd_out}"
+    read -r _sd_ok _sd_ns _sd_ch <<<"${_sd_out}" || true
     _prop "operatorpolicy_namespace" "${_sd_ns:-unknown}"
     _prop "operatorpolicy_channel" "${_sd_ch:-unknown}"
     # The policy's spec channel is the REQUESTED channel, not the live one, so
@@ -476,6 +824,26 @@ except Exception:
       if [[ "${_existing_csv}" == "Succeeded" ]]; then
         _qr_avail=$(oc get quayregistries.quay.redhat.com registry -n "${QUAY_NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\n"}{end}' 2>/dev/null) || _qr_avail="undecided"
         if grep -qx 'Available=True' <<<"${_qr_avail}"; then
+          # Registry availability says nothing about admin initialization: a
+          # policy-owned Job may still be running. Record the credential state
+          # instead of gating on it, because driving an already-initialized
+          # database back through the single-shot Job turns a healthy install
+          # into quay-admin-partial-state.
+          _sd_secret_state=$(_quay_admin_secrets_state)
+          _prop "quay_admin_secrets_at_self_disable" "${_sd_secret_state}"
+          if [[ "${_sd_secret_state}" != "present" ]]; then
+            echo ">>> NOTE: QuayRegistry is Available but quayadmin/quaydevel/quay-pull-secret/quay-integration are not all present yet; the quay smoke step needs them"
+          fi
+          # A policy-owned Job that failed stopped somewhere in the admin
+          # sequence (it writes quay-integration before the org and repo setup),
+          # so "workaround removal ready" would be a false green. An absent or
+          # unreadable state stays a recorded observation here: this branch must
+          # not install, and the smoke step reports the missing objects.
+          _sd_job_state=$(_quay_admin_job_state)
+          _prop "quay_admin_job_at_self_disable" "${_sd_job_state}"
+          if [[ "${_sd_job_state}" == "failed" ]]; then
+            _quay_admin_job_fail
+          fi
           echo ">>> workaround_removal_ready=true (OperatorPolicy Compliant, channel ${_sd_ch}, CSV Succeeded, QuayRegistry Available) - not installing"
           _prop "workaround_removal_ready" "true"
           _prop "quay_subscription" "adopted"
@@ -524,7 +892,7 @@ for _attempt in 1 2 3; do
     _precondition_ok=true
     break
   fi
-  if grep -qi "not found" <<<"${_pm_raw}"; then
+  if printf '%s' "${_pm_raw}" | grep -qi "not found"; then
     _classify "quay-catalog-missing" "packagemanifest quay-operator not found in openshift-marketplace (successful query)"
     echo "ERROR: ${_class_detail}"
     exit 1
@@ -822,31 +1190,59 @@ echo ">>> QuayRegistry registry Available"
 
 # --- create-admin-user machinery: SA/Role/RoleBinding (policy-install-quay)
 #     and the Job (policy-config-quay) that initializes the Quay DB and creates
-#     the quayadmin / quaydevel / quay-pull-secret secrets, org devel and repo
-#     devel/example. Ported with two reviewed deviations: QUAY_USER_EMAIL is
-#     defined (upstream leaves it undefined) and user/initialize uses curl -fsSLk
-#     with an explicit failure exit (upstream uses curl -k -s without -f).
-#     The Job is first-run-only by construction (its own guard exits 1 when
-#     the quaydevel secret already exists), so: all three secrets present =>
-#     adopt and skip; otherwise delete any stale Job and re-create it.
-# The policy Job creates four secrets: quayadmin (admin token/password/basic),
-# quaydevel (the devel user), quay-pull-secret (dockerconfigjson) and
-# quay-integration (an automation token). All four must be present before the
-# Job is considered done.
-_quay_admin_secrets_present() {
-  local _s
-  for _s in quayadmin quaydevel quay-pull-secret quay-integration; do
-    if ! oc get secret "${_s}" -n "${QUAY_NAMESPACE}" >/dev/null 2>&1; then
-      return 1
-    fi
-  done
-  return 0
-}
-
-if _quay_admin_secrets_present; then
+#     the quayadmin / quaydevel / quay-pull-secret / quay-integration secrets,
+#     org devel and repo devel/example. Ported with three reviewed deviations
+#     from the upstream text: QUAY_USER_EMAIL is defined (upstream leaves it
+#     undefined), user/initialize uses curl -fsSLk with an explicit failure exit
+#     (upstream uses curl -k -s without -f), and quayadmin's basic credential
+#     encodes the admin account (upstream derives it from QUAY_PASSWORD before
+#     that variable is assigned, so it encodes "quaydevel:" with an empty
+#     password; the upstream defect is INTEROP-9724). Two further departures from
+#     the upstream text are already in the ported step and are not part of this
+#     hardening: quay_cmd returns curl's status instead of its own success echo,
+#     and the route read is checked where it happens. The hardening on top of the
+#     port adds quay_require (it fails the Job on the calls that must succeed),
+#     the access_token and generated-password checks before the Secrets are
+#     written, response bodies that carry client_secret discarded, the Secret
+#     state separating absence from a query error, connect and total timeouts on
+#     every Quay call, and activeDeadlineSeconds on the Job (the one manifest
+#     divergence from the policy Job text) so it cannot outlive the admin phase.
+#     The Job is first-run-only by construction (its own guard exits 1 when the
+#     quaydevel secret already exists), so its state picks the branch: a live Job
+#     is waited on and never deleted mid-flight, a Failed Job fails the step when
+#     the four Secrets exist (it writes quay-integration before the org and repo
+#     setup), a finished Job with all four Secrets is adopted, and a finished Job
+#     without them is replaced, but only when its UID and terminal state are still
+#     the ones observed: a name-only delete could remove a live replacement that
+#     the policy created meanwhile.
+# _quay_admin_secrets_state and _quay_admin_job_state are defined above the
+# self-disable predicate: that predicate records the credential state too.
+# The Secrets are read before the Job state: a Job that starts in that window
+# finds the quaydevel Secret, exits on its own guard, and shows up as live or
+# failed in the state read instead of being adopted mid-flight.
+_admin_secrets=0
+_secret_state=$(_quay_admin_secrets_state)
+if [[ "${_secret_state}" == "query-failed" ]]; then
+  _quay_admin_secrets_query_fail
+fi
+if [[ "${_secret_state}" == "present" ]]; then
+  _admin_secrets=1
+fi
+_job_state=$(_quay_admin_job_state)
+_job_wait=0
+_decided_uid=""
+_install_adopted=0
+if [[ "${_job_state}" == "query-failed" ]]; then
+  _quay_admin_job_query_fail
+fi
+if [[ "${_job_state}" == "failed" ]] && (( _admin_secrets )); then
+  _quay_admin_job_fail
+fi
+if (( _admin_secrets )) && [[ "${_job_state}" != "live" ]]; then
+  _install_adopted=1
   _prop "quay_admin_secrets" "adopted"
   _prop "quay_admin_job" "skipped-existing-secrets"
-  echo ">>> create-admin-user: quayadmin/quaydevel/quay-pull-secret already present - adopting"
+  echo ">>> create-admin-user: quayadmin/quaydevel/quay-pull-secret/quay-integration present and no Job in flight - adopting"
 else
   echo ">>> PHASE: create-admin-user (Quay DB initialize, admin + devel user secrets)"
   cat <<EOF | oc create -f - 2>&1 || true
@@ -913,32 +1309,460 @@ EOF
   done
   _prop "quay_admin_rbac" "present"
 
-  # The policy Job is single-shot, not idempotent: it exits 1 when the
-  # quaydevel secret already exists, and it exits 1 when Quay answers
-  # "non-empty database" to /api/v1/user/initialize. So it can only populate an
-  # EMPTY registry. A quayadmin secret without the rest means the database was
-  # already initialized and the remaining objects are gone: re-running the Job
-  # cannot repair that, and reporting it as an install failure would hide the
-  # real cause. Fail fast with its own class instead.
-  if oc get secret quayadmin -n "${QUAY_NAMESPACE}" >/dev/null 2>&1; then
-    _classify "quay-admin-partial-state" "quayadmin exists but quaydevel/quay-pull-secret/quay-integration are not all present; the policy Job cannot re-initialize an already-initialized Quay database (see policy-config-quay.yaml create-admin-user)"
-    echo "ERROR: ${_class_detail}"
-    _dump_diagnostics
-    exit 1
+  # The RBAC creation above takes time, and a policy-owned Job may have started,
+  # finished or failed meanwhile: re-read the Secrets and the Job state before
+  # deciding, in that order (see above), so a stale observation cannot replace a
+  # live Job or adopt a half-finished one.
+  _admin_secrets=0
+  _secret_state=$(_quay_admin_secrets_state)
+  if [[ "${_secret_state}" == "query-failed" ]]; then
+    _quay_admin_secrets_query_fail
   fi
+  if [[ "${_secret_state}" == "present" ]]; then
+    _admin_secrets=1
+  fi
+  read -r _job_state _decided_uid <<<"$(_quay_admin_job_snapshot)"
+  # The Job the Secret observation describes: a later replacement invalidates it.
+  _secrets_uid="${_decided_uid}"
+  # A Job that finished between the Secret read and this one has written its last
+  # Secrets, and the stale "absent" would send a healthy install down the
+  # partial-state exit: re-read the Secrets once now that the Job is terminal.
+  if [[ "${_job_state}" == "complete" || "${_job_state}" == "failed" ]] && ! (( _admin_secrets )); then
+    _secret_state=$(_quay_admin_secrets_state)
+    if [[ "${_secret_state}" == "query-failed" ]]; then
+      _quay_admin_secrets_query_fail
+    fi
+    if [[ "${_secret_state}" == "present" ]]; then
+      _admin_secrets=1
+    fi
+    # The re-read retries each Secret, so the Job can finish, appear or be
+    # replaced while it runs: refresh the state and the UID that the decision and
+    # the delete precondition use, or a stale "failed" would fail a healthy
+    # install on a replacement Job's Secrets.
+    read -r _job_state _decided_uid <<<"$(_quay_admin_job_snapshot)"
+  fi
+  if [[ "${_job_state}" == "query-failed" ]]; then
+    _quay_admin_job_query_fail
+  elif [[ "${_job_state}" == "failed" ]] && (( _admin_secrets )); then
+    _quay_admin_job_fail
+  elif [[ "${_job_state}" == "live" ]]; then
+    # Deleting a live Job loses the credentials it has already generated, and the
+    # single-shot replacement cannot re-initialize a non-empty database. Wait for
+    # it instead, inside the same QUAY_ADMIN_JOB_TIMEOUT budget, so the
+    # step-level budget invariant still holds.
+    _job_wait=1
+    # No Job started by this step minted the token, so a rejection on a registry
+    # read is reported as unverified rather than as a defect here.
+    _install_adopted=1
+    _prop "quay_admin_job_inherited" "live"
+    echo ">>> create-admin-user Job is live; waiting for it instead of deleting or replacing it"
+  elif (( _admin_secrets )); then
+    # Another writer produced the Secrets, so the token is not this step's.
+    _install_adopted=1
+    _prop "quay_admin_secrets" "adopted-late"
+    _prop "quay_admin_job" "skipped-existing-secrets"
+    echo ">>> create-admin-user: all four secrets are present on re-read - not touching the Job"
+  else
+    # The policy Job is single-shot, not idempotent: it exits 1 when the
+    # quaydevel secret already exists, and it exits 1 when Quay answers
+    # "non-empty database" to /api/v1/user/initialize. So it can only populate an
+    # EMPTY registry. A quayadmin secret without the rest means the database was
+    # already initialized and the remaining objects are gone: re-running the Job
+    # cannot repair that, and reporting it as an install failure would hide the
+    # real cause. Fail fast with its own class instead.
+    if _qa_out=$(oc get secret quayadmin -n "${QUAY_NAMESPACE}" --request-timeout="$(_left_budget 20)" 2>&1); then
+      # A policy-owned Job that started after the snapshot above writes
+      # quayadmin first, so presence alone can catch a healthy initialization in
+      # flight. Re-read the state, and wait for a live Job instead of reporting
+      # a partial install.
+      read -r _partial_state _ <<<"$(_quay_admin_job_snapshot)"
+      if [[ "${_partial_state}" == "query-failed" ]]; then
+        _quay_admin_job_query_fail
+      fi
+      if [[ "${_partial_state}" == "live" ]]; then
+        _job_state="live"
+        _job_wait=1
+        _install_adopted=1
+        _prop "quay_admin_job_inherited" "live"
+        echo ">>> create-admin-user Job is live; waiting for it instead of reporting a partial install"
+      else
+        # The Job went terminal between the Secret read above and this one, so
+        # its last writes can sit in that read's blind spot: re-read before
+        # declaring a partial install, and adopt the Job if it finished the work.
+        if [[ "${_partial_state}" == "complete" || "${_partial_state}" == "failed" || "${_partial_state}" == "absent" ]]; then
+          _secret_state=$(_quay_admin_secrets_state)
+          if [[ "${_secret_state}" == "query-failed" ]]; then
+            _quay_admin_secrets_query_fail
+          fi
+          if [[ "${_secret_state}" == "present" ]]; then
+            # A Failed Job leaves the registry half-configured even with all four
+            # Secrets, so it keeps its own class and its log, exactly as on the
+            # branch above.
+            if [[ "${_partial_state}" == "failed" ]]; then
+              _quay_admin_job_fail
+            fi
+            _admin_secrets=1
+            _install_adopted=1
+            _prop "quay_admin_secrets" "adopted-late"
+            _prop "quay_admin_job" "skipped-existing-secrets"
+            echo ">>> create-admin-user: the Job finished and all four secrets are present on re-read - not touching the Job"
+          fi
+        fi
+        if (( ! _admin_secrets )); then
+          _classify "quay-admin-partial-state" "quayadmin exists but quaydevel/quay-pull-secret/quay-integration are not all present; the policy Job cannot re-initialize an already-initialized Quay database (see policy-config-quay.yaml create-admin-user)"
+          echo "ERROR: ${_class_detail}"
+          _dump_diagnostics
+          exit 1
+        fi
+      fi
+    elif ! printf '%s' "${_qa_out}" | grep -qF '(NotFound)'; then
+      # A read timeout or an RBAC error is not absence: treating it as absence
+      # deletes a terminal Job and lets the replacement die on its own guard.
+      _classify "quay-admin-secrets-query-failed" "the quayadmin Secret could not be read after the Job decision ($(printf '%s' "${_qa_out}" | head -1)); presence is unknown, so the Job is left in place"
+      echo "ERROR: ${_class_detail}"
+      _dump_diagnostics
+      exit 1
+    fi
 
-  if oc get job create-admin-user -n "${QUAY_NAMESPACE}" >/dev/null 2>&1; then
-    echo ">>> deleting stale Job create-admin-user (admin secrets absent)"
-    oc delete job create-admin-user -n "${QUAY_NAMESPACE}" --ignore-not-found=true --wait=true --timeout=60s 2>&1 || true
-    _prop "quay_admin_job_stale_deleted" "true"
-  fi
-  cat <<'JOBEOF' | oc create -f - 2>&1
+    # A live Job was handled above and a Failed Job with the four Secrets fails
+    # the step, so only a finished Job reaches this point. A finished Job without
+    # the Secrets is stale and is replaced: the Job's own guard and its
+    # non-empty-database check keep a retry safe, and a retry is the only
+    # recovery from a transient failure such as an unreachable route.
+    if [[ "${_job_state}" == "complete" || "${_job_state}" == "failed" ]] && (( ! _admin_secrets )); then
+      # Deleting by name can remove a Job this step never observed: a live
+      # policy-owned Job that replaced the finished one while the RBAC objects
+      # were created. Deleting it loses the credentials it generated, and its
+      # replacement cannot re-initialize a non-empty database. Re-read the UID
+      # and the state, and only delete the object observed as terminal.
+      read -r _delete_state _delete_uid <<<"$(_quay_admin_job_snapshot)"
+      if [[ "${_delete_state}" == "query-failed" ]]; then
+        _quay_admin_job_query_fail
+      fi
+      if [[ "${_delete_state}" == "complete" || "${_delete_state}" == "failed" ]]; then
+        if [[ "${_delete_uid}" != "${_decided_uid}" ]]; then
+          # The replacement may have finished its work already: read its state
+          # first and the four Secrets after it, so the Secrets answer describes
+          # the state they are judged against and a replacement that wrote them
+          # after the earlier read is still adopted.
+          read -r _recheck_state _recheck_uid <<<"$(_quay_admin_job_snapshot)"
+          if [[ "${_recheck_state}" == "query-failed" ]]; then
+            _quay_admin_job_query_fail
+          fi
+          if [[ "${_recheck_state}" == "live" ]]; then
+            # A third writer can hold the name and still be writing: wait for it
+            # instead of reporting a replacement or verifying a half-written
+            # registry. The wait loop below gates the create, and the delete is
+            # gated on _job_wait so the live Job is never deleted.
+            _job_state="${_recheck_state}"
+            _job_wait=1
+            _install_adopted=1
+            _prop "quay_admin_job_inherited" "live"
+            echo ">>> create-admin-user Job is live under the name after the Secrets re-read; waiting for it"
+          else
+            _secret_state=$(_quay_admin_secrets_state)
+            if [[ "${_secret_state}" == "query-failed" ]]; then
+              _quay_admin_secrets_query_fail
+            fi
+            # The Secret read retries, so the state read above can be older than
+            # it: read the state once more and judge the Secrets, the Failed
+            # verdict and the adoption against this read only.
+            read -r _final_state _final_uid <<<"$(_quay_admin_job_snapshot)"
+            if [[ "${_final_state}" == "query-failed" ]]; then
+              _quay_admin_job_query_fail
+            fi
+            if [[ "${_final_state}" == "live" ]]; then
+              _job_state="${_final_state}"
+              _job_wait=1
+              _install_adopted=1
+              _prop "quay_admin_job_inherited" "live"
+              echo ">>> create-admin-user Job is live after the Secrets re-read; waiting for it"
+            elif [[ "${_secret_state}" != "present" ]]; then
+              if [[ "${_final_state}" == "complete" ]]; then
+                _secret_state=$(_quay_admin_secrets_state)
+                if [[ "${_secret_state}" == "query-failed" ]]; then
+                  _quay_admin_secrets_query_fail
+                fi
+                if [[ "${_secret_state}" == "present" ]]; then
+                  _admin_secrets=1
+                  _install_adopted=1
+                  _prop "quay_admin_secrets" "adopted-late"
+                  _prop "quay_admin_job" "skipped-existing-secrets"
+                  echo ">>> create-admin-user: the Job was replaced and wrote all four secrets - not touching the Job"
+                else
+                  _classify "quay-admin-job-replaced" "create-admin-user Job was replaced while the RBAC objects were created (observed UID ${_decided_uid:-none}, now ${_final_uid:-none}); not deleting an object this step did not observe"
+                  echo "ERROR: ${_class_detail}"
+                  _dump_diagnostics
+                  exit 1
+                fi
+              else
+                if [[ "${_final_state}" == "failed" ]]; then
+                  _quay_admin_job_fail
+                fi
+                _classify "quay-admin-job-replaced" "create-admin-user Job was replaced while the RBAC objects were created (observed UID ${_decided_uid:-none}, now ${_final_uid:-none}); not deleting an object this step did not observe"
+                echo "ERROR: ${_class_detail}"
+                _dump_diagnostics
+                exit 1
+              fi
+            elif [[ "${_final_state}" == "failed" ]]; then
+              _quay_admin_job_fail
+            elif [[ "${_final_state}" == "absent" ]]; then
+              echo ">>> NOTE: the replacement Job was removed after it wrote the four secrets; keeping them and leaving the Job alone"
+              _admin_secrets=1
+              _install_adopted=1
+              _prop "quay_admin_secrets" "adopted-late"
+              _prop "quay_admin_job" "skipped-existing-secrets"
+            else
+              _admin_secrets=1
+              _install_adopted=1
+              _prop "quay_admin_secrets" "adopted-late"
+              _prop "quay_admin_job" "skipped-existing-secrets"
+              echo ">>> create-admin-user: the Job was replaced and wrote all four secrets - not touching the Job"
+            fi
+          fi
+        elif [[ "${_delete_uid}" != "${_secrets_uid}" ]]; then
+          # The Secret observation describes an earlier Job, so its absence says
+          # nothing about this one: a Job created in between can have written all
+          # four Secrets and finished. Re-read before replacing it.
+          _secret_state=$(_quay_admin_secrets_state)
+          if [[ "${_secret_state}" == "query-failed" ]]; then
+            _quay_admin_secrets_query_fail
+          fi
+          if [[ "${_secret_state}" == "present" ]]; then
+            # The re-read retried four Secrets, so the state read above can be
+            # older than it: read the state again before a Failed verdict.
+            read -r _recheck_state _recheck_uid <<<"$(_quay_admin_job_snapshot)"
+            if [[ "${_recheck_state}" == "query-failed" ]]; then
+              _quay_admin_job_query_fail
+            fi
+            if [[ "${_recheck_state}" == "live" ]]; then
+              # The writer that began after the Secret observation is still
+              # running, so wait for it before verifying what it wrote.
+              _job_state="${_recheck_state}"
+              _job_wait=1
+              _install_adopted=1
+              _prop "quay_admin_job_inherited" "live"
+              echo ">>> create-admin-user Job is live under the name after the Secrets re-read; waiting for it"
+            else
+              # A Failed Job leaves the registry half-configured even with all
+              # four Secrets, so it keeps its own class and its log here too.
+              if [[ "${_recheck_state}" == "failed" ]]; then
+                _quay_admin_job_fail
+              fi
+              _admin_secrets=1
+              _install_adopted=1
+              _prop "quay_admin_secrets" "adopted-late"
+              _prop "quay_admin_job" "skipped-existing-secrets"
+              echo ">>> create-admin-user: the Job that replaced the observed one wrote all four secrets - not touching the Job"
+            fi
+          fi
+        fi
+      fi
+      if (( ! _admin_secrets )) && (( ! _job_wait )) && [[ "${_delete_state}" == "complete" || "${_delete_state}" == "failed" ]]; then
+        # The check above is a name-level read, so the delete carries the
+        # observed UID as an API precondition: oc delete has no --uid flag, and a
+        # replacement Job that appears between the read and the delete must make
+        # the API reject the request (409 Conflict) instead of being deleted.
+        # Background propagation is named because a raw batch/v1 DeleteOptions
+        # without it orphans the Job's pods, while oc delete asks for background:
+        # the delete then still frees the name and leaves no stale pods behind.
+        _delete_opts=$(printf '{"apiVersion":"batch/v1","kind":"DeleteOptions","propagationPolicy":"Background","preconditions":{"uid":"%s"}}' "${_decided_uid}")
+        _delete_rc=0
+        _delete_out=$(oc delete --raw "/apis/batch/v1/namespaces/${QUAY_NAMESPACE}/jobs/create-admin-user" -f - 2>&1 <<<"${_delete_opts}") || _delete_rc=$?
+        if (( _delete_rc == 0 )); then
+          # --raw returns before the object is finalized: a Job holding the
+          # job-tracking finalizer keeps its name until its pods report, and the
+          # create below would then hit AlreadyExists and wait on a terminating
+          # Job. Poll the name, bounded in wall-clock time and by the work
+          # budget. Only absence means cleared: once the name is free the other
+          # writer may legitimately create a Job of its own, which is adopted
+          # like a concurrent create instead of failing the step. Read errors
+          # are counted, not read as presence.
+          _delete_wait=$(_left_budget 60)
+          _delete_until=$(( $(date +%s) + _delete_wait ))
+          _gone=0
+          _recreated=0
+          _strikes=0
+          while :; do
+            if ! _still_raw=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" --request-timeout="$(_left_budget 20)" -o jsonpath='__quay_job__{.metadata.uid}' 2>&1); then
+              _still=${_still_raw}
+              if printf '%s' "${_still_raw}" | grep -qF '(NotFound)'; then
+                _gone=1
+                break
+              fi
+              (( _strikes += 1 )) || true
+              if (( _strikes >= 3 )); then
+                _classify "quay-admin-job-query-failed" "the create-admin-user Job could not be read after the stale-Job delete ($(printf '%s' "${_still}" | head -1))"
+                echo "ERROR: ${_class_detail}"
+                _dump_diagnostics
+                exit 1
+              fi
+            else
+              # Strip anything a warning wrote to stderr before comparing, and
+              # treat a success without the sentinel as unparseable rather than
+              # as a different UID, or a warning would read as a recreate.
+              _still=${_still_raw##*__quay_job__}
+              if [[ "${_still}" == "${_still_raw}" ]]; then
+                _still=""
+              else
+                # A warning can follow the payload, on the same line or on the
+                # next: the UID is the first token of the first line.
+                _still=${_still%%$'\n'*}
+                _still=${_still%% *}
+              fi
+              if [[ -n "${_still}" && "${_still}" != "${_decided_uid}" ]]; then
+                _recreated=1
+                break
+              fi
+              if [[ -z "${_still}" ]]; then
+                (( _strikes += 1 )) || true
+                if (( _strikes >= 3 )); then
+                  _classify "quay-admin-job-query-failed" "the create-admin-user Job could not be read after the stale-Job delete (unparseable read: $(printf '%s' "${_still_raw}" | head -1))"
+                  echo "ERROR: ${_class_detail}"
+                  _dump_diagnostics
+                  exit 1
+                fi
+              else
+                _strikes=0
+              fi
+            fi
+            # At least one read runs, so a window shorter than the interval
+            # cannot assert the outcome without looking.
+            (( $(date +%s) < _delete_until )) || break
+            sleep 2
+          done
+          if (( ! _gone )) && (( ! _recreated )) && (( _strikes > 0 )); then
+            _classify "quay-admin-job-query-failed" "the stale-Job delete window closed after ${_strikes} failed read(s), so the delete outcome is unknown"
+            echo "ERROR: ${_class_detail}"
+            _dump_diagnostics
+            exit 1
+          fi
+          if (( _recreated )); then
+            echo ">>> create-admin-user Job was created by the other writer after the stale Job was deleted; adopting it"
+            _install_adopted=1
+            _prop "quay_admin_job_inherited" "created-concurrently"
+            _job_wait=1
+          elif (( ! _gone )); then
+            _classify "quay-admin-job-delete-failed" "the stale create-admin-user Job is still present ${_delete_wait}s after the delete (a finalizer may be holding it); a replacement cannot be created under the same name"
+            echo "ERROR: ${_class_detail}"
+            _dump_diagnostics
+            exit 1
+          else
+            echo ">>> deleted stale ${_delete_state} Job create-admin-user (admin secrets absent)"
+            _prop "quay_admin_job_stale_deleted" "true"
+          fi
+        elif printf '%s' "${_delete_out}" | grep -qF '(NotFound)'; then
+          echo ">>> create-admin-user Job was removed before the delete; creating it again"
+        elif printf '%s' "${_delete_out}" | grep -qiE 'conflict|precondition'; then
+          # The precondition rejected the delete, so another writer holds the
+          # name: read it and take the same paths as the arms above rather than
+          # failing a registry whose replacement is healthy.
+          read -r _conflict_state _conflict_uid <<<"$(_quay_admin_job_snapshot)"
+          if [[ "${_conflict_state}" == "query-failed" ]]; then
+            _quay_admin_job_query_fail
+          fi
+          if [[ "${_conflict_state}" == "live" ]]; then
+            _job_state="${_conflict_state}"
+            _job_wait=1
+            _install_adopted=1
+            _prop "quay_admin_job_inherited" "live"
+            echo ">>> create-admin-user Job was replaced and is live; waiting for it instead of deleting it"
+          else
+            _secret_state=$(_quay_admin_secrets_state)
+            if [[ "${_secret_state}" == "query-failed" ]]; then
+              _quay_admin_secrets_query_fail
+            fi
+            # Judge the Secrets against a state read taken after them, so a
+            # writer that appeared during the read is seen.
+            read -r _final_state _final_uid <<<"$(_quay_admin_job_snapshot)"
+            if [[ "${_final_state}" == "query-failed" ]]; then
+              _quay_admin_job_query_fail
+            fi
+            if [[ "${_final_state}" == "live" ]]; then
+              _job_state="${_final_state}"
+              _job_wait=1
+              _install_adopted=1
+              _prop "quay_admin_job_inherited" "live"
+              echo ">>> create-admin-user Job was replaced and is live; waiting for it instead of deleting it"
+            elif [[ "${_secret_state}" != "present" ]]; then
+              if [[ "${_final_state}" == "complete" ]]; then
+                _secret_state=$(_quay_admin_secrets_state)
+                if [[ "${_secret_state}" == "query-failed" ]]; then
+                  _quay_admin_secrets_query_fail
+                fi
+                if [[ "${_secret_state}" == "present" ]]; then
+                  _admin_secrets=1
+                  _install_adopted=1
+                  _prop "quay_admin_secrets" "adopted-late"
+                  _prop "quay_admin_job" "skipped-existing-secrets"
+                  echo ">>> create-admin-user Job was replaced and wrote all four secrets - not touching the Job"
+                else
+                  _classify "quay-admin-job-replaced" "create-admin-user Job was replaced while the RBAC objects were created (observed UID ${_decided_uid:-none}, now ${_final_uid:-none}); the UID precondition rejected the delete and the replacement wrote no Secrets, so this step cannot verify the registry"
+                  echo "ERROR: ${_class_detail}"
+                  _dump_diagnostics
+                  exit 1
+                fi
+              else
+                if [[ "${_final_state}" == "failed" ]]; then
+                  _quay_admin_job_fail
+                fi
+                _classify "quay-admin-job-replaced" "create-admin-user Job was replaced while the RBAC objects were created (observed UID ${_decided_uid:-none}, now ${_final_uid:-none}); the UID precondition rejected the delete and the replacement wrote no Secrets, so this step cannot verify the registry"
+                echo "ERROR: ${_class_detail}"
+                _dump_diagnostics
+                exit 1
+              fi
+            elif [[ "${_final_state}" == "failed" ]]; then
+              _quay_admin_job_fail
+            else
+              _admin_secrets=1
+              _install_adopted=1
+              _prop "quay_admin_secrets" "adopted-late"
+              _prop "quay_admin_job" "skipped-existing-secrets"
+              echo ">>> create-admin-user Job was replaced and wrote all four secrets - not touching the Job"
+            fi
+          fi
+        else
+          _classify "quay-admin-job-delete-failed" "oc delete of the stale create-admin-user Job failed ($(printf '%s' "${_delete_out}" | head -1)); the Job is left in place"
+          echo "ERROR: ${_class_detail}"
+          _dump_diagnostics
+          exit 1
+        fi
+      elif (( _admin_secrets )); then
+        # The Job that replaced the observed one wrote the four Secrets: nothing
+        # to delete or create, and the registry check below still gates the exit.
+        :
+      elif (( _job_wait )); then
+        # An arm above already decided to wait on the Job.
+        :
+      elif [[ "${_delete_state}" == "absent" ]]; then
+        echo ">>> create-admin-user Job was removed while the branch was being decided; creating it again"
+      else
+        # A Job this step did not start is live under the name: wait for it
+        # below, and mark it adopted so a rejected registry read warns instead of
+        # failing a registry whose Secrets this step did not write.
+        _job_state="${_delete_state}"
+        _job_wait=1
+        _install_adopted=1
+        _prop "quay_admin_job_inherited" "live"
+        echo ">>> create-admin-user Job started by another writer while the branch was being decided; waiting instead of creating"
+      fi
+    fi
+    if (( ! _job_wait )) && (( ! _admin_secrets )); then
+      _create_rc=0
+      _create_out=$(cat <<'JOBEOF' | oc create -f - 2>&1
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: create-admin-user
   namespace: local-quay
 spec:
+  # Backstop for the Job's own waits: it must not outlive the admin phase, or a
+  # silent hang keeps the Job live and every later run inherits it. This is the
+  # one deliberate divergence from the policy Job text. A killed Job reports
+  # Failed=True with reason DeadlineExceeded, which the failure path prints, so
+  # the step's own quay-admin-job-timeout class only covers a parent budget
+  # shorter than this deadline.
+  activeDeadlineSeconds: 360
   template:
     spec:
       containers:
@@ -947,32 +1771,32 @@ spec:
             - -c
             - |
               #!/usr/bin/env bash
-              set -eo pipefail
+              set -euo pipefail
 
               function quay_cmd() {
                 DATA='{}'
-                if [ ! -z "$4" ]; then
-                  DATA=$4
+                if [ -n "${4:-}" ]; then
+                  DATA="${4:-}"
                 fi
                 # Method and path only: the request body can carry account
                 # fields and the response body API payloads, and both the Job
                 # log and the step's diagnostics copy are readable in
                 # artifacts.
                 echo "[$1] $2 $3" 1>&2
-                if [ $1 = "Basic" ]; then
-                  COUNT=$(oc -n $QUAY_NAMESPACE get --ignore-not-found=true secret $QUAY_USER_SECRET | wc -l)
+                if [ "$1" = "Basic" ]; then
+                  COUNT=$(oc -n "${QUAY_NAMESPACE}" get --ignore-not-found=true secret "${QUAY_USER_SECRET}" | wc -l)
                   if [ $COUNT -gt 1 ]; then
-                      BASIC=$(oc -n $QUAY_NAMESPACE extract secret/$QUAY_USER_SECRET --keys=basic --to=-)
+                      BASIC=$(oc -n "${QUAY_NAMESPACE}" extract secret/${QUAY_USER_SECRET} --keys=basic --to=-)
                   fi
                   # The header value is a credential read by curl from a process
                   # substitution (curl -H @file), so no secret appears in the
                   # process list while curl runs.
-                  curl -X $2 $CURL_OPTS -H 'Content-Type: application/json' -H @<( set +x; printf 'Authorization: Basic %s\n' "$BASIC" ) https://$QUAY_HOST$3 --data "$DATA"
+                  curl -X "$2" $CURL_OPTS -H 'Content-Type: application/json' -H @<( set +x; printf 'Authorization: Basic %s\n' "$BASIC" ) "https://${QUAY_HOST}$3" --data "$DATA"
 
-                elif [ $1 = "Bearer" ]; then
-                  curl -X $2 $CURL_OPTS -H 'Content-Type: application/json' -H @<( set +x; printf 'Authorization: Bearer %s\n' "$TOKEN" ) https://$QUAY_HOST$3 --data "$DATA"
+                elif [ "$1" = "Bearer" ]; then
+                  curl -X "$2" $CURL_OPTS -H 'Content-Type: application/json' -H @<( set +x; printf 'Authorization: Bearer %s\n' "$TOKEN" ) "https://${QUAY_HOST}$3" --data "$DATA"
                 else
-                  curl -X $2 $CURL_OPTS -H 'Content-Type: application/json' -H 'Fake: dummy' https://$QUAY_HOST$3 --data "$DATA"
+                  curl -X "$2" $CURL_OPTS -H 'Content-Type: application/json' -H 'Fake: dummy' "https://${QUAY_HOST}$3" --data "$DATA"
                 fi
                 typeset -i QRC="${?}"
                 if [ "${QRC}" -ne 0 ]; then
@@ -1007,7 +1831,7 @@ spec:
               function quay_api_get() {
                 curl -s -k -w '\n%{http_code}' \
                   --connect-timeout 10 --max-time 30 \
-                  -H @<( set +x; printf 'Authorization: Bearer %s\n' "$TOKEN" ) "https://$QUAY_HOST$1"
+                  -H @<( set +x; printf 'Authorization: Bearer %s\n' "$TOKEN" ) "https://${QUAY_HOST}$1"
               }
 
               # One bounded wait, no polling loop: a loop of oc wait calls
@@ -1028,27 +1852,27 @@ spec:
               fi
               echo "done"
 
-              CURL_OPTS="-fsSLk"
+              CURL_OPTS="-fsSLk --connect-timeout 10 --max-time 60"
               QUAY_ADMIN=quayadmin
               QUAY_USER=quaydevel
-              QUAY_USER_SECRET=$QUAY_USER
+              QUAY_USER_SECRET="${QUAY_USER}"
               QUAY_NAMESPACE=local-quay
-              QUAY_HOST=$(oc get route -n $QUAY_NAMESPACE registry-quay -o jsonpath='{.spec.host}') || { echo "Quay route does not exist yet, please wait and try again."; exit 1; }
+              QUAY_HOST=$(oc get route -n "${QUAY_NAMESPACE}" registry-quay -o jsonpath='{.spec.host}') || { echo "Quay route does not exist yet, please wait and try again."; exit 1; }
               QUAY_ORG=devel
               QUAY_ORG_EMAIL=devel@myorg.com
               QUAY_USER_EMAIL=devel-user@myorg.com
               QUAY_REPO=example
-              if RESULT=$(oc get secret -n $QUAY_NAMESPACE $QUAY_USER_SECRET); then
-                echo "Quay user configuration secret already exists: $QUAY_USER_SECRET in namespace $QUAY_NAMESPACE"
+              if RESULT=$(oc get secret -n "${QUAY_NAMESPACE}" "${QUAY_USER_SECRET}"); then
+                echo "Quay user configuration secret already exists: ${QUAY_USER_SECRET} in namespace ${QUAY_NAMESPACE}"
                 exit 1
               fi
 
-              ADMINPASS=`head -c 8 /dev/urandom | base64 | sed 's/=//'`
+              ADMINPASS=$(head -c 8 /dev/urandom | base64 | tr -d "=" | tr -d "\n")
               # The initialize body carries the generated admin password, so it
               # is built in an assignment and streamed on stdin: never in argv.
               typeset INIT_JSON="{ \"username\": \"quayadmin\", \"password\": \"${ADMINPASS}\", \"email\": \"quayadmin@example.com\", \"access_token\": true}"
               CURL_RC=0
-              RESULT=$(printf '%s' "${INIT_JSON}" | curl -fsSLk -X POST https://$QUAY_HOST/api/v1/user/initialize --header 'Content-Type: application/json' --data @-) || CURL_RC=$?
+              RESULT=$(printf '%s' "${INIT_JSON}" | curl -fsSLk --connect-timeout 10 --max-time 120 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" --header 'Content-Type: application/json' --data @-) || CURL_RC=$?
               if [ $CURL_RC -ne 0 ]; then
                 echo "Quay user initialization call failed (curl rc=${CURL_RC}); no secrets created." 1>&2
                 exit 1
@@ -1058,11 +1882,15 @@ spec:
                 exit 1
               else
                 echo "[INFO] Destroy any previous secrets ..."
-                oc -n $QUAY_NAMESPACE delete --ignore-not-found=true secret $QUAY_USER_SECRET
+                oc -n "${QUAY_NAMESPACE}" delete --ignore-not-found=true secret "${QUAY_USER_SECRET}"
 
                 echo "[INFO] Creating quay admin secret quayadmin ..."
-                TOKEN=$(echo "$RESULT" | tr ',' '\n' | grep access_token | awk -F: '{print $2}' | sed 's/"//g')
-                oc -n $QUAY_NAMESPACE create secret generic quayadmin \
+                TOKEN=$(printf '%s' "$RESULT" | sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
+                if [ -z "$TOKEN" ]; then
+                  echo "[ERROR] no access_token in the initialize response; refusing to create the quayadmin secret" 1>&2
+                  exit 1
+                fi
+                oc -n "${QUAY_NAMESPACE}" create secret generic quayadmin \
                   --from-file=token=<(printf '%s' "${TOKEN}") \
                   --from-file=password=<(printf '%s' "${ADMINPASS}") \
                   --from-file=basic=<(printf '%s' "${QUAY_ADMIN}:${ADMINPASS}" | base64 -w0)
@@ -1070,18 +1898,22 @@ spec:
                 # does not outlive its use.
                 unset INIT_JSON
 
-                echo "[INFO] Creating $QUAY_USER user ..."
+                echo "[INFO] Creating ${QUAY_USER} user ..."
                 typeset -i URC=0
                 RESPONSE=$(quay_cmd Bearer POST /api/v1/superuser/users/ "{ \"username\": \"$QUAY_USER\", \"email\": \"$QUAY_USER_EMAIL\", \"access_token\": true}") || URC=$?
                 if [ "${URC}" -ne 0 ]; then
-                  echo "[ERROR] failed to create Quay user $QUAY_USER (curl rc=${URC}); user secrets not created." 1>&2
+                  echo "[ERROR] failed to create Quay user ${QUAY_USER} (curl rc=${URC}); user secrets not created." 1>&2
                   exit 1
                 fi
 
-                QUAY_PASSWORD=$(echo $RESPONSE | tr ',' '\n' | grep '"password"' | cut -d \" -f 4)
-                BASE64AUTH=`echo -n $QUAY_USER:$QUAY_PASSWORD | base64 -w0`
+                QUAY_PASSWORD=$(echo "$RESPONSE" | tr ',' '\n' | grep '"password"' | cut -d \" -f 4)
+                if [ -z "$QUAY_PASSWORD" ]; then
+                  echo "[ERROR] superuser/users response carried no password; refusing to create ${QUAY_USER_SECRET}" 1>&2
+                  exit 1
+                fi
+                BASE64AUTH=$(printf '%s' "${QUAY_USER}:${QUAY_PASSWORD}" | base64 -w0)
 
-                echo "[INFO] Creating $QUAY_USER_SECRET secret ..."
+                echo "[INFO] Creating ${QUAY_USER_SECRET} secret ..."
                 # Secret values arrive on their own streams, never in argv
                 # (process listings and the Job manifest's command line are
                 # readable in artifacts). Two keys cannot both read stdin, so
@@ -1092,10 +1924,10 @@ spec:
                   --from-file=basic=<( set +x; printf '%s' "${BASE64AUTH}" )
 
                 echo "[INFO] Creating quay-pull-secret ..."
-                echo -e "{ \"auths\": { \"$QUAY_HOST\": { \"auth\": \"$BASE64AUTH\" } }}" | oc -n $QUAY_NAMESPACE create secret generic quay-pull-secret --from-file=.dockerconfigjson=/dev/stdin --type=kubernetes.io/dockerconfigjson
+                printf '%s' "{ \"auths\": { \"$QUAY_HOST\": { \"auth\": \"$BASE64AUTH\" } }}" | oc -n "${QUAY_NAMESPACE}" create secret generic quay-pull-secret --from-file=.dockerconfigjson=/dev/stdin --type=kubernetes.io/dockerconfigjson
 
                 echo "[INFO] Creating quay integration token secret ..."
-                oc -n $QUAY_NAMESPACE create secret generic quay-integration \
+                oc -n "${QUAY_NAMESPACE}" create secret generic quay-integration \
                   --from-file=token=<( set +x; printf '%s' "${TOKEN}" )
               fi
 
@@ -1121,7 +1953,7 @@ spec:
                   ;;
               esac
               if [ "${_ORG_ABSENT}" -eq 1 ]; then
-                echo "[INFO] Creating $QUAY_ORG org ..."
+                echo "[INFO] Creating ${QUAY_ORG} org ..."
                 # Email cannot be shared with the initial user
                 quay_required Bearer POST /api/v1/organization/ "{\"name\": \"$QUAY_ORG\", \"email\": \"$QUAY_ORG_EMAIL\" }"
                 quay_cmd Basic GET /api/v1/organization/$QUAY_ORG > /dev/null
@@ -1142,7 +1974,7 @@ spec:
               # verdict here; the read above already carried the failure.
               COUNT="$(printf '%s\n' "${_APPS_BODY}" | grep -c -- "${APPLICATION}" || true)"
               if [ "${COUNT}" -eq 0 ]; then
-                echo "[INFO] Creating $APPLICATION application..."
+                echo "[INFO] Creating ${APPLICATION} application..."
                 quay_required Bearer POST /api/v1/organization/$QUAY_ORG/applications "{\"name\": \"$QUAY_ORG-automation\", \"description\": \"automation app\" }"
               fi
 
@@ -1166,11 +1998,11 @@ spec:
                   ;;
               esac
               if [ "${_REPO_ABSENT}" -eq 1 ]; then
-                echo "[INFO] Creating $QUAY_REPO repo..."
+                echo "[INFO] Creating ${QUAY_REPO} repo..."
                 quay_required Bearer POST /api/v1/repository "{\"namespace\":\"$QUAY_ORG\", \"repository\":\"$QUAY_REPO\", \"visibility\":\"public\", \"description\":\"Development Repo\", \"repo_kind\":\"image\"}"
               fi
 
-              echo "[INFO] Looking for $QUAY_ORG members ..."
+              echo "[INFO] Looking for ${QUAY_ORG} members ..."
               _MEMB_READ="$(quay_api_get "/api/v1/organization/${QUAY_ORG}/team/owners/members")"
               _MEMB_STATUS="${_MEMB_READ##*$'\n'}"
               _MEMB_BODY="${_MEMB_READ%$'\n'*}"
@@ -1180,11 +2012,11 @@ spec:
               fi
               COUNT="$(printf '%s\n' "${_MEMB_BODY}" | grep -c -- "\"name\": \"${QUAY_USER}\"" || true)"
               if [ "${COUNT}" -eq 0 ]; then
-                echo "[INFO] Associating $QUAY_USER with $QUAY_ORG ..."
+                echo "[INFO] Associating ${QUAY_USER} with ${QUAY_ORG} ..."
                 quay_required Bearer PUT /api/v1/organization/$QUAY_ORG/team/owners/members/$QUAY_USER '{}'
               fi
 
-              echo "[INFO] Looking for $QUAY_REPO admins ..."
+              echo "[INFO] Looking for ${QUAY_REPO} admins ..."
               _ADMIN_READ="$(quay_api_get "/api/v1/repository/${QUAY_ORG}/${QUAY_REPO}/permissions/user/${QUAY_USER}")"
               _ADMIN_STATUS="${_ADMIN_READ##*$'\n'}"
               _ADMIN_BODY="${_ADMIN_READ%$'\n'*}"
@@ -1202,7 +2034,7 @@ spec:
                   ;;
               esac
               if [ "${COUNT}" -eq 0 ]; then
-                echo "[INFO] Give $QUAY_USER admin rights to the repo ..."
+                echo "[INFO] Give ${QUAY_USER} admin rights to the repo ..."
                 quay_required Bearer PUT /api/v1/repository/$QUAY_ORG/$QUAY_REPO/permissions/user/$QUAY_USER '{ "role": "admin"}'
               fi
 
@@ -1216,55 +2048,98 @@ spec:
       serviceAccountName: create-admin-user
       terminationGracePeriodSeconds: 30
 JOBEOF
-  # Wait for Complete OR Failed: oc wait --for=condition=Complete never returns
-  # on a failed Job, so it burned the full timeout and then classified from
-  # .status.failed == 1 (wrong as soon as the default backoffLimit of 6 yields
-  # more than one failed pod). The Failed condition is the terminal signal;
-  # .status.failed is diagnostic detail only.
-  _job_deadline=$(_clamp_deadline $(( $(date +%s) + QUAY_ADMIN_JOB_TIMEOUT )))
-  _job_state=""
-  while :; do
-    _job_conds=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" \
-      -o jsonpath='{range .status.conditions[?(@.status=="True")]}{.type}{" "}{end}' 2>/dev/null) || _job_conds=""
-    case " ${_job_conds} " in
-      *" Complete "*) _job_state="complete"; break ;;
-      *" Failed "*) _job_state="failed"; break ;;
-    esac
-    _job_left=$(( _job_deadline - $(date +%s) ))
-    if (( _job_left <= 0 )); then _job_state="timeout"; break; fi
-    if (( _job_left < _po_poll_interval )); then sleep "${_job_left}"; else sleep "${_po_poll_interval}"; fi
-  done
-  _prop "quay_admin_job_state" "${_job_state}"
-  if [[ "${_job_state}" != "complete" ]]; then
-    _job_failed=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" -o jsonpath='{.status.failed}' 2>/dev/null) || _job_failed="undecided"
-    # The Job prints method and path only, never a request or response body (see
-    # quay_cmd); this filter is the backstop for a credential field or bearer
-    # token that reaches the pod log, since that log is copied into the
-    # artifact directory together with the trace.
-    echo ">>> DIAG: create-admin-user Job logs (tail 200, credential-shaped values scrubbed):"
-    oc logs job/create-admin-user -n "${QUAY_NAMESPACE}" --tail=200 2>&1 \
-      | _scrub_job_log | head -c 65536 || true
-    if [[ "${_job_state}" == "failed" ]]; then
-      _classify "quay-admin-job-failed" "create-admin-user Job reported condition Failed=True (failed pods=${_job_failed:-none})"
-    else
-      _classify "quay-admin-job-timeout" "create-admin-user Job neither Complete nor Failed within ${QUAY_ADMIN_JOB_TIMEOUT}s (failed pods=${_job_failed:-none})"
+      ) || _create_rc=$?
+      if (( _create_rc != 0 )); then
+        # A live OperatorPolicy may create the same Job between the state read
+        # above and this create: adopt that one instead of exiting unclassified.
+        if printf '%s' "${_create_out}" | grep -qiE 'already ?exists'; then
+          echo ">>> create-admin-user Job was created by the other writer between the state read and this create; adopting it"
+          _install_adopted=1
+          _prop "quay_admin_job_inherited" "created-concurrently"
+        else
+          echo "${_create_out}"
+          _classify "quay-admin-job-create-failed" "oc create of the create-admin-user Job failed; no Job is running"
+          echo "ERROR: ${_class_detail}"
+          _dump_diagnostics
+          exit 1
+        fi
+      else
+        echo "${_create_out}"
+      fi
+      _job_wait=1
     fi
-    echo "ERROR: ${_class_detail}"
-    _dump_diagnostics
-    exit 1
   fi
-  if ! _quay_admin_secrets_present; then
-    echo ">>> DIAG: create-admin-user Job logs (tail 200, credential-shaped values scrubbed):"
-    oc logs job/create-admin-user -n "${QUAY_NAMESPACE}" --tail=200 2>&1 \
-      | _scrub_job_log | head -c 65536 || true
-    _classify "quay-admin-secrets-missing" "Job create-admin-user completed but quayadmin/quaydevel/quay-pull-secret are not all present"
-    echo "ERROR: ${_class_detail}"
-    _dump_diagnostics
-    exit 1
+  if (( _job_wait )); then
+    # Wait for Complete OR Failed: oc wait --for=condition=Complete never returns
+    # on a failed Job, so it burned the full timeout and then classified from
+    # .status.failed == 1 (wrong as soon as the default backoffLimit of 6 yields
+    # more than one failed pod). The Failed condition is the terminal signal;
+    # .status.failed is diagnostic detail only. The state helper separates
+    # absence from an API error, so a Job that cannot be read is reported as
+    # quay-admin-job-query-failed instead of burning the whole timeout.
+    # The verification below the wait is charged against the same deadline: cap
+    # the wait deadline so the Secret re-read and the registry checks still fit
+    # inside it (a cap, not a subtraction from the configured timeout, so a short
+    # QUAY_ADMIN_JOB_TIMEOUT still gets its full value when the budget allows).
+    _job_started=$(date +%s)
+    _job_deadline=$(_clamp_deadline $(( _job_started + QUAY_ADMIN_JOB_TIMEOUT )))
+    _verify_cap=$(( _work_deadline - _diag_reserve - _oc_overrun_reserve - _verify_reserve ))
+    if (( _job_deadline > _verify_cap )); then _job_deadline=${_verify_cap}; fi
+    if (( _job_deadline <= $(date +%s) )); then _job_deadline=$(( $(date +%s) + 1 )); fi
+    _job_state=""
+    while :; do
+      _job_state=$(_quay_admin_job_state)
+      case "${_job_state}" in
+        complete|failed) break ;;
+        query-failed) _quay_admin_job_query_fail ;;
+        absent)
+          _classify "quay-admin-job-deleted" "create-admin-user Job disappeared while the step was waiting for it"
+          echo "ERROR: ${_class_detail}"
+          _dump_diagnostics
+          exit 1
+          ;;
+      esac
+      _job_left=$(( _job_deadline - $(date +%s) ))
+      if (( _job_left <= 0 )); then _job_state="timeout"; break; fi
+      if (( _job_left < _po_poll_interval )); then sleep "${_job_left}"; else sleep "${_po_poll_interval}"; fi
+    done
+    _job_waited=$(( $(date +%s) - _job_started ))
+    _prop "quay_admin_job_state" "${_job_state}"
+    if [[ "${_job_state}" == "failed" ]]; then
+      _quay_admin_job_fail
+    fi
+    if [[ "${_job_state}" != "complete" ]]; then
+      _job_failed=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" -o jsonpath='{.status.failed}' 2>/dev/null) || _job_failed=""
+      echo ">>> DIAG: create-admin-user Job logs (tail 200):"
+      _quay_admin_log || true
+      _classify "quay-admin-job-timeout" "create-admin-user Job neither Complete nor Failed within ${_job_waited}s (QUAY_ADMIN_JOB_TIMEOUT=${QUAY_ADMIN_JOB_TIMEOUT}s, capped by the verification reserve; failed pods=${_job_failed:-none})"
+      echo "ERROR: ${_class_detail}"
+      _dump_diagnostics
+      exit 1
+    fi
+    _secret_state=$(_quay_admin_secrets_state)
+    if [[ "${_secret_state}" == "query-failed" ]]; then
+      _quay_admin_secrets_query_fail
+    fi
+    if [[ "${_secret_state}" != "present" ]]; then
+      echo ">>> DIAG: create-admin-user Job logs (tail 200):"
+      _quay_admin_log || true
+      _classify "quay-admin-secrets-missing" "Job create-admin-user completed but quayadmin/quaydevel/quay-pull-secret/quay-integration are not all present"
+      echo "ERROR: ${_class_detail}"
+      _dump_diagnostics
+      exit 1
+    fi
+    _prop "quay_admin_job" "completed"
+    if (( ${_install_adopted:-0} )); then
+      # The Job that produced them was inherited, so this step wrote neither.
+      _prop "quay_admin_secrets" "present"
+    else
+      _prop "quay_admin_secrets" "created"
+    fi
   fi
-  _prop "quay_admin_job" "completed"
-  _prop "quay_admin_secrets" "created"
 fi
+
+_quay_org_repo_check
 
 for _s in quayadmin quaydevel quay-pull-secret quay-integration; do
   _prop "secret_${_s//-/_}" "present"
@@ -1272,3 +2147,4 @@ done
 
 _prop "quay_deployed" "true"
 echo ">>> PHASE: Quay deployed (operator + registry + admin secrets)"
+true
