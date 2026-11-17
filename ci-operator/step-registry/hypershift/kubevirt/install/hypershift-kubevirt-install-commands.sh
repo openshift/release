@@ -40,9 +40,24 @@ CNV_PRERELEASE_CATALOG_IMAGE=$(curl -s https://prow.ci.openshift.org/prowjob?pro
 CNV_SUBSCRIPTION_CHANNEL=$(curl -s https://prow.ci.openshift.org/prowjob?prowjob="${PROW_JOB_ID}" |\
   ${YQ} e '.spec.pod_spec.containers[0].env[] | select(.name == "CNV_CHANNEL") | .value')
 
+CNV_STARTING_CSV="${CNV_STARTING_CSV:-}"
+
 if [ "${CNV_SUBSCRIPTION_SOURCE}" == "redhat-operators" ]
 then
   CNV_RELEASE_CHANNEL=stable
+  # Temporary pin: CNV 5.0.0 rolled out to the redhat-operators stable channel on
+  # 2026-11-04 and breaks guest LoadBalancer data-plane traffic on KubeVirt
+  # hosted clusters (TLS handshake timeouts to the guest API server through the
+  # ELB, NoWorkerNodesAvailable), permafailing the hypershift kubevirt e2e jobs.
+  # On OCP 5.x management clusters the stable channel now resolves to CNV 5.0.0,
+  # so pin to the last known good CSV. Older management clusters resolve to their
+  # own CNV line and are not affected.
+  # TODO(CNTRLPLANE-XXXX): remove this pin once CNV 5.x is safe to consume in CI.
+  # Related: CNV-101385, CNV-100829.
+  if [[ -z "${CNV_STARTING_CSV}" && $(ocp_version | cut -d. -f1) -ge 5 ]]
+  then
+    CNV_STARTING_CSV=kubevirt-hyperconverged-operator.v4.22.12
+  fi
 elif [ -n "${CNV_PRERELEASE_CATALOG_IMAGE}" ] && [ -n "${CNV_SUBSCRIPTION_CHANNEL}" ]
 then
   CNV_RELEASE_CHANNEL=${CNV_SUBSCRIPTION_CHANNEL}
@@ -134,6 +149,13 @@ spec:
   - openshift-cnv
 EOF
 
+# Optional startingCSV pin (see comment above)
+CNV_STARTING_CSV_FIELD=""
+if [ -n "${CNV_STARTING_CSV}" ]
+then
+  CNV_STARTING_CSV_FIELD="  startingCSV: ${CNV_STARTING_CSV}"
+fi
+
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -148,6 +170,7 @@ spec:
   name: kubevirt-hyperconverged
   source: ${CNV_SUBSCRIPTION_SOURCE}
   sourceNamespace: openshift-marketplace
+${CNV_STARTING_CSV_FIELD}
 EOF
 
 sleep 30
@@ -179,6 +202,12 @@ if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath='{.status.phase}') != "Su
   echo "CSV ${CSV} Describe"
   oc describe CSV ${CSV} -n openshift-cnv
   exit 1
+fi
+
+# When pinned via startingCSV, block in-run upgrades back to the channel head
+# (the pin is pointless if OLM auto-upgrades to CNV 5.0.0 before the tests finish).
+if [ -n "${CNV_STARTING_CSV}" ]; then
+  oc patch subscription -n openshift-cnv kubevirt-hyperconverged --type=merge -p '{"spec":{"installPlanApproval":"Manual"}}'
 fi
 
 # Deploy HyperConverged custom resource to complete kubevirt's installation
