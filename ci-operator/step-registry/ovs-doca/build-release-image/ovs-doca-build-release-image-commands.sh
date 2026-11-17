@@ -72,6 +72,30 @@ jq --arg auth "$(printf 'serviceaccount:%s' "${SA_TOKEN}" | base64 | tr -d '\n')
   ".auths[\"${INTERNAL_REGISTRY}\"] = {auth: \$auth}" \
   "${AUTH_FILE}" > "${AUTH_FILE}.tmp" && mv "${AUTH_FILE}.tmp" "${AUTH_FILE}"
 
+# 3a. TLS trust for the in-cluster registry endpoint: it serves a certificate
+#     signed by the cluster's own CA, which is not part of the cli image's
+#     system trust (pushing through it otherwise fails with "x509:
+#     certificate signed by unknown authority"). Fetch the registry's served
+#     certificate chain and append it to a copy of the system bundle, exported
+#     as SSL_CERT_FILE, which oc's Go TLS stack honors. Trusting the served
+#     certificate pins the cluster's current registry certificate: acceptable
+#     here because the connection stays inside the cluster's pod network,
+#     authenticates as this pod's service account, and writes only to this
+#     job's own namespace. Subject and issuer are logged for the record.
+INTERNAL_HOST="${INTERNAL_REGISTRY%%:*}"
+REGISTRY_CHAIN="${SHARED_DIR}/.ovs-doca-registry-chain.pem"
+openssl s_client -showcerts -connect "${INTERNAL_REGISTRY}" -servername "${INTERNAL_HOST}" </dev/null 2>/dev/null \
+  | sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p' > "${REGISTRY_CHAIN}" || true
+if ! grep -q "BEGIN CERTIFICATE" "${REGISTRY_CHAIN}"; then
+  echo "ERROR: could not fetch the certificate chain of ${INTERNAL_REGISTRY}"
+  exit 1
+fi
+openssl x509 -in "${REGISTRY_CHAIN}" -noout -subject -issuer 2>/dev/null || true
+SYS_BUNDLE="$(ls /etc/pki/tls/certs/ca-bundle.crt /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem 2>/dev/null | head -1)"
+cat "${SYS_BUNDLE:-/dev/null}" "${REGISTRY_CHAIN}" > "${SHARED_DIR}/.ovs-doca-ca.pem"
+export SSL_CERT_FILE="${SHARED_DIR}/.ovs-doca-ca.pem"
+echo "SSL_CERT_FILE: system bundle (${SYS_BUNDLE:-none}) + registry chain"
+
 # 4. Rebuild the payload with our image as rhel-coreos. Component images are
 #    referenced by digest (not copied), so this only assembles and push the
 #    release image itself.
@@ -92,4 +116,4 @@ fi
 echo "${DEST%:*}@${DIGEST}" > "${SHARED_DIR}/custom-release-image"
 echo "rebuilt payload: ${DEST%:*}@${DIGEST}"
 echo "handed over to ipi-install via \${SHARED_DIR}/custom-release-image"
-rm -f "${AUTH_FILE}"
+rm -f "${AUTH_FILE}" "${REGISTRY_CHAIN}" "${SHARED_DIR}/.ovs-doca-ca.pem"
