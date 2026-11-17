@@ -150,6 +150,35 @@ ${TIMEOUT_CASE}
 </testsuite>
 EOF
 
+elif [[ "${AGENT}" == "trt-jira-planner" ]]; then
+    # Planner: setup/plan/pr phases + timeout check
+    PHASE_SETUP=$(echo "${PHASE_DURATIONS}" | jq -r '.setup // 0')
+    PHASE_PLAN=$(echo "${PHASE_DURATIONS}" | jq -r '.plan // 0')
+    PHASE_PR=$(echo "${PHASE_DURATIONS}" | jq -r '.pr // 0')
+    TOTAL_DURATION=$(( PHASE_SETUP + PHASE_PLAN + PHASE_PR ))
+    CLAUDE_EXIT=$(echo "${METADATA}" | jq -r '.claude_exit // 0')
+
+    FAILURE_COUNT=0
+    TIMEOUT_CASE=""
+    if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+        FAILURE_COUNT=1
+        TIMEOUT_CASE="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_PLAN}\">
+    <failure message=\"Claude timed out.\">Claude exceeded the time limit and had to be nudged to wrap up.</failure>
+  </testcase>"
+    else
+        TIMEOUT_CASE="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_PLAN}\"/>"
+    fi
+
+    cat > "${JUNIT_FILE}" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="agentic-trt-jira-planner" tests="4" failures="${FAILURE_COUNT}" time="${TOTAL_DURATION}">
+  <testcase name="${PHASE_PREFIX} Phase: setup" time="${PHASE_SETUP}"/>
+  <testcase name="${PHASE_PREFIX} Phase: plan" time="${PHASE_PLAN}"/>
+  <testcase name="${PHASE_PREFIX} Phase: pr-creation" time="${PHASE_PR}"/>
+${TIMEOUT_CASE}
+</testsuite>
+EOF
+
 elif [[ "${AGENT}" == "trt-review-responder" ]]; then
     # Review-responder: single review phase + summary
     PHASE_REVIEW=$(echo "${PHASE_DURATIONS}" | jq -r '.review // 0')

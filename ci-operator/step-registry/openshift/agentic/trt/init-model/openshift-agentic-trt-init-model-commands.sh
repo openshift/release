@@ -1227,8 +1227,8 @@ finalize_session_metrics() {
     # later phase cannot overwrite the earlier phase's cost row.
     local phase="${1:-}"
     rm -f "${SHARED_DIR}/claude-otel.jsonl" "${SHARED_DIR}/claude-session-metrics-autodl.json"
-    if [[ "${phase}" != "solve" && "${phase}" != "review" ]]; then
-        echo "Warning: finalize_session_metrics requires phase solve or review, skipping session metrics"
+    if [[ "${phase}" != "solve" && "${phase}" != "plan" && "${phase}" != "review" ]]; then
+        echo "Warning: finalize_session_metrics requires phase solve, plan, or review, skipping session metrics"
         rm -f "${SESSION_PROMPT_FILE}"
         return 0
     fi

@@ -245,7 +245,7 @@ if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
           merged_at: "",
           claude_exit: $claude_exit,
           phase_durations: $phase_durations
-        }' > "${SHARED_DIR}/metrics-metadata-solve.json"
+        }' > "${SHARED_DIR}/metrics-metadata-plan.json"
     finalize_session_metrics plan
     exit "${CLAUDE_EXIT}"
 fi
@@ -359,9 +359,9 @@ jq -n \
       merged_at: "",
       claude_exit: $claude_exit,
       phase_durations: $phase_durations
-    }' > "${SHARED_DIR}/metrics-metadata-solve.json"
+    }' > "${SHARED_DIR}/metrics-metadata-plan.json"
 
-echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-solve.json"
+echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-plan.json"
 
 finalize_session_metrics plan
 
