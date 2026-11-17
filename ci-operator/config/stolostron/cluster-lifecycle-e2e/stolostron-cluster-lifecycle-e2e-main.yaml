@@ -8,12 +8,20 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.19-linux
+    tag: go1.23-linux
 images:
   items:
   - dockerfile_path: build/Dockerfile
     from: base
     to: cluster-lifecycle-e2e
+  - dockerfile_literal: |
+      FROM src
+      WORKDIR /go/src/github.com/stolostron/cluster-lifecycle-e2e
+      RUN cd openshift-tests-ext && make build
+      RUN cp openshift-tests-ext/acm-tests-ext /usr/bin/openshift-tests-extension
+      RUN gzip -f -k /usr/bin/openshift-tests-extension
+    from: src
+    to: acm-lifecycle-ote
 promotion:
   to:
   - disabled: true
