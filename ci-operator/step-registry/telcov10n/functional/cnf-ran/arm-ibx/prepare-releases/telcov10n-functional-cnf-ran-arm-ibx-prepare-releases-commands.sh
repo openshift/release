@@ -30,5 +30,6 @@ done
 
 ansible-playbook playbooks/ran/arm-ibx-prepare-releases.yml \
   -i inventories/ocp-deployment/build-inventory.py \
+  -e ansible_remote_tmp=/tmp/.ansible/tmp \
   -e "arm_ibx_version=${VERSION} spoke_cluster=${SEED_SPOKE_CLUSTER} arm_ibx_releases_file=${SHARED_DIR}/arm-ibx-releases.json"
 cp "${SHARED_DIR}/arm-ibx-releases.json" "${ARTIFACT_DIR}/arm-ibx-releases.json"
