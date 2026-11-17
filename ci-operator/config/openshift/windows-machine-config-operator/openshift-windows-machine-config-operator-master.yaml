@@ -251,7 +251,16 @@ tests:
   optional: true
   steps:
     cluster_profile: vsphere-elastic
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
     env:
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]\|\[tls-adherence\]
+      TEST_SUITE: windows-machine-config-operator/all
+      TIMEOUT: +4 hours
       WINDOWS_SERVER_VERSION: "2025"
     test:
     - as: setup-and-hold
@@ -297,6 +306,8 @@ tests:
           cpu: 1000m
           memory: 400Mi
       timeout: 6h45m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
   timeout: 20h0m0s
 - as: vsphere-e2e-ccm-install
