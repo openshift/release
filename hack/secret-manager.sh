@@ -23,8 +23,14 @@ HOST_OS="$(uname -s)"
 # bumped, update NATIVE_COMMIT to the ci-tools-standalone commit it was built
 # from, otherwise macOS silently stays behind the container path.
 NATIVE_COMMIT="4daba691a18147afa424be4aa288e5d853323cc0"
-NATIVE_DIR="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-native"
-NATIVE_LOCK="$NATIVE_DIR.lock"
+# Each commit gets its own immutable directory. A newer pin provisions a new
+# directory rather than moving or deleting the one an in-flight invocation may
+# already be running from, which publishing then reduces to a single rename.
+# Directories for other commits are pruned once they are old enough that no
+# invocation can still be using them.
+NATIVE_ROOT="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-native"
+NATIVE_DIR="$NATIVE_ROOT/$NATIVE_COMMIT"
+NATIVE_LOCK="$NATIVE_ROOT/.lock"
 NATIVE_STAGE=""
 NATIVE_SRC="$NATIVE_DIR/src"
 NATIVE_PYTHON="$NATIVE_DIR/venv/bin/python3"
@@ -40,8 +46,8 @@ if [ "${1:-}" = "clean" ]; then
     echo "Removing cached credentials..."
     rm -rf "$GCLOUD_CONFIG_PATH" "$SSO_AUTH_CONFIG_PATH"
     echo "Done. Run the 'login' command to re-authenticate."
-    if use_native && [ -d "$NATIVE_DIR" ]; then
-        echo "The native CLI cache in $NATIVE_DIR is kept; remove it to reclaim disk space."
+    if use_native && [ -d "$NATIVE_ROOT" ]; then
+        echo "The native CLI cache in $NATIVE_ROOT is kept; remove it to reclaim disk space."
     fi
     exit 0
 fi
@@ -76,9 +82,30 @@ update_image_if_stale() {
     fi
 }
 
+# native_cli_ready is true once a commit's directory exists and has an
+# interpreter. A directory only ever appears through the rename below, so its
+# presence implies a complete build.
 native_cli_ready() {
-    [ -f "$NATIVE_DIR/commit" ] && [ "$(cat "$NATIVE_DIR/commit")" = "$NATIVE_COMMIT" ] &&
-        [ -x "$NATIVE_PYTHON" ]
+    [ -x "$NATIVE_PYTHON" ]
+}
+
+# prune_native_caches removes caches for other commits that are far too old for
+# a running invocation to still be using them. The current commit's directory is
+# never touched, and neither is anything that is not a commit-directory name.
+prune_native_caches() {
+    local dir base
+    for dir in "$NATIVE_ROOT"/*/; do
+        [ -d "$dir" ] || continue
+        base="${dir%/}"
+        base="${base##*/}"
+        [ "${#base}" -eq 40 ] || continue
+        case "$base" in
+            "$NATIVE_COMMIT" | *[!0-9a-f]*) continue ;;
+        esac
+        if [ -n "$(find "$dir" -maxdepth 0 -mtime +7 2>/dev/null)" ]; then
+            rm -rf "$dir"
+        fi
+    done
 }
 
 # release_native_lock drops the lock if this process still owns it and disarms
@@ -109,7 +136,8 @@ ensure_native_cli() {
         exit 1
     fi
     local waited=0 holder="" claimed="" reclaimable=""
-    NATIVE_STAGE="$NATIVE_DIR.stage.$$"
+    mkdir -p "$NATIVE_ROOT"
+    NATIVE_STAGE="$NATIVE_ROOT/.stage.$$"
     while ! mkdir "$NATIVE_LOCK" 2>/dev/null; do
         native_cli_ready && return 0
         # A killed run leaves the lock behind. A lock that names a live holder is
@@ -181,20 +209,14 @@ ensure_native_cli() {
     uv pip install -q --python "$NATIVE_STAGE/venv/bin/python3" \
         -r "$NATIVE_STAGE/src/cmd/secret-manager/requirements.txt"
     printf '%s' "$NATIVE_COMMIT" >"$NATIVE_STAGE/commit"
-    # Publish without discarding a working cache first: move the old cache aside,
-    # install the new one, and put the old one back if that fails.
-    local previous="$NATIVE_DIR.previous.$$"
-    rm -rf "$previous"
-    if [ -d "$NATIVE_DIR" ]; then
-        mv "$NATIVE_DIR" "$previous"
-    fi
-    if mv "$NATIVE_STAGE" "$NATIVE_DIR"; then
-        rm -rf "$previous"
-    else
+    # Publish with a single rename into this commit's own directory. Nothing is
+    # moved or removed, so a concurrent invocation running from another commit's
+    # directory is unaffected.
+    if ! mv "$NATIVE_STAGE" "$NATIVE_DIR" 2>/dev/null && ! native_cli_ready; then
         echo "Error: could not publish the native CLI cache." >&2
-        mv "$previous" "$NATIVE_DIR" 2>/dev/null || true
         exit 1
     fi
+    prune_native_caches
     release_native_lock
 }
 
