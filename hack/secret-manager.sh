@@ -8,11 +8,39 @@ SSO_AUTH_CONFIG_PATH="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-dex"
 IMAGE_CHECK_STAMP="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-image-check"
 CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}"
 IMAGE="${SECRET_MANAGER_IMAGE:-quay.io/openshift/ci-public:ci_secret-manager_latest}"
+HOST_OS="$(uname -s)"
+
+# On macOS the CLI runs natively instead of in a container. The container path
+# relies on virtiofs ownership emulation that podman cannot provide reliably:
+# mounts appear inside the VM as root, podman pins the credential directories
+# with a user.containers.override_stat xattr that later runs cannot write
+# through, and the SSO callback port and browser have to be tunnelled out of the
+# VM. Natively none of that applies, because the CLI binds loopback and opens
+# the browser itself.
+#
+# There is no published package for the CLI, so pin the source to a commit and
+# install its pinned requirements into a private virtualenv. When the image is
+# bumped, update NATIVE_COMMIT to the ci-tools-standalone commit it was built
+# from, otherwise macOS silently stays behind the container path.
+NATIVE_COMMIT="4daba691a18147afa424be4aa288e5d853323cc0"
+NATIVE_DIR="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-native"
+NATIVE_SRC="$NATIVE_DIR/src"
+NATIVE_PYTHON="$NATIVE_DIR/venv/bin/python3"
+NATIVE_MAIN="$NATIVE_SRC/cmd/secret-manager/main.py"
+
+use_native() {
+    # SECRET_MANAGER_CONTAINER=1 forces the container path on macOS, for example
+    # to test a locally built image via SECRET_MANAGER_IMAGE.
+    [ "$HOST_OS" = Darwin ] && [ "${SECRET_MANAGER_CONTAINER:-}" != 1 ]
+}
 
 if [ "${1:-}" = "clean" ]; then
     echo "Removing cached credentials..."
     rm -rf "$GCLOUD_CONFIG_PATH" "$SSO_AUTH_CONFIG_PATH"
     echo "Done. Run the 'login' command to re-authenticate."
+    if use_native && [ -d "$NATIVE_DIR" ]; then
+        echo "The native CLI cache in $NATIVE_DIR is kept; remove it to reclaim disk space."
+    fi
     exit 0
 fi
 
@@ -46,6 +74,50 @@ update_image_if_stale() {
     fi
 }
 
+# ensure_native_cli provisions the pinned CLI source and its virtualenv.
+ensure_native_cli() {
+    if [ -f "$NATIVE_DIR/commit" ] && [ "$(cat "$NATIVE_DIR/commit")" = "$NATIVE_COMMIT" ] &&
+        [ -x "$NATIVE_PYTHON" ]; then
+        return 0
+    fi
+    if ! command -v uv &>/dev/null; then
+        echo "Error: 'uv' is not installed. Install it with: brew install uv" >&2
+        exit 1
+    fi
+    echo "Setting up the native secret-manager CLI at ${NATIVE_COMMIT:0:12} (first run only)..." >&2
+    rm -rf "$NATIVE_DIR"
+    mkdir -p "$NATIVE_SRC"
+    if ! curl -fsSL --max-time 300 \
+        "https://codeload.github.com/openshift/ci-tools-standalone/tar.gz/$NATIVE_COMMIT" |
+        tar -xz -C "$NATIVE_SRC" --strip-components=1; then
+        echo "Error: could not download ci-tools-standalone at $NATIVE_COMMIT." >&2
+        rm -rf "$NATIVE_DIR"
+        exit 1
+    fi
+    if [ ! -f "$NATIVE_MAIN" ] || [ ! -f "$NATIVE_SRC/cmd/secret-manager/requirements.txt" ]; then
+        echo "Error: unexpected ci-tools-standalone layout at $NATIVE_COMMIT." >&2
+        rm -rf "$NATIVE_DIR"
+        exit 1
+    fi
+    uv venv -q -p 3.12 "$NATIVE_DIR/venv"
+    uv pip install --python "$NATIVE_PYTHON" \
+        -r "$NATIVE_SRC/cmd/secret-manager/requirements.txt"
+    printf '%s' "$NATIVE_COMMIT" >"$NATIVE_DIR/commit"
+}
+
+# run_native executes the CLI directly. SM_CALLBACK_HOST and SM_BROWSER_REQUEST
+# are deliberately unset, so the CLI listens on loopback and opens the browser
+# itself rather than writing the URL for this wrapper to open.
+run_native() {
+    ensure_native_cli
+    mkdir -p "$SSO_AUTH_CONFIG_PATH"
+    chmod 700 "$SSO_AUTH_CONFIG_PATH"
+    CLOUDSDK_CONFIG="$GCLOUD_CONFIG_PATH" \
+        SM_AUTH_DIR="$SSO_AUTH_CONFIG_PATH" \
+        GOOGLE_CLOUD_QUOTA_PROJECT=openshift-ci-secrets \
+        "$NATIVE_PYTHON" "$NATIVE_MAIN" "$@"
+}
+
 mkdir -p "$GCLOUD_CONFIG_PATH"
 
 if [ "${1:-}" = "login" ] && [ "$#" -eq 1 ]; then
@@ -54,15 +126,25 @@ if [ "${1:-}" = "login" ] && [ "$#" -eq 1 ]; then
         exit 1
     fi
     CLOUDSDK_CONFIG="$GCLOUD_CONFIG_PATH" gcloud auth application-default login --verbosity=error
-    chmod -R a+rX "$GCLOUD_CONFIG_PATH"
+    if ! use_native; then
+        # The container runs as a mapped, unprivileged UID and needs to read the
+        # credentials directory; natively the CLI runs as this user already.
+        chmod -R a+rX "$GCLOUD_CONFIG_PATH"
+        update_image_if_stale
+        touch "$IMAGE_CHECK_STAMP"
+    fi
+fi
+
+# Other commands check for a newer image at most once a day.
+if ! use_native && [ "${1:-}" != "login" ] &&
+    [ -z "$(find "$IMAGE_CHECK_STAMP" -mmin -1440 2>/dev/null)" ]; then
     update_image_if_stale
     touch "$IMAGE_CHECK_STAMP"
 fi
 
-# Other commands check for a newer image at most once a day.
-if [ "${1:-}" != "login" ] && [ -z "$(find "$IMAGE_CHECK_STAMP" -mmin -1440 2>/dev/null)" ]; then
-    update_image_if_stale
-    touch "$IMAGE_CHECK_STAMP"
+if use_native; then
+    run_native "$@"
+    exit 0
 fi
 
 tty_flags=()
@@ -156,7 +238,7 @@ if [[ "$needs_sso" = true ]]; then
                 case "$url" in
                     https://idp.ci.openshift.org/auth\?*)
                         opener=xdg-open
-                        if [[ "$(uname -s)" = Darwin ]]; then
+                        if [ "$HOST_OS" = Darwin ]; then
                             opener=open
                         fi
                         if ! "$opener" "$url" >/dev/null 2>&1; then
