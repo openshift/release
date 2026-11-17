@@ -355,7 +355,14 @@ fi
 
 # Explicit ICMP from the VNET so cluster nodes can reach the bastion. The TCP
 # allow rule above does not cover ICMP; do not rely only on default NSG rules.
-run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow-icmp' --priority 1001 --access Allow --protocol Icmp --source-address-prefixes VirtualNetwork --destination-address-prefixes '*' --destination-port-ranges '*'"
+# Azure Stack Hub runs under the 2019-03-01-hybrid profile, whose NSG rules only
+# accept */Tcp/Udp, so the rule is skipped there; the default AllowVnetInBound
+# rule already permits ICMP from the VNET on that profile.
+if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
+    echo "Skip the ICMP nsg rule, protocol Icmp is not supported by the Azure Stack Hub API profile"
+else
+    run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow-icmp' --priority 1001 --access Allow --protocol Icmp --source-address-prefixes VirtualNetwork --destination-address-prefixes '*' --destination-port-ranges '*'"
+fi
 
 echo "Create bastion vm"
 if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
