@@ -18,7 +18,7 @@ export T5CI_VERSION="${T5CI_VERSION:-5.0}"
 
 # --- cloud-event-proxy (CEP) build/deploy method (version-dependent) ---
 # 5.1+ : CEPv2 is built from linuxptp-daemon/Dockerfile.cep and deployed via the
-#        EVENT_PROXY_IMAGE env var (the standalone cloud-event-proxy repo is gone).
+#        SIDECAR_EVENT_IMAGE env var (the standalone cloud-event-proxy repo is gone).
 # <5.1 : CEPv1 is built from the standalone cloud-event-proxy repo and deployed
 #        via the SIDECAR_EVENT_IMAGE env var.
 USE_CEPV2=false
@@ -491,24 +491,13 @@ grep -r "imagePullPolicy: IfNotPresent" --files-with-matches | awk '{print  "sed
 
 # deploy ptp-operator
 if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
-  if [[ "${USE_CEPV2:-false}" == "true" ]]; then
-    # 5.1+: setting EVENT_PROXY_IMAGE signals the operator to deploy CEPv2
-    make deploy \
-      IMG=${IMG} \
-      LINUXPTP_DAEMON_IMAGE=${DAEMON_IMG} \
-      EVENT_PROXY_IMAGE=${SIDECAR_IMG}
-  else
     make deploy \
       IMG=${IMG} \
       LINUXPTP_DAEMON_IMAGE=${DAEMON_IMG} \
       SIDECAR_EVENT_IMAGE=${SIDECAR_IMG}
   fi
 else
-  if [[ -n "${EVENT_PROXY_IMAGE:-}" ]]; then
-    make deploy IMG=${IMG} EVENT_PROXY_IMAGE=${EVENT_PROXY_IMAGE}
-  else
     make deploy IMG=${IMG}
-  fi
 fi
 
 # wait until the linuxptp-daemon pods are ready
