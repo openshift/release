@@ -411,6 +411,13 @@ fi
 # fi
 log "Choosing openshift version ${OPENSHIFT_VERSION}"
 
+# Record the OCP payload this run is testing (ROSAENG-76164).
+# For release:latest nightlies this is the nightly payload tag; for pinned
+# versions it is the resolved cluster version. Written before provisioning
+# starts so the artifacts survive a failed install.
+echo -n "${OPENSHIFT_VERSION}" > "${SHARED_DIR}/payload-tag"
+echo -n "${OPENSHIFT_VERSION}" > "${ARTIFACT_DIR}/payload-tag"
+
 # Add USER_TAGS to help with cloud cost and make sure to remove
 # invalid tags so that CLI usage doesn't fail later.
 # The [ and ] characters are considered invalid tags, which are
