@@ -24,6 +24,15 @@ trap 'chown -R ec2-user:ec2-user .' EXIT
 # shellcheck source=/dev/null
 source common.sh
 
+# As in TNT, move API DNS to HAProxy after the new control-plane nodes join.
+first_node_ip=$(jq -er '.[0].ip' inventory.json)
+first_node_name=$(jq -er '.[0].name' inventory.json)
+virsh net-update "${network}" delete dns-host "<host ip='${first_node_ip}'/>" --live --config
+virsh net-update "${network}" add-last dns-host \
+  "<host ip='${first_node_ip}'><hostname>${first_node_name}</hostname><hostname>${first_node_name}.${cluster_domain}</hostname></host>" --live --config
+virsh net-update "${network}" add-last dns-host \
+  "<host ip='${gateway}'><hostname>api.${cluster_domain}</hostname><hostname>api-int.${cluster_domain}</hostname></host>" --live --config
+
 # Compact-cluster scheduling policy belongs to this workflow, not add-nodes.
 oc patch scheduler cluster --type=merge -p '{"spec":{"mastersSchedulable":true}}'
 oc label nodes -l node-role.kubernetes.io/master node-role.kubernetes.io/worker= --overwrite

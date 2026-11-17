@@ -95,6 +95,8 @@ create_vm() {
     --network "network=${network},model=virtio,mac=${mac}" \
     --cdrom "${image_dir}/${name}.iso" --os-variant rhel9.0 --graphics none \
     --noautoconsole --boot hd,cdrom --events on_reboot=restart \
+    --boot loader=/usr/share/edk2/ovmf/OVMF_CODE.fd,loader_ro=yes,loader_type=pflash,nvram_template=/usr/share/edk2/ovmf/OVMF_VARS.fd,loader_secure=no \
+    --tpm none \
     --serial "file,path=/var/log/libvirt/qemu/${name}-console.log"
 
   # virt-install stops the live install on reboot despite on_reboot=restart.
@@ -212,7 +214,7 @@ fi
 rm -f subscription-manager-org subscription-manager-act-key
 subscription-manager repos --enable=rhel-9-for-x86_64-baseos-rpms --enable=rhel-9-for-x86_64-appstream-rpms
 for attempt in 1 2 3; do
-  if dnf install -y qemu-kvm libvirt virt-install jq podman haproxy \
+  if dnf install -y qemu-kvm libvirt virt-install edk2-ovmf jq podman haproxy \
     policycoreutils-python-utils openssl; then
     break
   fi
@@ -254,7 +256,7 @@ cat > network.xml <<EOF
   <domain name='${cluster_domain}' localOnly='yes'/>
   <dns>
     <forwarder addr='${upstream_dns}'/>
-    <host ip='192.168.126.1'><hostname>api.${cluster_domain}</hostname><hostname>api-int.${cluster_domain}</hostname></host>
+    <host ip='192.168.126.10'><hostname>master-0</hostname><hostname>master-0.${cluster_domain}</hostname><hostname>api.${cluster_domain}</hostname><hostname>api-int.${cluster_domain}</hostname></host>
   </dns>
   <ip address='192.168.126.1' netmask='255.255.255.0'><dhcp><range start='192.168.126.2' end='192.168.126.9'/></dhcp></ip>
   <dnsmasq:options><dnsmasq:option value='address=/.apps.${cluster_domain}/192.168.126.1'/></dnsmasq:options>
@@ -293,8 +295,6 @@ networking:
   - 172.30.0.0/16
 platform:
   none: {}
-bootstrapInPlace:
-  installationDisk: /dev/vda
 featureSet: CustomNoUpgrade
 featureGates:
 - MutableTopology=true
@@ -302,7 +302,50 @@ pullSecret: '$(jq -c . pull-secret)'
 sshKey: '$(cat ssh-publickey)'
 EOF
 cp install/install-config.yaml install/install-config.saved.yaml
-openshift-install --dir=install create single-node-ignition-config
+cat > install/agent-config.yaml <<EOF
+apiVersion: v1alpha1
+kind: AgentConfig
+metadata:
+  name: transition
+rendezvousIP: 192.168.126.10
+additionalNTPSources:
+- 0.rhel.pool.ntp.org
+- 1.rhel.pool.ntp.org
+- 2.rhel.pool.ntp.org
+hosts:
+- hostname: master-0
+  role: master
+  rootDeviceHints:
+    deviceName: /dev/vda
+  interfaces:
+  - name: eth0
+    macAddress: 52:54:00:7a:00:0a
+  networkConfig:
+    interfaces:
+    - name: eth0
+      type: ethernet
+      state: up
+      mac-address: 52:54:00:7a:00:0a
+      ipv4:
+        enabled: true
+        dhcp: false
+        address:
+        - ip: 192.168.126.10
+          prefix-length: 24
+      ipv6:
+        enabled: false
+    dns-resolver:
+      config:
+        server:
+        - 192.168.126.1
+    routes:
+      config:
+      - destination: 0.0.0.0/0
+        next-hop-address: 192.168.126.1
+        next-hop-interface: eth0
+        table-id: 254
+EOF
+openshift-install --dir=install agent create image
 
 # Both the installer and the ISO come from this job's payload.
 os_image=$(oc adm release info --registry-config=pull-secret --image-for=machine-os-images "${release_image}")
@@ -311,8 +354,30 @@ mv coreos-x86_64.iso rhcos-live.iso
 # shellcheck source=/dev/null
 source common.sh
 refresh_load_balancer
-create_vm master-0 52:54:00:7a:00:0a 192.168.126.10 install/bootstrap-in-place-for-live-iso.ign
-openshift-install --dir=install wait-for install-complete --log-level=info 2>&1 |
+
+# Like sno-agent, start a persistent UEFI VM with disk-first boot order.
+# Agent manages the installation and reboots without virt-install's install phase.
+if virsh dominfo master-0 >/dev/null 2>&1 || [[ -e "${image_dir}/master-0.qcow2" || -e "${image_dir}/master-0.iso" ]]; then
+  echo 'VM name or disk overlaps an existing resource' >&2
+  exit 1
+fi
+virsh net-update "${network}" add-last ip-dhcp-host \
+  "<host mac='52:54:00:7a:00:0a' name='master-0' ip='192.168.126.10'/>" --live --config
+qemu-img create -f qcow2 "${image_dir}/master-0.qcow2" 120G
+cp install/agent.x86_64.iso "${image_dir}/master-0.iso"
+chmod 644 "${image_dir}/master-0.iso"
+restorecon -R "${image_dir}"
+virt-install --connect qemu:///system --name master-0 --memory 32768 --vcpus 8 \
+  --cpu host-passthrough --disk "${image_dir}/master-0.qcow2,bus=virtio" \
+  --network "network=${network},model=virtio,mac=52:54:00:7a:00:0a" \
+  --disk "${image_dir}/master-0.iso,device=cdrom" --os-variant rhel9.0 --graphics none \
+  --import --noautoconsole --boot hd,cdrom --events on_reboot=restart \
+  --boot loader=/usr/share/edk2/ovmf/OVMF_CODE.fd,loader_ro=yes,loader_type=pflash,nvram_template=/usr/share/edk2/ovmf/OVMF_VARS.fd,loader_secure=no \
+  --tpm none --serial "file,path=/var/log/libvirt/qemu/master-0-console.log"
+
+openshift-install --dir=install agent wait-for bootstrap-complete --log-level=info 2>&1 |
+  sed -E 's/(password: (\\?")?)[^"\\[:space:]]+/\1REDACTED/g'
+openshift-install --dir=install agent wait-for install-complete --log-level=info 2>&1 |
   sed -E 's/(password: (\\?")?)[^"\\[:space:]]+/\1REDACTED/g'
 oc wait node --all --for=condition=Ready --timeout=10m
 oc get nodes -o json | jq -e '.items | length == 1' >/dev/null
