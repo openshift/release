@@ -1,0 +1,216 @@
+build_root:
+  from_repository: true
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: auto-rebase
+  cron: 0 6 * * 1
+  steps:
+    test:
+    - as: auto-rebase
+      commands: |
+        set -euo pipefail
+
+        # --- Mint a GitHub App installation token (openshift-app-platform-shift-bot) ---
+        APP_ID=$(cat /var/run/github-app/app-id)
+        PEM_PATH="/var/run/github-app/private-key.pem"
+        HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        NOW=$(date +%s); IAT=$((NOW - 60)); EXP=$((NOW + 300))
+        PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$IAT" "$EXP" "$APP_ID" | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        SIGNATURE=$(printf '%s' "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "$PEM_PATH" -binary | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
+
+        REPO_OWNER="openshift"
+        REPO_NAME="ocp-release-operator-sdk"
+
+        INSTALL_RESPONSE=$(curl -s -w "\n%{http_code}" --connect-timeout 10 --max-time 30 \
+          -H "Authorization: Bearer ${JWT}" -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/installation")
+        HTTP_CODE=$(echo "$INSTALL_RESPONSE" | tail -1)
+        INSTALL_BODY=$(echo "$INSTALL_RESPONSE" | sed '$d')
+        if [[ "$HTTP_CODE" -ne 200 ]]; then
+          echo "ERROR: GitHub App not installed on ${REPO_OWNER}/${REPO_NAME} (HTTP ${HTTP_CODE})" >&2
+          exit 1
+        fi
+        INST_ID=$(echo "$INSTALL_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+        TOKEN_RESPONSE=$(curl -s -w "\n%{http_code}" --connect-timeout 10 --max-time 30 -X POST \
+          -H "Authorization: Bearer ${JWT}" -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/app/installations/${INST_ID}/access_tokens")
+        T_CODE=$(echo "$TOKEN_RESPONSE" | tail -1)
+        T_BODY=$(echo "$TOKEN_RESPONSE" | sed '$d')
+        if [[ "$T_CODE" -ne 201 ]]; then
+          echo "ERROR: Failed to mint installation token (HTTP ${T_CODE})" >&2
+          exit 1
+        fi
+        export GITHUB_TOKEN=$(echo "$T_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+        # Install gh + oc CLIs (not in the base src image).
+        # oc is required by update_golang_builder / _resolve_builder_ocp.
+        GH_VERSION=2.62.0
+        curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
+          | tar -xz -C /tmp
+        mkdir -p /tmp/bin
+        curl -fsSL "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz" \
+          | tar -xz -C /tmp/bin oc
+        export PATH="/tmp/bin:/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
+
+        export FORCE_REMOTE_URLS=1
+        ./hack/auto-rebase.sh
+      credentials:
+      - mount_path: /var/run/github-app
+        name: openshift-app-platform-shift-github-bot
+        namespace: test-credentials
+      - mount_path: /var/run/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 200m
+          memory: 2Gi
+- as: auto-rebase-demo
+  cron: 0 6 * * 1
+  steps:
+    test:
+    - as: auto-rebase-demo
+      commands: |
+        set -euo pipefail
+
+        # --- Mint a GitHub App installation token (openshift-app-platform-shift-bot) ---
+        APP_ID=$(cat /var/run/github-app/app-id)
+        PEM_PATH="/var/run/github-app/private-key.pem"
+        HEADER=$(printf '{"alg":"RS256","typ":"JWT"}' | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        NOW=$(date +%s); IAT=$((NOW - 60)); EXP=$((NOW + 300))
+        PAYLOAD=$(printf '{"iat":%d,"exp":%d,"iss":"%s"}' "$IAT" "$EXP" "$APP_ID" | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        SIGNATURE=$(printf '%s' "${HEADER}.${PAYLOAD}" | openssl dgst -sha256 -sign "$PEM_PATH" -binary | openssl base64 -e -A | tr '+/' '-_' | tr -d '=')
+        JWT="${HEADER}.${PAYLOAD}.${SIGNATURE}"
+
+        REPO_OWNER="openshift"
+        REPO_NAME="ocp-release-operator-sdk"
+
+        INSTALL_RESPONSE=$(curl -s -w "\n%{http_code}" --connect-timeout 10 --max-time 30 \
+          -H "Authorization: Bearer ${JWT}" -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/installation")
+        HTTP_CODE=$(echo "$INSTALL_RESPONSE" | tail -1)
+        INSTALL_BODY=$(echo "$INSTALL_RESPONSE" | sed '$d')
+        if [[ "$HTTP_CODE" -ne 200 ]]; then
+          echo "ERROR: GitHub App not installed on ${REPO_OWNER}/${REPO_NAME} (HTTP ${HTTP_CODE})" >&2
+          exit 1
+        fi
+        INST_ID=$(echo "$INSTALL_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+
+        TOKEN_RESPONSE=$(curl -s -w "\n%{http_code}" --connect-timeout 10 --max-time 30 -X POST \
+          -H "Authorization: Bearer ${JWT}" -H "Accept: application/vnd.github+json" \
+          "https://api.github.com/app/installations/${INST_ID}/access_tokens")
+        T_CODE=$(echo "$TOKEN_RESPONSE" | tail -1)
+        T_BODY=$(echo "$TOKEN_RESPONSE" | sed '$d')
+        if [[ "$T_CODE" -ne 201 ]]; then
+          echo "ERROR: Failed to mint installation token (HTTP ${T_CODE})" >&2
+          exit 1
+        fi
+        export GITHUB_TOKEN=$(echo "$T_BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+        # App installation tokens only write to openshift/* — stage the fork's
+        # pre-baked demo-e2e-base (v1.42.1 + scripts) onto openshift, then rebase.
+        git config --global --add safe.directory "$(pwd)" || true
+        _cred_file=$(mktemp)
+        chmod 600 "$_cred_file"
+        printf 'https://x-access-token:%s@github.com\n' "$GITHUB_TOKEN" >"$_cred_file"
+        git config credential.helper "store --file=${_cred_file}"
+        # ci-operator src checkout has no 'origin' remote — add or rewrite it.
+        if git remote get-url origin >/dev/null 2>&1; then
+          git remote set-url origin "https://github.com/openshift/ocp-release-operator-sdk.git"
+        else
+          git remote add origin "https://github.com/openshift/ocp-release-operator-sdk.git"
+        fi
+        git remote add demo-src https://github.com/neha037/ocp-release-operator-sdk.git 2>/dev/null || true
+        git fetch demo-src demo-e2e-base
+        git push -f origin "refs/remotes/demo-src/demo-e2e-base:refs/heads/demo-e2e-base"
+        # auto-rebase.sh reads UPSTREAM-VERSION from the working tree before
+        # checking out REBASE_BRANCH — switch to the demo base first.
+        git fetch origin demo-e2e-base
+        git checkout -B demo-e2e-base origin/demo-e2e-base
+
+        # Install gh + oc CLIs (not in the base src image).
+        # oc is required by update_golang_builder / _resolve_builder_ocp.
+        GH_VERSION=2.62.0
+        curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
+          | tar -xz -C /tmp
+        mkdir -p /tmp/bin
+        curl -fsSL "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz" \
+          | tar -xz -C /tmp/bin oc
+        export PATH="/tmp/bin:/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
+        export GH_TOKEN="$GITHUB_TOKEN"
+
+        # Overlay unmerged builder-probe fix onto demo-e2e-base and push so
+        # auto-rebase.sh's re-checkout of REBASE_BRANCH keeps the new script.
+        # Remove this block after the fix PR merges.
+        git fetch demo-src fix-builder-probe
+        git checkout demo-src/fix-builder-probe -- hack/auto-rebase.sh
+        git -c user.name=openshift-app-platform-shift-bot \
+            -c user.email=267347085+openshift-app-platform-shift-bot@users.noreply.github.com \
+            commit -m "TEMP: overlay unmerged builder-probe fix for CI validation" \
+            -- hack/auto-rebase.sh
+        git push -f origin demo-e2e-base
+
+        # Diagnostic: which builder probe sources are visible in this pod?
+        echo "==> DIAG: oc=$(command -v oc || echo MISSING)"
+        oc version --client 2>&1 | head -1 || true
+        oc whoami 2>&1 | head -1 || true
+        echo "==> DIAG: pull-secret files:"
+        ls -la /var/run/secrets/ci-pull-credentials/.dockerconfigjson \
+               /var/run/secrets/registry-pull--build-farms/.dockerconfigjson 2>&1 || true
+        echo "==> DIAG: ocp/builder golang-1.26 tags:"
+        oc get is builder -n ocp -o jsonpath='{.status.tags[*].tag}' 2>&1 \
+          | tr ' ' '\n' | grep 'golang-1.26' | head -5 || echo "(none or error)"
+        echo "==> DIAG: openshift/release golang-1.26 tags:"
+        oc get is release -n openshift -o jsonpath='{.status.tags[*].tag}' 2>&1 \
+          | tr ' ' '\n' | grep 'golang-1.26' | head -5 || echo "(none or error)"
+        echo "==> DIAG: oc image info 1.26/5.0:"
+        REG_ARGS=()
+        for s in /var/run/secrets/ci-pull-credentials/.dockerconfigjson \
+                 /var/run/secrets/registry-pull--build-farms/.dockerconfigjson; do
+          if [[ -f "$s" ]]; then REG_ARGS=(--registry-config="$s"); break; fi
+        done
+        oc image info registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-5.0 \
+          --filter-by-os=linux/amd64 "${REG_ARGS[@]}" 2>&1 | head -5 || true
+
+        # Reset prior demo PR/branch so open_pr_exists does not skip.
+        gh pr list --repo openshift/ocp-release-operator-sdk \
+          --head v1.42.3-rebase-demo-e2e-base --state open --json number -q '.[].number' \
+          | while read -r n; do
+              [[ -n "$n" ]] || continue
+              gh pr close "$n" --repo openshift/ocp-release-operator-sdk \
+                --comment "Closing to re-test unmerged builder-probe overlay." || true
+            done
+        git push origin --delete v1.42.3-rebase-demo-e2e-base 2>/dev/null || true
+
+        export REBASE_BRANCH=demo-e2e-base
+        export FORCE_REMOTE_URLS=1
+        export SKIP_BUILD=1
+        ./hack/auto-rebase.sh
+      credentials:
+      - mount_path: /var/run/github-app
+        name: openshift-app-platform-shift-github-bot
+        namespace: test-credentials
+      - mount_path: /var/run/secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 200m
+          memory: 2Gi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: ocp-release-operator-sdk
+  variant: periodics
