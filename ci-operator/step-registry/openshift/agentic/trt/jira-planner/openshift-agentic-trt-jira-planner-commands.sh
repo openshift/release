@@ -19,6 +19,40 @@ source "${SHARED_DIR}/trt-telemetry.sh"
 
 planner_cleanup() {
     local rc=$?
+    # Record failure metadata for post-agent exits (e.g., publication failures)
+    # so the metrics post-step always receives a planner result.
+    if [[ "${PLAN_PHASE_STARTED:-false}" == "true" && ! -f "${SHARED_DIR}/metrics-metadata-plan.json" ]]; then
+        jq -n \
+            --arg agent "trt-jira-planner" \
+            --arg phase "plan" \
+            --arg issue_key "${JIRA_ISSUE_KEY:-}" \
+            --arg planning_key "${PLANNING_ISSUE_KEY:-}" \
+            --arg result "failed" \
+            --arg pr_url "" \
+            --arg upstream_repo "${UPSTREAM_REPO:-}" \
+            --arg started_at "${PLAN_STARTED_AT:-}" \
+            --argjson claude_exit "${CLAUDE_EXIT:-1}" \
+            --argjson phase_durations "$(jq -n \
+                --argjson setup "${PHASE_SETUP_DURATION:-0}" \
+                --argjson plan "${PHASE_PLAN_DURATION:-0}" \
+                '{setup: $setup, plan: $plan, pr: 0}')" \
+            '{
+              agent: $agent,
+              phase: $phase,
+              issue_key: $issue_key,
+              planning_key: $planning_key,
+              result: $result,
+              pr_url: $pr_url,
+              upstream_repo: $upstream_repo,
+              started_at: $started_at,
+              pr_status: "",
+              merged_at: "",
+              claude_exit: $claude_exit,
+              phase_durations: $phase_durations
+            }' > "${SHARED_DIR}/metrics-metadata-plan.json" 2>/dev/null \
+            || echo "WARNING: failed to write failure metadata" >&2
+        finalize_session_metrics plan 2>/dev/null || true
+    fi
     rm -f "${SESSION_PROMPT_FILE}" \
         || echo "WARNING: failed to remove private prompt temporary file" >&2
     if declare -F copy_artifacts >/dev/null; then
@@ -212,6 +246,7 @@ if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
         || true
 fi
 PHASE_PLAN_DURATION=$(( $(date +%s) - PHASE_PLAN_START ))
+PLAN_PHASE_STARTED=true
 
 refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
 
