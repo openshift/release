@@ -68,6 +68,7 @@ CONFIG
 
 create_vm() {
   local name=$1 mac=$2 ip=$3 ignition=$4
+  local deadline state
 
   # Never remove an existing VM, disk, DHCP entry, or DNS record.
   if virsh dominfo "${name}" >/dev/null 2>&1 || [[ -e "${image_dir}/${name}.qcow2" || -e "${image_dir}/${name}.iso" ]]; then
@@ -95,6 +96,48 @@ create_vm() {
     --cdrom "${image_dir}/${name}.iso" --os-variant rhel9.0 --graphics none \
     --noautoconsole --boot hd,cdrom --events on_reboot=restart \
     --serial "file,path=/var/log/libvirt/qemu/${name}-console.log"
+
+  # virt-install stops the live install on reboot despite on_reboot=restart.
+  deadline=$((SECONDS + 1200))
+  while true; do
+    state=$(virsh domstate "${name}")
+    [[ "${state}" != 'shut off' ]] || break
+
+    if (( SECONDS >= deadline )); then
+      echo 'Timed out waiting for the live install VM to shut off' >&2
+      return 1
+    fi
+
+    sleep 10
+  done
+
+  # Boot only from the installed disk; keeping the ISO bootable can reinstall it.
+  virsh dumpxml --inactive "${name}" > "${name}-disk.xml"
+  python3 - "${name}-disk.xml" <<'PY'
+import sys
+import xml.etree.ElementTree as ET
+
+tree = ET.parse(sys.argv[1])
+root = tree.getroot()
+os_config = root.find('os')
+devices = root.find('devices')
+
+for boot in os_config.findall('boot'):
+    os_config.remove(boot)
+ET.SubElement(os_config, 'boot', dev='hd')
+
+for device in list(devices):
+    if device.tag == 'disk' and device.get('device') == 'cdrom':
+        devices.remove(device)
+    else:
+        for boot in device.findall('boot'):
+            device.remove(boot)
+
+tree.write(sys.argv[1], encoding='unicode')
+PY
+  virsh define "${name}-disk.xml"
+  virsh start "${name}"
+  [[ "$(virsh domstate "${name}")" == running ]]
 }
 
 approve_expected_csrs() {
