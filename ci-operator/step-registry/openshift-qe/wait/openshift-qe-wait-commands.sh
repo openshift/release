@@ -2,6 +2,11 @@
 sleep ${CLUSTER_DURATION} & wait
 
 # Copied from workers-scale/workers-scale-commands.sh
+log(){
+    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
+}
+
+# Copied from workers-scale/workers-scale-commands.sh
 function waitForReady() {
     echo "Wait for Ready"
     set +x
