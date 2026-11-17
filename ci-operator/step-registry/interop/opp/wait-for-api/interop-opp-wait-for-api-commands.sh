@@ -6,7 +6,7 @@ set -o pipefail
 # JUnit result for this gate. The aggregated junit_operator.xml row for a
 # failed step carries an empty message, so without a per-step carrier a
 # timeout renders as a bare red step and triage has to open the build log.
-_suite="lp-interop--OPP--wait-for-api"
+_suite="lp-interop--OPP--interop-opp-wait-for-api"
 _junit_file="${ARTIFACT_DIR:-/tmp}/junit_${_suite}.xml"
 _junit_emitted=0
 _junit_write() {
@@ -20,6 +20,9 @@ _junit_write() {
         failures=1
         case_body=$(printf '\n    <failure message="%s">%s</failure>' "${text}" "${text}")
     fi
+    # Timeout property: effective budget used by the retry loop (seconds).
+    # Exposed as JUnit property for lane triage and aggregation.
+    local _timeout_val="${API_WAIT_BUDGET_S:-480}"
     if ! mkdir -p "$(dirname "${_junit_file}")"; then
         echo "JUNIT CONTRACT VIOLATION: carrier write failed: ${_junit_file}" >&2
         return 0
@@ -27,6 +30,9 @@ _junit_write() {
     if ! {
         printf '<?xml version="1.0" encoding="UTF-8"?>\n'
         printf '<testsuite name="%s" tests="1" failures="%s">\n' "${_suite}" "${failures}"
+        printf '  <properties>\n'
+        printf '    <property name="timeout" value="%s"/>\n' "${_timeout_val}"
+        printf '  </properties>\n'
         printf '  <testcase name="cluster-api-reachable" classname="interop.opp.wait-for-api">%s\n  </testcase>\n' "${case_body}"
         printf '</testsuite>\n'
     } > "${_junit_file}"; then
