@@ -292,6 +292,9 @@ function configure_terraform() {
     OCP_TARGET="latest"
     export OCP_TARGET
 
+    RELEASE_IMAGE_OVERRIDE="${TARGET_VERSION}"
+    export RELEASE_IMAGE_OVERRIDE
+
 cat << EOF >${IBMCLOUD_HOME}/ocp-install-dir/var-multi-arch-upi.tfvars
 ibmcloud_api_key    = "${IBMCLOUD_API_KEY}"
 ibmcloud_zone       = "${POWERVS_ZONE}"
@@ -311,7 +314,7 @@ master    = { memory = "16", processors = "1", "count" = 3 }
 worker    = { memory = "16", processors = "1", "count" = 2 }
 openshift_install_tarball = "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/multi/clients/${OCP_STREAM}/${OCP_TARGET}/ppc64le/openshift-install-linux.tar.gz"
 openshift_client_tarball  = "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/multi/clients/${OCP_STREAM}/${OCP_TARGET}/ppc64le/openshift-client-linux.tar.gz"
-release_image_override    = "${TARGET_VERSION}"
+release_image_override    = "${RELEASE_IMAGE_OVERRIDE}"
 qe_only_disable_image_policy = true
 
 use_zone_info_for_names    = true
@@ -426,6 +429,18 @@ function build_upi_cluster() {
         echo "Unexpected it's blank"
         exit 77
     fi
+
+    # Collect the bastion's host key once, right after it becomes reachable, and
+    # save it to SHARED_DIR so subsequent steps (e.g. upi-install-powervs-mirror)
+    # can verify the host identity without disabling StrictHostKeyChecking.
+    echo "Scanning bastion host key"
+    BASTION_KNOWN_HOSTS="${SHARED_DIR}/bastion_known_hosts"
+    ssh-keyscan -T 60 -H "${BASTION_PUBLIC_IP}" > "${BASTION_KNOWN_HOSTS}" 2>/dev/null
+    if [ ! -s "${BASTION_KNOWN_HOSTS}" ]; then
+        echo "[ERROR] ssh-keyscan returned no host keys for ${BASTION_PUBLIC_IP}"
+        exit 1
+    fi
+    echo "Bastion host key saved to ${BASTION_KNOWN_HOSTS}"
 
     set +o pipefail # avoid problems with unexpected fails after this step.
 
