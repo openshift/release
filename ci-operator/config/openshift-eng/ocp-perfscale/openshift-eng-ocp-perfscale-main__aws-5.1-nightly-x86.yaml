@@ -113,6 +113,82 @@ tests:
     - chain: openshift-qe-orion-consolidated
     workflow: openshift-qe-installer-aws
   timeout: 10h0m0s
+- always_run: false
+  as: control-plane-2000nodes
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: false
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CLUSTER_DURATION: "79200"
+      CLUSTER_NETWORK_CIDR: 20.0.0.0/8
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: r5.12xlarge
+      CONTROL_PLANE_REPLICAS: "5"
+      ETCD_QUOTA_BACKEND_GIB: "16"
+      IF_CREATE_WORKLOAD_NODE: true
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.12xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 1Ti
+      OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE: m5.2xlarge
+      OPENSHIFT_WORKLOAD_NODE_VOLUME_SIZE: 1000
+      SERVICE_NETWORK_CIDR: 172.0.0.0/12
+      SET_ENV_BY_PLATFORM: custom
+      USER_TAGS: |
+        TicketId 532
+      ZONES_COUNT: "6"
+    test:
+    - ref: openshift-qe-set-etcd-quota
+    - ref: openshift-qe-wait
+    workflow: openshift-qe-installer-aws
+  timeout: 24h0m0s
+- always_run: false
+  as: control-plane-test-8nodes
+  reporter_config:
+    channel: '#ocp-qe-scale-ci-results'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+      {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+      logs> :warning: {{end}}'
+  steps:
+    allow_skip_on_success: false
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      CLUSTER_NETWORK_CIDR: "10.128.0.0/19"
+      CLUSTER_DURATION: "1800"
+      COMPUTE_NODE_TYPE: m6a.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.2xlarge
+      CONTROL_PLANE_REPLICAS: "3"
+      ETCD_QUOTA_BACKEND_GIB: "16"
+      IF_CREATE_WORKLOAD_NODE: true
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: m6a.xlarge
+      OPENSHIFT_PROMETHEUS_STORAGE_SIZE: 100Gi
+      OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE: m6a.xlarge
+      OPENSHIFT_WORKLOAD_NODE_VOLUME_SIZE: 100
+      SERVICE_NETWORK_CIDR: 172.0.0.0/12
+      SET_ENV_BY_PLATFORM: custom
+      USER_TAGS: |
+        TicketId 532
+      ZONES_COUNT: "6"
+    test:
+    - ref: openshift-qe-set-etcd-quota
+    - ref: openshift-qe-wait
+    workflow: openshift-qe-installer-aws
+  timeout: 4h0m0s
 - as: control-plane-252nodes
   cron: 0 5 5,19 * *
   reporter_config:
