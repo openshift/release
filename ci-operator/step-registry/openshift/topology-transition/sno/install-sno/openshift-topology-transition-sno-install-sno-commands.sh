@@ -84,7 +84,7 @@ create_vm() {
     .storage.files = ((.storage.files // []) + [{path:"/etc/hostname",mode:420,overwrite:true,contents:{source:$hostname}}])' \
     "${ignition}" > "${name}-live.ign"
   # Use the same ISO tool container as baremetalds-sno-add-worker.
-  podman run --rm --security-opt label=disable -v "${PWD}:${PWD}:ro" \
+  podman run --rm --privileged --security-opt label=disable -v "${PWD}:${PWD}:ro" \
     -v "${image_dir}:${image_dir}" -w "${PWD}" quay.io/coreos/coreos-installer:release \
     iso ignition embed -i "${name}-live.ign" -o "${image_dir}/${name}.iso" rhcos-live.iso
   chmod 644 "${image_dir}/${name}.iso"
