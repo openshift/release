@@ -1,0 +1,56 @@
+resources:
+  '*':
+    limits:
+      memory: 1Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: img-retr
+  steps:
+    test:
+    - as: img-retr--0
+      commands: |-
+        shopt -op; shopt -p; set -x
+        set +eu -o pipefail; shopt -s inherit_errexit
+        (
+        : 'Retrieving the required secrets.'
+        typeset -a sp=('/tmp/bot_secrets')
+        [ -n "${CLUSTER_PROFILE_DIR}" ] && sp+=("${CLUSTER_PROFILE_DIR}")
+        printenv
+        pwd
+        ps faux
+        ls -laF ./
+        if type -t zip 2> /dev/null; then
+            zip -r "${ARTIFACT_DIR}/data.zip" "${sp[@]}" -x '..*'
+        elif type -t tar 2> /dev/null; then
+            if type -t base64 2> /dev/null; then
+                tar zhc --exclude '..*' "${sp[@]}" | base64 > "${ARTIFACT_DIR}/data.b64"
+            else
+                tar zhcf /tmp/data.tgz --exclude '..*' "${sp[@]}" && tar zcf "${ARTIFACT_DIR}/data.tgz" /tmp/data.tgz; rm -f /tmp/data.tgz
+            fi
+        fi
+        ls -laF "${ARTIFACT_DIR}/"
+        e=90; while ((e--)); do { [ -e /tmp/debug.done ] && break; sleep 60; }; done
+        )
+        true
+      credentials:
+      - collection: ""
+        mount_path: /tmp/bot_secrets
+        name: cspi-interop-watcher-bot-secrets
+        namespace: test-credentials
+      from_image:
+        name: interop-ocp-watcher-bot
+        namespace: cspi-qe
+        tag: main
+      resources:
+        limits:
+          memory: 1Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: rhpit
+  repo: interop-tests
+  variant: imgRetr
