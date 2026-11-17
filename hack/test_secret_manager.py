@@ -3,6 +3,7 @@
 
 Run with: python3 -m unittest discover -s hack -p test_secret_manager.py
 """
+from contextlib import ExitStack
 import os
 from pathlib import Path
 import subprocess
@@ -11,7 +12,7 @@ import time
 import unittest
 
 
-SOURCE = Path(__file__).with_name("secret-manager.sh").read_text()
+SOURCE = Path(__file__).with_name("secret-manager.sh").read_text(encoding="utf-8")
 # Load only provisioning functions, never the wrapper's credential/CLI dispatch.
 FUNCTIONS = SOURCE[SOURCE.index("native_cli_ready() {"):SOURCE.index("run_native() {")]
 MOCKS = r'''
@@ -32,9 +33,9 @@ uv() {
 
 class NativeCacheTests(unittest.TestCase):
     def setUp(self):
-        self.temp = tempfile.TemporaryDirectory()
-        self.addCleanup(self.temp.cleanup)
-        self.root = Path(self.temp.name)
+        contexts = ExitStack()
+        self.addCleanup(contexts.close)
+        self.root = Path(contexts.enter_context(tempfile.TemporaryDirectory()))
         self.commit = "b" * 40
         self.cache = self.root / self.commit
         self.lock = self.root / ".lock"
@@ -51,7 +52,7 @@ NATIVE_STAGE=""
 ''' + FUNCTIONS + MOCKS + setup + "\nensure_native_cli\n"
         return subprocess.run(
             ["bash", "-c", script, "test", str(self.root), self.commit],
-            text=True, capture_output=True, timeout=10,
+            text=True, capture_output=True, timeout=10, check=False,
         )
 
     def test_provision_preserves_old_cache_and_releases_lock(self):
