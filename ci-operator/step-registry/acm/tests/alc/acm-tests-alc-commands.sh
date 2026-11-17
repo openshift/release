@@ -12,7 +12,7 @@ if [ "${MAP_TESTS}" = "true" ]; then
     )"
     if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
         trap '
-            LP_IO__ET_PPP__NEW_TS_NAME="${LP_QE__CR__TS_NAME__PFX__ACM:+${LP_QE__CR__TS_NAME__PFX__ACM}--}%s" \
+            LP_IO__ET_PPP__NEW_TS_NAME="${LP_QE__CR__TS_NAME__PFX__ACM:-lp-interop--ACM--OPP}--%s" \
                 ExitTrap--PostProcessPrep
         ' EXIT
     else
@@ -107,5 +107,44 @@ for dir in test-results playwright-report ../tests/cypress/results; do
     cp -r "$dir" "$ARTIFACT_DIR/" || true
   fi
 done
+
+# INTEROP-9598: assertiveness floor plus carrier guarantee. Playwright's global
+# setup can abort before a single spec runs (known cause: the AAP operator
+# preflight at assertAapOperatorRunning) and still leave a well-formed zero-test
+# test-results/junit.xml, so the step exits green and prow renders nothing.
+# Whenever no runner report carries a test case, replace the report with one
+# failing row that names the condition and fail the step. The runner's original
+# bytes are kept beside it (suffixed, so the EXIT trap merge, which globs
+# *.xml, leaves them alone). The synthetic uses the canonical suite prefix
+# lp-interop--ACM--OPP--acm-tests-alc with root testsuites and a non-empty
+# failure message, ensuring no 0-test carrier and one testcase per spec
+# (here, one for the abort).
+typeset _junit_report="${ARTIFACT_DIR}/test-results/junit.xml"
+typeset -i _junit_cases=0
+while IFS= read -r -d '' _junit_file; do
+    _junit_cases+=$(grep -c '<testcase' "${_junit_file}" || true)
+done < <(find "${ARTIFACT_DIR}" -type f -iname 'junit*.xml' -print0 2>/dev/null)
+
+if (( _junit_cases == 0 )); then
+    if [[ -f "${_junit_report}" ]]; then
+        _junit_condition="the JUnit report declares zero test cases"
+        cp -f "${_junit_report}" "${_junit_report}.empty-original" || true
+    else
+        _junit_condition="the runner wrote no JUnit report"
+        mkdir -p "$(dirname "${_junit_report}")"
+    fi
+    cat > "${_junit_report}" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="lp-interop--ACM--OPP--acm-tests-alc" tests="1" failures="1" errors="0" skipped="0">
+    <testcase name="acm-tests-alc: runner asserted nothing" classname="lp-interop--ACM--OPP--acm-tests-alc">
+      <failure message="${_junit_condition}" type="empty-junit-carrier">${_junit_condition}, so this step asserted nothing. Look for the runner abort in the step build log; a known cause is the AAP operator preflight in the runner global setup (INTEROP-9598).</failure>
+    </testcase>
+  </testsuite>
+</testsuites>
+EOF
+    echo "ERROR: ${_junit_condition}; failing the step and recording a JUnit row that names it (INTEROP-9598/9697)." >&2
+    _test_rc=1
+fi
 
 exit "${_test_rc}"
