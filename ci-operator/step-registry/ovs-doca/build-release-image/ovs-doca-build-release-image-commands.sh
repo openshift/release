@@ -69,17 +69,23 @@ RELEASE_INTERNAL="${INTERNAL_REGISTRY}/${RELEASE_IMAGE_LATEST#*/}"
 echo "destination: ${DEST}"
 echo "pushing via: ${DEST_INTERNAL}"
 
-# 3. Push credentials: this pod's service-account token as basic auth for
-#    the in-cluster registry endpoint (and the same token works for pulling
-#    the source payload and component images through the internal form of
-#    the same registry -- no external-route round trip, no cluster pull-secret
-#    needed). Built with printf: there is no jq in this image.
+# 3. Credentials: the cluster pull-secret (which covers pulling the payload's
+#    component images -- they live in quay.io/openshift-release-dev, not in
+#    the CI registry) with this pod's service-account token added for the
+#    in-cluster registry endpoint, used both to pull the source payload
+#    through its internal form and to push the rebuilt payload. There is no
+#    jq in this image (rehearsal 2122658718276390912), so the entry is
+#    sed-inserted and the result verified.
 SA_TOKEN="$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)"
 SA_AUTH="$(printf 'serviceaccount:%s' "${SA_TOKEN}" | base64 | tr -d '\n')"
 AUTH_FILE="${SHARED_DIR}/.ovs-doca-pushcreds"
-printf '{"auths":{"%s":{"auth":"%s"}}}' "${INTERNAL_REGISTRY}" "${SA_AUTH}" > "${AUTH_FILE}"
-grep -q "auths" "${AUTH_FILE}" || { echo "ERROR: could not build push credentials"; exit 1; }
-echo "push credentials: service-account token for ${INTERNAL_REGISTRY}"
+sed "s|\"auths\": *{|\"auths\": {\"${INTERNAL_REGISTRY}\": {\"auth\": \"${SA_AUTH}\"},|" \
+  "${CLUSTER_PROFILE_DIR}/pull-secret" > "${AUTH_FILE}" || true
+if ! grep -q "${INTERNAL_REGISTRY}" "${AUTH_FILE}"; then
+  echo "ERROR: could not add the internal-registry credential to the cluster pull-secret"
+  exit 1
+fi
+echo "push credentials: cluster pull-secret + service-account token for ${INTERNAL_REGISTRY}"
 
 # 3a. TLS trust for the in-cluster registry endpoint: it serves a certificate
 #     signed by the cluster's own CA, which is not part of this image's
