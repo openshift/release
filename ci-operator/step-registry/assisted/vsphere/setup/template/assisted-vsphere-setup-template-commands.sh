@@ -18,7 +18,24 @@ unset SSL_CERT_FILE
 unset GOVC_TLS_CA_CERTS
 
 echo "Data center is ${GOVC_DATACENTER}"
-if govc object.collect "/${GOVC_DATACENTER}/vm/assisted-test-infra-ci/assisted-test-infra-machine-template"; then
+TEMPLATE_PATH="/${GOVC_DATACENTER}/vm/assisted-test-infra-ci/assisted-test-infra-machine-template"
+
+# TEMPORARY - remove once the template has been rebuilt in every datacenter.
+# The CI SSH key (edge-group/assisted-installer-ci) was rotated on 2026-11-17.
+# Templates created before the cutoff contain the old public key, so delete them
+# and let packer rebuild below. Templates created after the cutoff are kept.
+TEMPLATE_KEY_CUTOFF="2026-11-17T12:00:00Z"
+if govc object.collect "${TEMPLATE_PATH}" >/dev/null 2>&1; then
+    template_created="$(govc vm.info -json "${TEMPLATE_PATH}" | jq -r '(.virtualMachines // .VirtualMachines)[0] | (.config // .Config) | (.createDate // .CreateDate) // empty')"
+    echo "Existing template create date: ${template_created:-unknown}"
+    if [[ -z "${template_created}" ]] || [[ "$(date -d "${template_created}" +%s)" -lt "$(date -d "${TEMPLATE_KEY_CUTOFF}" +%s)" ]]; then
+        echo "Template predates the SSH key rotation (${TEMPLATE_KEY_CUTOFF}) - deleting it"
+        govc object.destroy "${TEMPLATE_PATH}"
+    fi
+fi
+# END TEMPORARY
+
+if govc object.collect "${TEMPLATE_PATH}"; then
     printf 'Assisted service ci template already exist - skipping \n'
     exit 0
 fi
