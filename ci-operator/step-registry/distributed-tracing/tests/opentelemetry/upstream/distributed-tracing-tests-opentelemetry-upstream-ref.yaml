@@ -14,7 +14,8 @@ ref:
     documentation: |-
       Space separated chainsaw test directories of the operator repository to run, relative to the repository root,
       for example "tests/e2e/smoke-deletion tests/e2e-crd-validations tests/e2e-sidecar". Exactly these directories
-      run; a directory that does not exist fails the job. Empty (the default) runs the full suite, minus SKIP_TESTS.
+      run; a directory that does not exist fails the job. tests/e2e-instrumentation-go runs the Go auto-instrumentation
+      suite as a whole. Empty (the default) runs the full suite, minus SKIP_TESTS.
       Exactly one of RUN_TESTS and SKIP_TESTS must be set: both, or neither, fail the job.
   - name: SKIP_TESTS
     default: ""
@@ -50,6 +51,9 @@ ref:
   - name: INSTRUMENTATION_APACHE_HTTPD_IMG
     default: ""
     documentation: The OpenTelemetry Apache HTTPD auto-instrumentation image used in testing.
+  - name: OTLPSINK_IMG
+    default: ""
+    documentation: The OTLP sink image that the Go auto-instrumentation tests deploy as the backend of their collectors.
   dependencies:
   - name: "opentelemetry-operator"
     env: OPERATOR_IMG
@@ -69,6 +73,8 @@ ref:
     env: INSTRUMENTATION_DOTNET_IMG
   - name: "opentelemetry-instrumentation-apache-httpd"
     env: INSTRUMENTATION_APACHE_HTTPD_IMG
+  - name: "otlp-sink"
+    env: OTLPSINK_IMG
   documentation: |-
     The distributed-tracing-tests-opentelemetry-upstream step runs the OpenTelemetry Operator e2e tests of the upstream
     main branch against an operator that was installed from a bundle built in the same CI run. The same step serves the
@@ -82,9 +88,13 @@ ref:
     The operator is pointed at the target allocator and OpAMP bridge images built in the same run. The tests of the OpAMP
     bridge use the bridge server image of the run. The instrumentation tests run with the auto-instrumentation images of
     the run: once for a job with RUN_TESTS, twice for the full suite (first with the default images of the operator).
+    This also holds for the Go auto-instrumentation suite (tests/e2e-instrumentation-go), which runs through the make
+    targets e2e-instrumentation-go and e2e-instrumentation-go-default of the repository and asserts on the telemetry that
+    an OTLP sink of the run receives.
 
-    One chainsaw run with the sidecar selector of the OpenShift version runs the selected tests, then
-    e2e-metadata-filters (the filter variables are set on the operator first), then, for the full suite, the automatic
+    One chainsaw run with the sidecar selector of the OpenShift version runs the selected tests, then the Go
+    auto-instrumentation suite, then e2e-metadata-filters (the filter variables are set on the operator first), then,
+    for the full suite, the instrumentation tests with the auto-instrumentation images of the run and the automatic
     RBAC tests (the operator is granted the permissions that the tests need and is restarted; it adds a finalizer to
     the collectors afterwards, hence they run late), then e2e-openshift-tls-profile last because it triggers a MachineConfig
     rollout. The operator runs with the default collector image and with PHP auto-instrumentation enabled, which the
@@ -98,3 +108,4 @@ ref:
     - opentelemetry-opampbridge: the OpAMP Bridge image
     - opamp-bridge-server: the test server image for the OpAMP Bridge tests
     - opentelemetry-instrumentation-java, -nodejs, -python, -dotnet, -apache-httpd: the auto-instrumentation images
+    - otlp-sink: the OTLP sink of the Go auto-instrumentation tests (tests/test-e2e-apps/otlp-sink)
