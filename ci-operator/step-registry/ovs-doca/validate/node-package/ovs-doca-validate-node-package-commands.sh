@@ -113,18 +113,18 @@ for NODE_ROLE in $OVS_DOCA_VALIDATE_NODE_ROLES; do
       record_pass "$LABEL: stock openvswitch removed"
     fi
 
-    # Diagnostic only, deliberately not asserted by default: whether
-    # openvswitch-selinux-extra-policy survived the Fast Datapath removal (or
-    # was installed deliberately, as the el10 variant does). Pass
-    # OVS_DOCA_EXPECTED_SELINUX_POLICY to turn this into an assertion on an
-    # exact NEVRA.
-    SELINUX_POLICY=$(debug_node "$NODE" "rpm -q openvswitch-selinux-extra-policy 2>&1 || echo not-installed")
-    echo "openvswitch-selinux-extra-policy: $SELINUX_POLICY"
+    # Diagnostic only, deliberately not asserted by default: which selinux
+    # policy module covers OVS. The image build installs the DOCA repo's own
+    # doca-openvswitch-selinux-policy (not a hard dependency of the rpm, but
+    # nodes run SELinux enforcing). Pass OVS_DOCA_EXPECTED_SELINUX_POLICY to
+    # turn this into an assertion on an exact NEVRA.
+    SELINUX_POLICY=$(debug_node "$NODE" "rpm -q doca-openvswitch-selinux-policy 2>&1 || echo not-installed")
+    echo "doca-openvswitch-selinux-policy: $SELINUX_POLICY"
     if [ -n "${OVS_DOCA_EXPECTED_SELINUX_POLICY:-}" ]; then
       if [ "$SELINUX_POLICY" = "$OVS_DOCA_EXPECTED_SELINUX_POLICY" ]; then
-        record_pass "$LABEL: openvswitch-selinux-extra-policy ($SELINUX_POLICY)"
+        record_pass "$LABEL: doca-openvswitch-selinux-policy ($SELINUX_POLICY)"
       else
-        record_fail "$LABEL: openvswitch-selinux-extra-policy" \
+        record_fail "$LABEL: doca-openvswitch-selinux-policy" \
           "expected $OVS_DOCA_EXPECTED_SELINUX_POLICY, got: $SELINUX_POLICY"
       fi
     fi
