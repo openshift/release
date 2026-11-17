@@ -29,6 +29,7 @@ DECODER = shutil.which("oc") or shutil.which("kubectl")
 
 class EnmaasPlacementFixture(unittest.TestCase):
     def setUp(self):
+        self.assertIsNotNone(DECODER, "EnMaaS regressions require oc or kubectl on PATH; no decoder coverage may be skipped")
         self.directory = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.directory)
         source = DEPLOY.read_text(encoding="utf-8")
@@ -314,7 +315,6 @@ class EnmaasPlacementConstraintTests(EnmaasPlacementFixture):
         self.assertIn('for project in enmaas enmaas-monitoring;', source)
         self.assertIn('--server-side --field-manager=enmaas-opps --force-conflicts', source)
 
-    @unittest.skipUnless(DECODER, "requires an actual oc or kubectl local decoder")
     def test_render_consumer_fail_fast(self):
         source = DEPLOY.read_text(encoding="utf-8")
         consumer = source[source.index('echo "Rendering and checking'):].split(
@@ -434,7 +434,6 @@ class EnmaasSerializationTests(EnmaasPlacementFixture):
             input=raw, capture_output=True, text=True, check=False, timeout=15,
         )
 
-    @unittest.skipUnless(DECODER, "requires an actual oc or kubectl local decoder")
     def test_null_serialization_actual_kubernetes_decoder(self):
         documents = [self.workload("Pod", self.pod_spec()),
                      {"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "synthetic"},
@@ -473,9 +472,8 @@ class EnmaasSerializationTests(EnmaasPlacementFixture):
         self.assertEqual(items[0], config)
         self.assertEqual(len(items), 2)
         self.assertEqual(items[1]["kind"], "Job")
-        if DECODER:
-            decoded = self.decode((self.directory / "manifest.yaml").read_text(encoding="utf-8"), DECODER)
-            self.assertEqual(decoded.returncode, 0, decoded.stderr)
+        decoded = self.decode((self.directory / "manifest.yaml").read_text(encoding="utf-8"), DECODER)
+        self.assertEqual(decoded.returncode, 0, decoded.stderr)
 
     def test_unrelated_custom_null_fields_preserved(self):
         custom = {"apiVersion": "example.invalid/v1", "kind": "Settings", "metadata": {"name": "synthetic"},
