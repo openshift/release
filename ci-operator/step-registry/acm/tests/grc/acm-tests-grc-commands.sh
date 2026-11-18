@@ -154,6 +154,35 @@ typeset -i _OPP_POLICY_COUNT=-1
 # carrier reads it, so a declaration in the placement-present branch would
 # leave it unbound (nounset) whenever that branch is not taken.
 typeset -i _OPP_BASELINE_OK=0
+# Helper for finding 4 (INTEROP-9741 hardening, step 6): single write site
+# for 00-placement-query-error.log with both scrub passes. Takes the
+# placement query rc and the stderr temp file path. On scrub failure the
+# raw stderr is withheld and only the command, rc, and a note are written.
+_opp_write_query_error_log() {
+    local _oqe_rc="$1"
+    local _oqe_src="$2"
+    local _oqe_tmp
+    local _oqe_scrub_rc=0
+    _oqe_tmp="$(mktemp)" || true
+    mkdir -p "${_OPP_EVIDENCE_DIR}"
+    if [[ -n "${_secrets_pattern}" ]]; then
+        sed -E "s/${_secrets_pattern}/[REDACTED]/g" "${_oqe_src}" > "${_oqe_tmp}" 2>/dev/null || _oqe_scrub_rc=$?
+    else
+        cp "${_oqe_src}" "${_oqe_tmp}" 2>/dev/null || _oqe_scrub_rc=$?
+    fi
+    if (( _oqe_scrub_rc == 0 )); then
+        _scrub_leaktk_patterns -i "${_oqe_tmp}" 2>/dev/null || _oqe_scrub_rc=$?
+    fi
+    {
+        echo "oc get placement -n${_OPP_PLACEMENT_NS} ${_OPP_PLACEMENT_NAME} failed with rc=${_oqe_rc}"
+        if (( _oqe_scrub_rc == 0 )); then
+            sed 's/^/  /' "${_oqe_tmp}"
+        else
+            echo "stderr withheld: scrubbing failed"
+        fi
+    } > "${_OPP_EVIDENCE_DIR}/00-placement-query-error.log" 2>&1 || true
+    rm -f "${_oqe_tmp}" 2>/dev/null || true
+}
 # Three-way placement probe. The previous form classified absence by grepping
 # the probe stderr for "not found" strings, so a Forbidden response that
 # mentioned a matching name was misread as absence and silently deactivated
@@ -276,11 +305,7 @@ else
         rm -f "${_OPP_NS_OUT}"
     elif (( _OPP_NS_RC != 0 )); then
         _OPP_QUERY_FAILED=1
-        mkdir -p "${_OPP_EVIDENCE_DIR}"
-        {
-            echo "oc get placement -n${_OPP_PLACEMENT_NS} ${_OPP_PLACEMENT_NAME} failed with rc=${_OPP_QUERY_RC}"
-            sed 's/^/  /' "${_OPP_QUERY_LOG}"
-        } > "${_OPP_EVIDENCE_DIR}/00-placement-query-error.log" 2>&1 || true
+        _opp_write_query_error_log "${_OPP_QUERY_RC}" "${_OPP_QUERY_LOG}"
         echo "ERROR: OPP placement query failed (rc=${_OPP_QUERY_RC}); a failed query is not a lane without OPP, so the OPP checks will run and report this as a failure. See co-located 00-placement-query-error.log" >&2
         rm -f "${_OPP_NS_OUT}"
     else
@@ -293,20 +318,12 @@ else
                 echo "No OPP placement in ${_OPP_PLACEMENT_NS} (placements API not found); OPP checks inactive for this lane"
             else
                 _OPP_QUERY_FAILED=1
-                mkdir -p "${_OPP_EVIDENCE_DIR}"
-                {
-                    echo "oc get placement -n${_OPP_PLACEMENT_NS} ${_OPP_PLACEMENT_NAME} failed with rc=${_OPP_QUERY_RC}"
-                    sed 's/^/  /' "${_OPP_QUERY_LOG}"
-                } > "${_OPP_EVIDENCE_DIR}/00-placement-query-error.log" 2>&1 || true
+                _opp_write_query_error_log "${_OPP_QUERY_RC}" "${_OPP_QUERY_LOG}"
                 echo "ERROR: OPP placement query failed (rc=${_OPP_QUERY_RC}); a failed query is not a lane without OPP, so the OPP checks will run and report this as a failure. See co-located 00-placement-query-error.log" >&2
             fi
         else
             _OPP_QUERY_FAILED=1
-            mkdir -p "${_OPP_EVIDENCE_DIR}"
-            {
-                echo "oc get placement -n${_OPP_PLACEMENT_NS} ${_OPP_PLACEMENT_NAME} failed with rc=${_OPP_QUERY_RC}"
-                sed 's/^/  /' "${_OPP_QUERY_LOG}"
-            } > "${_OPP_EVIDENCE_DIR}/00-placement-query-error.log" 2>&1 || true
+            _opp_write_query_error_log "${_OPP_QUERY_RC}" "${_OPP_QUERY_LOG}"
             echo "ERROR: OPP placement query failed (rc=${_OPP_QUERY_RC}); a failed query is not a lane without OPP, so the OPP checks will run and report this as a failure. See co-located 00-placement-query-error.log" >&2
         fi
         rm -f "${_OPP_API_OUT}"
