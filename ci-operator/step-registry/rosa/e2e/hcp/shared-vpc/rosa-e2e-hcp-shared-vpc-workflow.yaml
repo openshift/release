@@ -40,7 +40,11 @@ workflow:
     # operator roles do not exist yet, so the shared roles are created with a
     # placeholder trust. Requires .awscred_shared_account.
     - ref: rosa-e2e-hcp-shared-vpc-prepare
-    - chain: rosa-sts-oidc-config-create
+    # Scoped variant of rosa-sts-oidc-config-create whose operator-roles step
+    # (rosa-e2e-hcp-shared-vpc-operator-roles-create) also passes
+    # --vpc-endpoint-role-arn: rosa rejects --shared-vpc-role-arn on HCP
+    # clusters without it.
+    - chain: rosa-e2e-hcp-shared-vpc-sts-oidc-config-create
     # Replaces the placeholder trust on the shared roles with the installer
     # and operator role principals (created by the chain) and attaches the
     # cluster-account assume-role permission policies; must run after the
@@ -110,11 +114,14 @@ workflow:
     control-plane-operator roles), and the HCP-only VPC endpoint role carrying
     the AWS-managed ROSASharedVPCEndpointPolicy and the internal
     communication hosted zone. The prepare step runs before the
-    rosa-sts-oidc-config-create chain so rosa-sts-operator-roles-create can
-    pass --shared-vpc-role-arn to rosa create operator-roles; the shared roles
-    are created with a placeholder trust that rosa-e2e-hcp-shared-vpc-trust
-    replaces with the installer and operator role principals after the chain,
-    along with attaching the cluster-account assume-role permission policies.
+    rosa-e2e-hcp-shared-vpc-sts-oidc-config-create chain (a scoped
+    rosa-sts-oidc-config-create whose operator-roles step passes both
+    --shared-vpc-role-arn and --vpc-endpoint-role-arn, as rosa requires on
+    HCP clusters) so the operator roles can be created with the shared role
+    ARNs; the shared roles are created with a placeholder trust that
+    rosa-e2e-hcp-shared-vpc-trust replaces with the installer and operator
+    role principals after the chain, along with attaching the cluster-account
+    assume-role permission policies.
     The workflow requires a second AWS account: every shared-VPC consumer
     reads ${CLUSTER_PROFILE_DIR}/.awscred_shared_account from the cluster
     profile and fails without it. The validation tail is
