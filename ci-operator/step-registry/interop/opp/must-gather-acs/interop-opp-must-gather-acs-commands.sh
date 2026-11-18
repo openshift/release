@@ -1,7 +1,8 @@
 #!/bin/bash
-set -o nounset
-set -o errexit
-set -o pipefail
+# BASH-1: xtrace is what makes a CI failure diagnosable from the log
+# alone; inherit_errexit stops an unguarded command substitution from
+# swallowing a failure inside a subshell.
+set -euxo pipefail; shopt -s inherit_errexit
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
@@ -26,7 +27,7 @@ oc_notfound() { # oc_notfound <rc> <stderr-text>
 # prevent the OLM evidence capture section from running.  This is critical
 # because OLM evidence is most valuable when the operator fails to install.
 
-# collect_acs_diagnostics — downloads ACS/StackRox diagnostic bundle
+# collect_acs_diagnostics - downloads ACS/StackRox diagnostic bundle
 # via the Central API. Skips silently if ACS is not installed.
 collect_acs_diagnostics() {
     mkdir -p "${ARTIFACT_DIR}/acs-must-gather"
@@ -38,21 +39,21 @@ collect_acs_diagnostics() {
       -o=jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
 
     if [[ -z "${ACS_CSV}" ]]; then
-        echo "WARNING: No ACS CSV found in namespace ${ACS_NAMESPACE} — skipping diagnostic collection."
+        echo "WARNING: No ACS CSV found in namespace ${ACS_NAMESPACE} - skipping diagnostic collection."
         echo "SKIPPED: No ACS CSV found" > "${ARTIFACT_DIR}/acs-must-gather/SKIPPED"
         BUNDLE_STATUS="skipped:no-csv"
         return 0
     fi
 
     # The Central workload (route, secret, diagnostic bundle) runs in the
-    # namespace named by the Central CR — NOT the operator namespace
+    # namespace named by the Central CR - NOT the operator namespace
     # (ACS_NAMESPACE). Discover it from the CR; without a CR there is no
     # Central to gather from. (INTEROP-9647 D9: this step was previously
-    # dead on every stanza — route/secret were queried in the operator
+    # dead on every stanza - route/secret were queried in the operator
     # namespace and always came back empty.)
     WORKLOAD_NS=$(oc get central -A -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
     if [[ -z "${WORKLOAD_NS}" ]]; then
-        echo "WARNING: No Central CR found — cannot determine the ACS workload namespace."
+        echo "WARNING: No Central CR found - cannot determine the ACS workload namespace."
         echo "SKIPPED: No Central CR" > "${ARTIFACT_DIR}/acs-must-gather/SKIPPED"
         BUNDLE_STATUS="skipped:no-central-cr"
         return 0
@@ -64,18 +65,24 @@ collect_acs_diagnostics() {
       -o jsonpath='{.spec.host}' 2>/dev/null || true)
 
     if [[ -z "${CENTRAL_HOST}" ]]; then
-        echo "WARNING: Central route not found in ${WORKLOAD_NS} — skipping."
+        echo "WARNING: Central route not found in ${WORKLOAD_NS} - skipping."
         echo "SKIPPED: No Central route" > "${ARTIFACT_DIR}/acs-must-gather/SKIPPED"
         BUNDLE_STATUS="skipped:no-route"
         return 0
     fi
 
     # Retrieve admin password (workload namespace)
+    # BASH-7.3: xtrace prints assignment values, so the password read and
+    # its emptiness test run with tracing suspended; tracing resumes at once.
+    set +x
     ADMIN_PW=$(oc get secret central-htpasswd -n "${WORKLOAD_NS}" \
       -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)
+    _adminPwMissing=0
+    [[ -n "${ADMIN_PW}" ]] || _adminPwMissing=1
+    set -x
 
-    if [[ -z "${ADMIN_PW}" ]]; then
-        echo "WARNING: Cannot retrieve Central admin password — skipping."
+    if (( _adminPwMissing )); then
+        echo "WARNING: Cannot retrieve Central admin password - skipping."
         echo "SKIPPED: No admin credentials" > "${ARTIFACT_DIR}/acs-must-gather/SKIPPED"
         BUNDLE_STATUS="skipped:no-credentials"
         return 0
@@ -107,7 +114,7 @@ collect_acs_diagnostics() {
         # Credential-free handshake check against the same endpoint the download
         # uses: curl exit 0 means the served certificate chained to Central's CA
         # (an unauthenticated 401 is still a verified handshake); non-zero means
-        # CA or hostname mismatch — no credential is involved either way.
+        # CA or hostname mismatch - no credential is involved either way.
         if curl -s -o /dev/null --cacert "${CENTRAL_CA_FILE}" \
               --connect-timeout 10 --max-time 30 -w '' \
               "https://${CENTRAL_HOST}/v1/debug/diagnostics" 2>"${TLS_PREFLIGHT_ERR}"; then
@@ -135,7 +142,10 @@ collect_acs_diagnostics() {
     CURL_CFG=$(mktemp)
     chmod 600 "${CURL_CFG}"
     trap 'rm -f "${CURL_CFG}"' EXIT
+    # BASH-7.3: the credential write must not be traced.
+    set +x
     printf 'user = "admin:%s"\n' "${ADMIN_PW}" > "${CURL_CFG}"
+    set -x
 
     # shellcheck disable=SC2086
     HTTP_CODE=$(curl -s ${CURL_TLS_OPTS} --connect-timeout 10 --max-time 120 -K "${CURL_CFG}" -w '%{http_code}' \
@@ -161,7 +171,7 @@ collect_acs_diagnostics() {
         fi
     fi
 
-    # Clean up credentials file immediately — the EXIT trap only fires at
+    # Clean up credentials file immediately - the EXIT trap only fires at
     # script end, so remove it here to avoid the password persisting through
     # the OLM evidence capture section.
     rm -f "${CURL_CFG}"
@@ -172,7 +182,7 @@ collect_acs_diagnostics || true
 # ─── OLM Evidence Capture (INTEROP-9525) ────────────────────────────────────
 # Captures OLM lifecycle state to diagnose why Central CR creation fails
 # on OCP 5.0/5.1. Runs with set +e so every command executes even when
-# preceding ones fail — capturing absence IS evidence.
+# preceding ones fail - capturing absence IS evidence.
 #
 # Each resource is captured with targeted field extraction (not full -o yaml
 # or -o json dumps) to avoid leaking sensitive fields such as registry
@@ -269,7 +279,7 @@ else
   echo "probe_error: operatorpolicy CRD lookup failed (rc=${OP_CRD_RC}): ${OP_CRD_OUTPUT}" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
 fi
 
-# 2. CatalogSource — capture name, status.connectionState, spec.image
+# 2. CatalogSource - capture name, status.connectionState, spec.image
 echo "[2/10] CatalogSource..."
 oc get catalogsource -n openshift-marketplace -o json 2>/dev/null | \
   python3 -c '
@@ -316,7 +326,7 @@ print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/03-subscription.json" 2>&1 || \
   echo "probe_error: subscription query failed" > "${EVIDENCE_DIR}/03-subscription.json"
 
-# 4. InstallPlan — capture name, status.phase, status.conditions
+# 4. InstallPlan - capture name, status.phase, status.conditions
 echo "[4/10] InstallPlan..."
 oc get installplan -A -o json 2>/dev/null | \
   python3 -c '
@@ -334,7 +344,7 @@ print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/04-installplan.json" 2>&1 || \
   echo "probe_error: installplan query failed" > "${EVIDENCE_DIR}/04-installplan.json"
 
-# 5. CSV — capture name, status.phase, status.reason, status.message
+# 5. CSV - capture name, status.phase, status.reason, status.message
 echo "[5/10] ClusterServiceVersion..."
 oc get csv -A -o json 2>/dev/null | \
   python3 -c '
@@ -1429,7 +1439,7 @@ if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" == "1" ]]; then
   exit $?
 fi
 
-# 11. PlacementDecisions — cluster names only (INTEROP-9647 Stage 0: which
+# 11. PlacementDecisions - cluster names only (INTEROP-9647 Stage 0: which
 #     clusters the placements selected; answers whether
 #     placement-openshift-plus-hub selected any cluster for policy propagation)
 echo "[11] PlacementDecisions..."
@@ -1458,7 +1468,7 @@ print(json.dumps(result, indent=2))
 # ephemeral-storage capacity/allocatable plus pressure conditions, MCP
 # rollout state, stackrox DaemonSet scheduling, and workerocs machinesets.
 
-# 12. PVCs — name, namespace, StorageClass, requested size, phase
+# 12. PVCs - name, namespace, StorageClass, requested size, phase
 echo "[12] PVCs (storage axis)..."
 oc get pvc -A -o json 2>/dev/null | \
   python3 -c '
@@ -1476,7 +1486,7 @@ for i in data.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/12-pvcs.json" 2>&1 || true
 
-# 13. Nodes — role, age, pressure conditions, ephemeral-storage capacity.
+# 13. Nodes - role, age, pressure conditions, ephemeral-storage capacity.
 #     Per-node "used" is not exposed via the node object; DiskPressure
 #     conditions are the pressure signal actually available.
 echo "[13] Nodes (storage axis)..."
@@ -1510,7 +1520,7 @@ for i in data.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/13-nodes-storage.json" 2>&1 || true
 
-# 14. MachineConfigPools — rollout state (the 9646 ENOSPC showed worker
+# 14. MachineConfigPools - rollout state (the 9646 ENOSPC showed worker
 #     Degraded with MCD write failures)
 echo "[14] MachineConfigPools..."
 oc get mcp -o json 2>/dev/null | \
@@ -1535,7 +1545,7 @@ for i in data.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/14-machineconfigpools.json" 2>&1 || true
 
-# 15. StackRox DaemonSets — collector/sensor scheduling (desired vs ready)
+# 15. StackRox DaemonSets - collector/sensor scheduling (desired vs ready)
 echo "[15] StackRox DaemonSets..."
 export STAGE0_WORKLOAD_NS="${WORKLOAD_NS:-}"
 export STAGE0_OPERATOR_NS="${ACS_NAMESPACE}"
@@ -1561,7 +1571,7 @@ for i in data.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/15-stackrox-daemonsets.json" 2>&1 || true
 
-# 16. workerocs machinesets — the policy-created nodes with small roots
+# 16. workerocs machinesets - the policy-created nodes with small roots
 echo "[16] workerocs machinesets..."
 oc get machinesets -A -o json 2>/dev/null | \
   python3 -c '
@@ -1583,7 +1593,7 @@ for i in data.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/16-workerocs-machinesets.json" 2>&1 || true
 
-# 17. ACS image footprint — container images of ACS deployments (operator
+# 17. ACS image footprint - container images of ACS deployments (operator
 #     and workload namespaces)
 echo "[17] ACS image footprint..."
 oc get deployments -A -o json 2>/dev/null | \
