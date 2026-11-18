@@ -322,9 +322,31 @@ fi
 # missing" (fail).  On OCP versions where the Quay Bridge Operator is not
 # available in the catalog the QuayIntegration CRD will be absent entirely;
 # that is an environment limitation, not a test failure.
+# Bounded retry for the read-only preflight queries below. The Quay check is
+# now a hard failure, so a single transient apiserver error would red a gating
+# lane on a hiccup; each attempt is also time-boxed so a hung apiserver fails
+# the step inside the pod timeout instead of stalling it.
+_oc_query_bounded() {
+    typeset -i _attempts="${1:-3}"
+    shift
+    typeset -i _i=1 _rc=0
+    while (( _i <= _attempts )); do
+        if "$@" "--request-timeout=30s" 2>/dev/null; then
+            return 0
+        else
+            _rc=$?
+        fi
+        if (( _i < _attempts )); then
+            sleep $(( _i * 5 ))
+        fi
+        (( _i += 1 ))
+    done
+    return "${_rc}"
+}
+
 typeset apiOutput=""
 typeset -i apiRc=0
-apiOutput=$(oc api-resources --api-group=quay.redhat.com) || apiRc=$?
+apiOutput=$(_oc_query_bounded 3 oc api-resources --api-group=quay.redhat.com) || apiRc=$?
 
 if ((apiRc != 0)); then
     : "WARNING: oc api-resources failed (rc=${apiRc}) - cannot determine CRD presence, falling through to CR check"
@@ -342,7 +364,7 @@ fi
 
 typeset getOutput=""
 typeset -i getRc=0
-getOutput=$(oc get quayintegration quay --ignore-not-found -o name) || getRc=$?
+getOutput=$(_oc_query_bounded 3 oc get quayintegration quay --ignore-not-found -o name) || getRc=$?
 
 if ((getRc != 0)); then
     : "WARNING: oc get quayintegration failed (rc=${getRc}) - cluster API error"
