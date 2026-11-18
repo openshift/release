@@ -1006,7 +1006,7 @@ else:
                     pollsSinceLastExtension=0
                     echo "Progress detected: extending deadline by ${appliedExtension}s (total wait now ${effectiveTimeout}s/${maxTimeout}s max, extension #${extensionsApplied})"
                 else
-                    echo "Progress detected but max timeout ${maxTimeout}s would be exceeded — no further extensions"
+                    echo "Progress detected but max timeout ${maxTimeout}s would be exceeded; no further extensions"
                 fi
             elif (( _vetoStreakHit )); then
                 # Sustained-cycling fail-fast: the veto's purpose (the
@@ -1025,7 +1025,7 @@ else:
 done
 
 typeset -i elapsed=$(( SECONDS - startSeconds ))
-echo "MCPs did not stabilize within ${elapsed}s — classifying timeout..."
+echo "MCPs did not stabilize within ${elapsed}s; classifying timeout..."
 if (( extensionsApplied > 0 )); then
     echo "Deadline was extended ${extensionsApplied} time(s) due to detected progress (initial timeout: ${mcpWaitTimeout}s, effective: ${effectiveTimeout}s)"
 fi
