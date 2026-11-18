@@ -60,6 +60,7 @@ spec:
             case "$ARCH" in \
                 x86_64*) ARCH='amd64' ;; \
                 aarch64*) ARCH='arm64' ;; \
+                s390x) ARCH='s390x' ;; \
                 *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
             esac && \
             export ARCH && \
@@ -72,6 +73,8 @@ spec:
             OC_CLIENT_URL="https://mirror.openshift.com/pub/openshift-v4/clients/ocp/4.19.0/openshift-client-linux" && \
             if [ "$ARCH" = "aarch64" ]; then \
                 OC_CLIENT_URL="${OC_CLIENT_URL}-arm64.tar.gz"; \
+            elif [ "$ARCH" = "s390x" ]; then \
+                OC_CLIENT_URL="https://mirror.openshift.com/pub/openshift-v4/s390x/clients/ocp/4.19.0/openshift-client-linux.tar.gz"; \
             else \
                 OC_CLIENT_URL="${OC_CLIENT_URL}.tar.gz"; \
             fi && \
@@ -82,9 +85,12 @@ spec:
             chmod g+xw -R $(go env GOROOT)
 
         ENV VAULT_DISABLE_MLOCK true
-        RUN dnf config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
-            dnf install -y vault-1.7.7-1 && \
-            setcap cap_ipc_lock= /usr/bin/vault
+        # ci-tools uses Vault in tests; the s390x entrypoint-wrapper build does not need it.
+        RUN if [ "$(uname -m)" != "s390x" ]; then \
+                dnf config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
+                dnf install -y vault-1.7.7-1 && \
+                setcap cap_ipc_lock= /usr/bin/vault; \
+            fi
 
         RUN dnf install -y nodejs && npm install -g typescript@6
         RUN npm config set cache /go/.npm --global
