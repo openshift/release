@@ -115,6 +115,15 @@ def run(*args, timeout=30):
     return subprocess.run(args, check=True, text=True, capture_output=True, timeout=timeout).stdout
 
 
+def command_operation(command):
+    if command[0] == 'virsh' and command[1] in {
+            'net-dumpxml', 'list', 'dumpxml', 'net-define', 'net-destroy', 'net-start', 'net-list'}:
+        return 'virsh ' + command[1]
+
+    return {'nmcli': 'nmcli DNS reload', 'ip': 'ip link update',
+            'dig': 'dig guest DNS lookup', 'getent': 'getent host DNS lookup'}.get(command[0], 'host network command')
+
+
 def main():
     network, domain, target_ip, dns_config, gateway = sys.argv[1:]
     apps_domain = 'apps.' + domain
@@ -231,6 +240,9 @@ def main():
         bridge = live.find('bridge').get('name')
         taps = []
         for name in run('virsh', 'list', '--name').splitlines():
+            if not name.strip():
+                continue
+
             vm = ET.fromstring(run('virsh', 'dumpxml', name))
             for interface in vm.findall('devices/interface'):
                 source, target = interface.find('source'), interface.find('target')
@@ -305,10 +317,10 @@ def main():
 try:
     main()
 except subprocess.CalledProcessError as error:
-    print('Cluster DNS update failed while applying or checking host network state', file=sys.stderr)
+    print(f'Cluster DNS update failed: {command_operation(error.cmd)} (exit {error.returncode})', file=sys.stderr)
     sys.exit(error.returncode)
-except subprocess.TimeoutExpired:
-    print('Cluster DNS update timed out while applying host network state', file=sys.stderr)
+except subprocess.TimeoutExpired as error:
+    print(f'Cluster DNS update timed out: {command_operation(error.cmd)} (exit 124)', file=sys.stderr)
     sys.exit(124)
 except (OSError, ValueError, AttributeError, ET.ParseError):
     print('Cluster DNS update failed; check gathered host network state', file=sys.stderr)
