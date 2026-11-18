@@ -74,7 +74,7 @@ fi
 # SecuredCluster policies can target local-cluster.  In OPP single-
 # cluster test environments local-cluster is the only managed cluster,
 # and the default NotIn rule prevents the SecuredCluster CR from being
-# created — causing stackrox-opp-readiness to timeout.
+# created; causing stackrox-opp-readiness to timeout.
 sed -i '/local-cluster.*NotIn/d' \
   ../policygenerator/policy-sets/stable/openshift-plus/input/clusters-placement.yaml
 
@@ -119,7 +119,7 @@ done
 typeset -a skipPoliciesArr=()
 if [[ -n "${SKIP_POLICIES:-}" ]]; then
   IFS=',' read -ra skipPoliciesArr <<< "${SKIP_POLICIES}"
-  printf '[%s] SKIP_POLICIES set — will skip %d polic(ies):\n' \
+  printf '[%s] SKIP_POLICIES set; will skip %d polic(ies):\n' \
     "$(date -u +%FT%TZ)" "${#skipPoliciesArr[@]}"
   for p in "${skipPoliciesArr[@]}"; do
     printf '  - %s\n' "${p}"
@@ -128,7 +128,7 @@ fi
 
 # Write the full skip manifest for auditing / artifact collection
 {
-  printf '# skip-policies manifest — generated %s\n' "$(date -u +%FT%TZ)"
+  printf '# skip-policies manifest; generated %s\n' "$(date -u +%FT%TZ)"
   printf '# SKIP_POLICIES=%s\n' "${SKIP_POLICIES:-}"
   printf '# Total policies to skip: %d\n' "${#skipPoliciesArr[@]}"
   for p in "${skipPoliciesArr[@]}"; do
@@ -150,7 +150,7 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
   # Build a regex to filter out skipped policies
   typeset skipRegex=""
   skipRegex="$(IFS='|'; echo "${skipPoliciesArr[*]}")"
-  # Fetch the full policy list first — fail hard if oc cannot reach the cluster
+  # Fetch the full policy list first; fail hard if oc cannot reach the cluster
   typeset policyList=""
   policyList="$(oc get policies -n policies -o name)" || {
     printf '[%s] ERROR: failed to list policies in namespace "policies"\n' \
@@ -175,11 +175,11 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
       exit 1
     fi
   else
-    printf '[%s] All policies are in the skip list — no policies to wait for\n' \
+    printf '[%s] All policies are in the skip list; no policies to wait for\n' \
       "$(date -u +%FT%TZ)"
   fi
 else
-  printf '[%s] No policies to skip — waiting for ALL policies to become Compliant…\n' \
+  printf '[%s] No policies to skip; waiting for ALL policies to become Compliant…\n' \
     "$(date -u +%FT%TZ)"
   if ! oc wait policies --all -n policies \
     --for jsonpath='{.status.compliant}'=Compliant \
