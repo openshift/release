@@ -1,6 +1,21 @@
 #!/bin/bash
 set -euo pipefail
 
+report_result() {
+  local result=$?
+
+  if (( result == 0 )); then
+    echo 'Scaling check step: completed successfully'
+  else
+    printf 'Scaling check step: failed (exit %s)\n' "${result}" >&2
+  fi
+
+  exit "${result}"
+}
+trap report_result EXIT
+
+echo 'Scaling check step: starting'
+
 if [[ ! "${NODE_INVENTORY}" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_./-]*$ ]]; then
   echo 'NODE_INVENTORY must name an inventory file on the EC2 host' >&2
   exit 1
@@ -37,7 +52,19 @@ printf -v remote_args '%q ' "${workdir}" "${NODE_INVENTORY}" "${EXPECTED_NODES}"
 ssh "${SSHOPTS[@]}" "${remote}" "sudo bash -s -- ${remote_args}" <<'REMOTE'
 set -euo pipefail
 cd "$1"
-trap 'chown -R ec2-user:ec2-user .' EXIT
+restore_ownership() {
+  local result=$?
+
+  if ! chown -R ec2-user:ec2-user . 2>/dev/null; then
+    echo 'Could not restore ownership of remote files' >&2
+    if (( result == 0 )); then
+      result=1
+    fi
+  fi
+
+  exit "${result}"
+}
+trap restore_ownership EXIT
 inventory=$2
 expected_nodes=$3
 etcd_members=$4
@@ -45,19 +72,36 @@ control_plane_as_workers=$5
 # shellcheck source=/dev/null
 source common.sh
 
+echo 'Checking the expected node inventory'
+mkdir -p results
+
 # Fail on an invalid handoff instead of passing an empty batch.
 jq -e 'type == "array" and length > 0 and
   all(.[]; (.name | type == "string" and length > 0) and
     (.role == "control-plane" or .role == "worker" or .role == "infra")) and
   ([.[].name] | length == (unique | length))' "${inventory}" >/dev/null
 
-deadline=$((SECONDS + 3600))
+started=${SECONDS}
+deadline=$((started + 3600))
+attempt=0
 while (( SECONDS < deadline )); do
-  if ! oc --request-timeout=30s get nodes -o json > results/scaling-nodes.json || \
-    ! jq -e --slurpfile expected "${inventory}" --arg count "${expected_nodes}" \
-      --argjson compact "${control_plane_as_workers}" '
+  attempt=$((attempt + 1))
+  printf 'Scaling check attempt %s (elapsed %ss, limit 3600s)\n' "${attempt}" "$((SECONDS - started))"
+
+  if ! oc --request-timeout=30s get nodes -o json > results/scaling-nodes.json 2>/dev/null; then
+    echo 'Node API query failed; retrying in 20s'
+    sleep 20
+    continue
+  fi
+  if ! jq -e --arg count "${expected_nodes}" '
+    .items | if $count == "" then true else length == ($count | tonumber) end
+    ' results/scaling-nodes.json >/dev/null 2>&1; then
+    echo 'Waiting for the expected node count; retrying in 20s'
+    sleep 20
+    continue
+  fi
+  if ! jq -e --slurpfile expected "${inventory}" --argjson compact "${control_plane_as_workers}" '
       .items as $nodes |
-      (if $count == "" then true else ($nodes | length) == ($count | tonumber) end) and
       all($expected[0][]; . as $node | any($nodes[];
         .metadata.name == $node.name and
         (.metadata.labels | has("node-role.kubernetes.io/" +
@@ -67,32 +111,57 @@ while (( SECONDS < deadline )); do
         (if $compact and $node.role == "control-plane" then
           (.metadata.labels | has("node-role.kubernetes.io/worker")) and
           all(.spec.taints[]?; .effect != "NoSchedule" and .effect != "NoExecute")
-        else true end)))' results/scaling-nodes.json >/dev/null; then
+        else true end)))' results/scaling-nodes.json >/dev/null 2>&1; then
+    echo 'Waiting for expected node readiness, roles, and scheduling; retrying in 20s'
     sleep 20
     continue
   fi
+  echo 'Expected node count, readiness, roles, and scheduling checks passed'
 
   # Workers and infra nodes need no etcd membership check by default.
   if [[ -z "${etcd_members}" ]]; then
+    echo 'Scaling checks passed; no etcd target was requested'
     exit 0
   fi
-  if ! pod=$(oc --request-timeout=30s -n openshift-etcd get pods -l app=etcd -o json | jq -r '
+  if ! pod=$(oc --request-timeout=30s -n openshift-etcd get pods -l app=etcd -o json 2>/dev/null | jq -r '
     [.items[] | select(.metadata.deletionTimestamp == null) |
-      select(any(.status.conditions[]?; .type == "Ready" and .status == "True")) | .metadata.name][0] // empty'); then
+      select(any(.status.conditions[]?; .type == "Ready" and .status == "True")) | .metadata.name][0] // empty' 2>/dev/null); then
+    echo 'Etcd pod query failed; retrying in 20s'
     sleep 20
     continue
   fi
-  if [[ -n "${pod}" ]] && \
-    oc --request-timeout=30s -n openshift-etcd exec "${pod}" -c etcdctl -- etcdctl member list -w json > results/etcd-members.json && \
-    jq -e --argjson count "${etcd_members}" '.members | length == $count and
-      all(.[]; .isLearner != true and .name != "")' results/etcd-members.json >/dev/null && \
-    oc --request-timeout=30s -n openshift-etcd exec "${pod}" -c etcdctl -- etcdctl endpoint health --cluster -w json > results/etcd-health.json && \
-    jq -e --argjson count "${etcd_members}" 'length == $count and all(.[]; .health == true)' results/etcd-health.json >/dev/null; then
+  if [[ -z "${pod}" ]]; then
+    echo 'Waiting for a ready etcd pod; retrying in 20s'
+    sleep 20
+    continue
+  fi
+  if ! oc --request-timeout=30s -n openshift-etcd exec "${pod}" -c etcdctl -- etcdctl member list -w json \
+    > results/etcd-members.json 2>/dev/null; then
+    echo 'Etcd member query failed; retrying in 20s'
+    sleep 20
+    continue
+  fi
+  if ! jq -e --argjson count "${etcd_members}" '.members | length == $count and
+    all(.[]; .isLearner != true and .name != "")' results/etcd-members.json >/dev/null 2>&1; then
+    echo 'Waiting for the expected voting etcd members; retrying in 20s'
+    sleep 20
+    continue
+  fi
+  if ! oc --request-timeout=30s -n openshift-etcd exec "${pod}" -c etcdctl -- etcdctl endpoint health --cluster -w json \
+    > results/etcd-health.json 2>/dev/null; then
+    echo 'Etcd health query failed; retrying in 20s'
+    sleep 20
+    continue
+  fi
+  if jq -e --argjson count "${etcd_members}" 'length == $count and all(.[]; .health == true)' \
+    results/etcd-health.json >/dev/null 2>&1; then
+    printf 'Scaling checks passed with %s healthy voting etcd members\n' "${etcd_members}"
     exit 0
   fi
+  echo 'Waiting for healthy etcd endpoints; retrying in 20s'
   sleep 20
 done
 
-echo 'Timed out waiting for the expected nodes, roles, or configured etcd target' >&2
+printf 'Timed out after %s scaling check attempts waiting for expected nodes or etcd\n' "${attempt}" >&2
 exit 1
 REMOTE

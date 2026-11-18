@@ -1,10 +1,26 @@
 #!/bin/bash
 set -euo pipefail
 
+report_result() {
+  local result=$?
+
+  if (( result == 0 )); then
+    echo 'Topology test step: completed successfully'
+  else
+    printf 'Topology test step: failed (exit %s)\n' "${result}" >&2
+  fi
+
+  exit "${result}"
+}
+trap report_result EXIT
+
+echo 'Topology test step: starting'
+
 if [[ ! "${TEST_SUITE}" =~ ^[a-zA-Z0-9][a-zA-Z0-9/_-]*$ || ! "${TEST_SUITE_TIMEOUT}" =~ ^[1-9][0-9]*[smh]$ ]]; then
   echo 'TEST_SUITE must be a suite name and TEST_SUITE_TIMEOUT a positive duration (s, m, or h)' >&2
   exit 1
 fi
+printf 'Test suite: %s\n' "${TEST_SUITE}"
 
 # SSH requires an entry for the random UID assigned to this container.
 if ! whoami &> /dev/null; then
@@ -22,29 +38,65 @@ SSHOPTS=(-o ConnectTimeout=10 -o StrictHostKeyChecking=no -o UserKnownHostsFile=
 remote="$(cat "${SHARED_DIR}/ssh_user")@$(cat "${SHARED_DIR}/public_address")"
 workdir=$(cat "${SHARED_DIR}/remote_workdir")
 
+suite_artifacts=${TEST_SUITE//\//-}
+mkdir -p "${ARTIFACT_DIR}/${suite_artifacts}"
+
 # Like the image-based lanes, run the job's test image binary on the EC2 host.
 printf -v remote_args '%q ' "${workdir}" "${TESTS_PULL_REF}" "${TEST_SUITE}" "${TEST_SUITE_TIMEOUT}" \
   "${TARGET_CONTROL_PLANE_TOPOLOGY}" "${TARGET_INFRASTRUCTURE_TOPOLOGY}" \
   "${TARGET_CONTROL_PLANE_NODES}" "${TARGET_COMPUTE_NODES}" "${TARGET_ARBITER_NODES}" \
   "${TARGET_CONTROL_PLANE_NODES_SCHEDULABLE}"
+echo 'Preparing the test binary on the host'
+set +e
 ssh "${SSHOPTS[@]}" "${remote}" "sudo bash -s -- ${remote_args}" <<'REMOTE'
 set -euo pipefail
 cd "$1"
-trap 'chown -R ec2-user:ec2-user .' EXIT
+restore_ownership() {
+  local result=$?
+
+  if ! chown -R ec2-user:ec2-user . 2>/dev/null; then
+    echo 'Could not restore ownership of remote files' >&2
+    if (( result == 0 )); then
+      result=1
+    fi
+  fi
+
+  exit "${result}"
+}
+trap restore_ownership EXIT
 tests_image=$2
 suite=$3
 suite_timeout=$4
 export TARGET_CONTROL_PLANE_TOPOLOGY=$5 TARGET_INFRASTRUCTURE_TOPOLOGY=$6
 export TARGET_CONTROL_PLANE_NODES=$7 TARGET_COMPUTE_NODES=$8 TARGET_ARBITER_NODES=$9
 export TARGET_CONTROL_PLANE_NODES_SCHEDULABLE=${10}
+artifacts="results/${suite//\//-}"
+rm -rf "${artifacts}"
+mkdir -p "${artifacts}/junit"
 # shellcheck source=/dev/null
 source common.sh
 
 oc image extract --registry-config=pull-secret "${tests_image}" --path=/usr/bin/openshift-tests:bin --confirm
 chmod +x bin/openshift-tests
-artifacts="results/${suite//\//-}"
-mkdir -p "${artifacts}"
+
+printf 'Running test suite: %s\n' "${suite}"
 # Origin retains its 45/195-minute suite limits and five-minute CLI limit.
 timeout --signal=TERM --kill-after=2m "${suite_timeout}" openshift-tests run "${suite}" \
   -o "${artifacts}/e2e.log" --junit-dir="${artifacts}/junit" 2>&1 | tee "${artifacts}/output.log"
 REMOTE
+suite_result=$?
+set -e
+
+# Each test step publishes its own logs and JUnit, even when the suite fails.
+echo 'Copying test logs and JUnit results to the step artifacts'
+artifact_result=0
+scp "${SSHOPTS[@]}" -r "${remote}:${workdir}/results/${suite_artifacts}/." \
+  "${ARTIFACT_DIR}/${suite_artifacts}/" 2>/dev/null || artifact_result=$?
+if (( artifact_result != 0 )); then
+  printf 'Could not copy test artifacts (exit %s)\n' "${artifact_result}" >&2
+fi
+
+if (( suite_result != 0 )); then
+  exit "${suite_result}"
+fi
+exit "${artifact_result}"

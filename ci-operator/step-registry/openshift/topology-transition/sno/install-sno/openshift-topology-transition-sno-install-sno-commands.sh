@@ -1,5 +1,22 @@
 #!/bin/bash
 set -euo pipefail
+
+finish_step() {
+  local result=$?
+
+  trap - EXIT
+  if (( result != 0 )); then
+    printf 'SNO install step: failed (exit %s)\n' "${result}" >&2
+  else
+    echo 'SNO install step: completed successfully'
+  fi
+
+  exit "${result}"
+}
+trap finish_step EXIT
+
+echo 'SNO install step: starting'
+
 umask 077
 
 # SSH requires an entry for the random UID assigned to this container.
@@ -20,6 +37,8 @@ workdir="/home/$(cat "${SHARED_DIR}/ssh_user")/topology-transition"
 printf '%s\n' "${workdir}" > "${SHARED_DIR}/remote_workdir"
 printf '%s\n' "${workdir}/pull-secret" > "${SHARED_DIR}/pull_secret_file"
 
+echo 'Preparing the EC2 work directory and install inputs'
+
 # Keep the handoff even if installation fails so post steps can gather logs.
 ssh "${SSHOPTS[@]}" "${remote}" "mkdir -p '${workdir}/bin' '${workdir}/results'"
 jq -cs '.[0] * .[1]' "${CLUSTER_PROFILE_DIR}/pull-secret" \
@@ -27,6 +46,8 @@ jq -cs '.[0] * .[1]' "${CLUSTER_PROFILE_DIR}/pull-secret" \
 scp "${SSHOPTS[@]}" "${SHARED_DIR}/topology-pull-secret" "${remote}:${workdir}/pull-secret"
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${remote}:${workdir}/ssh-publickey"
 scp "${SSHOPTS[@]}" /var/run/rhsm/subscription-manager-{org,act-key} "${remote}:${workdir}/"
+
+echo 'Copying dev-scripts to the EC2 host'
 
 # The dev-scripts image contains the source tree in its working directory.
 # Follow the same source handoff as baremetalds-devscripts-setup.
@@ -75,75 +96,231 @@ set_api_dns() {
 
   dns_config=$(jq -er .dnsConfig state.json)
   [[ -f "${dns_config}" ]]
+  echo 'Updating host and guest DNS for the cluster'
 
-  # Keep dev-scripts node and provisioner aliases when moving host and guest DNS.
-  python3 - "${network}" "${cluster_domain}" "${target_ip}" <<'API_DNS_PY'
+  # Patch the current network rather than replacing dev-scripts node/DHCP data.
+  python3 - "${network}" "${cluster_domain}" "${target_ip}" "${dns_config}" "${gateway}" <<'API_DNS_PY'
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
+import time
 import xml.etree.ElementTree as ET
 
-network, domain, target_ip = sys.argv[1:]
-aliases = ['api', 'api-int', f'api.{domain}', f'api-int.{domain}']
-root = ET.fromstring(subprocess.check_output(['virsh', 'net-dumpxml', network], text=True))
-target_names = []
+DNSMASQ = 'http://libvirt.org/schemas/network/dnsmasq/1.0'
+ET.register_namespace('dnsmasq', DNSMASQ)
 
-for host in root.findall('dns/host'):
-    names = [entry.text for entry in host.findall('hostname')]
-    if host.get('ip') != target_ip and not any(name in aliases for name in names):
-        continue
 
-    subprocess.run(['virsh', 'net-update', network, 'delete', 'dns-host',
-                    ET.tostring(host, encoding='unicode'), '--live', '--config'], check=True)
-    remaining = [name for name in names if name not in aliases]
-    if host.get('ip') == target_ip:
-        target_names.extend(remaining)
-    elif remaining:
-        for entry in list(host):
-            if entry.tag == 'hostname' and entry.text in aliases:
+def run(*args, timeout=30):
+    return subprocess.run(args, check=True, text=True, capture_output=True, timeout=timeout).stdout
+
+
+def main():
+    network, domain, target_ip, dns_config, gateway = sys.argv[1:]
+    apps_domain = 'apps.' + domain
+    aliases = ['api', 'api-int', f'api.{domain}', f'api-int.{domain}']
+    parser = ET.XMLParser(target=ET.TreeBuilder(insert_comments=True))
+    original = run('virsh', 'net-dumpxml', network, '--inactive')
+    root = ET.fromstring(original, parser=parser)
+    before = ET.canonicalize(ET.tostring(root, encoding='unicode'), strip_text=True)
+    dns = root.find('dns')
+    if dns is None:
+        dns = ET.SubElement(root, 'dns')
+
+    def is_apps(name):
+        name = name.lstrip('*.')
+        return name == apps_domain or name.endswith('.' + apps_domain)
+
+    # Guest forwarding through the host loopback can retain the old ingress IP.
+    # Use the explicit wildcard, as in TNT, and retain unrelated forwarders.
+    for forwarder in list(dns.findall('forwarder')):
+        if is_apps(forwarder.get('domain', '')):
+            dns.remove(forwarder)
+
+    route_names = []
+    target_host = next((host for host in dns.findall('host') if host.get('ip') == target_ip), None)
+    for host in list(dns.findall('host')):
+        for entry in list(host.findall('hostname')):
+            name = entry.text or ''
+            if is_apps(name):
+                route_names.append(name)
+            if host.get('ip') != target_ip and (name in aliases or is_apps(name)):
+                if name not in aliases:
+                    aliases.append(name)
                 host.remove(entry)
-        subprocess.run(['virsh', 'net-update', network, 'add-last', 'dns-host',
-                        ET.tostring(host, encoding='unicode'), '--live', '--config'], check=True)
+        if not host.findall('hostname'):
+            dns.remove(host)
 
-host = ET.Element('host', ip=target_ip)
-for name in dict.fromkeys(target_names + aliases):
-    ET.SubElement(host, 'hostname').text = name
-subprocess.run(['virsh', 'net-update', network, 'add-last', 'dns-host',
-                ET.tostring(host, encoding='unicode'), '--live', '--config'], check=True)
+    if target_host is None:
+        target_host = ET.SubElement(dns, 'host', ip=target_ip)
+    target_names = {entry.text for host in dns.findall('host') if host.get('ip') == target_ip
+                    for entry in host.findall('hostname')}
+    for name in dict.fromkeys(aliases):
+        if name not in target_names:
+            ET.SubElement(target_host, 'hostname').text = name
 
-# SNO adds exact route names to /etc/hosts, which take priority over DNS.
-hosts_file = Path('/etc/hosts')
-lines = []
-for line in hosts_file.read_text().splitlines(keepends=True):
-    record, marker, comment = line.partition('#')
-    fields = record.split()
-    matching = [name for name in fields[1:] if name.endswith('.apps.' + domain)]
-    if not matching:
-        lines.append(line)
-        continue
+    def rewrite_address(value):
+        if not value.startswith('address=/') or '/' not in value[len('address=/'):]:
+            return [value]
 
-    remaining = [name for name in fields[1:] if name not in matching]
-    suffix = ' #' + comment.rstrip('\n') if marker else ''
-    if remaining:
-        lines.append(' '.join([fields[0]] + remaining) + suffix + '\n')
-        suffix = ''
-    lines.append(' '.join([target_ip] + matching) + suffix + '\n')
-hosts_file.write_text(''.join(lines))
+        names, old_ip = value[len('address=/'):].rsplit('/', 1)
+        names = names.split('/')
+        managed = [name for name in names if name in aliases or is_apps(name)]
+        if not managed:
+            return [value]
+
+        # Replace all old wildcard forms with one canonical wildcard below.
+        moved = [name for name in managed if name.lstrip('*.') != apps_domain]
+        remaining = [name for name in names if name not in managed]
+        return ([f'address=/{"/".join(remaining)}/{old_ip}'] if remaining else []) + \
+               ([f'address=/{"/".join(moved)}/{target_ip}'] if moved else [])
+
+    options = root.find(f'{{{DNSMASQ}}}options')
+    if options is None:
+        options = ET.SubElement(root, f'{{{DNSMASQ}}}options')
+    for option in list(options):
+        if option.tag != f'{{{DNSMASQ}}}option':
+            continue
+        values = rewrite_address(option.get('value', ''))
+        if values == [option.get('value', '')]:
+            continue
+
+        index = list(options).index(option)
+        options.remove(option)
+        for offset, value in enumerate(values):
+            options.insert(index + offset, ET.Element(f'{{{DNSMASQ}}}option', value=value))
+    ET.SubElement(options, f'{{{DNSMASQ}}}option', value=f'address=/{apps_domain}/{target_ip}')
+
+    # Keep exact route entries in /etc/hosts from overriding the wildcard.
+    hosts_file = Path('/etc/hosts')
+    lines = []
+    for line in hosts_file.read_text().splitlines(keepends=True):
+        record, marker, comment = line.partition('#')
+        fields = record.split()
+        matching = [name for name in fields[1:] if is_apps(name)]
+        route_names.extend(matching)
+        if not matching or fields[0] == target_ip:
+            lines.append(line)
+            continue
+
+        remaining = [name for name in fields[1:] if name not in matching]
+        suffix = ' #' + comment.rstrip('\n') if marker else ''
+        if remaining:
+            lines.append(' '.join([fields[0]] + remaining) + suffix + '\n')
+            suffix = ''
+        lines.append(' '.join([target_ip] + matching) + suffix + '\n')
+    hosts_file.write_text(''.join(lines))
+
+    # Preserve other host DNS settings and move more-specific route overrides too.
+    config = Path(dns_config)
+    lines = []
+    for line in config.read_text().splitlines():
+        values = rewrite_address(line.strip())
+        lines.extend([line] if values == [line.strip()] else values)
+    for value in [f'address=/{apps_domain}/{target_ip}',
+                  f'address=/api.{domain}/{target_ip}', f'address=/api-int.{domain}/{target_ip}']:
+        if value not in lines:
+            lines.append(value)
+    config.write_text('\n'.join(lines) + '\n')
+    run('nmcli', 'general', 'reload', 'dns-full')
+
+    if ET.canonicalize(ET.tostring(root, encoding='unicode'), strip_text=True) != before:
+        # Custom dnsmasq options cannot be changed with net-update. Restart only
+        # this network, then reconnect its existing taps to the recreated bridge.
+        live = ET.fromstring(run('virsh', 'net-dumpxml', network))
+        bridge = live.find('bridge').get('name')
+        taps = []
+        for name in run('virsh', 'list', '--name').splitlines():
+            vm = ET.fromstring(run('virsh', 'dumpxml', name))
+            for interface in vm.findall('devices/interface'):
+                source, target = interface.find('source'), interface.find('target')
+                if source is None or target is None or not target.get('dev'):
+                    continue
+                if source.get('network') != network and source.get('bridge') != bridge:
+                    continue
+                link = interface.find('link')
+                taps.append((target.get('dev'), link is None or link.get('state') != 'down'))
+
+        def reconnect_taps():
+            for tap, link_up in taps:
+                run('ip', 'link', 'set', 'dev', tap, 'master', bridge)
+                run('ip', 'link', 'set', 'dev', tap, 'up' if link_up else 'down')
+
+        with tempfile.TemporaryDirectory(prefix='topology-dns-') as temp:
+            prior = Path(temp) / 'before.xml'
+            updated = Path(temp) / 'after.xml'
+            prior.write_text(original)
+            updated.write_bytes(ET.tostring(root))
+            print('Applying guest DNS changes and reconnecting VM links', flush=True)
+            try:
+                run('virsh', 'net-define', str(updated))
+                run('virsh', 'net-destroy', network)
+                run('virsh', 'net-start', network)
+                reconnect_taps()
+            except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                print('Guest DNS apply failed; restoring the prior guest network', file=sys.stderr)
+                try:
+                    active = network in run('virsh', 'net-list', '--name').splitlines()
+                    if active:
+                        run('virsh', 'net-destroy', network)
+                    run('virsh', 'net-define', str(prior))
+                    run('virsh', 'net-start', network)
+                    reconnect_taps()
+                except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                    print('Could not fully restore the prior guest network; check gathered host logs', file=sys.stderr)
+                raise
+    else:
+        print('Guest DNS configuration is already current', flush=True)
+
+    # Query the resolver used by guests, not just the EC2 host's /etc/hosts.
+    probes = aliases[:4] + ['topology-dns-check.' + apps_domain,
+                           next(iter(route_names), 'console-openshift-console.' + apps_domain)]
+    deadline = time.monotonic() + 120
+
+    def dns_run(*args):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ValueError('DNS checks timed out')
+        return run(*args, timeout=min(5, remaining))
+
+    for attempt in range(1, 31):
+        print(f'Cluster DNS check: attempt {attempt} of 30', flush=True)
+        try:
+            for name in dict.fromkeys(probes):
+                answers = dns_run('dig', '+short', '+time=2', '+tries=1', '@' + gateway, name, 'A').split()
+                if answers != [target_ip]:
+                    raise ValueError('guest DNS mismatch')
+            for name in [f'api.{domain}', 'topology-dns-check.' + apps_domain, probes[-1]]:
+                answers = {line.split()[0] for line in dns_run('getent', 'ahostsv4', name).splitlines()}
+                if answers != {target_ip}:
+                    raise ValueError('host DNS mismatch')
+            print('Cluster DNS checks passed for API, wildcard apps, and an existing route', flush=True)
+            return
+        except (ValueError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            if attempt == 30 or time.monotonic() >= deadline:
+                raise ValueError('DNS checks timed out') from None
+            time.sleep(min(2, max(0, deadline - time.monotonic())))
+
+
+try:
+    main()
+except subprocess.CalledProcessError as error:
+    print('Cluster DNS update failed while applying or checking host network state', file=sys.stderr)
+    sys.exit(error.returncode)
+except subprocess.TimeoutExpired:
+    print('Cluster DNS update timed out while applying host network state', file=sys.stderr)
+    sys.exit(124)
+except (OSError, ValueError, AttributeError, ET.ParseError):
+    print('Cluster DNS update failed; check gathered host network state', file=sys.stderr)
+    sys.exit(1)
 API_DNS_PY
-
-  cat > "${dns_config}" <<EOF
-address=/api.${cluster_domain}/${target_ip}
-address=/api-int.${cluster_domain}/${target_ip}
-address=/.apps.${cluster_domain}/${target_ip}
-listen-address=::1
-cache-size=0
-EOF
-  systemctl reload NetworkManager
 }
 
 create_vm() {
   local name=$1 mac=$2 ip=$3 ignition=$4
-  local deadline state
+  local deadline state started attempt=0
+
+  echo 'Preparing a new VM and its install ISO'
 
   # Never remove an existing VM, disk, DHCP entry, or DNS record.
   if virsh dominfo "${name}" >/dev/null 2>&1 || [[ -e "${image_dir}/${name}.qcow2" || -e "${image_dir}/${name}.iso" ]]; then
@@ -175,8 +352,11 @@ create_vm() {
     --serial "file,path=/var/log/libvirt/qemu/${name}-console.log"
 
   # virt-install stops the live install on reboot despite on_reboot=restart.
-  deadline=$((SECONDS + 1200))
+  started=${SECONDS}
+  deadline=$((started + 1200))
   while true; do
+    attempt=$((attempt + 1))
+    printf 'VM disk install: attempt %s, elapsed %ss of 1200s\n' "${attempt}" "$((SECONDS - started))"
     state=$(virsh domstate "${name}")
     [[ "${state}" != 'shut off' ]] || break
 
@@ -187,6 +367,8 @@ create_vm() {
 
     sleep 10
   done
+
+  echo 'VM disk install finished; starting the installed disk'
 
   # Boot only from the installed disk; keeping the ISO bootable can reinstall it.
   virsh dumpxml --inactive "${name}" > "${name}-disk.xml"
@@ -214,13 +396,18 @@ tree.write(sys.argv[1], encoding='unicode')
 PY
   virsh define "${name}-disk.xml"
   virsh start "${name}"
-  [[ "$(virsh domstate "${name}")" == running ]]
+  if [[ "$(virsh domstate "${name}")" != running ]]; then
+    echo 'VM did not start from its installed disk' >&2
+    return 1
+  fi
+
+  echo 'VM started from its installed disk'
 }
 
 approve_expected_csrs() {
   local csr signer username name request subject
 
-  oc --request-timeout=30s get csr -o json > csrs.json || return 1
+  oc --request-timeout=30s get csr -o json > csrs.json 2>/dev/null || return 1
   while IFS=$'\t' read -r csr signer username request; do
     [[ -n "${csr}" ]] || continue
     printf '%s' "${request}" | base64 -d > csr.pem
@@ -234,7 +421,7 @@ approve_expected_csrs() {
     case "${signer}:${username}" in
       kubernetes.io/kube-apiserver-client-kubelet:system:serviceaccount:openshift-machine-config-operator:node-bootstrapper|\
       "kubernetes.io/kubelet-serving:system:node:${name}")
-        oc --request-timeout=30s adm certificate approve "${csr}" >/dev/null || return 1
+        oc --request-timeout=30s adm certificate approve "${csr}" >/dev/null 2>&1 || return 1
         ;;
     esac
   done < <(jq -r '.items[] | select((.status.conditions // [] | length) == 0) |
@@ -242,15 +429,18 @@ approve_expected_csrs() {
 }
 
 wait_for_nodes() {
-  local role=$1 deadline=$((SECONDS + 3600))
+  local role=$1 started=${SECONDS} deadline=$((SECONDS + 3600)) attempt=0
 
   while (( SECONDS < deadline )); do
-    if ! approve_expected_csrs || ! oc --request-timeout=30s get csr -o json > csrs.json; then
+    attempt=$((attempt + 1))
+    printf 'Node join: attempt %s, elapsed %ss of 3600s\n' "${attempt}" "$((SECONDS - started))"
+    if ! approve_expected_csrs || ! oc --request-timeout=30s get csr -o json > csrs.json 2>/dev/null; then
+      echo 'Node join pending: could not check or approve certificates'
       sleep 15
       continue
     fi
 
-    if oc --request-timeout=30s get nodes -o json > nodes.json && jq -e --arg role "${role}" --slurpfile nodes nodes.json '
+    if oc --request-timeout=30s get nodes -o json > nodes.json 2>/dev/null && jq -e --arg role "${role}" --slurpfile nodes nodes.json '
       all(.[]; .name as $name | any($nodes[0].items[];
         .metadata.name == $name and
         (.metadata.labels | has("node-role.kubernetes.io/" + $role)) and
@@ -260,8 +450,11 @@ wait_for_nodes() {
           .spec.signerName == "kubernetes.io/kubelet-serving" and
           .spec.username == ("system:node:" + $name) and
           ((.status.certificate // "") | length > 0)))' expected-nodes.json >/dev/null; then
+      echo 'Node join checks passed: expected nodes and roles are ready; serving certificates are issued'
       return 0
     fi
+
+    echo 'Node join pending: waiting for expected nodes, roles, or serving certificates'
     sleep 15
   done
 
@@ -276,11 +469,37 @@ ssh "${SSHOPTS[@]}" "${remote}" sudo env HOME=/root bash -s -- "${workdir}" "${R
 set -euo pipefail
 umask 077
 cd "$1"
-trap 'chown -R ec2-user:ec2-user .' EXIT
+heartbeat_pid=''
+
+stop_install_progress() {
+  if [[ -n "${heartbeat_pid}" ]]; then
+    kill "${heartbeat_pid}" 2>/dev/null || true
+    wait "${heartbeat_pid}" 2>/dev/null || true
+    heartbeat_pid=''
+  fi
+}
+
+cleanup_remote() {
+  local result=$?
+
+  trap - EXIT
+  stop_install_progress
+  if ! chown -R ec2-user:ec2-user .; then
+    echo 'Could not restore host file ownership' >&2
+    if (( result == 0 )); then
+      result=1
+    fi
+  fi
+
+  exit "${result}"
+}
+trap cleanup_remote EXIT
+
 release_image=$2
 export PATH="${PWD}/bin:${PATH}"
 export REGISTRY_AUTH_FILE="${PWD}/pull-secret"
 
+echo 'Preparing host packages and subscription'
 subscription-manager config --rhsm.manage_repos=1
 if ! subscription-manager identity >/dev/null 2>&1; then
   subscription-manager register --org="$(cat subscription-manager-org)" \
@@ -291,8 +510,9 @@ subscription-manager repos --enable=rhel-9-for-x86_64-baseos-rpms --enable=rhel-
 # As in baremetalds-devscripts-setup, install only the tools needed to start make.
 # Dev-scripts installs the VM, network, and Agent dependencies.
 for attempt in 1 2 3; do
+  printf 'Host package install: attempt %s of 3\n' "${attempt}"
   if dnf install -y git sysstat sos make podman python3 jq net-tools gcc \
-    dnf-plugins-core haproxy policycoreutils-python-utils openssl; then
+    dnf-plugins-core haproxy policycoreutils-python-utils openssl bind-utils; then
     break
   fi
   [[ ${attempt} -lt 3 ]] || exit 1
@@ -300,6 +520,8 @@ for attempt in 1 2 3; do
 done
 [[ -c /dev/kvm ]]
 export PATH="/usr/local/bin:${PATH}"
+
+echo 'Preparing dev-scripts configuration and cluster state'
 
 # Fail on reuse. Do not overwrite an earlier deployment or format host disks.
 mkdir dev-scripts
@@ -351,11 +573,22 @@ printf 'export ADDN_DNS=%q\n' "${upstream_dns}" >> dev-scripts/config_root.sh
 
 # Dev-scripts uses xtrace internally. Keep its full output private on the host;
 # gather publishes only known public files and the redacted installer log.
-echo 'Starting dev-scripts Agent SNO install'
+echo 'Starting dev-scripts Agent SNO install (150 minute limit)'
+python3 -u - <<'PROGRESS' &
+import time
+
+started = time.monotonic()
+while True:
+    time.sleep(60)
+    print(f'Dev-scripts Agent SNO install: still running, elapsed {int(time.monotonic() - started)}s of 9000s', flush=True)
+PROGRESS
+heartbeat_pid=$!
 if (umask 022; cd dev-scripts && timeout --kill-after=5m 150m make agent) > dev-scripts.log 2>&1; then
+  stop_install_progress
   echo 'Dev-scripts Agent SNO install completed'
 else
   result=$?
+  stop_install_progress
   # Report only a known phase name and exit code, never raw xtrace output.
   phase=make
   for candidate in 01_agent_requirements 01_install_requirements 02_configure_host \
@@ -370,6 +603,8 @@ else
   printf 'Dev-scripts failed in %s (exit %s); gathering installer and VM logs\n' "${phase}" "${result}" >&2
   exit "${result}"
 fi
+
+echo 'Recording the installed SNO state'
 
 # Use the payload client extracted by dev-scripts in all later steps.
 cp /usr/local/bin/oc bin/oc
@@ -403,6 +638,8 @@ inventory = [dict(name=node['metadata']['name'], ip=ip, mac=mac, role='control-p
 Path('inventory.json').write_text(json.dumps(inventory, indent=2) + '\n')
 PY
 
+echo 'Configuring the load balancer and API DNS'
+
 # The later node-add flow uses host HAProxy for API, MCS, and ingress.
 # Keep API DNS on the SNO until both new nodes have joined.
 setsebool -P haproxy_connect_any on
@@ -416,18 +653,26 @@ done
 refresh_load_balancer
 set_api_dns "$(jq -er '.[0].ip' inventory.json)"
 
+echo 'Extracting the matching ISO for added nodes'
+
 # Use a matching payload ISO for nodes added after the initial SNO install.
 os_image=$(oc adm release info --registry-config=pull-secret --image-for=machine-os-images "${release_image}")
 oc image extract --registry-config=pull-secret "${os_image}" --path=/coreos/coreos-x86_64.iso:. --confirm
 mv coreos-x86_64.iso rhcos-live.iso
-oc wait node --all --for=condition=Ready --timeout=10m
+echo 'Waiting for the installed node to be ready (10 minute limit)'
+oc wait node --all --for=condition=Ready --timeout=10m >/dev/null
 # Operators can start another rollout just after the installer reports success.
 echo 'Waiting for cluster operators to settle'
-deadline=$((SECONDS + 1200))
+started=${SECONDS}
+deadline=$((started + 1200))
+attempt=0
 while true; do
-  if oc --request-timeout=30s get clusteroperators -o json | jq -e '.items | length > 0 and all(.[];
+  attempt=$((attempt + 1))
+  printf 'Cluster operator check: attempt %s, elapsed %ss of 1200s\n' "${attempt}" "$((SECONDS - started))"
+  if oc --request-timeout=30s get clusteroperators -o json 2>/dev/null | jq -e '.items | length > 0 and all(.[];
     any(.status.conditions[]; .type == "Available" and .status == "True") and
     all(.status.conditions[]; (.type != "Degraded" and .type != "Progressing") or .status == "False"))' >/dev/null; then
+    echo 'Cluster operator checks passed'
     break
   fi
 
@@ -438,9 +683,12 @@ while true; do
 
   sleep 10
 done
+echo 'Checking that MutableTopology is enabled'
 oc get featuregate cluster -o json | jq -e '.spec.featureSet == "CustomNoUpgrade" and
   any(.status.featureGates[]; any(.enabled[]; .name == "MutableTopology"))' >/dev/null
 REMOTE
+
+echo 'Copying the cluster handoff files for later steps'
 
 # These files contain credentials. Keep them in SHARED_DIR, never ARTIFACT_DIR.
 scp "${SSHOPTS[@]}" "${remote}:${workdir}/install/auth/kubeconfig" "${SHARED_DIR}/kubeconfig"

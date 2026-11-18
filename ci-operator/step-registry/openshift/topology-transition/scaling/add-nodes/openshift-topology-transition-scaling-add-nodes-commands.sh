@@ -1,6 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 
+finish_step() {
+  local result=$?
+
+  trap - EXIT
+  if (( result != 0 )); then
+    printf 'Add nodes step: failed (exit %s)\n' "${result}" >&2
+  else
+    echo 'Add nodes step: completed successfully'
+  fi
+
+  exit "${result}"
+}
+trap finish_step EXIT
+
+echo 'Add nodes step: starting'
+
 case "${NODE_ROLE}" in
   control-plane|worker|infra) ;;
   *) echo 'NODE_ROLE must be control-plane, worker, or infra' >&2; exit 1 ;;
@@ -30,13 +46,29 @@ ssh "${SSHOPTS[@]}" "${remote}" sudo bash -s -- "${workdir}" "${NODE_ROLE}" "${A
 set -euo pipefail
 umask 077
 cd "$1"
-trap 'chown -R ec2-user:ec2-user .' EXIT
+cleanup_remote() {
+  local result=$?
+
+  trap - EXIT
+  if ! chown -R ec2-user:ec2-user .; then
+    echo 'Could not restore host file ownership' >&2
+    if (( result == 0 )); then
+      result=1
+    fi
+  fi
+
+  exit "${result}"
+}
+trap cleanup_remote EXIT
+
 node_role=$2
 additional_nodes=$3
 # shellcheck source=/dev/null
 source common.sh
 cluster_domain=$(jq -er .clusterDomain state.json)
 network=$(jq -er .network state.json)
+
+printf 'Planning %s added nodes\n' "${additional_nodes}"
 
 # Check the whole batch before changing DHCP, disks, or inventory.
 oc get nodes -o json > existing-nodes.json
@@ -117,6 +149,8 @@ for offset, index in enumerate(range(next_ip, next_ip + count)):
 pathlib.Path('expected-nodes.json').write_text(json.dumps(planned, indent=2) + '\n')
 PY
 
+echo 'Preparing node join data'
+
 # Trust the running MCS CA, rather than an expired install-time Ignition token.
 oc -n openshift-machine-config-operator get configmap machine-config-server-ca \
   -o jsonpath='{.data.ca-bundle\.crt}' > mcs-ca.crt
@@ -132,7 +166,10 @@ jq -n --arg ca "data:text/plain;charset=utf-8;base64,$(base64 -w0 mcs-ca.crt)" \
   '{ignition:{version:"3.2.0",security:{tls:{certificateAuthorities:[{source:$ca}]}},config:{merge:[{source:$url}]}}}' > join.ign
 
 # The live image installs to disk and reboots into the node Ignition.
+node_index=0
 while IFS=$'\t' read -r name ip mac; do
+  node_index=$((node_index + 1))
+  printf 'Creating added VM %s of %s\n' "${node_index}" "${additional_nodes}"
   jq --arg hostname "data:;base64,$(printf '%s\n' "${name}" | base64 -w0)" '
     .storage.files = [{path:"/etc/hostname",mode:420,overwrite:true,contents:{source:$hostname}}]' join.ign > "${name}.ign"
   jq -n --arg ignition "data:;base64,$(base64 -w0 "${name}.ign")" \
@@ -144,6 +181,8 @@ while IFS=$'\t' read -r name ip mac; do
   mv inventory.next.json inventory.json
   create_vm "${name}" "${mac}" "${ip}" "${name}-install.ign"
 done < <(jq -r '.[] | [.name,.ip,.mac] | @tsv' expected-nodes.json)
+
+echo 'Updating the load balancer and waiting for added nodes to join'
 refresh_load_balancer
 wait_for_nodes "${kube_role}"
 if [[ "${node_role}" == infra ]]; then
@@ -155,5 +194,6 @@ fi
 cp expected-nodes.json "added-${node_role}-$(date +%s).json"
 REMOTE
 
+echo 'Copying the added-node handoff files'
 scp "${SSHOPTS[@]}" "${remote}:${workdir}/inventory.json" "${SHARED_DIR}/topology-inventory.json"
 scp "${SSHOPTS[@]}" "${remote}:${workdir}/expected-nodes.json" "${SHARED_DIR}/topology-added-${NODE_ROLE}.json"
