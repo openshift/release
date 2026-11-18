@@ -211,7 +211,7 @@ Mandatory. Follow "Incident note" in `/tmp/qe-agent-modules/analysis-summary.md`
 
 ## Step 5e — If JOB_CONFIG: Recommend a Job Configuration Change
 
-The test and product are fine, but the job lacks something (the kubeadmin password file, the console operator, `OPENSHIFT_CREATE_DASHBOARD=true` in the operator bundle, access to the telemetrygen image). Don't modify tests or write `jira-payload.json`. In `qe-agent-analysis.md`, give the evidence and the exact change: the job is `e2e-ui-ocp-4-22` in `ci-operator/config/openshift/open-telemetry-opentelemetry-operator/` — branch `rhosdt-0.158` variant `art-build` for premerge, branch `main` variant `upstream` for upstream; use whichever matches `step_script_ref`.
+The test and product are fine, but the job lacks something (the kubeadmin password file, the console operator, `OPENSHIFT_CREATE_DASHBOARD=true` in the operator bundle, access to the telemetrygen image). Don't modify tests or write `jira-payload.json`. In `qe-agent-analysis.md`, give the evidence and the exact change: the job is `e2e-ui-ocp-4-22` in `ci-operator/config/openshift/open-telemetry-opentelemetry-operator/` — branch `rhosdt-0.158` or `rhosdt-0.163` variant `art-build` for premerge, branch `main` variant `upstream` for upstream; use whichever matches `step_script_ref`.
 
 ---
 
