@@ -407,10 +407,11 @@ except Exception:
     # in Placement.status; check the decisions first and fall back to the
     # Placement status fields for older API shapes.
     typeset -i _opp_sel=0
-    typeset -i _opp_try=0
-    while (( _opp_try < 30 )); do
+    _opp_start_epoch="$(date +%s)"
+    _opp_deadline="$((_opp_start_epoch + 300))"
+    while (( $(date +%s) < _opp_deadline )); do
         _opp_dec="no"
-        if [[ "$(oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | python3 -c '
+        if [[ "$(oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" --request-timeout=30s -o json 2>/dev/null | python3 -c '
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -425,7 +426,7 @@ except Exception:
 ')" == "yes" ]]; then
             _opp_dec="yes"
         else
-            _opp_dec="$(oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | python3 -c '
+            _opp_dec="$(oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" --request-timeout=30s -o json 2>/dev/null | python3 -c '
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -442,12 +443,11 @@ except Exception:
             _opp_sel=1
             break
         fi
-        _opp_try=$((_opp_try + 1))
         sleep 10
     done
 
     # Post-suite placement state and decisions as evidence.
-    oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | \
+    oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" --request-timeout=30s -o json 2>/dev/null | \
         python3 -c '
 import json, sys
 d = json.load(sys.stdin)
@@ -457,7 +457,7 @@ print(json.dumps({
     "status": d.get("status", {})
 }, indent=2))
 ' > "${_OPP_EVIDENCE_DIR}/05-placement-status-post.json" 2>&1
-    oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | \
+    oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" --request-timeout=30s -o json 2>/dev/null | \
         python3 -c '
 import json, sys
 d = json.load(sys.stdin)
@@ -497,7 +497,7 @@ print(json.dumps(result, indent=2))
         echo "  </testcase>"
         echo "  <testcase classname=\"grc-placement-restore\" name=\"placement-selects-local-cluster\">"
         if [[ "${_opp_sel}" -ne 1 ]]; then
-            echo "    <failure message=\"$(_opp_xesc "placement ${_OPP_PLACEMENT_NAME} does not select ${_OPP_MC_NAME} after the GRC suite; see 04-label-restore.log, 05-placement-status-post.json and 06-placementdecisions-post.json in this step artifacts")\"></failure>"
+            echo "    <failure message=\"$(_opp_xesc "placement ${_OPP_PLACEMENT_NAME} does not select ${_OPP_MC_NAME} after the GRC suite: selection could not be verified within 5 minutes; see 04-label-restore.log, 05-placement-status-post.json and 06-placementdecisions-post.json in this step artifacts")\"></failure>"
         fi
         echo "  </testcase>"
         echo "</testsuite>"
