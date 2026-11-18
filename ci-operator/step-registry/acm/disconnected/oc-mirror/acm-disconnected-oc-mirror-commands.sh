@@ -52,12 +52,18 @@ configure_pull_secrets() {
     redhat_auth_password=$(jq -r '.password' "$redhat_registry_path")
     redhat_registry_auth=$(echo -n "$redhat_auth_user:$redhat_auth_password" | base64 -w 0)
 
+    local brew_registry_path="/var/run/vault/mirror-registry/registry_brew.json"
+    local brew_auth_user brew_auth_password brew_registry_auth
+    brew_auth_user=$(jq -r '.user' "$brew_registry_path")
+    brew_auth_password=$(jq -r '.password' "$brew_registry_path")
+    brew_registry_auth=$(echo -n "$brew_auth_user:$brew_auth_password" | base64 -w 0)
+
     local mirror_registry_path="/var/run/vault/mirror-registry/registry_creds"
     local mirror_registry_auth
     mirror_registry_auth=$(head -n 1 "$mirror_registry_path" | base64 -w 0)
 
     oc extract secret/pull-secret -n openshift-config --confirm --to "${TMP_DIR}"
-    jq --argjson a "{\"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$mirror_registry_auth\"}}" \
+    jq --argjson a "{\"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"brew.registry.redhat.io\": {\"auth\": \"$brew_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$mirror_registry_auth\"}}" \
         '.auths |= . + $a' "${TMP_DIR}/.dockerconfigjson" > "${XDG_RUNTIME_DIR}/containers/auth.json"
 
     log "Pull secrets configured"
