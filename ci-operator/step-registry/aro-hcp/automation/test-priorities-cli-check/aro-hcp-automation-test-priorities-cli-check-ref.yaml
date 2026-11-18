@@ -1,0 +1,37 @@
+ref:
+  as: aro-hcp-automation-test-priorities-cli-check
+  from: cli-check-base
+  commands: aro-hcp-automation-test-priorities-cli-check-commands.sh
+  timeout: 45m0s
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: "2"
+      memory: 8Gi
+  credentials:
+    - collection: hcm-aro
+      group: aro-hcp-dev
+      mount_path: /var/run/aro-hcp-dev
+  env:
+    - name: ARO_HCP_REF
+      default: "f2de8c3eb"
+      documentation: |-
+        ARO-HCP revision to build the test CLI from. This step exists to run an
+        unreleased CLI revision inside a real Prow job.
+    - name: KUSTO_CLUSTER
+      default: hcp-dev-us-2
+      documentation: |-
+        Kusto cluster holding the CI telemetry tables.
+    - name: KUSTO_REGION
+      default: eastus2
+      documentation: |-
+        Kusto cluster region, used to build the data-plane endpoint.
+    - name: KUSTO_DATABASE
+      default: ServiceLogs
+      documentation: |-
+        Kusto database with the CI telemetry tables.
+  documentation: |-
+    Builds aro-hcp-tests from one ARO-HCP revision and exercises the priority
+    commands against real CI telemetry: score the last 30 days, list the catalog
+    and render the refresh summary from the in-memory plan. Nothing is written to
+    the checkout and no pull request is opened.
