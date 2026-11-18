@@ -67,15 +67,28 @@ log "listing the catalog"
 "${RUNNER}" list tests --output json >"${ARTIFACT_DIR}/catalog-before.json" ||
     error "list tests failed"
 
-log "rendering the summary from the in-memory plan"
+log "planning the refresh"
 "${RUNNER}" refresh-priorities \
     --report "${ARTIFACT_DIR}/priority-scores.json" \
     --catalog "${ARTIFACT_DIR}/catalog-before.json" \
     --repo "${REPO}" \
-    --summary-html "${ARTIFACT_DIR}/priorities-summary.html" \
-    --summary-note "CLI check from ARO-HCP ${resolved}" \
     >"${ARTIFACT_DIR}/priority-changes.json" ||
     error "refresh-priorities failed"
+
+log "rendering the summary from the saved reports"
+"${RUNNER}" priorities-summary \
+    --report "${ARTIFACT_DIR}/priority-scores.json" \
+    --changes "${ARTIFACT_DIR}/priority-changes.json" \
+    --note "CLI check from ARO-HCP ${resolved}" \
+    --publication-url "https://github.com/Azure/ARO-HCP/pull/8177" \
+    --output "${ARTIFACT_DIR}/priorities-summary.html" ||
+    error "priorities-summary failed"
+
+log "rendering the notice page"
+"${RUNNER}" priorities-summary \
+    --note "Publication skipped: an open generated pull request exists" \
+    --output "${ARTIFACT_DIR}/priorities-notice.html" ||
+    error "priorities-summary notice failed"
 
 created=$(jq '.changes | length' "${ARTIFACT_DIR}/priority-changes.json") ||
     error "cannot read the change summary"
