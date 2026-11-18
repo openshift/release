@@ -25,7 +25,6 @@ ssh "${SSHOPTS[@]}" "${remote}" "mkdir -p '${workdir}/bin' '${workdir}/results'"
 jq -cs '.[0] * .[1]' "${CLUSTER_PROFILE_DIR}/pull-secret" \
   /var/run/pull-secret/.dockerconfigjson > "${SHARED_DIR}/topology-pull-secret"
 scp "${SSHOPTS[@]}" "${SHARED_DIR}/topology-pull-secret" "${remote}:${workdir}/pull-secret"
-scp "${SSHOPTS[@]}" "$(command -v oc)" "${remote}:${workdir}/bin/oc"
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${remote}:${workdir}/ssh-publickey"
 scp "${SSHOPTS[@]}" /var/run/rhsm/subscription-manager-{org,act-key} "${remote}:${workdir}/"
 
@@ -300,7 +299,6 @@ for attempt in 1 2 3; do
   sleep 15
 done
 [[ -c /dev/kvm ]]
-install -m 755 bin/oc /usr/local/bin/oc
 export PATH="/usr/local/bin:${PATH}"
 
 # Fail on reuse. Do not overwrite an earlier deployment or format host disks.
