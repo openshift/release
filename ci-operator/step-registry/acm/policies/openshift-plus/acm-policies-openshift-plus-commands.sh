@@ -16,7 +16,7 @@ fi
 typeset -i _pc_ref_count
 _pc_ref_count=$(git ls-remote https://github.com/stolostron/policy-collection.git "${POLICY_COLLECTION_REF}" 2>/dev/null | wc -l)
 if (( _pc_ref_count > 1 )); then
-  echo "ERROR: POLICY_COLLECTION_REF '${POLICY_COLLECTION_REF}' matches ${_pc_ref_count} refs (expected 0 or 1 for SHA) — failing closed" >&2
+  echo "ERROR: POLICY_COLLECTION_REF '${POLICY_COLLECTION_REF}' matches ${_pc_ref_count} refs (expected 0 or 1 for SHA); failing closed" >&2
   exit 1
 fi
 
