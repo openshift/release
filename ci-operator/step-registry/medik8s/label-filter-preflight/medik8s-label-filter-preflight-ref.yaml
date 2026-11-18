@@ -1,0 +1,32 @@
+ref:
+  as: medik8s-label-filter-preflight
+  from: src
+  commands: medik8s-label-filter-preflight-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 30m
+  env:
+  - name: ECO_TEST_FEATURES
+    documentation: |-
+      Space-separated suite directory names under tests/ (same as make run-tests).
+      Required. Example: snr-operator
+  - name: ECO_TEST_LABELS
+    documentation: |-
+      Ginkgo --label-filter expression. Required for candidate jobs so a missing
+      or mistyped filter cannot silently select the whole suite.
+    default: ""
+  documentation: |-
+    Runs a clusterless Ginkgo dry-run (`ECO_DRY_RUN=true`, `--dry-run`) against
+    ECO_TEST_FEATURES / ECO_TEST_LABELS before cluster install.
+
+    Place this ref first in `pre`, then `chain: ipi-aws-pre` (setting test-level
+    `pre` replaces the workflow pre chain). If zero specs match the filter, this
+    step exits non-zero so remaining pre/test steps (including IPI) are skipped.
+
+    Caveats (by design for candidate dailies):
+    - The multi-stage job still acquires a Boskos lease when `cluster_profile` is
+      set; only cluster creation is avoided.
+    - An empty candidate suite therefore leaves the periodic red until at least
+      one matching spec exists.
