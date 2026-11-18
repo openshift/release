@@ -225,7 +225,7 @@ PHASE_PLAN_START=$(date +%s)
 echo "Invoking Claude to plan ${JIRA_ISSUE_KEY} (subtask ${PLANNING_ISSUE_KEY})..."
 PLAN_PHASE_STARTED=true
 
-CLAUDE_EXIT=0
+CLAUDE_EXIT=1
 agentic_ci --timeout 5400 \
     "Create an implementation plan for Jira issue ${JIRA_ISSUE_KEY} with planning subtask ${PLANNING_ISSUE_KEY}. Follow the Planning Process instructions in your system prompt.
 
@@ -234,7 +234,7 @@ Work serially without delegation. Commit locally; do not push or invoke gh direc
     --settings "${AGENT_SETTINGS}" \
     --output-format stream-json \
     --append-system-prompt-file "${SYSTEM_PROMPT}" \
-    || CLAUDE_EXIT=$?
+    && CLAUDE_EXIT=0 || CLAUDE_EXIT=$?
 
 if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
     echo "Claude timed out. Nudging to wrap up..."
