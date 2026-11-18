@@ -841,14 +841,14 @@ _og_names() {
 # spec: {} drops a targetNamespaces the other writer set), which breaks the
 # adoption contract - an object this step did not create is never written.
 _og_create() {
-  cat <<EOF | oc create -f - 2>&1
-apiVersion: operators.coreos.com/v1
-kind: OperatorGroup
-metadata:
-  name: rhacs-operator-group
-  namespace: ${ACS_NAMESPACE}
-spec: {}
-EOF
+  # CIOP-1: marshal with jq --arg. Shell interpolation into YAML breaks on a
+  # quote or colon in the value and no parser gets to check the result.
+  jq -cn --arg ns "${ACS_NAMESPACE}" \
+    '{apiVersion:"operators.coreos.com/v1",
+      kind:"OperatorGroup",
+      metadata:{name:"rhacs-operator-group",namespace:$ns},
+      spec:{}}' |
+  oc create -f - 2>&1
 }
 # Used only on the success path of _og_create, where rhacs-operator-group is
 # this step's own object: a second group that appeared concurrently is
@@ -948,19 +948,18 @@ if oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}"
 else
   # oc create (not apply): if a second writer (a live OperatorPolicy) wins
   # the race, create fails AlreadyExists and we adopt, never overwrite.
-  if ! cat <<EOF | oc create -f - 2>&1
-apiVersion: operators.coreos.com/v1alpha1
-kind: Subscription
-metadata:
-  name: rhacs-operator
-  namespace: ${ACS_NAMESPACE}
-spec:
-  channel: "${ACS_CHANNEL}"
-  installPlanApproval: Automatic
-  name: rhacs-operator
-  source: redhat-operators
-  sourceNamespace: openshift-marketplace
-EOF
+  # CIOP-1: jq --arg marshalling (see _og_create): the channel string is a
+  # variable, so it never reaches the manifest as raw text.
+  if ! jq -cn --arg ns "${ACS_NAMESPACE}" --arg ch "${ACS_CHANNEL}" \
+      '{apiVersion:"operators.coreos.com/v1alpha1",
+        kind:"Subscription",
+        metadata:{name:"rhacs-operator",namespace:$ns},
+        spec:{channel:$ch,
+              installPlanApproval:"Automatic",
+              name:"rhacs-operator",
+              source:"redhat-operators",
+              sourceNamespace:"openshift-marketplace"}}' |
+      oc create -f - 2>&1
   then
     if oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" >/dev/null 2>&1; then
       _prop "acs_subscription" "race-tolerated"
@@ -1071,20 +1070,33 @@ install_deadline=$(_clamp_deadline "${_install_want}")
 if (( install_deadline < _install_want )); then
   echo ">>> NOTE: CSV-Succeeded wait clamped to $(( install_deadline - $(date +%s) ))s (requested ${ACS_INSTALL_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
 fi
+# Two-stage wait (L-1): stage 1 is `oc wait --for=create`, which blocks on
+# the API server for the object itself instead of polling it with `oc get`
+# plus `sleep` (each poll burns the shared work budget). Stage 2 waits for
+# the phase on the object stage 1 saw. `--timeout=0s` means check once and
+# return, so an exhausted budget still classifies rather than hanging.
+typeset -i _csv_created=0
 _api_quiet
-while :; do
+install_left=$(( install_deadline - $(date +%s) ))
+(( install_left < 0 )) && install_left=0
+if oc wait csv "${csvName}" -n "${ACS_NAMESPACE}" \
+    --for=create --timeout="${install_left}s" 2>&1; then
+    _csv_created=1
+    csv_probe_out=""
+else
+    # One bounded probe carries the API error text the NotFound test below
+    # reads, so "never created" is classified from the API answer, never
+    # guessed. An object that appeared after the create wait timed out still
+    # gets stage 2 (the probe succeeded, so there is something to wait on).
     if csv_probe_out=$(oc get csv "${csvName}" -n "${ACS_NAMESPACE}" -o name 2>&1); then
-        break
+        _csv_created=1
     fi
-    install_left=$(( install_deadline - $(date +%s) ))
-    if (( install_left <= 0 )); then break; fi
-    if (( install_left < 5 )); then sleep "${install_left}"; else sleep 5; fi
-done
+fi
 _api_loud
 install_left=$(( install_deadline - $(date +%s) ))
 (( install_left < 0 )) && install_left=0
 
-if ! oc wait csv "${csvName}" -n "${ACS_NAMESPACE}" \
+if (( ! _csv_created )) || ! oc wait csv "${csvName}" -n "${ACS_NAMESPACE}" \
     --for=jsonpath='{.status.phase}'=Succeeded \
     --timeout="${install_left}s" 2>&1; then
     _phase=$(oc get csv "${csvName}" -n "${ACS_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null) || _phase="unknown"
