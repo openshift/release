@@ -536,6 +536,7 @@ print(json.dumps(result, indent=2))
     typeset -i _opp_base_ok="${_OPP_BASELINE_OK}"
     typeset -i _opp_failures=$(( (1 - _opp_inv_ok) + (1 - _opp_sel) + (1 - _opp_base_ok) ))
     _opp_junit="${ARTIFACT_DIR}/junit_grc_placement_restore.xml"
+    typeset -i _opp_junit_write_rc=0
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
         echo "<testsuite name=\"grc-placement-restore\" tests=\"3\" failures=\"${_opp_failures}\">"
@@ -559,7 +560,13 @@ print(json.dumps(result, indent=2))
         fi
         echo "  </testcase>"
         echo "</testsuite>"
-    } > "${_opp_junit}"
+    } > "${_opp_junit}" 2>&1 || _opp_junit_write_rc=$?
+    if (( _opp_junit_write_rc != 0 )) || [[ ! -s "${_opp_junit}" ]] || ! tail -n1 "${_opp_junit}" 2>/dev/null | grep -qF "</testsuite>"; then
+        echo "ERROR: failed to write JUnit report ${_opp_junit} (write rc=${_opp_junit_write_rc})" >&2
+        if [[ "${_test_rc}" -eq 0 ]]; then
+            _test_rc=1
+        fi
+    fi
     if [[ "${_opp_failures}" -gt 0 ]]; then
         echo "OPP placement checks FAILED; see ${_opp_junit}" >&2
         if [[ "${_test_rc}" -eq 0 ]]; then
