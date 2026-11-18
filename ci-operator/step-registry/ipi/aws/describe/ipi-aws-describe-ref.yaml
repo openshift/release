@@ -1,0 +1,31 @@
+ref:
+  as: ipi-aws-describe
+  from: upi-installer
+  commands: ipi-aws-describe-commands.sh
+  best_effort: true
+  timeout: 5m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Post-install step that queries AWS for all cluster resources and writes a comprehensive
+    inventory to artifacts for debugging and documentation purposes.
+
+    This step queries AWS EC2, ELB, and other services to gather information about:
+    - EC2 Instances (with nested virtualization details)
+    - EBS Volumes
+    - VPCs and Subnets
+    - Security Groups
+    - Load Balancers (Classic and Application/Network)
+    - Route Tables
+    - Internet Gateways
+    - NAT Gateways
+
+    Outputs:
+    - ${ARTIFACT_DIR}/aws-cluster-describe.json - Full JSON inventory with public IPs redacted
+    - ${ARTIFACT_DIR}/aws-cluster-describe.log - Human-readable summary of all resources
+    - ${SHARED_DIR}/aws-cluster-describe.json - Copy of JSON for use by subsequent steps
+
+    This step is marked as best_effort and will not fail the test if AWS queries fail.
+    It is primarily useful for debugging cluster configuration and verifying resource creation.
