@@ -37,7 +37,6 @@ additional_nodes=$3
 source common.sh
 cluster_domain=$(jq -er .clusterDomain state.json)
 network=$(jq -er .network state.json)
-[[ "${network}" == topology-transition ]]
 
 # Check the whole batch before changing DHCP, disks, or inventory.
 oc get nodes -o json > existing-nodes.json
@@ -57,6 +56,19 @@ subnet = ipaddress.ip_network(state['cidr'])
 image_dir = pathlib.Path(state['imageDirectory'])
 used_names = {node['metadata']['name'] for node in existing_nodes['items']}
 used_ips, used_macs = set(), set()
+
+network = ET.fromstring(subprocess.check_output(['virsh', 'net-dumpxml', state['network']], text=True))
+bridge = network.find('bridge')
+network_ip = next((entry for entry in network.findall('ip') if entry.get('address') == state['gateway']), None)
+if bridge is None or bridge.get('name') != state['bridge'] or network_ip is None:
+    sys.exit('VM network does not match recorded state')
+
+prefix = network_ip.get('prefix') or network_ip.get('netmask')
+if ipaddress.ip_network(f"{state['gateway']}/{prefix}", strict=False) != subnet:
+    sys.exit('VM subnet does not match recorded state')
+
+dhcp_ranges = [(int(ipaddress.ip_address(entry.get('start'))), int(ipaddress.ip_address(entry.get('end'))))
+               for entry in network_ip.findall('dhcp/range')]
 
 for node in inventory:
     used_names.add(node['name'])
@@ -86,10 +98,17 @@ if next_ip + count > int(subnet.broadcast_address):
     sys.exit('Not enough IPs in the VM subnet')
 
 planned = []
-for index in range(next_ip, next_ip + count):
-    name = ('master' if role == 'control-plane' else role) + '-' + str(index - int(subnet.network_address) - 10)
+name_prefix = 'master' if role == 'control-plane' else role
+name_indexes = [int(node['name'].removeprefix(name_prefix + '-')) for node in inventory
+                if node['name'].startswith(name_prefix + '-') and node['name'].removeprefix(name_prefix + '-').isdigit()]
+next_name_index = max(name_indexes, default=-1) + 1
+
+for offset, index in enumerate(range(next_ip, next_ip + count)):
+    name = f'{name_prefix}-{next_name_index + offset}'
     ip = str(ipaddress.ip_address(index))
     mac = f'52:54:00:7a:00:{index - int(subnet.network_address):02x}'
+    if any(start <= index <= end for start, end in dhcp_ranges):
+        sys.exit('Requested VM IP overlaps the dynamic DHCP pool')
     if (name in used_names or ip in used_ips or mac in used_macs or
             any((image_dir / (name + suffix)).exists() for suffix in ['.iso', '.qcow2'])):
         sys.exit('Requested VM resources overlap existing names, IPs, MACs, or disks')

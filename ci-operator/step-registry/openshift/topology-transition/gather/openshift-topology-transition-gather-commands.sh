@@ -32,8 +32,9 @@ export KUBECONFIG="${PWD}/install/auth/kubeconfig"
 # Copy only known public files. Install assets and Ignition contain credentials.
 cp inventory.json state.json results/host/ 2>/dev/null || true
 virsh list --all > results/host/vms.txt
-virsh net-dumpxml topology-transition > results/host/network.xml
-journalctl --no-pager -u libvirtd -u haproxy > results/host/services.log
+network=$(jq -er '.network // "transitionbm"' state.json 2>/dev/null) || network=transitionbm
+virsh net-dumpxml "${network}" > results/host/network.xml
+journalctl --no-pager -u libvirtd -u virtqemud -u virtnetworkd -u haproxy > results/host/services.log
 cp /var/log/libvirt/qemu/*.log results/host/ 2>/dev/null || true
 if [[ -s install/.openshift_install.log ]]; then
   # Redact before writing artifacts; keep the surrounding log text intact.
