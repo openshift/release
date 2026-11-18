@@ -591,6 +591,115 @@ tests:
     - ref: openshift-tests-extension-setup-out-of-payload
     - ref: openshift-e2e-test
     workflow: ipi-nutanix-ovn-hybrid
+- always_run: false
+  as: azure-ipi-ote-debug
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]\|\[tls-adherence\]
+      TEST_SUITE: windows-machine-config-operator/all
+      TIMEOUT: +4 hours
+    test:
+    - as: wmco-setup-and-hold
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        # The Azure profile already configures azure storage on the registry, so only
+        # the management state is patched here. Adding emptyDir on top of the existing
+        # azure stanza leaves two storage types configured and the image-registry
+        # operator refuses to reconcile.
+        oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed"}}'
+        # -m 2 reproduces the two-node setup path. Setup is expected to fail inside
+        # TestWMCO/create/Creation until the WMCO provisioning budget scales with the
+        # node count, so the cluster is held either way for inspection.
+        hack/run-ci-e2e-test.sh -t setup-only -s -m 2 || echo "WMCO setup failed, holding the cluster for debugging"
+        # Hold the cluster instead of adding a separate wait step. A new wait pod carries a
+        # required pod anti-affinity against pods labelled pod-scaler.openshift.io/measured=false
+        # and cannot be scheduled on the ci-test workers while other jobs occupy them.
+        if [[ -n "${PULL_NUMBER:-}" ]]; then
+          echo "Debug hold: touch /tmp/debug.done in this pod to release it early"
+          end=$(date -d "${TIMEOUT}" +%s)
+          while [[ ! -f /tmp/debug.done && $(date +%s) -lt ${end} ]]; do sleep 60; done
+        fi
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      env:
+      - default: +4 hours
+        documentation: How long the opt-in debug hold keeps the cluster available
+          before the job continues on its own.
+        name: TIMEOUT
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 6h45m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-azure-ovn-hybrid
+  timeout: 20h0m0s
+- always_run: false
+  as: vsphere-ipi-ote-debug
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "3"
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]\|\[tls-adherence\]
+      TEST_SUITE: windows-machine-config-operator/all
+      TIMEOUT: +4 hours
+    test:
+    - as: wmco-setup-and-hold
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        # -m 2 provisions two Windows Machine nodes so the serial scale-up cases can
+        # be triggered by hand against a held cluster while the machineset recovery
+        # defect is investigated. Setup is not allowed to fail the hold.
+        hack/run-ci-e2e-test.sh -t setup-only -s -m 2 || echo "WMCO setup failed, holding the cluster for debugging"
+        # Hold the cluster instead of adding a separate wait step. A new wait pod carries a
+        # required pod anti-affinity against pods labelled pod-scaler.openshift.io/measured=false
+        # and cannot be scheduled on the ci-test workers while other jobs occupy them.
+        if [[ -n "${PULL_NUMBER:-}" ]]; then
+          echo "Debug hold: touch /tmp/debug.done in this pod to release it early"
+          end=$(date -d "${TIMEOUT}" +%s)
+          while [[ ! -f /tmp/debug.done && $(date +%s) -lt ${end} ]]; do sleep 60; done
+        fi
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      env:
+      - default: +4 hours
+        documentation: How long the opt-in debug hold keeps the cluster available
+          before the job continues on its own.
+        name: TIMEOUT
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 6h45m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+  timeout: 20h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift
