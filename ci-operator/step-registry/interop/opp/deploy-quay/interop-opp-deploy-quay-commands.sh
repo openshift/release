@@ -288,7 +288,7 @@ _poll_jsonpath() {
       if [[ -n "${_failval}" && "${_out}" == "${_failval}" ]]; then return 3; fi
     else
       _poll_last=""
-      if printf '%s' "${_out}" | grep -qF '(NotFound)'; then
+      if grep -qF '(NotFound)' <<<"${_out}"; then
         : # object absent yet: wait, do not count as a query failure
       else
         (( _fails += 1 )) || true
@@ -446,7 +446,7 @@ _quay_admin_secrets_state() {
       if _out=$(oc get secret "${_s}" -n "${QUAY_NAMESPACE}" --request-timeout="$(_left_budget 20)" 2>&1); then
         break
       fi
-      if printf '%s' "${_out}" | grep -qF '(NotFound)'; then
+      if grep -qF '(NotFound)' <<<"${_out}"; then
         echo absent
         return 0
       fi
@@ -507,7 +507,7 @@ _quay_admin_job_snapshot() {
       echo "${_state} ${_uid}"
       return 0
     fi
-    if printf '%s' "${_out}" | grep -qF '(NotFound)'; then
+    if grep -qF '(NotFound)' <<<"${_out}"; then
       echo "absent -"
       return 0
     fi
@@ -618,7 +618,7 @@ _quay_devel_repo_role() {
   _body=${_body%$'\n'*}
   case "${_code}" in
     200)
-      if printf '%s' "${_body}" | grep -qE '"role"[[:space:]]*:[[:space:]]*"admin"'; then
+      if grep -qE '"role"[[:space:]]*:[[:space:]]*"admin"' <<<"${_body}"; then
         echo admin
       else
         echo other
@@ -892,7 +892,7 @@ for _attempt in 1 2 3; do
     _precondition_ok=true
     break
   fi
-  if printf '%s' "${_pm_raw}" | grep -qi "not found"; then
+  if grep -qi "not found" <<<"${_pm_raw}"; then
     _classify "quay-catalog-missing" "packagemanifest quay-operator not found in openshift-marketplace (successful query)"
     echo "ERROR: ${_class_detail}"
     exit 1
@@ -1415,7 +1415,7 @@ EOF
           exit 1
         fi
       fi
-    elif ! printf '%s' "${_qa_out}" | grep -qF '(NotFound)'; then
+    elif ! grep -qF '(NotFound)' <<<"${_qa_out}"; then
       # A read timeout or an RBAC error is not absence: treating it as absence
       # deletes a terminal Job and lets the replacement die on its own guard.
       _classify "quay-admin-secrets-query-failed" "the quayadmin Secret could not be read after the Job decision ($(printf '%s' "${_qa_out}" | head -1)); presence is unknown, so the Job is left in place"
@@ -1586,7 +1586,7 @@ EOF
           while :; do
             if ! _still_raw=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" --request-timeout="$(_left_budget 20)" -o jsonpath='__quay_job__{.metadata.uid}' 2>&1); then
               _still=${_still_raw}
-              if printf '%s' "${_still_raw}" | grep -qF '(NotFound)'; then
+              if grep -qF '(NotFound)' <<<"${_still_raw}"; then
                 _gone=1
                 break
               fi
@@ -1651,9 +1651,9 @@ EOF
             echo ">>> deleted stale ${_delete_state} Job create-admin-user (admin secrets absent)"
             _prop "quay_admin_job_stale_deleted" "true"
           fi
-        elif printf '%s' "${_delete_out}" | grep -qF '(NotFound)'; then
+        elif grep -qF '(NotFound)' <<<"${_delete_out}"; then
           echo ">>> create-admin-user Job was removed before the delete; creating it again"
-        elif printf '%s' "${_delete_out}" | grep -qiE 'conflict|precondition'; then
+        elif grep -qiE 'conflict|precondition' <<<"${_delete_out}"; then
           # The precondition rejected the delete, so another writer holds the
           # name: read it and take the same paths as the arms above rather than
           # failing a registry whose replacement is healthy.
@@ -1877,7 +1877,7 @@ spec:
                 echo "Quay user initialization call failed (curl rc=${CURL_RC}); no secrets created." 1>&2
                 exit 1
               fi
-              if echo "$RESULT" | grep -q "non-empty database"; then
+              if grep -q "non-empty database" <<<"$RESULT"; then
                 echo "Quay user configuration failed, the database has been initialized."
                 exit 1
               else
@@ -1940,7 +1940,7 @@ spec:
                 2[0-9][0-9])
                   # A successful read that still says not_found is a definite
                   # absence; any other successful body means the org is there.
-                  if printf '%s\n' "${_ORG_BODY}" | grep -q not_found; then
+                  if grep -q not_found <<<"${_ORG_BODY}"; then
                     _ORG_ABSENT=1
                   fi
                   ;;
@@ -1985,7 +1985,7 @@ spec:
               _REPO_ABSENT=0
               case "${_REPO_STATUS}" in
                 2[0-9][0-9])
-                  if printf '%s\n' "${_REPO_BODY}" | grep -q not_found; then
+                  if grep -q not_found <<<"${_REPO_BODY}"; then
                     _REPO_ABSENT=1
                   fi
                   ;;
@@ -2052,7 +2052,7 @@ JOBEOF
       if (( _create_rc != 0 )); then
         # A live OperatorPolicy may create the same Job between the state read
         # above and this create: adopt that one instead of exiting unclassified.
-        if printf '%s' "${_create_out}" | grep -qiE 'already ?exists'; then
+        if grep -qiE 'already ?exists' <<<"${_create_out}"; then
           echo ">>> create-admin-user Job was created by the other writer between the state read and this create; adopting it"
           _install_adopted=1
           _prop "quay_admin_job_inherited" "created-concurrently"
