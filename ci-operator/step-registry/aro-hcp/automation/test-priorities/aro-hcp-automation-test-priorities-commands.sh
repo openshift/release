@@ -212,30 +212,6 @@ publication_blocker() {
     done <<<"${listing}"
 }
 
-# write_notice_html records why a run stopped before collecting anything, so the
-# job page explains the no-op instead of showing only logs.
-write_notice_html() {
-    local reason=$1
-    cat >"${ARTIFACT_DIR}/priorities-summary.html" <<HTML
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="color-scheme" content="light dark">
-<title>E2E start priority refresh</title>
-<style>
-html, body { margin: 0; padding: 0; background: transparent; }
-body { padding: 8px 10px 32px; font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1f2328; }
-.meta { margin: 0; color: #59636e; }
-@media (prefers-color-scheme: dark) { body { color: #e6edf3; } .meta { color: #9198a1; } }
-</style>
-</head>
-<body>
-<p class="meta">${reason}</p>
-</body></html>
-HTML
-}
-
 # ---------------------------------------------------------------------------
 # Publication gates that must run before any collection or commit
 # ---------------------------------------------------------------------------
@@ -243,128 +219,13 @@ if [[ "${publish}" == true ]]; then
     load_github_token
     blocker=$(publication_blocker) || error "cannot evaluate the open pull request gate"
     if [[ -n "${blocker:-}" ]]; then
-        write_notice_html "Publication skipped before collection: ${blocker}." ||
+        "${RUNNER}" priorities-summary --note "Publication skipped before collection: ${blocker}." \
+            --output "${ARTIFACT_DIR}/priorities-summary.html" >/dev/null ||
             error "cannot write the run summary"
         log "[info] skipping publication: ${blocker}"
         exit 0
     fi
 fi
-
-# write_summary_html renders the run outcome, coverage and proposed changes into
-# one self-contained artifact so the job page explains the decision without
-# opening the report JSON. Its one argument is the outcome line.
-write_summary_html() {
-    local outcome=$1 env_rows change_rows unmatched_rows run_line
-    local window_from window_to selected_origin selected_algorithm min_samples global_median
-    local unchanged insufficient unmatched
-    env_rows=$(jq -r '
-        .environments[]? |
-        "<tr><td>\(.environment)</td><td class=\"num\">\(.eligible_build_count)</td>" +
-        "<td class=\"num\">\(.eligible_sample_count)</td><td class=\"num\">\(.median_minutes * 10 | round / 10)m</td>" +
-        "<td>\(.latest_eligible_completion // "-" | tostring | .[0:19] | sub("T"; " "))</td></tr>"' "${SCORES}") ||
-        return 1
-    change_rows=$(jq -r '
-        .changes[]? |
-        "<tr><td><code title=\"\(.path | @html):\(.line)\">\(.path | split("/") | last | @html):\(.line)</code></td>" +
-        "<td class=\"num\">\(.old_priority) to \(.new_priority)</td>" +
-        "<td class=\"num\">\(.score_minutes * 10 | round / 10)m</td>" +
-        "<td class=\"num\">\(.eligible_build_count)</td>" +
-        "<td>\(.environments | join(", ") | @html)</td>" +
-        "<td>\(.name | @html)</td></tr>"' "${CHANGES}") ||
-        return 1
-    unmatched_rows=$(jq -r '.unmatched[]? | "<li>\(. | @html)</li>"' "${CHANGES}") || return 1
-    window_from=$(jq -r '.selection.from | .[0:19] | sub("T"; " ")' "${SCORES}") || return 1
-    window_to=$(jq -r '.selection.to | .[0:19] | sub("T"; " ")' "${SCORES}") || return 1
-    selected_origin=$(jq -r '.selection.origin // "" | @html' "${SCORES}") || return 1
-    selected_algorithm=$(jq -r '.algorithm | @html' "${SCORES}") || return 1
-    min_samples=$(jq -r '.min_samples' "${SCORES}") || return 1
-    global_median=$(jq -r '.global_median_minutes // "n/a" | tostring | .[0:5]' "${SCORES}") || return 1
-    unchanged=$(jq -r '.unchanged | length' "${CHANGES}") || return 1
-    insufficient=$(jq -r '.insufficient | length' "${CHANGES}") || return 1
-    unmatched=$(jq -r '.unmatched | length' "${CHANGES}") || return 1
-    run_line=""
-    if [[ -n "${job_url}" ]]; then
-        run_line=" Run: <a href=\"${job_url}\">${job_name} ${build_id}</a>."
-    fi
-
-    {
-        cat <<HTML
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="color-scheme" content="light dark">
-<title>E2E start priority refresh</title>
-<style>
-html, body { margin: 0; padding: 0; background: transparent; }
-body { padding: 8px 10px 32px; font: 12px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #1f2328; }
-h2 { margin: 14px 0 6px; font-size: 13px; }
-.meta { margin: 0 0 10px; color: #59636e; }
-.table-wrap { max-height: 320px; overflow: auto; border: 1px solid #d1d9e0; border-radius: 6px; }
-table { border-collapse: separate; border-spacing: 0; width: 100%; }
-table.changes { table-layout: fixed; }
-table.changes th:nth-child(1) { width: 26%; }
-table.changes th:nth-child(2) { width: 9%; }
-table.changes th:nth-child(3) { width: 8%; }
-table.changes th:nth-child(4) { width: 7%; }
-table.changes th:nth-child(5) { width: 12%; }
-table.changes th:nth-child(6) { width: 38%; }
-th, td { text-align: left; padding: 5px 10px; border-bottom: 1px solid #d1d9e0; vertical-align: top; }
-thead th { position: sticky; top: 0; z-index: 1; background: #f6f8fa; font-weight: 600; }
-tbody tr:last-child td { border-bottom: 0; }
-td.num { white-space: nowrap; font-variant-numeric: tabular-nums; }
-td { overflow-wrap: anywhere; }
-code { font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; }
-details { margin: 8px 0 0; }
-details ul { max-height: 132px; overflow: auto; margin: 4px 0 0; padding-left: 20px; }
-@media (prefers-color-scheme: dark) {
-  body { color: #e6edf3; }
-  .meta { color: #9198a1; }
-  .table-wrap { border-color: #3d444d; }
-  th, td { border-color: #3d444d; }
-  thead th { background: #151b23; }
-}
-</style>
-</head>
-<body>
-<p class="meta">
-Window ${window_from} to ${window_to} UTC, <code>${selected_origin}</code>,
-algorithm <code>${selected_algorithm}</code>, minimum ${min_samples} builds per spec and environment,
-global median ${global_median}m.${run_line}
-<br>${outcome}
-</p>
-<p class="meta">${unchanged} unchanged, ${insufficient} insufficient, ${unmatched} unmatched.</p>
-HTML
-        if [[ -n "${unmatched_rows}" ]]; then
-            echo '<details><summary>Unmatched specs (retired or absent from this catalog)</summary><ul>'
-            printf '%s\n' "${unmatched_rows}"
-            echo '</ul></details>'
-        fi
-        cat <<HTML
-<h2>Coverage</h2>
-<div class="table-wrap"><table class="coverage">
-<thead><tr><th>Environment</th><th>Eligible builds</th><th>Eligible samples</th><th>Median</th><th>Latest eligible run</th></tr></thead>
-<tbody>
-HTML
-        printf '%s\n' "${env_rows}"
-        cat <<HTML
-</tbody></table></div>
-<h2>Proposed changes ($(jq -r '.changes | length' "${CHANGES}"))</h2>
-<div class="table-wrap"><table class="changes">
-<thead><tr><th>Declaration</th><th>Priority</th><th>Score</th><th>Builds</th><th>Environments</th><th>Spec</th></tr></thead>
-<tbody>
-HTML
-        printf '%s\n' "${change_rows}"
-        cat <<HTML
-</tbody></table></div>
-HTML
-        
-        # Deck sizes the lens iframe from the wrapped content height measured at
-        # load, so end with an in-content spacer rather than body padding alone.
-        echo '<div style="height:24px" aria-hidden="true"></div>'
-        echo '</body></html>'
-    } >"${ARTIFACT_DIR}/priorities-summary.html"
-}
 
 # ---------------------------------------------------------------------------
 # Collect and score
@@ -438,7 +299,9 @@ changed_count=$(jq '.changes | length' "${CHANGES}") || error "cannot read the c
 info "planned ${changed_count} source changes"
 
 if [[ "${publish}" != true ]]; then
-    write_summary_html "Read-only run: the proposals above were recorded and nothing was written to the repository or to GitHub." ||
+    "${RUNNER}" priorities-summary --report "${SCORES}" --changes "${CHANGES}" \
+        --note "Read-only run: the proposals above were recorded and nothing was written to the repository or to GitHub." \
+        --output "${ARTIFACT_DIR}/priorities-summary.html" >/dev/null ||
         error "cannot write the run summary"
     log "[info] read-only run finished; ${changed_count} proposed changes recorded in ${CHANGES}"
     exit 0
@@ -448,7 +311,9 @@ if ((changed_count == 0)); then
     if [[ -n "$(git -C "${REPO_DIR}" status --porcelain)" ]]; then
         error "the refresh reported no proposals but the checkout changed; refusing to continue"
     fi
-    write_summary_html "No priority change is proposed, so nothing was published." ||
+    "${RUNNER}" priorities-summary --report "${SCORES}" --changes "${CHANGES}" \
+        --note "No priority change is proposed, so nothing was published." \
+        --output "${ARTIFACT_DIR}/priorities-summary.html" >/dev/null ||
         error "cannot write the run summary"
     log "[info] no priority changes proposed; nothing to publish"
     exit 0
@@ -658,7 +523,11 @@ if ((page > MAX_PR_PAGES)); then
     error "pull request #${number} has more than $((MAX_PR_PAGES * 100)) files; refusing to publish unverified"
 fi
 
-write_summary_html "Published pull request #${number}: <a href=\"$(jq -r '.html_url' <<<"${published}")\">$(jq -r '.html_url' <<<"${published}")</a>." ||
+pull_url=$(jq -r '.html_url' <<<"${published}") || error "cannot read the pull request URL"
+"${RUNNER}" priorities-summary --report "${SCORES}" --changes "${CHANGES}" \
+    --note "Published pull request #${number}." \
+    --publication-url "${pull_url}" \
+    --output "${ARTIFACT_DIR}/priorities-summary.html" >/dev/null ||
     error "pull request #${number} was created but the run summary could not be written"
 log "[info] opened pull request #${number}: $(jq -r '.html_url' <<<"${published}")"
 exit 0
