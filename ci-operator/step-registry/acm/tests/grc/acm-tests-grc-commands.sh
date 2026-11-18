@@ -154,25 +154,29 @@ typeset -i _OPP_POLICY_COUNT=-1
 # carrier reads it, so a declaration in the placement-present branch would
 # leave it unbound (nounset) whenever that branch is not taken.
 typeset -i _OPP_BASELINE_OK=0
-# Three-way placement probe. The previous `>/dev/null 2>&1` form collapsed
-# every failure into "this lane has no OPP placement": an API error, an RBAC
-# gap or a timeout then skipped the whole post-suite block, so the
-# relabel/detach regression INTEROP-9711 targets went unobserved on a green
-# step with no grc-placement-restore carrier row. The error text separates
-# the three states. A missing object or namespace, or a cluster without the
-# placements API, means this lane has no OPP placement (inactive, as before,
-# which keeps the non-OPP consumers of this step green). Any other failure is
-# an undetermined answer: it must surface as a failed check, not as silence.
+# Three-way placement probe. The previous form classified absence by grepping
+# the probe stderr for "not found" strings, so a Forbidden response that
+# mentioned a matching name was misread as absence and silently deactivated
+# the OPP checks on a green run. Classify absent vs error via structured
+# machine-readable queries with --ignore-not-found: rc=0 with non-empty
+# output means the object exists (active); rc=0 with empty output means
+# confirmed absence. A missing placement object, a missing namespace, or a
+# cluster without the placements API each leave the lane inactive
+# (preserving green non-OPP lanes). Any other failure, including Forbidden
+# and any discovery-call error, surfaces as a failed check via
+# _OPP_QUERY_FAILED.
 _OPP_QUERY_LOG="$(mktemp)"
+_OPP_QUERY_OUT="$(mktemp)"
 typeset -i _OPP_QUERY_RC=0
-oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" --request-timeout=30s >/dev/null 2>"${_OPP_QUERY_LOG}" || _OPP_QUERY_RC=$?
+oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" --ignore-not-found --request-timeout=30s -o name >"${_OPP_QUERY_OUT}" 2>"${_OPP_QUERY_LOG}" || _OPP_QUERY_RC=$?
 if (( _OPP_QUERY_RC == 0 )); then
-    _OPP_ACTIVE=1
-    mkdir -p "${_OPP_EVIDENCE_DIR}"
-    # 1. OperatorPolicy inventory (targeted extraction, INTEROP-9525 style:
-    #    name + conditions only, no full resource dumps).
-    oc get operatorpolicy -A --request-timeout=30s -o json 2>/dev/null | \
-        python3 -c '
+    if [[ -s "${_OPP_QUERY_OUT}" ]]; then
+        _OPP_ACTIVE=1
+        mkdir -p "${_OPP_EVIDENCE_DIR}"
+        # 1. OperatorPolicy inventory (targeted extraction, INTEROP-9525 style:
+        #    name + conditions only, no full resource dumps).
+        oc get operatorpolicy -A --request-timeout=30s -o json 2>/dev/null | \
+            python3 -c '
 import json, sys
 data = json.load(sys.stdin)
 result = []
@@ -184,17 +188,17 @@ for i in data.get("items", []):
     })
 print(json.dumps(result, indent=2))
 ' > "${_OPP_EVIDENCE_DIR}/01-operatorpolicy.json" 2>&1
-    _OPP_POLICY_COUNT="$(python3 -c '
+        _OPP_POLICY_COUNT="$(python3 -c '
 import json, sys
 try:
     print(len(json.load(open(sys.argv[1]))))
 except Exception:
     print(-1)
 ' "${_OPP_EVIDENCE_DIR}/01-operatorpolicy.json")"
-    echo "${_OPP_POLICY_COUNT}" > "${_OPP_EVIDENCE_DIR}/00-operatorpolicy-count.txt"
-    # 2. local-cluster labels (the restore baseline for the post-suite block).
-    oc get managedcluster "${_OPP_MC_NAME}" --request-timeout=30s -o json 2>/dev/null | \
-        python3 -c '
+        echo "${_OPP_POLICY_COUNT}" > "${_OPP_EVIDENCE_DIR}/00-operatorpolicy-count.txt"
+        # 2. local-cluster labels (the restore baseline for the post-suite block).
+        oc get managedcluster "${_OPP_MC_NAME}" --request-timeout=30s -o json 2>/dev/null | \
+            python3 -c '
 import json, sys
 d = json.load(sys.stdin)
 print(json.dumps({
@@ -202,11 +206,11 @@ print(json.dumps({
     "labels": d["metadata"].get("labels", {})
 }, indent=2))
 ' > "${_OPP_EVIDENCE_DIR}/02-managedcluster-labels.json" 2>&1
-    # 3. Placement status (pre-suite state) and the authoritative
-    #    PlacementDecision resources (the placement controller writes
-    #    selected cluster names there, not into Placement.status).
-    oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" --request-timeout=30s -o json 2>/dev/null | \
-        python3 -c '
+        # 3. Placement status (pre-suite state) and the authoritative
+        #    PlacementDecision resources (the placement controller writes
+        #    selected cluster names there, not into Placement.status).
+        oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" --request-timeout=30s -o json 2>/dev/null | \
+            python3 -c '
 import json, sys
 d = json.load(sys.stdin)
 print(json.dumps({
@@ -215,8 +219,8 @@ print(json.dumps({
     "status": d.get("status", {})
 }, indent=2))
 ' > "${_OPP_EVIDENCE_DIR}/03-placement-status.json" 2>&1
-    oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" --request-timeout=30s -o json 2>/dev/null | \
-        python3 -c '
+        oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" --request-timeout=30s -o json 2>/dev/null | \
+            python3 -c '
 import json, sys
 d = json.load(sys.stdin)
 result = []
@@ -227,10 +231,10 @@ for item in d.get("items", []):
     })
 print(json.dumps(result, indent=2))
 ' > "${_OPP_EVIDENCE_DIR}/03-placementdecisions.json" 2>&1
-    # Validate the label baseline now: an unreadable baseline must never be
-    # interpreted as absent labels by the post-suite restore loop.
-    typeset -i _OPP_BASELINE_OK=0
-    if python3 -c '
+        # Validate the label baseline now: an unreadable baseline must never be
+        # interpreted as absent labels by the post-suite restore loop.
+        typeset -i _OPP_BASELINE_OK=0
+        if python3 -c '
 import json, sys
 try:
     d = json.load(open(sys.argv[1]))
@@ -238,30 +242,39 @@ try:
 except Exception:
     raise SystemExit(1)
 ' "${_OPP_EVIDENCE_DIR}/02-managedcluster-labels.json"; then
-        _OPP_BASELINE_OK=1
-    else
-        echo "OPP label baseline unreadable; the post-suite restore will be skipped and reported as a failure"
-    fi
-    # Scrub the snapshot files (both passes) before they land in artifacts.
-    # Tracing is already off in this section; keep it off for the suite run.
-    for _opp_f in "${_OPP_EVIDENCE_DIR}"/*.json; do
-        [[ -f "${_opp_f}" ]] || continue
-        _opp_tmp="$(mktemp)"
-        if [[ -n "${_secrets_pattern}" ]]; then
-            sed -E "s/${_secrets_pattern}/[REDACTED]/g" "${_opp_f}" > "${_opp_tmp}" || cp "${_opp_f}" "${_opp_tmp}"
+            _OPP_BASELINE_OK=1
         else
-            cp "${_opp_f}" "${_opp_tmp}"
+            echo "OPP label baseline unreadable; the post-suite restore will be skipped and reported as a failure"
         fi
-        _scrub_leaktk_patterns -i "${_opp_tmp}"
-        mv "${_opp_tmp}" "${_opp_f}"
-    done
-    echo "OPP snapshot taken: ${_OPP_POLICY_COUNT} OperatorPolicy objects; labels and placement state in ${_OPP_EVIDENCE_DIR}"
-else
-    # The probe above did not answer yes or no. Treat the lane as OPP-shaped
-    # only if the error is not one of the "no such placement here" shapes.
-    if grep -qiE 'not[[:space:]]*found|doesn.t have a resource type|no matches for kind|could not find the requested resource' "${_OPP_QUERY_LOG}"; then
-        echo "No OPP placement in ${_OPP_PLACEMENT_NS} (oc get placement rc=${_OPP_QUERY_RC}); OPP checks inactive for this lane"
+        # Scrub the snapshot files (both passes) before they land in artifacts.
+        # Tracing is already off in this section; keep it off for the suite run.
+        for _opp_f in "${_OPP_EVIDENCE_DIR}"/*.json; do
+            [[ -f "${_opp_f}" ]] || continue
+            _opp_tmp="$(mktemp)"
+            if [[ -n "${_secrets_pattern}" ]]; then
+                sed -E "s/${_secrets_pattern}/[REDACTED]/g" "${_opp_f}" > "${_opp_tmp}" || cp "${_opp_f}" "${_opp_tmp}"
+            else
+                cp "${_opp_f}" "${_opp_tmp}"
+            fi
+            _scrub_leaktk_patterns -i "${_opp_tmp}"
+            mv "${_opp_tmp}" "${_opp_f}"
+        done
+        echo "OPP snapshot taken: ${_OPP_POLICY_COUNT} OperatorPolicy objects; labels and placement state in ${_OPP_EVIDENCE_DIR}"
     else
+        echo "No OPP placement in ${_OPP_PLACEMENT_NS} (placement ${_OPP_PLACEMENT_NAME} not found); OPP checks inactive for this lane"
+    fi
+else
+    # Probe failed with rc!=0; verify the other two absence shapes with
+    # structured discovery calls. Only confirmed absence leaves the lane
+    # inactive; every other result, including Forbidden and discovery errors,
+    # takes the query-failure path.
+    _OPP_NS_OUT="$(mktemp)"
+    typeset -i _OPP_NS_RC=0
+    oc get namespace "${_OPP_PLACEMENT_NS}" --ignore-not-found --request-timeout=30s -o name >"${_OPP_NS_OUT}" 2>"${_OPP_QUERY_LOG}" || _OPP_NS_RC=$?
+    if (( _OPP_NS_RC == 0 )) && [[ ! -s "${_OPP_NS_OUT}" ]]; then
+        echo "No OPP placement in ${_OPP_PLACEMENT_NS} (namespace ${_OPP_PLACEMENT_NS} not found); OPP checks inactive for this lane"
+        rm -f "${_OPP_NS_OUT}"
+    elif (( _OPP_NS_RC != 0 )); then
         _OPP_QUERY_FAILED=1
         mkdir -p "${_OPP_EVIDENCE_DIR}"
         {
@@ -269,9 +282,37 @@ else
             sed 's/^/  /' "${_OPP_QUERY_LOG}"
         } > "${_OPP_EVIDENCE_DIR}/00-placement-query-error.log" 2>&1 || true
         echo "ERROR: OPP placement query failed (rc=${_OPP_QUERY_RC}); a failed query is not a lane without OPP, so the OPP checks will run and report this as a failure. See co-located 00-placement-query-error.log" >&2
+        rm -f "${_OPP_NS_OUT}"
+    else
+        rm -f "${_OPP_NS_OUT}"
+        _OPP_API_OUT="$(mktemp)"
+        typeset -i _OPP_API_RC=0
+        oc api-resources --api-group=cluster.open-cluster-management.io --request-timeout=30s -o name >"${_OPP_API_OUT}" 2>"${_OPP_QUERY_LOG}" || _OPP_API_RC=$?
+        if (( _OPP_API_RC == 0 )); then
+            if ! grep -q "placements" "${_OPP_API_OUT}"; then
+                echo "No OPP placement in ${_OPP_PLACEMENT_NS} (placements API not found); OPP checks inactive for this lane"
+            else
+                _OPP_QUERY_FAILED=1
+                mkdir -p "${_OPP_EVIDENCE_DIR}"
+                {
+                    echo "oc get placement -n${_OPP_PLACEMENT_NS} ${_OPP_PLACEMENT_NAME} failed with rc=${_OPP_QUERY_RC}"
+                    sed 's/^/  /' "${_OPP_QUERY_LOG}"
+                } > "${_OPP_EVIDENCE_DIR}/00-placement-query-error.log" 2>&1 || true
+                echo "ERROR: OPP placement query failed (rc=${_OPP_QUERY_RC}); a failed query is not a lane without OPP, so the OPP checks will run and report this as a failure. See co-located 00-placement-query-error.log" >&2
+            fi
+        else
+            _OPP_QUERY_FAILED=1
+            mkdir -p "${_OPP_EVIDENCE_DIR}"
+            {
+                echo "oc get placement -n${_OPP_PLACEMENT_NS} ${_OPP_PLACEMENT_NAME} failed with rc=${_OPP_QUERY_RC}"
+                sed 's/^/  /' "${_OPP_QUERY_LOG}"
+            } > "${_OPP_EVIDENCE_DIR}/00-placement-query-error.log" 2>&1 || true
+            echo "ERROR: OPP placement query failed (rc=${_OPP_QUERY_RC}); a failed query is not a lane without OPP, so the OPP checks will run and report this as a failure. See co-located 00-placement-query-error.log" >&2
+        fi
+        rm -f "${_OPP_API_OUT}"
     fi
 fi
-rm -f "${_OPP_QUERY_LOG}"
+rm -f "${_OPP_QUERY_OUT}" "${_OPP_QUERY_LOG}"
 
 # Run the test suite with all output captured to a temp file.
 _grc_raw_log="$(mktemp)"
