@@ -284,8 +284,8 @@ systemd:
         StandardError=journal+console
         ExecStartPre=-/bin/podman kill haproxy
         ExecStartPre=-/bin/podman rm haproxy
-        ExecStartPre=/bin/podman pull registry.access.redhat.com/hi/haproxy:latest
-        ExecStartPre=-/bin/sh -c 'podman image inspect --format "haproxy: using image {{{{.Id}}}} ({{{{.Digest}}}})" registry.access.redhat.com/hi/haproxy:latest || echo "haproxy: image is not present, pull failed"'
+        ExecStartPre=/bin/sh -c 'if ! podman pull registry.access.redhat.com/hi/haproxy:latest; then echo "haproxy: image pull failed"; exit 1; fi'
+        ExecStartPre=-/bin/sh -c 'podman image inspect --format "haproxy: using image {{{{.Id}}}} ({{{{.Digest}}}})" registry.access.redhat.com/hi/haproxy:latest || echo "haproxy: image inspection failed"'
         ExecStart=/bin/podman run --name haproxy \
         --net=host \
         --privileged \
