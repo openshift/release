@@ -2,6 +2,11 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+# BASH-1: without inherit_errexit a command substitution runs with errexit
+# cleared, so a failing command inside `$( ... )` only surfaces through the
+# substitution's last command. Every substitution in this script carries an
+# explicit `|| true` / `|| return`, so the guard now sees the inner failure.
+shopt -s inherit_errexit
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
@@ -19,9 +24,15 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 # stay distinct from "no ready backend" so a caller cannot record a read
 # failure as a definite negative.
 _central_backend_target() {
-    local _slice_json _backend_target
+    # BASH-3: typeset at declaration with an initial value, never the
+    # non-POSIX `local` builtin.
+    typeset _slice_json='' _backend_target=''
+    # Third argument: where oc's own reason for a failed read is appended.
+    # Discarding it left the caller's recorded "the EndpointSlice read
+    # failed" state without a cause; the default keeps other callers quiet.
+    typeset _errfile="${3:-/dev/null}"
     _slice_json="$(oc get endpointslices -n "$1" \
-      -l "kubernetes.io/service-name=$2" -o json 2>/dev/null)" || return 2
+      -l "kubernetes.io/service-name=$2" -o json 2>>"${_errfile}")" || return 2
     _backend_target="$(printf '%s\n' "${_slice_json}" | \
       python3 -c '
 import json, sys
@@ -159,11 +170,13 @@ collect_acs_diagnostics() {
             # this retry.
             _central_svc="$(oc get route central -n "${WORKLOAD_NS}" \
               -o jsonpath='{.spec.to.name}' 2>/dev/null || true)"
-            _central_backend=""
-            _central_backend_rc=0
+            typeset _central_backend='' _central_addr='' _central_port=''
+            typeset _central_svc_dns='' _central_connect_to=''
+            typeset -i _central_backend_rc=0 _central_direct_rc=0
             if [[ -n "${_central_svc}" ]]; then
                 _central_backend="$(
-                  _central_backend_target "${WORKLOAD_NS}" "${_central_svc}"
+                  _central_backend_target "${WORKLOAD_NS}" "${_central_svc}" \
+                    "${TLS_PREFLIGHT_ERR}"
                 )" || _central_backend_rc=$?
             fi
             if [[ "${_central_backend_rc}" -eq 0 &&
