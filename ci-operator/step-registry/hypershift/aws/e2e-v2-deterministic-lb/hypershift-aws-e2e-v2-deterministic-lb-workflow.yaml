@@ -15,8 +15,12 @@ workflow:
     the spec as passed, not skipped. The spec skips when the EIP pre-step
     variables are missing, so a green job with a skipped spec proves nothing.
 
-    The EIP is tagged with an expirationDate so a leaked allocation can be
-    reaped by the account janitor when the release step never runs. This lane
+    The EIP is tagged with the management cluster's
+    kubernetes.io/cluster/<infra-id>=owned tag and an expirationDate. If the
+    release step never runs, the management cluster's own destroy path releases
+    the EIP, and the hypershift janitor finds the management cluster through its
+    VPC and runs the same destroy. This assumes the janitor's credentials cover
+    the same AWS account as the job. This lane
     covers the AWS nested management-cluster path for CNTRLPLANE-4579; the
     Agent/MetalLB, Azure, Cilium and KubeVirt lanes are separate and are not
     covered here.

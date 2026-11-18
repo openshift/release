@@ -74,10 +74,20 @@ if [[ -z "${MGMT_REGION:-}" ]]; then
     exit 2
 fi
 
+# The management cluster's infra ID is needed for the VPC lookup and to tag the
+# EIP with the ownership tag that the management cluster destroy path uses to
+# release leaked addresses.
+if [[ -z "${MGMT_INFRA_ID:-}" ]]; then
+    MGMT_INFRA_ID=$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}')
+fi
+if [[ -z "${MGMT_INFRA_ID:-}" ]]; then
+    echo "could not discover the management cluster infrastructure name" >&2
+    exit 2
+fi
+
 if [[ -z "${MGMT_PUBLIC_SUBNET:-}" ]]; then
-    INFRA_ID=$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}')
     VPC_ID=$(aws_cmd ec2 describe-vpcs \
-        --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
+        --filters "Name=tag:kubernetes.io/cluster/${MGMT_INFRA_ID},Values=owned" \
         --query 'Vpcs[0].VpcId' --output text)
     # This subnet belongs to the management VPC. The guest cluster only uses
     # the resulting annotation on the management-side KAS Service.
@@ -111,7 +121,7 @@ if [[ -z "${EIP_ALLOCATION_ID}" ]]; then
     fi
     if [[ -z "${EIP_ALLOCATION_ID}" ]]; then
         if ! ALLOCATION=$(aws_cmd ec2 allocate-address --domain vpc \
-            --tag-specifications "ResourceType=elastic-ip,Tags=[{Key=Name,Value=${TAG_NAME}-${RUN_ID}},{Key=Jira,Value=CNTRLPLANE-4579},{Key=Purpose,Value=deterministic-lb-e2e},{Key=expirationDate,Value=${EIP_EXPIRATION}},{Key=${EIP_RUN_TAG},Value=${RUN_ID}}]" \
+            --tag-specifications "ResourceType=elastic-ip,Tags=[{Key=Name,Value=${TAG_NAME}-${RUN_ID}},{Key=Jira,Value=CNTRLPLANE-4579},{Key=Purpose,Value=deterministic-lb-e2e},{Key=expirationDate,Value=${EIP_EXPIRATION}},{Key=kubernetes.io/cluster/${MGMT_INFRA_ID},Value=owned},{Key=${EIP_RUN_TAG},Value=${RUN_ID}}]" \
             --query '[AllocationId,PublicIp]' --output text); then
             echo "failed to allocate an EIP for run ${RUN_ID}" >&2
             exit 1
@@ -151,6 +161,7 @@ cat > "${ENV_FILE}" <<EOF
 export EIP_ALLOCATION_ID=${EIP_ALLOCATION_ID}
 export EIP_PUBLIC_IP=${EIP_PUBLIC_IP}
 export MGMT_REGION=${MGMT_REGION}
+export MGMT_INFRA_ID=${MGMT_INFRA_ID}
 export MGMT_PUBLIC_SUBNET=${MGMT_PUBLIC_SUBNET}
 export HYPERSHIFT_E2E_RUN_ID=${RUN_ID}
 export HYPERSHIFT_DETERMINISTIC_LB_EIP=${EIP_ALLOCATION_ID}
