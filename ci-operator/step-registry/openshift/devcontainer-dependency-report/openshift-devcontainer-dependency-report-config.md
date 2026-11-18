@@ -184,7 +184,7 @@
           "name": "postgres-service-image",
           "classification": "repo-coupled",
           "file": ".devcontainer/init-services.sh",
-          "extract": {"kind": "regex", "pattern": "^POSTGRES_IMAGE=(?P<version>[^ ]+)$"},
+          "extract": {"kind": "regex", "pattern": "^POSTGRES_IMAGE=(?P<version>\\S+)$"},
           "authority": "OpenShift CI image promotion configuration",
           "rationale": "The CI image tag is repository/promotion coupled and requires its owning authority; no independent bump is proposed."
         },
@@ -192,7 +192,7 @@
           "name": "redis-service-image",
           "classification": "repo-coupled",
           "file": ".devcontainer/init-services.sh",
-          "extract": {"kind": "regex", "pattern": "^REDIS_IMAGE=(?P<version>[^ ]+)$"},
+          "extract": {"kind": "regex", "pattern": "^REDIS_IMAGE=(?P<version>\\S+)$"},
           "authority": "OpenShift CI image promotion configuration",
           "rationale": "The CI image tag is repository/promotion coupled and requires its owning authority; no independent bump is proposed."
         }

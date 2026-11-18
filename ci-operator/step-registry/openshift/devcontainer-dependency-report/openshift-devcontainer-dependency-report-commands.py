@@ -15,7 +15,10 @@ from pathlib import Path
 from typing import Any
 
 
-STABLE_VERSION = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
+STABLE_COMPONENT = r"(?:0|[1-9]\d*)"
+STABLE_VERSION = re.compile(
+    rf"^({STABLE_COMPONENT})\.({STABLE_COMPONENT})\.({STABLE_COMPONENT})$"
+)
 CLASSIFICATIONS = {"pinned", "floating", "repo-coupled", "manual", "unsupported"}
 
 
@@ -24,7 +27,9 @@ class CheckError(RuntimeError):
 
 
 def parse_version(value: str, prefix: str = "") -> tuple[int, int, int]:
-    candidate = value.removeprefix(prefix)
+    if prefix and not value.startswith(prefix):
+        raise CheckError(f"{value!r} does not start with required prefix {prefix!r}")
+    candidate = value[len(prefix) :]
     match = STABLE_VERSION.fullmatch(candidate)
     if not match:
         raise CheckError(f"{value!r} is not a stable three-part version")
@@ -101,11 +106,26 @@ def source_versions(source: dict[str, Any], fetcher: Fetcher) -> list[str]:
         if not isinstance(payload, list):
             raise CheckError("GitHub tags response is not a list")
         return [item["name"] for item in payload if item.get("name")]
-    if kind in {"npm", "pypi"}:
-        releases = payload.get("versions") if kind == "npm" else payload.get("releases")
+    if kind == "npm":
+        releases = payload.get("versions")
         if not isinstance(releases, dict):
-            raise CheckError(f"{kind} response has no version map")
-        return list(releases)
+            raise CheckError("npm response has no version map")
+        return [
+            version
+            for version, metadata in releases.items()
+            if isinstance(metadata, dict) and not metadata.get("deprecated")
+        ]
+    if kind == "pypi":
+        releases = payload.get("releases")
+        if not isinstance(releases, dict):
+            raise CheckError("pypi response has no version map")
+        return [
+            version
+            for version, files in releases.items()
+            if isinstance(files, list)
+            and files
+            and any(isinstance(item, dict) and not item.get("yanked") for item in files)
+        ]
     raise CheckError(f"unsupported source kind {kind!r}")
 
 
@@ -131,26 +151,91 @@ def validate_config(config: dict[str, Any]) -> None:
     if config.get("schema_version") != 1:
         raise CheckError("only config schema_version 1 is supported")
     sources = config.get("sources", {})
-    for repository in config.get("repositories", []):
-        for dependency in repository.get("dependencies", []):
+    repositories = config.get("repositories")
+    if not isinstance(repositories, list) or not repositories:
+        raise CheckError("config must contain at least one repository")
+    seen_repositories: set[str] = set()
+    for repository in repositories:
+        if not isinstance(repository, dict):
+            raise CheckError("each repository declaration must be an object")
+        repository_name = repository.get("name")
+        if not repository_name or not repository.get("ref"):
+            raise CheckError("each repository requires name and ref")
+        if repository_name in seen_repositories:
+            raise CheckError(f"duplicate repository declaration: {repository_name}")
+        seen_repositories.add(repository_name)
+        dependencies = repository.get("dependencies")
+        if not isinstance(dependencies, list) or not dependencies:
+            raise CheckError(f"{repository_name}: at least one dependency is required")
+        seen_dependencies: set[tuple[str, str]] = set()
+        for dependency in dependencies:
+            if not isinstance(dependency, dict):
+                raise CheckError(f"{repository_name}: each dependency must be an object")
+            dependency_name = dependency.get("name")
+            file_path = dependency.get("file")
+            if not dependency_name or not file_path or not dependency.get("rationale"):
+                raise CheckError(
+                    f"{repository_name}: each dependency requires name, file, and rationale"
+                )
+            identity = (file_path, dependency_name)
+            if identity in seen_dependencies:
+                raise CheckError(
+                    f"{repository_name}: duplicate dependency declaration: "
+                    f"{file_path} {dependency_name}"
+                )
+            seen_dependencies.add(identity)
+            extraction = dependency.get("extract")
+            if not isinstance(extraction, dict) or not extraction.get("pattern"):
+                raise CheckError(
+                    f"{repository_name}/{dependency_name}: extraction requires a pattern"
+                )
+            if extraction.get("kind") not in {"presence", "regex"}:
+                raise CheckError(
+                    f"{repository_name}/{dependency_name}: invalid extraction kind"
+                )
+            if extraction["kind"] == "presence" and not extraction.get("current"):
+                raise CheckError(
+                    f"{repository_name}/{dependency_name}: presence extraction requires current"
+                )
             classification = dependency.get("classification")
             if classification not in CLASSIFICATIONS:
                 raise CheckError(
-                    f"{repository.get('name')}/{dependency.get('name')}: invalid classification"
+                    f"{repository_name}/{dependency_name}: invalid classification"
                 )
             if classification == "pinned":
-                if dependency.get("source") not in sources or "policy" not in dependency:
+                source = sources.get(dependency.get("source"))
+                policy = dependency.get("policy")
+                if not isinstance(source, dict) or not source.get("kind") or not source.get("url"):
                     raise CheckError(
-                        f"{repository['name']}/{dependency['name']}: pinned entries require source and policy"
+                        f"{repository_name}/{dependency_name}: pinned entries require a valid source"
                     )
-                version_in_policy((0, 0, 0), dependency["policy"])
+                if (
+                    not isinstance(policy, dict)
+                    or not isinstance(policy.get("min_inclusive"), str)
+                    or not isinstance(policy.get("max_exclusive"), str)
+                ):
+                    raise CheckError(
+                        f"{repository_name}/{dependency_name}: pinned entries require policy bounds"
+                    )
+                minimum = parse_version(policy["min_inclusive"])
+                maximum = parse_version(policy["max_exclusive"])
+                if minimum >= maximum:
+                    raise CheckError(
+                        f"{repository_name}/{dependency_name}: policy range must be non-empty"
+                    )
             elif dependency.get("source") or dependency.get("policy"):
                 raise CheckError(
-                    f"{repository['name']}/{dependency['name']}: only pinned entries may define source/policy"
+                    f"{repository_name}/{dependency_name}: only pinned entries may define source/policy"
                 )
             if classification == "repo-coupled" and not dependency.get("authority"):
                 raise CheckError(
-                    f"{repository['name']}/{dependency['name']}: repo-coupled entries require authority"
+                    f"{repository_name}/{dependency_name}: repo-coupled entries require authority"
+                )
+            if classification != "repo-coupled" and classification != "pinned" and not dependency.get(
+                "version_source"
+            ):
+                raise CheckError(
+                    f"{repository_name}/{dependency_name}: {classification} entries require version_source"
                 )
 
 
@@ -173,7 +258,7 @@ def check(config: dict[str, Any], fetcher: Fetcher) -> list[dict[str, Any]]:
                 "classification": dependency["classification"],
                 "current": None,
                 "proposed": None,
-                "version_source": dependency.get("version_source"),
+                "version_source": dependency.get("version_source") or dependency.get("authority"),
                 "authority": dependency.get("authority"),
                 "status": dependency["classification"],
                 "rationale": dependency["rationale"],
