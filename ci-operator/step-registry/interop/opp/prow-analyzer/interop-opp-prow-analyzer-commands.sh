@@ -54,6 +54,10 @@ GCS_API_ROOT="${GCS_API_ROOT:-https://storage.googleapis.com/storage/v1/b/${GCS_
 GCS_MEDIA_ROOT="${GCS_MEDIA_ROOT:-https://storage.googleapis.com/${GCS_BUCKET}}"
 GCS_LIST_TIMEOUT="${GCS_LIST_TIMEOUT:-60}"
 GCS_FETCH_TIMEOUT="${GCS_FETCH_TIMEOUT:-60}"
+# Rule U-2 (docs/mpex-practices-rules.md): a per-request --max-time bounds one
+# request, not a token chain a server can keep extending, so the listing walk
+# carries its own page cap.
+GCS_LIST_MAX_PAGES="${GCS_LIST_MAX_PAGES:-100}"
 GCS_POLL_ATTEMPTS="${GCS_POLL_ATTEMPTS:-3}"
 GCS_POLL_INTERVAL="${GCS_POLL_INTERVAL:-15}"
 : "${SHARED_DIR:=/tmp}"
@@ -234,14 +238,24 @@ analyzer_job_url() {
 }
 
 # gcs_list_build_objects <prefix> <outfile>: object names, one per line,
-# paginated; returns non-zero when the listing itself fails.
+# paginated and capped at GCS_LIST_MAX_PAGES; returns non-zero when the listing
+# itself fails, including a page walk that outruns the cap.
 gcs_list_build_objects() {
-    typeset prefix="$1" out="$2" token=""
+    typeset prefix="$1" out="$2" token="" pages=0
     # the pagination scratch files are temp files too: register them so
     # on_exit removes them (every other scratch file follows this pattern)
     _CLEANUP_FILES+=("${out}.page" "${out}.token")
     : > "${out}"
     while :; do
+        pages=$(( pages + 1 ))
+        if [ "${pages}" -gt "${GCS_LIST_MAX_PAGES}" ]; then
+            # a walk this long is a runaway token chain, not evidence: report a
+            # listing failure so the caller degrades to runtime_tree_unavailable
+            # instead of looping until the step is killed
+            printf 'gcs_list_build_objects: page cap %s exceeded for prefix %s\n' \
+                "${GCS_LIST_MAX_PAGES}" "${prefix}" >&2
+            return 1
+        fi
         if [ -n "${token}" ]; then
             set -- --data-urlencode "pageToken=${token}"
         else
