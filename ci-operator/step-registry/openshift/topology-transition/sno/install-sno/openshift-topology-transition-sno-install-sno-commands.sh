@@ -421,9 +421,23 @@ os_image=$(oc adm release info --registry-config=pull-secret --image-for=machine
 oc image extract --registry-config=pull-secret "${os_image}" --path=/coreos/coreos-x86_64.iso:. --confirm
 mv coreos-x86_64.iso rhcos-live.iso
 oc wait node --all --for=condition=Ready --timeout=10m
-oc get clusteroperators -o json | jq -e 'all(.items[];
-  any(.status.conditions[]; .type == "Available" and .status == "True") and
-  all(.status.conditions[]; (.type != "Degraded" and .type != "Progressing") or .status == "False"))' >/dev/null
+# Operators can start another rollout just after the installer reports success.
+echo 'Waiting for cluster operators to settle'
+deadline=$((SECONDS + 1200))
+while true; do
+  if oc --request-timeout=30s get clusteroperators -o json | jq -e '.items | length > 0 and all(.[];
+    any(.status.conditions[]; .type == "Available" and .status == "True") and
+    all(.status.conditions[]; (.type != "Degraded" and .type != "Progressing") or .status == "False"))' >/dev/null; then
+    break
+  fi
+
+  if (( SECONDS >= deadline )); then
+    echo 'Timed out waiting for cluster operators to settle' >&2
+    exit 1
+  fi
+
+  sleep 10
+done
 oc get featuregate cluster -o json | jq -e '.spec.featureSet == "CustomNoUpgrade" and
   any(.status.featureGates[]; any(.enabled[]; .name == "MutableTopology"))' >/dev/null
 REMOTE
