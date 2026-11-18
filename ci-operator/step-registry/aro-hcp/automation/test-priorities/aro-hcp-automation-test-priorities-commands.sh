@@ -20,7 +20,7 @@ umask 077
 
 readonly MARKER='<!-- aro-hcp-test-priorities:v1 -->'
 readonly TITLE='test(e2e): refresh start priority bands'
-readonly SCHEDULED_JOB='periodic-ci-Azure-ARO-HCP-main-test-priorities-test-priorities-refresh'
+readonly SCHEDULED_JOB='periodic-ci-Azure-ARO-HCP-main-e2e-test-priorities-refresh'
 RUNNER=${E2E_RUNNER:-/opt/app-root/src/github.com/Azure/ARO-HCP/test/aro-hcp-tests}
 BAKED_REPO=${E2E_BAKED_REPO:-/opt/app-root/src/github.com/Azure/ARO-HCP}
 readonly RUNNER BAKED_REPO
