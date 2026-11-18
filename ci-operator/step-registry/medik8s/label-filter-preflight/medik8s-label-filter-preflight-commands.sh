@@ -6,6 +6,14 @@ set -euo pipefail
 # Failing here skips remaining pre/test steps, including IPI install.
 # A cluster_profile lease is still held for the job; only AWS IPI is avoided.
 # See the step documentation for why empty candidate suites stay red.
+#
+# Leave a SHARED_DIR marker until this step succeeds so post steps such as
+# medik8s-analyze-e2e-failure can skip waiting for e2e-test artifacts that
+# will never appear when preflight fails.
+
+if [[ -n "${SHARED_DIR:-}" ]]; then
+  touch "${SHARED_DIR}/e2e-test-skipped-by-preflight"
+fi
 
 if [[ -z "${ECO_TEST_FEATURES:-}" ]]; then
   echo "ECO_TEST_FEATURES is required" >&2
@@ -26,9 +34,15 @@ echo "Label-filter preflight: features=${ECO_TEST_FEATURES} labels=${ECO_TEST_LA
 make ginkgo
 # Makefile run-tests does not forward args; call the runner with --dry-run.
 ginkgo_ver="$(grep 'github.com/onsi/ginkgo/v2 ' go.mod | awk '{print $2}')"
-export GINKGO="$(pwd)/bin/ginkgo/${ginkgo_ver}/ginkgo"
+GINKGO="$(pwd)/bin/ginkgo/${ginkgo_ver}/ginkgo"
+export GINKGO
 if [[ ! -x "${GINKGO}" ]]; then
   echo "ginkgo binary not found at ${GINKGO}" >&2
   exit 1
 fi
 scripts/test-runner.sh --dry-run
+
+# Preflight passed — e2e-test will run; clear the skip marker for the analyzer.
+if [[ -n "${SHARED_DIR:-}" ]]; then
+  rm -f "${SHARED_DIR}/e2e-test-skipped-by-preflight"
+fi
