@@ -58,6 +58,15 @@ GCS_FETCH_TIMEOUT="${GCS_FETCH_TIMEOUT:-60}"
 # request, not a token chain a server can keep extending, so the listing walk
 # carries its own page cap.
 GCS_LIST_MAX_PAGES="${GCS_LIST_MAX_PAGES:-100}"
+# The cap test below must not be what validates the override: on a non-numeric
+# value the test itself errors, the `if` reads that as false, and the walk runs
+# unbounded; a zero or negative value refuses every listing. Clamp to the
+# default and warn - this step is best-effort and never reds a job.
+if ! [ "${GCS_LIST_MAX_PAGES}" -gt 0 ] 2>/dev/null; then
+    printf 'warning: GCS_LIST_MAX_PAGES=%s is not a positive integer, using 100\n' \
+        "${GCS_LIST_MAX_PAGES}" >&2
+    GCS_LIST_MAX_PAGES=100
+fi
 GCS_POLL_ATTEMPTS="${GCS_POLL_ATTEMPTS:-3}"
 GCS_POLL_INTERVAL="${GCS_POLL_INTERVAL:-15}"
 : "${SHARED_DIR:=/tmp}"
