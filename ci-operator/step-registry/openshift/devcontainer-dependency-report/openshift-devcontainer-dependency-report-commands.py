@@ -10,6 +10,7 @@ import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,7 @@ STABLE_VERSION = re.compile(
     rf"^({STABLE_COMPONENT})\.({STABLE_COMPONENT})\.({STABLE_COMPONENT})$"
 )
 CLASSIFICATIONS = {"pinned", "floating", "repo-coupled", "manual", "unsupported"}
+GITHUB_PAGE_LIMIT = 10
 
 
 class CheckError(RuntimeError):
@@ -86,26 +88,94 @@ class Fetcher:
                     body = response.read().decode("utf-8")
             except (OSError, UnicodeError, urllib.error.HTTPError) as exc:
                 raise CheckError(f"lookup failed for {url}: {exc}") from exc
-            value = json.loads(body) if as_json else body
+            if as_json:
+                try:
+                    value = json.loads(body)
+                except json.JSONDecodeError as exc:
+                    raise CheckError(f"lookup failed for {url}: invalid JSON: {exc}") from exc
+            else:
+                value = body
         self.cache[url] = value
         return value
 
 
+def github_page_url(url: str, page: int) -> tuple[str, int]:
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        port = parsed.port
+    except ValueError as exc:
+        raise CheckError(f"invalid GitHub source URL {url!r}: {exc}") from exc
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise CheckError("GitHub source URL must use public HTTPS")
+    if parsed.username is not None or parsed.password is not None:
+        raise CheckError("GitHub source URL must be public HTTPS without credentials")
+    if port not in {None, 443}:
+        raise CheckError("GitHub source URL must not use a nonstandard port")
+    if parsed.fragment:
+        raise CheckError("GitHub source URL must not include a fragment")
+    query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+    per_page_values = [value for key, value in query if key == "per_page"]
+    page_values = [value for key, value in query if key == "page"]
+    if len(per_page_values) > 1 or len(page_values) > 1:
+        raise CheckError("GitHub source URL has duplicate pagination parameters")
+    try:
+        per_page = int(per_page_values[0]) if per_page_values else 30
+    except ValueError as exc:
+        raise CheckError("GitHub source URL per_page must be an integer") from exc
+    if not 1 <= per_page <= 100:
+        raise CheckError("GitHub source URL per_page must be between 1 and 100")
+    if page_values and page_values[0] != "1":
+        raise CheckError("GitHub source URL pagination must start at page 1")
+    if page == 1:
+        return url, per_page
+    query = [(key, value) for key, value in query if key != "page"]
+    query.append(("page", str(page)))
+    return urllib.parse.urlunsplit(parsed._replace(query=urllib.parse.urlencode(query))), per_page
+
+
+def github_items(source: dict[str, Any], fetcher: Fetcher) -> list[dict[str, Any]]:
+    url = source["url"]
+    _, per_page = github_page_url(url, 1)
+    items: list[dict[str, Any]] = []
+    for page in range(1, GITHUB_PAGE_LIMIT + 1):
+        page_url, _ = github_page_url(url, page)
+        payload = fetcher.get(page_url, as_json=True)
+        if not isinstance(payload, list):
+            raise CheckError(f"GitHub {source['kind']} page {page} response is not a list")
+        for index, item in enumerate(payload):
+            if not isinstance(item, dict):
+                raise CheckError(
+                    f"GitHub {source['kind']} page {page} item {index} is not an object"
+                )
+            items.append(item)
+        if len(payload) < per_page:
+            return items
+    raise CheckError(
+        f"GitHub pagination reached the safety limit of {GITHUB_PAGE_LIMIT} pages; "
+        "refusing to select from partial version data"
+    )
+
+
 def source_versions(source: dict[str, Any], fetcher: Fetcher) -> list[str]:
-    payload = fetcher.get(source["url"], as_json=True)
     kind = source["kind"]
     if kind == "github_releases":
-        if not isinstance(payload, list):
-            raise CheckError("GitHub releases response is not a list")
+        payload = github_items(source, fetcher)
         return [
             item["tag_name"]
             for item in payload
-            if not item.get("draft") and not item.get("prerelease") and item.get("tag_name")
+            if not item.get("draft")
+            and not item.get("prerelease")
+            and isinstance(item.get("tag_name"), str)
+            and item["tag_name"]
         ]
     if kind == "github_tags":
-        if not isinstance(payload, list):
-            raise CheckError("GitHub tags response is not a list")
-        return [item["name"] for item in payload if item.get("name")]
+        payload = github_items(source, fetcher)
+        return [
+            item["name"]
+            for item in payload
+            if isinstance(item.get("name"), str) and item["name"]
+        ]
+    payload = fetcher.get(source["url"], as_json=True)
     if kind == "npm":
         releases = payload.get("versions")
         if not isinstance(releases, dict):

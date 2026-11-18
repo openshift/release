@@ -16,6 +16,27 @@
     {"tag_name": "v1.3.0-rc.1", "draft": false, "prerelease": false},
     {"tag_name": "v2.0.0", "draft": false, "prerelease": false}
   ],
+  "https://example.invalid/multipage-releases?per_page=2": [
+    {"tag_name": "v1.1.0", "draft": false, "prerelease": false},
+    {"tag_name": "v1.2.0", "draft": false, "prerelease": false}
+  ],
+  "https://example.invalid/multipage-releases?per_page=2&page=2": [
+    {"tag_name": "v1.3.0", "draft": false, "prerelease": false}
+  ],
+  "https://example.invalid/gopls-tags?per_page=2": [
+    {"name": "go1.26.0"},
+    {"name": "gopls/v0.20.0"}
+  ],
+  "https://example.invalid/gopls-tags?per_page=2&page=2": [
+    {"name": "gopls/v0.21.2"}
+  ],
+  "https://example.invalid/page-error?per_page=2": [
+    {"name": "v1.0.0"},
+    {"name": "v1.0.1"}
+  ],
+  "https://example.invalid/page-error?per_page=2&page=2": {
+    "__error__": "recorded page-2 timeout"
+  },
   "https://example.invalid/npm": {
     "versions": {
       "1.2.1": {},

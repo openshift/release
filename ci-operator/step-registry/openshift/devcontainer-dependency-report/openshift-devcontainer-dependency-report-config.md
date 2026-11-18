@@ -74,7 +74,7 @@
           "name": "golangci-lint",
           "classification": "pinned",
           "file": ".devcontainer/Dockerfile",
-          "extract": {"kind": "regex", "pattern": "^ARG GOLANGCI_LINT_VERSION=(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)$"},
+          "extract": {"kind": "regex", "pattern": "^ARG GOLANGCI_LINT_VERSION=(?P<version>\\S+)$"},
           "source": "golangci-lint",
           "policy": {"min_inclusive": "2.0.0", "max_exclusive": "3.0.0"},
           "rationale": "Report a stable 2.x candidate only; maintainers must validate the lint configuration and repository code."
@@ -83,7 +83,7 @@
           "name": "github-cli",
           "classification": "pinned",
           "file": ".devcontainer/Dockerfile",
-          "extract": {"kind": "regex", "pattern": "^ARG GH_VERSION=(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)$"},
+          "extract": {"kind": "regex", "pattern": "^ARG GH_VERSION=(?P<version>\\S+)$"},
           "source": "gh",
           "policy": {"min_inclusive": "2.0.0", "max_exclusive": "3.0.0"},
           "rationale": "Report a stable 2.x candidate only; this is not a compatibility claim."
@@ -108,7 +108,7 @@
           "name": "gotestsum",
           "classification": "pinned",
           "file": ".devcontainer/Dockerfile",
-          "extract": {"kind": "regex", "pattern": "gotest\\.tools/gotestsum@v(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)"},
+          "extract": {"kind": "regex", "pattern": "gotest\\.tools/gotestsum@v(?P<version>\\S+)(?=$|\\s)"},
           "source": "gotestsum",
           "policy": {"min_inclusive": "1.0.0", "max_exclusive": "2.0.0"},
           "rationale": "Report a stable 1.x candidate only; maintainers must validate repository tests."
@@ -117,7 +117,7 @@
           "name": "gopls",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "golang\\.org/x/tools/gopls@v(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)"},
+          "extract": {"kind": "regex", "pattern": "golang\\.org/x/tools/gopls@v(?P<version>\\S+)(?=$|\\s)"},
           "source": "gopls",
           "policy": {"min_inclusive": "0.21.0", "max_exclusive": "0.22.0"},
           "rationale": "Report a stable candidate only within the explicitly approved 0.21 line."
@@ -126,7 +126,7 @@
           "name": "delve",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "github\\.com/go-delve/delve/cmd/dlv@v(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)"},
+          "extract": {"kind": "regex", "pattern": "github\\.com/go-delve/delve/cmd/dlv@v(?P<version>\\S+)(?=$|\\s)"},
           "source": "delve",
           "policy": {"min_inclusive": "1.27.0", "max_exclusive": "2.0.0"},
           "rationale": "Report a stable 1.x candidate only; maintainers must validate debugger support."
@@ -135,7 +135,7 @@
           "name": "staticcheck",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "honnef\\.co/go/tools/cmd/staticcheck@v(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)"},
+          "extract": {"kind": "regex", "pattern": "honnef\\.co/go/tools/cmd/staticcheck@v(?P<version>\\S+)(?=$|\\s)"},
           "source": "staticcheck",
           "policy": {"min_inclusive": "0.7.0", "max_exclusive": "0.8.0"},
           "rationale": "Report a stable candidate only within the explicitly approved 0.7 line."
@@ -222,7 +222,7 @@
           "name": "golangci-lint",
           "classification": "pinned",
           "file": ".devcontainer/Dockerfile",
-          "extract": {"kind": "regex", "pattern": "^ARG GOLANGCI_LINT_VERSION=(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)$"},
+          "extract": {"kind": "regex", "pattern": "^ARG GOLANGCI_LINT_VERSION=(?P<version>\\S+)$"},
           "source": "golangci-lint",
           "policy": {"min_inclusive": "2.0.0", "max_exclusive": "3.0.0"},
           "rationale": "Report a stable 2.x candidate only; maintainers must validate the lint configuration and repository code."
@@ -231,7 +231,7 @@
           "name": "github-cli",
           "classification": "pinned",
           "file": ".devcontainer/Dockerfile",
-          "extract": {"kind": "regex", "pattern": "^ARG GH_VERSION=(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)$"},
+          "extract": {"kind": "regex", "pattern": "^ARG GH_VERSION=(?P<version>\\S+)$"},
           "source": "gh",
           "policy": {"min_inclusive": "2.0.0", "max_exclusive": "3.0.0"},
           "rationale": "Report a stable 2.x candidate only; this is not a compatibility claim."
@@ -248,7 +248,7 @@
           "name": "gotestsum",
           "classification": "pinned",
           "file": ".devcontainer/Dockerfile",
-          "extract": {"kind": "regex", "pattern": "gotest\\.tools/gotestsum@v(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)"},
+          "extract": {"kind": "regex", "pattern": "gotest\\.tools/gotestsum@v(?P<version>\\S+)(?=$|\\s)"},
           "source": "gotestsum",
           "policy": {"min_inclusive": "1.0.0", "max_exclusive": "2.0.0"},
           "rationale": "Report a stable 1.x candidate only; maintainers must validate repository tests."
@@ -257,7 +257,7 @@
           "name": "gopls",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "golang\\.org/x/tools/gopls@v(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)"},
+          "extract": {"kind": "regex", "pattern": "golang\\.org/x/tools/gopls@v(?P<version>\\S+)(?=$|\\s)"},
           "source": "gopls",
           "policy": {"min_inclusive": "0.21.0", "max_exclusive": "0.22.0"},
           "rationale": "Report a stable candidate only within the explicitly approved 0.21 line."
@@ -266,7 +266,7 @@
           "name": "delve",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "github\\.com/go-delve/delve/cmd/dlv@v(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)"},
+          "extract": {"kind": "regex", "pattern": "github\\.com/go-delve/delve/cmd/dlv@v(?P<version>\\S+)(?=$|\\s)"},
           "source": "delve",
           "policy": {"min_inclusive": "1.27.0", "max_exclusive": "2.0.0"},
           "rationale": "Report a stable 1.x candidate only; maintainers must validate debugger support."
@@ -275,7 +275,7 @@
           "name": "staticcheck",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "honnef\\.co/go/tools/cmd/staticcheck@v(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)"},
+          "extract": {"kind": "regex", "pattern": "honnef\\.co/go/tools/cmd/staticcheck@v(?P<version>\\S+)(?=$|\\s)"},
           "source": "staticcheck",
           "policy": {"min_inclusive": "0.7.0", "max_exclusive": "0.8.0"},
           "rationale": "Report a stable candidate only within the explicitly approved 0.7 line."
@@ -346,7 +346,7 @@
           "name": "golangci-lint",
           "classification": "pinned",
           "file": ".devcontainer/Dockerfile",
-          "extract": {"kind": "regex", "pattern": "^ARG GOLANGCI_LINT_VERSION=(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)$"},
+          "extract": {"kind": "regex", "pattern": "^ARG GOLANGCI_LINT_VERSION=(?P<version>\\S+)$"},
           "source": "golangci-lint",
           "policy": {"min_inclusive": "2.0.0", "max_exclusive": "3.0.0"},
           "rationale": "Report a stable 2.x candidate only; maintainers must validate the lint configuration and repository code."
@@ -355,7 +355,7 @@
           "name": "github-cli",
           "classification": "pinned",
           "file": ".devcontainer/Dockerfile",
-          "extract": {"kind": "regex", "pattern": "^ARG GH_VERSION=(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)$"},
+          "extract": {"kind": "regex", "pattern": "^ARG GH_VERSION=(?P<version>\\S+)$"},
           "source": "gh",
           "policy": {"min_inclusive": "2.0.0", "max_exclusive": "3.0.0"},
           "rationale": "Report a stable 2.x candidate only; this is not a compatibility claim."
@@ -364,7 +364,7 @@
           "name": "uv",
           "classification": "pinned",
           "file": ".devcontainer/Dockerfile",
-          "extract": {"kind": "regex", "pattern": "^ARG UV_VERSION=(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)$"},
+          "extract": {"kind": "regex", "pattern": "^ARG UV_VERSION=(?P<version>\\S+)$"},
           "source": "uv",
           "policy": {"min_inclusive": "0.7.0", "max_exclusive": "0.8.0"},
           "rationale": "Report a stable candidate only within the explicitly approved 0.7 line."
@@ -373,7 +373,7 @@
           "name": "playwright",
           "classification": "pinned",
           "file": ".devcontainer/Dockerfile",
-          "extract": {"kind": "regex", "pattern": "npx playwright@(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+) install"},
+          "extract": {"kind": "regex", "pattern": "npx playwright@(?P<version>\\S+) install"},
           "source": "playwright",
           "policy": {"min_inclusive": "1.62.0", "max_exclusive": "1.63.0"},
           "rationale": "Report a stable candidate only within the approved 1.62 line; browser compatibility must be validated."
@@ -390,7 +390,7 @@
           "name": "prometheus",
           "classification": "pinned",
           "file": ".devcontainer/Dockerfile",
-          "extract": {"kind": "regex", "pattern": "^ARG PROMETHEUS_VERSION=(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)$"},
+          "extract": {"kind": "regex", "pattern": "^ARG PROMETHEUS_VERSION=(?P<version>\\S+)$"},
           "source": "prometheus",
           "policy": {"min_inclusive": "3.4.0", "max_exclusive": "4.0.0"},
           "rationale": "Report a stable 3.x candidate only; maintainers must validate Prometheus data and flags."
@@ -399,7 +399,7 @@
           "name": "gopls",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "golang\\.org/x/tools/gopls@v(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)"},
+          "extract": {"kind": "regex", "pattern": "golang\\.org/x/tools/gopls@v(?P<version>\\S+)(?=$|\\s)"},
           "source": "gopls",
           "policy": {"min_inclusive": "0.21.0", "max_exclusive": "0.22.0"},
           "rationale": "Report a stable candidate only within the explicitly approved 0.21 line."
@@ -408,7 +408,7 @@
           "name": "delve",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "github\\.com/go-delve/delve/cmd/dlv@v(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)"},
+          "extract": {"kind": "regex", "pattern": "github\\.com/go-delve/delve/cmd/dlv@v(?P<version>\\S+)(?=$|\\s)"},
           "source": "delve",
           "policy": {"min_inclusive": "1.27.0", "max_exclusive": "2.0.0"},
           "rationale": "Report a stable 1.x candidate only; maintainers must validate debugger support."
@@ -417,7 +417,7 @@
           "name": "staticcheck",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "honnef\\.co/go/tools/cmd/staticcheck@v(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)"},
+          "extract": {"kind": "regex", "pattern": "honnef\\.co/go/tools/cmd/staticcheck@v(?P<version>\\S+)(?=$|\\s)"},
           "source": "staticcheck",
           "policy": {"min_inclusive": "0.7.0", "max_exclusive": "0.8.0"},
           "rationale": "Report a stable candidate only within the explicitly approved 0.7 line."
@@ -466,7 +466,7 @@
           "name": "apm-cli",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "apm-cli==(?P<version>[0-9]+\\.[0-9]+\\.[0-9]+)"},
+          "extract": {"kind": "regex", "pattern": "apm-cli==(?P<version>\\S+)(?=$|\\s)"},
           "source": "apm-cli",
           "policy": {"min_inclusive": "0.11.0", "max_exclusive": "0.12.0"},
           "rationale": "Report a stable candidate only within the explicitly approved 0.11 line."

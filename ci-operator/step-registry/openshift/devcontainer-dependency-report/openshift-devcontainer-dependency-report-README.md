@@ -25,7 +25,7 @@ Run the recorded-response unit tests without network access:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 \
-  ci-operator/step-registry/openshift/devcontainer-dependency-report/openshift-devcontainer-dependency-report-test-commands.py
+  hack/test_devcontainer_dependency_report.py
 ```
 
 The checker uses only the Python standard library. Inventory and extraction
