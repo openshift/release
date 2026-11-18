@@ -77,6 +77,7 @@ function main() {
   printf '%s\n' '<testsuite name="test-extension" tests="1" errors="0" failures="0"><testcase name="payload-extension-packaging-and-discovery"/></testsuite>' > "${ARTIFACT_DIR}/junit_test_extension.xml"
 }
 
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+# CI evaluates command text with bash -c, where BASH_SOURCE can be unset.
+if [[ "${BASH_SOURCE[0]:-$0}" == "$0" ]]; then
   main "$@"
 fi
