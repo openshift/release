@@ -149,7 +149,10 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
   # regex built from env-derived names is an injection sink, and BRE/ERE
   # engines disagree).  The wait list keeps the original -o name lines.
   typeset -a applyPoliciesArr=()
-  typeset -a skipPresentArr=()
+  # Presence is keyed by name, never packed into a '|'-joined record: a name
+  # that carried the separator would shift the fields and put the wrong
+  # presence flag on a JUnit row.
+  typeset -A skipPresentMap=()
   typeset _found=false
   typeset _line=''
   typeset _skip=false
@@ -163,9 +166,9 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
       fi
     done <<< "${policyList}"
     if [[ "${_found}" == true ]]; then
-      skipPresentArr+=("${p}|true")
+      skipPresentMap["${p}"]="true"
     else
-      skipPresentArr+=("${p}|false")
+      skipPresentMap["${p}"]="false"
       printf '[%s] WARNING: policy "%s" from SKIP_POLICIES not found in cluster (ignoring)\n' \
         "$(date -u +%FT%TZ)" "${p}"
     fi
@@ -182,9 +185,17 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
     [[ "${_skip}" == false ]] && applyPoliciesArr+=("${_line}")
   done <<< "${policyList}"
 
+  # Counted from the map, not by piping packed records through grep: the
+  # pipeline form needed `|| true` to survive grep's exit 1 on a zero count,
+  # which masks any real read error in the same command substitution.
+  typeset -i _presentCount=0
+  for p in "${skipPoliciesArr[@]}"; do
+    if [[ "${skipPresentMap[${p}]}" == true ]]; then
+      (( _presentCount += 1 ))
+    fi
+  done
   printf '# Present in cluster: %d of %d\n' \
-    "$(printf '%s\n' "${skipPresentArr[@]}" | grep -c '|true$' || true)" \
-    "${#skipPoliciesArr[@]}" >> "${ARTIFACT_DIR}/skip-policies.txt"
+    "${_presentCount}" "${#skipPoliciesArr[@]}" >> "${ARTIFACT_DIR}/skip-policies.txt"
 
   # Emit one failing JUnit testcase per normalized skip entry
   # (INTEROP-9677): while any skip remains, the skip state must be
@@ -209,20 +220,21 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
     typeset _f="${ARTIFACT_DIR}/junit_skip_policies.xml"
     # Pre-seed a distinct evidence-incomplete failing case first so a
     # crash mid-emission leaves a red artifact, never nothing.
-    printf '<?xml version="1.0" encoding="UTF-8"?>\n<testsuite name="lp-interop--OPP--policies" tests="1" failures="1" skipped="0">\n  <testcase classname="interop.opp.policies.evidence-incomplete" name="EVIDENCE-INCOMPLETE: junit emission aborted" time="0">\n    <failure message="evidence-incomplete">skip-visibility JUnit emission did not complete</failure>\n  </testcase>\n</testsuite>\n' > "${_f}" || {
+    printf '<?xml version="1.0" encoding="UTF-8"?>\n<testsuite name="lp-interop--OPP--policies" tests="1" failures="1" skipped="0">\n  <testcase classname="lp-interop--OPP--policies" name="[sig-interop][Jira:INTEROP][Feature:OPP] EVIDENCE-INCOMPLETE: junit emission aborted" time="0">\n    <failure message="evidence-incomplete">skip-visibility JUnit emission did not complete</failure>\n  </testcase>\n</testsuite>\n' > "${_f}" || {
       printf '[%s] WARNING: could not write %s\n' "$(date -u +%FT%TZ)" "${_f}" >&2
       return 0
     }
     typeset _tmp=""
     _tmp="$(mktemp "${_f}.XXXXXX")" || return 0
     chmod 0644 "${_tmp}"
-    typeset _n=${#skipPresentArr[@]}
+    typeset _n=${#skipPoliciesArr[@]}
     typeset _p=''
     typeset _present=''
     {
       printf '<?xml version="1.0" encoding="UTF-8"?>\n'
       printf '<testsuite name="lp-interop--OPP--policies" tests="%d" failures="%d" skipped="0">\n' "${_n}" "${_n}"
-      printf '%s\n' "${skipPresentArr[@]}" | LC_ALL=C sort -t'|' -k1,1 | while IFS='|' read -r _p _present; do
+      printf '%s\n' "${skipPoliciesArr[@]}" | LC_ALL=C sort | while IFS= read -r _p; do
+        typeset _present="${skipPresentMap[${_p}]:-unknown}"
         typeset _esc=''
         _esc="$(_skipXmlEscape "${_p}")"
         printf '  <testcase classname="lp-interop--OPP--policies" name="[sig-interop][Jira:INTEROP][Feature:OPP] %s skipped by SKIP_POLICIES" time="0">\n' "${_esc}"
@@ -269,7 +281,23 @@ PY
         --for jsonpath='{.status.compliant}'=Compliant \
         --timeout=40m; then
       : "Non-skipped policies failed to become compliant:"
-      printf '%s\n' "${applyPoliciesArr[@]}"
+      # Current cluster state for the wait list, by exact name compare: the
+      # expected list alone told the operator nothing about what the policies
+      # actually reported, and the previous `grep -Ev` form built a regex from
+      # env-derived names.
+      typeset _liveNames=""
+      _liveNames="$(oc get policies -n policies --ignore-not-found -o name 2>/dev/null || true)"
+      typeset _liveLine="" _applyLine=""
+      while IFS= read -r _liveLine; do
+        [[ -z "${_liveLine}" ]] && continue
+        for _applyLine in "${applyPoliciesArr[@]}"; do
+          if [[ "${_liveLine}" == "${_applyLine}" ]]; then
+            printf '  still present and not Compliant: %s\n' "${_liveLine}"
+            break
+          fi
+        done
+      done <<< "${_liveNames}"
+      printf '  wait list (%d): %s\n' "${#applyPoliciesArr[@]}" "${applyPoliciesArr[*]}"
       oc get policies -n policies --ignore-not-found -o yaml
       oc describe policies -n policies
       exit 1
