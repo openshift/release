@@ -81,8 +81,21 @@ elif command == "aws":
     elif action == "ec2 describe-vpcs":
         print("10.0.0.0/16")
     elif action == "ec2 create-security-group":
+        if "--tag-specifications" in args:
+            build_id = os.environ["BUILD_ID"]
+            assert args[args.index("--tag-specifications") + 1] == (
+                "ResourceType=security-group,Tags=["
+                f"{{Key=Name,Value=enmaas-ci-{build_id}-rds-sg}},"
+                f"{{Key=EnMaaS,Value=ci}},{{Key=BuildID,Value={build_id}}}]")
+            if scenario == "sg-tag-failure":
+                fail("UnauthorizedOperation")
+        else:
+            assert scenario == "sg-tag-failure"
         print("sg-synthetic")
-    elif action in ("ec2 create-tags", "ec2 authorize-security-group-ingress", "rds create-db-instance"):
+    elif action == "ec2 create-tags":
+        assert scenario == "sg-tag-failure"
+        fail("UnauthorizedOperation")
+    elif action in ("ec2 authorize-security-group-ingress", "rds create-db-instance"):
         print("synthetic-network-metadata")
     elif action == "rds wait":
         assert args[2] == "db-instance-available"
@@ -269,6 +282,30 @@ assert token not in result.stderr
         for value in ("synthetic.internal.invalid", "vpc-synthetic", "sg-synthetic", "10.0.0.0/16",
                       "synthetic-network-metadata", "synthetic-placeholder"):
             self.assertNotIn(value, result.stdout + result.stderr)
+
+    def test_security_group_created_with_exact_tags_without_separate_tag_call(self):
+        (self.directory / "vpc_id").write_text("vpc-synthetic", encoding="utf-8")
+        (self.directory / "private_subnet_ids").write_text("['subnet-synthetic']", encoding="utf-8")
+        result = self.run_step("provision-rds")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.directory / "rds-security-group-id").read_text(encoding="utf-8").strip(),
+                         "sg-synthetic")
+        actions = [action for command, action in self.calls() if command == "aws"]
+        self.assertNotIn("ec2 create-tags", actions)
+        self.assertIn("ec2 authorize-security-group-ingress", actions)
+        self.assertIn("rds create-db-instance", actions)
+
+    def test_security_group_tag_failure_stops_before_ingress_and_database(self):
+        (self.directory / "vpc_id").write_text("vpc-synthetic", encoding="utf-8")
+        (self.directory / "private_subnet_ids").write_text("['subnet-synthetic']", encoding="utf-8")
+        result = self.run_step("provision-rds", "sg-tag-failure")
+        self.assertEqual(result.returncode, 254)
+        self.assertIn("UnauthorizedOperation", result.stderr)
+        self.assertFalse((self.directory / "rds-security-group-id").exists())
+        actions = [action for command, action in self.calls() if command == "aws"]
+        self.assertIn("ec2 create-security-group", actions)
+        for action in ("ec2 create-tags", "ec2 authorize-security-group-ingress", "rds create-db-instance"):
+            self.assertNotIn(action, actions)
 
     def test_installed_csv_not_grep_and_bounded_unset_status(self):
         result = self.run_step("install-operators")

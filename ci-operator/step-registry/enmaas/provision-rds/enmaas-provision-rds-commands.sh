@@ -61,17 +61,12 @@ SG_ID=$(aws ec2 create-security-group \
   --group-name "${INSTANCE_ID}-rds-sg" \
   --description "EnMaaS CI RDS security group for ${INSTANCE_ID}" \
   --vpc-id "${VPC_ID}" \
+  --tag-specifications "ResourceType=security-group,Tags=[{Key=Name,Value=${INSTANCE_ID}-rds-sg},{Key=EnMaaS,Value=ci},{Key=BuildID,Value=${BUILD_ID}}]" \
   --region "${REGION}" \
   --query 'GroupId' \
   --output text)
 echo "Security group created."
 echo "${SG_ID}" > "${SHARED_DIR}/rds-security-group-id"
-
-# Tag the security group
-aws ec2 create-tags \
-  --resources "${SG_ID}" \
-  --region "${REGION}" \
-  --tags Key=Name,Value="${INSTANCE_ID}-rds-sg" Key=EnMaaS,Value=ci Key=BuildID,Value="${BUILD_ID}" >/dev/null
 
 # Allow inbound PostgreSQL traffic from VPC CIDR
 aws ec2 authorize-security-group-ingress \
