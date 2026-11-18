@@ -199,6 +199,37 @@ tests:
       cli: latest
       commands: |
         export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+        # TODO: temporary HyperShift compatibility for the console e2e scripts,
+        # kept here until contrib/create-user.sh supports hosted clusters. Run
+        # the suite this way to identify which tests need disabling under HCP.
+        # oauths.config is immutable on hosted clusters: IDPs are managed via
+        # the HostedCluster on the management cluster. The kubeadmin password
+        # is not exported to $SHARED_DIR by the hypershift-aws chains.
+        set +x
+        oc --kubeconfig="${SHARED_DIR}/kubeconfig" -n clusters get secret "$(cat "${SHARED_DIR}/cluster-name")-kubeadmin-password" -o jsonpath='{.data.password}' | base64 -d > /tmp/kubeadmin-password
+        set -x
+        export KUBEADMIN_PASSWORD_FILE=/tmp/kubeadmin-password
+        cat > contrib/create-user.sh <<'EOS'
+        #!/usr/bin/env bash
+        set -exuo pipefail
+        # HyperShift variant: configure the htpasswd IDP on the HostedCluster
+        # in the management cluster instead of patching the guest oauths.config.
+        BASEDIR=$(dirname "$0")/..
+        MGMT_KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        CLUSTER_NAME="$(cat "${SHARED_DIR}/cluster-name")"
+        oc --kubeconfig="${MGMT_KUBECONFIG}" apply -f <(sed 's/namespace: openshift-config/namespace: clusters/' "$BASEDIR/frontend/packages/console-shared/src/test-data/htpasswd-secret.yaml")
+        oc --kubeconfig="${MGMT_KUBECONFIG}" patch hostedcluster -n clusters "${CLUSTER_NAME}" --type=merge -p '{"spec":{"configuration":{"oauth":{"identityProviders":[{"name":"test","mappingMethod":"claim","type":"HTPasswd","htpasswd":{"fileData":{"name":"htpass-secret"}}}]}}}}'
+        for i in $(seq 1 24); do
+          cp "${KUBECONFIG}" /tmp/login-check.kubeconfig
+          if oc --kubeconfig=/tmp/login-check.kubeconfig login --username=test --password=test >/dev/null 2>&1; then
+            echo "htpasswd IDP is ready"
+            exit 0
+          fi
+          sleep 15
+        done
+        echo "htpasswd IDP did not become ready in time"
+        exit 1
+        EOS
         ./test-prow-e2e.sh
       dependencies:
       - env: PLUGIN_PULL_SPEC
