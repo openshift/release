@@ -210,19 +210,24 @@ tests:
         MGMT_KUBECONFIG="${SHARED_DIR}/kubeconfig"
         CLUSTER_NAME="$(cat "${SHARED_DIR}/cluster-name")"
         htpasswd_file=/tmp/htpasswd
-        grep 'htpasswd:' frontend/packages/console-shared/src/test-data/htpasswd-secret.yaml | awk '{print $2}' | base64 -d > "${htpasswd_file}"
-        printf 'e2e-admin:%s\n' "$(openssl passwd -apr1 test)" >> "${htpasswd_file}"
+        printf '%s\ne2e-admin:%s\n' "$(grep 'htpasswd:' frontend/packages/console-shared/src/test-data/htpasswd-secret.yaml | awk '{print $2}' | base64 -d | tr -d '\n')" "$(openssl passwd -apr1 test)" > "${htpasswd_file}"
         oc --kubeconfig="${MGMT_KUBECONFIG}" -n clusters create secret generic htpass-secret --from-file=htpasswd="${htpasswd_file}" --dry-run=client -o yaml | oc --kubeconfig="${MGMT_KUBECONFIG}" apply -f -
         oc --kubeconfig="${MGMT_KUBECONFIG}" patch hostedcluster -n clusters "${CLUSTER_NAME}" --type=merge -p '{"spec":{"configuration":{"oauth":{"identityProviders":[{"name":"test","mappingMethod":"claim","type":"HTPasswd","htpasswd":{"fileData":{"name":"htpass-secret"}}}]}}}}'
         oc create clusterrolebinding e2e-admin --clusterrole=cluster-admin --user=e2e-admin --dry-run=client -o yaml | oc apply -f -
+        idp_ready=false
         for i in $(seq 1 24); do
           cp "${KUBECONFIG}" /tmp/login-check.kubeconfig
           if oc --kubeconfig=/tmp/login-check.kubeconfig login --username=test --password=test >/dev/null 2>&1; then
+            idp_ready=true
             echo "htpasswd IDP is ready"
             break
           fi
           sleep 15
         done
+        if [ "${idp_ready}" != "true" ]; then
+          echo "htpasswd IDP did not become ready in time"
+          exit 1
+        fi
         admin_verified=false
         for i in $(seq 1 12); do
           cp "${KUBECONFIG}" /tmp/admin-check.kubeconfig
