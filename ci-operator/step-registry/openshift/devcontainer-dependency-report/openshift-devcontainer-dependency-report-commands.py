@@ -99,21 +99,38 @@ class Fetcher:
         return value
 
 
-def github_page_url(url: str, page: int) -> tuple[str, int]:
+def github_page_url(url: str, kind: str, page: int) -> tuple[str, int]:
     try:
         parsed = urllib.parse.urlsplit(url)
         port = parsed.port
     except ValueError as exc:
         raise CheckError(f"invalid GitHub source URL {url!r}: {exc}") from exc
-    if parsed.scheme != "https" or not parsed.hostname:
-        raise CheckError("GitHub source URL must use public HTTPS")
+    if parsed.scheme != "https" or parsed.hostname != "api.github.com":
+        raise CheckError("GitHub source URL must use https://api.github.com")
     if parsed.username is not None or parsed.password is not None:
         raise CheckError("GitHub source URL must be public HTTPS without credentials")
     if port not in {None, 443}:
         raise CheckError("GitHub source URL must not use a nonstandard port")
     if parsed.fragment:
         raise CheckError("GitHub source URL must not include a fragment")
+    expected_endpoint = {
+        "github_releases": "releases",
+        "github_tags": "tags",
+    }.get(kind)
+    path_parts = parsed.path.strip("/").split("/")
+    if expected_endpoint is None:
+        raise CheckError(f"invalid GitHub source kind {kind!r}")
+    if len(path_parts) != 4 or path_parts[0] != "repos":
+        raise CheckError(f"invalid GitHub {kind} API path")
+    if not path_parts[1] or not path_parts[2] or path_parts[3] != expected_endpoint:
+        raise CheckError(f"invalid GitHub {kind} API path")
     query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+    unsupported_parameters = {key for key, _ in query} - {"page", "per_page"}
+    if unsupported_parameters:
+        raise CheckError(
+            "GitHub source URL has unsupported query parameters: "
+            + ", ".join(sorted(unsupported_parameters))
+        )
     per_page_values = [value for key, value in query if key == "per_page"]
     page_values = [value for key, value in query if key == "page"]
     if len(per_page_values) > 1 or len(page_values) > 1:
@@ -135,10 +152,11 @@ def github_page_url(url: str, page: int) -> tuple[str, int]:
 
 def github_items(source: dict[str, Any], fetcher: Fetcher) -> list[dict[str, Any]]:
     url = source["url"]
-    _, per_page = github_page_url(url, 1)
+    kind = source["kind"]
+    _, per_page = github_page_url(url, kind, 1)
     items: list[dict[str, Any]] = []
     for page in range(1, GITHUB_PAGE_LIMIT + 1):
-        page_url, _ = github_page_url(url, page)
+        page_url, _ = github_page_url(url, kind, page)
         payload = fetcher.get(page_url, as_json=True)
         if not isinstance(payload, list):
             raise CheckError(f"GitHub {source['kind']} page {page} response is not a list")

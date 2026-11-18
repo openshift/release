@@ -9,6 +9,7 @@ import importlib.util
 import json
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 
@@ -23,6 +24,20 @@ SPEC = importlib.util.spec_from_file_location(
 assert SPEC and SPEC.loader
 CHECKER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECKER)
+
+
+class FakeResponse:
+    def __init__(self, body: bytes) -> None:
+        self.body = body
+
+    def __enter__(self) -> FakeResponse:
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return self.body
 
 
 def dependency(file_name: str = ".devcontainer/Dockerfile") -> dict:
@@ -40,7 +55,10 @@ def dependency(file_name: str = ".devcontainer/Dockerfile") -> dict:
     }
 
 
-def config(item: dict, source_url: str = "https://example.invalid/releases") -> dict:
+def config(
+    item: dict,
+    source_url: str = "https://api.github.com/repos/example/tool/releases?per_page=100",
+) -> dict:
     return {
         "schema_version": 1,
         "sources": {
@@ -123,7 +141,7 @@ class CheckerTests(unittest.TestCase):
         source = {
             "kind": "github_releases",
             "tag_prefix": "v",
-            "url": "https://example.invalid/releases",
+            "url": "https://api.github.com/repos/example/tool/releases?per_page=100",
         }
         versions = CHECKER.source_versions(source, CHECKER.Fetcher(self.responses))
         self.assertEqual(versions, ["v1.2.1", "v2.0.0"])
@@ -132,7 +150,7 @@ class CheckerTests(unittest.TestCase):
         source = {
             "kind": "github_releases",
             "tag_prefix": "v",
-            "url": "https://example.invalid/multipage-releases?per_page=2",
+            "url": "https://api.github.com/repos/example/multipage/releases?per_page=2",
         }
         versions = CHECKER.source_versions(source, CHECKER.Fetcher(self.responses))
         self.assertEqual(versions, ["v1.1.0", "v1.2.0", "v1.3.0"])
@@ -141,7 +159,7 @@ class CheckerTests(unittest.TestCase):
         source = {
             "kind": "github_tags",
             "tag_prefix": "gopls/v",
-            "url": "https://example.invalid/gopls-tags?per_page=2",
+            "url": "https://api.github.com/repos/golang/tools/tags?per_page=2",
         }
         proposed, parsed = CHECKER.latest_allowed(
             source,
@@ -154,27 +172,81 @@ class CheckerTests(unittest.TestCase):
         source = {
             "kind": "github_tags",
             "tag_prefix": "v",
-            "url": "https://example.invalid/page-error?per_page=2",
+            "url": "https://api.github.com/repos/example/page-error/tags?per_page=2",
         }
         with self.assertRaisesRegex(CHECKER.CheckError, "recorded page-2 timeout"):
             CHECKER.source_versions(source, CHECKER.Fetcher(self.responses))
 
     def test_github_pagination_limit_refuses_partial_version_data(self) -> None:
-        url = "https://example.invalid/bounded-tags?per_page=1"
-        responses = {url: [{"name": "v1.0.0"}]}
+        url = "https://api.github.com/repos/example/bounded/releases?per_page=1"
+        responses = {
+            url: [{"tag_name": "v1.0.0", "draft": False, "prerelease": False}]
+        }
         for page in range(2, CHECKER.GITHUB_PAGE_LIMIT + 1):
-            responses[f"{url}&page={page}"] = [{"name": f"v1.0.{page - 1}"}]
-        source = {"kind": "github_tags", "tag_prefix": "v", "url": url}
+            responses[f"{url}&page={page}"] = [
+                {
+                    "tag_name": f"v1.0.{page - 1}",
+                    "draft": False,
+                    "prerelease": False,
+                }
+            ]
+        source = {"kind": "github_releases", "tag_prefix": "v", "url": url}
         with self.assertRaisesRegex(CHECKER.CheckError, "safety limit"):
             CHECKER.source_versions(source, CHECKER.Fetcher(responses))
+        row = CHECKER.check(
+            config(dependency(), url),
+            CHECKER.Fetcher({**self.responses, **responses}),
+        )[0]
+        self.assertEqual(row["status"], "error")
+        self.assertIsNone(row["proposed"])
+        self.assertIn("partial version data", row["error"])
 
     def test_github_pagination_rejects_credentialed_url(self) -> None:
         source = {
             "kind": "github_tags",
-            "url": "https://account@example.invalid/tags",
+            "url": "https://account@api.github.com/repos/example/tool/tags",
         }
         with self.assertRaisesRegex(CHECKER.CheckError, "without credentials"):
             CHECKER.source_versions(source, CHECKER.Fetcher({}))
+
+    def test_github_pagination_requires_matching_api_endpoint(self) -> None:
+        invalid_sources = (
+            {"kind": "github_tags", "url": "https://github.com/example/tool/tags"},
+            {
+                "kind": "github_tags",
+                "url": "https://api.github.com/repos/example/tool/releases",
+            },
+            {
+                "kind": "github_releases",
+                "url": "https://api.github.com/repos/example/tool/releases?other=value",
+            },
+        )
+        for source in invalid_sources:
+            with self.subTest(source=source):
+                with self.assertRaises(CHECKER.CheckError):
+                    CHECKER.source_versions(source, CHECKER.Fetcher({}))
+
+    def test_fetcher_reports_malformed_json_with_url(self) -> None:
+        url = "https://api.github.com/repos/example/tool/releases?per_page=100"
+        with mock.patch.object(
+            CHECKER.urllib.request,
+            "urlopen",
+            return_value=FakeResponse(b"{not-json"),
+        ):
+            with self.assertRaisesRegex(CHECKER.CheckError, "lookup failed.*invalid JSON"):
+                CHECKER.Fetcher().get(url, as_json=True)
+
+    def test_fetcher_reports_network_failure_with_url(self) -> None:
+        url = "https://api.github.com/repos/example/tool/releases?per_page=100"
+        with mock.patch.object(
+            CHECKER.urllib.request,
+            "urlopen",
+            side_effect=TimeoutError("recorded network timeout"),
+        ):
+            with self.assertRaisesRegex(
+                CHECKER.CheckError, "lookup failed.*recorded network timeout"
+            ):
+                CHECKER.Fetcher().get(url, as_json=True)
 
     def test_no_change_never_proposes_a_downgrade(self) -> None:
         row = self.run_check(config(dependency(".devcontainer/no-change")))
@@ -196,7 +268,10 @@ class CheckerTests(unittest.TestCase):
 
     def test_lookup_failure_is_an_error_not_no_change(self) -> None:
         row = self.run_check(
-            config(dependency(), "https://example.invalid/lookup-error")
+            config(
+                dependency(),
+                "https://api.github.com/repos/example/lookup-error/releases?per_page=100",
+            )
         )
         self.assertEqual(row["status"], "error")
         self.assertIsNone(row["proposed"])
@@ -211,7 +286,7 @@ class CheckerTests(unittest.TestCase):
         row = self.run_check(
             config(
                 dependency(".devcontainer/numeric"),
-                "https://example.invalid/semver-releases",
+                "https://api.github.com/repos/example/semver/releases?per_page=100",
             )
         )
         self.assertEqual(row["current"], "1.9.9")
@@ -279,9 +354,21 @@ class CheckerTests(unittest.TestCase):
                     with self.assertRaisesRegex(CHECKER.CheckError, "not a stable"):
                         CHECKER.parse_version(current)
 
+    def test_all_pinned_extractors_do_not_truncate_build_suffixes(self) -> None:
+        for repository in self.production_config["repositories"]:
+            for item in repository["dependencies"]:
+                if item["classification"] != "pinned":
+                    continue
+                with self.subTest(repository=repository["name"], dependency=item["name"]):
+                    content, expected = pinned_declaration(item["name"], "+build.1")
+                    current = CHECKER.extract_current(content, item)
+                    self.assertEqual(current, expected)
+                    with self.assertRaisesRegex(CHECKER.CheckError, "not a stable"):
+                        CHECKER.parse_version(current)
+
     def test_gopls_extractor_rejects_invalid_complete_token(self) -> None:
         item = configured_dependency(self.production_config, "openshift/sippy", "gopls")
-        content, expected = pinned_declaration("gopls", ".invalid")
+        content, expected = pinned_declaration("gopls", "!invalid")
         current = CHECKER.extract_current(content, item)
         self.assertEqual(current, expected)
         with self.assertRaisesRegex(CHECKER.CheckError, "not a stable"):
@@ -296,7 +383,7 @@ class CheckerTests(unittest.TestCase):
         row = self.run_check(
             config(
                 dependency(),
-                "https://example.invalid/no-stable-releases",
+                "https://api.github.com/repos/example/no-stable/releases?per_page=100",
             )
         )
         self.assertEqual(row["status"], "error")
