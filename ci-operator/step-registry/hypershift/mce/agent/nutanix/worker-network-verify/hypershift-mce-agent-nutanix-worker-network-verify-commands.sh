@@ -8,7 +8,7 @@ if [[ ! -s "$SHARED_DIR/nested_kubeconfig" ||
       ! -s "$SHARED_DIR/kubeconfig" ||
       ! -s "$SHARED_DIR/nutanix_proxy_url" ||
       ! -s "$SHARED_DIR/nutanix_subnet_cidr" ||
-      ! -s "$SHARED_DIR/nutanix_worker_macs.json" ||
+      ! -s "$SHARED_DIR/nutanix_worker_names" ||
       ! -s "$SHARED_DIR/hosted_kube-apiserver_port" ]]; then
   echo "The guest kubeconfigs or Nutanix worker network inputs are missing."
   exit 1
@@ -106,8 +106,8 @@ if ! valid_host "$canary_host" || ! valid_host "$assisted_host" || ! valid_host 
   exit 1
 fi
 
-worker_count=$(jq -er 'if type == "array" then length else empty end' \
-  "$SHARED_DIR/nutanix_worker_macs.json")
+worker_count=$(awk 'NF { count++ } END { print count + 0 }' \
+  "$SHARED_DIR/nutanix_worker_names")
 if (( worker_count < 1 )); then
   echo "The Nutanix worker count is invalid."
   exit 1

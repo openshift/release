@@ -23,6 +23,12 @@ if [[ ! "${NUTANIX_WORKERS:-}" =~ ^[1-9][0-9]*$ ]]; then
   echo "NUTANIX_WORKERS must be a positive integer."
   exit 1
 fi
+if [[ ! "$CLUSTER_NAME" =~ ^[a-z0-9-]+$ ||
+      "$INFRAENV_NAME" != "$CLUSTER_NAME-nutanix" ||
+      ! "$AGENT_NAMESPACE" =~ ^[a-z0-9-]+$ ]]; then
+  echo "The recorded HostedCluster, InfraEnv, or Agent namespace is invalid."
+  exit 1
+fi
 if [[ -n "${AGENT_QE_INFRA_ANSIBLE_DIR:-}" ]]; then
   ANSIBLE_FILES_DIR=${AGENT_QE_INFRA_ANSIBLE_DIR}
 else
@@ -61,18 +67,18 @@ ssh -F "$gateway_ssh_config" nutanix-ingress-gateway \
   'sudo systemctl is-active --quiet hypershift-nutanix-ingress-firewall.service'
 
 mkdir -p "$WORK_DIR"
-reserved_macs_file="$SHARED_DIR/nutanix_worker_macs.json"
-if [[ ! -s "$reserved_macs_file" ]] || ! jq -e --arg cluster "$CLUSTER_NAME" --argjson count "$NUTANIX_WORKERS" '
-  type == "array" and length == $count and
-  ([.[].mac] | unique | length) == $count and
-  all(to_entries[]; .value.name == ($cluster + "-worker-" + (.key | tostring)) and
-    (.value.mac | test("^02(:[0-9a-f]{2}){5}$")))
-' "$reserved_macs_file" >/dev/null; then
-  echo "The InfraEnv did not reserve exactly $NUTANIX_WORKERS distinct worker MACs for this run."
+worker_names_file="$SHARED_DIR/nutanix_worker_names"
+expected_names_file="$WORK_DIR/expected-worker-names"
+: > "$expected_names_file"
+for ((worker_index = 0; worker_index < NUTANIX_WORKERS; worker_index++)); do
+  printf '%s-worker-%s\n' "$CLUSTER_NAME" "$worker_index" >> "$expected_names_file"
+done
+if [[ -e "$worker_names_file" ]] && ! cmp -s "$expected_names_file" "$worker_names_file"; then
+  echo "The recorded Nutanix worker names do not match this run."
   exit 1
 fi
-jq -r '.[].name' "$reserved_macs_file" > "$SHARED_DIR/hostnames.txt"
-cp "$SHARED_DIR/hostnames.txt" "$SHARED_DIR/nutanix_worker_names"
+cp "$expected_names_file" "$worker_names_file"
+cp "$worker_names_file" "$SHARED_DIR/hostnames.txt"
 printf '%s\n' "$IMAGE_NAME" > "$SHARED_DIR/nutanix_image_name"
 : > "$SHARED_DIR/vm_uuids.txt"
 : > "$SHARED_DIR/image_uuid.txt"
@@ -105,7 +111,7 @@ cat > "$playbook" <<EOF
   vars:
     vm_memory_gb: 16
     vm_disk_size_gb: 120
-    worker_macs: "{{ lookup('file', lookup('env', 'SHARED_DIR') + '/nutanix_worker_macs.json') | from_json }}"
+    worker_names: "{{ lookup('file', lookup('env', 'SHARED_DIR') + '/nutanix_worker_names').splitlines() }}"
   module_defaults:
     group/nutanix.ncp.ntnx:
       nutanix_username: "{{ lookup('env', 'NUTANIX_USERNAME') }}"
@@ -115,9 +121,9 @@ cat > "$playbook" <<EOF
   roles:
     - "$ANSIBLE_FILES_DIR/roles/nutanix/upload_image"
   tasks:
-    - name: Provision workers with their InfraEnv NMStateConfig MACs
+    - name: Provision HostedCluster workers
       nutanix.ncp.ntnx_vms:
-        name: "{{ worker.name }}"
+        name: "{{ worker }}"
         vcpus: 8
         cores_per_vcpu: 1
         memory_gb: "{{ vm_memory_gb }}"
@@ -136,13 +142,12 @@ cat > "$playbook" <<EOF
         networks:
           - subnet:
               uuid: "{{ vm_network_uuid }}"
-            mac_address: "{{ worker.mac }}"
         boot_config:
           boot_order:
             - DISK
             - CDROM
         state: present
-      loop: "{{ worker_macs }}"
+      loop: "{{ worker_names }}"
       loop_control:
         loop_var: worker
       async: 600
@@ -212,20 +217,21 @@ if [[ $(wc -l < "$SHARED_DIR/vm_uuids.txt") -ne "$NUTANIX_WORKERS" || ! -s "$SHA
   exit 1
 fi
 
-map_file="$SHARED_DIR/nutanix_worker_vms.tsv"
-: > "$map_file"
 mkdir -p "$ARTIFACT_DIR"
 shape_file="$ARTIFACT_DIR/nutanix-worker-vm-shapes.jsonl"
 : > "$shape_file"
-while IFS=$'\t' read -r name expected_mac && IFS= read -r uuid <&3; do
+while IFS= read -r uuid; do
   vm_json=$(curl --silent --show-error --fail --insecure --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
     "$NUTANIX_PC_URL/api/nutanix/v3/vms/$uuid")
-  mac=$(jq -er --arg subnet "$SUBNET_UUID" '[.spec.resources.nic_list[]? |
-    select(.subnet_reference.uuid == $subnet) | .mac_address // empty] |
-    map(ascii_downcase) | unique |
-    if length == 1 then .[0] else error("VM NIC MAC is missing or ambiguous") end' <<<"$vm_json")
-  if [[ "$mac" != "$expected_mac" ]]; then
-    echo "Nutanix VM $name did not receive its reserved NIC MAC $expected_mac."
+  name=$(jq -er '.spec.name' <<<"$vm_json")
+  if ! grep -Fxq "$name" "$worker_names_file"; then
+    echo "Nutanix VM $uuid does not have one of this run's worker names."
+    exit 1
+  fi
+  if ! jq -e --arg subnet "$SUBNET_UUID" \
+    '[.spec.resources.nic_list[]? | select(.subnet_reference.uuid == $subnet)] | length == 1' \
+    <<<"$vm_json" >/dev/null; then
+    echo "Nutanix VM $name does not have exactly one NIC on the worker subnet."
     exit 1
   fi
   shape=$(jq -c '{sockets:.status.resources.num_sockets,
@@ -238,10 +244,13 @@ while IFS=$'\t' read -r name expected_mac && IFS= read -r uuid <&3; do
     printf 'Nutanix VM %s has an unexpected CPU, memory, or disk shape: %s\n' "$name" "$shape"
     exit 1
   fi
-  jq -cn --arg name "$name" --arg uuid "$uuid" --arg mac "$mac" --argjson shape "$shape" \
-    '$shape + {name:$name,uuid:$uuid,mac:$mac}' >> "$shape_file"
-  printf '%s\t%s\t%s\n' "$name" "$uuid" "$mac" >> "$map_file"
-done 3< "$SHARED_DIR/vm_uuids.txt" < <(jq -r '.[] | [.name, .mac] | @tsv' "$reserved_macs_file")
+  jq -cn --arg name "$name" --arg uuid "$uuid" --argjson shape "$shape" \
+    '$shape + {name:$name,uuid:$uuid}' >> "$shape_file"
+done < "$SHARED_DIR/vm_uuids.txt"
+if ! cmp -s <(sort "$worker_names_file") <(jq -r '.name' "$shape_file" | sort); then
+  echo "The provisioned Nutanix VMs do not match this run's worker names."
+  exit 1
+fi
 
 function matching_agents() {
   oc get agents -n "$AGENT_NAMESPACE" -o json | jq -r --arg infraenv "$INFRAENV_NAME" \
@@ -268,57 +277,25 @@ if [[ $(awk 'NF { count++ } END { print count + 0 }' <<<"$agents") -ne "$NUTANIX
   exit 1
 fi
 
-inventory_deadline=$((SECONDS + 1200))
 for agent in $agents; do
-  while :; do
-    agent_json=$(oc get agent "$agent" -n "$AGENT_NAMESPACE" -o json)
-    if jq -e 'any(.status.inventory.interfaces[]?; (.macAddress // "") != "")' <<<"$agent_json" >/dev/null; then
-      break
-    fi
-    if (( SECONDS >= inventory_deadline )); then
-      echo "Agent $agent has not reported network interface inventory."
-      exit 1
-    fi
-    sleep 30
-  done
-done
-
-map_file="$SHARED_DIR/nutanix_agent_vm_mapping.tsv"
-: > "$map_file"
-mapped_agent_names=""
-mapped_count=0
-while IFS=$'\t' read -r vm_name _ vm_mac; do
-  vm_mac_normalized=$(tr -d ':' <<<"$vm_mac" | tr '[:upper:]' '[:lower:]')
-  matched_agent=""
-  for agent in $agents; do
-    inventory_macs=$(oc get agent "$agent" -n "$AGENT_NAMESPACE" -o json | jq -r '.status.inventory.interfaces[]?.macAddress // empty' | tr '[:upper:]' '[:lower:]' | tr -d ':')
-    if grep -Fxq "$vm_mac_normalized" <<<"$inventory_macs"; then
-      if [[ -n "$matched_agent" ]]; then
-        echo "More than one Agent reports the MAC address $vm_mac."
-        exit 1
-      fi
-      matched_agent=$agent
-    fi
-  done
-  if [[ -z "$matched_agent" ]] || grep -Fxq "$matched_agent" <<<"$mapped_agent_names"; then
-    echo "Nutanix VM $vm_name ($vm_mac) did not map to exactly one distinct InfraEnv Agent."
+  agent_json=$(oc get agent "$agent" -n "$AGENT_NAMESPACE" -o json)
+  if ! jq -e --arg infraenv "$INFRAENV_NAME" --arg run_key "$RUN_LABEL_KEY" \
+    --arg cluster "$CLUSTER_NAME" '
+    .metadata.labels["infraenvs.agent-install.openshift.io"] == $infraenv and
+    ((.metadata.labels[$run_key] // $cluster) == $cluster)
+  ' <<<"$agent_json" >/dev/null; then
+    echo "Agent $agent does not belong to this run's InfraEnv."
     exit 1
   fi
-  mapped_agent_names=$(printf '%s\n%s' "$mapped_agent_names" "$matched_agent")
-  mapped_count=$((mapped_count + 1))
-  oc label agent "$matched_agent" -n "$AGENT_NAMESPACE" "$RUN_LABEL_KEY=$CLUSTER_NAME" --overwrite
-  agent_hostname=$(oc get agent "$matched_agent" -n "$AGENT_NAMESPACE" -o jsonpath='{.status.inventory.hostname}')
-  printf '%s\t%s\t%s\t%s\n' "$matched_agent" "$agent_hostname" "$vm_name" "$vm_mac" >> "$map_file"
-done < "$SHARED_DIR/nutanix_worker_vms.tsv"
+  oc label agent "$agent" -n "$AGENT_NAMESPACE" "$RUN_LABEL_KEY=$CLUSTER_NAME" --overwrite
+done
 
-if [[ "$mapped_count" -ne "$NUTANIX_WORKERS" ]]; then
-  echo "The run's $NUTANIX_WORKERS VM NICs did not map to $NUTANIX_WORKERS distinct Agents."
-  exit 1
-fi
-
-selected_count=$(oc get agents -n "$AGENT_NAMESPACE" -l "$RUN_LABEL_KEY=$CLUSTER_NAME" --no-headers | wc -l)
-if [[ "$selected_count" -ne "$NUTANIX_WORKERS" ]]; then
-  echo "The run label matched $selected_count Agents; expected exactly $NUTANIX_WORKERS."
+selected_agents=$(oc get agents -n "$AGENT_NAMESPACE" -l "$RUN_LABEL_KEY=$CLUSTER_NAME" -o json)
+if ! jq -e --arg infraenv "$INFRAENV_NAME" --argjson count "$NUTANIX_WORKERS" '
+  (.items | length) == $count and
+  all(.items[]; .metadata.labels["infraenvs.agent-install.openshift.io"] == $infraenv)
+' <<<"$selected_agents" >/dev/null; then
+  echo "The run label did not select exactly $NUTANIX_WORKERS Agents from this InfraEnv."
   exit 1
 fi
 

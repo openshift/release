@@ -17,7 +17,7 @@ lease_resource=${NUTANIX_QUOTA_SLICE}
 
 if [[ ! -s "$context_file" ]]; then
   if [[ -s "$SHARED_DIR/nutanix_worker_names" || -s "$SHARED_DIR/nutanix_image_name" ||
-        -s "$SHARED_DIR/nutanix_infraenv_name" || -s "$SHARED_DIR/nutanix_worker_macs.json" ||
+        -s "$SHARED_DIR/nutanix_infraenv_name" ||
         -s "$SHARED_DIR/nutanix_ingress_tunnel_state.json" ]]; then
     echo "Nutanix resources may exist but the private Nutanix context is unavailable; cleanup cannot be verified for $lease_resource."
     exit 1
@@ -28,7 +28,7 @@ fi
 # shellcheck source=/dev/null
 source "$context_file"
 if [[ ! -s "$SHARED_DIR/cluster-name" ]]; then
-  if [[ -s "$SHARED_DIR/nutanix_worker_macs.json" || -s "$SHARED_DIR/nutanix_worker_names" ||
+  if [[ -s "$SHARED_DIR/nutanix_worker_names" ||
         -s "$SHARED_DIR/nutanix_infraenv_name" ]]; then
     echo "Nutanix resources may exist but the HostedCluster name is unavailable."
     exit 1
@@ -41,32 +41,22 @@ if [[ ! "$CLUSTER_NAME" =~ ^[a-z0-9-]+$ ]]; then
   exit 1
 fi
 
-# The InfraEnv step records worker names and MACs before the workers step can
-# create VMs. Recover exact run-owned names when worker provisioning failed or
-# its UUID records were never returned to the CI shared directory.
-worker_macs_file="$SHARED_DIR/nutanix_worker_macs.json"
+# The workers step records exact run-owned names before it can create VMs, so
+# cleanup can recover their UUIDs after partial provisioning.
 worker_names_file="$SHARED_DIR/nutanix_worker_names"
-if [[ -e "$worker_macs_file" ]]; then
-  if [[ ! -s "$worker_macs_file" ]] || ! jq -e --arg cluster "$CLUSTER_NAME" '
-    . as $workers |
-    ($workers | type) == "array" and
-    ($workers | length) > 0 and
-    all($workers | to_entries[];
-      .value.name == ($cluster + "-worker-" + (.key | tostring)) and
-      (.value.mac // "" | test("^02(:[0-9a-f]{2}){5}$"))) and
-    ([$workers[].mac] | unique | length) == ($workers | length)
-  ' "$worker_macs_file" >/dev/null; then
-    echo "The recorded Nutanix worker MAC reservations are invalid; refusing VM cleanup."
+if [[ -e "$worker_names_file" ]]; then
+  if [[ ! -s "$worker_names_file" ]]; then
+    echo "The recorded Nutanix worker names are empty; refusing VM cleanup."
     exit 1
   fi
-  if [[ -s "$worker_names_file" ]]; then
-    if ! cmp -s "$worker_names_file" <(jq -r '.[].name' "$worker_macs_file"); then
-      echo "The recorded Nutanix worker names do not match the MAC reservations."
+  expected_index=0
+  while IFS= read -r worker_name || [[ -n "$worker_name" ]]; do
+    if [[ "$worker_name" != "$CLUSTER_NAME-worker-$expected_index" ]]; then
+      echo "The recorded Nutanix worker names do not match this run; refusing VM cleanup."
       exit 1
     fi
-  else
-    jq -r '.[].name' "$worker_macs_file" > "$worker_names_file"
-  fi
+    expected_index=$((expected_index + 1))
+  done < "$worker_names_file"
 fi
 
 image_name_file="$SHARED_DIR/nutanix_image_name"
@@ -102,17 +92,6 @@ if [[ -s "$SHARED_DIR/nutanix_agent_namespace" || -s "$SHARED_DIR/nutanix_infrae
   elif [[ -n "$remaining_agents" ]]; then
     echo "Run-owned Agents remain in namespace $AGENT_NAMESPACE."
     management_cleanup_failed=true
-  fi
-  if [[ -s "$SHARED_DIR/nutanix_worker_macs.json" ]]; then
-    oc delete nmstateconfigs -n "$AGENT_NAMESPACE" -l "$RUN_LABEL_KEY=$CLUSTER_NAME" \
-      --ignore-not-found --wait=true --timeout=2m || true
-    if ! remaining_nmstateconfigs=$(oc get nmstateconfigs -n "$AGENT_NAMESPACE" \
-      -l "$RUN_LABEL_KEY=$CLUSTER_NAME" -o name 2>/dev/null); then
-      management_cleanup_failed=true
-    elif [[ -n "$remaining_nmstateconfigs" ]]; then
-      echo "Run-owned NMStateConfigs remain in namespace $AGENT_NAMESPACE."
-      management_cleanup_failed=true
-    fi
   fi
   if [[ -s "$SHARED_DIR/nutanix_infraenv_name" ]]; then
     INFRAENV_NAME=$(cat "$SHARED_DIR/nutanix_infraenv_name")
