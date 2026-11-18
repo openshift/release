@@ -30,7 +30,21 @@ pre:
 - chain: ipi-aws-pre
 ```
 
+## Intentional coverage gaps
+
+`stability:candidate` is **not** for specs that need a non-default workflow
+(`tier:upgrade`, `tier:upgrade-operator`, `tier:upgrade-cluster`,
+`tier:fresh-install`, `tier:interop`, disconnected-only paths, etc.).
+
+Those specs must not carry `stability:candidate`. Candidate dailies exclude those
+tiers, and normal/upgrade/interop jobs exclude `stability:candidate`, so a
+mislabelled combo would match no job — that is a docs/review rule in
+`rhwa-system-tests`, not something these dailies try to cover.
+
 ## Related
 
 - Label constant: `stability:candidate` in `openshift/rhwa-system-tests`
 - Normal jobs must include `!stability:candidate` in `ECO_TEST_LABELS`
+- On preflight failure, `${SHARED_DIR}/e2e-test-skipped-by-preflight` lets
+  `medik8s-analyze-e2e-failure` exit without polling for missing `e2e-test`
+  artifacts
