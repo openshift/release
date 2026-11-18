@@ -448,11 +448,22 @@ TestAcsSensors() {
         scConds="$(echo "${scStatus}" | cut -d/ -f3)"
         : "SecuredCluster ${scName} in ${scNs}: conditions=${scConds}"
 
-        # Verify sensor pods are Running in the SecuredCluster namespace
+        # Verify sensor pods are Running in the SecuredCluster namespace.
+        # A failed query is classified separately from an empty list: the
+        # previous `|| true` collapsed an API error and a genuinely empty
+        # result into the same "No sensor pods found" verdict, which is the
+        # masked failure the SecuredCluster query above already avoids.
         typeset sensorStatus=""
-        sensorStatus="$(oc get pods -n "${scNs}" -l app=sensor -o json | jq -r '
+        if ! sensorStatus="$(oc get pods -n "${scNs}" -l app=sensor -o json 2>"${_opp_smoke_tmp}/sensor.err" | jq -r '
             .items[] | "\(.metadata.name):\(.status.phase)"
-        ')" || true
+        ')"; then
+            if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/sensor.err"; then
+                AddResult "acs-sensors" "skip" "pods resource not served by this cluster"
+                return
+            fi
+            AddResult "acs-sensors" "fail" "Failed to query sensor pods in ${scNs}"
+            return
+        fi
 
         if [[ -z "${sensorStatus}" ]]; then
             failMsg="No sensor pods found in ${scNs}"
