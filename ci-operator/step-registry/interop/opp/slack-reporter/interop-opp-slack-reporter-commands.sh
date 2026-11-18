@@ -7,9 +7,10 @@
 #
 # Lane-neutral best-effort post step: exits 0 on every graceful path.
 # Emits a stage-tagged versioned result line (exactly one stage=terminal);
-# emits NO JUnit ever. Shell tracing is OFF for the whole script; no env
+# emits NO JUnit ever. Bash xtrace is ON (BASH-1) for the bash glue; no env
 # dumps; the webhook credential is read from its mounted file by the
-# embedded delivery program only: never argv, never export.
+# embedded delivery program only: never argv, never export, never a bash
+# variable, so no bash line can put it in the trace.
 #
 # The JUnit parser below is GENERATED from sub-projects/lib-opp-interop/src/opp_interop/junit.py by
 # embed.py between the sentinels; regenerate, never hand-edit. The
@@ -35,7 +36,7 @@ fi
 # lands the fallback terminal line through the EXIT trap. Bash-level
 # aborts on genuinely fatal paths (mkdir of the sent dir) degrade to
 # the same one-terminal-line exit-0 outcome the trap always provided.
-set -euo pipefail
+set -euxo pipefail; shopt -s inherit_errexit
 
 # ------------------------------------------------- constants (reporter-owned)
 # Provenance classes (design doc section 5): repo-mirrored values are
