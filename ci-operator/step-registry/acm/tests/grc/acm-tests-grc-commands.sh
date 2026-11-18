@@ -165,13 +165,13 @@ typeset -i _OPP_BASELINE_OK=0
 # an undetermined answer: it must surface as a failed check, not as silence.
 _OPP_QUERY_LOG="$(mktemp)"
 typeset -i _OPP_QUERY_RC=0
-oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" >/dev/null 2>"${_OPP_QUERY_LOG}" || _OPP_QUERY_RC=$?
+oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" --request-timeout=30s >/dev/null 2>"${_OPP_QUERY_LOG}" || _OPP_QUERY_RC=$?
 if (( _OPP_QUERY_RC == 0 )); then
     _OPP_ACTIVE=1
     mkdir -p "${_OPP_EVIDENCE_DIR}"
     # 1. OperatorPolicy inventory (targeted extraction, INTEROP-9525 style:
     #    name + conditions only, no full resource dumps).
-    oc get operatorpolicy -A -o json 2>/dev/null | \
+    oc get operatorpolicy -A --request-timeout=30s -o json 2>/dev/null | \
         python3 -c '
 import json, sys
 data = json.load(sys.stdin)
@@ -193,7 +193,7 @@ except Exception:
 ' "${_OPP_EVIDENCE_DIR}/01-operatorpolicy.json")"
     echo "${_OPP_POLICY_COUNT}" > "${_OPP_EVIDENCE_DIR}/00-operatorpolicy-count.txt"
     # 2. local-cluster labels (the restore baseline for the post-suite block).
-    oc get managedcluster "${_OPP_MC_NAME}" -o json 2>/dev/null | \
+    oc get managedcluster "${_OPP_MC_NAME}" --request-timeout=30s -o json 2>/dev/null | \
         python3 -c '
 import json, sys
 d = json.load(sys.stdin)
@@ -205,7 +205,7 @@ print(json.dumps({
     # 3. Placement status (pre-suite state) and the authoritative
     #    PlacementDecision resources (the placement controller writes
     #    selected cluster names there, not into Placement.status).
-    oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | \
+    oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" --request-timeout=30s -o json 2>/dev/null | \
         python3 -c '
 import json, sys
 d = json.load(sys.stdin)
@@ -215,7 +215,7 @@ print(json.dumps({
     "status": d.get("status", {})
 }, indent=2))
 ' > "${_OPP_EVIDENCE_DIR}/03-placement-status.json" 2>&1
-    oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | \
+    oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" --request-timeout=30s -o json 2>/dev/null | \
         python3 -c '
 import json, sys
 d = json.load(sys.stdin)
