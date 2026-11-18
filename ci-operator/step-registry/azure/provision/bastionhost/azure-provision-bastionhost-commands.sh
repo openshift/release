@@ -194,6 +194,31 @@ else
   bastion_vnet_name="${VNET_NAME}"
 fi
 
+# The VNET normally lives in the same resource group as the bastion, and everything below assumed
+# that. VNET_RESOURCE_GROUP breaks the two apart for the case where the VNET is a shared, permanent
+# fixture that the run must not own: the bastion and all of its disposable resources go into
+# ${bastion_rg}, which the caller can delete wholesale at teardown, while the subnet is carved out
+# of a VNET in ${bastion_vnet_rg} that outlives the run.
+#
+# Default is empty, which keeps ${bastion_vnet_rg} == ${bastion_rg} and every command identical to
+# what it was before.
+if [ -z "${VNET_RESOURCE_GROUP}" ]; then
+  bastion_vnet_rg="${bastion_rg}"
+else
+  bastion_vnet_rg="${VNET_RESOURCE_GROUP}"
+fi
+echo "bastion resource group: ${bastion_rg}"
+echo "vnet resource group   : ${bastion_vnet_rg}"
+
+# The Azure Stack path builds the NIC inside an ARM template, where resourceId() always resolves
+# in the deployment's own resource group. There is no way to point it at a VNET elsewhere without
+# rewriting the template, and no Azure Stack job needs this, so refuse rather than silently
+# deploying against a VNET that does not exist.
+if [[ "${bastion_vnet_rg}" != "${bastion_rg}" && "${CLUSTER_TYPE}" == "azurestack" ]]; then
+    echo "ERROR: VNET_RESOURCE_GROUP is not supported on azurestack."
+    exit 1
+fi
+
 #####################################
 ###############Log In################
 #####################################
@@ -294,7 +319,7 @@ if [[ -z "${bastion_subnet}" ]] && [[ -z "${bastion_nsg}" ]]; then
     run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}"
 
     echo "Querying VNET address prefixes from ${bastion_vnet_name}..."
-    vnet_address_prefixes=$(az network vnet show --resource-group "${bastion_rg}" --name "${bastion_vnet_name}" --query 'addressSpace.addressPrefixes' -o tsv)
+    vnet_address_prefixes=$(az network vnet show --resource-group "${bastion_vnet_rg}" --name "${bastion_vnet_name}" --query 'addressSpace.addressPrefixes' -o tsv)
     if [[ -z "${vnet_address_prefixes}" ]]; then
         echo "Falling back to AZURE_VNET_ADDRESS_PREFIXES / AZURE_VNET_IPV6_ADDRESS_PREFIXES"
         vnet_address_prefixes="${AZURE_VNET_ADDRESS_PREFIXES} ${AZURE_VNET_IPV6_ADDRESS_PREFIXES:-}"
@@ -305,7 +330,7 @@ if [[ -z "${bastion_subnet}" ]] && [[ -z "${bastion_nsg}" ]]; then
     echo "VNET address prefixes: ${vnet_address_prefixes}"
 
     echo "Querying existing subnet prefixes (addressPrefix and addressPrefixes)..."
-    existing_subnet_prefixes=$(az network vnet subnet list --resource-group "${bastion_rg}" --vnet-name "${bastion_vnet_name}" -o json \
+    existing_subnet_prefixes=$(az network vnet subnet list --resource-group "${bastion_vnet_rg}" --vnet-name "${bastion_vnet_name}" -o json \
         | jq -r '.[] | ((.addressPrefixes // [])[]), (.addressPrefix // empty)' | awk 'NF && $0 != "null"' | sort -u)
     echo "Existing subnet prefixes: ${existing_subnet_prefixes:-<none>}"
 
@@ -316,7 +341,7 @@ if [[ -z "${bastion_subnet}" ]] && [[ -z "${bastion_nsg}" ]]; then
         bastion_subnet_cidr=$(find_available_cidr expand ipv4 24 "${vnet_address_prefixes}" "")
         echo "Selected new VNET prefix: ${bastion_subnet_cidr}"
         vnet_prefix_args=$(echo "${vnet_address_prefixes}" | tr '\n' ' ')
-        run_command_with_retries "az network vnet update --resource-group ${bastion_rg} --name ${bastion_vnet_name} --address-prefixes ${vnet_prefix_args} ${bastion_subnet_cidr}" "3" || {
+        run_command_with_retries "az network vnet update --resource-group ${bastion_vnet_rg} --name ${bastion_vnet_name} --address-prefixes ${vnet_prefix_args} ${bastion_subnet_cidr}" "3" || {
             echo "ERROR: failed to add address prefix ${bastion_subnet_cidr} to VNET ${bastion_vnet_name}"
             exit 1
         }
@@ -338,7 +363,7 @@ if [[ -z "${bastion_subnet}" ]] && [[ -z "${bastion_nsg}" ]]; then
             bastion_subnet_cidr_ipv6=$(find_available_cidr expand ipv6 64 "${vnet_address_prefixes}" "")
             echo "Selected new VNET IPv6 prefix: ${bastion_subnet_cidr_ipv6}"
             vnet_prefix_args=$(echo "${vnet_address_prefixes}" | tr '\n' ' ')
-            run_command_with_retries "az network vnet update --resource-group ${bastion_rg} --name ${bastion_vnet_name} --address-prefixes ${vnet_prefix_args} ${bastion_subnet_cidr_ipv6}" "3" || {
+            run_command_with_retries "az network vnet update --resource-group ${bastion_vnet_rg} --name ${bastion_vnet_name} --address-prefixes ${vnet_prefix_args} ${bastion_subnet_cidr_ipv6}" "3" || {
                 echo "ERROR: failed to add address prefix ${bastion_subnet_cidr_ipv6} to VNET ${bastion_vnet_name}"
                 exit 1
             }
@@ -347,7 +372,17 @@ if [[ -z "${bastion_subnet}" ]] && [[ -z "${bastion_nsg}" ]]; then
         echo "Found available IPv6 subnet: ${bastion_subnet_cidr_ipv6}"
         vnet_subnet_address_parameter="${vnet_subnet_address_parameter} ${bastion_subnet_cidr_ipv6}"
     fi
-    run_command "az network vnet subnet create -g ${bastion_rg} --vnet-name ${bastion_vnet_name} -n ${bastion_subnet} ${vnet_subnet_address_parameter} --network-security-group ${bastion_nsg}" || exit 2
+    # The NSG stays in ${bastion_rg} so it is torn down with the rest of the run, but the subnet is
+    # created in ${bastion_vnet_rg}. A bare --network-security-group name is resolved in the
+    # subnet's own group, so the association has to be made by resource ID once the two differ.
+    bastion_nsg_ref="${bastion_nsg}"
+    if [[ "${bastion_vnet_rg}" != "${bastion_rg}" ]]; then
+        bastion_nsg_ref="$(az network nsg show -g "${bastion_rg}" -n "${bastion_nsg}" --query id -o tsv)"
+        if [[ -z "${bastion_nsg_ref}" ]]; then
+            echo "ERROR: could not resolve the resource ID of nsg '${bastion_nsg}' in '${bastion_rg}'." && exit 1
+        fi
+    fi
+    run_command "az network vnet subnet create -g ${bastion_vnet_rg} --vnet-name ${bastion_vnet_name} -n ${bastion_subnet} ${vnet_subnet_address_parameter} --network-security-group ${bastion_nsg_ref}" || exit 2
 else
     # bastion subnet and nsg already exist, create additional nsg rule
     run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}"
@@ -498,11 +533,25 @@ EOF
         --parameters "vmImageId=${bastion_image_id}" \
         --output none
 else
+    # 'az network nic create' resolves a bare --subnet inside the group given by --resource-group,
+    # so a NIC in ${bastion_rg} cannot name a subnet that lives in ${bastion_vnet_rg}. Passing the
+    # subnet's resource ID is the supported way to cross groups, and --vnet-name must then be
+    # omitted. Keep the name form when the two groups are the same, so nothing changes for the
+    # jobs that do not set VNET_RESOURCE_GROUP.
+    if [[ "${bastion_vnet_rg}" != "${bastion_rg}" ]]; then
+        bastion_subnet_id="$(az network vnet subnet show -g "${bastion_vnet_rg}" --vnet-name "${bastion_vnet_name}" -n "${bastion_subnet}" --query id -o tsv)"
+        if [[ -z "${bastion_subnet_id}" ]]; then
+            echo "ERROR: could not resolve the resource ID of subnet '${bastion_subnet}' in vnet '${bastion_vnet_name}' (${bastion_vnet_rg})." && exit 1
+        fi
+        nic_subnet_args="--subnet ${bastion_subnet_id}"
+    else
+        nic_subnet_args="--vnet-name ${bastion_vnet_name} --subnet ${bastion_subnet}"
+    fi
     run_command "az network public-ip create --resource-group ${bastion_rg} --name ${bastion_name}PublicIPv4 --sku Standard --version IPv4"
-    run_command "az network nic create --resource-group ${bastion_rg} --name ${bastion_name}NIC --vnet-name ${bastion_vnet_name} --subnet ${bastion_subnet} --network-security-group ${bastion_nsg} --public-ip-address ${bastion_name}PublicIPv4"
+    run_command "az network nic create --resource-group ${bastion_rg} --name ${bastion_name}NIC ${nic_subnet_args} --network-security-group ${bastion_nsg} --public-ip-address ${bastion_name}PublicIPv4"
     if [[ "${IP_FAMILY}" == *"DualStack"* ]]; then
         run_command "az network public-ip create --resource-group ${bastion_rg} --name ${bastion_name}PublicIPv6 --sku Standard --version IPv6"
-        run_command "az network nic ip-config create --resource-group ${bastion_rg} --name ${bastion_name}IPv6config --nic-name ${bastion_name}NIC --private-ip-address-version IPv6 --vnet-name ${bastion_vnet_name} --subnet ${bastion_subnet} --public-ip-address ${bastion_name}PublicIPv6"
+        run_command "az network nic ip-config create --resource-group ${bastion_rg} --name ${bastion_name}IPv6config --nic-name ${bastion_name}NIC --private-ip-address-version IPv6 ${nic_subnet_args} --public-ip-address ${bastion_name}PublicIPv6"
     fi
     run_command "az vm create --resource-group ${bastion_rg} --name ${bastion_name} --admin-username core --admin-password 'NotActuallyApplied!' --image '${bastion_image_id}' --public-ip-sku 'Standard' --os-disk-size-gb 199 --nics ${bastion_name}NIC --size ${BASTION_VM_SIZE} --debug --custom-data '${bastion_ignition_file}' | tee '${SHARED_DIR}/${bastion_name}_output.json'"
 fi
@@ -541,9 +590,19 @@ if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
     echo "Adding private DNS record for mirror registry"
     private_zone="mirror-registry.${BASE_DOMAIN}"
     dns_vnet_link_name="${bastion_name}-pvz-vnet-link"
+    # Same resolution rule as the NIC: --virtual-network is looked up in --resource-group, which
+    # is the zone's group, so link by VNET resource ID when the VNET lives somewhere else.
+    if [[ "${bastion_vnet_rg}" != "${bastion_rg}" ]]; then
+        dns_link_vnet="$(az network vnet show -g "${bastion_vnet_rg}" -n "${bastion_vnet_name}" --query id -o tsv)"
+        if [[ -z "${dns_link_vnet}" ]]; then
+            echo "ERROR: could not resolve the resource ID of vnet '${bastion_vnet_name}' in '${bastion_vnet_rg}'." && exit 1
+        fi
+    else
+        dns_link_vnet="${bastion_vnet_name}"
+    fi
     run_command "az network private-dns zone create -g ${bastion_rg} -n ${private_zone}" &&
     run_command "az network private-dns record-set a add-record -g ${bastion_rg} -z ${private_zone} -n ${bastion_name} -a ${bastion_private_ip}" &&
-    run_command "az network private-dns link vnet create --name '${dns_vnet_link_name}' --registration-enabled false --resource-group ${bastion_rg} --virtual-network ${bastion_vnet_name} --zone-name ${private_zone}" || exit 2
+    run_command "az network private-dns link vnet create --name '${dns_vnet_link_name}' --registration-enabled false --resource-group ${bastion_rg} --virtual-network ${dns_link_vnet} --zone-name ${private_zone}" || exit 2
 
     echo "Adding public DNS record for mirror registry"
     cmd="az network dns record-set a add-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip}"

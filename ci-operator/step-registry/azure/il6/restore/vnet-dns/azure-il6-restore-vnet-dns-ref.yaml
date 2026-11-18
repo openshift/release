@@ -1,0 +1,47 @@
+ref:
+  as: azure-il6-restore-vnet-dns
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-il6-restore-vnet-dns-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: AZURE_IL6_RESOURCE_GROUP
+    default: "CI-Azure-IL6-DoNotDelete"
+    documentation: |-
+      The shared, permanent resource group holding the VNet. This step updates the VNet in place
+      and deletes nothing.
+  - name: AZURE_IL6_VNET_NAME
+    default: "RHOCP-CI-AzureIL6-virtual-network"
+    documentation: |-
+      The shared, permanent VNet whose dnsServers are restored.
+  - name: AZURE_IL6_EMULATOR_DNS
+    default: "10.55.1.53 10.55.2.53"
+    documentation: |-
+      The emulator's DNS servers, space separated. The VNet's dnsServers are set back to exactly
+      this, undoing the repoint azure-il6-bastion-setup made so that cluster nodes could use the
+      bastion's split-horizon resolver.
+  documentation: |-
+    Puts the shared VNet's dnsServers back to the emulator's resolvers, as the first action of
+    teardown.
+
+    azure-il6-bastion-setup repoints them at the bastion so that cluster nodes inherit its
+    split-horizon resolver. dnsServers is a single value on a VNet that outlives the run, so it
+    has to be handed back. If the bastion is deleted while the VNet still points at it, the VNet
+    is left resolving nothing, and the next run's bastion cannot resolve its own boot images, let
+    alone the IL6 plane.
+
+    This is a separate step, and the first one in the deprovision chain, precisely because of that
+    ordering: the bastion is now removed wholesale by azure-deprovision-resourcegroup, so the
+    restore cannot live in a step that runs after it. It is a no-op unless
+    ${SHARED_DIR}/azure_il6_vnet_dns_override exists, which azure-il6-bastion-setup writes only
+    when it actually made the change.
+
+    Failure is a warning, not an error: azure-il6-check-prereqs detects and repairs a stale
+    dnsServers value at the start of the next run, and aborting here would skip the teardown
+    steps that follow.

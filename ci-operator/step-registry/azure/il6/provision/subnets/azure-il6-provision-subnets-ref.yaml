@@ -34,16 +34,27 @@ ref:
     This exists instead of azure-provision-vnet because that step runs 'az network vnet create'
     unconditionally, which would collide with the emulator-provisioned VNet.
 
-    Safety contract -- this step deliberately does NOT write any of:
+    Two resource groups are in play and the split is the whole safety model:
 
-      ${SHARED_DIR}/resourcegroup          ${SHARED_DIR}/resourcegroup_cluster
-      ${SHARED_DIR}/resourcegroup_vnet     ${SHARED_DIR}/resourcegroup_nsg
-      ${SHARED_DIR}/resourcegroup_sa       ${SHARED_DIR}/resourcegroup_aks
+      ${SHARED_DIR}/resourcegroup   a per-run group created by azure-provision-resourcegroup. The
+                                    NSG created here, and everything azure-provision-bastionhost
+                                    creates, go in it. Deleted wholesale at teardown by
+                                    azure-deprovision-resourcegroup.
 
-    azure-deprovision-resourcegroup deletes every resource group named in those files. Writing the
-    shared group's name into any of them -- which is the natural way to make downstream provisioning
-    steps work -- would destroy the emulator environment at teardown. Downstream steps are given the
-    group name through the AZURE_IL6_RESOURCE_GROUP env var instead.
+      AZURE_IL6_RESOURCE_GROUP      the shared, permanent group. Holds the VNet, the VPN gateway
+                                    and the IPsec tunnels to the emulator. CI never creates or
+                                    deletes it, and it reaches install-config only as
+                                    platform.azure.networkResourceGroupName.
+
+    Only the two subnets land in the shared group, because a subnet is a child resource of the
+    VNet and cannot live anywhere else. They are the only thing
+    azure-il6-deprovision-resources has to clean up by name.
+
+    This step therefore asserts, before creating anything, that ${SHARED_DIR}/resourcegroup does
+    not name the shared group -- azure-deprovision-resourcegroup deletes every group listed there,
+    and that would take the emulator environment with it -- and that the per-run group is in the
+    same region as the VNet, since a NIC cannot attach to a subnet in another region and the
+    bastion VM inherits its location from its resource group.
 
     Outputs:
       ${SHARED_DIR}/customer_vnet_subnets.yaml  consumed by ipi-conf-azure-provisionednetwork

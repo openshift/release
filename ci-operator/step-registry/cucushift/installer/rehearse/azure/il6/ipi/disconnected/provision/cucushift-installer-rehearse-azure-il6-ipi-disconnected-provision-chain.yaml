@@ -3,6 +3,10 @@ chain:
   steps:
   # --- commercial Azure plane: preflight and the resources CI owns -------------------------
   - ref: azure-il6-check-prereqs
+  # A throwaway group for everything the run owns, so teardown is one 'az group delete' rather
+  # than a prefix sweep through the shared fixture. Runs after the preflight so a broken fixture
+  # still fails before anything is created.
+  - ref: azure-provision-resourcegroup
   - ref: azure-il6-provision-subnets
   - chain: azure-provision-bastionhost
   - ref: azure-il6-bastion-setup
@@ -38,13 +42,30 @@ chain:
     default: "RHOCP-CI-AzureIL6-virtual-network"
   - name: AZURE_IL6_VNET_CIDR
     default: "10.10.0.0/16"
-  # azure-provision-bastionhost takes the group and VNet under these generic names. Passing them
-  # explicitly is what keeps the bastion out of a throwaway resource group and inside the VNet
-  # that has the IPsec tunnels.
-  - name: RESOURCE_GROUP
-    default: "CI-Azure-IL6-DoNotDelete"
+  # azure-provision-bastionhost takes the VNet under this generic name, which is what puts the
+  # bastion inside the VNet that has the IPsec tunnels.
   - name: VNET_NAME
     default: "RHOCP-CI-AzureIL6-virtual-network"
+  # ...but NOT in that VNet's resource group. RESOURCE_GROUP is deliberately left empty so
+  # azure-provision-bastionhost falls back to ${SHARED_DIR}/resourcegroup, the per-run group
+  # azure-provision-resourcegroup just created. VNET_RESOURCE_GROUP then tells it where to find
+  # the VNet, and the bastion's NIC is bound to the subnet by resource ID across the two groups.
+  #
+  # An earlier revision pointed RESOURCE_GROUP at the shared group. That put the bastion VM, its
+  # NIC, public IP, disks, image, storage account and a private DNS zone inside a permanent
+  # fixture, left teardown matching each of them by name prefix, and aimed an installer-facing
+  # variable at a group that is never empty.
+  - name: RESOURCE_GROUP
+    default: ""
+  - name: VNET_RESOURCE_GROUP
+    default: "CI-Azure-IL6-DoNotDelete"
+  - name: CUSTOM_AZURE_REGION
+    default: "westus2"
+    documentation: |-
+      The region azure-provision-resourcegroup creates the per-run group in. Must be the shared
+      VNet's region: the bastion VM inherits its location from its resource group, and a NIC
+      cannot attach to a subnet in another region. azure-il6-provision-subnets asserts this
+      rather than letting it surface as an opaque Azure error.
   - name: AZURE_VNET_ADDRESS_PREFIXES
     default: "10.10.0.0/16"
   - name: BASTION_VM_SIZE
@@ -104,7 +125,23 @@ chain:
     ipi-install-install-in-bastion for the install, and azure-il6-private-custom-dns for the load
     balancer lookup that feeds dnsmasq.
 
-    The resource group is permanent and holds infrastructure CI cannot recreate (a VPN gateway and
-    two configured IPsec tunnels). It is referenced only as networkResourceGroupName, and the
-    teardown chain deletes prefix-matched resources inside it rather than the group itself. See
-    azure-il6-deprovision-resources.
+    Three resource groups are in play, and keeping them straight is the safety model:
+
+      CI-Azure-IL6-DoNotDelete   permanent, holds infrastructure CI cannot recreate: the VNet, a
+                                 VPN gateway and two configured IPsec tunnels. Reaches
+                                 install-config only as networkResourceGroupName. The only thing
+                                 the run puts in it is two subnets, because a subnet is a child
+                                 resource of the VNet.
+
+      ${NAMESPACE}-${UNIQUE_HASH}-rg
+                                 created per run by azure-provision-resourcegroup. The bastion
+                                 and everything around it live here, and the group is deleted
+                                 wholesale at teardown.
+
+      ${infraID}-rg              created by the installer for the cluster itself, on the emulated
+                                 plane, and destroyed by 'openshift-install destroy'. The
+                                 installer requires the group it is given to be empty, which is
+                                 why neither of the groups above may ever become
+                                 platform.azure.resourceGroupName -- ipi-conf-azureil6 asserts it.
+
+    See azure-il6-deprovision-resources and azure-il6-restore-vnet-dns for the teardown side.
