@@ -18,6 +18,8 @@ for tool in git go jq; do
     command -v "${tool}" >/dev/null 2>&1 || error "required tool '${tool}' is not installed"
 done
 
+[[ "${ARO_HCP_REF}" =~ ^[0-9a-f]{40}$ ]] ||
+    error "ARO_HCP_REF must be a full 40-character commit SHA, got '${ARO_HCP_REF}'"
 log "fetching Azure/ARO-HCP at ${ARO_HCP_REF}"
 git init --quiet "${WORKDIR}/aro-hcp"
 git -C "${WORKDIR}/aro-hcp" remote add origin https://github.com/Azure/ARO-HCP.git
