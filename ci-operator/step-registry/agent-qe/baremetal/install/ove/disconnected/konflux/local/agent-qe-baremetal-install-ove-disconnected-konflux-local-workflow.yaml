@@ -1,0 +1,18 @@
+workflow:
+  as: agent-qe-baremetal-install-ove-disconnected-konflux-local
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+      - chain: agent-qe-baremetal-install-ove-disconnected-konflux-local
+    post:
+      - ref: agent-qe-baremetal-install-ove-disconnected-konflux-destroy-assisted
+        best_effort: true
+      - ref: agent-qe-baremetal-install-ove-disconnected-konflux-delete-iso
+      - chain: baremetal-lab-agent-post
+    env:
+      DISCONNECTED: "true"
+      PATCH_STATIC_NETWORK: "true"
+  documentation: |-
+    Provision and deprovision an ABI OVE cluster on a bare-metal lab. A local assisted-service uses the
+    extracted Konflux OVE ISO as its disconnected-iso OS image and release:latest as its release image.
+    Nodes boot the generated discovery ISO. The Assisted UI step waits for the installed cluster to become stable.
