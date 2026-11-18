@@ -105,7 +105,10 @@ function NotReadyOppPods () {
 # inputs too.
 # shellcheck disable=SC2317  # invoked from Main
 function PredicateSelfTest () {
-    local fixture expected got failures=0
+    # BASH-3: typeset, not the non-POSIX `local` builtin, and initialised at
+    # declaration so `set -u` cannot trip on a partially assigned set.
+    typeset fixture='' expected='' got=''
+    typeset -i failures=0
 
     fixture="installer-2-ip-10-0-0-11.example.internal                                 0/1   Error       0     65m
 installer-2-retry-1-ip-10-0-0-11.example.internal                         0/1   Error       0     64m
@@ -495,14 +498,57 @@ function ValidatePlatformHealth () {
     true
 }
 
+function SettleOppOperatorCsvs () {
+    # Best-effort bounded settle for the operators this step validates.
+    # The previous form slept a fixed 300s unconditionally: 5 minutes of wall
+    # clock on every run, including the runs where every CSV had already
+    # reported a terminal phase, and it could not distinguish a converged
+    # operator from one stuck mid-Replacing.  Poll the requested operators
+    # only (an `oc wait --all` would block on unrelated CSVs that are
+    # legitimately Replacing), require the same phase on two consecutive
+    # reads, and never fail: ValidateOppOperators makes the verdict.
+    typeset -i window="${1:-300}"
+    typeset -i deadline=$((SECONDS + window))
+    typeset -a settleOpsArr=()
+    IFS=',' read -ra settleOpsArr <<< "${OPP_OPERATORS}"
+    typeset -A settlePrevMap=()
+    typeset -i stableCount=0
+    typeset -i elapsed=0
+    typeset settleCsvs='' settleOp='' settlePhase=''
+    while (( SECONDS < deadline )); do
+        settleCsvs="$(oc get csv -A -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.phase}}{{end}}{{"\n"}}{{end}}' 2>/dev/null || true)"
+        stableCount=0
+        for settleOp in "${settleOpsArr[@]}"; do
+            settlePhase="$(awk -F'\t' -v op="${settleOp}" 'index($2, op) == 1 {print $3; exit}' <<< "${settleCsvs}")"
+            # Only a terminal phase counts as settled: a CSV stuck in
+            # Replacing/InstallReady must keep the full window (that is the
+            # convergence tolerance the fixed sleep provided), while a CSV
+            # already reporting Succeeded/Failed shortens the settle.
+            if [[ "${settlePhase}" == "Succeeded" || "${settlePhase}" == "Failed" ]]; then
+                if [[ "${settlePrevMap[${settleOp}]:-}" == "${settlePhase}" ]]; then
+                    (( stableCount += 1 ))
+                fi
+            fi
+            settlePrevMap["${settleOp}"]="${settlePhase}"
+        done
+        if (( stableCount == ${#settleOpsArr[@]} )); then
+            elapsed=$(( window - (deadline - SECONDS) ))
+            : "Operator CSVs stable after ${elapsed}s of the ${window}s settle window"
+            return 0
+        fi
+        sleep 15
+    done
+    : "Operator CSV settle window (${window}s) expired; validating the phases as read"
+    return 0
+}
+
 function ValidateOppOperators () {
     echo ">>> PHASE: Validating OPP operators"
     : "Validating OPP operator health"
     typeset -a operatorsArr=()
     IFS=',' read -ra operatorsArr <<< "${OPP_OPERATORS}"
 
-    : "Waiting 5 minutes for operator settling"
-    sleep 300
+    SettleOppOperatorCsvs 300
 
     typeset allCsvsJson=""
     typeset -i failCount=0
@@ -610,7 +656,7 @@ SUITE_NAME="${SUITE_NAME:-ocp-upgrade}"
 # --- JUnit wrapper ---
 # shellcheck disable=SC2317  # invoked via trap
 WriteJunit() {
-  local rc=${1:-0}
+  typeset rc=${1:-0}
   TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   JUNIT_FILE="${ARTIFACT_DIR}/junit_${SUITE_NAME}.xml"
   if [[ $rc -eq 0 ]]; then
