@@ -6,6 +6,7 @@ workflow:
     ingress tunnel gateway. The ingress VIP is derived from the selected Nutanix subnet.
     Run-owned public Route53 records resolve the hosted API and apps names to private addresses;
     Nutanix workers use their subnet's DHCP-provided resolver.
+    Installs MCE from the redhat-operators catalog before configuring HyperShift.
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -18,6 +19,7 @@ workflow:
     - ref: enable-qe-catalogsource
     - ref: deploy-konflux-operator
     - chain: hypershift-mce-agent-lvm
+    - ref: install-operators
     - ref: hypershift-mce-install
     - chain: hypershift-mce-agent-nutanix-create
     test:
@@ -37,6 +39,8 @@ workflow:
     - ref: baremetalds-devscripts-gather
     - ref: ofcir-release
     env:
+      OPERATORS: |-
+        [{"name":"multicluster-engine","source":"redhat-operators","channel":"!default","install_namespace":"multicluster-engine","operator_group":"multicluster-engine-group","target_namespaces":"!install"}]
       # Nutanix workers cannot reach the private API VIPs directly, so the API pollers
       # and MCE addon agents crash. This also excludes other legacy node invariants.
       # https://redhat.atlassian.net/browse/OCPBUGS-138703
