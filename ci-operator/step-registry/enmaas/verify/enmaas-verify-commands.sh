@@ -34,7 +34,7 @@ if ! oc -n enmaas wait --for=condition=Ready cluster.postgresql.cnpg.io/aigatewa
 fi
 
 echo "--- Checking PVC status ---"
-PVC_STATUS=$(oc get pvc -n enmaas -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}' 2>/dev/null || true)
+PVC_STATUS=$(oc get pvc -n enmaas -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\n"}{end}')
 if [[ -n "${PVC_STATUS}" ]]; then
   echo "${PVC_STATUS}"
   NOT_BOUND=$(echo "${PVC_STATUS}" | grep -v Bound || true)

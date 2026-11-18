@@ -55,26 +55,32 @@ EOF
 echo "Waiting for operator CSVs to reach Succeeded phase..."
 TIMEOUT=600
 INTERVAL=15
-ELAPSED=0
+DEADLINE=$((SECONDS + TIMEOUT))
+
+operator_ready() {
+  local namespace="$1" subscription="$2" remaining csv phase
+  remaining=$((DEADLINE - SECONDS))
+  ((remaining > 0)) || return 1
+  csv=$(timeout "${remaining}s" oc --request-timeout="${remaining}s" get subscription "${subscription}" \
+    -n "${namespace}" -o jsonpath='{.status.installedCSV}') || return 1
+  [[ -n "${csv}" ]] || return 1
+  remaining=$((DEADLINE - SECONDS))
+  ((remaining > 0)) || return 1
+  phase=$(timeout "${remaining}s" oc --request-timeout="${remaining}s" get csv "${csv}" \
+    -n "${namespace}" -o jsonpath='{.status.phase}') || return 1
+  [[ "${phase}" == Succeeded ]]
+}
 
 while true; do
   CNPG_READY=false
   CERT_READY=false
 
-  CNPG_CSV=$(oc get csv -n openshift-operators -o name 2>/dev/null | grep cloudnative-pg || true)
-  if [[ -n "${CNPG_CSV}" ]]; then
-    CNPG_PHASE=$(oc get "${CNPG_CSV}" -n openshift-operators -o jsonpath='{.status.phase}' 2>/dev/null || true)
-    if [[ "${CNPG_PHASE}" == "Succeeded" ]]; then
-      CNPG_READY=true
-    fi
+  if operator_ready openshift-operators cloudnative-pg; then
+    CNPG_READY=true
   fi
 
-  CERT_CSV=$(oc get csv -n cert-manager-operator -o name 2>/dev/null | grep cert-manager || true)
-  if [[ -n "${CERT_CSV}" ]]; then
-    CERT_PHASE=$(oc get "${CERT_CSV}" -n cert-manager-operator -o jsonpath='{.status.phase}' 2>/dev/null || true)
-    if [[ "${CERT_PHASE}" == "Succeeded" ]]; then
-      CERT_READY=true
-    fi
+  if operator_ready cert-manager-operator openshift-cert-manager-operator; then
+    CERT_READY=true
   fi
 
   if [[ "${CNPG_READY}" == "true" ]] && [[ "${CERT_READY}" == "true" ]]; then
@@ -82,16 +88,15 @@ while true; do
     break
   fi
 
-  if [[ ${ELAPSED} -ge ${TIMEOUT} ]]; then
+  REMAINING=$((DEADLINE - SECONDS))
+  if ((REMAINING <= 0)); then
     echo "ERROR: Timed out waiting for operator CSVs to reach Succeeded phase after ${TIMEOUT}s."
-    echo "CloudNativePG CSV phase: ${CNPG_PHASE:-not found}"
-    echo "cert-manager CSV phase: ${CERT_PHASE:-not found}"
     exit 1
   fi
 
-  echo "Waiting for operator CSVs... (${ELAPSED}s/${TIMEOUT}s)"
-  sleep ${INTERVAL}
-  ELAPSED=$((ELAPSED + INTERVAL))
+  echo "Waiting for installed operator CSVs..."
+  ((REMAINING < INTERVAL)) && INTERVAL=${REMAINING}
+  sleep "${INTERVAL}"
 done
 
 echo "EnMaaS operator prerequisites installed successfully."

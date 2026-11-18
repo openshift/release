@@ -9,13 +9,13 @@ WORK_DIR=$(mktemp -d)
 # Clone EnMaaS-opps repository
 ENMAAS_CREDENTIALS="/secret/enmaas/token"
 if [[ -f "${ENMAAS_CREDENTIALS}" ]]; then
-    echo "Configuring git credentials for private repository clone..."
-    GITHUB_TOKEN=$(cat "${ENMAAS_CREDENTIALS}")
-    # Configure credential helper to avoid token leakage in git remote output or shell traces
-    git config --global credential.helper \
-        "!f() { echo username=x-access-token; echo password=${GITHUB_TOKEN}; }; f"
-    git clone "https://github.com/redhat-et/EnMaaS-opps.git" \
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
+    git -c credential.helper= -c credential.useHttpPath=true \
+        -c 'credential.https://github.com/redhat-et/EnMaaS-opps.git.helper=!f() { set +x; if [ "$1" = get ]; then printf "username=x-access-token\npassword="; cat /secret/enmaas/token; printf "\n"; fi; }; f' \
+        clone "https://github.com/redhat-et/EnMaaS-opps.git" \
         --branch "${ENMAAS_BRANCH}" --depth 1 "${WORK_DIR}/EnMaaS-opps"
+    $WAS_TRACING && set -x
 else
     echo "WARNING: No GitHub credentials found at ${ENMAAS_CREDENTIALS}"
     echo "Attempting unauthenticated clone (will fail for private repos)..."
@@ -65,7 +65,7 @@ if [[ -f "${SHARED_DIR}/rds-endpoint" ]]; then
     # Point EnMaaS to the external RDS PostgreSQL instance
     if grep -q '^DB_HOST=' "${PARAMS_FILE}"; then
       sed -i "s|^DB_HOST=.*|DB_HOST=${RDS_HOST}|" "${PARAMS_FILE}"
-      echo "Params updated: DB_HOST=${RDS_HOST}"
+      echo "Params updated: DB_HOST"
     else
       echo "WARNING: DB_HOST key not found in ${PARAMS_FILE}, skipping."
     fi
@@ -314,6 +314,8 @@ def place(value, api_workload):
         selector.setdefault(infra_key, "")
         if selector[infra_key] != "":
             sys.exit(f"Conflicting infra selector in {project}")
+    else:
+        selector.setdefault("node-role.kubernetes.io/worker", "")
     tolerations = [
         item for item in value.get("tolerations", [])
         if not (item.get("key") == "dedicated" and item.get("value") == "enmaas")
@@ -333,7 +335,16 @@ def place(value, api_workload):
     ):
         sys.exit(f"Broad or conflicting infra toleration in {project}")
     value["tolerations"] = tolerations
-    affinity = value.get("affinity", {}).get("nodeAffinity", {})
+    affinity = value.get("affinity")
+    if affinity is None:
+        affinity = {}
+    if not isinstance(affinity, dict):
+        raise ValueError("invalid affinity")
+    affinity = affinity.get("nodeAffinity")
+    if affinity is None:
+        affinity = {}
+    if not isinstance(affinity, dict):
+        raise ValueError("invalid node affinity")
     terms = affinity.get("requiredDuringSchedulingIgnoredDuringExecution", {}).get("nodeSelectorTerms", [])
     terms = terms + [item["preference"] for item in affinity.get("preferredDuringSchedulingIgnoredDuringExecution", [])]
     for term in terms:
@@ -341,6 +352,21 @@ def place(value, api_workload):
             if requirement == {"key": "enmaas", "operator": "In", "values": ["true"]}:
                 requirement.update(key=infra_key if monitoring else "kubernetes.io/os",
                                    values=[""] if monitoring else ["linux"])
+    if not monitoring:
+        ordinary_worker = {"key": infra_key, "operator": "DoesNotExist"}
+        required = affinity.get("requiredDuringSchedulingIgnoredDuringExecution")
+        if required is None:
+            affinity["requiredDuringSchedulingIgnoredDuringExecution"] = {
+                "nodeSelectorTerms": [{"matchExpressions": [ordinary_worker]}]}
+        else:
+            for term in required["nodeSelectorTerms"]:
+                if term.get("matchExpressions") or term.get("matchFields"):
+                    expressions = term.setdefault("matchExpressions", [])
+                    if ordinary_worker not in expressions:
+                        expressions.append(ordinary_worker)
+        if value.get("affinity") is None:
+            value["affinity"] = {}
+        value["affinity"]["nodeAffinity"] = affinity
     eligible = [
         node for node in nodes
         if not node.get("spec", {}).get("unschedulable", False)

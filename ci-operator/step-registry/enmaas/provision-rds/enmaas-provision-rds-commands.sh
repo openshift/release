@@ -2,6 +2,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set +x
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
@@ -10,7 +11,11 @@ REGION="${REGION:-us-east-2}"
 echo "Provisioning RDS PostgreSQL instance for EnMaaS..."
 
 # Generate a unique instance identifier from the build
-INSTANCE_ID="enmaas-ci-${BUILD_ID:0:8}"
+if [[ ! "${BUILD_ID}" =~ ^[0-9]{1,20}$ ]]; then
+  echo "ERROR: BUILD_ID must contain 1 to 20 digits."
+  exit 1
+fi
+INSTANCE_ID="enmaas-ci-${BUILD_ID}"
 SUBNET_GROUP_NAME="${INSTANCE_ID}-subnet-group"
 
 echo "Instance identifier: ${INSTANCE_ID}"
@@ -21,7 +26,6 @@ if [[ ! -f "${SHARED_DIR}/vpc_id" ]]; then
   exit 1
 fi
 VPC_ID=$(cat "${SHARED_DIR}/vpc_id")
-echo "VPC ID: ${VPC_ID}"
 
 # Read private subnet IDs (stored as JSON array with single quotes by vpc-shared step)
 if [[ ! -f "${SHARED_DIR}/private_subnet_ids" ]]; then
@@ -32,18 +36,17 @@ fi
 # Convert single quotes to double quotes for jq, then extract as space-separated list
 RAW_SUBNETS=$(cat "${SHARED_DIR}/private_subnet_ids")
 PRIVATE_SUBNETS=$(echo "${RAW_SUBNETS}" | tr "'" '"' | jq -r '.[]')
-echo "Private subnets: ${PRIVATE_SUBNETS}"
 
 # Create DB subnet group
 echo "Creating DB subnet group: ${SUBNET_GROUP_NAME}..."
+echo "${SUBNET_GROUP_NAME}" > "${SHARED_DIR}/rds-subnet-group"
 aws rds create-db-subnet-group \
   --db-subnet-group-name "${SUBNET_GROUP_NAME}" \
   --db-subnet-group-description "EnMaaS CI RDS subnet group for ${INSTANCE_ID}" \
   --subnet-ids ${PRIVATE_SUBNETS} \
   --region "${REGION}" \
-  --tags Key=EnMaaS,Value=ci Key=BuildID,Value="${BUILD_ID}"
+  --tags Key=EnMaaS,Value=ci Key=BuildID,Value="${BUILD_ID}" >/dev/null
 echo "DB subnet group created."
-echo "${SUBNET_GROUP_NAME}" > "${SHARED_DIR}/rds-subnet-group"
 
 # Get VPC CIDR block for security group rule
 VPC_CIDR=$(aws ec2 describe-vpcs \
@@ -51,7 +54,6 @@ VPC_CIDR=$(aws ec2 describe-vpcs \
   --region "${REGION}" \
   --query 'Vpcs[0].CidrBlock' \
   --output text)
-echo "VPC CIDR: ${VPC_CIDR}"
 
 # Create security group for RDS
 echo "Creating security group for RDS..."
@@ -62,14 +64,14 @@ SG_ID=$(aws ec2 create-security-group \
   --region "${REGION}" \
   --query 'GroupId' \
   --output text)
-echo "Security group created: ${SG_ID}"
+echo "Security group created."
 echo "${SG_ID}" > "${SHARED_DIR}/rds-security-group-id"
 
 # Tag the security group
 aws ec2 create-tags \
   --resources "${SG_ID}" \
   --region "${REGION}" \
-  --tags Key=Name,Value="${INSTANCE_ID}-rds-sg" Key=EnMaaS,Value=ci Key=BuildID,Value="${BUILD_ID}"
+  --tags Key=Name,Value="${INSTANCE_ID}-rds-sg" Key=EnMaaS,Value=ci Key=BuildID,Value="${BUILD_ID}" >/dev/null
 
 # Allow inbound PostgreSQL traffic from VPC CIDR
 aws ec2 authorize-security-group-ingress \
@@ -77,8 +79,8 @@ aws ec2 authorize-security-group-ingress \
   --protocol tcp \
   --port 5432 \
   --cidr "${VPC_CIDR}" \
-  --region "${REGION}"
-echo "Inbound rule added: TCP 5432 from ${VPC_CIDR}"
+  --region "${REGION}" >/dev/null
+echo "Inbound PostgreSQL rule added."
 
 # Generate a random password for the RDS master user
 # Disable tracing due to password handling
@@ -101,7 +103,7 @@ aws rds create-db-instance \
   --backup-retention-period 0 \
   --db-name "${RDS_DB_NAME}" \
   --region "${REGION}" \
-  --tags Key=EnMaaS,Value=ci Key=BuildID,Value="${BUILD_ID}"
+  --tags Key=EnMaaS,Value=ci Key=BuildID,Value="${BUILD_ID}" >/dev/null
 echo "RDS instance creation initiated."
 
 # Wait for the instance to become available
@@ -123,7 +125,7 @@ RDS_PORT=$(aws rds describe-db-instances \
   --query 'DBInstances[0].Endpoint.Port' \
   --output text)
 
-echo "RDS endpoint: ${RDS_ENDPOINT}:${RDS_PORT}"
+echo "RDS endpoint discovered."
 
 # Write connection details to SHARED_DIR for downstream steps
 echo "${RDS_ENDPOINT}" > "${SHARED_DIR}/rds-endpoint"
@@ -137,7 +139,6 @@ echo "${RDS_PASSWORD}" > "${SHARED_DIR}/rds-password"
 echo ""
 echo "=== RDS Provisioning Summary ==="
 echo "Instance ID:    ${INSTANCE_ID}"
-echo "Endpoint:       ${RDS_ENDPOINT}"
 echo "Port:           ${RDS_PORT}"
 echo "Database:       ${RDS_DB_NAME}"
 echo "Username:       ${RDS_MASTER_USERNAME}"
@@ -145,5 +146,4 @@ echo "Instance Class: ${RDS_INSTANCE_CLASS}"
 echo "Engine:         PostgreSQL ${RDS_ENGINE_VERSION}"
 echo "Storage:        ${RDS_ALLOCATED_STORAGE} GB"
 echo "Subnet Group:   ${SUBNET_GROUP_NAME}"
-echo "Security Group: ${SG_ID}"
 echo "================================"

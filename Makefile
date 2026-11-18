@@ -180,6 +180,7 @@ test-tls-scanner:
 .PHONY: test-enmaas-deployment
 test-enmaas-deployment:
 	python3 hack/test_enmaas_placement.py
+	python3 hack/test_enmaas_shell.py
 
 # Use the same local config and registry validation as make jobs.
 validate-step-registry: ci-operator-checkconfig

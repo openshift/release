@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -23,11 +24,13 @@ DECODER = shutil.which("oc") or shutil.which("kubectl")
 class EnmaasPlacementFixture(unittest.TestCase):
     def setUp(self):
         self.assertIsNotNone(DECODER, "EnMaaS regressions require oc or kubectl on PATH; no decoder coverage may be skipped")
-        self.directory = Path(tempfile.mkdtemp())
+        self.directory = Path(tempfile.mkdtemp(prefix="enmaas placement "))
         self.addCleanup(shutil.rmtree, self.directory)
         source = DEPLOY.read_text(encoding="utf-8")
         function = source.split("configure_placement() {", 1)[1].split("\n}\n", 1)[0]
-        self.script = "configure_placement() {" + function + '\n}\nconfigure_placement "$1" "$2" "${3:-false}"\n'
+        self.script = ('python3() { "$TEST_PYTHON" "$@"; }; export -f python3\n'
+                       + "configure_placement() {" + function
+                       + '\n}\nconfigure_placement "$1" "$2" "${3:-false}"\n')
         self.nodes = [
             {"metadata": {"labels": {"kubernetes.io/os": "linux", "node-role.kubernetes.io/worker": ""}}},
             {"metadata": {"labels": {"kubernetes.io/os": "linux", INFRA: ""}},
@@ -70,7 +73,8 @@ class EnmaasPlacementFixture(unittest.TestCase):
         result = subprocess.run(
             ["bash", "-eu", "-o", "pipefail", "-c", self.script, "placement", str(manifest), project,
              external_database],
-            env={"PATH": "/usr/local/bin:/usr/bin:/bin", "WORK_DIR": str(self.directory)},
+            env={"PATH": "/usr/local/bin:/usr/bin:/bin", "WORK_DIR": str(self.directory),
+                 "TEST_PYTHON": sys.executable},
             capture_output=True, text=True, check=False,
         )
         try:
@@ -105,11 +109,20 @@ class EnmaasPlacementTests(EnmaasPlacementFixture):
                 result, rendered = self.run_placement(documents, project)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertIn("11 pod specs", result.stdout)
-                for actual, previous in zip(self.find_specs(rendered), self.find_specs(original)):
+                actual_specs = list(self.find_specs(rendered))
+                previous_specs = list(self.find_specs(original))
+                self.assertEqual(len(actual_specs), 11)
+                self.assertEqual(len(previous_specs), 11)
+                for actual, previous in zip(actual_specs, previous_specs):
                     self.assertEqual(actual.pop("nodeSelector"), {
-                        "kubernetes.io/os": "linux", **({INFRA: ""} if project.endswith("monitoring") else {})})
+                        "kubernetes.io/os": "linux", **({INFRA: ""} if project.endswith("monitoring")
+                                                       else {"node-role.kubernetes.io/worker": ""})})
                     self.assertEqual(actual.pop("tolerations"),
                                      [INFRA_TOLERATION] if project.endswith("monitoring") else [])
+                    if project == "enmaas":
+                        self.assertEqual(actual.pop("affinity")["nodeAffinity"][
+                            "requiredDuringSchedulingIgnoredDuringExecution"], {"nodeSelectorTerms": [
+                                {"matchExpressions": [{"key": INFRA, "operator": "DoesNotExist"}]}]})
                     previous.pop("nodeSelector")
                     previous.pop("tolerations")
                     self.assertEqual(actual, previous)
@@ -151,6 +164,43 @@ class EnmaasPlacementTests(EnmaasPlacementFixture):
 
 
 class EnmaasPlacementConstraintTests(EnmaasPlacementFixture):
+    def test_null_affinity_and_malformed_affinity(self):
+        for affinity in (None, {"nodeAffinity": None}, False, [], {"nodeAffinity": []}):
+            with self.subTest(affinity=affinity):
+                spec = {**self.pod_spec(), "affinity": affinity}
+                result, rendered = self.run_placement([self.workload("Pod", spec)], "enmaas")
+                self.assertEqual(result.returncode == 0, affinity in (None, {"nodeAffinity": None}))
+                if result.returncode:
+                    self.assertEqual(rendered[0]["spec"]["affinity"], affinity)
+
+    def test_application_requires_ordinary_worker_selector(self):
+        for labels, success in (({}, False), ({"node-role.kubernetes.io/worker": ""}, True),
+                                ({"node-role.kubernetes.io/worker": "", INFRA: ""}, False)):
+            with self.subTest(labels=labels):
+                self.nodes = [{"metadata": {"labels": {"kubernetes.io/os": "linux", **labels}}}]
+                result, rendered = self.run_placement([self.workload("Pod", self.pod_spec())], "enmaas")
+                self.assertEqual(result.returncode == 0, success, result.stderr)
+                if success:
+                    self.assertEqual(rendered[0]["spec"]["nodeSelector"]["node-role.kubernetes.io/worker"], "")
+                    self.assertEqual(rendered[0]["spec"]["affinity"]["nodeAffinity"][
+                        "requiredDuringSchedulingIgnoredDuringExecution"]["nodeSelectorTerms"], [
+                            {"matchExpressions": [{"key": INFRA, "operator": "DoesNotExist"}]}])
+
+    def test_worker_affinity_preserves_or_terms_and_empty_terms(self):
+        for terms, success in (([], False), ([{}], False), ([{}, {"matchExpressions": [
+                {"key": "kubernetes.io/os", "operator": "In", "values": ["linux"]}]}], True)):
+            with self.subTest(terms=terms):
+                spec = self.pod_spec()
+                spec["affinity"] = {"nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": {
+                    "nodeSelectorTerms": terms}}}
+                result, rendered = self.run_placement([self.workload("Pod", spec)], "enmaas")
+                self.assertEqual(result.returncode == 0, success, result.stderr)
+                if success:
+                    actual = rendered[0]["spec"]["affinity"]["nodeAffinity"][
+                        "requiredDuringSchedulingIgnoredDuringExecution"]["nodeSelectorTerms"]
+                    self.assertEqual(actual[0], {})
+                    self.assertEqual(actual[1]["matchExpressions"][:-1], terms[1]["matchExpressions"])
+
     def test_only_actual_pod_specs_changed(self):
         unrelated = [
             {"apiVersion": "example.invalid/v1", "kind": "Deployment", "spec": self.pod_spec()},
@@ -261,9 +311,11 @@ class EnmaasPlacementConstraintTests(EnmaasPlacementFixture):
                     self.assertEqual(result.returncode == 0, name == "infra-node", result.stderr)
 
     def test_cordoned_and_untolerated_noexecute_nodes_fail(self):
+        original = copy.deepcopy(self.nodes)
         for constraint in ({"unschedulable": True}, {"taints": [
                 {"key": "unrelated", "value": "", "effect": "NoExecute"}]}):
             with self.subTest(constraint=constraint):
+                self.nodes = copy.deepcopy(original)
                 self.nodes[1]["spec"].update(constraint)
                 result, _ = self.run_placement([self.workload("Pod", self.pod_spec())])
                 self.assertNotEqual(result.returncode, 0)
@@ -312,7 +364,7 @@ class EnmaasPlacementConstraintTests(EnmaasPlacementFixture):
         source = DEPLOY.read_text(encoding="utf-8")
         consumer = source[source.index('echo "Rendering and checking'):].split(
             'echo "Patching NetworkPolicy', 1)[0]
-        consumer = consumer.replace("/tmp/", str(self.directory) + "/")
+        consumer = consumer.replace("/tmp/", "./")
         manifest = self.directory / "input.yaml"
         spec = self.pod_spec()
         spec["containers"].extend([{"name": "enmaas-api", "image": API}, {
@@ -345,13 +397,18 @@ metadata: invalid
 }
 oc() {
   if [[ "$1" == --kubeconfig=* ]]; then
-    echo decode >> "${WORK_DIR}/decodes"
-    "$REAL_DECODER" "$@"
+    "$REAL_DECODER" "$@" || return "$?"
+    for argument in "$@"; do
+      [[ "$argument" != --filename=* ]] || echo "${argument#--filename=}" >> "${WORK_DIR}/decodes"
+    done
+    return 0
   elif [[ "$1 $2" == "get nodes" ]]; then
     cat "${WORK_DIR}/input-nodes.json"
     return "${GET_STATUS:-0}"
   elif [[ "$1" == apply ]]; then
     [[ $(wc -l < "${WORK_DIR}/decodes") == 2 ]] || return 19
+    grep -qxF './enmaas.yaml' "${WORK_DIR}/decodes" || return 19
+    grep -qxF './enmaas-monitoring.yaml' "${WORK_DIR}/decodes" || return 19
     echo "$*" >> "${WORK_DIR}/applies"
     cp "${@: -1}" "${WORK_DIR}/applied-$(wc -l < "${WORK_DIR}/applies").yaml"
     return "${APPLY_STATUS:-0}"
@@ -381,10 +438,11 @@ export -f oc
                         '\nconfigure_placement "$1" "$2"', 1)[0] + "\n" + consumer],
                     env={"PATH": str(self.directory) + ":/usr/local/bin:/usr/bin:/bin",
                          "WORK_DIR": str(self.directory),
+                         "TEST_PYTHON": sys.executable,
                          "REAL_DECODER": DECODER,
                          "DB_URL": "synthetic-presence-indicator",
                          "ENMAAS_ENV": "synthetic", **environment},
-                    capture_output=True, text=True, check=False,
+                    cwd=self.directory, capture_output=True, text=True, check=False,
                 )
                 self.assertEqual(result.returncode, expected, result.stderr)
                 if not apply_count:
@@ -607,7 +665,7 @@ class EnmaasDefaultImageTests(EnmaasPlacementFixture):
                         "imagePullSecrets", "get secret", "get serviceaccount", "configure_images",
                         "ENMAAS_API_IMAGE", "METERING_IMAGE", "PRAXIS_IMAGE", "VERTEX_IMAGE"):
             self.assertNotIn(removed, source)
-        self.assertEqual(source.count("git clone"), 2)
+        self.assertEqual(source.count('clone "https://github.com/redhat-et/EnMaaS-opps.git"'), 2)
         self.assertIn('ENMAAS_CREDENTIALS="/secret/enmaas/token"', source)
 
     def test_helper_image_and_existing_github_credential_retained(self):
