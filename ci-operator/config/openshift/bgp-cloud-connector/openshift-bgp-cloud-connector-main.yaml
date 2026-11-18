@@ -771,6 +771,84 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-gcp-manual-oidc-workload-identity
+- always_run: false
+  as: gcp-osd-capabilities-probe
+  optional: true
+  steps:
+    cluster_profile: rosa-e2e-03
+    test:
+    - as: capabilities
+      commands: |
+        set -uo pipefail
+        # PROBE ONLY. Reports, without creating anything, what
+        # e2e-gcp-osd-workload-identity-operator needs from this
+        # profile's GCP project and does not have: the APIs it calls,
+        # the permissions in the suite's own lists, the compute quota
+        # in its region, and what is already running there. It never
+        # stops early, so one run reports everything.
+        profile="$(mktemp -d)"
+        ln -s "${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json" "${profile}/gce.json"
+        export CLUSTER_PROFILE_DIR="${profile}"
+        source hack/gcp/ci.sh
+        # ci_bootstrap without its kubeconfig check: this job has no
+        # cluster.
+        ci_make_workdir
+        trap ci_remove_workdir EXIT
+        ci_gcp_credentials
+        ci_ensure_gcloud
+        project="$(jq -r .project_id "${CLUSTER_PROFILE_DIR}/gce.json")"
+        echo "project $(gcp_project_fingerprint "${project}"), region ${REGION}"
+
+        echo "== APIs"
+        enabled="$(gcloud services list --enabled --project "${project}" --format='value(config.name)' 2>&1)" \
+          || echo "  could not list the enabled services: ${enabled}"
+        for api in compute.googleapis.com networkconnectivity.googleapis.com iam.googleapis.com \
+            iamcredentials.googleapis.com cloudresourcemanager.googleapis.com serviceusage.googleapis.com \
+            dns.googleapis.com; do
+          if grep -Fxq "${api}" <<<"${enabled}"; then echo "  enabled   ${api}"; else echo "  DISABLED  ${api}"; fi
+        done
+
+        for list in gcp_estate_permissions gcp_identity_permissions; do
+          declare -n perms="${list}"
+          echo "== ${list} (${#perms[@]})"
+          if ! held="$(gcp_permissions_held "${project}" "${perms[@]}")"; then
+            echo "  could not ask GCP"
+            continue
+          fi
+          for p in "${perms[@]}"; do
+            if grep -Fxq -- "${p}" <<<"${held}"; then echo "  granted  ${p}"; else echo "  DENIED   ${p}"; fi
+          done
+          unset -n perms
+        done
+
+        echo "== compute quota in ${REGION}, used/limit"
+        gcloud compute regions describe "${REGION}" --project "${project}" --format=json \
+          | jq -r '.quotas[] | select(.limit > 0)
+              | select((.usage / .limit) >= 0.5 or (.metric | test("^(CPUS|N2_CPUS|E2_CPUS|INSTANCES|IN_USE_ADDRESSES|SSD_TOTAL_GB|DISKS_TOTAL_GB)$")))
+              | "  \(.metric) \(.usage)/\(.limit)"' \
+          || echo "  could not read the region's quota"
+        echo "== project-wide compute quota at half or more, used/limit"
+        gcloud compute project-info describe --project "${project}" --format=json \
+          | jq -r '.quotas[] | select(.limit > 0 and (.usage / .limit) >= 0.5) | "  \(.metric) \(.usage)/\(.limit)"' \
+          || echo "  could not read the project's quota"
+
+        echo "== instances in the project, by zone and status"
+        gcloud compute instances list --project "${project}" --format='value(zone.basename(),status)' \
+          | sort | uniq -c | sed 's/^/  /' || echo "  could not list instances"
+        echo "== Network Connectivity hubs"
+        gcloud network-connectivity hubs list --project "${project}" --format='value(name.basename())' 2>&1 \
+          | sed 's/^/  /'
+        exit 0
+      env:
+      - default: us-east1
+        name: REGION
+      from: e2e-runner
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
 - as: e2e-rosa-operator
   skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
