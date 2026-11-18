@@ -41,6 +41,7 @@ export TARGET_CONTROL_PLANE_NODES_SCHEDULABLE=${10}
 source common.sh
 
 oc image extract --registry-config=pull-secret "${tests_image}" --path=/usr/bin/openshift-tests:bin --confirm
+chmod +x bin/openshift-tests
 artifacts="results/${suite//\//-}"
 mkdir -p "${artifacts}"
 # Origin retains its 45/195-minute suite limits and five-minute CLI limit.
