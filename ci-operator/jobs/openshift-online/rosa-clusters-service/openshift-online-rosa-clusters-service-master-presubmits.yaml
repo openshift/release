@@ -6,6 +6,55 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build09
+    context: ci/prow/commits-signed
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    extra_refs:
+    - base_ref: main
+      clone_depth: 1
+      org: openshift
+      path_alias: github.com/openshift/release-signing-checker
+      repo: release
+      skip_submodules: true
+      sparse_checkout_files:
+      - hack
+      workdir: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-online-rosa-clusters-service-master-commits-signed
+    optional: true
+    rerun_command: /test commits-signed
+    spec:
+      containers:
+      - command:
+        - hack/verify-commits-signed.py
+        env:
+        - name: GITHUB_TOKEN_PATH
+          value: /etc/github/oauth
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: token
+          readOnly: true
+      volumes:
+      - name: token
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    trigger: (?m)^/test( | .* )commits-signed,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build09
     context: ci/prow/go-unit-coverage
     decorate: true
     decoration_config:
