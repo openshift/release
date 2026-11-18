@@ -10,11 +10,16 @@ workflow:
     The deterministic-lb variant is selected by the TEST_PLAN in the job. The
     EIP and public subnet are written to SHARED_DIR/eip.env and consumed by the
     create-guests and run-tests steps. The deterministic-lb variant and the
-    deterministic-lb-ip label filter are provided by openshift/hypershift#10237;
-    if that PR is not present, the runner can select zero specs, so trigger this
-    job only against a Hypershift branch that contains the variant. This lane
+    deterministic-lb-ip label filter are provided by openshift/hypershift#10237.
+    A run that does not execute the spec is not coverage: the JUnit must report
+    the spec as passed, not skipped. The spec skips when the EIP pre-step
+    variables are missing, so a green job with a skipped spec proves nothing.
+
+    The EIP is tagged with an expirationDate so a leaked allocation can be
+    reaped by the account janitor when the release step never runs. This lane
     covers the AWS nested management-cluster path for CNTRLPLANE-4579; the
-    Agent/MetalLB presubmit is a separate lane and is not covered here.
+    Agent/MetalLB, Azure, Cilium and KubeVirt lanes are separate and are not
+    covered here.
 
     The HyperShift launch capability is currently supported by the HyperShift
     team. For now, please direct all questions and comments to:

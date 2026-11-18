@@ -20,6 +20,14 @@ EIP_ALLOCATION_ID=""
 EIP_PUBLIC_IP=""
 EIP_ASSOCIATION=""
 
+# Tag leaked allocations with an expiry so the account janitor can reap them
+# when the release step never runs. Match the guest clusters' 4h window.
+if date -u -d '+4 hours' +%Y-%m-%dT%H:%M:%SZ >/dev/null 2>&1; then
+    EIP_EXPIRATION=$(date -u -d '+4 hours' +%Y-%m-%dT%H:%M:%SZ)
+else
+    EIP_EXPIRATION=$(date -u -v+4H +%Y-%m-%dT%H:%M:%SZ)
+fi
+
 if [[ ! -f "${LIB_FILE}" ]]; then
     echo "missing shared EIP helpers at ${LIB_FILE}" >&2
     exit 1
@@ -103,7 +111,7 @@ if [[ -z "${EIP_ALLOCATION_ID}" ]]; then
     fi
     if [[ -z "${EIP_ALLOCATION_ID}" ]]; then
         if ! ALLOCATION=$(aws_cmd ec2 allocate-address --domain vpc \
-            --tag-specifications "ResourceType=elastic-ip,Tags=[{Key=Name,Value=${TAG_NAME}-${RUN_ID}},{Key=Jira,Value=CNTRLPLANE-4579},{Key=Purpose,Value=deterministic-lb-e2e},{Key=${EIP_RUN_TAG},Value=${RUN_ID}}]" \
+            --tag-specifications "ResourceType=elastic-ip,Tags=[{Key=Name,Value=${TAG_NAME}-${RUN_ID}},{Key=Jira,Value=CNTRLPLANE-4579},{Key=Purpose,Value=deterministic-lb-e2e},{Key=expirationDate,Value=${EIP_EXPIRATION}},{Key=${EIP_RUN_TAG},Value=${RUN_ID}}]" \
             --query '[AllocationId,PublicIp]' --output text); then
             echo "failed to allocate an EIP for run ${RUN_ID}" >&2
             exit 1
