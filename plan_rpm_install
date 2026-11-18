@@ -1,0 +1,20 @@
+The goal is to allow the get-kata-rpm step (ci-operator/step-registry/sandboxed-containers-operator/get-kata-rpm) to not
+just download and copy the the rpm over the workers but also install (actually upgrade it).
+
+Let me give you the context. That step currently only fetches the rpm file and copies over the workers node, then later
+in the workflows that use it there will be another step that will run the openshift-tests-private
+(~/src/github.com/openshift/openshift-tests-private) for kata that run some setup routines, including the rpm installation. This is
+like that because the rpm only can be installed after the OSC operator is actually installed, and that was the responsability of the
+setup routines in openshift-tests-private. It happen that most of those setup routines where moved to a step own itself
+(ci-operator/step-registry/sandboxed-containers-operator/install-osc-operator). We will be getting rid of openshift-tests-private soon,
+so we are moving its functionalities to other steps.
+
+Given the context, I want to:
+* have get-kata-rpm to install the rpm as well, just like the openshift-tests-private does
+* get-kata-rpm should be executed after install-osc-operator
+* one new feature is to check whether the given rpm version is already installed, otherwise report and do nothing
+* the get-kata-rpm name does not make sense anymore. It should be renamed to update-kata-rpm instead
+
+I want to implement that in a couple of commits, grouping the changes logically. For every group of changes (i.e. commits)
+you should update the README.md files that references the step as well as the one from the step itself. Commit with -s and add
+`Assisted-by: Claude` in the text. Keep the code simple.

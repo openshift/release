@@ -1,0 +1,19 @@
+1· clone github.com/openshift/release/
+2. Fetch and switch to https://github.com/openshift/release/pull/84327
+3. Rebase with `main` (`git pull --rebase main`)
+4. Change ci-operator/config/openshift/sandboxed-containers-operator/openshift-sandboxed-containers-operator-devel__downstream-candidate422.yaml, under
+`as: azure-ipi-kata` section:
+- set `restrict_network_access` to true
+- adjust `KATA_RPM_VERSION`
+- add `KATA_RPM_BUILD_TASK: 71750058`
+- adjust `CATALOG_SOURCE_IMAGE` (replace with quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:1.13.1-1788510424)
+5. run `make ci-operator-config` to check everything is fine
+6. make a commit with your changes. Title like "[DO NOT MERGE] blah blah blah" so that we don't merge it by mistake
+7. open a commit
+8. There will run a couple of checks, they might take 15 min or more.
+9. If everything goes well you will get a message in the PR ([REHEARSALNOTIFIER]) saying jobs can be triggered
+9.1. make a comment in the PR with "/pj-rehearse periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate422-azure-ipi-kata"
+9.2 the request will be processed, i.e. a job will be triggered. It can take ~10min.
+10. There will be posted on the checkers list the link to the job ("ci/rehearse/periodic-ci-openshift-sandboxed-containers-operator-devel-downstream-candidate422....")
+
+ps: on KATA_RPM_BUILD_TASK the link you posted in the channel https://brewweb.engineering.redhat.com/brew/taskinfo?taskID=71749975 is for src.rpm, we need the rpm binary build task, so https://brewweb.engineering.redhat.com/brew/taskinfo?taskID=71750058
