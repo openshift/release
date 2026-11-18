@@ -111,8 +111,9 @@ for ((i = 0; i < total_workers; i++)); do
     ipv4=""
     route_ipv4=""
   fi
+  # Do not set a role: nodes-config.yaml hosts are always added as workers, and
+  # node-joiner with strict parsing (openshift/installer#11108) rejects the field.
   echo " - hostname: ${hostnames[$i]}
-   role: $(echo "${hostnames[$i]}" | rev | cut -d'-' -f2 | rev | cut -f1)
    interfaces:
     - name: ens32
       macAddress: ${mac_addresses[$i]}
