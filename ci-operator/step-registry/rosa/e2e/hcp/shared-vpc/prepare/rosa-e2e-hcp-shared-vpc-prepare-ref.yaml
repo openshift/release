@@ -13,23 +13,24 @@ ref:
     documentation: Cloud region for the shared-account resources. Falls back to LEASED_RESOURCE if empty.
   documentation: |-
     Prepares every shared-account resource an HCP shared VPC cluster needs
-    (ROSAENG-63353). Requires the second AWS account credentials
+    (ROSAENG-63353), before the rosa-sts-oidc-config-create chain: with
+    ENABLE_SHARED_VPC=yes, rosa-sts-operator-roles-create reads
+    ${SHARED_DIR}/hosted_zone_role_arn and passes --shared-vpc-role-arn to
+    rosa create operator-roles. Requires the second AWS account credentials
     ${CLUSTER_PROFILE_DIR}/.awscred_shared_account (the step fails without
     them). Creates the ingress private hosted zone (named
     rosa.<cluster>.<base-domain>, which OCM validates the HCP cluster domain
     prefix against), the shared route53 role carrying the AWS-managed
-    ROSASharedVPCRoute53Policy (trusting the cluster account's installer,
-    ingress-operator and control-plane-operator roles), the internal
-    communication hosted zone (<cluster>.hypershift.local) and the VPC
-    endpoint role carrying the AWS-managed ROSASharedVPCEndpointPolicy
-    (trusting the installer and control-plane-operator roles); rosa create
-    cluster requires --vpc-endpoint-role-arn and
-    --hcp-internal-communication-hosted-zone-id for Hosted Control Plane
-    shared VPC clusters. Then, with the cluster account credentials, attaches
-    the <shared-role>-assume-role permission policies to the installer,
-    ingress-operator and control-plane-operator roles (what rosa create
-    account-roles/operator-roles attach when run with the shared VPC flags).
-    Publishes cluster-name, hosted_zone_id, hosted_zone_role_arn,
-    vpc_endpoint_role_arn and hcp_internal_communication_hosted_zone_id to
-    ${SHARED_DIR} for rosa-cluster-provision and the post-phase cleanup and
-    orphan gate.
+    ROSASharedVPCRoute53Policy, the internal communication hosted zone
+    (<cluster>.hypershift.local) and the VPC endpoint role carrying the
+    AWS-managed ROSASharedVPCEndpointPolicy; rosa create cluster requires
+    --vpc-endpoint-role-arn and --hcp-internal-communication-hosted-zone-id
+    for Hosted Control Plane shared VPC clusters. The cluster account's
+    installer and operator roles do not exist yet at this point, so both
+    shared roles are created with a placeholder trust (the cluster account CI
+    user) that rosa-e2e-hcp-shared-vpc-trust replaces with the real
+    principals after the chain. Publishes cluster-name, hosted_zone_id,
+    hosted_zone_role_arn, vpc_endpoint_role_arn and
+    hcp_internal_communication_hosted_zone_id to ${SHARED_DIR} for
+    rosa-sts-operator-roles-create, rosa-cluster-provision and the post-phase
+    cleanup and orphan gate.

@@ -99,7 +99,7 @@ if [[ -n "${VPC_ID_TO_VERIFY}" ]]; then
 fi
 
 # Cluster-account assume-role policies (<shared-role-name>-assume-role, created
-# by rosa-e2e-hcp-shared-vpc-prepare and deleted best-effort by
+# by rosa-e2e-hcp-shared-vpc-trust and deleted best-effort by
 # rosa-e2e-hcp-shared-vpc-cleanup): they live in the cluster account, so verify
 # them with the main credentials before evaluating the result.
 CLUSTER_AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"

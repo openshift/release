@@ -19,11 +19,17 @@ log() {
 # --hcp-internal-communication-hosted-zone-id for Hosted Control Plane shared
 # VPC clusters). The shared roles carry the AWS-managed policies
 # ROSASharedVPCRoute53Policy and ROSASharedVPCEndpointPolicy, matching what a
-# real rosa shared VPC setup grants. It also wires the cross-account trust:
-# the shared roles trust the cluster account's installer and operator roles,
-# and the cluster-account roles get the sts:AssumeRole permission policies
-# (rosa create account-roles/operator-roles attaches those when run with the
-# shared VPC flags; with pre-created roles we attach them directly).
+# real rosa shared VPC setup grants.
+#
+# This step must run BEFORE the rosa-sts-oidc-config-create chain: with
+# ENABLE_SHARED_VPC=yes, rosa-sts-operator-roles-create reads
+# ${SHARED_DIR}/hosted_zone_role_arn and passes --shared-vpc-role-arn to rosa
+# create operator-roles. The cluster account's installer and operator roles do
+# not exist yet at that point, so the shared roles are created with a
+# placeholder trust (the cluster account CI user, the classic
+# aws-provision-route53-private-hosted-zone pattern);
+# rosa-e2e-hcp-shared-vpc-trust replaces it with the real principals once the
+# chain has created them.
 
 REGION="${REGION:-${LEASED_RESOURCE}}"
 
@@ -51,25 +57,31 @@ else
   echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 fi
 
-# Principals from the cluster account: the installer account role and the
-# ingress / control-plane operator roles (written by rosa-sts-account-roles-create
-# and rosa-sts-operator-roles-create).
-INSTALLER_ROLE_ARN="$(cat "${SHARED_DIR}/account-roles-arns" | { grep "Installer-Role" || true; })"
-INGRESS_OPERATOR_ROLE_ARN="$(cat "${SHARED_DIR}/operator-roles-arns" | { grep "openshift-ingress-operator-cloud-credentials" || true; })"
-CONTROL_PLANE_OPERATOR_ROLE_ARN="$(cat "${SHARED_DIR}/operator-roles-arns" | { grep "kube-system-control-plane-operator" || true; })"
-if [[ -z "${INSTALLER_ROLE_ARN}" || -z "${INGRESS_OPERATOR_ROLE_ARN}" || -z "${CONTROL_PLANE_OPERATOR_ROLE_ARN}" ]]; then
-  log "ERROR: could not resolve the installer / ingress-operator / control-plane-operator role ARNs"
-  log "       from ${SHARED_DIR}/account-roles-arns and ${SHARED_DIR}/operator-roles-arns;"
-  log "       this step must run after the rosa-sts-oidc-config-create chain"
-  exit 1
-fi
+# Placeholder trust principal: the cluster account's CI user. The installer
+# and operator roles it stands in for are created by the
+# rosa-sts-oidc-config-create chain after this step;
+# rosa-e2e-hcp-shared-vpc-trust replaces this trust with their ARNs.
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export AWS_DEFAULT_REGION="${REGION}"
+export AWS_REGION="${REGION}"
+CLUSTER_CREATOR_USER_ARN="$(aws sts get-caller-identity --query Arn --output text)"
+
+PLACEHOLDER_TRUST_POLICY="$(jq -c -n --arg creator "${CLUSTER_CREATOR_USER_ARN}" \
+  '{
+    Version: "2012-10-17",
+    Statement: [
+      {
+        Effect: "Allow",
+        Principal: {AWS: [$creator]},
+        Action: "sts:AssumeRole",
+        Condition: {}
+      }
+    ]
+  }')"
 
 # --- Shared-account resources (second AWS account) ---
 export AWS_SHARED_CREDENTIALS_FILE="${SHARED_AWSCRED}"
-export AWS_DEFAULT_REGION="${REGION}"
-export AWS_REGION="${REGION}"
-
-SHARED_ACCOUNT_ID="$(aws sts get-caller-identity --output text | awk '{print $1}')"
+SHARED_ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 
 # Name the RAM-shared VPC after this job's cluster: aws-provision-vpc-shared
 # tags it only with the job's stack name, which is not recognizable in the
@@ -101,43 +113,25 @@ log "Ingress private hosted zone: ${INGRESS_PHZ_ID} (${INGRESS_PHZ_NAME})"
 # of a hand-rolled customer-managed policy.
 SHARED_ROUTE53_POLICY_ARN="arn:aws:iam::aws:policy/ROSASharedVPCRoute53Policy"
 
-# Shared route53 role, trusting the installer and operator roles (in the
-# classic workflow aws-provision-route53-private-hosted-zone creates the role
-# and rosa-conf-shared-vpc-update-trust-policy replaces its trust with the
-# installer and ingress-operator principals; HCP additionally needs the
-# control-plane-operator principal).
+# Shared route53 role. Created with the placeholder trust (the installer and
+# operator principals only exist after the rosa-sts-oidc-config-create chain;
+# rosa-e2e-hcp-shared-vpc-trust replaces the trust with them: installer,
+# ingress-operator and control-plane-operator).
 ROUTE53_ROLE_NAME="${CLUSTER_NAME}-shared-role"
-ROUTE53_TRUST_POLICY="$(jq -c -n \
-  --arg installer "${INSTALLER_ROLE_ARN}" \
-  --arg ingress "${INGRESS_OPERATOR_ROLE_ARN}" \
-  --arg controlplane "${CONTROL_PLANE_OPERATOR_ROLE_ARN}" \
-  '{
-    Version: "2012-10-17",
-    Statement: [
-      {
-        Effect: "Allow",
-        Principal: {AWS: [$installer, $ingress, $controlplane]},
-        Action: "sts:AssumeRole",
-        Condition: {}
-      }
-    ]
-  }')"
 ROUTE53_ROLE_ARN="arn:aws:iam::${SHARED_ACCOUNT_ID}:role/${ROUTE53_ROLE_NAME}"
 if ! aws iam get-role --role-name "${ROUTE53_ROLE_NAME}" >/dev/null 2>&1; then
   aws iam create-role \
     --role-name "${ROUTE53_ROLE_NAME}" \
-    --assume-role-policy-document "${ROUTE53_TRUST_POLICY}" >/dev/null
+    --assume-role-policy-document "${PLACEHOLDER_TRUST_POLICY}" >/dev/null
 fi
-# Publish the ARN as soon as the role exists so the best-effort cleanup step
-# can delete it if trust or policy configuration below fails.
+# Publish the ARN as soon as the role exists so rosa-sts-operator-roles-create
+# can pass --shared-vpc-role-arn and the best-effort cleanup step can delete
+# the role if the later trust or policy configuration fails.
 echo "${ROUTE53_ROLE_ARN}" > "${SHARED_DIR}/hosted_zone_role_arn"
-aws iam update-assume-role-policy \
-  --role-name "${ROUTE53_ROLE_NAME}" \
-  --policy-document "${ROUTE53_TRUST_POLICY}"
 aws iam attach-role-policy \
   --role-name "${ROUTE53_ROLE_NAME}" \
   --policy-arn "${SHARED_ROUTE53_POLICY_ARN}"
-log "Route53 role ${ROUTE53_ROLE_ARN} trusts installer, ingress-operator and control-plane-operator"
+log "Route53 role ${ROUTE53_ROLE_ARN} created with placeholder trust (rosa-e2e-hcp-shared-vpc-trust replaces it)"
 
 # Internal communication hosted zone (<cluster>.hypershift.local), associated
 # with the same VPC as the ingress private hosted zone (reuse on re-run).
@@ -161,65 +155,22 @@ log "Internal communication hosted zone: ${INTERNAL_PHZ_ID} (${INTERNAL_PHZ_NAME
 # what rosa's PrepareSharedVPCEndPointRoleForHostedCP grants in production.
 VPC_ENDPOINT_POLICY_ARN="arn:aws:iam::aws:policy/ROSASharedVPCEndpointPolicy"
 
-# VPC endpoint role trusting the installer and control-plane-operator roles
+# VPC endpoint role, created with the placeholder trust like the route53 role
+# (rosa-e2e-hcp-shared-vpc-trust replaces it with the installer and
+# control-plane-operator principals).
 VPC_ENDPOINT_ROLE_NAME="${CLUSTER_NAME}-shared-vpcendpoint-role"
-VPC_ENDPOINT_TRUST_POLICY="$(jq -c -n \
-  --arg installer "${INSTALLER_ROLE_ARN}" --arg controlplane "${CONTROL_PLANE_OPERATOR_ROLE_ARN}" \
-  '{
-    Version: "2012-10-17",
-    Statement: [
-      {
-        Effect: "Allow",
-        Principal: {AWS: [$installer, $controlplane]},
-        Action: "sts:AssumeRole",
-        Condition: {}
-      }
-    ]
-  }')"
 VPC_ENDPOINT_ROLE_ARN="arn:aws:iam::${SHARED_ACCOUNT_ID}:role/${VPC_ENDPOINT_ROLE_NAME}"
 if ! aws iam get-role --role-name "${VPC_ENDPOINT_ROLE_NAME}" >/dev/null 2>&1; then
   aws iam create-role \
     --role-name "${VPC_ENDPOINT_ROLE_NAME}" \
-    --assume-role-policy-document "${VPC_ENDPOINT_TRUST_POLICY}" >/dev/null
+    --assume-role-policy-document "${PLACEHOLDER_TRUST_POLICY}" >/dev/null
 fi
 # Publish the ARN as soon as the role exists so the best-effort cleanup step
-# can delete it if trust or policy configuration below fails.
+# can delete the role if the later trust or policy configuration fails.
 echo "${VPC_ENDPOINT_ROLE_ARN}" > "${SHARED_DIR}/vpc_endpoint_role_arn"
-aws iam update-assume-role-policy \
-  --role-name "${VPC_ENDPOINT_ROLE_NAME}" \
-  --policy-document "${VPC_ENDPOINT_TRUST_POLICY}"
 aws iam attach-role-policy \
   --role-name "${VPC_ENDPOINT_ROLE_NAME}" \
   --policy-arn "${VPC_ENDPOINT_POLICY_ARN}"
-log "VPC endpoint role: ${VPC_ENDPOINT_ROLE_ARN}"
+log "VPC endpoint role: ${VPC_ENDPOINT_ROLE_ARN} (placeholder trust)"
 
-# --- Cluster-account permission policies (main AWS account) ---
-# IAM needs an sts:AssumeRole grant on the assuming side too. rosa names these
-# <shared-role-name>-assume-role (AssumeRolePolicyPrefix).
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-CLUSTER_ACCOUNT_ID="$(aws sts get-caller-identity --output text | awk '{print $1}')"
-
-attach_assume_role_policy() {
-  local target_role_arn="$1" shared_role_arn="$2"
-  local target_role_name="${target_role_arn##*/}"
-  local shared_role_name="${shared_role_arn##*/}"
-  local policy_arn="arn:aws:iam::${CLUSTER_ACCOUNT_ID}:policy/${shared_role_name}-assume-role"
-  if ! aws iam get-policy --policy-arn "${policy_arn}" >/dev/null 2>&1; then
-    policy_arn="$(aws iam create-policy \
-      --policy-name "${shared_role_name}-assume-role" \
-      --query 'Policy.Arn' --output text \
-      --policy-document "{\"Version\": \"2012-10-17\", \"Statement\": {\"Effect\": \"Allow\", \"Action\": \"sts:AssumeRole\", \"Resource\": \"${shared_role_arn}\"}}")"
-  fi
-  aws iam attach-role-policy \
-    --role-name "${target_role_name}" \
-    --policy-arn "${policy_arn}"
-}
-
-for principal in "${INSTALLER_ROLE_ARN}" "${INGRESS_OPERATOR_ROLE_ARN}" "${CONTROL_PLANE_OPERATOR_ROLE_ARN}"; do
-  attach_assume_role_policy "${principal}" "${ROUTE53_ROLE_ARN}"
-done
-for principal in "${INSTALLER_ROLE_ARN}" "${CONTROL_PLANE_OPERATOR_ROLE_ARN}"; do
-  attach_assume_role_policy "${principal}" "${VPC_ENDPOINT_ROLE_ARN}"
-done
-
-log "HCP shared VPC preparation complete"
+log "HCP shared VPC preparation complete (trust completed by rosa-e2e-hcp-shared-vpc-trust)"

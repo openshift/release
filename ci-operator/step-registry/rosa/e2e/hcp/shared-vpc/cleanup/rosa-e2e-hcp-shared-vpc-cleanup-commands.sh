@@ -11,10 +11,11 @@ log() {
 }
 
 # Post-phase cleanup for the HCP shared VPC resources created by
-# rosa-e2e-hcp-shared-vpc-prepare (ROSAENG-63353): the ingress private hosted
-# zone, the shared route53 role, the internal communication hosted zone and
-# the VPC endpoint role in the shared account, and the assume-role permission
-# policies in the cluster account. The shared roles carry AWS-managed
+# rosa-e2e-hcp-shared-vpc-prepare and rosa-e2e-hcp-shared-vpc-trust
+# (ROSAENG-63353): the ingress private hosted zone, the shared route53 role,
+# the internal communication hosted zone and the VPC endpoint role in the
+# shared account, and the assume-role permission policies in the cluster
+# account. The shared roles carry AWS-managed
 # policies (ROSASharedVPCRoute53Policy / ROSASharedVPCEndpointPolicy), which
 # are only detached, never deleted. Best-effort: the non-best-effort orphan
 # gate rosa-e2e-validate-shared-vpc-teardown runs after this step and fails

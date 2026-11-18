@@ -5,10 +5,9 @@ workflow:
       CHANNEL_GROUP: stable
       HOSTED_CP: "true"
       REPLICAS: "3"
-      # Shared VPC row (ROSAENG-63353): the rosa-e2e-shared-vpc profile
-      # leases a rosa-e2e-01 quota slice (the cluster account) and mounts
-      # rosa-e2e-03's credentials as .awscred_shared_account (the shared
-      # account). aws-provision-vpc-shared provisions the VPC there
+      # Shared VPC row (ROSAENG-63353): the rosa-e2e-01 profile's GSM group
+      # carries rosa-e2e-03's credentials as .awscred_shared_account (the
+      # shared account). aws-provision-vpc-shared provisions the VPC there
       # (RAM-shared to the cluster account) and
       # rosa-e2e-hcp-shared-vpc-prepare creates the PHZ and the shared VPC
       # roles there.
@@ -28,16 +27,25 @@ workflow:
     - ref: rosa-e2e-hcp-shared-vpc-dnsdomain-create
     - ref: aws-provision-vpc-shared
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
-    - chain: rosa-sts-oidc-config-create
     # Creates every shared VPC resource in the second AWS account: the ingress
     # private hosted zone (named rosa.<cluster>.<base-domain>, which OCM
     # validates the HCP cluster domain prefix against), the shared route53
     # role (AWS-managed ROSASharedVPCRoute53Policy), and the HCP-only VPC
     # endpoint role (AWS-managed ROSASharedVPCEndpointPolicy) and internal
     # communication hosted zone, plus the cluster-account assume-role
-    # permission policies. Requires .awscred_shared_account; runs after the
-    # oidc-config chain so the installer and operator role ARNs exist.
+    # permission policies. Must run BEFORE the oidc-config chain: with
+    # ENABLE_SHARED_VPC=yes in the env map, rosa-sts-operator-roles-create
+    # reads ${SHARED_DIR}/hosted_zone_role_arn and passes
+    # --shared-vpc-role-arn to rosa create operator-roles. The installer and
+    # operator roles do not exist yet, so the shared roles are created with a
+    # placeholder trust. Requires .awscred_shared_account.
     - ref: rosa-e2e-hcp-shared-vpc-prepare
+    - chain: rosa-sts-oidc-config-create
+    # Replaces the placeholder trust on the shared roles with the installer
+    # and operator role principals (created by the chain) and attaches the
+    # cluster-account assume-role permission policies; must run after the
+    # chain and before rosa-cluster-provision.
+    - ref: rosa-e2e-hcp-shared-vpc-trust
     # Provisions the cluster into the shared VPC (ENABLE_SHARED_VPC=yes is
     # set in the workflow env map above).
     - chain: rosa-cluster-provision
@@ -91,9 +99,9 @@ workflow:
     (ROSAENG-63353): the rosa-CLI head provisions an HCP cluster in a shared
     VPC - rosa-e2e-hcp-shared-vpc-dnsdomain-create claims a customer-managed
     HCP-architecture base domain, aws-provision-vpc-shared creates the VPC in
-    the shared AWS account (rosa-e2e-03, whose credentials the
-    rosa-e2e-shared-vpc cluster profile mounts as .awscred_shared_account,
-    RAM-shared to the cluster account in rosa-e2e-01) and
+    the shared AWS account (rosa-e2e-03, whose credentials the rosa-e2e-01
+    cluster profile's GSM group mounts as .awscred_shared_account, RAM-shared
+    to the cluster account in rosa-e2e-01) and
     rosa-e2e-hcp-shared-vpc-prepare creates every other shared-account
     resource rosa create cluster needs: the ingress private hosted zone (named
     rosa.<cluster>.<base-domain>, which OCM validates the HCP cluster domain
@@ -101,10 +109,15 @@ workflow:
     ROSASharedVPCRoute53Policy (trusting the installer, ingress-operator and
     control-plane-operator roles), and the HCP-only VPC endpoint role carrying
     the AWS-managed ROSASharedVPCEndpointPolicy and the internal
-    communication hosted zone, plus the cluster-account assume-role permission
-    policies. The workflow requires a second AWS account: every shared-VPC
-    consumer reads ${CLUSTER_PROFILE_DIR}/.awscred_shared_account from the
-    cluster profile and fails without it. The validation tail is
+    communication hosted zone. The prepare step runs before the
+    rosa-sts-oidc-config-create chain so rosa-sts-operator-roles-create can
+    pass --shared-vpc-role-arn to rosa create operator-roles; the shared roles
+    are created with a placeholder trust that rosa-e2e-hcp-shared-vpc-trust
+    replaces with the installer and operator role principals after the chain,
+    along with attaching the cluster-account assume-role permission policies.
+    The workflow requires a second AWS account: every shared-VPC consumer
+    reads ${CLUSTER_PROFILE_DIR}/.awscred_shared_account from the cluster
+    profile and fails without it. The validation tail is
     provisioner-agnostic: the customer step runs the rosa-e2e
     Feature:SharedVPC specs (cross-account DNS records in the shared private
     hosted zone), while the platform step runs its Area:ManagementPlane
