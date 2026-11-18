@@ -23,6 +23,19 @@ ref:
     default: ""
     documentation: |-
       The vnet name that is already existing.
+  - name: VNET_RESOURCE_GROUP
+    default: ""
+    documentation: |-
+      The resource group holding VNET_NAME, when that is not RESOURCE_GROUP. Leave empty -- the
+      default -- and the VNET is looked up in RESOURCE_GROUP exactly as before.
+
+      Set it when the VNET is a shared, permanent fixture that the run must not own. The bastion,
+      its NIC, public IP, NSG, disks, image, storage account and private DNS zone are then created
+      in RESOURCE_GROUP, which the caller can delete wholesale at teardown, while the bastion
+      subnet is carved out of the VNET in this group and has to be removed on its own.
+
+      Not supported on azurestack: that path creates the NIC from an ARM template, where
+      resourceId() always resolves in the deployment's own resource group.
   - name: BASTION_BOOT_IMAGE
     default: ""
     documentation: |-
