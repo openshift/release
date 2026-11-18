@@ -52,8 +52,8 @@ def main():
     for key in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN", "AWS_SECURITY_TOKEN"):
         if os.environ.get(key):
             raise ValueError("static AWS environment credentials are forbidden")
-    os.environ.update({"AWS_CONFIG_FILE": "/config/aws-config", "AWS_SHARED_CREDENTIALS_FILE": "/dev/null", "AWS_EC2_METADATA_DISABLED": "true"})
-    session = boto3.Session(profile_name="ci-hub", region_name="us-east-1")
+    os.environ.update({"AWS_CONFIG_FILE": "/var/run/secrets/aws/config/config", "AWS_SHARED_CREDENTIALS_FILE": "/dev/null", "AWS_EC2_METADATA_DISABLED": "true"})
+    session = boto3.Session(profile_name="hub", region_name="us-east-1")
     caller = session.client("sts", config=Config(connect_timeout=10, read_timeout=20)).get_caller_identity()
     if not caller["Arn"].startswith("arn:aws:sts::320297955214:assumed-role/ci-step-runner-hub/"):
         raise ValueError("unexpected AWS identity")

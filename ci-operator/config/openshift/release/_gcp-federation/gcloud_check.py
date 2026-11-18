@@ -20,7 +20,7 @@ def main():
     from google.auth import load_credentials_from_file
     from google.auth.transport.requests import AuthorizedSession
 
-    path = "/config/gcp-creds.json"
+    path = os.environ["GOOGLE_APPLICATION_CREDENTIALS"]
     project = "openshift-gce-devel-ci-2"
     config = json.load(open(path))
     if config.get("type") != "external_account" or "private_key" in config:

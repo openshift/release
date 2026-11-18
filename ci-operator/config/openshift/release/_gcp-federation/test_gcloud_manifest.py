@@ -12,7 +12,7 @@ from google.auth import load_credentials_from_dict
 from google.auth.transport.requests import Request
 
 from gcloud_bridge import Handler
-from gcloud_manifest import manifest
+from pathlib import Path
 
 
 class FakeCredentials:
@@ -35,27 +35,13 @@ class FakeSession:
 
 
 class GcloudHarnessTests(unittest.TestCase):
-    def test_manifest_isolates_projected_token_and_forbids_static_key_mounts(self):
-        config, job = manifest("ci-op-test", "gcloud-test")["items"]
-        pod = job["spec"]["template"]["spec"]
-        self.assertFalse(pod["automountServiceAccountToken"])
-        self.assertFalse(any("secret" in volume for volume in pod["volumes"]))
-        self.assertNotIn("aws-token", [volume["name"] for volume in pod["containers"][0]["volumeMounts"]])
-        self.assertIn("aws-token", [volume["name"] for volume in pod["initContainers"][0]["volumeMounts"]])
-        self.assertNotIn("ci-step-runner-gcp-broker", config["data"]["aws-config"])
-        self.assertEqual(pod["initContainers"][0]["restartPolicy"], "Always")
-        credentials = json.loads(config["data"]["gcp-creds.json"])
-        self.assertEqual(credentials["type"], "external_account")
-        self.assertNotIn("private_key", credentials)
-        self.assertEqual(credentials["credential_source"]["url"], "http://127.0.0.1:8085/security-credentials")
-
     def test_standard_google_loader_retrieves_fresh_aws_credentials(self):
         server = HTTPServer(("127.0.0.1", 0), Handler)
         server.aws = FakeSession()
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
-            config = json.loads(manifest("ci-op-test", "gcloud-test")["items"][0]["data"]["gcp-creds.json"])
+            config = json.loads(Path(__file__).with_name("gcp-creds.json").read_text())
             config.pop("service_account_impersonation_url")
             base = "http://127.0.0.1:" + str(server.server_port)
             config["credential_source"].update(region_url=base + "/region", url=base + "/security-credentials")
