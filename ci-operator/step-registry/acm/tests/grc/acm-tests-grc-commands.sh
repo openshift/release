@@ -148,8 +148,25 @@ _OPP_MC_NAME="local-cluster"
 _OPP_LABEL_KEYS=("local-cluster" "cluster.open-cluster-management.io/clusterset" "cluster.open-cluster-management.io/clustersets")
 _OPP_EVIDENCE_DIR="${ARTIFACT_DIR}/olm-evidence-pre-grc"
 typeset -i _OPP_ACTIVE=0
+typeset -i _OPP_QUERY_FAILED=0
 typeset -i _OPP_POLICY_COUNT=-1
-if oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" >/dev/null 2>&1; then
+# Declared at script scope, not inside the snapshot block: the post-suite
+# carrier reads it, so a declaration in the placement-present branch would
+# leave it unbound (nounset) whenever that branch is not taken.
+typeset -i _OPP_BASELINE_OK=0
+# Three-way placement probe. The previous `>/dev/null 2>&1` form collapsed
+# every failure into "this lane has no OPP placement": an API error, an RBAC
+# gap or a timeout then skipped the whole post-suite block, so the
+# relabel/detach regression INTEROP-9711 targets went unobserved on a green
+# step with no grc-placement-restore carrier row. The error text separates
+# the three states. A missing object or namespace, or a cluster without the
+# placements API, means this lane has no OPP placement (inactive, as before,
+# which keeps the non-OPP consumers of this step green). Any other failure is
+# an undetermined answer: it must surface as a failed check, not as silence.
+_OPP_QUERY_LOG="$(mktemp)"
+typeset -i _OPP_QUERY_RC=0
+oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" >/dev/null 2>"${_OPP_QUERY_LOG}" || _OPP_QUERY_RC=$?
+if (( _OPP_QUERY_RC == 0 )); then
     _OPP_ACTIVE=1
     mkdir -p "${_OPP_EVIDENCE_DIR}"
     # 1. OperatorPolicy inventory (targeted extraction, INTEROP-9525 style:
@@ -239,7 +256,22 @@ except Exception:
         mv "${_opp_tmp}" "${_opp_f}"
     done
     echo "OPP snapshot taken: ${_OPP_POLICY_COUNT} OperatorPolicy objects; labels and placement state in ${_OPP_EVIDENCE_DIR}"
+else
+    # The probe above did not answer yes or no. Treat the lane as OPP-shaped
+    # only if the error is not one of the "no such placement here" shapes.
+    if grep -qiE 'not[[:space:]]*found|doesn.t have a resource type|no matches for kind|could not find the requested resource' "${_OPP_QUERY_LOG}"; then
+        echo "No OPP placement in ${_OPP_PLACEMENT_NS} (oc get placement rc=${_OPP_QUERY_RC}); OPP checks inactive for this lane"
+    else
+        _OPP_QUERY_FAILED=1
+        mkdir -p "${_OPP_EVIDENCE_DIR}"
+        {
+            echo "oc get placement -n${_OPP_PLACEMENT_NS} ${_OPP_PLACEMENT_NAME} failed with rc=${_OPP_QUERY_RC}"
+            sed 's/^/  /' "${_OPP_QUERY_LOG}"
+        } > "${_OPP_EVIDENCE_DIR}/00-placement-query-error.log" 2>&1 || true
+        echo "ERROR: OPP placement query failed (rc=${_OPP_QUERY_RC}); a failed query is not a lane without OPP, so the OPP checks will run and report this as a failure. See co-located 00-placement-query-error.log" >&2
+    fi
 fi
+rm -f "${_OPP_QUERY_LOG}"
 
 # Run the test suite with all output captured to a temp file.
 _grc_raw_log="$(mktemp)"
@@ -326,7 +358,7 @@ set -x
 # rows so prow and the run gates see the outcome. The emitted suite name is
 # short; on lanes with MAP_TESTS=true the ExitTrap merge prefixes it with
 # the Component Readiness prefix for this step.
-if [[ "${_OPP_ACTIVE}" -eq 1 ]]; then
+if [[ "${_OPP_ACTIVE}" -eq 1 || "${_OPP_QUERY_FAILED}" -eq 1 ]]; then
     _opp_xesc() {
         printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g' -e "s/'/\&apos;/g"
     }
@@ -451,7 +483,11 @@ print(json.dumps(result, indent=2))
         echo "<testsuite name=\"grc-placement-restore\" tests=\"3\" failures=\"${_opp_failures}\">"
         echo "  <testcase classname=\"grc-placement-restore\" name=\"operatorpolicy-inventory-nonempty\">"
         if [[ "${_opp_inv_ok}" -ne 1 ]]; then
-            echo "    <failure message=\"$(_opp_xesc "operatorpolicy inventory at pre-GRC capture: ${_OPP_POLICY_COUNT} objects")\"></failure>"
+            if [[ "${_OPP_QUERY_FAILED}" -eq 1 ]]; then
+                echo "    <failure message=\"$(_opp_xesc "pre-GRC capture never ran: the OPP placement query failed (rc=${_OPP_QUERY_RC}); see 00-placement-query-error.log")\"></failure>"
+            else
+                echo "    <failure message=\"$(_opp_xesc "operatorpolicy inventory at pre-GRC capture: ${_OPP_POLICY_COUNT} objects")\"></failure>"
+            fi
         fi
         echo "  </testcase>"
         echo "  <testcase classname=\"grc-placement-restore\" name=\"label-baseline-readable\">"
