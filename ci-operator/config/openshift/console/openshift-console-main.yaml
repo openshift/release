@@ -201,17 +201,20 @@ tests:
       commands: |
         export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
         # TODO: temporary HyperShift compatibility for the console e2e scripts,
-        # kept here until contrib/create-user.sh supports hosted clusters. Run
-        # the suite this way to identify which tests need disabling under HCP.
-        # oauths.config is immutable on hosted clusters: the htpasswd IDP is
-        # configured on the HostedCluster in the management cluster instead.
-        # The kubeadmin password is not exported to $SHARED_DIR by the
-        # hypershift-aws chains and rotates when the OAuth configuration
-        # changes, so it is fetched and verified only after the IDP is ready.
+        # kept here until they support hosted clusters. Run the suite this way
+        # to identify which tests need disabling under HCP. oauths.config is
+        # immutable on hosted clusters, so the htpasswd IDP is configured on
+        # the HostedCluster in the management cluster instead. Configuring an
+        # IDP disables the kubeadmin user on HyperShift, so the admin persona
+        # logs in as an e2e-admin user in the same IDP with cluster-admin.
         MGMT_KUBECONFIG="${SHARED_DIR}/kubeconfig"
         CLUSTER_NAME="$(cat "${SHARED_DIR}/cluster-name")"
-        oc --kubeconfig="${MGMT_KUBECONFIG}" apply -f <(sed 's/namespace: openshift-config/namespace: clusters/' frontend/packages/console-shared/src/test-data/htpasswd-secret.yaml)
+        htpasswd_file=/tmp/htpasswd
+        grep 'htpasswd:' frontend/packages/console-shared/src/test-data/htpasswd-secret.yaml | awk '{print $2}' | base64 -d > "${htpasswd_file}"
+        printf 'e2e-admin:%s\n' "$(openssl passwd -apr1 test)" >> "${htpasswd_file}"
+        oc --kubeconfig="${MGMT_KUBECONFIG}" -n clusters create secret generic htpass-secret --from-file=htpasswd="${htpasswd_file}" --dry-run=client -o yaml | oc --kubeconfig="${MGMT_KUBECONFIG}" apply -f -
         oc --kubeconfig="${MGMT_KUBECONFIG}" patch hostedcluster -n clusters "${CLUSTER_NAME}" --type=merge -p '{"spec":{"configuration":{"oauth":{"identityProviders":[{"name":"test","mappingMethod":"claim","type":"HTPasswd","htpasswd":{"fileData":{"name":"htpass-secret"}}}]}}}}'
+        oc create clusterrolebinding e2e-admin --clusterrole=cluster-admin --user=e2e-admin --dry-run=client -o yaml | oc apply -f -
         for i in $(seq 1 24); do
           cp "${KUBECONFIG}" /tmp/login-check.kubeconfig
           if oc --kubeconfig=/tmp/login-check.kubeconfig login --username=test --password=test >/dev/null 2>&1; then
@@ -220,26 +223,24 @@ tests:
           fi
           sleep 15
         done
-        kubeadmin_verified=false
+        admin_verified=false
         for i in $(seq 1 12); do
-          # Disable tracing due to password handling
-          set +x
-          oc --kubeconfig="${MGMT_KUBECONFIG}" -n clusters get secret "${CLUSTER_NAME}-kubeadmin-password" -o jsonpath='{.data.password}' | base64 -d > /tmp/kubeadmin-password
-          set -x
-          cp "${KUBECONFIG}" /tmp/kubeadmin-check.kubeconfig
-          if oc --kubeconfig=/tmp/kubeadmin-check.kubeconfig login --username=kubeadmin --password="$(cat /tmp/kubeadmin-password)" >/dev/null 2>&1; then
-            kubeadmin_verified=true
-            echo "kubeadmin password verified"
+          cp "${KUBECONFIG}" /tmp/admin-check.kubeconfig
+          if oc --kubeconfig=/tmp/admin-check.kubeconfig login --username=e2e-admin --password=test >/dev/null 2>&1; then
+            admin_verified=true
+            echo "admin user verified"
             break
           fi
-          echo "kubeadmin password not valid yet, retrying"
+          echo "admin user not able to log in yet, retrying"
           sleep 15
         done
-        if [ "${kubeadmin_verified}" != "true" ]; then
-          echo "kubeadmin password could not be verified"
+        if [ "${admin_verified}" != "true" ]; then
+          echo "admin user could not be verified"
           exit 1
         fi
+        echo test > /tmp/kubeadmin-password
         export KUBEADMIN_PASSWORD_FILE=/tmp/kubeadmin-password
+        export OPENSHIFT_USERNAME=e2e-admin
         # IDP is configured above; stub out create-user.sh, which cannot patch
         # the immutable guest oauths.config on hosted clusters.
         cat > contrib/create-user.sh <<'EOS'
