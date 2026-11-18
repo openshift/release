@@ -22,7 +22,7 @@ oc-mirror, OMR, OSUS, Quay, RHOSDT and zero-trust. These jobs are required;
 validation failures block matching metadata changes from merging. Ensure metadata,
 source access and RPA mappings are ready for each stream.
 
-A job can run when its branch selector matches the PR's target branch and the PR changes metadata matched by `run_if_changed`.
+Jobs run for every PR targeting a configured branch, including metadata renamed outside the expected directories.
 The existing 16 ACM/MCE jobs remain required; their validation failures block
 merging. Each additional branch needs its own CI
 configuration referencing the same workflow. New y-streams
@@ -137,3 +137,10 @@ matching branches receive protection independently of job onboarding. After
 branchprotector reconciles, verify `allow_force_pushes.enabled: false` and
 `enforce_admins.enabled: true` using GitHub's branch-protection API. No force-push
 attempt is needed. Rehearsal does not apply branch protection.
+
+## LP Pyxis validation
+
+LP branch configurations set `VALIDATE_PYXIS: "true"` to check image and bundle
+delivery repositories for the expected product stream in `content_stream_tags`.
+The step clones `pyxis-repo-configs` and logs its revision. This check defaults
+to disabled, so OCP jobs using the shared workflow do not run Pyxis validation.
