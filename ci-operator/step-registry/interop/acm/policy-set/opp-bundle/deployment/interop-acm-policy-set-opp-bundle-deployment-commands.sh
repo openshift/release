@@ -236,7 +236,9 @@ typeset -i expectedMinPolicies=4
 typeset -i pollDeadline=$((SECONDS + 600))
 typeset -i policyGateStart=0
 policyGateStart=$(date +%s)
-until (( $(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length') >= expectedMinPolicies )); do
+typeset policyCountJson=''
+typeset -i policyCountRc=0
+until policyCountJson="$(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || policyCountRc=$?; (( policyCountRc != 0 )) && { printf '%s\n' "Error: failed to query policies (rc=${policyCountRc})" >&2; RecordResult "failed-policies-query" "failed" "oc get policies query failed with exit code ${policyCountRc}" "$(( $(date +%s) - policyGateStart ))"; exit 1; }; (( policyCountJson >= expectedMinPolicies )); do
   ((SECONDS > pollDeadline)) && {
     printf '%s\n' "Error: fewer than ${expectedMinPolicies} policies after 10 minutes" >&2
     RecordResult "openshift-plus-policy-set-deployed" "failed" "Fewer than ${expectedMinPolicies} policies in namespace policies after 10 minutes" "$(( $(date +%s) - policyGateStart ))"
