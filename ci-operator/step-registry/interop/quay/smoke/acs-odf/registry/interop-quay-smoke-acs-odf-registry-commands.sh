@@ -526,8 +526,8 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
     # The organization request is reported, not swallowed: the response body
     # and the HTTP status are both kept, so a rejected request cannot continue
     # as a success and leave the push lane without an organization.  The body
-    # of a rejected request is what names the rejection, so this request does
-    # not use -f: the status is appended with -w and split off instead.
+    # of a rejected request names the rejection, so this request fails with
+    # --fail-with-body (never -f, which drops it) and -w keeps the status.
     typeset orgRaw=''
     typeset orgResponse=''
     typeset orgHttp='000'
@@ -537,7 +537,7 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
         # session cookie and the CSRF token refreshed for that session,
         # otherwise this request goes out with an empty bearer header and the
         # push below has no organization.
-        orgRaw="$(curl -sSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
+        orgRaw="$(curl -sSL --fail-with-body "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
             -w '\n%{http_code}' \
             "https://${QUAY_HOST}/api/v1/organization/" \
             -b "${cookieFile}" \
@@ -546,7 +546,7 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
     else
         # The bearer token is handed to curl through a process-substitution
         # config, so it never appears in the curl argv.
-        orgRaw="$(curl -sSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
+        orgRaw="$(curl -sSL --fail-with-body "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
             -w '\n%{http_code}' \
             "https://${QUAY_HOST}/api/v1/organization/" \
             --config <(printf 'header = "Authorization: Bearer %s"\n' "${QUAY_TOKEN}") \
