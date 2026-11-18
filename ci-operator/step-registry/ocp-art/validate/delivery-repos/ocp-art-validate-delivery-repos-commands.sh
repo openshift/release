@@ -122,12 +122,12 @@ while IFS= read -r file; do
             while IFS= read -r repo; do
                 if [ -n "${repo}" ]; then
                     # Check if repo exists in stage
-                    if ! echo "${GITLAB_REPOS_STAGE}" | grep -q "^${repo}$"; then
+                    if ! grep -Fxq -- "${repo}" <<< "${GITLAB_REPOS_STAGE}"; then
                         MISSING_DELIVERY_REPOS_STAGE="${MISSING_DELIVERY_REPOS_STAGE}${repo}\n"
                         ALL_MISSING_REPOS="${ALL_MISSING_REPOS}${repo} (from ${file} - missing in stage)\n"
                     fi
                     # Check if repo exists in prod
-                    if ! echo "${GITLAB_REPOS_PROD}" | grep -q "^${repo}$"; then
+                    if ! grep -Fxq -- "${repo}" <<< "${GITLAB_REPOS_PROD}"; then
                         MISSING_DELIVERY_REPOS_PROD="${MISSING_DELIVERY_REPOS_PROD}${repo}\n"
                         ALL_MISSING_REPOS="${ALL_MISSING_REPOS}${repo} (from ${file} - missing in prod)\n"
                     fi
@@ -139,12 +139,12 @@ while IFS= read -r file; do
         if [ -n "${BUNDLE_DELIVERY_REPO}" ]; then
             HAS_REPOS=true
             # Check if repo exists in stage
-            if ! echo "${GITLAB_REPOS_STAGE}" | grep -q "^${BUNDLE_DELIVERY_REPO}$"; then
+            if ! grep -Fxq -- "${BUNDLE_DELIVERY_REPO}" <<< "${GITLAB_REPOS_STAGE}"; then
                 MISSING_BUNDLE_REPO_STAGE="${BUNDLE_DELIVERY_REPO}"
                 ALL_MISSING_REPOS="${ALL_MISSING_REPOS}${BUNDLE_DELIVERY_REPO} (from ${file} - missing in stage)\n"
             fi
             # Check if repo exists in prod
-            if ! echo "${GITLAB_REPOS_PROD}" | grep -q "^${BUNDLE_DELIVERY_REPO}$"; then
+            if ! grep -Fxq -- "${BUNDLE_DELIVERY_REPO}" <<< "${GITLAB_REPOS_PROD}"; then
                 MISSING_BUNDLE_REPO_PROD="${BUNDLE_DELIVERY_REPO}"
                 ALL_MISSING_REPOS="${ALL_MISSING_REPOS}${BUNDLE_DELIVERY_REPO} (from ${file} - missing in prod)\n"
             fi
@@ -158,13 +158,13 @@ while IFS= read -r file; do
         MISSING_COMPONENT_PROD=false
         
         # Check if component exists in stage
-        if ! echo "${GITLAB_COMPONENTS_STAGE}" | grep -q "^${expected_component}$"; then
+        if ! grep -Fxq -- "${expected_component}" <<< "${GITLAB_COMPONENTS_STAGE}"; then
             MISSING_COMPONENT_STAGE=true
             ALL_MISSING_COMPONENTS="${ALL_MISSING_COMPONENTS}${expected_component} (from ${file} - missing in stage)\n"
         fi
         
         # Check if component exists in prod
-        if ! echo "${GITLAB_COMPONENTS_PROD}" | grep -q "^${expected_component}$"; then
+        if ! grep -Fxq -- "${expected_component}" <<< "${GITLAB_COMPONENTS_PROD}"; then
             MISSING_COMPONENT_PROD=true
             ALL_MISSING_COMPONENTS="${ALL_MISSING_COMPONENTS}${expected_component} (from ${file} - missing in prod)\n"
         fi
