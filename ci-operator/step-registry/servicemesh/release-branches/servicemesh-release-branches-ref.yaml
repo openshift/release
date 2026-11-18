@@ -1,0 +1,54 @@
+ref:
+  as: servicemesh-release-branches
+  from: src
+  commands: servicemesh-release-branches-commands.sh
+  env:
+  - name: RELEASE_COMPONENT
+    default: istio
+    documentation: Component repository to branch (istio, proxy, ztunnel, or sail-operator).
+  credentials:
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
+  resources:
+    requests:
+      cpu: 100m
+      memory: 1Gi
+  timeout: 1h0m0s
+  grace_period: 1m0s
+  documentation: |-
+    Create missing z-stream branches in openshift-service-mesh for the latest
+    stable upstream component tag X.Y.Z, including X.Y.0, of supported minor versions
+    1.30 and 1.31. Older patches are never backfilled. Istio, proxy, and ztunnel
+    use release-X.Y.Z. Sail-operator maps upstream 1.30 to downstream 3.4 and
+    1.31 to 3.5, and creates the highest existing downstream patch branch plus one
+    (starting at .0 if none exists) unless that branch already contains the tag.
+
+    The branch point is the merge-base of the tag and upstream release-X.Y: the
+    tagged commit itself, or for security releases tagged on a side branch, the
+    commit that side branch was cut from. The z-stream branch starts from the
+    last first-parent commit of midstream release-X.Y that does not contain the
+    first upstream commit after the branch point, so it keeps every midstream
+    change made before then and nothing after. Branches are only created once the
+    y-stream sync has merged the branch point.
+
+    When that commit does not already contain the tag, the tag is merged into it
+    locally first, after which the merge must share exactly the branch point with
+    upstream release-X.Y. Only Istio's proxy/ztunnel dependency pins are restored
+    after merging; other components use the upstream files. The branch is pushed
+    only once it is complete, so existing z-stream branches are never changed and
+    no pull requests are opened. Conflicts are never resolved automatically: the
+    branch is not created, an issue is opened, and the job fails until someone
+    pushes the branch.
+
+    TODO: A merged branch has not been tested. Security tag commits exist only on
+    upstream's side branch; their cherry-picks reach midstream release-X.Y after
+    the cut point, or not at all, so midstream CI never runs the merged tree. The
+    same applies when one sync merged the tag together with later changes. No
+    Prow jobs match release-X.Y.Z branches, so nothing tests them after creation
+    either. One option: open the tag merge PR into a temporary release-X.Y-<name>
+    branch, which release-X.Y presubmits match, and create release-X.Y.Z from it
+    once the PR merges.
+
+    The bot token needs contents and issues write permissions in the selected
+    openshift-service-mesh component. Requires git, gh, and jq.
