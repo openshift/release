@@ -208,7 +208,11 @@ function CheckOppCompatibility () {
 
         # If OPP_OPERATORS is set, only check operators listed in it
         if [[ -n "${OPP_OPERATORS:-}" ]]; then
-            if ! echo ",${OPP_OPERATORS}," | grep -q ",${opPrefix},"; then
+            # Exact membership test: the previous `grep -q ",${opPrefix},"`
+            # built a regex from environment-derived text, the same lookup
+            # this function stops doing for the CSV row below, so a `.` or
+            # `[` inside an operator prefix matched more than itself.
+            if [[ ",${OPP_OPERATORS}," != *",${opPrefix},"* ]]; then
                 : "INFO: ${opPrefix}: Skipping (not in OPP_OPERATORS)"
                 details="${details}${opPrefix}: skipped (not in OPP_OPERATORS); "
                 continue
@@ -233,7 +237,17 @@ function CheckOppCompatibility () {
         fi
 
         csvName="$(echo "${csvLine}" | awk '{print $2}')"
-        installedVersion="$(echo "${csvName}" | grep -oE '[0-9]+\.[0-9]+' | head -1)" || true
+        # CSV names are `<package>.v<major>.<minor>.<patch>[-suffix]`. Anchor
+        # on that shape: taking the first `M.N` token anywhere in the name
+        # read `foo-3.1-operator.v1.2.3` as 3.1 and produced a wrong floor
+        # verdict. The bash regex also drops the `grep -o | head -1` pair,
+        # whose SIGPIPE under `set -o pipefail` needed the trailing `|| true`.
+        installedVersion=""
+        if [[ "${csvName}" =~ \.v([0-9]+)\.([0-9]+) ]]; then
+            installedVersion="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+        elif [[ "${csvName}" =~ [^0-9]([0-9]+)\.([0-9]+) ]]; then
+            installedVersion="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+        fi
         if [[ -z "${installedVersion}" ]]; then
             : "Operator ${opPrefix}: could not parse version from CSV ${csvName}"
             details="${details}${opPrefix}: version unparseable from ${csvName}; "
