@@ -29,14 +29,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-in-cluster-install
+- as: e2e
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 1h0m0s
+    timeout: 1h30m0s
     version: "4.22"
+  skip_if_only_changed: ^(\.|docs/|tools/|OWNERS$|OWNERS_ALIASES$|catalog/|catalog\.Dockerfile$|config/manifests/prod/kustomization\.yaml$)|\.md$
   steps:
     test:
     - as: install
@@ -52,6 +53,16 @@ tests:
       resources:
         requests:
           cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        export GOFLAGS=-mod=mod
+        OPERATOR_NAMESPACE=hyperfleet make test-e2e-ci
+      from: src
+      resources:
+        requests:
+          cpu: "4"
+          memory: 2Gi
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
