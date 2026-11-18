@@ -70,7 +70,9 @@ When modifying CI jobs in `ci-operator/config/`:
 ```bash
 make update
 ```
-This validates config, generates Prow job configs, and sanitizes job definitions.
+`make update` runs `make jobs`, which starts with `ci-operator-checkconfig`,
+then generates and sanitizes Prow jobs. It does not run Prow's `make checkconfig`;
+run that separately to validate Prow configuration.
 
 ### Validation
 ```bash
@@ -87,10 +89,17 @@ make new-repo
 Interactive tool to configure CI workflow for a new component repository. Automatically runs `make update` afterwards.
 
 ### Step Registry Validation
+
 ```bash
 make validate-step-registry
 ```
-Validates step registry definitions for correctness.
+
+Runs `ci-operator-checkconfig` across `ci-operator/config/` and the step
+registry, including the cluster-profile and cluster-claim-owner configuration.
+It is broader than validating only the edited step and does not run the tests.
+The matching `ci/prow/ci-operator-config` presubmit runs the same checker. The
+separate `ci/prow/ci-operator-registry` presubmit runs configresolver in-cluster;
+this local target does not exercise that path.
 
 ### Release Controllers
 ```bash
@@ -184,14 +193,23 @@ The release controller configurations that define acceptance gates for these str
 1. Create files in `ci-operator/step-registry/<component>/`:
    - `<name>-ref.yaml` (step metadata)
    - `<name>-commands.sh` (script to execute)
-2. Run `make registry-metadata` to update metadata
-3. Reference the step in workflow chains or directly in configs
+2. Reference the step in a workflow chain or workflow, or directly in a
+   ci-operator config if wiring it into a job.
+3. For a registry-only change that does not edit `ci-operator/config/`, run
+   `make registry-metadata` and `make validate-step-registry`.
+4. If wiring the step into a ci-operator config, run `make update` and then
+   `make checkconfig`. `make update` includes the config/registry validation and
+   registry metadata generation.
 
 ### Creating a New Workflow
 1. Define individual steps if needed
 2. Create a workflow file: `<name>-workflow.yaml`
 3. Define `pre`, `test`, and `post` phases using existing steps/chains
-4. Run `make validate-step-registry` to check correctness
+4. For a registry-only workflow change, run `make registry-metadata` and
+   `make validate-step-registry`. If you also wire the workflow into a
+   ci-operator config, run `make update` and then `make checkconfig`.
+   `make update` includes the config/registry validation and metadata
+   generation.
 
 ### Creating Variant Periodic Configurations
 CI analytical tooling requires release specific configuration.   Branch fast-forwarding from main to the active release duplicates configuration and job execution for periodics defined in the default configuration.  For jobs producing test data that will be processed by CI analytical tooling, periodic jobs should be configured separately from the main config:

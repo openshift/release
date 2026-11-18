@@ -120,8 +120,10 @@ presence is the sole signal.
    `best_effort: true`.
 5. To actually run it, set `TESTS_<SUITE_NAME>_ENABLE: "true"` on the desired
    test(s) in the configs — that's a config change; see the config AGENTS.md.
-6. `make registry-metadata && make jobs` (checkconfig validates the registry and
-   the image graph).
+6. For a registry-only suite or chain change, run
+   `make registry-metadata && make validate-step-registry`. If you also wire
+   the suite into ci-operator configs, run `make update && make checkconfig`;
+   `make update` includes config/registry validation and metadata generation.
 
 ## Reference example: `kata-upstream`
 

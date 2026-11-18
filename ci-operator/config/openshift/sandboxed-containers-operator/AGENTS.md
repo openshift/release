@@ -204,11 +204,18 @@ and `make jobs` and commit.
 Always regenerate and validate after editing configs:
 ```bash
 make ci-operator-config   # determinize config formatting & key ordering
-make jobs                 # prowgen + checkconfig + sanitize
+make jobs                 # ci-operator-checkconfig + prowgen + sanitize
+make checkconfig          # validate Prow configuration
 ```
-`make jobs` runs **`checkconfig`**, which resolves the image graph — this is what
-catches `from:`/`build_root` mistakes locally. Commit the edited configs **and**
-any regenerated files under `ci-operator/jobs/`. Never hand-edit `ci-operator/jobs/`.
+`make jobs` first runs `ci-operator-checkconfig`, which validates config-to-
+registry references and the static image graph (`defaults.FromConfigStatic`),
+catching `from:`/`build_root` mistakes locally. The in-cluster
+`ci/prow/ci-operator-registry` job runs configresolver with a service account; it
+loads the config and registry and checks in-cluster access, then exits before
+integrated image-stream lookup. `make jobs` then generates and sanitizes Prow
+jobs. The separate `make checkconfig` target validates Prow configuration.
+Commit the edited configs **and** any regenerated files under
+`ci-operator/jobs/`. Never hand-edit `ci-operator/jobs/`.
 
 Notes:
 - openshift/release presubmits are rehearsed with **`/pj-rehearse <job-name>`**,

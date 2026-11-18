@@ -352,8 +352,10 @@ python3 hack/claude-agent-eval/sync_commands.py
 python3 hack/claude-agent-eval/sync_commands.py --check
 bash hack/claude-agent-eval/test-container.sh
 pylint --rcfile=hack/.pylintrc --ignore=lib,image-mirroring --persistent=n hack
-make validate-step-registry
+# Optional repo-wide metadata and ci-operator config/registry checks
+# (not needed for eval-only Python edits).
 make registry-metadata
+make validate-step-registry
 ```
 
 Container tests default to the promoted `claude-ai-helpers:latest` CI image;

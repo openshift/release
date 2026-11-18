@@ -74,26 +74,31 @@ Common `from` alias values: `cli`, `tests`, or another image alias from the cons
 
 ## Validate and regenerate
 
+For a step-only change, regenerate metadata and run the repo-wide local check.
+It covers all ci-operator configs, the registry, cluster profiles, and
+cluster-claim owners; it does not run test steps and may report unrelated config
+problems:
+
 ```bash
 make registry-metadata
+make validate-step-registry
 ```
 
-Registry load check (optional; `make validate-step-registry` may fail if the local configresolver image no longer accepts `--prow-config`):
-
-```bash
-podman run --rm \
-  -v "$(pwd)/ci-operator/config:/config:z" \
-  -v "$(pwd)/ci-operator/step-registry:/step-registry:z" \
-  quay.io/openshift/ci-public:ci_ci-operator-configresolver_latest \
-  --config /config --registry /step-registry --validate-only
-```
-
-If wiring into a ci-operator config in the same PR, also:
+For a config-wired change in the same PR, run:
 
 ```bash
 make update
 make checkconfig
 ```
+
+`make update` runs `make jobs` (including `ci-operator-checkconfig`), then runs
+`make ci-operator-config`, `make prow-config`, `make registry-metadata`,
+`make release-controllers`, and `make boskos-config`. It can update generated
+files outside the component being changed, so review the full diff. When running
+`make update`, skip the standalone commands above to avoid repeating validation
+and metadata generation. The `ci/prow/step-registry-metadata` presubmit checks
+that generated metadata is current. `make checkconfig` remains a separate Prow
+configuration check.
 
 ## Wire into a test (same or follow-up PR)
 
@@ -118,7 +123,10 @@ This skill scaffolds **steps** only. For chains/workflows:
 - **Chain**: new `*-chain.yaml` listing `- ref:` / `- chain:` steps; no commands script.
 - **Workflow**: new `*-workflow.yaml` with `pre` / `test` / `post` phases.
 
-Copy structure from an existing chain/workflow in the same platform area; run `make validate-step-registry`.
+Copy structure from an existing chain/workflow in the same platform area. For a
+chain-only or workflow-only change, run `make registry-metadata` and
+`make validate-step-registry`. Those commands are sufficient unless you are
+also changing ci-operator configs or regenerating Prow jobs.
 
 ## Checklist
 
@@ -126,5 +134,7 @@ Copy structure from an existing chain/workflow in the same platform area; run `m
 - [ ] `-ref.yaml` + `-commands.sh` created and named consistently
 - [ ] documentation field describes behavior
 - [ ] secrets handled safely in shell
-- [ ] `make registry-metadata` pass (and optional configresolver `--validate-only` above)
+- [ ] For a registry-only change, `make registry-metadata` and
+      `make validate-step-registry` pass; for a config-wired change, run
+      `make update` and `make checkconfig`
 - [ ] referenced from config/chain/workflow if intended for use

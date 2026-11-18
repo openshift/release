@@ -168,12 +168,13 @@ image must be either:
 
 ```bash
 make registry-metadata    # regenerate step metadata after adding/renaming steps
-make jobs                 # runs checkconfig, which loads & validates the registry
+make validate-step-registry  # validate ci-operator configs and the registry
 ```
-`checkconfig` (run by `make jobs`) is the authoritative validation — it resolves
-refs/chains/workflows and the image graph. Note: `make validate-step-registry`
-may fail in some environments with `flag provided but not defined: -prow-config`
-(a tooling/container mismatch, not your change); rely on `checkconfig`.
+`make validate-step-registry` runs `ci-operator-checkconfig` against the full
+ci-operator config directory and registry, including cluster-profile and
+cluster-claim-owner configuration. `make jobs` runs this same validation first,
+then regenerates and sanitizes Prow jobs. The separate `make checkconfig` target
+validates Prow configuration.
 
 ## Keeping This File Current
 
