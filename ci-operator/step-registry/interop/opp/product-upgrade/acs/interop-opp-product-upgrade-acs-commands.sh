@@ -431,7 +431,7 @@ _detect_known_issue() {
     safe_desc="$(_xml_escape "${bug_description}")"
     safe_error="$(_xml_escape "${error_output:0:500}")"
 
-    echo ">>> KNOWN ISSUE: ${bug_id} — ${bug_description}"
+    echo ">>> KNOWN ISSUE: ${bug_id}: ${bug_description}"
     echo ">>> Marking as SKIPPED (tracked: https://issues.redhat.com/browse/${bug_id})"
 
     cat <<JUNIT_EOF >> "${ARTIFACT_DIR}/junit_known_issues.xml"
