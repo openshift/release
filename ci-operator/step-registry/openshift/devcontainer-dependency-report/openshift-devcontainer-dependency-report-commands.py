@@ -8,6 +8,7 @@ import datetime as dt
 import json
 import os
 import re
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -122,6 +123,84 @@ def resolve_github_revision(repository: str, ref: str, fetcher: Fetcher) -> str:
     return revision
 
 
+def job_spec_repository_revision(repository: str, requested_ref: str) -> str | None:
+    job_spec = os.environ.get("JOB_SPEC")
+    if not job_spec:
+        return None
+    try:
+        spec = json.loads(job_spec)
+    except json.JSONDecodeError as exc:
+        raise CheckError(f"JOB_SPEC is not valid JSON: {exc}") from exc
+    if not isinstance(spec, dict):
+        raise CheckError("JOB_SPEC root is not an object")
+    refs: list[dict[str, Any]] = []
+    if isinstance(spec.get("refs"), dict):
+        refs.append(spec["refs"])
+    extra_refs = spec.get("extra_refs", [])
+    if not isinstance(extra_refs, list) or not all(
+        isinstance(ref, dict) for ref in extra_refs
+    ):
+        raise CheckError("JOB_SPEC extra_refs is not a list of references")
+    refs.extend(extra_refs)
+    matches = [
+        ref for ref in refs if f"{ref.get('org')}/{ref.get('repo')}" == repository
+    ]
+    if len(matches) != 1:
+        raise CheckError(
+            f"JOB_SPEC has {len(matches)} references for selected repository {repository}; "
+            "exactly one is required"
+        )
+    selected = matches[0]
+    if selected.get("base_ref") != requested_ref:
+        raise CheckError(
+            f"JOB_SPEC selected {repository}@{selected.get('base_ref')}, "
+            f"but policy requires {requested_ref}"
+        )
+    revision = selected.get("base_sha")
+    if not isinstance(revision, str) or not COMMIT_SHA.fullmatch(revision):
+        raise CheckError(
+            f"JOB_SPEC has no valid exact revision for selected repository {repository}"
+        )
+    return revision
+
+
+def local_repository_revision(repository_root: Path) -> str:
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(repository_root), "rev-parse", "HEAD"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise CheckError(
+            f"could not determine local repository revision: {exc}"
+        ) from exc
+    revision = completed.stdout.strip()
+    if completed.returncode != 0 or not COMMIT_SHA.fullmatch(revision):
+        raise CheckError(
+            "could not determine an exact revision for the local repository"
+        )
+    return revision
+
+
+def selected_repository_revision(
+    repository: str,
+    requested_ref: str,
+    repository_root: Path,
+    explicit_revision: str | None,
+) -> str:
+    if explicit_revision:
+        if not COMMIT_SHA.fullmatch(explicit_revision):
+            raise CheckError("--repository-revision must be a 40-character commit SHA")
+        return explicit_revision
+    job_revision = job_spec_repository_revision(repository, requested_ref)
+    if job_revision:
+        return job_revision
+    return local_repository_revision(repository_root)
+
+
 def rehearsal_policy_source(fetcher: Fetcher) -> tuple[str, str] | None:
     job_spec = os.environ.get("JOB_SPEC")
     if not job_spec:
@@ -130,6 +209,8 @@ def rehearsal_policy_source(fetcher: Fetcher) -> tuple[str, str] | None:
         spec = json.loads(job_spec)
     except json.JSONDecodeError as exc:
         raise CheckError(f"JOB_SPEC is not valid JSON: {exc}") from exc
+    if not isinstance(spec, dict):
+        raise CheckError("JOB_SPEC root is not an object")
     refs = spec.get("refs")
     if not isinstance(refs, dict):
         return None
@@ -417,7 +498,10 @@ def validate_config(config: dict[str, Any]) -> None:
 
 
 def selected_config(
-    config: dict[str, Any], repository_name: str, fetcher: Fetcher
+    config: dict[str, Any],
+    repository_name: str,
+    repository_root: Path,
+    explicit_revision: str | None,
 ) -> tuple[dict[str, Any], str, str]:
     validate_config(config)
     matches = [
@@ -431,22 +515,50 @@ def selected_config(
         )
     repository = dict(matches[0])
     requested_ref = repository["ref"]
-    revision = resolve_github_revision(repository_name, requested_ref, fetcher)
-    repository["revision"] = revision
-    repository["raw_base"] = (
-        f"https://raw.githubusercontent.com/{repository_name}/{revision}"
+    revision = selected_repository_revision(
+        repository_name, requested_ref, repository_root, explicit_revision
     )
+    repository["revision"] = revision
     return {**config, "repositories": [repository]}, requested_ref, revision
 
 
-def check(config: dict[str, Any], fetcher: Fetcher) -> list[dict[str, Any]]:
+def repository_file(repository_root: Path, file_path: str) -> Path:
+    relative = Path(file_path)
+    if relative.is_absolute() or ".." in relative.parts:
+        raise CheckError(f"repository file must be a safe relative path: {file_path!r}")
+    root = repository_root.resolve()
+    candidate = (root / relative).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError as exc:
+        raise CheckError(
+            f"repository file escapes the local workspace: {file_path!r}"
+        ) from exc
+    return candidate
+
+
+def ensure_output_outside_repository(output_dir: Path, repository_root: Path) -> None:
+    root = repository_root.resolve()
+    output = output_dir.resolve()
+    try:
+        output.relative_to(root)
+    except ValueError:
+        return
+    raise CheckError(
+        f"output directory {output} is inside target repository {root}; refusing to write"
+    )
+
+
+def check(
+    config: dict[str, Any], fetcher: Fetcher, repository_root: Path
+) -> list[dict[str, Any]]:
+    if not repository_root.is_dir():
+        raise CheckError(
+            f"target repository workspace does not exist: {repository_root}"
+        )
     results: list[dict[str, Any]] = []
     source_cache: dict[tuple[str, str, str], tuple[str, tuple[int, int, int]]] = {}
     for repository in config["repositories"]:
-        raw_base = repository.get(
-            "raw_base",
-            f"https://raw.githubusercontent.com/{repository['name']}/{repository['ref']}",
-        )
         file_cache: dict[str, str | CheckError] = {}
         for dependency in repository["dependencies"]:
             file_path = dependency["file"]
@@ -469,11 +581,13 @@ def check(config: dict[str, Any], fetcher: Fetcher) -> list[dict[str, Any]]:
             try:
                 if file_path not in file_cache:
                     try:
-                        file_cache[file_path] = fetcher.get(
-                            f"{raw_base}/{file_path}", as_json=False
+                        file_cache[file_path] = repository_file(
+                            repository_root, file_path
+                        ).read_text(encoding="utf-8")
+                    except (CheckError, OSError, UnicodeError) as exc:
+                        file_cache[file_path] = CheckError(
+                            f"could not read local repository file {file_path}: {exc}"
                         )
-                    except CheckError as exc:
-                        file_cache[file_path] = exc
                 content = file_cache[file_path]
                 if isinstance(content, CheckError):
                     raise content
@@ -621,6 +735,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         default=os.environ.get("DEVCONTAINER_DEPENDENCY_REPOSITORY"),
         help="one public repository named in the shared policy",
     )
+    parser.add_argument(
+        "--repository-root",
+        default=os.environ.get("DEVCONTAINER_DEPENDENCY_ROOT", "/workspace"),
+        type=Path,
+        help="local checkout of the selected repository (default: /workspace)",
+    )
+    parser.add_argument(
+        "--repository-revision",
+        help="exact local repository commit (normally read from JOB_SPEC or git)",
+    )
     parser.add_argument("--config", type=Path, help="use a local policy file")
     parser.add_argument(
         "--policy-revision",
@@ -665,9 +789,13 @@ def main(argv: list[str] | None = None) -> int:
             )
         config = json.loads(config_text)
         config, requested_ref, repository_revision = selected_config(
-            config, args.repository, fetcher
+            config,
+            args.repository,
+            args.repository_root,
+            args.repository_revision,
         )
-        results = check(config, fetcher)
+        ensure_output_outside_repository(args.output_dir, args.repository_root)
+        results = check(config, fetcher, args.repository_root)
     except (OSError, json.JSONDecodeError, CheckError) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2
