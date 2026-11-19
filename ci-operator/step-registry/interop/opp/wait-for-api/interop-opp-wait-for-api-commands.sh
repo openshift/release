@@ -33,7 +33,7 @@ _junit_write() {
         printf '  <properties>\n'
         printf '    <property name="timeout" value="%s"/>\n' "${_timeout_val}"
         printf '  </properties>\n'
-        printf '  <testcase name="cluster-api-reachable" classname="interop.opp.wait-for-api">%s\n  </testcase>\n' "${case_body}"
+        printf '  <testcase name="cluster-api-reachable" classname="interop-opp-wait-for-api">%s\n  </testcase>\n' "${case_body}"
         printf '</testsuite>\n'
     } > "${_junit_file}"; then
         echo "JUNIT CONTRACT VIOLATION: carrier write failed: ${_junit_file}" >&2
