@@ -31,7 +31,7 @@ ACS_SELFTEST="${ACS_SELFTEST:-true}"
 
 # --- JUnit carrier machinery (deploy-acs precedent, D4/D6) -----------------
 _SUITE="lp-interop--OPP--stackrox-opp-smoke"
-_CLASSNAME="lp-interop.OPP.stackrox-opp-smoke"
+_CLASSNAME="stackrox-opp-smoke"
 _CARRIER="${ARTIFACT_DIR}/junit_${_SUITE}.xml"
 _junit_start=$(date +%s)
 declare -a _CASES=()
