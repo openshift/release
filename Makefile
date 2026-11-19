@@ -106,7 +106,6 @@ checkconfig:
 
 jobs:  ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
-	perl hack/generate-devcontainer-dependency-report-source-refs.pl --release-root .
 	$(MAKE) sanitize-prow-jobs
 	#$(MAKE) tide-config-manager-verified
 
