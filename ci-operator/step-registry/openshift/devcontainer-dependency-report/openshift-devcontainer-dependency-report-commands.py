@@ -1420,6 +1420,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     default_output = os.environ.get(
         "ARTIFACT_DIR", "artifacts/devcontainer-dependency-report"
     )
+    default_release_source = os.environ.get(
+        "DEVCONTAINER_DEPENDENCY_RELEASE_SOURCE_ROOT"
+    )
+    if default_release_source is None:
+        shared_dir = os.environ.get("SHARED_DIR")
+        default_release_source = (
+            str(Path(shared_dir) / "devcontainer-dependency-release-source")
+            if shared_dir
+            else "/release-source"
+        )
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--repository",
@@ -1434,15 +1444,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--release-source-root",
-        default=Path(
-            os.environ.get(
-                "DEVCONTAINER_DEPENDENCY_RELEASE_SOURCE_ROOT", "/release-source"
-            )
-        ),
+        default=Path(default_release_source),
         type=Path,
         help=(
             "local openshift/release checkout or CI source snapshot "
-            "(default: /release-source)"
+            "(default: staged SHARED_DIR snapshot in CI; /release-source locally)"
         ),
     )
     parser.add_argument("--output-dir", default=default_output, type=Path)

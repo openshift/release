@@ -5,10 +5,10 @@ scopes: the public `.devcontainer` definitions of `openshift/sippy`,
 `openshift/origin`, and `openshift-eng/ship-status-dash`; and the agentic CI
 tooling declarations owned by `openshift/release`. One weekly Prow periodic per
 target repository uses the same `openshift-devcontainer-dependency-report`
-workflow in that repository's `agentic-dev` image and publishes Markdown and
-JSON under its step artifacts. It does not build target repository containers,
-change dependencies, open pull requests, use credentials, or send external
-reports.
+workflow, with source staging isolated to a report-only pre-step and checking in
+that repository's existing `agentic-dev` image. It publishes Markdown and JSON
+under its step artifacts. It does not build target repository containers, change
+dependencies, open pull requests, use credentials, or send external reports.
 
 The checker and its policy data are a single co-versioned step-registry script.
 Dependency definitions are centralized once, while each repository declares a
@@ -56,14 +56,16 @@ committed content.
 The release-owned declarations are not fetched by the checker. For a normal
 periodic, generation adds an explicit `openshift/release` `extra_ref` while the
 target ref remains the Prow workdir. ci-operator clones both refs into its `src`
-image; the `agentic-dev` Dockerfile stages only the five selected release files,
-the actual release checkout `HEAD`, and their SHA256 manifest under
-`/release-source`. For a pull-request rehearsal, pj-rehearse uses the release PR
-as primary refs, drops the duplicate release `extra_ref`, and marks the remaining
-target ref as workdir. The same image stage therefore receives the candidate
-release checkout and the target checkout without duplicate clone paths. The
-checker validates the staged hashes before any public version lookup and records
-release provenance separately from the target checkout.
+image. A workflow pre-step running only for the report stages the five paths
+listed in `hack/devcontainer-dependency-report-source-files.txt`, the actual
+release checkout `HEAD`, and their SHA256 manifest in `SHARED_DIR`. Existing
+agentic jobs continue to use the unchanged `agentic-dev` image and do not require
+the release checkout. For a pull-request rehearsal, pj-rehearse uses the release
+PR as primary refs, drops the duplicate release `extra_ref`, and marks the
+remaining target ref as workdir. The pre-step therefore receives the candidate
+release checkout and target checkout without duplicate clone paths. The checker
+validates the staged hashes before any public version lookup and records release
+provenance separately from the target checkout.
 
 ## JSON report contract
 
@@ -112,5 +114,5 @@ must not be attributed to the target `HEAD`. This procedure is the dry run; the
 checker has no publication or mutation mode.
 
 The checker is syntax-compatible with Python 3.9 and uses only the standard
-library plus the `git` executable already installed in each current
-`agentic-dev` image.
+library plus the `git` executable already installed in the current source and
+`agentic-dev` images.
