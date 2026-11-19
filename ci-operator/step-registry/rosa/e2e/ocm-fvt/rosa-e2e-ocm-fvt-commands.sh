@@ -444,9 +444,16 @@ fi
 # a symlink's target, and refuses a directory, so it cannot delete a tree
 # something else owns. noclobber makes the redirection O_EXCL, so if rm could
 # not clear the name the write refuses rather than following a symlink left
-# behind or truncating what is there. Exclusivity here is against an existing
-# file or symlink, which is what can be at this name; a directory is refused
-# because a redirection cannot write one.
+# behind or truncating what is there. That exclusivity only covers a regular
+# file or a symlink to one, so the write is additionally chained to an unlink
+# that succeeded: a FIFO at this name is not refused by noclobber, and opening
+# one for writing blocks until something opens it for reading, which would
+# hang the step. Attempting the write only once the name is known to be free
+# avoids that, and leaves a name this step cannot clear - a directory, or
+# anything at all in an ARTIFACT_DIR it cannot write to - exactly as it found
+# it. A FIFO it can unlink is replaced like any other entry.
+# noclobber then covers only the gap between that unlink and this open, which
+# nothing in the job is expected to race for.
 #
 # chmod is the only thing that decides the mode, rather than sharing that job
 # with a umask, so the collector can read the result whatever the step
@@ -461,8 +468,8 @@ fi
 artifact_exit_code="${ARTIFACT_DIR}/ocm-fvt-exit-code"
 (
   set -o noclobber
-  rm -f -- "${artifact_exit_code}"
-  printf '%s\n' "${exit_code}" > "${artifact_exit_code}" &&
+  rm -f -- "${artifact_exit_code}" &&
+    printf '%s\n' "${exit_code}" > "${artifact_exit_code}" &&
     chmod 0644 -- "${artifact_exit_code}"
 ) 2>/dev/null || true
 
