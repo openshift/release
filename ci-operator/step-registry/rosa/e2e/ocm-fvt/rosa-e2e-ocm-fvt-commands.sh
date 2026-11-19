@@ -496,6 +496,19 @@ podman run \
   ocmtest "${ocmtest_args[@]}" || exit_code=$?
 trap 'cleanup_ocm_fvt || true; exit "${exit_code}"' EXIT
 (echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code") 2>/dev/null || true
+# Mirror into ARTIFACT_DIR as well: SHARED_DIR is not published to Prow GCS
+# artifacts, so without this the suite's own exit status survives only for the
+# in-job post steps that read SHARED_DIR. A run that ends before any test
+# executes publishes no report, and the step's finished.json cannot say whether
+# the suite exited non-zero or the step scaffolding around it did. Written
+# before publication so the audit manifest's handoff inventory lists it.
+# --remove-destination so an artifact name that already exists as a symlink is
+# replaced rather than written through, matching the O_NOFOLLOW writes the
+# collector uses; umask 022 so the Prow sidecar can read the result.
+(
+  umask 022
+  cp --remove-destination "${SHARED_DIR}/ocm-fvt-exit-code" "${ARTIFACT_DIR}/ocm-fvt-exit-code"
+) 2>/dev/null || true
 
 (
   umask 022
