@@ -2,11 +2,16 @@
 set -euo pipefail
 
 gather_skipped=false
+transfer_archive=''
 
 finish_step() {
   local result=$?
 
   trap - EXIT
+  if [[ -n "${transfer_archive}" ]]; then
+    rm -f -- "${transfer_archive}" || echo 'Gather warning: could not remove the temporary archive' >&2
+  fi
+
   if (( result != 0 )); then
     printf 'Gather step: failed (exit %s)\n' "${result}" >&2
   elif [[ "${gather_skipped}" == true ]]; then
@@ -18,6 +23,8 @@ finish_step() {
   exit "${result}"
 }
 trap finish_step EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
 
 echo 'Gather step: starting'
 
@@ -208,9 +215,36 @@ else
   echo 'Skipping cluster collection: no kubeconfig is available'
 fi
 printf 'Host and cluster collection finished with %s warnings\n' "${warnings}"
-chown -R ec2-user:ec2-user results
+
+# One archive avoids an SSH round trip for every small must-gather file.
+echo 'Packing collected files for transfer (5 minute limit)'
+if ! timeout --kill-after=10s 5m tar -czf gather.tar.gz -C results . 2>/dev/null; then
+  echo 'Could not pack the gathered files' >&2
+  exit 1
+fi
+if ! chown ec2-user:ec2-user gather.tar.gz 2>/dev/null; then
+  echo 'Could not set the archive ownership for transfer' >&2
+  exit 1
+fi
+echo 'Collected files packed successfully'
 REMOTE
 
-echo 'Copying collected files to CI artifacts'
 mkdir -p "${ARTIFACT_DIR}"
-scp "${SSHOPTS[@]}" -r "${remote}:${workdir}/results/." "${ARTIFACT_DIR}/"
+# Keep the uncensored archive outside Prow's upload directory, even if interrupted.
+transfer_archive=$(mktemp "${TMPDIR:-/tmp}/topology-gather.XXXXXX.tar.gz")
+echo 'Copying the gathered archive to CI (20 minute limit)'
+if timeout --kill-after=10s 20m scp "${SSHOPTS[@]}" "${remote}:${workdir}/gather.tar.gz" "${transfer_archive}" 2>/dev/null; then
+  echo 'Gathered archive copied successfully'
+else
+  result=$?
+  printf 'Could not copy the gathered archive (exit %s)\n' "${result}" >&2
+  exit "${result}"
+fi
+
+# Keep the existing browsable artifact paths and let Prow censor files individually.
+echo 'Unpacking gathered files into CI artifacts (5 minute limit)'
+if ! timeout --kill-after=10s 5m tar -xzf "${transfer_archive}" -C "${ARTIFACT_DIR}" --no-same-owner --no-same-permissions 2>/dev/null; then
+  echo 'Could not unpack the gathered archive' >&2
+  exit 1
+fi
+echo 'Gathered files unpacked successfully'
