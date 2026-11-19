@@ -230,17 +230,6 @@ ref:
     a failure in the step around it. The artifact holds that one integer and
     does not change it.
 
-
-    Both writes are best effort and neither can fail the step. The published
-    name is cleared before the copy, so a mirror that does not happen leaves no
-    artifact rather than whatever already held that name, which publication
-    would otherwise report as this run's status. Nothing in the step writes
-    that name twice, so such content can only have come from outside it.
-    Clearing it never
-    follows a symlink, never alters a symlink's target, and never removes a
-    directory; a directory at that name is left intact and nothing is
-    published over it.
-
     Both writes are best effort and neither can fail the step. They are
     independent: the published artifact is written from the status this run
     recorded in the step, not read back from the SHARED_DIR copy, so a
@@ -260,18 +249,18 @@ ref:
 
     The published name is cleared and then created, never written through.
     Clearing it never follows a symlink, never alters a symlink's target, and
-    never removes a directory. The write is exclusive against an existing file
-    or symlink, so when the name could not be cleared it is refused rather
-    than following a symlink left behind or truncating what is there, and a
-    directory at that name is left intact and nothing is published over it.
+    never removes a directory. The write happens only once that clearing has
+    succeeded, and is itself exclusive, so a name this step could not clear is
+    never opened: it is not followed if it is a symlink, not truncated if it
+    is a file, not written into if it is a FIFO - which would otherwise block
+    until a reader appeared - and a directory at that name is left intact.
+    Nothing is published over any of them.
 
     A name this step can neither clear nor write - a regular file in an
     ARTIFACT_DIR it cannot write to - is left exactly as it was, so what is
     uploaded under that name is then not this run's status and only the build
     log reports it. The published mode is set explicitly rather than left to
     the umask the step inherited.
-
-
 
     Uploaded artifacts are pattern-scanned after upload as well, and a whole
     matching object is then replaced with a short notice, which makes a report
