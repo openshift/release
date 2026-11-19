@@ -42,12 +42,12 @@ GITHUB_BASE_BRANCH=${GITHUB_BASE_BRANCH:-main}
 GITHUB_BOT_LOGIN=${GITHUB_BOT_LOGIN:-'aro-hcp-robot[bot]'}
 GITHUB_BOT_NAME=${GITHUB_BOT_NAME:-'aro-hcp-robot[bot]'}
 GITHUB_BOT_EMAIL=${GITHUB_BOT_EMAIL:-'aro-hcp-robot[bot]@users.noreply.github.com'}
+SHARED_DIR=${SHARED_DIR:-}
 GITHUB_TOKEN_PATH="${SHARED_DIR}/github-token"
 
 # Diagnostics always go to stderr so captured command output stays data only.
 log() { echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] ${*}" >&2; }
 info() { if [[ ${VERBOSITY} -ge 1 ]]; then log "[info] ${*}"; fi; }
-debug() { if [[ ${VERBOSITY} -ge 2 ]]; then log "[debug] ${*}"; fi; }
 error() { log "[error] ${*}"; exit 1; }
 
 PRIVATE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/test-priorities.XXXXXX")
@@ -100,6 +100,10 @@ if [[ "${publish}" == true ]]; then
 fi
 info "job ${job_name} (${job_type}), build ${build_id}, publication ${publish}"
 
+[[ -n "${ARTIFACT_DIR:-}" ]] || error "ARTIFACT_DIR is required"
+[[ "${PRIORITIES_MIN_SAMPLES}" =~ ^[0-9]+$ ]] ||
+    error "PRIORITIES_MIN_SAMPLES must be a number, got '${PRIORITIES_MIN_SAMPLES}'"
+
 for tool in git curl jq go; do
     command -v "${tool}" >/dev/null 2>&1 || error "required tool '${tool}' is not installed"
 done
@@ -108,6 +112,9 @@ done
 # Trusted checkout: derive a clean tree from the baked repository's HEAD
 # ---------------------------------------------------------------------------
 readonly REPO_DIR="${PRIVATE_DIR}/aro-hcp"
+
+# repo_git runs git inside the private checkout.
+repo_git() { git -C "${REPO_DIR}" "$@"; }
 [[ -d "${BAKED_REPO}/.git" ]] || error "${BAKED_REPO} is not a git checkout"
 # The E2E image compiles its binaries inside this checkout, so its working tree
 # carries untracked build output. Only the committed HEAD is ever published, so
@@ -116,10 +123,10 @@ base_sha=$(git -C "${BAKED_REPO}" rev-parse HEAD) || error "cannot resolve the b
 info "baked checkout HEAD is ${base_sha}"
 
 git clone --quiet --no-hardlinks "${BAKED_REPO}" "${REPO_DIR}" || error "cannot copy the baked checkout"
-git -C "${REPO_DIR}" checkout --quiet --detach "${base_sha}" || error "cannot check out ${base_sha}"
-git -C "${REPO_DIR}" remote remove origin || error "cannot detach the private checkout from ${BAKED_REPO}"
-[[ "$(git -C "${REPO_DIR}" rev-parse HEAD)" == "${base_sha}" ]] || error "the private checkout is not at ${base_sha}"
-[[ -z "$(git -C "${REPO_DIR}" status --porcelain)" ]] || error "the private checkout is not clean"
+repo_git checkout --quiet --detach "${base_sha}" || error "cannot check out ${base_sha}"
+repo_git remote remove origin || error "cannot detach the private checkout from ${BAKED_REPO}"
+[[ "$(repo_git rev-parse HEAD)" == "${base_sha}" ]] || error "the private checkout is not at ${base_sha}"
+[[ -z "$(repo_git status --porcelain)" ]] || error "the private checkout is not clean"
 info "working checkout ${REPO_DIR} at ${base_sha}"
 
 # ---------------------------------------------------------------------------
@@ -144,7 +151,7 @@ EOF
 }
 
 github_get() {
-    curl --config "${CURL_CONFIG}" "https://api.github.com/$1"
+    curl --config "${CURL_CONFIG}" "${API}/$1"
 }
 
 # require_valid_token fails fast when the installation token has expired before
@@ -308,7 +315,7 @@ if [[ "${publish}" != true ]]; then
 fi
 
 if ((changed_count == 0)); then
-    if [[ -n "$(git -C "${REPO_DIR}" status --porcelain)" ]]; then
+    if [[ -n "$(repo_git status --porcelain)" ]]; then
         error "the refresh reported no proposals but the checkout changed; refusing to continue"
     fi
     "${RUNNER}" priorities-summary --report "${SCORES}" --changes "${CHANGES}" \
@@ -362,7 +369,7 @@ info "running the start-priority and suite checks"
 
 # Every changed fixture must remain a permutation of its original: a priority
 # refresh may only reorder a suite, never add or remove a spec.
-mapfile -t fixture_paths < <(git -C "${REPO_DIR}" status --porcelain | cut -c4- |
+mapfile -t fixture_paths < <(repo_git status --porcelain | cut -c4- |
     grep -E '^test/testdata/zz_fixture_TestMainListSuitesForEachSuite_[A-Za-z0-9_.-]+\.txt$' || true)
 for fixture in "${fixture_paths[@]:-}"; do
     [[ -n "${fixture}" ]] || continue
@@ -377,7 +384,7 @@ done
 # ---------------------------------------------------------------------------
 # Diff allowlist and commit
 # ---------------------------------------------------------------------------
-mapfile -t diff_paths < <(git -C "${REPO_DIR}" status --porcelain | cut -c4-)
+mapfile -t diff_paths < <(repo_git status --porcelain | cut -c4-)
 if ((${#diff_paths[@]} == 0)); then
     log "[info] the verified checkout is unchanged; nothing to publish"
     exit 0
@@ -389,10 +396,10 @@ for path in "${diff_paths[@]}"; do
     fi
 done
 
-git -C "${REPO_DIR}" add -- "${diff_paths[@]}" || error "cannot stage the refreshed files"
-git -C "${REPO_DIR}" -c user.name="${GITHUB_BOT_NAME}" -c user.email="${GITHUB_BOT_EMAIL}" \
+repo_git add -- "${diff_paths[@]}" || error "cannot stage the refreshed files"
+repo_git -c user.name="${GITHUB_BOT_NAME}" -c user.email="${GITHUB_BOT_EMAIL}" \
     commit --quiet --message "${TITLE}" || error "cannot commit the refresh"
-commit_sha=$(git -C "${REPO_DIR}" rev-parse HEAD) || error "cannot resolve the refresh commit"
+commit_sha=$(repo_git rev-parse HEAD) || error "cannot resolve the refresh commit"
 info "committed ${commit_sha}"
 
 # ---------------------------------------------------------------------------
@@ -416,7 +423,7 @@ export GIT_TERMINAL_PROMPT=0
 unset GITHUB_TOKEN
 
 info "pushing ${branch}"
-if ! git -C "${REPO_DIR}" push \
+if ! repo_git push \
     --force-with-lease="refs/heads/${branch}:" \
     "https://x-access-token@github.com/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}.git" \
     "HEAD:refs/heads/${branch}" >"${PRIVATE_DIR}/push.log" 2>&1; then
