@@ -26,6 +26,22 @@ STEP = REPOSITORY / "ci-operator/step-registry/rosa/e2e/ocm-fvt"
 HELPERS = STEP / "prepare/rosa-e2e-ocm-fvt-prepare-commands.py"
 AUDIT = "ocm-fvt-artifact-audit.json"
 EXIT_CODE_ARTIFACT = "ocm-fvt-exit-code"
+PROMOTION_DIR = STEP / "osdfm-int-to-stage-release"
+# Resolved from the ref, like the step under test, so the fixture cannot drift
+# onto a script the registry no longer delivers.
+PROMOTION_STEP = PROMOTION_DIR / next(
+    line.split(": ", 1)[1] for line
+    in (PROMOTION_DIR / "rosa-e2e-ocm-fvt-osdfm-int-to-stage-release-ref.yaml")
+    .read_text(encoding="utf-8").splitlines() if line.startswith("  commands: "))
+# The promotion step reads credentials from fixed absolute paths this fixture
+# cannot redirect. Its gate is all these tests exercise, and it stops at the
+# first credential it cannot find - but on a host where those credentials do
+# exist it would carry on and promote for real, so the tests that run it past
+# the gate refuse to start there rather than relying on their absence.
+PROMOTION_CREDENTIAL = Path("/usr/local/osdfm-qe-credentials/osdfm_gitlab_token")
+NO_PROMOTION_CREDENTIALS = unittest.skipIf(
+    PROMOTION_CREDENTIAL.exists(),
+    "refusing to run the promotion step where its credentials are present")
 PUBLISHED_DIR = "ocm-fvt-results"
 DIGEST = "sha256:" + "a" * 64
 # Mirrors AUDIT_MAX_ENTRIES in the helper. The cap is the reason the exclusion
@@ -349,6 +365,11 @@ class ExitCodeArtifactTests(unittest.TestCase):
         self.assertFalse(stale.exists(),
                          "a shared status this run could not write must not survive")
         self.assertIn("WARNING: could not record the ocm-fvt exit status", process.stdout)
+        # End to end: the promotion step, run against the SHARED_DIR this step
+        # left behind, takes its existing "not found" path.
+        promotion = run_promotion_step(self.shared)
+        self.assertEqual(promotion.returncode, 0, promotion.stderr)
+        self.assertIn("Skipping stage promotion", promotion.stderr)
 
     @UNPRIVILEGED
     def test_a_failed_shared_write_does_not_follow_an_existing_symlink(self):
@@ -418,6 +439,55 @@ class ExitCodeArtifactTests(unittest.TestCase):
         # Guards against the fixture silently degrading to an empty suite run.
         self.assertIn("junit-ocm-fvt-report.xml", listed)
         self.assertNotIn(SECRET, json.dumps(manifest))
+
+
+def run_promotion_step(shared):
+    """Run the OSDFM stage-promotion post step against a SHARED_DIR.
+
+    Only its gate is exercised. The credentials it needs afterwards live at
+    absolute paths that do not exist here, so a run that gets past the gate
+    stops at the first credential check - which is exactly how these
+    assertions tell "would promote" from "skipped".
+    """
+    return subprocess.run(["bash", str(PROMOTION_STEP)],
+                          env={"PATH": os.defpath, "SHARED_DIR": str(shared)},
+                          capture_output=True, text=True, timeout=120, check=False)
+
+
+class PromotionGateTests(unittest.TestCase):
+    """Pin the consumer contract the step's shared-status handling relies on.
+
+    This step removes a SHARED_DIR status it could not write so that the
+    promotion step skips. That is only safe while the promotion step keeps
+    treating an absent file as "do not promote", so the contract is asserted
+    here rather than assumed. The promotion step itself is not modified.
+    """
+
+    def setUp(self):
+        self.shared = Path(tempfile.mkdtemp()).resolve()
+        self.addCleanup(shutil.rmtree, self.shared, True)
+
+    @NO_PROMOTION_CREDENTIALS
+    def test_a_recorded_success_is_not_skipped(self):
+        (self.shared / EXIT_CODE_ARTIFACT).write_text("0\n", encoding="utf-8")
+        process = run_promotion_step(self.shared)
+        self.assertNotIn("Skipping", process.stdout + process.stderr)
+        # Past the gate, stopped by the first credential it cannot find.
+        self.assertEqual(process.returncode, 1)
+        self.assertIn("osdfm_gitlab_token not found", process.stderr)
+
+    def test_a_recorded_failure_skips(self):
+        (self.shared / EXIT_CODE_ARTIFACT).write_text("42\n", encoding="utf-8")
+        process = run_promotion_step(self.shared)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertIn("Skipping OSDFM stage promotion", process.stdout)
+        self.assertIn("exit code 42", process.stdout)
+
+    def test_an_absent_status_skips(self):
+        """The path this step's invalidation of an unwritable status relies on."""
+        process = run_promotion_step(self.shared)
+        self.assertEqual(process.returncode, 0, process.stderr)
+        self.assertIn("Skipping stage promotion", process.stderr)
 
 
 if __name__ == "__main__":

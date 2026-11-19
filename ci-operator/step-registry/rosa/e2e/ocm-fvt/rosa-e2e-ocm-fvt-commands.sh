@@ -454,8 +454,10 @@ fi
 # just create is ever re-moded.
 #
 # If the name can neither be cleared nor written - a regular file in an
-# ARTIFACT_DIR this step cannot write to - it is left exactly as it was and
-# nothing is published; the build log above still carries the run's status.
+# ARTIFACT_DIR this step cannot write to - the step does not change it, but
+# what is already there is what the collector uploads under that name, so the
+# published object is then not this run's status. The SHARED_DIR copy and this
+# step's own log output are unaffected by that failure.
 artifact_exit_code="${ARTIFACT_DIR}/ocm-fvt-exit-code"
 (
   set -o noclobber
