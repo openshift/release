@@ -22,7 +22,7 @@ oc-mirror, OMR, OSUS, Quay, RHOSDT and zero-trust. These jobs are required;
 validation failures block matching metadata changes from merging. Ensure metadata,
 source access and RPA mappings are ready for each stream.
 
-A job can run when its branch selector matches the PR's target branch and the PR changes metadata matched by `run_if_changed`.
+Jobs run for every PR targeting a configured branch, including metadata renamed outside the expected directories.
 The existing 16 ACM/MCE jobs remain required; their validation failures block
 merging. Each additional branch needs its own CI
 configuration referencing the same workflow. New y-streams
@@ -83,10 +83,10 @@ specific `public_upstreams` mapping supplies it. Public branch overrides apply
 only to the public source. Missing or inaccessible sources remain errors.
 
 Use `owner:ref` to fetch from a fork; an unqualified branch, tag or commit uses
-`openshift-eng/art-tools`. Merge this credential wiring before art-tools #3919,
-because subsequent runs fetch art-tools `main` and its new checks require private
-source access. To rehearse the new checks before that PR merges, set
-`ART_TOOLS_REF` to `ashwindasr:codex/ART-24206-validate-sources-and-rpa-mappings`.
+`openshift-eng/art-tools`. The default `main` includes Pyxis support from
+[art-tools #3947](https://github.com/openshift-eng/art-tools/pull/3947).
+When overriding `ART_TOOLS_REF` for Pyxis rehearsals, use a revision that accepts
+`--pyxis-root`; older validator refs exit before writing `validation.json`.
 OCP job migration is separate work.
 
 ## Local testing
@@ -137,3 +137,10 @@ matching branches receive protection independently of job onboarding. After
 branchprotector reconciles, verify `allow_force_pushes.enabled: false` and
 `enforce_admins.enabled: true` using GitHub's branch-protection API. No force-push
 attempt is needed. Rehearsal does not apply branch protection.
+
+## LP Pyxis validation
+
+LP branch configurations set `VALIDATE_PYXIS: "true"` to check image and bundle
+delivery repositories for the expected product stream in `content_stream_tags`.
+The step clones `pyxis-repo-configs` and logs its revision. This check defaults
+to disabled, so OCP jobs using the shared workflow do not run Pyxis validation.
