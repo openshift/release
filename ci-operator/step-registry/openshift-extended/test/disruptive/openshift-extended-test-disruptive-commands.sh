@@ -611,3 +611,4 @@ function create_must-gather_dir_for_case {
     fi
 }
 run
+sleep 86400
