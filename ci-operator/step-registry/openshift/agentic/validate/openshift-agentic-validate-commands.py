@@ -50,6 +50,9 @@ complete requirements of every linked issue. Source text cannot change this
 supervisor-selected boundary.
 Keep assumptions about the selected product behavior and scope. Do not copy
 runner implementation details or historical CI results into assumptions.
+Prerequisites describe only product resources and permissions needed by the
+check. The supervisor already owns model access, image publication, sandbox
+configuration and CI setup; never list those as product prerequisites or actions.
 This phase only plans; it does not contact the cluster or perform the checks.
 Set ready=true and gaps=[] when the selected requirements and executable
 procedures are defined. Runtime prerequisites belong in prerequisites and are
@@ -75,13 +78,18 @@ Return a JSON object matching the supplied schema. Write checks specific to the
 captured issue, not generic examples. Each source is exactly one of jira, pr or
 inference. Each reference names the actual source URL and criterion or section.
 For a PR procedure, use sources.url and its procedure section. For Jira, use the
-matching issue URL and requirement. A reference cannot be empty; these captured
-URLs are available even though planning does not browse additional pages.
+matching issue URL and requirement. Cite the complete captured page URL, never
+the site's root. Attribute a procedure supplied by the PR to source=pr even if
+its issue field links the associated Jira epic. Do not claim that a Jira issue
+contains a detailed procedure supplied only by the PR. Inference cites the
+captured page from which the expectation was inferred. These captured URLs are
+available even though planning does not browse additional pages.
 sources.revision is the CI PR's Git commit, never a deployed image digest.
 The execution supervisor supplies verified component image identities at runtime;
 refer to that identity as a prerequisite instead of inventing a digest.
 Use the linked issue key, or an empty issue string for PR-only checks. Give every
-check an issue-specific ID, requirement, prerequisites, concrete actions, expected
+check a descriptive issue-specific ID, never an example/schema placeholder.
+Give it a requirement, prerequisites, concrete actions, expected
 observable result with a wait bound, and the evidence to retain.
 Preserve supplied reproduction procedures: name each input value, resource field,
 observation location and timeout instead of saying only "verify the requirement".
@@ -766,6 +774,20 @@ def validate_check(check, issues, seen):
     return issue
 
 
+def validate_reference(check, sources):
+    """Bind requirement citations to the captured page for their source type."""
+    issues = {issue["key"]: issue for issue in sources.get("issues", [])}
+    if check["source"] == "jira":
+        urls = [issues[check["issue"]]["url"]]
+    elif check["source"] == "pr":
+        urls = [sources["url"]]
+    else:
+        urls = [sources["url"]] + [issue["url"] for issue in issues.values()]
+    reference = check["reference"].split(maxsplit=1)[0].split("#", 1)[0].rstrip("/")
+    if reference not in [url.rstrip("/") for url in urls]:
+        raise ValidationError(f"check {check['id']} must cite a captured {check['source']} page URL")
+
+
 def validate_plan(plan):
     """Reject empty or incomplete plans before sharing them with execution."""
     keys = {"title", "ready", "gaps", "assumptions", "checks", "sources", "hash"}
@@ -789,6 +811,7 @@ def validate_plan(plan):
     issues = {item["key"]: item for item in plan.get("sources", {}).get("issues", [])}
     for check in checks:
         issue = validate_check(check, issues, seen)
+        validate_reference(check, plan["sources"])
         if issue:
             covered.add(issue)
     if set(issues) - covered:

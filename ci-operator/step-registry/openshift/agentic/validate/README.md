@@ -46,7 +46,10 @@ supervisor.
    Readiness means that the plan is executable; installation and runtime
    prerequisites are verified by execution, not by planning.
    Response-schema constraints require nonempty check fields and HTTPS source
-   citations. The validator independently rejects missing or malformed citations.
+   citations. The validator independently requires the captured Jira issue URL
+   for Jira checks and the captured PR URL for PR checks. Inferred checks cite
+   one of those captured pages; site roots and unrelated pages are rejected.
+   Product prerequisites exclude model access, image publication and CI setup.
    PR Git revisions identify CI source; deployed image identities are supplied by
    the execution supervisor and must not be invented during planning.
 4. `write_plan` writes `validation.json`, `validation.md` and public source
