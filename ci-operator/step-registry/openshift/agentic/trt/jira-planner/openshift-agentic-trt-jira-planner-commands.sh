@@ -211,8 +211,9 @@ if ! echo "${CHANGED_FILES}" | grep -qiE '\.md$'; then
 fi
 NON_DOC_FILES=$(echo "${CHANGED_FILES}" | grep -viE '\.(md|txt|rst)$' || true)
 if [[ -n "${NON_DOC_FILES}" ]]; then
-    echo "WARNING: Non-documentation files changed (plan-only policy):"
+    echo "ERROR: Non-documentation files changed (plan-only policy):"
     echo "${NON_DOC_FILES}"
+    exit 1
 fi
 
 publish_agent_pr \
