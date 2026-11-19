@@ -19,6 +19,17 @@ images:
       FROM claude-ai-helpers AS ai-helpers
       FROM nested-podman AS podman
       FROM src AS source
+      FROM source AS release-source
+      RUN set -eu; \
+          release_root=/go/src/github.com/openshift/release; \
+          snapshot=/release-source; \
+          files="ci-operator/config/openshift/sippy/openshift-sippy-main__agentic.yaml ci-operator/config/openshift/origin/openshift-origin-main__agentic.yaml ci-operator/config/openshift-eng/ship-status-dash/openshift-eng-ship-status-dash-main__agentic.yaml ci-operator/step-registry/openshift/agentic/trt/init-model/openshift-agentic-trt-init-model-commands.sh ci-operator/step-registry/openshift/agentic/trt/jira-solver/openshift-agentic-trt-jira-solver-commands.sh"; \
+          mkdir -p "${snapshot}"; \
+          git -C "${release_root}" rev-parse HEAD > "${snapshot}/REVISION"; \
+          git -C "${release_root}" diff --quiet HEAD -- ${files}; \
+          cd "${release_root}"; \
+          cp --parents ${files} "${snapshot}"; \
+          sha256sum ${files} > "${snapshot}/SHA256SUMS"
       FROM origin-devcontainer
       USER root
       RUN dnf install -y podman fuse-overlayfs shadow-utils openssl python3-pip && dnf clean all
@@ -29,6 +40,7 @@ images:
           chmod -R g=u /etc/subuid /etc/subgid /etc/passwd /etc/group && \
           chmod +rx /entrypoint.sh
       COPY --from=source /go/src/github.com/openshift/origin /workspace
+      COPY --from=release-source /release-source /release-source
       RUN chgrp -R 0 /workspace && chmod -R g=u /workspace
       COPY --from=ai-helpers /opt/ai-helpers /opt/ai-helpers
       RUN mkdir -p /home/vscode/.claude/plugins
