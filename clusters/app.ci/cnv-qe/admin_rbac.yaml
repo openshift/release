@@ -27,3 +27,37 @@ metadata:
   annotations:
     kubernetes.io/service-account.name: periodic-job-bot
 type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: secret-owner
+  namespace: cnv-qe
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["api-token-secret-16-11-2026"]
+  verbs:
+  - get
+  - create
+  - update
+  - patch
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: secret-owner-cnv-qe
+  namespace: cnv-qe
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: cnv-ci-admin
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: secret-owner

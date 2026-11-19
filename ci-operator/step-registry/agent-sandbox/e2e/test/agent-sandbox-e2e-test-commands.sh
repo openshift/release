@@ -5,7 +5,6 @@
 # Expects:
 #   - KUBECONFIG in SHARED_DIR (set by cluster provisioning)
 #   - agent-sandbox operator deployed
-#   - kata RuntimeClass available on worker nodes
 #   - Go toolchain available (from: src)
 
 set -euo pipefail
@@ -52,8 +51,8 @@ go install gotest.tools/gotestsum@latest
 
 echo ">>> Running tests"
 gotestsum \
-  --junitfile="${SANDBOX_REPORT_DIR}/junit_kata-e2e.xml" \
-  --jsonfile="${SANDBOX_REPORT_DIR}/kata-e2e.json" \
+  --junitfile="${SANDBOX_REPORT_DIR}/junit_e2e.xml" \
+  --jsonfile="${SANDBOX_REPORT_DIR}/e2e.json" \
   -- \
   ./test/e2e/extensions/... \
   -run "${SANDBOX_TEST_PATTERN}" \

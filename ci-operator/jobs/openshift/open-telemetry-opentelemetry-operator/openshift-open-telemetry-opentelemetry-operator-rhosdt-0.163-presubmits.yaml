@@ -1,66 +1,45 @@
 presubmits:
-  redhat-developer/rhdh:
+  openshift/open-telemetry-opentelemetry-operator:
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
-    cluster: build07
-    context: ci/prow/e2e-aks-helm-nightly
+    - ^rhosdt-0\.163$
+    - ^rhosdt-0\.163-
+    cluster: build01
+    context: ci/prow/art-build-ci-bundle-opentelemetry-bundle
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
     labels:
+      ci-operator.openshift.io/variant: art-build
       ci.openshift.io/generator: prowgen
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 4
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-aks-helm-nightly
-    optional: true
-    rerun_command: /test e2e-aks-helm-nightly
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-rhosdt-0.163-art-build-ci-bundle-opentelemetry-bundle
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-ci-bundle-opentelemetry-bundle
     spec:
       containers:
       - args:
-        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aks-helm-nightly
+        - --target=opentelemetry-bundle
+        - --variant=art-build
         command:
         - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
-        ports:
-        - containerPort: 8080
-          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -73,24 +52,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -100,529 +61,30 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aks-helm-nightly,?($|\s.*)
+    trigger: (?m)^/test( | .* )art-build-ci-bundle-opentelemetry-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
+    - ^rhosdt-0\.163$
+    - ^rhosdt-0\.163-
     cluster: build07
-    context: ci/prow/e2e-aks-operator-nightly
+    context: ci/prow/art-build-e2e-ocp-4-12
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
     labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
       ci.openshift.io/generator: prowgen
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 4
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-aks-operator-nightly
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-rhosdt-0.163-art-build-e2e-ocp-4-12
     optional: true
-    rerun_command: /test e2e-aks-operator-nightly
-    spec:
-      containers:
-      - args:
-        - --enable-secrets-store-csi-driver=true
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aks-operator-nightly
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aks-operator-nightly,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
-    cluster: build07
-    context: ci/prow/e2e-eks-helm-nightly
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 4
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-eks-helm-nightly
-    optional: true
-    rerun_command: /test e2e-eks-helm-nightly
-    spec:
-      containers:
-      - args:
-        - --enable-secrets-store-csi-driver=true
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-eks-helm-nightly
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-eks-helm-nightly,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
-    cluster: build07
-    context: ci/prow/e2e-eks-operator-nightly
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 4
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-eks-operator-nightly
-    optional: true
-    rerun_command: /test e2e-eks-operator-nightly
-    spec:
-      containers:
-      - args:
-        - --enable-secrets-store-csi-driver=true
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-eks-operator-nightly
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-eks-operator-nightly,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
-    cluster: build07
-    context: ci/prow/e2e-gke-helm-nightly
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 1
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-gke-helm-nightly
-    optional: true
-    rerun_command: /test e2e-gke-helm-nightly
-    spec:
-      containers:
-      - args:
-        - --enable-secrets-store-csi-driver=true
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-gke-helm-nightly
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gke-helm-nightly,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
-    cluster: build07
-    context: ci/prow/e2e-gke-operator-nightly
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 1
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-gke-operator-nightly
-    optional: true
-    rerun_command: /test e2e-gke-operator-nightly
-    spec:
-      containers:
-      - args:
-        - --enable-secrets-store-csi-driver=true
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-gke-operator-nightly
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gke-operator-nightly,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
-    cluster: build07
-    context: ci/prow/e2e-ocp-helm
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 2
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-ocp-helm
-    rerun_command: /test e2e-ocp-helm
-    skip_if_only_changed: ^docs/|rpms\.lock\.yaml|showcase-docs/|^\.changeset/|CONTRIBUTING\.md|OWNERS|README\.md|USAGE_DATA\.md|^scripts/|^\.github/|\.threatmodel/|^ui/|\.md|\\.mdc|\\.toml$
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-ocp-4-12
     spec:
       containers:
       - args:
@@ -636,7 +98,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-helm
+        - --target=e2e-ocp-4-12
+        - --variant=art-build
         command:
         - ci-operator
         env:
@@ -713,24 +176,30 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-helm,?($|\s.*)
+    trigger: (?m)^/test( | .* )art-build-e2e-ocp-4-12,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
+    - ^rhosdt-0\.163$
+    - ^rhosdt-0\.163-
     cluster: build07
-    context: ci/prow/e2e-ocp-helm-nightly
+    context: ci/prow/art-build-e2e-ocp-4-16
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
     labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
       ci.openshift.io/generator: prowgen
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 1
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-ocp-helm-nightly
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-rhosdt-0.163-art-build-e2e-ocp-4-16
     optional: true
-    rerun_command: /test e2e-ocp-helm-nightly
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-ocp-4-16
     spec:
       containers:
       - args:
@@ -744,7 +213,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-helm-nightly
+        - --target=e2e-ocp-4-16
+        - --variant=art-build
         command:
         - ci-operator
         env:
@@ -821,24 +291,30 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-helm-nightly,?($|\s.*)
+    trigger: (?m)^/test( | .* )art-build-e2e-ocp-4-16,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
+    - ^rhosdt-0\.163$
+    - ^rhosdt-0\.163-
     cluster: build07
-    context: ci/prow/e2e-ocp-helm-upgrade-nightly
+    context: ci/prow/art-build-e2e-ocp-4-18-arm64
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
     labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
       ci.openshift.io/generator: prowgen
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 1
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-ocp-helm-upgrade-nightly
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-rhosdt-0.163-art-build-e2e-ocp-4-18-arm64
     optional: true
-    rerun_command: /test e2e-ocp-helm-upgrade-nightly
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-ocp-4-18-arm64
     spec:
       containers:
       - args:
@@ -852,7 +328,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-helm-upgrade-nightly
+        - --target=e2e-ocp-4-18-arm64
+        - --variant=art-build
         command:
         - ci-operator
         env:
@@ -929,24 +406,30 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-helm-upgrade-nightly,?($|\s.*)
+    trigger: (?m)^/test( | .* )art-build-e2e-ocp-4-18-arm64,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
+    - ^rhosdt-0\.163$
+    - ^rhosdt-0\.163-
     cluster: build07
-    context: ci/prow/e2e-ocp-operator-auth-providers-nightly
+    context: ci/prow/art-build-e2e-ocp-4-20-fips
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
     labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
       ci.openshift.io/generator: prowgen
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 1
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-ocp-operator-auth-providers-nightly
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-rhosdt-0.163-art-build-e2e-ocp-4-20-fips
     optional: true
-    rerun_command: /test e2e-ocp-operator-auth-providers-nightly
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-ocp-4-20-fips
     spec:
       containers:
       - args:
@@ -960,7 +443,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-operator-auth-providers-nightly
+        - --target=e2e-ocp-4-20-fips
+        - --variant=art-build
         command:
         - ci-operator
         env:
@@ -1037,24 +521,30 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-operator-auth-providers-nightly,?($|\s.*)
+    trigger: (?m)^/test( | .* )art-build-e2e-ocp-4-20-fips,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
+    - ^rhosdt-0\.163$
+    - ^rhosdt-0\.163-
     cluster: build07
-    context: ci/prow/e2e-ocp-operator-nightly
+    context: ci/prow/art-build-e2e-ocp-4-21
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
     labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
       ci.openshift.io/generator: prowgen
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 1
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-ocp-operator-nightly
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-rhosdt-0.163-art-build-e2e-ocp-4-21
     optional: true
-    rerun_command: /test e2e-ocp-operator-nightly
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-ocp-4-21
     spec:
       containers:
       - args:
@@ -1068,7 +558,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-operator-nightly
+        - --target=e2e-ocp-4-21
+        - --variant=art-build
         command:
         - ci-operator
         env:
@@ -1145,24 +636,30 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-operator-nightly,?($|\s.*)
+    trigger: (?m)^/test( | .* )art-build-e2e-ocp-4-21,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
+    - ^rhosdt-0\.163$
+    - ^rhosdt-0\.163-
     cluster: build07
-    context: ci/prow/e2e-ocp-v4-16-helm-nightly
+    context: ci/prow/art-build-e2e-ocp-4-23
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
     labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
       ci.openshift.io/generator: prowgen
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 1
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-ocp-v4-16-helm-nightly
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-rhosdt-0.163-art-build-e2e-ocp-4-23
     optional: true
-    rerun_command: /test e2e-ocp-v4-16-helm-nightly
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-ocp-4-23
     spec:
       containers:
       - args:
@@ -1176,7 +673,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-v4-16-helm-nightly
+        - --target=e2e-ocp-4-23
+        - --variant=art-build
         command:
         - ci-operator
         env:
@@ -1253,24 +751,30 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-v4-16-helm-nightly,?($|\s.*)
+    trigger: (?m)^/test( | .* )art-build-e2e-ocp-4-23,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
+    - ^rhosdt-0\.163$
+    - ^rhosdt-0\.163-
     cluster: build07
-    context: ci/prow/e2e-ocp-v4-18-helm-nightly
+    context: ci/prow/art-build-e2e-ocp-5-0
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
     labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
       ci.openshift.io/generator: prowgen
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 1
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-ocp-v4-18-helm-nightly
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-rhosdt-0.163-art-build-e2e-ocp-5-0
     optional: true
-    rerun_command: /test e2e-ocp-v4-18-helm-nightly
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-ocp-5-0
     spec:
       containers:
       - args:
@@ -1284,7 +788,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-v4-18-helm-nightly
+        - --target=e2e-ocp-5-0
+        - --variant=art-build
         command:
         - ci-operator
         env:
@@ -1361,24 +866,29 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-v4-18-helm-nightly,?($|\s.*)
+    trigger: (?m)^/test( | .* )art-build-e2e-ocp-5-0,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
+    - ^rhosdt-0\.163$
+    - ^rhosdt-0\.163-
     cluster: build07
-    context: ci/prow/e2e-ocp-v4-19-helm-nightly
+    context: ci/prow/art-build-e2e-pre-merge
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
     labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
       ci.openshift.io/generator: prowgen
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 1
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-ocp-v4-19-helm-nightly
-    optional: true
-    rerun_command: /test e2e-ocp-v4-19-helm-nightly
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-rhosdt-0.163-art-build-e2e-pre-merge
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-pre-merge
     spec:
       containers:
       - args:
@@ -1392,7 +902,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-v4-19-helm-nightly
+        - --target=e2e-pre-merge
+        - --variant=art-build
         command:
         - ci-operator
         env:
@@ -1469,24 +980,30 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-v4-19-helm-nightly,?($|\s.*)
+    trigger: (?m)^/test( | .* )art-build-e2e-pre-merge,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
+    - ^rhosdt-0\.163$
+    - ^rhosdt-0\.163-
     cluster: build07
-    context: ci/prow/e2e-ocp-v4-21-helm-nightly
+    context: ci/prow/art-build-e2e-ui-ocp-4-22
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
     labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
       ci.openshift.io/generator: prowgen
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 1
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-ocp-v4-21-helm-nightly
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-rhosdt-0.163-art-build-e2e-ui-ocp-4-22
     optional: true
-    rerun_command: /test e2e-ocp-v4-21-helm-nightly
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-e2e-ui-ocp-4-22
     spec:
       containers:
       - args:
@@ -1500,7 +1017,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-v4-21-helm-nightly
+        - --target=e2e-ui-ocp-4-22
+        - --variant=art-build
         command:
         - ci-operator
         env:
@@ -1577,38 +1095,36 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-v4-21-helm-nightly,?($|\s.*)
+    trigger: (?m)^/test( | .* )art-build-e2e-ui-ocp-4-22,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
-    cluster: build07
-    context: ci/prow/e2e-ocp-v4-22-helm-nightly
+    - ^rhosdt-0\.163$
+    - ^rhosdt-0\.163-
+    cluster: build01
+    context: ci/prow/art-build-fips-check
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
     labels:
+      ci-operator.openshift.io/variant: art-build
       ci.openshift.io/generator: prowgen
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 1
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-ocp-v4-22-helm-nightly
-    optional: true
-    rerun_command: /test e2e-ocp-v4-22-helm-nightly
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-rhosdt-0.163-art-build-fips-check
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-fips-check
     spec:
       containers:
       - args:
-        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-ocp-v4-22-helm-nightly
+        - --target=fips-check
+        - --variant=art-build
         command:
         - ci-operator
         env:
@@ -1626,23 +1142,8 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1655,27 +1156,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1685,68 +1165,48 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ocp-v4-22-helm-nightly,?($|\s.*)
+    trigger: (?m)^/test( | .* )art-build-fips-check,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
+    - ^rhosdt-0\.163$
+    - ^rhosdt-0\.163-
     cluster: build07
-    context: ci/prow/e2e-osd-gcp-helm-nightly
+    context: ci/prow/art-build-images
     decorate: true
     decoration_config:
-      skip_cloning: true
+      sparse_checkout_files:
+      - Dockerfile.art
+      - Dockerfile.ta.art
+      - tests/e2e-openshift/Dockerfile
     labels:
+      capability/arm64: arm64
+      ci-operator.openshift.io/variant: art-build
       ci.openshift.io/generator: prowgen
+      job-release: "4.22"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 1
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-osd-gcp-helm-nightly
-    optional: true
-    rerun_command: /test e2e-osd-gcp-helm-nightly
+    name: pull-ci-openshift-open-telemetry-opentelemetry-operator-rhosdt-0.163-art-build-images
+    path_alias: github.com/open-telemetry/opentelemetry-operator
+    rerun_command: /test art-build-images
     spec:
       containers:
       - args:
-        - --enable-secrets-store-csi-driver=true
         - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-osd-gcp-helm-nightly
+        - --target=[images]
+        - --variant=art-build
         command:
         - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
         imagePullPolicy: Always
         name: ""
-        ports:
-        - containerPort: 8080
-          name: http
         resources:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1759,24 +1219,6 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -1786,105 +1228,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-osd-gcp-helm-nightly,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-1\.9$
-    - ^release-1\.9-
-    cluster: build07
-    context: ci/prow/e2e-osd-gcp-operator-nightly
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 1
-    name: pull-ci-redhat-developer-rhdh-release-1.9-e2e-osd-gcp-operator-nightly
-    optional: true
-    rerun_command: /test e2e-osd-gcp-operator-nightly
-    spec:
-      containers:
-      - args:
-        - --enable-secrets-store-csi-driver=true
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --gsm-config=/etc/gsm-config/gsm-config.yaml
-        - --gsm-credentials-file=/etc/gsm-credentials/key.json
-        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-osd-gcp-operator-nightly
-        command:
-        - ci-operator
-        env:
-        - name: HTTP_SERVER_IP
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
-        imagePullPolicy: Always
-        name: ""
-        ports:
-        - containerPort: 8080
-          name: http
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/gsm-config
-          name: gsm-config
-          readOnly: true
-        - mountPath: /etc/gsm-credentials
-          name: gsm-sa-key
-          readOnly: true
-        - mountPath: /secrets/manifest-tool
-          name: manifest-tool-local-pusher
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - configMap:
-          name: gsm-config
-        name: gsm-config
-      - csi:
-          driver: secrets-store.csi.k8s.io
-          readOnly: true
-          volumeAttributes:
-            secretProviderClass: ci-operator-sa-key-spc
-        name: gsm-sa-key
-      - name: manifest-tool-local-pusher
-        secret:
-          secretName: manifest-tool-local-pusher
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-osd-gcp-operator-nightly,?($|\s.*)
+    trigger: (?m)^/test( | .* )art-build-images,?($|\s.*)

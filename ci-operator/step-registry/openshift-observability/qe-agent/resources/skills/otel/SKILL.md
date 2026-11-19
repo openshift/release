@@ -18,7 +18,7 @@ This skill drives an agentic loop that takes failing CI test results for the Ope
 
 ## Step 0 — Read Setup Context and Fetch the Step Script
 
-Read `${SHARED_DIR}/qe-agent-context.json`, written at exit by either `distributed-tracing-tests-opentelemetry-premerge` (branch `rhosdt-0.158`) or `distributed-tracing-tests-opentelemetry-upstream` (branch `main`), for example:
+Read `${SHARED_DIR}/qe-agent-context.json`, written at exit by either `distributed-tracing-tests-opentelemetry-premerge` (branch `rhosdt-0.158` or `rhosdt-0.163`) or `distributed-tracing-tests-opentelemetry-upstream` (branch `main`), for example:
 
 ```json
 {
