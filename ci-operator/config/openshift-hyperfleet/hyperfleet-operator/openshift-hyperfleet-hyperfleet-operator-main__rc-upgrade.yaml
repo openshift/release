@@ -6,7 +6,7 @@ build_root:
       USER root
       COPY --from=go-builder /usr/lib/golang /usr/local/go
       ENV PATH="/usr/local/go/bin:${PATH}"
-      RUN dnf install -y ca-certificates curl git jq make python3 && dnf clean all
+      RUN dnf install -y ca-certificates curl git jq make python3 python3-pyyaml && dnf clean all
 resources:
   '*':
     limits:
@@ -26,7 +26,6 @@ tests:
     timeout: 1h0m0s
     version: "4.22"
   cron: 0 0 31 2 *
-  nested_podman: true
   reporter_config:
     channel: '#hyperfleet-e2e-status'
     job_states_to_report:
@@ -48,48 +47,83 @@ tests:
         mkdir -p "${ARTIFACT_DIR}"
         prow_artifact_dir="${ARTIFACT_DIR}"
 
-        run_dir_file="${SHARED_DIR}/hyperfleet-operator-upgrade-run-dir"
-        if [[ ! -f "${run_dir_file}" ]]; then
-            echo "Upgrade test did not create a run directory; no suite resources were created."
+        state_file="${SHARED_DIR}/hyperfleet-operator-upgrade-state.json"
+        invoked_file="${SHARED_DIR}/hyperfleet-operator-upgrade-suite-invoked"
+        shared_receipt="${SHARED_DIR}/hyperfleet-operator-upgrade-cleanup.json"
+        if [[ ! -e "${state_file}" && ! -e "${invoked_file}" ]]; then
+            echo "Upgrade suite was not invoked; no suite resources were created."
             exit 0
         fi
-        run_dir="$(cat "${run_dir_file}")"
-        [[ "${run_dir}" == "${SHARED_DIR}/hyperfleet-operator-upgrade-"* ]] || {
-            echo "ERROR: invalid upgrade run directory" >&2
+        if [[ ! -f "${state_file}" || ! -f "${invoked_file}" ]]; then
+            echo "ERROR: upgrade suite recovery state is missing" >&2
             exit 1
-        }
-        evidence_dir="${run_dir}/evidence"
-        receipt="${evidence_dir}/cleanup.json"
-        status=0
+        fi
+        if ! state_bytes="$(wc -c < "${state_file}")" || (( state_bytes > 4096 )) ||
+            ! jq -e '(.operatorCommit | type == "string" and test("^[a-f0-9]{40}$")) and
+                (.namespace | type == "string" and test("^hf-upgrade-[0-9]{1,12}$")) and
+                (.buildID | type == "string" and test("^[0-9]+$"))' "${state_file}" >/dev/null; then
+            echo "ERROR: upgrade suite recovery state is invalid or oversized" >&2
+            exit 1
+        fi
+        if [[ ! -f "${shared_receipt}" ]]; then
+            echo "ERROR: upgrade suite cleanup receipt is missing" >&2
+            exit 1
+        fi
+        if ! receipt_bytes="$(wc -c < "${shared_receipt}")" || (( receipt_bytes > 131072 )); then
+            echo "ERROR: upgrade suite cleanup receipt is unreadable or oversized" >&2
+            exit 1
+        fi
+        operator_commit="$(jq -r '.operatorCommit' "${state_file}")"
+        upgrade_namespace="$(jq -r '.namespace' "${state_file}")"
+        namespace_suffix="$(jq -r '.buildID' "${state_file}")"
+        if (( ${#namespace_suffix} > 12 )); then
+            namespace_suffix="${namespace_suffix: -12}"
+        fi
+        if [[ "${upgrade_namespace}" != "hf-upgrade-${namespace_suffix}" ]]; then
+            echo "ERROR: upgrade namespace does not match the recorded build" >&2
+            exit 1
+        fi
+        if ! jq -e --arg namespace "${upgrade_namespace}" \
+            '(.runID | type == "string" and length > 0) and
+             (.namespace == $namespace) and
+             (.cleaned | type == "boolean")' "${shared_receipt}" >/dev/null; then
+            echo "ERROR: upgrade suite cleanup receipt is invalid" >&2
+            exit 1
+        fi
 
-        if [[ -f "${run_dir}/suite-invoked" ]]; then
-            if [[ ! -f "${receipt}" ]]; then
-                echo "ERROR: suite was invoked but its cleanup receipt is missing" >&2
+        run_dir="$(mktemp -d /tmp/hyperfleet-operator-upgrade-cleanup.XXXXXX)"
+        evidence_dir="${run_dir}/evidence"
+        mkdir -p "${evidence_dir}"
+        cp "${shared_receipt}" "${evidence_dir}/cleanup.json"
+        status=0
+        if ! jq -e '.cleaned == true' "${evidence_dir}/cleanup.json" >/dev/null; then
+            if [[ ! -f "${KUBECONFIG:-}" ]]; then
+                echo "ERROR: cleanup needs the claimed cluster kubeconfig" >&2
                 status=1
-            elif ! jq -e '.cleaned == true' "${receipt}" >/dev/null; then
-                if [[ ! -f "${KUBECONFIG:-}" || ! -f "${run_dir}/operator/Makefile" ]]; then
-                    echo "ERROR: cleanup needs the claimed cluster kubeconfig and operator source" >&2
+            else
+                KUBECONFIG="$(realpath "${KUBECONFIG}")"
+                export KUBECONFIG
+                export ARTIFACT_DIR="${evidence_dir}"
+                export GOTOOLCHAIN=go1.26.0
+                export GOCACHE="${run_dir}/go-cache"
+                export GOMODCACHE="${run_dir}/go-mod"
+                mkdir -p "${GOCACHE}" "${GOMODCACHE}"
+                operator_dir="${run_dir}/operator"
+                if ! git init -q "${operator_dir}" ||
+                    ! git -C "${operator_dir}" remote add origin https://github.com/openshift-hyperfleet/hyperfleet-operator.git ||
+                    ! git -C "${operator_dir}" fetch -q --depth 1 origin "${operator_commit}" ||
+                    ! git -C "${operator_dir}" checkout -q --detach FETCH_HEAD ||
+                    [[ "$(git -C "${operator_dir}" rev-parse HEAD)" != "${operator_commit}" ]] ||
+                    ! (cd "${operator_dir}" && make cleanup-e2e-upgrade); then
+                    echo "ERROR: UID-bound cleanup failed; retain the receipt for investigation" >&2
                     status=1
-                else
-                    KUBECONFIG="$(realpath "${KUBECONFIG}")"
-                    export KUBECONFIG
-                    export ARTIFACT_DIR="${evidence_dir}"
-                    export GOTOOLCHAIN=go1.26.0
-                    export GOCACHE="${run_dir}/go-cache"
-                    export GOMODCACHE="${run_dir}/go-mod"
-                    if ! (cd "${run_dir}/operator" && make cleanup-e2e-upgrade); then
-                        echo "ERROR: UID-bound cleanup failed; retain the receipt for investigation" >&2
-                        status=1
-                    fi
                 fi
             fi
         fi
 
-        if [[ -d "${evidence_dir}" ]]; then
-            if ! cp -a "${evidence_dir}/." "${prow_artifact_dir}/"; then
-                echo "ERROR: could not archive final upgrade evidence" >&2
-                status=1
-            fi
+        if ! cp -a "${evidence_dir}/." "${prow_artifact_dir}/"; then
+            echo "ERROR: could not archive final upgrade cleanup receipt" >&2
+            status=1
         fi
         exit "${status}"
       from: src
@@ -105,6 +139,7 @@ tests:
     test:
     - as: openshift-hyperfleet-operator-upgrade-test
       cli: latest
+      nested_podman: true
       commands: |-
         #!/usr/bin/env bash
         # Gangway POST target: https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com/v1/executions/
@@ -126,10 +161,9 @@ tests:
         }
 
         prow_artifact_dir="${ARTIFACT_DIR}"
-        run_dir="${SHARED_DIR}/hyperfleet-operator-upgrade-${BUILD_ID}"
+        run_dir="$(mktemp -d /tmp/hyperfleet-operator-upgrade.XXXXXX)"
         evidence_dir="${run_dir}/evidence"
         mkdir -p "${evidence_dir}" "${prow_artifact_dir}"
-        printf '%s\n' "${run_dir}" > "${SHARED_DIR}/hyperfleet-operator-upgrade-run-dir"
 
         finish() {
             local status=$?
@@ -147,6 +181,15 @@ tests:
           </testcase>
         </testsuite>
         XML
+            fi
+            # SHARED_DIR transfers only flat, bounded files between step pods.
+            if [[ -f "${evidence_dir}/cleanup.json" ]]; then
+                if ! receipt_bytes="$(wc -c < "${evidence_dir}/cleanup.json")" ||
+                    (( receipt_bytes > 131072 )) ||
+                    ! cp "${evidence_dir}/cleanup.json" "${SHARED_DIR}/hyperfleet-operator-upgrade-cleanup.json"; then
+                    echo "ERROR: could not transfer the bounded cleanup receipt" >&2
+                    (( status != 0 )) || status=1
+                fi
             fi
             if ! cp -a "${evidence_dir}/." "${prow_artifact_dir}/"; then
                 echo "ERROR: could not archive upgrade evidence from test step" >&2
@@ -250,9 +293,14 @@ tests:
         import re
         import secrets
         import sys
+        import yaml
 
         scenario = pathlib.Path(sys.argv[1]).read_text()
-        if not re.search(r"^fixtures:\s*fixtures\.yaml\s*(?:#.*)?$", scenario, re.MULTILINE):
+        try:
+            decoded = yaml.safe_load(scenario)
+        except yaml.YAMLError:
+            raise SystemExit("ERROR: invalid scenario YAML") from None
+        if not isinstance(decoded, dict) or decoded.get("fixtures") != "fixtures.yaml":
             raise SystemExit("ERROR: scenario must reference fixtures.yaml beside itself")
         if re.search(r"\${[^}]+\}", scenario):
             raise SystemExit("ERROR: release-qualified scenario still contains placeholders")
@@ -324,7 +372,11 @@ tests:
                 select(any(.[]; (.imageID // "") | test("sha256:[a-f0-9]{64}")))' \
             > "${evidence_dir}/runner-images.json"
 
-        touch "${run_dir}/suite-invoked"
+        jq -n --arg commit "${MULTISTAGE_PARAM_OVERRIDE_OPERATOR_COMMIT}" \
+            --arg namespace "${UPGRADE_NAMESPACE}" --arg buildID "${BUILD_ID}" \
+            '{operatorCommit: $commit, namespace: $namespace, buildID: $buildID}' \
+            > "${SHARED_DIR}/hyperfleet-operator-upgrade-state.json"
+        touch "${SHARED_DIR}/hyperfleet-operator-upgrade-suite-invoked"
         cd "${operator_dir}"
         make test-e2e-upgrade
       env:
