@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Verify post-migration VM state produced by p2p-mtv-execute-live-migration.
+# Verify post-migration VM state produced by interop-acm-cclm-acm-virt-bundle-hub-spoke.
 #
 # Checks (all hard-fail; recorded as JUnit cases):
 # destination VMIs Running; destination VM runStrategy==Always (OCPBUGS-101771);
@@ -159,9 +159,9 @@ function DumpDiagnostics () {
     failed: .status.migrationState.failed,
     failureReason: .status.migrationState.failureReason}]'
 
-  HubOc get plan,migration -n "${MTV_PROVIDER_NAMESPACE}" 2>&1 \
+  HubOc get plan,migration -n "${MTV_NAMESPACE}" 2>&1 \
     | RedactOutput > "${diagDir}/hub-mtv-resources.txt" || true
-  HubOc get events -n "${MTV_PROVIDER_NAMESPACE}" --sort-by='.lastTimestamp' 2>&1 \
+  HubOc get events -n "${MTV_NAMESPACE}" --sort-by='.lastTimestamp' 2>&1 \
     | RedactOutput > "${diagDir}/hub-mtv-events.txt" || true
 
   typeset -i k
@@ -533,7 +533,7 @@ function VerifyVmDataIntegrity () {
 # Pod lookup uses two strategies to handle label differences after CCLM migration:
 # 1. kubevirt.io/domain= label (standard KubeVirt label; may be absent post-CCLM).
 # 2. Pod name prefix virt-launcher-<vmname>- (fallback; matches proven GetSourceVirtLauncherPod
-#    pattern used in p2p-mtv-execute-hub-spoke-migration-commands.sh).
+#    pattern used in interop-acm-cclm-acm-virt-bundle-hub-spoke-commands.sh).
 # All pods are fetched once with kubevirt.io=virt-launcher to scope the snapshot.
 function CollectDestLaunchers () {
   typeset -n _names="${1:?}"; (($#)) && shift

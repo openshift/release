@@ -4,6 +4,8 @@ Provisions an **ACM managed spoke** on the hub via Hive `ClusterDeployment`.
 
 Assumes an ACM hub is already reachable (`KUBECONFIG` from CI Operator).
 
+Used by every ACM+Virt job. See the [JUnit step index](../../../interop/acm/cclm/acm-virt-bundle/README.md) and the [interop-testing job README](../../../../config/RedHatQE/interop-testing/README.md).
+
 ## Order of operations
 
 1. Derive spoke name from `ACM_SPOKE_CLUSTER_NAME_PREFIX` + hub name hash; write `${SHARED_DIR}/managed-cluster-name`.
