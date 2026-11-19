@@ -327,10 +327,12 @@ chain:
           sys.exit("ERROR: expected one rendered HostedCluster")
       clusters[0]["spec"].setdefault("configuration", {})["featureGate"] = json.loads(sys.argv[1])
       for obj in objects:
-          if obj["kind"] == "NodePool" and sys.argv[2]:
-              obj["spec"]["release"]["image"] = sys.argv[2]
+          # Match the non-custom skew predicate. Otherwise retain the CLI
+          # release image, including HYPERSHIFT_HC_RELEASE_IMAGE, for both objects.
+          if obj["kind"] == "NodePool" and sys.argv[2] and sys.argv[3] and sys.argv[2] != sys.argv[3]:
+              obj["spec"]["release"]["image"] = sys.argv[3]
       json.dump({"apiVersion": "v1", "kind": "List", "items": objects}, sys.stdout)
-      ' "${guest_feature_spec}" "${NODEPOOL_RELEASE_IMAGE_LATEST}" > "${configured}"
+      ' "${guest_feature_spec}" "${RELEASE_IMAGE_LATEST}" "${NODEPOOL_RELEASE_IMAGE_LATEST}" > "${configured}"
         if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
           # Match the existing render-only mode, without exporting Secret data.
           python3 -c '
