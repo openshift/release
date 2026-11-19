@@ -11,7 +11,7 @@ operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/medik8s/workload-availability-operator:v0.1.0
+  - pullspec: quay.io/medik8s/workload-availability-operator:v5.1.0
     with: workload-availability-operator
 prowgen:
   enable_secrets_store_csi_driver: true
@@ -40,7 +40,9 @@ tests:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       ECO_DUMP_FAILED_TESTS: "true"
       ECO_TEST_FEATURES: nmo-operator
-      ECO_TEST_LABELS: '!component:olm'
+      ECO_TEST_LABELS: '!component:olm && !tier:upgrade && !tier:upgrade-operator
+        && !tier:fresh-install && !tier:upgrade-cluster && !tier:interop && !disruption:destructive
+        && !tier:preview'
       ECO_TEST_VERBOSE: "true"
       OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: openshift-workload-availability
@@ -57,6 +59,439 @@ tests:
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
       - name: ECO_TEST_VERBOSE
+      - name: WORKLOAD_IMAGE
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 2h0m0s
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: e2e-wao-nmo-pr-aws
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_DUMP_FAILED_TESTS: "true"
+      ECO_TEST_FEATURES: nmo-operator
+      ECO_TEST_LABELS: '!component:olm && !tier:upgrade && !tier:upgrade-operator
+        && !tier:fresh-install && !tier:upgrade-cluster && !tier:interop && !disruption:destructive
+        && !tier:preview'
+      ECO_TEST_VERBOSE: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      OO_PACKAGE: workload-availability-operator
+      OO_TARGET_NAMESPACES: '!all'
+      WORKLOAD_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    test:
+    - as: e2e-nmo
+      cli: latest
+      commands: |
+        make e2e-tests
+      env:
+      - name: ECO_DUMP_FAILED_TESTS
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: WORKLOAD_IMAGE
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 2h0m0s
+    workflow: optional-operators-ci-aws
+- as: install-wao-snr-daily-aws
+  cron: 0 5 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      E2E_ENABLE_COMPONENTS: snr
+      ECO_DUMP_FAILED_TESTS: "true"
+      ECO_TEST_FEATURES: snr-operator
+      ECO_TEST_LABELS: '!component:olm && !tier:upgrade && !tier:upgrade-operator
+        && !tier:fresh-install && !tier:upgrade-cluster && !tier:interop && !disruption:destructive
+        && !tier:preview'
+      ECO_TEST_VERBOSE: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      OO_PACKAGE: workload-availability-operator
+      OO_TARGET_NAMESPACES: '!all'
+      WORKLOAD_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    test:
+    - as: e2e-snr
+      cli: latest
+      commands: |
+        make e2e-tests
+      env:
+      - name: ECO_DUMP_FAILED_TESTS
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: E2E_ENABLE_COMPONENTS
+      - name: WORKLOAD_IMAGE
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 2h0m0s
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: e2e-wao-snr-pr-aws
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      E2E_ENABLE_COMPONENTS: snr
+      ECO_DUMP_FAILED_TESTS: "true"
+      ECO_TEST_FEATURES: snr-operator
+      ECO_TEST_LABELS: '!component:olm && !tier:upgrade && !tier:upgrade-operator
+        && !tier:fresh-install && !tier:upgrade-cluster && !tier:interop && !disruption:destructive
+        && !tier:preview'
+      ECO_TEST_VERBOSE: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      OO_PACKAGE: workload-availability-operator
+      OO_TARGET_NAMESPACES: '!all'
+      WORKLOAD_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    test:
+    - as: e2e-snr
+      cli: latest
+      commands: |
+        make e2e-tests
+      env:
+      - name: ECO_DUMP_FAILED_TESTS
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: E2E_ENABLE_COMPONENTS
+      - name: WORKLOAD_IMAGE
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 2h0m0s
+    workflow: optional-operators-ci-aws
+- as: install-wao-nhc-daily-aws
+  cron: 0 6 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      E2E_ENABLE_COMPONENTS: nhc
+      ECO_DUMP_FAILED_TESTS: "true"
+      ECO_TEST_FEATURES: nhc-operator
+      ECO_TEST_LABELS: '!component:olm && !tier:upgrade && !tier:upgrade-operator
+        && !tier:fresh-install && !tier:upgrade-cluster && !tier:interop && !disruption:destructive
+        && !tier:preview'
+      ECO_TEST_VERBOSE: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      OO_PACKAGE: workload-availability-operator
+      OO_TARGET_NAMESPACES: '!all'
+      WORKLOAD_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    test:
+    - as: e2e-nhc
+      cli: latest
+      commands: |
+        make e2e-tests
+      env:
+      - name: ECO_DUMP_FAILED_TESTS
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: E2E_ENABLE_COMPONENTS
+      - name: WORKLOAD_IMAGE
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 2h0m0s
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: e2e-wao-nhc-pr-aws
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      E2E_ENABLE_COMPONENTS: nhc
+      ECO_DUMP_FAILED_TESTS: "true"
+      ECO_TEST_FEATURES: nhc-operator
+      ECO_TEST_LABELS: '!component:olm && !tier:upgrade && !tier:upgrade-operator
+        && !tier:fresh-install && !tier:upgrade-cluster && !tier:interop && !disruption:destructive
+        && !tier:preview'
+      ECO_TEST_VERBOSE: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      OO_PACKAGE: workload-availability-operator
+      OO_TARGET_NAMESPACES: '!all'
+      WORKLOAD_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    test:
+    - as: e2e-nhc
+      cli: latest
+      commands: |
+        make e2e-tests
+      env:
+      - name: ECO_DUMP_FAILED_TESTS
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: E2E_ENABLE_COMPONENTS
+      - name: WORKLOAD_IMAGE
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 2h0m0s
+    workflow: optional-operators-ci-aws
+- as: install-wao-sbr-daily-aws
+  cron: 0 7 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      E2E_ENABLE_COMPONENTS: sbr
+      ECO_DUMP_FAILED_TESTS: "true"
+      ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_LABELS: '!component:olm && !tier:upgrade && !tier:upgrade-operator
+        && !tier:fresh-install && !tier:upgrade-cluster && !tier:interop && !disruption:destructive
+        && !tier:preview'
+      ECO_TEST_VERBOSE: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      OO_PACKAGE: workload-availability-operator
+      OO_TARGET_NAMESPACES: '!all'
+      WORKLOAD_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    test:
+    - as: e2e-sbr
+      cli: latest
+      commands: |
+        make e2e-tests
+      env:
+      - name: ECO_DUMP_FAILED_TESTS
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: E2E_ENABLE_COMPONENTS
+      - name: WORKLOAD_IMAGE
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 2h0m0s
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: e2e-wao-sbr-pr-aws
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      E2E_ENABLE_COMPONENTS: sbr
+      ECO_DUMP_FAILED_TESTS: "true"
+      ECO_TEST_FEATURES: sbr-operator
+      ECO_TEST_LABELS: '!component:olm && !tier:upgrade && !tier:upgrade-operator
+        && !tier:fresh-install && !tier:upgrade-cluster && !tier:interop && !disruption:destructive
+        && !tier:preview'
+      ECO_TEST_VERBOSE: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      OO_PACKAGE: workload-availability-operator
+      OO_TARGET_NAMESPACES: '!all'
+      WORKLOAD_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    test:
+    - as: e2e-sbr
+      cli: latest
+      commands: |
+        make e2e-tests
+      env:
+      - name: ECO_DUMP_FAILED_TESTS
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: E2E_ENABLE_COMPONENTS
+      - name: WORKLOAD_IMAGE
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 2h0m0s
+    workflow: optional-operators-ci-aws
+- as: install-wao-far-daily-aws
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      E2E_ENABLE_COMPONENTS: far
+      ECO_DUMP_FAILED_TESTS: "true"
+      ECO_TEST_FEATURES: far-operator
+      ECO_TEST_LABELS: '!component:olm && !tier:upgrade && !tier:upgrade-operator
+        && !tier:fresh-install && !tier:upgrade-cluster && !tier:interop && !disruption:destructive
+        && !tier:preview'
+      ECO_TEST_VERBOSE: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      OO_PACKAGE: workload-availability-operator
+      OO_TARGET_NAMESPACES: '!all'
+      WORKLOAD_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    test:
+    - as: e2e-far
+      cli: latest
+      commands: |
+        make e2e-tests
+      env:
+      - name: ECO_DUMP_FAILED_TESTS
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: E2E_ENABLE_COMPONENTS
+      - name: WORKLOAD_IMAGE
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 2h0m0s
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: e2e-wao-far-pr-aws
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      E2E_ENABLE_COMPONENTS: far
+      ECO_DUMP_FAILED_TESTS: "true"
+      ECO_TEST_FEATURES: far-operator
+      ECO_TEST_LABELS: '!component:olm && !tier:upgrade && !tier:upgrade-operator
+        && !tier:fresh-install && !tier:upgrade-cluster && !tier:interop && !disruption:destructive
+        && !tier:preview'
+      ECO_TEST_VERBOSE: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      OO_PACKAGE: workload-availability-operator
+      OO_TARGET_NAMESPACES: '!all'
+      WORKLOAD_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    test:
+    - as: e2e-far
+      cli: latest
+      commands: |
+        make e2e-tests
+      env:
+      - name: ECO_DUMP_FAILED_TESTS
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: E2E_ENABLE_COMPONENTS
+      - name: WORKLOAD_IMAGE
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 2h0m0s
+    workflow: optional-operators-ci-aws
+- as: install-wao-mdr-daily-aws
+  cron: 0 9 * * *
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      E2E_ENABLE_COMPONENTS: mdr
+      ECO_DUMP_FAILED_TESTS: "true"
+      ECO_TEST_FEATURES: mdr-operator
+      ECO_TEST_LABELS: '!component:olm && !tier:upgrade && !tier:upgrade-operator
+        && !tier:fresh-install && !tier:upgrade-cluster && !tier:interop && !disruption:destructive
+        && !tier:preview'
+      ECO_TEST_VERBOSE: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      OO_PACKAGE: workload-availability-operator
+      OO_TARGET_NAMESPACES: '!all'
+      WORKLOAD_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    test:
+    - as: e2e-mdr
+      cli: latest
+      commands: |
+        make e2e-tests
+      env:
+      - name: ECO_DUMP_FAILED_TESTS
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: E2E_ENABLE_COMPONENTS
+      - name: WORKLOAD_IMAGE
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
+      timeout: 2h0m0s
+    workflow: optional-operators-ci-aws
+- always_run: false
+  as: e2e-wao-mdr-pr-aws
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      E2E_ENABLE_COMPONENTS: mdr
+      ECO_DUMP_FAILED_TESTS: "true"
+      ECO_TEST_FEATURES: mdr-operator
+      ECO_TEST_LABELS: '!component:olm && !tier:upgrade && !tier:upgrade-operator
+        && !tier:fresh-install && !tier:upgrade-cluster && !tier:interop && !disruption:destructive
+        && !tier:preview'
+      ECO_TEST_VERBOSE: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-workload-availability
+      OO_PACKAGE: workload-availability-operator
+      OO_TARGET_NAMESPACES: '!all'
+      WORKLOAD_IMAGE: registry.access.redhat.com/ubi9/ubi-minimal:latest
+    test:
+    - as: e2e-mdr
+      cli: latest
+      commands: |
+        make e2e-tests
+      env:
+      - name: ECO_DUMP_FAILED_TESTS
+      - name: ECO_TEST_FEATURES
+      - name: ECO_TEST_LABELS
+      - name: ECO_TEST_VERBOSE
+      - name: E2E_ENABLE_COMPONENTS
       - name: WORKLOAD_IMAGE
       from: src
       resources:
