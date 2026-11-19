@@ -29,6 +29,22 @@ AUDIT_MAX_SCAN = 8192
 AUDIT_MAX_PATH = 160
 AUDIT_MAX_COMPONENT = 96
 AUDIT_UNSAFE = re.compile(r"[^0-9A-Za-z._-]")
+# Entries publication wanted to copy and could not, by the fixed reason it
+# recorded them under. These are counted as well as recorded, because the
+# per-entry records compete for a place under AUDIT_MAX_ENTRIES: a run that
+# fills the cap can drop the one record saying a diagnostic is missing, and
+# what is left then reads exactly like a run that published everything. The
+# counters are taken before the cap and are bounded by the entry budget, so
+# a reader learns that something was excluded even from a capped manifest.
+#
+# They count exclusion events, not artifacts lost: an unreadable directory
+# cannot be walked, so it is one event standing for an unknown subtree. A
+# non-zero count is therefore a lower bound on what is missing, and it is
+# reported as the number of entries publication turned away.
+#
+# Deliberate private-state exclusions are counted separately by
+# private_record and are not publication incompleteness.
+EXCLUDED_REASONS = ("irregular", "unreadable")
 # A file name is data produced by the test run, and the manifest is the one
 # object that aggregates every name in the step. A long unbroken alphanumeric
 # run is the shape of a token, a key id or a digest, so such a run is reduced
@@ -131,6 +147,18 @@ def audit_record(budget, parts, disposition, **fields):
     budget["audit"].append(dict(fields, path=audit_path(parts), disposition=disposition))
 
 
+def excluded_record(budget, parts, reason):
+    """Count one entry publication could not copy, and record it as well.
+
+    The count is what the publication record reports; the per-entry record is
+    what names it, when it survives the cap. Both come from this one call, so
+    a reader comparing them can tell a count with no matching record from a
+    publication that excluded nothing.
+    """
+    budget["excluded"][reason] += 1
+    audit_record(budget, parts, "excluded", reason=reason)
+
+
 def failed_record(budget, parts, reason, rule=None):
     """Record the entry publication refused, then let the caller raise.
 
@@ -227,7 +255,15 @@ def audit_write(artifacts, budget, outcome):
         # Rendered like every other name in the manifest: the destination is
         # now caller-supplied rather than a constant, so it goes through the
         # same restricted character set and token-run elision.
-        "publication": dict(outcome, destination=audit_component(budget["destination"])),
+        #
+        # The exclusion counts travel with the outcome rather than being left
+        # to the capped entry list: "published" describes the rename, not
+        # whether every diagnostic reached the destination, and a reader
+        # deciding whether a missing artifact was ever collected needs both.
+        # Fixed keys and integers only, so the record says that something was
+        # turned away, and how often, without naming any of it.
+        "publication": dict(outcome, destination=audit_component(budget["destination"]),
+                            excluded=dict(budget["excluded"])),
         "limits": {
             "entries_left": budget["entries_left"],
             "bytes_left": budget["bytes_left"],
@@ -357,8 +393,7 @@ def publish_file(source, destination, budget, name, located):
     try:
         descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=source)
     except PermissionError:
-        budget["excluded"] = True
-        audit_record(budget, located, "excluded", reason="unreadable")
+        excluded_record(budget, located, "unreadable")
         return
     with os.fdopen(descriptor, "rb") as original:
         opened = os.fstat(original.fileno())
@@ -416,8 +451,7 @@ def publish(source, destination, budget, depth=0, parents=()):
                 try:
                     child = os.open(name, directory_flags, dir_fd=source)
                 except PermissionError:
-                    budget["excluded"] = True
-                    audit_record(budget, located, "excluded", reason="unreadable")
+                    excluded_record(budget, located, "unreadable")
                     continue
                 try:
                     os.mkdir(name, 0o700, dir_fd=destination)
@@ -432,8 +466,7 @@ def publish(source, destination, budget, depth=0, parents=()):
             elif stat.S_ISREG(info.st_mode):
                 publish_file(source, destination, budget, name, located)
             else:
-                budget["excluded"] = True
-                audit_record(budget, located, "excluded", reason="irregular")
+                excluded_record(budget, located, "irregular")
 
 
 def handle_publish(arguments):
@@ -447,7 +480,8 @@ def handle_publish(arguments):
     published = arguments[3] if len(arguments) == 4 else PUBLISHED_DIR
     if not PUBLISHED_NAME.fullmatch(published):
         raise ValueError("Artifact destination must be a plain directory name")
-    budget = {"entries_left": 8192, "bytes_left": 256 * 1024 * 1024, "excluded": False,
+    budget = {"entries_left": 8192, "bytes_left": 256 * 1024 * 1024,
+              "excluded": {reason: 0 for reason in EXCLUDED_REASONS},
               "audit": [], "private": {}, "failed": [], "reports": 0,
               "destination": published}
     # Pessimistic until the publication tree is in place, so an unwinding this
@@ -494,7 +528,7 @@ def handle_publish(arguments):
             audit_write(artifacts, budget, outcome)
     finally:
         os.close(artifacts)
-    if budget["excluded"]:
+    if any(budget["excluded"].values()):
         print("WARNING: unreadable or non-regular ocm-fvt artifacts excluded from publication")
 
 

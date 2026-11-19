@@ -131,6 +131,19 @@ ref:
     byte count per file. Both lists are sorted and then capped, and the cap
     and the number of records dropped by it are reported alongside them.
 
+    The publication record carries the outcome of the rename together with a
+    count, per fixed exclusion reason, of the entries publication turned away.
+    The counts are taken before the entry cap: a run that fills the cap can
+    lose the per-entry record for an excluded artifact, and an outcome of
+    published on its own would then read exactly like a run that published
+    everything. A count with no matching entry record means the cap dropped
+    it, not that nothing was excluded.
+
+    They count entries publication turned away, not artifacts missing from
+    the destination. An unreadable directory cannot be walked, so it is one
+    exclusion standing for a subtree of unknown size. A non-zero count is a
+    lower bound on what is absent.
+
     Exclusion reasons are a fixed set. unreadable and irregular name the entry
     concerned, because the name is the diagnostic. private-state does not:
     .datainfo, cluster.ini, kubeconfig and *.kubeconfig are held back exactly
@@ -147,6 +160,13 @@ ref:
     needs most when publication did not finish. A refused entry that is itself
     private-state carries its directory and the matching rule instead of its
     name, so refusing one never discloses what excluding it withholds.
+
+    The suite's own exit status is written to SHARED_DIR/ocm-fvt-exit-code for
+    later steps and mirrored to ARTIFACT_DIR/ocm-fvt-exit-code, which is the
+    copy Prow uploads. A run that ends before any test executes publishes no
+    report, and the step's finished.json cannot separate a non-zero suite from
+    a failure in the step around it. The artifact holds that one integer and
+    does not change it.
 
     Uploaded artifacts are pattern-scanned after upload as well, and a whole
     matching object is then replaced with a short notice, which makes a report
