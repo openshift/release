@@ -416,39 +416,51 @@ podman run \
   quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest \
   ocmtest "${ocmtest_args[@]}" || exit_code=$?
 trap 'cleanup_ocm_fvt || true; exit "${exit_code}"' EXIT
-(echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code") 2>/dev/null || true
-# Mirror into ARTIFACT_DIR as well: SHARED_DIR is not published to Prow GCS
-# artifacts, so without this the suite's own exit status survives only for the
-# in-job post steps that read SHARED_DIR. A run that ends before any test
-# executes publishes no report, and the step's finished.json cannot say whether
-# the suite exited non-zero or the step scaffolding around it did. Written
-# before publication so the audit manifest's handoff inventory lists it.
-# The artifact name is cleared before the copy rather than during it. Both
-# writes above are best effort, so the copy can fail with something already at
-# that name, and a status artifact that survives a failed mirror is worse than
-# no artifact at all: publication would report a stale exit code as this run's.
-# rm -f removes a regular file or a symlink without following it and without
-# touching a symlink's target, and refuses a directory, so it cannot delete a
-# tree that something else owns.
+# Record the suite's status for later steps. The write is best effort, but a
+# value that is not this run's is worse than none: the OSDFM stage-promotion
+# post step promotes when it reads 0 and skips when the file is absent, so a
+# readable but unwritable file already holding 0 would promote a run that
+# failed. On a failed write the recorded value is by definition not this run's,
+# so it is removed and that step takes its existing "not found" path. rm never
+# follows a symlink and never removes a directory.
+if ! (echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code") 2>/dev/null; then
+  rm -f -- "${SHARED_DIR}/ocm-fvt-exit-code" 2>/dev/null || true
+  echo "WARNING: could not record the ocm-fvt exit status for later steps"
+fi
+
+# Publish the same status: SHARED_DIR is not uploaded to Prow GCS, so without
+# this the suite's own exit status survives only for the in-job post steps that
+# read SHARED_DIR. A run that ends before any test executes publishes no
+# report, and the step's finished.json cannot say whether the suite exited
+# non-zero or the step scaffolding around it did. Written before publication so
+# the audit manifest's handoff inventory lists it.
 #
-# cp alone is not enough to clear the name. --remove-destination resolves the
-# destination first, so a symlink pointing at a directory is treated as that
-# directory: cp writes inside it and the chmod then re-modes it. -T refuses a
-# directory destination outright, which leaves a directory rm would not remove
-# intact and unpublished.
+# The value comes from exit_code, not from the SHARED_DIR copy. Reading that
+# copy back would republish whatever it held when the write above failed, which
+# is the one case this artifact exists to describe.
 #
-# cp takes the mode from the source, and the SHARED_DIR copy is written under
-# whatever umask the step inherited, so the mode is set explicitly rather than
-# left to umask, matching the 0644 the collector gives its own artifacts. The
-# chmod is chained to a successful copy, since errexit is suspended inside this
-# subshell and an unconditional chmod would otherwise re-mode whatever a
-# refused copy left behind.
+# The name is cleared first and then created, never written through. rm -f
+# removes a regular file or a symlink without following it and without touching
+# a symlink's target, and refuses a directory, so it cannot delete a tree
+# something else owns. noclobber makes the redirection O_EXCL, so if rm could
+# not clear the name the write refuses rather than following a symlink left
+# behind or truncating what is there. Exclusivity here is against an existing
+# file or symlink, which is what can be at this name; a directory is refused
+# because a redirection cannot write one.
+#
+# chmod is the only thing that decides the mode, rather than sharing that job
+# with a umask, so the collector can read the result whatever the step
+# inherited. It is chained to a successful write, so nothing the step did not
+# just create is ever re-moded.
+#
+# If the name can neither be cleared nor written - a regular file in an
+# ARTIFACT_DIR this step cannot write to - it is left exactly as it was and
+# nothing is published; the build log above still carries the run's status.
 artifact_exit_code="${ARTIFACT_DIR}/ocm-fvt-exit-code"
 (
-  umask 022
+  set -o noclobber
   rm -f -- "${artifact_exit_code}"
-  cp --no-target-directory --remove-destination -- \
-    "${SHARED_DIR}/ocm-fvt-exit-code" "${artifact_exit_code}" &&
+  printf '%s\n' "${exit_code}" > "${artifact_exit_code}" &&
     chmod 0644 -- "${artifact_exit_code}"
 ) 2>/dev/null || true
 
