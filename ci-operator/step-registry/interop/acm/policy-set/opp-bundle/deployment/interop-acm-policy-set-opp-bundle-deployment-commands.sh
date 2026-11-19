@@ -140,7 +140,7 @@ eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
-        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
 )"
 
 # Post-process the JUnit XML for Component Readiness routing.  This runs from
@@ -225,6 +225,10 @@ PinSubscriptionChannel () {
 # skipped with no failure row.  Record the failure, then exit as before.
 typeset -i deployStart=0
 deployStart=$(date +%s)
+if ! oc create namespace policies --dry-run=client -o yaml | oc apply -f - 1>/dev/null; then
+  RecordResult "openshift-plus-policy-set-deployed" "failed" "failed to create namespace policies" "$(( $(date +%s) - deployStart ))"
+  exit 1
+fi
 if ! echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus; then
   RecordResult "openshift-plus-policy-set-deployed" "failed" "deploy.sh returned a nonzero status; the openshift-plus policy set was not submitted" "$(( $(date +%s) - deployStart ))"
   exit 1
@@ -238,7 +242,7 @@ typeset -i policyGateStart=0
 policyGateStart=$(date +%s)
 typeset policyCountJson=''
 typeset -i policyCountRc=0
-until policyCountJson="$(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || policyCountRc=$?; (( policyCountRc != 0 )) && { printf '%s\n' "Error: failed to query policies (rc=${policyCountRc})" >&2; RecordResult "failed-policies-query" "failed" "oc get policies query failed with exit code ${policyCountRc}" "$(( $(date +%s) - policyGateStart ))"; exit 1; }; (( policyCountJson >= expectedMinPolicies )); do
+until policyCountJson="$(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || policyCountRc=$?; (( policyCountRc != 0 )) && { RecordResult "policy-query" "failed" "failed to query policies in namespace policies (rc=${policyCountRc})" "0"; printf '%s\n' "Error: failed to query policies (rc=${policyCountRc})" >&2; RecordResult "failed-policies-query" "failed" "oc get policies query failed with exit code ${policyCountRc}" "$(( $(date +%s) - policyGateStart ))"; exit 1; }; (( policyCountJson >= expectedMinPolicies )); do
   ((SECONDS > pollDeadline)) && {
     printf '%s\n' "Error: fewer than ${expectedMinPolicies} policies after 10 minutes" >&2
     RecordResult "openshift-plus-policy-set-deployed" "failed" "Fewer than ${expectedMinPolicies} policies in namespace policies after 10 minutes" "$(( $(date +%s) - policyGateStart ))"
@@ -337,8 +341,7 @@ for ns in "${quayNamespacesArr[@]}"; do
       --for condition=Available=True \
       --timeout=10m; then
       RecordResult "quay-registry-available" "failed" "QuayRegistry in namespace ${ns} did not become Available within 10 minutes" "$(( $(date +%s) - quayStart ))"
-      oc get quayregistry --all -n "${ns}" --ignore-not-found -o yaml
-      oc describe quayregistry --all -n "${ns}"
+      oc get quayregistry -n "${ns}" --ignore-not-found -o yaml || true
       exit 1
     fi
     RecordResult "quay-registry-available" "passed" "" "$(( $(date +%s) - quayStart ))"
@@ -357,7 +360,8 @@ fi
 # Non-existent policy names produce a warning, not a failure.
 typeset -a skipPoliciesArr=()
 if [[ -n "${LPC_LP_OPP__ACM_PS__SKIP_POLICIES}" ]]; then
-  IFS=',' read -ra _skipRawArr <<< "${LPC_LP_OPP__ACM_PS__SKIP_POLICIES}"
+  typeset _skipNormalized="${LPC_LP_OPP__ACM_PS__SKIP_POLICIES//$'\n'/','}"
+  IFS=',' read -ra _skipRawArr <<< "${_skipNormalized}"
   for _skipEntry in "${_skipRawArr[@]}"; do
     # Trim surrounding whitespace: an untrimmed entry ("a, b" yields " b")
     # would never match a policy name and would silently skip nothing.
@@ -752,7 +756,12 @@ while :; do
   # The gate is complete only when the set is stable, covers the names the
   # pass covered, and carries every policy the applied PolicySets list.
   typeset missingPolicies=''
-  missingPolicies="$(MissingExpectedPolicies "${expectedPolicies}" "${complianceStableSet}")" || missingPolicies=''
+  typeset -i _mpRc=0
+  missingPolicies="$(MissingExpectedPolicies "${expectedPolicies}" "${complianceStableSet}")" || _mpRc=$?
+  if (( _mpRc != 0 )); then
+    RecordResult "policies-compliant" "failed" "Could not compare expected PolicySet membership with current set (comparison failed with exit ${_mpRc})" "$(( $(date +%s) - complianceStart ))"
+    exit 1
+  fi
   if [[ -n "${missingPolicies}" ]]; then
     : "Policy set stable at ${complianceStableCount} policies but incomplete: $(printf '%s\n' "${missingPolicies}" | wc -l) expected polic(ies) absent ($(printf '%s' "${missingPolicies}" | tr '\n' ' ')); re-running the compliance wait"
     missingExpectedNote="; the set stayed stable at ${complianceStableCount} policies without $(printf '%s\n' "${missingPolicies}" | wc -l) expected polic(ies): $(printf '%s' "${missingPolicies}" | tr '\n' ' ')"
