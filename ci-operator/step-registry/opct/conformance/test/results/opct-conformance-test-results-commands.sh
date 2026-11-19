@@ -376,8 +376,9 @@ function check_plugin_gate() {
     return 2
   fi
 
-  # Parse with jq.  This step uses the 'cli-jq' supplemental image
-  # (base cli + jq) because the base 'cli' image does not include jq.
+  # Parse with jq.  This step uses the 'upi-installer' image (already a
+  # base_images dependency of every consuming config) because it ships jq,
+  # unlike the base 'cli' image.
   local plugins_json
   plugins_json=$(jq -e -c '
     .provider.plugins
