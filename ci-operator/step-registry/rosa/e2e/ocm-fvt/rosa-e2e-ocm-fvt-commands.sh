@@ -425,10 +425,18 @@ trap 'cleanup_ocm_fvt || true; exit "${exit_code}"' EXIT
 # before publication so the audit manifest's handoff inventory lists it.
 # --remove-destination so an artifact name that already exists as a symlink is
 # replaced rather than written through, matching the O_NOFOLLOW writes the
-# collector uses; umask 022 so the Prow sidecar can read the result.
+# collector uses. cp takes the mode from the source, and the SHARED_DIR copy is
+# written under whatever umask the step inherited, so the mode is set
+# explicitly rather than left to umask, matching the 0644 the collector gives
+# its own artifacts. The chmod is chained to a successful copy: errexit is
+# suspended inside this subshell, and a cp that fails early leaves whatever
+# already occupied the name in place, so an unconditional chmod would act on
+# that instead - following a pre-existing symlink, which is exactly what
+# --remove-destination is here to avoid.
 (
   umask 022
-  cp --remove-destination "${SHARED_DIR}/ocm-fvt-exit-code" "${ARTIFACT_DIR}/ocm-fvt-exit-code"
+  cp --remove-destination "${SHARED_DIR}/ocm-fvt-exit-code" "${ARTIFACT_DIR}/ocm-fvt-exit-code" &&
+    chmod 0644 "${ARTIFACT_DIR}/ocm-fvt-exit-code"
 ) 2>/dev/null || true
 
 (
