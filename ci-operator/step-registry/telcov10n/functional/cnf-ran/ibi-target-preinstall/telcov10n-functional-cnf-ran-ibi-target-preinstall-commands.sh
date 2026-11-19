@@ -47,6 +47,7 @@ create_work_directories() {
 }
 
 configure_ansible() {
+  local bastion_identity
   install -m 600 /var/group_variables/common/all/ansible_ssh_private_key "${TEMP_DIR}/ssh-key"
   export ANSIBLE_PRIVATE_KEY_FILE="${TEMP_DIR}/ssh-key"
   export ANSIBLE_HOST_KEY_CHECKING=False
@@ -54,8 +55,12 @@ configure_ansible() {
   export ANSIBLE_TIMEOUT=600
   export ANSIBLE_REMOTE_TEMP=/tmp
 
-  BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
-  BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
+  bastion_identity=$(
+    exec 2>"${TEMP_DIR}/inventory.log" || exit 1
+    ansible-inventory -i "${INVENTORY_PATH}/build-inventory.py" --host bastion |
+      jq -er '[.ansible_host, .ansible_user] | join(" ")'
+  )
+  read -r BASTION_IP BASTION_USER <<< "${bastion_identity}"
   [[ -n "${BASTION_IP}" && -n "${BASTION_USER}" ]]
 }
 
@@ -113,6 +118,7 @@ main() {
     return 0
   fi
 
+  cd /eco-ci-cd
   validate_inputs
   restore_target_inventory
   create_work_directories

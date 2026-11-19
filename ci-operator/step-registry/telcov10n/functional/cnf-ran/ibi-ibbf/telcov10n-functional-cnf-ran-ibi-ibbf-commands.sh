@@ -52,22 +52,13 @@ configure_ansible() {
   export ANSIBLE_REMOTE_TEMP=/tmp
 
   # Resolve YAML quoting and inventory precedence without logging private variables.
-  if ! bastion_identity=$(
+  bastion_identity=$(
     exec 2>"${TEMP_DIR}/inventory.log" || exit 1
     ansible-inventory -i "${INVENTORY_PATH}/build-inventory.py" --host bastion |
-      python3 -c '
-import json, sys
-host = json.load(sys.stdin)
-values = [host.get(key) for key in ("ansible_host", "ansible_user")]
-if any(not isinstance(value, str) or not value or any(c.isspace() for c in value) for value in values):
-    sys.exit("Missing or invalid bastion connection identity.")
-print(*values)
-'
-  ); then
-    echo "Could not resolve target bastion inventory." >&2
-    return 1
-  fi
+      jq -er '[.ansible_host, .ansible_user] | join(" ")'
+  )
   read -r BASTION_IP BASTION_USER <<< "${bastion_identity}"
+  [[ -n "${BASTION_IP}" && -n "${BASTION_USER}" ]]
 }
 
 redact_bastion() {

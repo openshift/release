@@ -12,6 +12,9 @@ ref:
       cpu: 100m
       memory: 512Mi
   env:
+  - name: TARGET_CLUSTER_NAME
+    default: ""
+    documentation: Target hub whose kubeconfig provides metadata to the shared uploader.
   - name: VERSION
     default: "4.20"
     documentation: OpenShift release family used in the ReportPortal launch name.
@@ -25,8 +28,10 @@ ref:
   documentation: |-
     Collect current-run raw JUnit reports from the seed and target bastions.
     Prefix suites by IBI stage and upload them together to ReportPortal using
-    the existing cnf-polarion DataRouter metadata and client, without Polarion.
-    Include the independent IBBF policy gate and exclude duplicate processed XML.
-    Upload available reports even when another stage's reports cannot be read,
-    then fail for collection or upload errors. Keep the shared final verifier
-    responsible for deferred Deployment Types failures.
+    the existing upload-report.yaml, with the same two XML input sets as PTP.
+    Include the independent IBBF policy gate. Raw copies have distinct filenames
+    and are supplied separately from the labelled Report Portal suites.
+    Preserve the shared uploader's Polarion-first behavior and enable Report Portal.
+    Collection or upload errors fail the step; incomplete bundles are not uploaded.
+    Completed test failures remain reportable. Keep the shared final verifier
+    responsible for deferred Deployment Types and IBBF test failures.

@@ -78,10 +78,15 @@ create_work_directories() {
 }
 
 configure_ssh() {
+  local bastion_identity
   cp /var/group_variables/common/all/ansible_ssh_private_key "${TEMP_DIR}/ssh-key"
   chmod 600 "${TEMP_DIR}/ssh-key"
-  BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
-  BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
+  bastion_identity=$(
+    exec 2>"${TEMP_DIR}/inventory.log" || exit 1
+    ansible-inventory -i "${INVENTORY_PATH}/build-inventory.py" --host bastion |
+      jq -er '[.ansible_host, .ansible_user] | join(" ")'
+  )
+  read -r BASTION_IP BASTION_USER <<< "${bastion_identity}"
   [[ -n "${BASTION_IP}" && -n "${BASTION_USER}" ]]
   SSH_OPTS=(
     -i "${TEMP_DIR}/ssh-key"
@@ -185,9 +190,10 @@ PYTEST
 }
 
 collect_reports() {
-  local copy_rc=0 junit_rc=0
+  local copy_rc=0 junit_rc=0 scp_host="${BASTION_IP}"
+  if [[ "${scp_host}" == *:* ]]; then scp_host="[${scp_host}]"; fi
   scp -q -r "${SSH_OPTS[@]}" \
-    "${BASTION_USER}@${BASTION_IP}:${WORK_DIR}/report" "${REPORT_DIR}/" \
+    "${BASTION_USER}@${scp_host}:${WORK_DIR}/report" "${REPORT_DIR}/" \
     2>&1 | redact_bastion || copy_rc=$?
 
   # Keep all artifacts, but give the verifier only the Ginkgo JUnit report.
@@ -213,6 +219,7 @@ main() {
   record_result 1
   trap 'finish "$?"' EXIT
 
+  cd /eco-ci-cd
   validate_inputs
   restore_target_inventory
   create_work_directories
