@@ -16,11 +16,11 @@ echo "=== TRT Jira Planner ==="
 }
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/trt-telemetry.sh"
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/agentic-ci-common.sh"
 
 planner_cleanup() {
     local rc=$?
-    # Record failure metadata for post-agent exits (e.g., publication failures)
-    # so the metrics post-step always receives a planner result.
     if [[ "${PLAN_PHASE_STARTED:-false}" == "true" && ! -f "${SHARED_DIR}/metrics-metadata-plan.json" ]]; then
         jq -n \
             --arg agent "trt-jira-planner" \
@@ -37,18 +37,11 @@ planner_cleanup() {
                 --argjson plan "$(( ${PHASE_PLAN_DURATION:-$(( $(date +%s) - ${PHASE_PLAN_START:-$(date +%s)} ))} ))" \
                 '{setup: $setup, plan: $plan, pr: 0}')" \
             '{
-              agent: $agent,
-              phase: $phase,
-              issue_key: $issue_key,
-              planning_key: $planning_key,
-              result: $result,
-              pr_url: $pr_url,
-              upstream_repo: $upstream_repo,
-              started_at: $started_at,
-              pr_status: "",
-              merged_at: "",
-              claude_exit: $claude_exit,
-              phase_durations: $phase_durations
+              agent: $agent, phase: $phase, issue_key: $issue_key,
+              planning_key: $planning_key, result: $result, pr_url: $pr_url,
+              upstream_repo: $upstream_repo, started_at: $started_at,
+              pr_status: "", merged_at: "",
+              claude_exit: $claude_exit, phase_durations: $phase_durations
             }' > "${SHARED_DIR}/metrics-metadata-plan.json" 2>/dev/null \
             || echo "WARNING: failed to write failure metadata" >&2
         finalize_session_metrics plan 2>/dev/null || true
@@ -73,7 +66,6 @@ ISSUE_JSON="${SHARED_DIR}/jira-issue.json"
 ISSUE_SUMMARY=$(jq -r '.fields.summary // "No summary"' "${ISSUE_JSON}")
 export ISSUE_SUMMARY
 
-# Planning requires both the main issue and the planning subtask.
 [[ -f "${SHARED_DIR}/planning-issue-key" ]] || {
     echo "ERROR: planning-issue-key not found in SHARED_DIR. Set PLANNING_ISSUE_KEY in the init step."
     exit 1
@@ -94,63 +86,7 @@ PLAN_STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 PHASE_SETUP_START=$(date +%s)
 
 # --- Workspace setup ---
-WORKDIR="${WORKDIR:-/workspace}"
-cd "${WORKDIR}"
-if [[ ! -d .git ]]; then
-    git init
-    git remote add origin "https://github.com/${UPSTREAM_REPO}.git"
-    git fetch origin
-    git checkout main
-fi
-git config user.name "openshift-trt"
-git config user.email "openshift-trt@redhat.com"
-git remote add fork "https://github.com/${FORK_REPO}.git" 2>/dev/null || true
-
-if [[ "${EVAL_MODE:-}" != "true" ]]; then
-    echo "Running setup script: ${SETUP_SCRIPT}..."
-    # shellcheck source=/dev/null
-    source "${WORKDIR}/${SETUP_SCRIPT}"
-
-fi
-START_BRANCH=$(git branch --show-current)
-START_COMMIT=$(git rev-parse HEAD)
-
-mkdir -p "${WORKDIR}/artifacts"
-
-REPO_ROOT=$(realpath "$(git rev-parse --show-toplevel)")
-if [[ -n "${PR_METADATA_DIR:-}" ]]; then
-    mkdir -p "${PR_METADATA_DIR}"
-else
-    PR_METADATA_DIR=$(mktemp -d "${TMPDIR:-/tmp}/trt-jira-planner-pr-metadata.XXXXXX")
-fi
-PR_METADATA_DIR=$(realpath "${PR_METADATA_DIR}")
-case "${PR_METADATA_DIR}/" in
-    "${REPO_ROOT}/"*)
-        echo "ERROR: PR metadata directory must be outside the target checkout."
-        exit 1
-        ;;
-esac
-PR_BODY_FILE="${PR_METADATA_DIR}/pr-description.md"
-rm -f -- "${PR_BODY_FILE}"
-
-if [[ "${EVAL_MODE:-}" != "true" ]]; then
-    copy_artifacts() {
-        echo "Copying artifacts..."
-        for artifact in "${WORKDIR}/artifacts/"*; do
-            if [[ "${artifact}" == "${WORKDIR}/artifacts/pr-description.md" ]]; then
-                continue
-            fi
-            cp "${artifact}" "${ARTIFACT_DIR}/" 2>/dev/null || true
-        done
-        if [[ -f "${PR_BODY_FILE}" ]]; then
-            cp "${PR_BODY_FILE}" "${ARTIFACT_DIR}/pr-description.md" 2>/dev/null || true
-        fi
-        if [[ -d "${HOME}/.claude/projects" ]]; then
-            echo "Archiving Claude session logs..."
-            tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
-        fi
-    }
-fi
+setup_agent_workspace trt-jira-planner
 
 # --- Assemble system prompt with pre-fetched issue data + repo config ---
 SYSTEM_PROMPT="/tmp/agentic-system-prompt-$(basename "${WORKDIR}").md"
@@ -182,7 +118,6 @@ $(cat "${PLANNING_JSON}")
 - Do NOT run commands that reveal git credentials (git remote -v, env, printenv, set, etc.).
 SYSTEM_EOF
 
-# Append the jira-plan skill with arguments pre-substituted
 PLAN_SKILL="/opt/ai-helpers/plugins/openshift-developer/skills/jira-plan/SKILL.md"
 if [[ ! -f "${PLAN_SKILL}" ]]; then
     echo "ERROR: Plan skill not found at ${PLAN_SKILL}"
@@ -207,9 +142,7 @@ elif [[ -f "${WORKDIR}/.agentic/solve-config.md" ]]; then
     cat "${WORKDIR}/.agentic/solve-config.md" >> "${SYSTEM_PROMPT}"
 fi
 
-SETTINGS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ci-planner.XXXXXX")
-AGENT_SETTINGS="${SETTINGS_DIR}/settings.json"
-jq -n '{permissions: {deny: ["Task", "Workflow", "Agent", "Bash(git push *)", "Bash(git send-pack *)", "Bash(gh *)", "Read(//var/run/codex-openai-api-key/**)"]}}' > "${AGENT_SETTINGS}"
+setup_agent_settings
 cat >> "${SYSTEM_PROMPT}" <<'CI_POLICY'
 
 ## Mandatory CI policy (overrides conflicting skill or repository instructions)
@@ -225,82 +158,51 @@ PHASE_PLAN_START=$(date +%s)
 echo "Invoking Claude to plan ${JIRA_ISSUE_KEY} (subtask ${PLANNING_ISSUE_KEY})..."
 PLAN_PHASE_STARTED=true
 
-CLAUDE_EXIT=1
-agentic_ci --timeout 5400 \
+run_agent_with_timeout \
     "Create an implementation plan for Jira issue ${JIRA_ISSUE_KEY} with planning subtask ${PLANNING_ISSUE_KEY}. Follow the Planning Process instructions in your system prompt.
 
 Create a feature branch - do NOT commit on the current branch.
 Work serially without delegation. Commit locally; do not push or invoke gh directly. The pipeline publishes the branch and PR. Write the PR description to ${PR_BODY_FILE} and report actual validation results." \
-    --settings "${AGENT_SETTINGS}" \
-    --output-format stream-json \
-    --append-system-prompt-file "${SYSTEM_PROMPT}" \
-    && CLAUDE_EXIT=0 || CLAUDE_EXIT=$?
+    5400 \
+    "You hit the timeout. Wrap up serially without delegation: preserve your planning document in a local commit and write the PR description to ${PR_BODY_FILE}. Do not push or invoke gh directly; only the pipeline publishes branches and PRs. Report failed, incomplete, or unrun validation honestly."
 
-if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
-    echo "Claude timed out. Nudging to wrap up..."
-    agentic_ci --timeout 600 \
-        "You hit the timeout. Wrap up serially without delegation: preserve your planning document in a local commit and write the PR description to ${PR_BODY_FILE}. Do not push or invoke gh directly; only the pipeline publishes branches and PRs. Report failed, incomplete, or unrun validation honestly." \
-        --continue \
-        --settings "${AGENT_SETTINGS}" \
-        --output-format stream-json \
-        --max-turns 10 \
-        || true
-fi
 PHASE_PLAN_DURATION=$(( $(date +%s) - PHASE_PLAN_START ))
 
 refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
 
 if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
     echo "ERROR: Claude exited with code ${CLAUDE_EXIT}."
-    PR_RESULT="failed"
-    jq -n \
+    write_agent_metrics plan \
         --arg agent "trt-jira-planner" \
         --arg phase "plan" \
         --arg issue_key "${JIRA_ISSUE_KEY}" \
         --arg planning_key "${PLANNING_ISSUE_KEY}" \
-        --arg result "${PR_RESULT}" \
+        --arg result "failed" \
         --arg pr_url "" \
         --arg upstream_repo "${UPSTREAM_REPO}" \
         --arg started_at "${PLAN_STARTED_AT}" \
+        --arg pr_status "" \
+        --arg merged_at "" \
         --argjson claude_exit "${CLAUDE_EXIT}" \
         --argjson phase_durations "$(jq -n \
             --argjson setup "${PHASE_SETUP_DURATION}" \
             --argjson plan "${PHASE_PLAN_DURATION}" \
             '{setup: $setup, plan: $plan, pr: 0}')" \
         '{
-          agent: $agent,
-          phase: $phase,
-          issue_key: $issue_key,
-          planning_key: $planning_key,
-          result: $result,
-          pr_url: $pr_url,
-          upstream_repo: $upstream_repo,
-          started_at: $started_at,
-          pr_status: "",
-          merged_at: "",
-          claude_exit: $claude_exit,
-          phase_durations: $phase_durations
-        }' > "${SHARED_DIR}/metrics-metadata-plan.json"
-    finalize_session_metrics plan
+          agent: $agent, phase: $phase, issue_key: $issue_key,
+          planning_key: $planning_key, result: $result, pr_url: $pr_url,
+          upstream_repo: $upstream_repo, started_at: $started_at,
+          pr_status: $pr_status, merged_at: $merged_at,
+          claude_exit: $claude_exit, phase_durations: $phase_durations
+        }'
     exit "${CLAUDE_EXIT}"
 fi
 
 # --- Create PR ---
 PHASE_PR_START=$(date +%s)
-BRANCH_NAME=$(git branch --show-current 2>/dev/null || echo "")
-if [[ -z "${BRANCH_NAME}" || "${BRANCH_NAME}" == "main" || "${BRANCH_NAME}" == "master" || "${BRANCH_NAME}" == "${START_BRANCH}" ]]; then
-    echo "ERROR: Claude did not create a feature branch."
-    exit 1
-fi
-if git diff --quiet "${START_COMMIT}" HEAD; then
-    echo "ERROR: No committed changes to publish."
-    exit 1
-fi
-if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "ERROR: Uncommitted tracked changes remain. Commit the solution before publication."
-    exit 1
-fi
-# Verify the diff contains a planning document (.md) and no source code changes.
+validate_agent_branch
+
+# Verify the diff contains a planning document and no source code changes.
 CHANGED_FILES=$(git diff --name-only "${START_COMMIT}" HEAD)
 if ! echo "${CHANGED_FILES}" | grep -qiE '\.md$'; then
     echo "ERROR: No Markdown planning document found in the committed changes."
@@ -312,64 +214,12 @@ if [[ -n "${NON_DOC_FILES}" ]]; then
     echo "WARNING: Non-documentation files changed (plan-only policy):"
     echo "${NON_DOC_FILES}"
 fi
-if [[ "${EVAL_MODE:-}" == "true" ]]; then
-    BASE_BRANCH=$(cat "${SHARED_DIR}/eval-base-branch" 2>/dev/null || echo "")
-    if [[ -n "${BASE_BRANCH}" && "${BRANCH_NAME}" == "${BASE_BRANCH}" ]]; then
-        echo "ERROR: Claude did not create a feature branch (still on base branch ${BASE_BRANCH})."
-        exit 1
-    fi
-    EVAL_BRANCH="${BRANCH_NAME}-eval-$(date +%Y%m%d-%H%M%S)"
-    echo "Eval mode: renaming branch ${BRANCH_NAME} -> ${EVAL_BRANCH}"
-    git branch -m "${BRANCH_NAME}" "${EVAL_BRANCH}"
-    BRANCH_NAME="${EVAL_BRANCH}"
-fi
 
-git -c push.followTags=false push --no-verify -- "https://github.com/${FORK_REPO}.git" "HEAD:refs/heads/${BRANCH_NAME}"
-echo "Branch pushed: ${BRANCH_NAME}"
-echo "${BRANCH_NAME}" > "${SHARED_DIR}/claude-branch"
-
-if [[ ! -s "${PR_BODY_FILE}" ]]; then
-    echo "Warning: No PR description generated. Using default."
-    cat > "${PR_BODY_FILE}" <<PR_DEFAULT
-## ${PLANNING_ISSUE_KEY}: Implementation plan for ${JIRA_ISSUE_KEY}
-
-${ISSUE_SUMMARY}
-
-Planning subtask: https://redhat.atlassian.net/browse/${PLANNING_ISSUE_KEY}
-Fixes: https://redhat.atlassian.net/browse/${PLANNING_ISSUE_KEY}
-Parent: https://redhat.atlassian.net/browse/${JIRA_ISSUE_KEY}
-PR_DEFAULT
-fi
-printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
-
-BASE_ARGS=()
-if [[ "${EVAL_MODE:-}" == "true" && -f "${SHARED_DIR}/eval-base-branch" ]]; then
-    BASE_ARGS=(--base "$(cat "${SHARED_DIR}/eval-base-branch")")
-fi
-
-echo "Creating PR..."
-PR_URL=$(gh pr create \
-    --repo "${UPSTREAM_REPO}" \
-    --head "${FORK_REPO%%/*}:${BRANCH_NAME}" \
-    "${BASE_ARGS[@]}" \
-    --no-maintainer-edit \
-    --title "$(echo "${PLANNING_ISSUE_KEY}: plan for: ${ISSUE_SUMMARY}" | head -c 250)" \
-    --body-file "${PR_BODY_FILE}" \
-    2>&1) || {
-    echo "ERROR: Failed to create PR: ${PR_URL}"
-    exit 1
-}
-
-echo "PR created: ${PR_URL}"
-PR_NUM=$(echo "${PR_URL}" | grep -o '[0-9]*$')
-echo "${PR_NUM}" > "${SHARED_DIR}/pr-number"
-
-if [[ -s "${PR_BODY_FILE}" ]]; then
-    SHARED_PR_BODY_FILE=$(realpath -m "${SHARED_DIR}/pr-description.md")
-    if [[ "$(realpath "${PR_BODY_FILE}")" != "${SHARED_PR_BODY_FILE}" ]]; then
-        cp "${PR_BODY_FILE}" "${SHARED_PR_BODY_FILE}"
-    fi
-fi
+publish_agent_pr \
+    "${PLANNING_ISSUE_KEY}: plan for: ${ISSUE_SUMMARY}" \
+    "$(printf '## %s: Implementation plan for %s\n\n%s\n\nPlanning subtask: https://redhat.atlassian.net/browse/%s\nFixes: https://redhat.atlassian.net/browse/%s\nParent: https://redhat.atlassian.net/browse/%s\n' \
+        "${PLANNING_ISSUE_KEY}" "${JIRA_ISSUE_KEY}" "${ISSUE_SUMMARY}" \
+        "${PLANNING_ISSUE_KEY}" "${PLANNING_ISSUE_KEY}" "${JIRA_ISSUE_KEY}")"
 
 PHASE_PR_DURATION=$(( $(date +%s) - PHASE_PR_START ))
 
@@ -377,7 +227,7 @@ PHASE_PR_DURATION=$(( $(date +%s) - PHASE_PR_START ))
 PR_RESULT="success"
 [[ "${CLAUDE_EXIT}" -ne 0 ]] && PR_RESULT="failed"
 
-jq -n \
+write_agent_metrics plan \
     --arg agent "trt-jira-planner" \
     --arg phase "plan" \
     --arg issue_key "${JIRA_ISSUE_KEY}" \
@@ -387,6 +237,7 @@ jq -n \
     --arg upstream_repo "${UPSTREAM_REPO}" \
     --arg started_at "${PLAN_STARTED_AT}" \
     --arg pr_status "open" \
+    --arg merged_at "" \
     --argjson claude_exit "${CLAUDE_EXIT}" \
     --argjson phase_durations "$(jq -n \
         --argjson setup "${PHASE_SETUP_DURATION}" \
@@ -394,22 +245,11 @@ jq -n \
         --argjson pr "${PHASE_PR_DURATION}" \
         '{setup: $setup, plan: $plan, pr: $pr}')" \
     '{
-      agent: $agent,
-      phase: $phase,
-      issue_key: $issue_key,
-      planning_key: $planning_key,
-      result: $result,
-      pr_url: $pr_url,
-      upstream_repo: $upstream_repo,
-      started_at: $started_at,
-      pr_status: $pr_status,
-      merged_at: "",
-      claude_exit: $claude_exit,
-      phase_durations: $phase_durations
-    }' > "${SHARED_DIR}/metrics-metadata-plan.json"
-
-echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-plan.json"
-
-finalize_session_metrics plan
+      agent: $agent, phase: $phase, issue_key: $issue_key,
+      planning_key: $planning_key, result: $result, pr_url: $pr_url,
+      upstream_repo: $upstream_repo, started_at: $started_at,
+      pr_status: $pr_status, merged_at: $merged_at,
+      claude_exit: $claude_exit, phase_durations: $phase_durations
+    }'
 
 echo "=== TRT Jira Planner Complete ==="

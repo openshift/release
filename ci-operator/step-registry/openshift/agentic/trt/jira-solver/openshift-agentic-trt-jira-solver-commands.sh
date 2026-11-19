@@ -16,9 +16,9 @@ echo "=== TRT Jira Solver ==="
 }
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/trt-telemetry.sh"
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/agentic-ci-common.sh"
 
-# Keep the private prompt through normal metrics extraction, but never beyond
-# this task shell. Existing artifact cleanup is chained without trap eval.
 solver_cleanup() {
     local rc=$?
     rm -f "${SESSION_PROMPT_FILE}" \
@@ -43,72 +43,14 @@ export ISSUE_SUMMARY
 
 echo "Issue: ${JIRA_ISSUE_KEY} | Upstream: ${UPSTREAM_REPO} | Fork: ${FORK_REPO}"
 
-# Solve-step start. The dashboard uses this as the trigger time for time-to-merge.
 SOLVE_STARTED_AT=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 PHASE_SETUP_START=$(date +%s)
 
 # --- Workspace setup ---
-WORKDIR="${WORKDIR:-/workspace}"
-cd "${WORKDIR}"
-# In eval mode, eval-solve pre-clones the repo — this block only runs in standalone (production) mode
-if [[ ! -d .git ]]; then
-    git init
-    git remote add origin "https://github.com/${UPSTREAM_REPO}.git"
-    git fetch origin
-    git checkout main
-fi
-git config user.name "openshift-trt"
-git config user.email "openshift-trt@redhat.com"
-git remote add fork "https://github.com/${FORK_REPO}.git" 2>/dev/null || true
-
-if [[ "${EVAL_MODE:-}" != "true" ]]; then
-    echo "Running setup script: ${SETUP_SCRIPT}..."
-    # shellcheck source=/dev/null
-    source "${WORKDIR}/${SETUP_SCRIPT}"
-
-fi
-START_BRANCH=$(git branch --show-current)
-START_COMMIT=$(git rev-parse HEAD)
-
-mkdir -p "${WORKDIR}/artifacts"
-
-# Keep pipeline-owned publication metadata outside the target checkout so it
-# cannot be swept into the solution commit with repository changes.
-REPO_ROOT=$(realpath "$(git rev-parse --show-toplevel)")
-if [[ -n "${PR_METADATA_DIR:-}" ]]; then
-    mkdir -p "${PR_METADATA_DIR}"
-else
-    PR_METADATA_DIR=$(mktemp -d "${TMPDIR:-/tmp}/trt-jira-solver-pr-metadata.XXXXXX")
-fi
-PR_METADATA_DIR=$(realpath "${PR_METADATA_DIR}")
-case "${PR_METADATA_DIR}/" in
-    "${REPO_ROOT}/"*)
-        echo "ERROR: PR metadata directory must be outside the target checkout."
-        exit 1
-        ;;
-esac
-PR_BODY_FILE="${PR_METADATA_DIR}/pr-description.md"
-rm -f -- "${PR_BODY_FILE}"
-
-if [[ "${EVAL_MODE:-}" != "true" ]]; then
-    copy_artifacts() {
-        echo "Copying artifacts..."
-        for artifact in "${WORKDIR}/artifacts/"*; do
-            if [[ "${artifact}" == "${WORKDIR}/artifacts/pr-description.md" ]]; then
-                continue
-            fi
-            cp "${artifact}" "${ARTIFACT_DIR}/" 2>/dev/null || true
-        done
-        if [[ -f "${PR_BODY_FILE}" ]]; then
-            cp "${PR_BODY_FILE}" "${ARTIFACT_DIR}/pr-description.md" 2>/dev/null || true
-        fi
-        podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
-        if [[ -d "${HOME}/.claude/projects" ]]; then
-            echo "Archiving Claude session logs..."
-            tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
-        fi
-    }
-fi
+_copy_extra_artifacts() {
+    podman logs sippy-postgres > "${ARTIFACT_DIR}/postgres.log" 2>&1 || true
+}
+setup_agent_workspace trt-jira-solver
 
 # --- Assemble system prompt with pre-fetched issue data + repo config ---
 SYSTEM_PROMPT="/tmp/agentic-system-prompt-$(basename "${WORKDIR}").md"
@@ -136,7 +78,6 @@ $(cat "${ISSUE_JSON}")
 - Do NOT run commands that reveal git credentials (git remote -v, env, printenv, set, etc.).
 SYSTEM_EOF
 
-# Append the jira-solve skill with arguments pre-substituted
 SOLVE_SKILL="/opt/ai-helpers/plugins/openshift-developer/skills/jira-solve/SKILL.md"
 if [[ ! -f "${SOLVE_SKILL}" ]]; then
     echo "ERROR: Solve skill not found at ${SOLVE_SKILL}"
@@ -153,17 +94,12 @@ sed -e 's/\$1/'"${JIRA_ISSUE_KEY}"'/g' \
     -e 's/\$3/--ci/g' \
     "${SOLVE_SKILL}" >> "${SYSTEM_PROMPT}"
 
-# Repo-specific guidance overrides generic skill guidance, but not the CI policy below.
 if [[ -f "${WORKDIR}/.agentic/solve-config.md" ]]; then
     echo "" >> "${SYSTEM_PROMPT}"
     cat "${WORKDIR}/.agentic/solve-config.md" >> "${SYSTEM_PROMPT}"
 fi
 
-# Layer native permissions over repository settings without replacing its hooks.
-# Credential path denies are non-exhaustive and best effort, not a sandbox.
-SETTINGS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/ci-solver.XXXXXX")
-AGENT_SETTINGS="${SETTINGS_DIR}/settings.json"
-jq -n '{permissions: {deny: ["Task", "Workflow", "Agent", "Bash(git push *)", "Bash(git send-pack *)", "Bash(gh *)", "Read(//var/run/codex-openai-api-key/**)"]}}' > "${AGENT_SETTINGS}"
+setup_agent_settings
 cat >> "${SYSTEM_PROMPT}" <<'CI_POLICY'
 
 ## Mandatory CI policy (overrides conflicting skill or repository instructions)
@@ -177,137 +113,52 @@ PHASE_SETUP_DURATION=$(( $(date +%s) - PHASE_SETUP_START ))
 PHASE_SOLVE_START=$(date +%s)
 echo "Invoking Claude to solve ${JIRA_ISSUE_KEY}..."
 
-CLAUDE_EXIT=0
-agentic_ci --timeout 5400 \
+run_agent_with_timeout \
     "Solve Jira issue ${JIRA_ISSUE_KEY}. Follow the Solve Process instructions in your system prompt.
 
 Create a feature branch — do NOT commit on the current branch.
 Work serially without delegation. Commit locally; do not push or invoke gh directly. The upload-screenshot skill may publish screenshot assets to ${FORK_REPO}; the pipeline publishes the branch and PR. Write the PR description to ${PR_BODY_FILE} and report actual validation results." \
-    --settings "${AGENT_SETTINGS}" \
-    --output-format stream-json \
-    --append-system-prompt-file "${SYSTEM_PROMPT}" \
-    || CLAUDE_EXIT=$?
+    5400 \
+    "You hit the timeout. Wrap up serially without delegation: preserve your work in a local commit and write the PR description to ${PR_BODY_FILE}. Do not push or invoke gh directly; only the upload-screenshot skill may publish screenshot assets to ${FORK_REPO}, and only the pipeline publishes branches and PRs. Report failed, incomplete, or unrun validation honestly; this timed-out solve remains failed."
 
-if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
-    echo "Claude timed out. Nudging to wrap up..."
-    agentic_ci --timeout 600 \
-        "You hit the timeout. Wrap up serially without delegation: preserve your work in a local commit and write the PR description to ${PR_BODY_FILE}. Do not push or invoke gh directly; only the upload-screenshot skill may publish screenshot assets to ${FORK_REPO}, and only the pipeline publishes branches and PRs. Report failed, incomplete, or unrun validation honestly; this timed-out solve remains failed." \
-        --continue \
-        --settings "${AGENT_SETTINGS}" \
-        --output-format stream-json \
-        --max-turns 10 \
-        || true
-fi
 PHASE_SOLVE_DURATION=$(( $(date +%s) - PHASE_SOLVE_START ))
 
 refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
 
 if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
     echo "ERROR: Claude exited with code ${CLAUDE_EXIT}."
-    # Write failure metadata before exiting so post-step can emit metrics
-    PR_RESULT="failed"
-    jq -n \
+    write_agent_metrics solve \
         --arg agent "trt-jira-solver" \
         --arg phase "solve" \
         --arg issue_key "${JIRA_ISSUE_KEY}" \
-        --arg result "${PR_RESULT}" \
+        --arg result "failed" \
         --arg pr_url "" \
         --arg upstream_repo "${UPSTREAM_REPO}" \
         --arg started_at "${SOLVE_STARTED_AT}" \
+        --arg pr_status "" \
+        --arg merged_at "" \
         --argjson claude_exit "${CLAUDE_EXIT}" \
         --argjson phase_durations "$(jq -n \
             --argjson setup "${PHASE_SETUP_DURATION}" \
             --argjson solve "${PHASE_SOLVE_DURATION}" \
             '{setup: $setup, solve: $solve, pr: 0}')" \
         '{
-          agent: $agent,
-          phase: $phase,
-          issue_key: $issue_key,
-          result: $result,
-          pr_url: $pr_url,
-          upstream_repo: $upstream_repo,
-          started_at: $started_at,
-          pr_status: "",
-          merged_at: "",
-          claude_exit: $claude_exit,
-          phase_durations: $phase_durations
-        }' > "${SHARED_DIR}/metrics-metadata-solve.json"
-    finalize_session_metrics solve
+          agent: $agent, phase: $phase, issue_key: $issue_key,
+          result: $result, pr_url: $pr_url, upstream_repo: $upstream_repo,
+          started_at: $started_at, pr_status: $pr_status, merged_at: $merged_at,
+          claude_exit: $claude_exit, phase_durations: $phase_durations
+        }'
     exit "${CLAUDE_EXIT}"
 fi
 
 # --- Create PR ---
 PHASE_PR_START=$(date +%s)
-BRANCH_NAME=$(git branch --show-current 2>/dev/null || echo "")
-if [[ -z "${BRANCH_NAME}" || "${BRANCH_NAME}" == "main" || "${BRANCH_NAME}" == "master" || "${BRANCH_NAME}" == "${START_BRANCH}" ]]; then
-    echo "ERROR: Claude did not create a feature branch."
-    exit 1
-fi
-if git diff --quiet "${START_COMMIT}" HEAD; then
-    echo "ERROR: No committed changes to publish."
-    exit 1
-fi
-if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "ERROR: Uncommitted tracked changes remain. Commit the solution before publication."
-    exit 1
-fi
-if [[ "${EVAL_MODE:-}" == "true" ]]; then
-    BASE_BRANCH=$(cat "${SHARED_DIR}/eval-base-branch" 2>/dev/null || echo "")
-    if [[ -n "${BASE_BRANCH}" && "${BRANCH_NAME}" == "${BASE_BRANCH}" ]]; then
-        echo "ERROR: Claude did not create a feature branch (still on base branch ${BASE_BRANCH})."
-        exit 1
-    fi
-    EVAL_BRANCH="${BRANCH_NAME}-eval-$(date +%Y%m%d-%H%M%S)"
-    echo "Eval mode: renaming branch ${BRANCH_NAME} -> ${EVAL_BRANCH}"
-    git branch -m "${BRANCH_NAME}" "${EVAL_BRANCH}"
-    BRANCH_NAME="${EVAL_BRANCH}"
-fi
+validate_agent_branch
 
-# The agent never pushes. Publish only this branch to the configured fork; do
-# not fall back to upstream, honor push.default, or delete another remote ref.
-git -c push.followTags=false push --no-verify -- "https://github.com/${FORK_REPO}.git" "HEAD:refs/heads/${BRANCH_NAME}"
-echo "Branch pushed: ${BRANCH_NAME}"
-echo "${BRANCH_NAME}" > "${SHARED_DIR}/claude-branch"
-
-if [[ ! -s "${PR_BODY_FILE}" ]]; then
-    echo "Warning: No PR description generated. Using default."
-    cat > "${PR_BODY_FILE}" <<PR_DEFAULT
-## ${JIRA_ISSUE_KEY}: ${ISSUE_SUMMARY}
-
-Fixes: https://redhat.atlassian.net/browse/${JIRA_ISSUE_KEY}
-PR_DEFAULT
-fi
-printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
-
-BASE_ARGS=()
-if [[ "${EVAL_MODE:-}" == "true" && -f "${SHARED_DIR}/eval-base-branch" ]]; then
-    BASE_ARGS=(--base "$(cat "${SHARED_DIR}/eval-base-branch")")
-fi
-
-echo "Creating PR..."
-PR_URL=$(gh pr create \
-    --repo "${UPSTREAM_REPO}" \
-    --head "${FORK_REPO%%/*}:${BRANCH_NAME}" \
-    "${BASE_ARGS[@]}" \
-    --no-maintainer-edit \
-    --title "$(echo "${JIRA_ISSUE_KEY}: ${ISSUE_SUMMARY}" | head -c 250)" \
-    --body-file "${PR_BODY_FILE}" \
-    2>&1) || {
-    echo "ERROR: Failed to create PR: ${PR_URL}"
-    exit 1
-}
-
-echo "PR created: ${PR_URL}"
-PR_NUM=$(echo "${PR_URL}" | grep -o '[0-9]*$')
-echo "${PR_NUM}" > "${SHARED_DIR}/pr-number"
-
-# Copy PR description to SHARED_DIR for downstream steps (e.g., eval-judge)
-if [[ -s "${PR_BODY_FILE}" ]]; then
-    SHARED_PR_BODY_FILE=$(realpath -m "${SHARED_DIR}/pr-description.md")
-    if [[ "$(realpath "${PR_BODY_FILE}")" != "${SHARED_PR_BODY_FILE}" ]]; then
-        cp "${PR_BODY_FILE}" "${SHARED_PR_BODY_FILE}"
-    fi
-fi
+publish_agent_pr \
+    "${JIRA_ISSUE_KEY}: ${ISSUE_SUMMARY}" \
+    "$(printf '## %s: %s\n\nFixes: https://redhat.atlassian.net/browse/%s\n' \
+        "${JIRA_ISSUE_KEY}" "${ISSUE_SUMMARY}" "${JIRA_ISSUE_KEY}")"
 
 PHASE_PR_DURATION=$(( $(date +%s) - PHASE_PR_START ))
 
@@ -315,7 +166,7 @@ PHASE_PR_DURATION=$(( $(date +%s) - PHASE_PR_START ))
 PR_RESULT="success"
 [[ "${CLAUDE_EXIT}" -ne 0 ]] && PR_RESULT="failed"
 
-jq -n \
+write_agent_metrics solve \
     --arg agent "trt-jira-solver" \
     --arg phase "solve" \
     --arg issue_key "${JIRA_ISSUE_KEY}" \
@@ -324,6 +175,7 @@ jq -n \
     --arg upstream_repo "${UPSTREAM_REPO}" \
     --arg started_at "${SOLVE_STARTED_AT}" \
     --arg pr_status "open" \
+    --arg merged_at "" \
     --argjson claude_exit "${CLAUDE_EXIT}" \
     --argjson phase_durations "$(jq -n \
         --argjson setup "${PHASE_SETUP_DURATION}" \
@@ -331,21 +183,10 @@ jq -n \
         --argjson pr "${PHASE_PR_DURATION}" \
         '{setup: $setup, solve: $solve, pr: $pr}')" \
     '{
-      agent: $agent,
-      phase: $phase,
-      issue_key: $issue_key,
-      result: $result,
-      pr_url: $pr_url,
-      upstream_repo: $upstream_repo,
-      started_at: $started_at,
-      pr_status: $pr_status,
-      merged_at: "",
-      claude_exit: $claude_exit,
-      phase_durations: $phase_durations
-    }' > "${SHARED_DIR}/metrics-metadata-solve.json"
-
-echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-solve.json"
-
-finalize_session_metrics solve
+      agent: $agent, phase: $phase, issue_key: $issue_key,
+      result: $result, pr_url: $pr_url, upstream_repo: $upstream_repo,
+      started_at: $started_at, pr_status: $pr_status, merged_at: $merged_at,
+      claude_exit: $claude_exit, phase_durations: $phase_durations
+    }'
 
 echo "=== TRT Jira Solver Complete ==="

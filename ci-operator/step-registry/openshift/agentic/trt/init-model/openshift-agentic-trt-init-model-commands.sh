@@ -1295,4 +1295,216 @@ HEREDOC_EOF
 chmod +x "${SHARED_DIR}/trt-telemetry.sh"
 echo "Telemetry helper written to ${SHARED_DIR}/trt-telemetry.sh"
 
+cat > "${SHARED_DIR}/agentic-ci-common.sh" << 'HEREDOC_EOF'
+#!/bin/bash
+# Shared plumbing for TRT agent steps (solver, planner). Source after
+# trt-telemetry.sh; callers keep only their distinct prompts, issue
+# inputs, and output policies.
+#
+#   source "${SHARED_DIR}/agentic-ci-common.sh"
+
+# setup_agent_workspace [tmpdir-label]
+#   Initialises the git checkout, fork remote, setup script, copy_artifacts,
+#   and PR metadata directory. Sets globals: WORKDIR, START_BRANCH,
+#   START_COMMIT, PR_METADATA_DIR, PR_BODY_FILE, REPO_ROOT.
+setup_agent_workspace() {
+    local label="${1:-trt-agent}"
+
+    WORKDIR="${WORKDIR:-/workspace}"
+    cd "${WORKDIR}"
+    if [[ ! -d .git ]]; then
+        git init
+        git remote add origin "https://github.com/${UPSTREAM_REPO}.git"
+        git fetch origin
+        git checkout main
+    fi
+    git config user.name "openshift-trt"
+    git config user.email "openshift-trt@redhat.com"
+    git remote add fork "https://github.com/${FORK_REPO}.git" 2>/dev/null || true
+
+    if [[ "${EVAL_MODE:-}" != "true" ]]; then
+        echo "Running setup script: ${SETUP_SCRIPT}..."
+        # shellcheck source=/dev/null
+        source "${WORKDIR}/${SETUP_SCRIPT}"
+
+    fi
+    START_BRANCH=$(git branch --show-current)
+    START_COMMIT=$(git rev-parse HEAD)
+
+    mkdir -p "${WORKDIR}/artifacts"
+
+    REPO_ROOT=$(realpath "$(git rev-parse --show-toplevel)")
+    if [[ -n "${PR_METADATA_DIR:-}" ]]; then
+        mkdir -p "${PR_METADATA_DIR}"
+    else
+        PR_METADATA_DIR=$(mktemp -d "${TMPDIR:-/tmp}/${label}-pr-metadata.XXXXXX")
+    fi
+    PR_METADATA_DIR=$(realpath "${PR_METADATA_DIR}")
+    case "${PR_METADATA_DIR}/" in
+        "${REPO_ROOT}/"*)
+            echo "ERROR: PR metadata directory must be outside the target checkout."
+            exit 1
+            ;;
+    esac
+    PR_BODY_FILE="${PR_METADATA_DIR}/pr-description.md"
+    rm -f -- "${PR_BODY_FILE}"
+
+    if [[ "${EVAL_MODE:-}" != "true" ]]; then
+        copy_artifacts() {
+            echo "Copying artifacts..."
+            for artifact in "${WORKDIR}/artifacts/"*; do
+                if [[ "${artifact}" == "${WORKDIR}/artifacts/pr-description.md" ]]; then
+                    continue
+                fi
+                cp "${artifact}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+            done
+            if [[ -f "${PR_BODY_FILE}" ]]; then
+                cp "${PR_BODY_FILE}" "${ARTIFACT_DIR}/pr-description.md" 2>/dev/null || true
+            fi
+            if declare -F _copy_extra_artifacts >/dev/null; then
+                _copy_extra_artifacts || true
+            fi
+            if [[ -d "${HOME}/.claude/projects" ]]; then
+                echo "Archiving Claude session logs..."
+                tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
+            fi
+        }
+    fi
+}
+
+# setup_agent_settings
+#   Creates the CI agent settings.json (tool denials). Sets AGENT_SETTINGS.
+setup_agent_settings() {
+    local settings_dir
+    settings_dir=$(mktemp -d "${TMPDIR:-/tmp}/ci-agent.XXXXXX")
+    AGENT_SETTINGS="${settings_dir}/settings.json"
+    jq -n '{permissions: {deny: ["Task", "Workflow", "Agent", "Bash(git push *)", "Bash(git send-pack *)", "Bash(gh *)", "Read(//var/run/codex-openai-api-key/**)"]}}' > "${AGENT_SETTINGS}"
+}
+
+# run_agent_with_timeout <prompt> <timeout-secs> <nudge-prompt> [extra-args...]
+#   Invokes agentic_ci with timeout handling and a nudge continuation on
+#   timeout. Sets CLAUDE_EXIT.
+run_agent_with_timeout() {
+    local prompt="$1" timeout_secs="$2" nudge_prompt="$3"
+    shift 3
+
+    CLAUDE_EXIT=0
+    agentic_ci --timeout "${timeout_secs}" \
+        "${prompt}" \
+        --settings "${AGENT_SETTINGS}" \
+        --output-format stream-json \
+        --append-system-prompt-file "${SYSTEM_PROMPT}" \
+        "$@" \
+        || CLAUDE_EXIT=$?
+
+    if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+        echo "Claude timed out. Nudging to wrap up..."
+        agentic_ci --timeout 600 \
+            "${nudge_prompt}" \
+            --continue \
+            --settings "${AGENT_SETTINGS}" \
+            --output-format stream-json \
+            --max-turns 10 \
+            || true
+    fi
+}
+
+# validate_agent_branch
+#   Validates the agent created a feature branch with committed changes and
+#   no uncommitted tracked files. Handles eval-mode branch renaming.
+#   Sets BRANCH_NAME.
+validate_agent_branch() {
+    BRANCH_NAME=$(git branch --show-current 2>/dev/null || echo "")
+    if [[ -z "${BRANCH_NAME}" || "${BRANCH_NAME}" == "main" || "${BRANCH_NAME}" == "master" || "${BRANCH_NAME}" == "${START_BRANCH}" ]]; then
+        echo "ERROR: Claude did not create a feature branch."
+        exit 1
+    fi
+    if git diff --quiet "${START_COMMIT}" HEAD; then
+        echo "ERROR: No committed changes to publish."
+        exit 1
+    fi
+    if ! git diff --quiet || ! git diff --cached --quiet; then
+        echo "ERROR: Uncommitted tracked changes remain. Commit the solution before publication. Git status:"
+        git status --short
+        exit 1
+    fi
+    if [[ "${EVAL_MODE:-}" == "true" ]]; then
+        local base_branch
+        base_branch=$(cat "${SHARED_DIR}/eval-base-branch" 2>/dev/null || echo "")
+        if [[ -n "${base_branch}" && "${BRANCH_NAME}" == "${base_branch}" ]]; then
+            echo "ERROR: Claude did not create a feature branch (still on base branch ${base_branch})."
+            exit 1
+        fi
+        local eval_branch="${BRANCH_NAME}-eval-$(date +%Y%m%d-%H%M%S)"
+        echo "Eval mode: renaming branch ${BRANCH_NAME} -> ${eval_branch}"
+        git branch -m "${BRANCH_NAME}" "${eval_branch}"
+        BRANCH_NAME="${eval_branch}"
+    fi
+}
+
+# publish_agent_pr <pr-title> [default-pr-body]
+#   Pushes the branch to the fork, creates the PR, copies the PR body to
+#   SHARED_DIR. Sets PR_URL, PR_NUM.
+publish_agent_pr() {
+    local pr_title="$1"
+    local default_pr_body="${2:-}"
+
+    git -c push.followTags=false push --no-verify -- "https://github.com/${FORK_REPO}.git" "HEAD:refs/heads/${BRANCH_NAME}"
+    echo "Branch pushed: ${BRANCH_NAME}"
+    echo "${BRANCH_NAME}" > "${SHARED_DIR}/claude-branch"
+
+    if [[ ! -s "${PR_BODY_FILE}" ]]; then
+        echo "Warning: No PR description generated. Using default."
+        if [[ -n "${default_pr_body}" ]]; then
+            printf '%s\n' "${default_pr_body}" > "${PR_BODY_FILE}"
+        fi
+    fi
+    printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
+
+    local base_args=()
+    if [[ "${EVAL_MODE:-}" == "true" && -f "${SHARED_DIR}/eval-base-branch" ]]; then
+        base_args=(--base "$(cat "${SHARED_DIR}/eval-base-branch")")
+    fi
+
+    echo "Creating PR..."
+    PR_URL=$(gh pr create \
+        --repo "${UPSTREAM_REPO}" \
+        --head "${FORK_REPO%%/*}:${BRANCH_NAME}" \
+        "${base_args[@]}" \
+        --no-maintainer-edit \
+        --title "$(echo "${pr_title}" | head -c 250)" \
+        --body-file "${PR_BODY_FILE}" \
+        2>&1) || {
+        echo "ERROR: Failed to create PR: ${PR_URL}"
+        exit 1
+    }
+
+    echo "PR created: ${PR_URL}"
+    PR_NUM=$(echo "${PR_URL}" | grep -o '[0-9]*$')
+    echo "${PR_NUM}" > "${SHARED_DIR}/pr-number"
+
+    if [[ -s "${PR_BODY_FILE}" ]]; then
+        local shared_pr_body
+        shared_pr_body=$(realpath -m "${SHARED_DIR}/pr-description.md")
+        if [[ "$(realpath "${PR_BODY_FILE}")" != "${shared_pr_body}" ]]; then
+            cp "${PR_BODY_FILE}" "${shared_pr_body}"
+        fi
+    fi
+}
+
+# write_agent_metrics <phase> <metadata-json-args...>
+#   Writes metrics-metadata-<phase>.json from the provided jq arguments
+#   and calls finalize_session_metrics. Expects jq --arg/--argjson pairs
+#   that produce the metadata object.
+write_agent_metrics() {
+    local phase="$1"
+    shift
+    jq -n "$@" > "${SHARED_DIR}/metrics-metadata-${phase}.json"
+    echo "Metrics metadata written to ${SHARED_DIR}/metrics-metadata-${phase}.json"
+    finalize_session_metrics "${phase}"
+}
+HEREDOC_EOF
+chmod +x "${SHARED_DIR}/agentic-ci-common.sh"
+echo "Common agent helper written to ${SHARED_DIR}/agentic-ci-common.sh"
+
 echo "=== TRT Init Model Complete ==="
