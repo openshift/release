@@ -105,9 +105,9 @@ mirror:
   - catalog: ${MCE_IIB_IMAGE}
     packages:
     - name: multicluster-engine
-      defaultChannel: release-${MCE_VERSION}
+      defaultChannel: stable-${MCE_VERSION}
       channels:
-      - name: release-${MCE_VERSION}
+      - name: stable-${MCE_VERSION}
 EOF
 
     log "ImageSetConfiguration:"
