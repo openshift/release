@@ -99,9 +99,15 @@ mirror:
   - catalog: ${ACM_IIB_IMAGE}
     packages:
     - name: advanced-cluster-management
+      defaultChannel: release-${ACM_VERSION}
+      channels:
+      - name: release-${ACM_VERSION}
   - catalog: ${MCE_IIB_IMAGE}
     packages:
     - name: multicluster-engine
+      defaultChannel: release-${MCE_VERSION}
+      channels:
+      - name: release-${MCE_VERSION}
 EOF
 
     log "ImageSetConfiguration:"
@@ -118,7 +124,7 @@ mirror_operators() {
         "docker://${MIRROR_REGISTRY_HOST}" \
         --src-tls-verify=false \
         --dest-tls-verify=false \
-        --log-level=info 2>&1 | tee "${TMP_DIR}/acm_mce_mirror.log" || {
+        --log-level=debug 2>&1 | tee "${ARTIFACT_DIR}/acm_mce_mirror.log" || {
         log "ERROR: oc-mirror failed"
         return 1
     }
