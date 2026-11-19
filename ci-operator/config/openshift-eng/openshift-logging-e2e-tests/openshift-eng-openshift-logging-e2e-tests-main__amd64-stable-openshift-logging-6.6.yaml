@@ -38,11 +38,8 @@ resources:
       cpu: "1"
       memory: 1Gi
 tests:
-- always_run: false
-  as: aws-ipi-f14-logging-clo
+- as: aws-ipi-f14-logging-clo
   cron: 0 9 * * 3
-  optional: true
-  presubmit: true
   steps:
     cluster_profile: aws-observability
     env:
@@ -58,26 +55,35 @@ tests:
     - chain: openshift-observability-logging-e2e-suite
     workflow: cucushift-installer-rehearse-aws-ipi-ovn
 - always_run: false
-  as: aws-ipi-f14-logging-clo-premerge
+  as: aws-ipi-f14-logging-clo-full
   optional: true
   steps:
     cluster_profile: aws-observability
     env:
-      AGENT_SKILL: cluster-logging
       BASE_DOMAIN: devobscluster.devcluster.openshift.com
       TEST_MAX_CONCURRENCY: "1"
-      TEST_SUITE: openshift-logging-e2e-tests/cluster-logging-operator
+      TEST_SUITE: openshift-logging-e2e-tests/cluster-logging-operator/all
     post:
-    - ref: openshift-observability-qe-agent
     - chain: cucushift-installer-rehearse-aws-ipi-deprovision
     test:
     - chain: openshift-observability-logging-e2e-suite
     workflow: cucushift-installer-rehearse-aws-ipi-ovn
 - always_run: false
-  as: aws-ipi-f14-logging-loki
-  cron: 0 9 * * 4
+  as: aws-ipi-f14-logging-clo-premerge
   optional: true
-  presubmit: true
+  steps:
+    cluster_profile: aws-observability
+    env:
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
+      TEST_MAX_CONCURRENCY: "1"
+      TEST_SUITE: openshift-logging-e2e-tests/cluster-logging-operator
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    test:
+    - chain: openshift-observability-logging-e2e-suite
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
+- as: aws-ipi-f14-logging-loki
+  cron: 0 9 * * 4
   steps:
     cluster_profile: aws-observability
     env:
@@ -93,17 +99,29 @@ tests:
     - chain: openshift-observability-logging-e2e-suite
     workflow: cucushift-installer-rehearse-aws-ipi-ovn
 - always_run: false
+  as: aws-ipi-f14-logging-loki-full
+  optional: true
+  steps:
+    cluster_profile: aws-observability
+    env:
+      BASE_DOMAIN: devobscluster.devcluster.openshift.com
+      TEST_MAX_CONCURRENCY: "1"
+      TEST_SUITE: openshift-logging-e2e-tests/loki-operator/all
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    test:
+    - chain: openshift-observability-logging-e2e-suite
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
+- always_run: false
   as: aws-ipi-f14-logging-loki-premerge
   optional: true
   steps:
     cluster_profile: aws-observability
     env:
-      AGENT_SKILL: loki
       BASE_DOMAIN: devobscluster.devcluster.openshift.com
       TEST_MAX_CONCURRENCY: "1"
       TEST_SUITE: openshift-logging-e2e-tests/loki-operator
     post:
-    - ref: openshift-observability-qe-agent
     - chain: cucushift-installer-rehearse-aws-ipi-deprovision
     test:
     - chain: openshift-observability-logging-e2e-suite
