@@ -50,7 +50,7 @@ typeset -i budget=0
 
 # --- JUnit carrier machinery (deploy-acs precedent, D4/D6) -----------------
 _SUITE="lp-interop--OPP--acs-readiness"
-_CLASSNAME="lp-interop.OPP.acs-readiness"
+_CLASSNAME="stackrox-opp-readiness"
 _CARRIER="${ARTIFACT_DIR}/junit_${_SUITE}.xml"
 _junit_start=$(date +%s)
 declare -a _CASES=()
