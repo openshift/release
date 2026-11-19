@@ -20,9 +20,14 @@ import sys
 
 command = Path(sys.argv[0]).name
 args = sys.argv[1:]
+if command == "oc":
+    request_timeouts = [arg for arg in args if arg.startswith("--request-timeout=")]
+    if request_timeouts and ("rollout" in args or "wait" in args):
+        assert request_timeouts[-1] == "--request-timeout=" + os.environ["VERIFY_TIMEOUT"]
+    args = [arg for arg in args if not arg.startswith("--request-timeout=")]
 scenario = os.environ.get("SCENARIO", "normal")
 directory = Path(os.environ["SHARED_DIR"])
-action = " ".join(args[:2])
+action = " ".join(args if command == "oc" else args[:2])
 with (directory / "calls").open("a") as stream:
     stream.write(json.dumps([command, action]) + "\n")
 
@@ -42,7 +47,6 @@ elif command == "jq":
     assert args == ["-r", ".[]"]
     print("\n".join(json.load(sys.stdin)))
 elif command == "oc":
-    args = [arg for arg in args if not arg.startswith("--request-timeout=")]
     if args[0] == "apply":
         sys.stdin.read()
     elif args[:2] == ["get", "subscription"]:
@@ -57,15 +61,29 @@ elif command == "oc":
             assert args[2] == "installed.v1", args
             print("Succeeded")
     elif args[:2] == ["get", "deployments"]:
-        print("synthetic")
+        if scenario == "list-error":
+            print("synthetic deployment lookup failure", file=sys.stderr)
+            sys.exit(17)
+        namespace = args[args.index("-n") + 1]
+        print("maas-api praxis" if namespace == "enmaas" else "prometheus grafana")
     elif "rollout" in args or "wait" in args:
-        pass
+        if "rollout" in args and scenario == "rollout-failures" and args[2] in (
+                "deployment/maas-api", "deployment/grafana"):
+            print("synthetic progress deadline exceeded", file=sys.stderr)
+            sys.exit(8)
+        if "wait" in args and scenario == "operator-error":
+            sys.exit(15)
     elif args[:2] == ["get", "pvc"]:
         if scenario == "pvc-error":
             print("synthetic lookup failure", file=sys.stderr)
             sys.exit(17)
+        if scenario == "pvc-pending":
+            print("synthetic-pvc\tPending")
+        elif scenario == "pvc-bound":
+            print("synthetic-pvc\tBound")
     elif "route" in args or "routes" in args:
-        pass
+        if "route" in args and scenario == "route-error":
+            sys.exit(16)
     elif "get" in args and ("statefulsets" in args or "pods" in args):
         pass
     else:
@@ -330,6 +348,42 @@ assert token not in result.stderr
                     self.assertNotIn("No PVCs found", result.stdout)
                 else:
                     self.assertIn("No PVCs found", result.stdout)
+
+    def test_verify_collects_rollout_failures_in_both_namespaces(self):
+        result = self.run_step("verify", "rollout-failures")
+        self.assertEqual(result.returncode, 8, result.stderr)
+        self.assertIn("Rollout failed: enmaas/deployment/maas-api", result.stdout)
+        self.assertIn("Rollout failed: enmaas-monitoring/deployment/grafana", result.stdout)
+        calls = [action for command, action in self.calls() if command == "oc"]
+        self.assertEqual(len([action for action in calls if action.startswith("rollout status ")]), 4)
+        self.assertTrue(any(action.startswith("get pvc ") for action in calls))
+        self.assertTrue(any("get route gateway-enmaas" in action for action in calls))
+        self.assertTrue(any(" wait " in action for action in calls))
+        self.assertIn("synthetic progress deadline exceeded", result.stderr)
+        self.assertNotIn("verification complete.", result.stdout)
+        self.assertFalse(any("secret" in action or "--output=json" in action for action in calls))
+
+    def test_verify_preserves_required_lookup_and_health_failures(self):
+        for scenario, expected in (("normal", 0), ("pvc-bound", 0), ("pvc-pending", 1),
+                                   ("list-error", 17), ("operator-error", 15), ("route-error", 16)):
+            with self.subTest(scenario=scenario):
+                (self.directory / "calls").unlink(missing_ok=True)
+                result = self.run_step("verify", scenario)
+                self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+                calls = [action for command, action in self.calls() if command == "oc"]
+                self.assertTrue(any("get route gateway-enmaas" in action for action in calls))
+                if scenario == "list-error":
+                    self.assertIn("Failed to list deployments in namespace enmaas-monitoring", result.stdout)
+                    self.assertNotIn("No deployments found", result.stdout)
+
+    def test_verify_deadline_fails_without_unbounded_requests(self):
+        source = (STEPS / "verify/enmaas-verify-commands.sh").read_text(encoding="utf-8")
+        self.assertIn('request_timeout=30s', source)
+        self.assertIn('timeout --kill-after=5s "${remaining}s" oc --request-timeout="${request_timeout}"', source)
+        result = self.run_step("verify", source=source.replace("SECONDS + 1800", "SECONDS - 1"))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("deadline", result.stderr)
+        self.assertEqual(self.calls(), [])
 
 
 if __name__ == "__main__":

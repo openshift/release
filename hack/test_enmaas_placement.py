@@ -549,6 +549,49 @@ class EnmaasDatabaseTests(EnmaasPlacementFixture):
             "name": "unrelated", "image": "example.invalid/other", "envFrom": copy.deepcopy(api["envFrom"])}]
         return spec
 
+    def test_both_api_names_in_nested_workloads_with_default_images(self):
+        for kind in ("Pod", "PodTemplate", "ReplicationController", "Deployment", "StatefulSet",
+                     "DaemonSet", "ReplicaSet", "DeploymentConfig", "Job", "CronJob"):
+            for api_name in ("maas-api", "enmaas-api"):
+                for identity in ("name", "label"):
+                    for external in ("true", "false"):
+                        with self.subTest(kind=kind, api=api_name, identity=identity, external=external):
+                            spec = self.database_spec()
+                            spec["containers"][0]["name"] = api_name
+                            spec["containers"][0]["env"][0]["name"] = "DATABASE_URL"
+                            if identity == "label":
+                                spec["initContainers"][0]["name"] = api_name
+                            spec["imagePullSecrets"] = [{"name": "rendered-default"}]
+                            spec["serviceAccountName"] = "rendered-sa"
+                            workload = self.workload(kind, spec)
+                            workload.setdefault("metadata", {})
+                            if identity == "name":
+                                workload["metadata"]["name"] = api_name
+                            else:
+                                workload["metadata"]["labels"] = {"app.kubernetes.io/name": api_name}
+                            documents = [{"apiVersion": "v1", "kind": "List", "items": [
+                                {"apiVersion": "v1", "kind": "List", "items": [workload]}]}]
+                            result, rendered = self.run_placement(documents, "enmaas", external)
+                            self.assertEqual(result.returncode, 0, result.stderr)
+                            actual = list(self.find_specs(rendered))
+                            self.assertEqual(len(actual), 1)
+                            expected = copy.deepcopy(spec)
+                            if external == "true":
+                                for container in (expected["containers"][0], expected["initContainers"][0]):
+                                    container["envFrom"][0]["secretRef"]["name"] = "maas-db-config"
+                                    container["env"][0]["valueFrom"]["secretKeyRef"]["name"] = "maas-db-config"
+                            for field in ("containers", "initContainers", "imagePullSecrets", "serviceAccountName"):
+                                self.assertEqual(actual[0][field], expected[field])
+
+    def test_maas_api_container_without_api_workload_identity_is_unchanged(self):
+        spec = self.database_spec()
+        spec["containers"][0]["name"] = "maas-api"
+        result, rendered = self.run_placement([self.workload("Deployment", spec)], "enmaas", "true")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        actual = list(self.find_specs(rendered))[0]
+        for field in ("containers", "initContainers"):
+            self.assertEqual(actual[field], spec[field])
+
     def test_external_database_references_only_api_init_and_main(self):
         spec = self.database_spec()
         documents = [self.api_workload("Deployment", spec)]

@@ -228,13 +228,13 @@ def pod_specs(resource):
         for item in resource["items"]:
             yield from pod_specs(item)
     elif path:
-        api_workload = resource.get("metadata", {}).get("name") == "enmaas-api"
+        api_workload = resource.get("metadata", {}).get("name") in ("enmaas-api", "maas-api")
         for field in path[:-1]:
             api_workload = api_workload or resource.get("metadata", {}).get("labels", {}).get(
-                "app.kubernetes.io/name") == "enmaas-api"
+                "app.kubernetes.io/name") in ("enmaas-api", "maas-api")
             resource = resource[field]
         api_workload = api_workload or resource.get("metadata", {}).get("labels", {}).get(
-            "app.kubernetes.io/name") == "enmaas-api"
+            "app.kubernetes.io/name") in ("enmaas-api", "maas-api")
         resource[path[-1]] = copy.deepcopy(resource[path[-1]])
         resource = resource[path[-1]]
         if not isinstance(resource.get("containers"), list) or not resource["containers"]:
@@ -289,7 +289,7 @@ def tolerates(toleration, taint):
 
 def configure_database(value):
     for container in value.get("containers", []) + value.get("initContainers", []):
-        if container.get("name") not in ("enmaas-api", "migrate"):
+        if container.get("name") not in ("enmaas-api", "maas-api", "migrate"):
             continue
         for entry in container.get("envFrom", []):
             reference = entry.get("secretRef", {})
