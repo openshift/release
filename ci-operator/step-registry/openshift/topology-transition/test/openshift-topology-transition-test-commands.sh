@@ -119,6 +119,8 @@ for attempt in 1 2 3; do
 done
 
 printf 'Running test suite: %s\n' "${suite}"
+# Keep operator placement unchanged before the topology suite's health checks.
+export OPENSHIFT_TESTS_SKIP_SINGLETON_REBALANCE=true
 # Origin retains its 45/195-minute suite limits and five-minute CLI limit.
 timeout --signal=TERM --kill-after=2m "${suite_timeout}" openshift-tests run "${suite}" \
   -o "${artifacts}/e2e.log" --junit-dir="${artifacts}/junit" 2>&1 | tee "${artifacts}/output.log"
