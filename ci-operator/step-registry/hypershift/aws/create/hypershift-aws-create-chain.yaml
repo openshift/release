@@ -17,7 +17,19 @@ chain:
     - name: GUEST_FEATURE_SET
       default: ""
       documentation: |
-        This field sets the cluster feature set. This is used to enable custom features such as tech preview features
+        Guest cluster feature set: empty (default), TechPreviewNoUpgrade,
+        DevPreviewNoUpgrade or CustomNoUpgrade. Applied before cluster creation.
+    - name: GUEST_FEATURE_GATES
+      default: ""
+      documentation: |
+        Comma-separated Name=true,Other=false guest gate overrides. Requires
+        GUEST_FEATURE_SET=CustomNoUpgrade; at most 64 unique gates.
+    - name: MULTISTAGE_PARAM_OVERRIDE_GUEST_FEATURE_SET
+      default: ""
+      documentation: Gangway transport override for GUEST_FEATURE_SET.
+    - name: MULTISTAGE_PARAM_OVERRIDE_GUEST_FEATURE_GATES
+      default: ""
+      documentation: Gangway transport override for GUEST_FEATURE_GATES.
     - name: HYPERSHIFT_NODE_COUNT
       default: "3"
       documentation: "The number nodes to automatically create and join to the cluster."
@@ -112,6 +124,43 @@ chain:
       documentation: "The CNI provider to use for the cluster. Supported values: cilium, calico"
     commands: |-
       set -exuo pipefail
+      GUEST_FEATURE_SET="${MULTISTAGE_PARAM_OVERRIDE_GUEST_FEATURE_SET:-${GUEST_FEATURE_SET}}"
+      GUEST_FEATURE_GATES="${MULTISTAGE_PARAM_OVERRIDE_GUEST_FEATURE_GATES:-${GUEST_FEATURE_GATES}}"
+      case "${GUEST_FEATURE_SET}" in
+        ""|TechPreviewNoUpgrade|DevPreviewNoUpgrade|CustomNoUpgrade) ;;
+        *) echo "ERROR: unsupported GUEST_FEATURE_SET" >&2; exit 1 ;;
+      esac
+      if [[ -n "${GUEST_FEATURE_GATES}" && "${GUEST_FEATURE_SET}" != CustomNoUpgrade ]]; then
+        echo "ERROR: GUEST_FEATURE_GATES requires GUEST_FEATURE_SET=CustomNoUpgrade" >&2
+        exit 1
+      fi
+      # The operator image has Python (UBI's package manager dependency), but
+      # does not contain jq. Only the custom path needs this dependency.
+      if [[ ${GUEST_FEATURE_SET} == CustomNoUpgrade ]]; then
+        guest_feature_spec=$(python3 - "${GUEST_FEATURE_SET}" "${GUEST_FEATURE_GATES}" <<'PY'
+      import json
+      import re
+      import sys
+
+      feature_set, gates = sys.argv[1:]
+      if len(gates) > 8192 or (gates and len(gates.split(",")) > 64):
+          sys.exit("ERROR: too many or overlong GUEST_FEATURE_GATES")
+      enabled, disabled, seen = [], [], set()
+      for entry in gates.split(",") if gates else []:
+          name, separator, value = entry.partition("=")
+          if (not separator or len(name) > 128 or
+                  not re.fullmatch(r"([A-Za-z0-9-]+\.)*[A-Za-z0-9-]+\.?", name) or
+                  value not in ("true", "false") or name in seen):
+              sys.exit("ERROR: invalid or duplicate GUEST_FEATURE_GATES; use Name=true,Other=false")
+          seen.add(name)
+          (enabled if value == "true" else disabled).append(name)
+      spec = {"featureSet": feature_set}
+      if feature_set == "CustomNoUpgrade":
+          spec["customNoUpgrade"] = {"enabled": enabled, "disabled": disabled}
+      print(json.dumps(spec))
+      PY
+        )
+      fi
       if [[ -n "${HYPERSHIFT_CLUSTER_ROLE:-}" ]]; then
         if [[ ! "${HYPERSHIFT_CLUSTER_ROLE}" =~ ^[a-z0-9-]+$ ]]; then
           echo "HYPERSHIFT_CLUSTER_ROLE must contain only lowercase letters, digits, or hyphens" >&2
@@ -184,8 +233,8 @@ chain:
         COMMAND+=(--public-only)
       fi
       
-      if [[ $GUEST_FEATURE_SET == "TechPreviewNoUpgrade" ]]; then
-        COMMAND+=(--feature-set=TechPreviewNoUpgrade)
+      if [[ $GUEST_FEATURE_SET == TechPreviewNoUpgrade || $GUEST_FEATURE_SET == DevPreviewNoUpgrade ]]; then
+        COMMAND+=(--feature-set="${GUEST_FEATURE_SET}")
       fi
       
       if [[ $HYPERSHIFT_INPLACE_NODE_UPGRADE_TYPE == "true" ]]; then
@@ -225,7 +274,7 @@ chain:
         COMMAND+=(--additional-trust-bundle "${SHARED_DIR}/${ADDITIONAL_CA_BUNDLE_FILE}")
       fi
 
-      if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
+      if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" && $GUEST_FEATURE_SET != CustomNoUpgrade ]]; then
         "${COMMAND[@]}" --render > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
         exit 0
       fi
@@ -251,9 +300,56 @@ chain:
         cp ${hosted_cluster_info_file} ${ARTIFACT_DIR}/aws-hosted-cluster-info-user-tag
       fi
 
+      # The CLI supports predefined sets, but has no individual gate override
+      # flag. Set the HostedCluster configuration before applying any objects.
+      if [[ $GUEST_FEATURE_SET == CustomNoUpgrade ]]; then
+        # Rendered objects contain credentials: keep them out of logs/artifacts
+        # and remove them before SHARED_DIR is uploaded, including on failure.
+        set +x
+        umask 077
+        rendered=$(mktemp "${SHARED_DIR}/guest-rendered.XXXXXX")
+        configured=$(mktemp "${SHARED_DIR}/guest-configured.XXXXXX")
+        trap 'rm -f -- "${rendered}" "${configured}"' EXIT
+        "${COMMAND[@]}" --render --render-sensitive > "${rendered}"
+        oc create --dry-run=client --validate=false -f "${rendered}" -o json |
+          python3 -c '
+      import json
+      import sys
+
+      # oc can print a List or consecutive JSON objects for a multi-document file.
+      source, decoder, objects = sys.stdin.read().strip(), json.JSONDecoder(), []
+      while source:
+          obj, end = decoder.raw_decode(source)
+          objects.extend(obj["items"] if obj["kind"] == "List" else [obj])
+          source = source[end:].lstrip()
+      clusters = [obj for obj in objects if obj["kind"] == "HostedCluster"]
+      if len(clusters) != 1:
+          sys.exit("ERROR: expected one rendered HostedCluster")
+      clusters[0]["spec"].setdefault("configuration", {})["featureGate"] = json.loads(sys.argv[1])
+      for obj in objects:
+          if obj["kind"] == "NodePool" and sys.argv[2]:
+              obj["spec"]["release"]["image"] = sys.argv[2]
+      json.dump({"apiVersion": "v1", "kind": "List", "items": objects}, sys.stdout)
+      ' "${guest_feature_spec}" "${NODEPOOL_RELEASE_IMAGE_LATEST}" > "${configured}"
+        if [[ $HYPERSHIFT_CREATE_CLUSTER_RENDER == "true" ]]; then
+          # Match the existing render-only mode, without exporting Secret data.
+          python3 -c '
+      import json
+      import sys
+      with open(sys.argv[1]) as source:
+          objects = json.load(source)
+      objects["items"] = [obj for obj in objects["items"] if obj["kind"] != "Secret"]
+      json.dump(objects, sys.stdout)
+      ' "${configured}" > "${SHARED_DIR}/hypershift_create_cluster_render.yaml"
+          exit 0
+        fi
+        oc apply -f "${configured}"
+        rm -f -- "${rendered}" "${configured}"
+        trap - EXIT
+        set -x
       # Execute the command
       # When using np_skew (different release images), we need eval to properly handle shell operators
-      if [[ -n "$RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && "$RELEASE_IMAGE_LATEST" != "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
+      elif [[ -n "$RELEASE_IMAGE_LATEST" && -n "$NODEPOOL_RELEASE_IMAGE_LATEST" && "$RELEASE_IMAGE_LATEST" != "$NODEPOOL_RELEASE_IMAGE_LATEST" ]]; then
         eval "${COMMAND[*]} $(support_np_skew)"
       else
         "${COMMAND[@]}"
