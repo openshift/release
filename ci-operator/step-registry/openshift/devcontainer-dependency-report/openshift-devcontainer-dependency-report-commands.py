@@ -59,8 +59,8 @@ def parsed_public_https_url(url: str) -> urllib.parse.SplitResult:
         raise CheckError("lookup URL must use public HTTPS")
     if parsed.username is not None or parsed.password is not None:
         raise CheckError("lookup URL must not contain credentials")
-    if port not in {None, 443}:
-        raise CheckError("lookup URL must not use a nonstandard port")
+    if port is not None:
+        raise CheckError("lookup URL must not include an explicit port")
     if parsed.fragment:
         raise CheckError("lookup URL must not include a fragment")
     return parsed
@@ -365,8 +365,8 @@ def github_page_url(url: str, kind: str, page: int) -> tuple[str, int]:
         raise CheckError("GitHub source URL must use https://api.github.com")
     if parsed.username is not None or parsed.password is not None:
         raise CheckError("GitHub source URL must be public HTTPS without credentials")
-    if port not in {None, 443}:
-        raise CheckError("GitHub source URL must not use a nonstandard port")
+    if port is not None:
+        raise CheckError("GitHub source URL must not include an explicit port")
     if parsed.fragment:
         raise CheckError("GitHub source URL must not include a fragment")
     expected_endpoint = {
