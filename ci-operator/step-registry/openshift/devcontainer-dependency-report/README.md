@@ -60,23 +60,6 @@ python3 ci-operator/step-registry/openshift/devcontainer-dependency-report/opens
   --output-dir /tmp/devcontainer-dependency-report
 ```
 
-## Rehearsal procedure
-
-On the `openshift/release` pull request, use `/pj-rehearse list` to refresh the
-affected-job list. Select only the exact report job names returned by that list:
-
-```text
-/pj-rehearse <first-devcontainer-dependency-report-job> [<next-report-job> ...]
-```
-
-A successful report-only rehearsal has one green rehearsal context per selected
-job, a log summary ending in `errors=0`, and both
-`devcontainer-dependency-report.json` and
-`devcontainer-dependency-report.md` artifacts. Each artifact must name only its
-selected repository, record the actual checkout `HEAD`, and identify the
-embedded policy. This procedure is the dry run; the checker has no publication
-or mutation mode.
-
 The checker is syntax-compatible with Python 3.9 and uses only the standard
 library plus the `git` executable already installed in each current
 `agentic-dev` image.
