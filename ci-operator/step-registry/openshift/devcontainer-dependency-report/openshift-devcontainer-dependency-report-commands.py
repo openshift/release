@@ -15,13 +15,20 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-
 STABLE_COMPONENT = r"(?:0|[1-9]\d*)"
 STABLE_VERSION = re.compile(
     rf"^({STABLE_COMPONENT})\.({STABLE_COMPONENT})\.({STABLE_COMPONENT})$"
 )
 CLASSIFICATIONS = {"pinned", "floating", "repo-coupled", "manual", "unsupported"}
 GITHUB_PAGE_LIMIT = 10
+POLICY_REPOSITORY = "openshift/release"
+POLICY_REF = "main"
+POLICY_PATH = (
+    "ci-operator/step-registry/openshift/devcontainer-dependency-report/"
+    "openshift-devcontainer-dependency-report-config.md"
+)
+REPOSITORY_NAME = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 
 
 class CheckError(RuntimeError):
@@ -62,41 +69,109 @@ def extract_current(content: str, dependency: dict[str, Any]) -> str:
 
 
 class Fetcher:
-    def __init__(self, responses: dict[str, Any] | None = None) -> None:
-        self.responses = responses
+    def __init__(self) -> None:
         self.cache: dict[str, Any] = {}
 
     def get(self, url: str, *, as_json: bool) -> Any:
         if url in self.cache:
             return self.cache[url]
-        if self.responses is not None:
-            if url not in self.responses:
-                raise CheckError(f"no recorded response for {url}")
-            value = self.responses[url]
-            if isinstance(value, dict) and "__error__" in value:
-                raise CheckError(f"lookup failed for {url}: {value['__error__']}")
-        else:
-            request = urllib.request.Request(
-                url,
-                headers={
-                    "Accept": "application/vnd.github+json, application/json",
-                    "User-Agent": "openshift-release-devcontainer-dependency-report/1",
-                },
-            )
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Accept": "application/vnd.github+json, application/json",
+                "User-Agent": "openshift-release-devcontainer-dependency-report/1",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                body = response.read().decode("utf-8")
+        except (OSError, UnicodeError, urllib.error.HTTPError) as exc:
+            raise CheckError(f"lookup failed for {url}: {exc}") from exc
+        if as_json:
             try:
-                with urllib.request.urlopen(request, timeout=30) as response:
-                    body = response.read().decode("utf-8")
-            except (OSError, UnicodeError, urllib.error.HTTPError) as exc:
-                raise CheckError(f"lookup failed for {url}: {exc}") from exc
-            if as_json:
-                try:
-                    value = json.loads(body)
-                except json.JSONDecodeError as exc:
-                    raise CheckError(f"lookup failed for {url}: invalid JSON: {exc}") from exc
-            else:
-                value = body
+                value = json.loads(body)
+            except json.JSONDecodeError as exc:
+                raise CheckError(
+                    f"lookup failed for {url}: invalid JSON: {exc}"
+                ) from exc
+        else:
+            value = body
         self.cache[url] = value
         return value
+
+
+def validate_repository_name(repository: str) -> None:
+    if not REPOSITORY_NAME.fullmatch(repository):
+        raise CheckError(f"invalid public GitHub repository name {repository!r}")
+
+
+def resolve_github_revision(repository: str, ref: str, fetcher: Fetcher) -> str:
+    validate_repository_name(repository)
+    url = (
+        f"https://api.github.com/repos/{repository}/commits/"
+        f"{urllib.parse.quote(ref, safe='')}"
+    )
+    payload = fetcher.get(url, as_json=True)
+    if not isinstance(payload, dict) or not isinstance(payload.get("sha"), str):
+        raise CheckError(f"commit lookup for {repository}@{ref} returned no revision")
+    revision = payload["sha"]
+    if not COMMIT_SHA.fullmatch(revision):
+        raise CheckError(
+            f"commit lookup for {repository}@{ref} returned an invalid revision"
+        )
+    return revision
+
+
+def rehearsal_policy_source(fetcher: Fetcher) -> tuple[str, str] | None:
+    job_spec = os.environ.get("JOB_SPEC")
+    if not job_spec:
+        return None
+    try:
+        spec = json.loads(job_spec)
+    except json.JSONDecodeError as exc:
+        raise CheckError(f"JOB_SPEC is not valid JSON: {exc}") from exc
+    refs = spec.get("refs")
+    if not isinstance(refs, dict):
+        return None
+    if f"{refs.get('org')}/{refs.get('repo')}" != POLICY_REPOSITORY:
+        return None
+    pulls = refs.get("pulls")
+    if not isinstance(pulls, list) or not pulls or not isinstance(pulls[0], dict):
+        raise CheckError("release rehearsal JOB_SPEC has no pull revision")
+    pull = pulls[0]
+    revision = pull.get("sha")
+    if not isinstance(revision, str) or not COMMIT_SHA.fullmatch(revision):
+        raise CheckError("release rehearsal JOB_SPEC has an invalid pull revision")
+    number = pull.get("number")
+    if not isinstance(number, int) or number <= 0:
+        raise CheckError("release rehearsal JOB_SPEC has an invalid pull number")
+    payload = fetcher.get(
+        f"https://api.github.com/repos/{POLICY_REPOSITORY}/pulls/{number}",
+        as_json=True,
+    )
+    if not isinstance(payload, dict) or not isinstance(payload.get("head"), dict):
+        raise CheckError("release pull lookup returned no head revision")
+    head = payload["head"]
+    head_repository = head.get("repo")
+    if not isinstance(head_repository, dict):
+        raise CheckError("release pull lookup returned no public head repository")
+    repository = head_repository.get("full_name")
+    if not isinstance(repository, str):
+        raise CheckError("release pull lookup returned no public head repository")
+    validate_repository_name(repository)
+    if head.get("sha") != revision:
+        raise CheckError("release pull head does not match the rehearsal revision")
+    return repository, revision
+
+
+def raw_github_url(repository: str, revision: str, path: str) -> str:
+    validate_repository_name(repository)
+    if not COMMIT_SHA.fullmatch(revision):
+        raise CheckError(f"invalid GitHub revision for {repository}: {revision!r}")
+    encoded_path = "/".join(
+        urllib.parse.quote(part, safe="") for part in path.split("/")
+    )
+    return f"https://raw.githubusercontent.com/{repository}/{revision}/{encoded_path}"
 
 
 def github_page_url(url: str, kind: str, page: int) -> tuple[str, int]:
@@ -147,7 +222,9 @@ def github_page_url(url: str, kind: str, page: int) -> tuple[str, int]:
         return url, per_page
     query = [(key, value) for key, value in query if key != "page"]
     query.append(("page", str(page)))
-    return urllib.parse.urlunsplit(parsed._replace(query=urllib.parse.urlencode(query))), per_page
+    return urllib.parse.urlunsplit(
+        parsed._replace(query=urllib.parse.urlencode(query))
+    ), per_page
 
 
 def github_items(source: dict[str, Any], fetcher: Fetcher) -> list[dict[str, Any]]:
@@ -159,7 +236,9 @@ def github_items(source: dict[str, Any], fetcher: Fetcher) -> list[dict[str, Any
         page_url, _ = github_page_url(url, kind, page)
         payload = fetcher.get(page_url, as_json=True)
         if not isinstance(payload, list):
-            raise CheckError(f"GitHub {source['kind']} page {page} response is not a list")
+            raise CheckError(
+                f"GitHub {source['kind']} page {page} response is not a list"
+            )
         for index, item in enumerate(payload):
             if not isinstance(item, dict):
                 raise CheckError(
@@ -230,7 +309,9 @@ def latest_allowed(
         if version_in_policy(parsed, policy):
             candidates.append((parsed, value.removeprefix(prefix)))
     if not candidates:
-        raise CheckError("version source returned no stable version inside the policy range")
+        raise CheckError(
+            "version source returned no stable version inside the policy range"
+        )
     parsed, rendered = max(candidates)
     return rendered, parsed
 
@@ -258,7 +339,9 @@ def validate_config(config: dict[str, Any]) -> None:
         seen_dependencies: set[tuple[str, str]] = set()
         for dependency in dependencies:
             if not isinstance(dependency, dict):
-                raise CheckError(f"{repository_name}: each dependency must be an object")
+                raise CheckError(
+                    f"{repository_name}: each dependency must be an object"
+                )
             dependency_name = dependency.get("name")
             file_path = dependency.get("file")
             if not dependency_name or not file_path or not dependency.get("rationale"):
@@ -293,7 +376,11 @@ def validate_config(config: dict[str, Any]) -> None:
             if classification == "pinned":
                 source = sources.get(dependency.get("source"))
                 policy = dependency.get("policy")
-                if not isinstance(source, dict) or not source.get("kind") or not source.get("url"):
+                if (
+                    not isinstance(source, dict)
+                    or not source.get("kind")
+                    or not source.get("url")
+                ):
                     raise CheckError(
                         f"{repository_name}/{dependency_name}: pinned entries require a valid source"
                     )
@@ -319,21 +406,46 @@ def validate_config(config: dict[str, Any]) -> None:
                 raise CheckError(
                     f"{repository_name}/{dependency_name}: repo-coupled entries require authority"
                 )
-            if classification != "repo-coupled" and classification != "pinned" and not dependency.get(
-                "version_source"
+            if (
+                classification != "repo-coupled"
+                and classification != "pinned"
+                and not dependency.get("version_source")
             ):
                 raise CheckError(
                     f"{repository_name}/{dependency_name}: {classification} entries require version_source"
                 )
 
 
-def check(config: dict[str, Any], fetcher: Fetcher) -> list[dict[str, Any]]:
+def selected_config(
+    config: dict[str, Any], repository_name: str, fetcher: Fetcher
+) -> tuple[dict[str, Any], str, str]:
     validate_config(config)
+    matches = [
+        repository
+        for repository in config["repositories"]
+        if repository["name"] == repository_name
+    ]
+    if len(matches) != 1:
+        raise CheckError(
+            f"selected repository {repository_name!r} does not have exactly one policy entry"
+        )
+    repository = dict(matches[0])
+    requested_ref = repository["ref"]
+    revision = resolve_github_revision(repository_name, requested_ref, fetcher)
+    repository["revision"] = revision
+    repository["raw_base"] = (
+        f"https://raw.githubusercontent.com/{repository_name}/{revision}"
+    )
+    return {**config, "repositories": [repository]}, requested_ref, revision
+
+
+def check(config: dict[str, Any], fetcher: Fetcher) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     source_cache: dict[tuple[str, str, str], tuple[str, tuple[int, int, int]]] = {}
     for repository in config["repositories"]:
         raw_base = repository.get(
-            "raw_base", f"https://raw.githubusercontent.com/{repository['name']}/{repository['ref']}"
+            "raw_base",
+            f"https://raw.githubusercontent.com/{repository['name']}/{repository['ref']}",
         )
         file_cache: dict[str, str | CheckError] = {}
         for dependency in repository["dependencies"]:
@@ -341,12 +453,14 @@ def check(config: dict[str, Any], fetcher: Fetcher) -> list[dict[str, Any]]:
             row: dict[str, Any] = {
                 "repository": repository["name"],
                 "ref": repository["ref"],
+                "revision": repository["revision"],
                 "file": file_path,
                 "dependency": dependency["name"],
                 "classification": dependency["classification"],
                 "current": None,
                 "proposed": None,
-                "version_source": dependency.get("version_source") or dependency.get("authority"),
+                "version_source": dependency.get("version_source")
+                or dependency.get("authority"),
                 "authority": dependency.get("authority"),
                 "status": dependency["classification"],
                 "rationale": dependency["rationale"],
@@ -368,9 +482,13 @@ def check(config: dict[str, Any], fetcher: Fetcher) -> list[dict[str, Any]]:
                 if dependency["classification"] == "pinned":
                     source = config["sources"][dependency["source"]]
                     row["version_source"] = source["url"]
-                    current_parsed = parse_version(current, dependency.get("current_prefix", ""))
+                    current_parsed = parse_version(
+                        current, dependency.get("current_prefix", "")
+                    )
                     if not version_in_policy(current_parsed, dependency["policy"]):
-                        raise CheckError("current version is outside the explicit policy range")
+                        raise CheckError(
+                            "current version is outside the explicit policy range"
+                        )
                     cache_key = (
                         dependency["source"],
                         dependency["policy"]["min_inclusive"],
@@ -413,10 +531,32 @@ def check(config: dict[str, Any], fetcher: Fetcher) -> list[dict[str, Any]]:
     return results
 
 
-def write_reports(results: list[dict[str, Any]], output_dir: Path) -> None:
+def write_reports(
+    results: list[dict[str, Any]],
+    output_dir: Path,
+    *,
+    policy_revision: str,
+    repository: str,
+    requested_ref: str,
+    repository_revision: str,
+) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
-    document = {"schema_version": 1, "generated_at": generated_at, "results": results}
+    generated_at = dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat()
+    document = {
+        "schema_version": 1,
+        "generated_at": generated_at,
+        "policy": {
+            "repository": POLICY_REPOSITORY,
+            "path": POLICY_PATH,
+            "revision": policy_revision,
+        },
+        "repository": {
+            "name": repository,
+            "requested_ref": requested_ref,
+            "revision": repository_revision,
+        },
+        "results": results,
+    }
     (output_dir / "devcontainer-dependency-report.json").write_text(
         json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -427,6 +567,10 @@ def write_reports(results: list[dict[str, Any]], output_dir: Path) -> None:
         "# Devcontainer dependency report",
         "",
         f"Generated: {generated_at}",
+        "",
+        f"Policy revision: `{POLICY_REPOSITORY}@{policy_revision}`",
+        "",
+        f"Repository revision: `{repository}@{repository_revision}` (requested `{requested_ref}`)",
         "",
         "This report is advisory. It does not claim compatibility or modify dependencies.",
         "",
@@ -468,34 +612,73 @@ def write_reports(results: list[dict[str, Any]], output_dir: Path) -> None:
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    default_config = os.environ.get(
-        "DEVCONTAINER_DEPENDENCY_CONFIG",
-        "ci-operator/step-registry/openshift/devcontainer-dependency-report/"
-        "openshift-devcontainer-dependency-report-config.md",
+    default_output = os.environ.get(
+        "ARTIFACT_DIR", "artifacts/devcontainer-dependency-report"
     )
-    default_output = os.environ.get("ARTIFACT_DIR", "artifacts/devcontainer-dependency-report")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--config", default=default_config, type=Path)
+    parser.add_argument(
+        "--repository",
+        default=os.environ.get("DEVCONTAINER_DEPENDENCY_REPOSITORY"),
+        help="one public repository named in the shared policy",
+    )
+    parser.add_argument("--config", type=Path, help="use a local policy file")
+    parser.add_argument(
+        "--policy-revision",
+        help="revision recorded for a local policy file (required with --config)",
+    )
     parser.add_argument("--output-dir", default=default_output, type=Path)
-    parser.add_argument("--responses-file", type=Path, help=argparse.SUPPRESS)
-    parser.add_argument("--fail-on-errors", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--fail-on-errors", action=argparse.BooleanOptionalAction, default=True
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
+    fetcher = Fetcher()
     try:
-        config = json.loads(args.config.read_text(encoding="utf-8"))
-        responses = (
-            json.loads(args.responses_file.read_text(encoding="utf-8"))
-            if args.responses_file
-            else None
+        if not args.repository:
+            raise CheckError(
+                "--repository or DEVCONTAINER_DEPENDENCY_REPOSITORY is required"
+            )
+        if args.config:
+            if not args.policy_revision:
+                raise CheckError("--policy-revision is required with --config")
+            if not COMMIT_SHA.fullmatch(args.policy_revision):
+                raise CheckError("--policy-revision must be a 40-character commit SHA")
+            config_text = args.config.read_text(encoding="utf-8")
+            policy_revision = args.policy_revision
+        else:
+            if args.policy_revision:
+                raise CheckError("--policy-revision may only be used with --config")
+            rehearsal_source = rehearsal_policy_source(fetcher)
+            policy_source_repository = POLICY_REPOSITORY
+            if rehearsal_source:
+                policy_source_repository, policy_revision = rehearsal_source
+            else:
+                policy_revision = resolve_github_revision(
+                    POLICY_REPOSITORY, POLICY_REF, fetcher
+                )
+            config_text = fetcher.get(
+                raw_github_url(policy_source_repository, policy_revision, POLICY_PATH),
+                as_json=False,
+            )
+        config = json.loads(config_text)
+        config, requested_ref, repository_revision = selected_config(
+            config, args.repository, fetcher
         )
-        results = check(config, Fetcher(responses))
+        results = check(config, fetcher)
     except (OSError, json.JSONDecodeError, CheckError) as exc:
         print(f"configuration error: {exc}", file=sys.stderr)
         return 2
-    write_reports(results, args.output_dir)
+    write_reports(
+        results,
+        args.output_dir,
+        policy_revision=policy_revision,
+        repository=args.repository,
+        requested_ref=requested_ref,
+        repository_revision=repository_revision,
+    )
     for row in results:
         suffix = f": {row['error']}" if row["error"] else ""
         print(
