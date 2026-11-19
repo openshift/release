@@ -15,8 +15,13 @@ fail() {
 }
 
 assert_status() {
-    local actual="$1" expected="$2" description="$3"
-    [[ "${actual}" == "${expected}" ]] || fail "${description}: expected status ${expected}, got ${actual}"
+    local actual="$1" expected="$2" description="$3" output_file="${4:-}"
+    if [[ "${actual}" != "${expected}" ]]; then
+        if [[ -n "${output_file}" && -f "${output_file}" ]]; then
+            sed -n '1,240p' "${output_file}" >&2
+        fi
+        fail "${description}: expected status ${expected}, got ${actual}"
+    fi
 }
 
 assert_contains() {
@@ -92,6 +97,48 @@ printf '{"number":%s,"state":"OPEN","title":"test","url":"%s","headRefName":"fea
     "${number}" "${url}" "${number}" "${head_repo}" "${head_owner}"
 EOF
 
+    cat > "${case_dir}/mock-bin/jq" <<'EOF'
+#!/bin/bash
+set -o nounset
+set -o errexit
+
+input=$(cat)
+expression="${!#}"
+case "${expression}" in
+    length)
+        [[ "${input}" == "[]" ]] && printf '0\n' || printf '1\n'
+        ;;
+    '.[0].number'*)
+        sed -n 's/.*"number":\([0-9][0-9]*\).*/\1/p' <<< "${input}"
+        ;;
+    '.number'*)
+        sed -n 's/.*"number":\([0-9][0-9]*\).*/\1/p' <<< "${input}"
+        ;;
+    '.url'*)
+        sed -n 's/.*"url":"\([^"]*\)".*/\1/p' <<< "${input}"
+        ;;
+    '.state'*)
+        sed -n 's/.*"state":"\([^"]*\)".*/\1/p' <<< "${input}"
+        ;;
+    '.headRefName'*)
+        sed -n 's/.*"headRefName":"\([^"]*\)".*/\1/p' <<< "${input}"
+        ;;
+    '.headRefOid'*)
+        sed -n 's/.*"headRefOid":"\([^"]*\)".*/\1/p' <<< "${input}"
+        ;;
+    '.headRepository.name'*)
+        sed -n 's/.*"headRepository":{"name":"\([^"]*\)"}.*/\1/p' <<< "${input}"
+        ;;
+    '.headRepositoryOwner.login'*)
+        sed -n 's/.*"headRepositoryOwner":{"login":"\([^"]*\)"}.*/\1/p' <<< "${input}"
+        ;;
+    *)
+        echo "unexpected jq expression: ${expression}" >&2
+        exit 92
+        ;;
+esac
+EOF
+
     cat > "${case_dir}/mock-bin/git" <<'EOF'
 #!/bin/bash
 set -o nounset
@@ -113,7 +160,7 @@ case "${1:-} ${2:-}" in
         ;;
 esac
 EOF
-    chmod +x "${case_dir}/mock-bin/gh" "${case_dir}/mock-bin/git"
+    chmod +x "${case_dir}/mock-bin/gh" "${case_dir}/mock-bin/jq" "${case_dir}/mock-bin/git"
     printf '%s\n' "${case_dir}"
 }
 
@@ -136,8 +183,18 @@ run_case() {
     printf '%s\t%s\n' "${status}" "${case_dir}"
 }
 
+diagnostic_file="${TEST_ROOT}/captured-output"
+printf '%s\n' 'subprocess diagnostic sentinel' > "${diagnostic_file}"
+set +o errexit
+diagnostic=$(assert_status 1 0 "diagnostic self-test" "${diagnostic_file}" 2>&1)
+diagnostic_status=$?
+set -o errexit
+[[ "${diagnostic_status}" -ne 0 ]] || fail "diagnostic self-test unexpectedly succeeded"
+grep -Fq 'subprocess diagnostic sentinel' <<< "${diagnostic}" || fail "captured subprocess output was not reported"
+echo "PASS: status failures report captured subprocess output"
+
 read -r status case_dir < <(run_case explicit 123 "")
-assert_status "${status}" 0 "explicit PR selection"
+assert_status "${status}" 0 "explicit PR selection" "${case_dir}/output"
 assert_contains "${case_dir}/gh-calls" "pr view 123 --repo acme/widgets"
 assert_not_contains "${case_dir}/gh-calls" "pr list"
 assert_contains "${case_dir}/git-calls" "fetch --no-tags --no-recurse-submodules fork refs/heads/feature-123"
@@ -146,7 +203,7 @@ assert_contains "${case_dir}/git-calls" "checkout --no-recurse-submodules --no-o
 echo "PASS: explicit PR selection bypasses Jira search"
 
 read -r status case_dir < <(run_case override 111 222)
-assert_status "${status}" 0 "Gangway override"
+assert_status "${status}" 0 "Gangway override" "${case_dir}/output"
 assert_contains "${case_dir}/gh-calls" "pr view 222 --repo acme/widgets"
 assert_not_contains "${case_dir}/gh-calls" "pr view 111"
 assert_not_contains "${case_dir}/gh-calls" "pr list"
@@ -167,7 +224,7 @@ assert_file_absent "${case_dir}/shared/pr-number"
 echo "PASS: missing explicit PR does not fall back"
 
 read -r status case_dir < <(run_case fallback "" "")
-assert_status "${status}" 0 "Jira-key fallback"
+assert_status "${status}" 0 "Jira-key fallback" "${case_dir}/output"
 assert_contains "${case_dir}/gh-calls" "pr list --repo acme/widgets --state open --search OCPBUGS-12345"
 assert_contains "${case_dir}/gh-calls" "pr view 77 --repo acme/widgets"
 [[ $(cat "${case_dir}/shared/pr-number") == 77 ]] || fail "fallback PR number was not persisted"
@@ -186,7 +243,7 @@ assert_file_absent "${case_dir}/shared/pr-number"
 echo "PASS: upstream mismatch fails before checkout"
 
 read -r status case_dir < <(run_case case_difference 123 "")
-assert_status "${status}" 0 "case-insensitive repository identity"
+assert_status "${status}" 0 "case-insensitive repository identity" "${case_dir}/output"
 assert_contains "${case_dir}/git-calls" "checkout --no-recurse-submodules --no-overwrite-ignore -B feature-123"
 echo "PASS: repository identity comparisons ignore case"
 
