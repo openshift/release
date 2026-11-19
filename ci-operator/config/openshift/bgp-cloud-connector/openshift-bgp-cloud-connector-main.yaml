@@ -771,6 +771,42 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-gcp-manual-oidc-workload-identity
+- always_run: false
+  as: gcp-osd-nowif-probe
+  optional: true
+  steps:
+    cluster_profile: rosa-e2e-03
+    env:
+      CHANNEL_GROUP: stable
+      COMPUTE_NODES: "3"
+      ENABLE_WIF: "no"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.22"
+      REGION: us-east1
+      SUBSCRIPTION_TYPE: marketplace-gcp
+    post:
+    - ref: osd-ccs-cluster-deprovision
+    pre:
+    - ref: osd-ccs-cluster-provision-gcp
+    test:
+    - as: nodes
+      cli: latest
+      commands: |
+        # PROBE ONLY. e2e-gcp-osd-workload-identity-operator's cluster
+        # settings with ENABLE_WIF=no, to tell whether its workers fail
+        # to join because of workload identity or because of this
+        # profile. Reaching this step at all answers that; the listing
+        # records what joined.
+        oc get clusterversion
+        oc get nodes -o wide
+        oc -n openshift-machine-api get machines -o wide
+      from: e2e-runner
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 10m0s
 - as: e2e-rosa-operator
   skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
