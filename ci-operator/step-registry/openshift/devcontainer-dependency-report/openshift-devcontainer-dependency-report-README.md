@@ -49,11 +49,16 @@ are clean or dirty as `local-working-tree-clean` or
 `local-working-tree-dirty`; it never describes working-tree content as commit
 content. If `--repository-revision` is supplied, it must match local `HEAD`.
 The generated periodics represent their target as the only `extra_refs` entry
-without `base_sha`. For only the three named periodics below, ci-operator builds
-the source image from that ref through clonerefs and copies its exact checkout
-to `/workspace`; the checker records its validated `HEAD` with provenance
-`periodic-checkout-head`. Other Prow shapes, including presubmits and rehearsals,
-must provide a valid exact SHA in `JOB_SPEC` and record `job-spec-exact`.
+without `base_sha`. ci-operator builds the source image from that ref through
+clonerefs and copies its exact checkout to `/workspace`; the checker verifies
+that `/workspace` is the Git root and records its `HEAD` with provenance
+`periodic-checkout-head`. `pj-rehearse` converts one of these periodics to a
+presubmit whose exact `openshift/release` pull is the primary ref and whose sole
+target extra ref is the `/workspace` workdir. The checker recognizes that exact
+generated rehearsal name and ref shape and records the target `HEAD` as
+`rehearsal-checkout-head`; the release pull SHA remains the independent policy
+revision. Other Prow shapes must provide a valid exact target SHA in `JOB_SPEC`
+and record `job-spec-exact`.
 
 ## Rehearsal procedure
 

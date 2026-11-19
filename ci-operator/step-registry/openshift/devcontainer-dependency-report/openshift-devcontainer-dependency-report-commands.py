@@ -32,11 +32,6 @@ POLICY_PATH = (
     "ci-operator/step-registry/openshift/devcontainer-dependency-report/"
     "openshift-devcontainer-dependency-report-config.md"
 )
-PERIODIC_JOB_BY_REPOSITORY = {
-    "openshift/sippy": "periodic-ci-openshift-sippy-main-agentic-periodic-sippy-devcontainer-dependency-report",
-    "openshift/origin": "periodic-ci-openshift-origin-main-agentic-periodic-origin-devcontainer-dependency-report",
-    "openshift-eng/ship-status-dash": "periodic-ci-openshift-eng-ship-status-dash-main-agentic-periodic-ship-status-dash-devcontainer-dependency-report",
-}
 REPOSITORY_NAME = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 GITHUB_API_PATH = re.compile(
@@ -211,7 +206,7 @@ def job_spec_repository_revision(
     if not isinstance(spec, dict):
         raise CheckError("JOB_SPEC root is not an object")
     primary_ref = spec.get("refs")
-    if primary_ref is not None and not isinstance(primary_ref, dict):
+    if "refs" in spec and not isinstance(primary_ref, dict):
         raise CheckError("JOB_SPEC refs is not a reference object")
     refs: list[dict[str, Any]] = []
     if isinstance(primary_ref, dict):
@@ -243,26 +238,67 @@ def job_spec_repository_revision(
         raise CheckError(
             f"JOB_SPEC has no valid exact revision for selected repository {repository}"
         )
-    periodic_checkout = (
-        spec.get("type") == "periodic"
-        and spec.get("job") == PERIODIC_JOB_BY_REPOSITORY.get(repository)
-        and primary_ref is None
-        and len(extra_refs) == 1
+    org, repo = repository.split("/", 1)
+    periodic_job = (
+        f"periodic-ci-{org}-{repo}-{requested_ref}-agentic-"
+        f"periodic-{repo}-devcontainer-dependency-report"
+    )
+    checkout_ref = (
+        len(extra_refs) == 1
         and selected is extra_refs[0]
         and "pulls" not in selected
         and repository_root == Path("/workspace")
     )
-    if not periodic_checkout:
+    periodic_checkout = (
+        spec.get("type") == "periodic"
+        and spec.get("job") == periodic_job
+        and primary_ref is None
+        and "workdir" not in selected
+        and checkout_ref
+    )
+    rehearsal_checkout = False
+    if isinstance(primary_ref, dict):
+        pulls = primary_ref.get("pulls")
+        if isinstance(pulls, list) and len(pulls) == 1 and isinstance(pulls[0], dict):
+            pull = pulls[0]
+            pull_number = pull.get("number")
+            rehearsal_checkout = (
+                spec.get("type") == "presubmit"
+                and isinstance(pull_number, int)
+                and not isinstance(pull_number, bool)
+                and pull_number > 0
+                and spec.get("job") == f"rehearse-{pull_number}-{periodic_job}"
+                and f"{primary_ref.get('org')}/{primary_ref.get('repo')}"
+                == POLICY_REPOSITORY
+                and primary_ref.get("base_ref") == POLICY_REF
+                and isinstance(primary_ref.get("base_sha"), str)
+                and COMMIT_SHA.fullmatch(primary_ref["base_sha"]) is not None
+                and isinstance(pull.get("sha"), str)
+                and COMMIT_SHA.fullmatch(pull["sha"]) is not None
+                and selected.get("workdir") is True
+                and checkout_ref
+            )
+    if not periodic_checkout and not rehearsal_checkout:
         raise CheckError(
             f"JOB_SPEC has no valid exact revision for selected repository {repository}"
         )
-    return local_repository_revision(repository_root), "periodic-checkout-head"
+    provenance = (
+        "periodic-checkout-head" if periodic_checkout else "rehearsal-checkout-head"
+    )
+    return local_repository_revision(repository_root), provenance
 
 
 def local_repository_revision(repository_root: Path) -> str:
     try:
         completed = subprocess.run(
-            ["git", "-C", str(repository_root), "rev-parse", "HEAD"],
+            [
+                "git",
+                "-C",
+                str(repository_root),
+                "rev-parse",
+                "--show-toplevel",
+                "HEAD",
+            ],
             check=False,
             capture_output=True,
             text=True,
@@ -272,10 +308,21 @@ def local_repository_revision(repository_root: Path) -> str:
         raise CheckError(
             f"could not determine local repository revision: {exc}"
         ) from exc
-    revision = completed.stdout.strip()
-    if completed.returncode != 0 or not COMMIT_SHA.fullmatch(revision):
+    output = completed.stdout.splitlines()
+    if completed.returncode != 0 or len(output) != 2:
         raise CheckError(
             "could not determine an exact revision for the local repository"
+        )
+    checkout_root, revision = output
+    try:
+        root_matches = Path(checkout_root).resolve() == repository_root.resolve()
+    except (OSError, RuntimeError) as exc:
+        raise CheckError(
+            f"could not validate the local Git checkout root: {exc}"
+        ) from exc
+    if not root_matches or not COMMIT_SHA.fullmatch(revision):
+        raise CheckError(
+            "local repository root or exact revision does not match the selected checkout"
         )
     return revision
 
@@ -345,14 +392,16 @@ def rehearsal_policy_source(fetcher: Fetcher) -> Optional[tuple[str, str]]:
     if f"{refs.get('org')}/{refs.get('repo')}" != POLICY_REPOSITORY:
         return None
     pulls = refs.get("pulls")
-    if not isinstance(pulls, list) or not pulls or not isinstance(pulls[0], dict):
-        raise CheckError("release rehearsal JOB_SPEC has no pull revision")
+    if not isinstance(pulls, list) or len(pulls) != 1 or not isinstance(pulls[0], dict):
+        raise CheckError(
+            "release rehearsal JOB_SPEC does not have exactly one pull revision"
+        )
     pull = pulls[0]
     revision = pull.get("sha")
     if not isinstance(revision, str) or not COMMIT_SHA.fullmatch(revision):
         raise CheckError("release rehearsal JOB_SPEC has an invalid pull revision")
     number = pull.get("number")
-    if not isinstance(number, int) or number <= 0:
+    if not isinstance(number, int) or isinstance(number, bool) or number <= 0:
         raise CheckError("release rehearsal JOB_SPEC has an invalid pull number")
     payload = fetcher.get(
         f"https://api.github.com/repos/{POLICY_REPOSITORY}/pulls/{number}",
