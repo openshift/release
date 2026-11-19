@@ -429,7 +429,7 @@ checkout_pr_head() {
     local worktree_status
 
     if [[ ! "${FORK_REPO}" =~ ^[^/]+/[^/]+$ ]] || \
-       [[ "${PR_HEAD_OWNER}/${PR_HEAD_REPO}" != "${FORK_REPO}" ]]; then
+       [[ "${PR_HEAD_OWNER,,}/${PR_HEAD_REPO,,}" != "${FORK_REPO,,}" ]]; then
         echo "ERROR: PR head repository does not match the configured fork"
         return 1
     fi
@@ -477,7 +477,7 @@ verify_push_target() {
     local -a fork_push_urls
 
     if [[ ! "${FORK_REPO}" =~ ^[^/]+/[^/]+$ ]] || \
-       [[ "${PR_HEAD_OWNER}/${PR_HEAD_REPO}" != "${FORK_REPO}" ]]; then
+       [[ "${PR_HEAD_OWNER,,}/${PR_HEAD_REPO,,}" != "${FORK_REPO,,}" ]]; then
         echo "ERROR: PR head repository does not match the configured fork"
         return 1
     fi
