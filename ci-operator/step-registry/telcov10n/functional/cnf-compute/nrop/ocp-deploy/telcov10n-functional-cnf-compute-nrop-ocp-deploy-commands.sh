@@ -11,6 +11,10 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
+if [[ -f "${SHARED_DIR}/nrop-upgrades-deploy-version" ]]; then
+  VERSION=$(cat "${SHARED_DIR}/nrop-upgrades-deploy-version")
+fi
+
 
 echo "Copy inventory files"
 mkdir -pv ${ECO_CI_CD_INVENTORY_PATH}/group_vars

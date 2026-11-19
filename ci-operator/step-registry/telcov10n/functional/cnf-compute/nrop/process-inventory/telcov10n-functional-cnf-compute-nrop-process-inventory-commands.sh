@@ -31,6 +31,8 @@ process_inventory() {
         return 1
     fi
 
+    # Inventory values can contain credentials; do not print them in shell traces.
+    set +x
     find "$directory" -type f | while IFS= read -r filename; do
         if [[ $filename == *"secretsync-vault-source-path"* ]]; then
           continue
@@ -38,6 +40,7 @@ process_inventory() {
           echo "$(basename "${filename}")": \'"$(cat "$filename")"\'
         fi
     done > "${dest_file}"
+    set -x
 
     echo "Processing complete. Check \"${dest_file}\""
 }
@@ -68,7 +71,12 @@ main() {
     mkdir -pv /eco-ci-cd/inventories/ocp-deployment/host_vars
 
     mkdir -pv /tmp/"${CLUSTER_NAME}"
-    cp -r "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/hypervisor" /tmp/"${CLUSTER_NAME}"/hypervisor
+    if [[ "${CLUSTER_NAME}" == "helix17" ]]; then
+        # helix17 and hlxcl9 share the ocp-edge92 hypervisor credentials.
+        cp -r "${MOUNTED_HOST_INVENTORY}/hlxcl9/hypervisor" /tmp/"${CLUSTER_NAME}"/hypervisor
+    else
+        cp -r "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/hypervisor" /tmp/"${CLUSTER_NAME}"/hypervisor
+    fi
     cp -r "${MOUNTED_HOST_INVENTORY}/${CLUSTER_NAME}/"* /tmp/"${CLUSTER_NAME}"/
     ls -l /tmp/"${CLUSTER_NAME}"/
     MOUNTED_HOST_INVENTORY="/tmp"
