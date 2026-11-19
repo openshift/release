@@ -685,7 +685,7 @@ function get_subnet_id() {
 #######################################
 function create_ssh_keypair() {
 	log_info "Creating SSH keypair: ${CLUSTER_NAME}-key"
-	local ssh_public_key="${SECRETS_DIR}/ssh-publickey"
+	local ssh_public_key="${SECRETS_DIR}/bastion-ssh-publickey"
 
 	# Delete existing keypair if present
 	if openstack --os-cloud="${CLOUD}" keypair show "${CLUSTER_NAME}-key" &>/dev/null; then
@@ -729,6 +729,7 @@ function create_bastion() {
 	log_info "  Image: ${BASTION_IMAGE_NAME}"
 	log_info "  Network: ${NETWORK_NAME}"
 	log_info "  Cloud: ${CLOUD}"
+	log_info "  Key: ${CLUSTER_NAME}-key"
 
 	# Note: an empty --bastionRsa is for remote creation
 	cd ${HOME} || {
