@@ -32,6 +32,11 @@ POLICY_PATH = (
     "ci-operator/step-registry/openshift/devcontainer-dependency-report/"
     "openshift-devcontainer-dependency-report-config.md"
 )
+PERIODIC_JOB_BY_REPOSITORY = {
+    "openshift/sippy": "periodic-ci-openshift-sippy-main-agentic-periodic-sippy-devcontainer-dependency-report",
+    "openshift/origin": "periodic-ci-openshift-origin-main-agentic-periodic-origin-devcontainer-dependency-report",
+    "openshift-eng/ship-status-dash": "periodic-ci-openshift-eng-ship-status-dash-main-agentic-periodic-ship-status-dash-devcontainer-dependency-report",
+}
 REPOSITORY_NAME = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 GITHUB_API_PATH = re.compile(
@@ -193,7 +198,9 @@ def resolve_github_revision(repository: str, ref: str, fetcher: Fetcher) -> str:
     return revision
 
 
-def job_spec_repository_revision(repository: str, requested_ref: str) -> Optional[str]:
+def job_spec_repository_revision(
+    repository: str, requested_ref: str, repository_root: Path
+) -> Optional[tuple[str, str]]:
     job_spec = os.environ.get("JOB_SPEC")
     if not job_spec:
         return None
@@ -203,9 +210,12 @@ def job_spec_repository_revision(repository: str, requested_ref: str) -> Optiona
         raise CheckError(f"JOB_SPEC is not valid JSON: {exc}") from exc
     if not isinstance(spec, dict):
         raise CheckError("JOB_SPEC root is not an object")
+    primary_ref = spec.get("refs")
+    if primary_ref is not None and not isinstance(primary_ref, dict):
+        raise CheckError("JOB_SPEC refs is not a reference object")
     refs: list[dict[str, Any]] = []
-    if isinstance(spec.get("refs"), dict):
-        refs.append(spec["refs"])
+    if isinstance(primary_ref, dict):
+        refs.append(primary_ref)
     extra_refs = spec.get("extra_refs", [])
     if not isinstance(extra_refs, list) or not all(
         isinstance(ref, dict) for ref in extra_refs
@@ -227,11 +237,26 @@ def job_spec_repository_revision(repository: str, requested_ref: str) -> Optiona
             f"but policy requires {requested_ref}"
         )
     revision = selected.get("base_sha")
-    if not isinstance(revision, str) or not COMMIT_SHA.fullmatch(revision):
+    if isinstance(revision, str) and COMMIT_SHA.fullmatch(revision):
+        return revision, "job-spec-exact"
+    if "base_sha" in selected:
         raise CheckError(
             f"JOB_SPEC has no valid exact revision for selected repository {repository}"
         )
-    return revision
+    periodic_checkout = (
+        spec.get("type") == "periodic"
+        and spec.get("job") == PERIODIC_JOB_BY_REPOSITORY.get(repository)
+        and primary_ref is None
+        and len(extra_refs) == 1
+        and selected is extra_refs[0]
+        and "pulls" not in selected
+        and repository_root == Path("/workspace")
+    )
+    if not periodic_checkout:
+        raise CheckError(
+            f"JOB_SPEC has no valid exact revision for selected repository {repository}"
+        )
+    return local_repository_revision(repository_root), "periodic-checkout-head"
 
 
 def local_repository_revision(repository_root: Path) -> str:
@@ -290,11 +315,14 @@ def selected_repository_revision(
 ) -> tuple[str, str]:
     if explicit_revision and not COMMIT_SHA.fullmatch(explicit_revision):
         raise CheckError("--repository-revision must be a 40-character commit SHA")
-    job_revision = job_spec_repository_revision(repository, requested_ref)
+    job_revision = job_spec_repository_revision(
+        repository, requested_ref, repository_root
+    )
     if job_revision:
-        if explicit_revision and explicit_revision != job_revision:
+        revision, inventory_source = job_revision
+        if explicit_revision and explicit_revision != revision:
             raise CheckError("--repository-revision does not match JOB_SPEC")
-        return job_revision, "job-spec-exact"
+        return revision, inventory_source
     local_revision = local_repository_revision(repository_root)
     if explicit_revision and explicit_revision != local_revision:
         raise CheckError("--repository-revision does not match local HEAD")

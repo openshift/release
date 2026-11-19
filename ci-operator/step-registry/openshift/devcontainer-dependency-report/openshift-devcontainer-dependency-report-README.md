@@ -25,9 +25,10 @@ policy repository alongside that exact pull revision.
 The target source is not downloaded again: ci-operator builds `agentic-dev` from
 the selected job ref and that image places the repository at `/workspace`.
 The checker reads declarations only from that local directory and records the
-matching exact target revision from `JOB_SPEC`. Both revisions are recorded in
-every report, and only the selected repository is included. If revision or file
-selection is ambiguous, the checker fails instead of inspecting another source.
+matching exact target revision from `JOB_SPEC` or the verified periodic checkout
+described below. Both revisions are recorded in every report, and only the
+selected repository is included. If revision or file selection is ambiguous,
+the checker fails instead of inspecting another source.
 
 Run the same checker on demand from an `openshift/release` checkout. A local
 policy requires its revision to be stated explicitly:
@@ -47,8 +48,12 @@ local `HEAD` as the base revision and records whether those inventoried files
 are clean or dirty as `local-working-tree-clean` or
 `local-working-tree-dirty`; it never describes working-tree content as commit
 content. If `--repository-revision` is supplied, it must match local `HEAD`.
-Prow runs instead record `job-spec-exact`, because ci-operator builds the source
-image from the exact target revision in `JOB_SPEC`.
+The generated periodics represent their target as the only `extra_refs` entry
+without `base_sha`. For only the three named periodics below, ci-operator builds
+the source image from that ref through clonerefs and copies its exact checkout
+to `/workspace`; the checker records its validated `HEAD` with provenance
+`periodic-checkout-head`. Other Prow shapes, including presubmits and rehearsals,
+must provide a valid exact SHA in `JOB_SPEC` and record `job-spec-exact`.
 
 ## Rehearsal procedure
 
