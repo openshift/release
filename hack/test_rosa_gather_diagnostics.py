@@ -14,6 +14,7 @@ import tarfile
 import tempfile
 import time
 import unittest
+from unittest.mock import Mock, patch
 
 import test_rosa_ocm_fvt_artifacts as producer
 
@@ -27,6 +28,33 @@ CONTAINER_OUTPUT = "/ocm-backend-tests/output"
 OUTPUT_MOUNT = ":" + CONTAINER_OUTPUT + ":z"
 PREPARE = ROOT / ("ci-operator/step-registry/rosa/e2e/ocm-fvt/prepare/"
                   "rosa-e2e-ocm-fvt-prepare-commands.py")
+KUBECONFIG = "apiVersion: v1\nkind: Config\n"
+
+
+def descendant_is_live(process_status):
+    try:
+        return process_status.read_text(encoding="utf-8").split()[2] != "Z"
+    except FileNotFoundError:
+        return False
+
+
+def fixture_system_tools(directory):
+    for tool in ("bash", "mkdir", "cat", "gzip"):
+        (directory / tool).symlink_to(shutil.which(tool))
+    (directory / "python3").symlink_to(sys.executable)
+
+
+def mock_oc(arguments):
+    if Path(os.environ["KUBECONFIG"]).read_text(encoding="utf-8") != KUBECONFIG:
+        return 1
+    if "logs" in arguments:
+        print("error panic timeout " + SECRET)
+    elif "events" in arguments:
+        print(json.dumps({"items": [{"type": "Warning", "message": SECRET}]}))
+    else:
+        print(json.dumps({"items": [{"metadata": {"name": "fixture-pod"}, "status": {
+            "phase": "Pending", "message": SECRET, "conditions": [{"type": "Ready", "status": "False"}]}}]}))
+    return 0
 
 
 def mock_curl(base, case, arguments):
@@ -62,6 +90,8 @@ def mock_ocm(base, case, arguments):
         print(SECRET)
         return int(case == "login-failure")
     path = arguments[1]
+    if case == "lookup-timeout" and "?" in path:
+        time.sleep(25)
     if case == "api-failure":
         print(SECRET, file=sys.stderr)
         return 1
@@ -96,7 +126,7 @@ def mock_ocm(base, case, arguments):
     elif path.endswith("/credentials"):
         if case == "missing-access":
             return 1
-        print(json.dumps({"kubeconfig": "apiVersion: v1\nkind: Config\n"}))
+        print(json.dumps({"kubeconfig": KUBECONFIG}))
     else:
         print(json.dumps({"id": CLUSTER, "state": "error" if case == "terminal" else "pending",
                           "provision_status": "PendingProject", "message": SECRET}))
@@ -150,6 +180,8 @@ def mock(command, arguments):
     if command == "ocm":
         return mock_ocm(base, case, arguments)
     if command == "ocm-backplane":
+        if case not in ("missing-access", "credential-fallback"):
+            Path(os.environ["KUBECONFIG"]).write_text(KUBECONFIG, encoding="utf-8")
         return int(case in ("missing-access", "credential-fallback"))
     if command == "tar":
         if case == "tar-timeout":
@@ -159,14 +191,7 @@ def mock(command, arguments):
             return 0
         os.execv("/usr/bin/tar", ["tar", *arguments])
     if command == "oc":
-        if "logs" in arguments:
-            print("error panic timeout " + SECRET)
-        elif "events" in arguments:
-            print(json.dumps({"items": [{"type": "Warning", "message": SECRET}]}))
-        else:
-            print(json.dumps({"items": [{"metadata": {"name": "fixture-pod"}, "status": {
-                "phase": "Pending", "message": SECRET, "conditions": [{"type": "Ready", "status": "False"}]}}]}))
-        return 0
+        return mock_oc(arguments)
     if command == "podman":
         return mock_podman(base, case, arguments)
     raise AssertionError("Unexpected fixture command")
@@ -178,6 +203,7 @@ class CollectorTests(unittest.TestCase):
             base = Path(directory)
             for name in ("bin", "shared", "artifacts", "credentials", "tmp"):
                 (base / name).mkdir()
+            fixture_system_tools(base / "bin")
             for command in ("curl", "ocm", "ocm-backplane", "oc", "tar"):
                 executable = base / "bin" / command
                 executable.write_text(f'#!{sys.executable}\nimport sys\nsys.path.insert(0, {str(ROOT / "hack")!r})\n'
@@ -215,7 +241,7 @@ class CollectorTests(unittest.TestCase):
                 (base / "shared/cluster-id").symlink_to(base / "credentials/ocm_token")
             delivered = base / "delivered.sh"
             delivered.write_text(SCRIPT.read_text().replace("/usr/local/cs-qe-credentials", str(base / "credentials")))
-            environment = {"PATH": str(base / "bin") + os.pathsep + os.defpath,
+            environment = {"PATH": str(base / "bin"),
                            "ARTIFACT_DIR": str(base / "artifacts"), "SHARED_DIR": str(base / "shared"),
                            "FIXTURE_DIR": str(base), "FIXTURE_CASE": case, "TMPDIR": str(base / "tmp"),
                            "BUILD_ID": "1", "JOB_NAME": "fixture"}
@@ -239,8 +265,7 @@ class CollectorTests(unittest.TestCase):
             self.assertLessEqual(len(calls.splitlines()), 30)
             if case == "tar-timeout":
                 descendant = int((base / "descendant-pid").read_text())
-                process_status = Path("/proc") / str(descendant) / "stat"
-                live = process_status.exists() and process_status.read_text().split()[2] != "Z"
+                live = descendant_is_live(Path("/proc") / str(descendant) / "stat")
                 try:
                     self.assertFalse(live, "Timed-out extraction must stop its decompressor descendant")
                 finally:
@@ -252,6 +277,42 @@ class CollectorTests(unittest.TestCase):
         artifacts, calls = self.run_fixture(ids=None)
         self.assertIn("missing_identity", artifacts["collection-outcome.json"]["reason"])
         self.assertEqual(calls, "")
+
+    def test_missing_tool_cannot_use_ambient_ocm(self):
+        with tempfile.TemporaryDirectory() as directory:
+            host = Path(directory)
+            marker = host / "ocm-used"
+            sentinel = host / "ocm"
+            sentinel.write_text(f'#!{sys.executable}\nfrom pathlib import Path\nPath({str(marker)!r}).touch()\n',
+                                encoding="utf-8")
+            sentinel.chmod(0o700)
+            fixture_system_tools(host)
+            with patch.object(os, "defpath", str(host)):
+                artifacts, _ = self.run_fixture("missing-tool")
+            self.assertFalse(marker.exists())
+            self.assertEqual(artifacts["collection-outcome.json"]["reason"], "login_tool_unavailable")
+
+    def test_descendant_liveness_reads_once_and_handles_reaping(self):
+        for state, expected in (("S", True), ("Z", False), (None, False)):
+            process_status = Mock()
+            if state is None:
+                process_status.read_text.side_effect = FileNotFoundError()
+            else:
+                process_status.read_text.return_value = "123 (fixture) " + state
+            self.assertEqual(descendant_is_live(process_status), expected)
+            process_status.read_text.assert_called_once_with(encoding="utf-8")
+            process_status.exists.assert_not_called()
+
+    def test_unavailable_name_crosscheck_stops_all_diagnostics(self):
+        for case, status in (("api-failure", "command_failed"), ("invalid-json", "invalid_response"),
+                             ("oversized", "command_failed"), ("lookup-timeout", "timeout")):
+            with self.subTest(case=case):
+                artifacts, calls = self.run_fixture(case, manifest=True)
+                self.assertEqual(artifacts["collection-outcome.json"]["reason"], "identity_lookup_" + status)
+                self.assertEqual(set(artifacts), {"collection-outcome.json"})
+                self.assertEqual(calls.count("ocm get "), 1)
+                self.assertNotIn("/clusters/" + CLUSTER, calls)
+                self.assertNotIn("ocm-backplane", calls)
 
     def test_id_rejection(self):
         for ids, reason in (("../../credentials", "malformed_identity"),
@@ -363,16 +424,94 @@ class CollectorTests(unittest.TestCase):
                     self.assertEqual(artifacts["collection-outcome.json"]["credentials_api"], "ok")
 
     def test_api_and_tool_failures_are_safe_and_explicit(self):
-        for case in ("api-failure", "invalid-json", "oversized", "download-failure", "login-failure",
-                     "missing-tool", "missing-token", "timeout"):
+        for case, status in (("api-failure", "command_failed"), ("invalid-json", "invalid_response"),
+                             ("oversized", "command_failed")):
+            with self.subTest(case=case):
+                artifacts, _ = self.run_fixture(case)
+                self.assertEqual(artifacts["collection-outcome.json"]["collector"], "complete")
+                for name in ("cluster.json", "cluster-status.json", "preinstall-resources.json"):
+                    self.assertEqual(artifacts[name]["outcome"], status)
+        for case, reason in (("download-failure", "ocm_install_command_failed"),
+                             ("login-failure", "login_command_failed"), ("missing-tool", "login_tool_unavailable"),
+                             ("missing-token", "token_unavailable"), ("timeout", "login_timeout")):
             with self.subTest(case=case):
                 artifacts, _ = self.run_fixture(case)
                 outcome = artifacts["collection-outcome.json"]
-                self.assertTrue(outcome["collector"] == "incomplete" or
-                                artifacts["cluster.json"]["outcome"] != "ok")
+                self.assertEqual(outcome["collector"], "incomplete")
+                self.assertEqual(outcome["reason"], reason)
 
 
 class ProducerHandoffTests(producer.ArtifactFixture):
+    def run_handoff(self, recordings, setup=""):
+        snippet = self.script.read_text(encoding="utf-8").split(
+            'python3 - "${ocm_fvt_output}" "${SHARED_DIR}" "${ocm_fvt_started}" <<\'PY\' 2>/dev/null || true\n',
+            1)[1].split("\nPY", 1)[0]
+        with tempfile.TemporaryDirectory(dir=self.artifacts) as directory:
+            output = Path(directory)
+            for index, content in enumerate(recordings):
+                profile = output / str(index)
+                profile.mkdir()
+                (profile / "cluster.ini").write_text(content, encoding="utf-8")
+            subprocess.run([sys.executable, "-", str(output), str(self.shared), str(int(time.time()) - 1)],
+                           input=setup + snippet, encoding="utf-8", capture_output=True, check=True,
+                           env={"BUILD_ID": "1", "JOB_NAME": "fixture"})
+        return json.loads((self.shared / "ocm-fvt-diagnostic-identity.json").read_text(encoding="utf-8"))
+
+    def test_literal_identity_formats_and_ambiguity(self):
+        for header in ("", "[Cluster]\n"):
+            manifest = self.run_handoff([header + "Name=fixture-run-name\nID=" + CLUSTER + "\n"])
+            self.assertEqual(manifest["outcome"], "ok")
+            self.assertEqual(manifest["ids"], [CLUSTER])
+            artifacts, _ = CollectorTests().run_fixture(ids=None, manifest=manifest)
+            self.assertEqual(artifacts["collection-outcome.json"]["identity"], "unique_run_name")
+        manifest = self.run_handoff(["ID=" + CLUSTER + "\n", "[Cluster]\nID=" + "b" * 32 + "\n"])
+        artifacts, calls = CollectorTests().run_fixture(ids=None, manifest=manifest)
+        self.assertEqual(artifacts["collection-outcome.json"]["reason"], "ambiguous_or_missing_name")
+        self.assertNotIn("/resources/live", calls)
+
+    def test_default_interpolated_and_duplicate_identity_rejected(self):
+        for content in ("[DEFAULT]\nID=" + CLUSTER + "\n",
+                        "[DEFAULT]\nraw=" + CLUSTER + "\n[Cluster]\nID=%(raw)s\n",
+                        "[Cluster]\nraw=" + CLUSTER + "\nID=%(raw)s\n",
+                        "[__unused_defaults__]\nID=" + CLUSTER + "\n[Cluster]\nID=%(id)s\n",
+                        "ID=" + CLUSTER + "\nID=" + CLUSTER + "\n"):
+            with self.subTest(content=content):
+                manifest = self.run_handoff([content])
+                self.assertEqual(manifest["outcome"], "invalid_or_incomplete_recording")
+                self.assertEqual(manifest["ids"], [])
+                self.assertEqual(manifest["names"], [])
+                artifacts, calls = CollectorTests().run_fixture(ids=None, manifest=manifest)
+                self.assertEqual(artifacts["collection-outcome.json"]["reason"], "invalid_identity_handoff")
+                self.assertNotIn("/resources/live", calls)
+        for section in ("DEFAULT", "__unused_defaults__", "OtherResource"):
+            manifest = self.run_handoff(["[" + section + "]\nID=" + CLUSTER + "\n"])
+            self.assertEqual(manifest["ids"], [])
+
+    def test_directory_scan_limit_and_context_cleanup(self):
+        manifest = self.run_handoff([""] * 128)
+        self.assertEqual(manifest["outcome"], "ok")
+        manifest = self.run_handoff([], '''import os, sys
+from pathlib import Path
+from types import SimpleNamespace
+class LimitedScan:
+    count = 0
+    def __enter__(self):
+        return self
+    def __exit__(self, *unused):
+        Path(sys.argv[2], "scan-closed").write_text(str(self.count), encoding="utf-8")
+    def __iter__(self):
+        return self
+    def __next__(self):
+        self.count += 1
+        if self.count > 129:
+            raise AssertionError("Enumeration exceeded its bound")
+        return SimpleNamespace(path=str(Path(sys.argv[1], "absent")), is_symlink=lambda: False)
+os.scandir = lambda unused: LimitedScan()
+''')
+        self.assertEqual(manifest["outcome"], "invalid_or_incomplete_recording")
+        self.assertEqual(manifest["ids"], [])
+        self.assertEqual((self.shared / "scan-closed").read_text(encoding="utf-8"), "129")
+
     def setUp(self):
         super().setUp()
         # rosa-e2e-ocm-fvt-prepare delivers itself as the artifact helper the

@@ -433,30 +433,33 @@ outcome = "invalid_or_incomplete_recording"
 try:
     if output.is_symlink():
         raise ValueError("invalid output")
-    for index, profile in enumerate(output.iterdir()):
-        if index >= 128:
-            raise ValueError("too many profiles")
-        recording = profile / "cluster.ini"
-        if profile.is_symlink() or recording.is_symlink() or not recording.is_file():
-            continue
-        if recording.stat().st_size > 65536:
-            raise ValueError("oversized recording")
-        parser = configparser.ConfigParser(strict=True)
-        parser.read_string("[recording]\n" + recording.read_text(encoding="utf-8"))
-        for section_name in parser:
-            if section_name.lower() not in ("recording", "cluster"):
+    with os.scandir(output) as profiles:
+        for index, profile in enumerate(profiles):
+            if index >= 128:
+                raise ValueError("too many profiles")
+            recording = Path(profile.path) / "cluster.ini"
+            if profile.is_symlink() or recording.is_symlink() or not recording.is_file():
                 continue
-            section = parser[section_name]
-            if section.get("id"):
-                if not re.fullmatch(r"[a-z0-9]{20,64}", section["id"]):
-                    raise ValueError("invalid id")
-                identifiers.add(section["id"])
-            if section.get("name"):
-                if not re.fullmatch(r"[a-z][a-z0-9-]{1,61}[a-z0-9]", section["name"]):
-                    raise ValueError("invalid name")
-                names.add(section["name"])
-            if max(len(names), len(identifiers)) > 32:
-                raise ValueError("too many identities")
+            if recording.stat().st_size > 65536:
+                raise ValueError("oversized recording")
+            parser = configparser.ConfigParser(strict=True, interpolation=None)
+            parser.read_string("[recording]\n" + recording.read_text(encoding="utf-8"))
+            if parser.defaults():
+                raise ValueError("default options are not recording identity")
+            for section_name in parser:
+                if section_name.lower() not in ("recording", "cluster"):
+                    continue
+                section = parser[section_name]
+                if section.get("id"):
+                    if not re.fullmatch(r"[a-z0-9]{20,64}", section["id"]):
+                        raise ValueError("invalid id")
+                    identifiers.add(section["id"])
+                if section.get("name"):
+                    if not re.fullmatch(r"[a-z][a-z0-9-]{1,61}[a-z0-9]", section["name"]):
+                        raise ValueError("invalid name")
+                    names.add(section["name"])
+                if max(len(names), len(identifiers)) > 32:
+                    raise ValueError("too many identities")
     outcome = "ok"
 except (OSError, ValueError, configparser.Error):
     names.clear()

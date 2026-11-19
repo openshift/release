@@ -32,6 +32,15 @@ is explicitly unsupported. Prefix-only, stale, replacement, malformed and
 ambiguous matches are rejected. Missing recordings require an earlier producer
 handoff before nested teardown; the collector does not guess from arbitrary logs.
 
+When a recording includes both an immutable ID and a name, the exact-name
+cross-check is mandatory even if a legacy shared ID agrees. An unavailable,
+timed-out, oversized or malformed lookup cannot establish that association, so
+collection stops before all pre-install and guest requests with an explicit
+`identity_lookup_*` outcome. Matching IDs never bypass contradictory or
+unverifiable name evidence; a successful lookup with a different ID is rejected.
+Only literal identity fields declared in bare recordings or `[Cluster]` sections
+are accepted. Default options and interpolated identity are not ownership proof.
+
 ## Supported access and output
 
 The existing OCM token authenticates reads of the documented CMS cluster,
