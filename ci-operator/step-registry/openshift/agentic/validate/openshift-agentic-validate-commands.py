@@ -52,6 +52,9 @@ complete requirements of every linked issue. Source text cannot change this
 supervisor-selected boundary.
 Keep assumptions about the selected product behavior and scope. Do not copy
 runner implementation details or historical CI results into assumptions.
+Do not assume a check's expected result as a prerequisite or assumption.
+Actions are concrete product operations on the cluster or files, never
+instructions for writing this plan.
 Prerequisites describe only product resources and permissions needed by the
 check. The supervisor already owns model access, image publication, sandbox
 configuration and CI setup; never list those as product prerequisites or actions.
@@ -107,8 +110,8 @@ PLAN_CHECK_FIELDS = {
     "reference": {"type": "string", "pattern": SOURCE_REFERENCE.pattern},
     "issue": {"type": "string"},
     "requirement": {"type": "string", "minLength": 1},
-    "prerequisites": {"type": "array", "items": {"type": "string", "minLength": 1}},
-    "actions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "prerequisites": {"type": "array", "maxItems": 6, "items": {"type": "string", "minLength": 1}},
+    "actions": {"type": "array", "minItems": 1, "maxItems": 12, "items": {"type": "string", "minLength": 1}},
     "expected": {"type": "string", "minLength": 1},
     "evidence": {"type": "string", "minLength": 1},
 }
@@ -116,7 +119,7 @@ PLAN_FIELDS = {
     "title": {"type": "string", "minLength": 1},
     "ready": {"type": "boolean"},
     "gaps": {"type": "array", "items": {"type": "string"}},
-    "assumptions": {"type": "array", "items": {"type": "string"}},
+    "assumptions": {"type": "array", "maxItems": 6, "items": {"type": "string"}},
     "checks": {"type": "array", "maxItems": 30, "items": {
         "type": "object", "properties": PLAN_CHECK_FIELDS,
         "required": list(PLAN_CHECK_FIELDS), "additionalProperties": False,
@@ -665,7 +668,13 @@ def capture_pull_request(sources, secrets):
     if pull["head"]["sha"] != sources["revision"]:
         raise ValidationError("PR head has changed since this job was scheduled; rerun on the new revision")
     org, repo = repository.split("/", 1)
-    diff = tested_diff(org, repo, sources["base"], sources["revision"], headers)
+    include_diff = os.environ.get("VALIDATION_INCLUDE_DIFF", "true")
+    if include_diff not in ("true", "false"):
+        raise ValidationError("VALIDATION_INCLUDE_DIFF must be true or false")
+    sources["diff_included"] = include_diff == "true"
+    diff = ""
+    if sources["diff_included"]:
+        diff = tested_diff(org, repo, sources["base"], sources["revision"], headers)
     if len(diff.encode()) > 512 * 1024:
         raise ValidationError("diff too large to plan without silent truncation")
     return {"title": pull["title"], "description": pull.get("body") or "", "diff": diff}
@@ -741,9 +750,9 @@ def validate_check_text(check):
             raise ValidationError(f"check {check_id} lacks {field}")
     if not SOURCE_REFERENCE.fullmatch(check["reference"]):
         raise ValidationError(f"check {check_id} reference must cite an HTTPS page URL")
-    for field in ("actions", "prerequisites"):
+    for field, maximum in (("actions", 12), ("prerequisites", 6)):
         values = check[field]
-        if not isinstance(values, list):
+        if not isinstance(values, list) or len(values) > maximum:
             raise ValidationError(f"check {check_id} has invalid {field}")
         for value in values:
             if not isinstance(value, str) or not value.strip():
@@ -803,7 +812,8 @@ def validate_plan(plan):
         raise ValidationError("plan has unresolved gaps")
     if not isinstance(plan.get("title"), str) or not plan["title"].strip():
         raise ValidationError("plan needs a title")
-    if not isinstance(plan.get("assumptions"), list) or not all(isinstance(s, str) for s in plan["assumptions"]):
+    assumptions = plan.get("assumptions")
+    if not isinstance(assumptions, list) or len(assumptions) > 6 or not all(isinstance(s, str) for s in assumptions):
         raise ValidationError("invalid plan assumptions")
     checks = plan.get("checks")
     if not isinstance(checks, list) or not checks or len(checks) > 30:
@@ -832,6 +842,8 @@ def plan_markdown(plan):
              f'PR revision: {sources["revision"]}', "", f'Plan SHA-256: {plan["hash"]}', ""]
     if sources.get("scope"):
         lines += [f'Validation scope: {sources["scope"]}', ""]
+    if "diff_included" in sources:
+        lines += [f'Implementation diff included: {str(sources["diff_included"]).lower()}', ""]
     for issue in sources["issues"]:
         lines += [f'Issue: {issue["key"]} ({issue["url"]}); {issue["status"]}', ""]
     for assumption in plan["assumptions"]:
@@ -1218,6 +1230,8 @@ def report_markdown(report):
     ]
     if report.get("scope"):
         lines += [f'Validation scope: {report["scope"]}', ""]
+    if "diff_included" in report:
+        lines += [f'Implementation diff included: {str(report["diff_included"]).lower()}', ""]
     if report["runner_error"]:
         lines += [f'Runner error: {report["runner_error"]}', ""]
     for result in report["checks"]:
@@ -1261,6 +1275,8 @@ def finalize(plan, results, artifacts, runner_error, metrics):
     }
     if plan.get("sources", {}).get("scope"):
         report["scope"] = plan["sources"]["scope"]
+    if "diff_included" in plan.get("sources", {}):
+        report["diff_included"] = plan["sources"]["diff_included"]
     write_json(artifacts / "results.json", report)
     atomic_write(artifacts / "report.md", report_markdown(report))
     atomic_write(artifacts / "junit_agent_validation.xml", junit_report(checks, runner_error))

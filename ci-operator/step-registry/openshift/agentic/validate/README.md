@@ -53,6 +53,8 @@ supervisor.
    for Jira checks and the captured PR URL for PR checks. Inferred checks cite
    one of those captured pages; site roots and unrelated pages are rejected.
    Product prerequisites exclude model access, image publication and CI setup.
+   Plans allow up to six assumptions, six prerequisites per check and twelve
+   product actions per check; generation and validation enforce these bounds.
    The citation pattern permits the complete page path and section even when
    a structured-output backend treats its regex as a full-string match. It
    excludes quotes and line breaks so decoding can terminate the JSON string.
@@ -76,6 +78,13 @@ in both the plan and result report. A scoped pass does not establish completion
 of the entire epic. Without this setting, preparation covers the whole issue.
 Rejection reports distinguish unsupported fields, a plan not marked ready, and
 unresolved gaps without publishing private rejected source text.
+
+`VALIDATION_INCLUDE_DIFF` defaults to `true` for component PRs. The release-repo
+rehearsals set it to `false`: their diff defines the CI runner rather than the
+installed router product under test. Planning still retrieves Jira and the PR's
+concrete product procedure. `sources.diff_included` records this explicit choice
+in the plan hash, Markdown and execution reports. This avoids treating the
+planner's own source code or prompt examples as product validation actions.
 
 ## Execution and reporting
 
