@@ -9,18 +9,76 @@ log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
 }
 
+# ---------------------------------------------------------------
+# Startup diagnostics
+#
+# Authentication happens before any reconcile output exists, so a run that
+# fails to log in used to end with an empty log and no report at all. The
+# report header and one line per startup phase are therefore written before
+# the first login attempt and on its outcome. Only fixed words and small
+# integers are recorded: credentials, command arguments and OCM output never
+# reach the log or the artifact directory, and failing to record a startup
+# line never changes the status the controller exits with.
+# ---------------------------------------------------------------
+REPORT="${ARTIFACT_DIR:-}/controller-report.txt"
+
+# Append an already sanitized line to the report. A missing or unwritable
+# artifact directory is reported by the write itself, not by exiting.
+report_line() {
+    if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+        printf '%s\n' "$1" 2>/dev/null >> "${REPORT}" || true
+    fi
+    return 0
+}
+
+# Log and report the outcome of one startup phase. Phase and status come from
+# the fixed sets below, and the remaining fields are integers, so an
+# unexpected value is replaced rather than printed.
+report_phase() {
+    local phase="$1" status="$2" exit_code="${3:-0}" attempts="${4:-0}" credentials line
+    case "${phase}" in
+        startup|authentication) ;;
+        *) phase="unknown" ;;
+    esac
+    case "${status}" in
+        started|succeeded|failed|no-credentials) ;;
+        *) status="unknown" ;;
+    esac
+    case "${OCM_LOGIN_CREDENTIAL_MODE:-unknown}" in
+        sso-client|ocm-token|none) credentials="${OCM_LOGIN_CREDENTIAL_MODE}" ;;
+        *) credentials="unknown" ;;
+    esac
+    [[ "${exit_code}" =~ ^[0-9]+$ ]] || exit_code=0
+    [[ "${attempts}" =~ ^[0-9]+$ ]] || attempts=0
+    line=$(printf 'PHASE: %s %s credentials=%s attempts=%s exit=%s' \
+        "${phase}" "${status}" "${credentials}" "${attempts}" "${exit_code}")
+    log "${line}"
+    report_line "${line}"
+    return 0
+}
+
+# Log in to OCM. Sets globals describing the most recent attempt, never its
+# inputs:
+#   OCM_LOGIN_CREDENTIAL_MODE: which credential kind was used, one of
+#     "sso-client", "ocm-token" or "none" when no credential was available
+#   OCM_LOGIN_ATTEMPTS: number of login attempts made (0 without credentials)
 ocm_login() {
     local target_env="$1" attempt exit_code
     local -a credentials
+    OCM_LOGIN_ATTEMPTS=0
     if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+        OCM_LOGIN_CREDENTIAL_MODE="sso-client"
         credentials=(--client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}")
     elif [[ -n "${OCM_TOKEN}" ]]; then
+        OCM_LOGIN_CREDENTIAL_MODE="ocm-token"
         credentials=(--token "${OCM_TOKEN}")
     else
+        OCM_LOGIN_CREDENTIAL_MODE="none"
         return 1
     fi
 
     for attempt in 1 2 3; do
+        OCM_LOGIN_ATTEMPTS="${attempt}"
         if ocm login --url "${target_env}" "${credentials[@]}" > /dev/null 2>&1; then
             CURRENT_OCM_ENV="${target_env}"
             return 0
@@ -39,6 +97,8 @@ ocm_authenticate() {
     SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
     OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)
     CURRENT_OCM_ENV=""
+    OCM_LOGIN_CREDENTIAL_MODE="unknown"
+    OCM_LOGIN_ATTEMPTS=0
     ocm_login "${OCM_LOGIN_ENV}"
 }
 
@@ -407,14 +467,44 @@ schedule_upgrade() {
     fi
 }
 
-ocm_authenticate || exit $?
+# ---------------------------------------------------------------
+# Startup diagnostics: report the phases around the first login, so that
+# a run ending here is not silent. See report_phase above.
+# ---------------------------------------------------------------
+# Start the report from scratch, as writing its header did before.
+if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+    : 2>/dev/null > "${REPORT}" || true
+fi
+report_line "Lease Controller Report - $(date -u)"
+report_line "======================================"
+report_phase startup started
+
+AUTH_EXIT=0
+ocm_authenticate || AUTH_EXIT=$?
+if [[ "${AUTH_EXIT}" -ne 0 ]]; then
+    if [[ "${OCM_LOGIN_CREDENTIAL_MODE:-unknown}" == "none" ]]; then
+        report_phase authentication no-credentials "${AUTH_EXIT}" "${OCM_LOGIN_ATTEMPTS:-0}"
+    else
+        report_phase authentication failed "${AUTH_EXIT}" "${OCM_LOGIN_ATTEMPTS:-0}"
+    fi
+    exit "${AUTH_EXIT}"
+fi
+report_phase authentication succeeded 0 "${OCM_LOGIN_ATTEMPTS:-0}"
 
 NOW_EPOCH=$(date +%s)
 STALE_THRESHOLD=$((STALE_LEASE_HOURS * 3600))
 ERROR_THRESHOLD=$((ERROR_REPLACE_HOURS * 3600))
-REPORT="${ARTIFACT_DIR}/controller-report.txt"
-echo "Lease Controller Report - $(date -u)" > "${REPORT}"
-echo "======================================" >> "${REPORT}"
+# Reconciliation appends to the report without the startup guard, so a report
+# that cannot be written has to stop the controller here, as writing the
+# header did before it moved above, rather than part way through reconciling.
+if [[ -z "${ARTIFACT_DIR:-}" ]]; then
+    log "ERROR: ARTIFACT_DIR is not set, refusing to reconcile"
+    exit 1
+fi
+if ! : 2>/dev/null >> "${REPORT}"; then
+    log "ERROR: controller report is not writable, refusing to reconcile"
+    exit 1
+fi
 
 # ---------------------------------------------------------------
 # Phase 1: Read desired state
