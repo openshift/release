@@ -51,8 +51,16 @@ set +e
 ssh "${SSHOPTS[@]}" "${remote}" "sudo bash -s -- ${remote_args}" <<'REMOTE'
 set -euo pipefail
 cd "$1"
+download_dir=''
 restore_ownership() {
   local result=$?
+
+  if [[ -n "${download_dir}" ]] && ! rm -rf -- "${download_dir}" 2>/dev/null; then
+    echo 'Could not remove the temporary test binary download' >&2
+    if (( result == 0 )); then
+      result=1
+    fi
+  fi
 
   if ! chown -R ec2-user:ec2-user . 2>/dev/null; then
     echo 'Could not restore ownership of remote files' >&2
@@ -76,8 +84,39 @@ mkdir -p "${artifacts}/junit"
 # shellcheck source=/dev/null
 source common.sh
 
-oc image extract --registry-config=pull-secret "${tests_image}" --path=/usr/bin/openshift-tests:bin --confirm
-chmod +x bin/openshift-tests
+# A failed layer download can leave a partial file. Publish only a complete
+# extraction, and never fall back to a binary left by an earlier suite.
+download_dir=$(mktemp -d "${PWD}/.tests-download.XXXXXX")
+for attempt in 1 2 3; do
+  printf 'Test binary download: attempt %s of 3 (2 minute limit per attempt)\n' "${attempt}"
+  rm -f -- "${download_dir}/openshift-tests"
+  if timeout --kill-after=10s 2m oc image extract --registry-config=pull-secret "${tests_image}" \
+      --path="/usr/bin/openshift-tests:${download_dir}" --confirm >/dev/null 2>&1; then
+    extract_result=0
+  else
+    extract_result=$?
+  fi
+
+  if (( extract_result == 0 )) && [[ -s "${download_dir}/openshift-tests" ]]; then
+    if ! chmod 755 "${download_dir}/openshift-tests" 2>/dev/null ||
+      ! mv -f -- "${download_dir}/openshift-tests" bin/openshift-tests 2>/dev/null; then
+      echo 'Could not publish the downloaded test binary' >&2
+      exit 1
+    fi
+    echo 'Test binary download completed successfully'
+    break
+  fi
+  if (( extract_result == 0 )); then
+    extract_result=1
+  fi
+  if (( attempt == 3 )); then
+    printf 'Test binary download failed after 3 attempts (exit %s)\n' "${extract_result}" >&2
+    exit "${extract_result}"
+  fi
+
+  printf 'Test binary download failed (exit %s); retrying in 10s\n' "${extract_result}"
+  sleep 10
+done
 
 printf 'Running test suite: %s\n' "${suite}"
 # Origin retains its 45/195-minute suite limits and five-minute CLI limit.

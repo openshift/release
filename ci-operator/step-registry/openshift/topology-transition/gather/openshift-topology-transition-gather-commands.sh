@@ -209,8 +209,51 @@ if [[ -s "${KUBECONFIG}" ]]; then
   timeout 2m oc get infrastructure cluster -o yaml > results/cluster/infrastructure.yaml 2>&1 || warn 'could not collect infrastructure state'
   timeout 2m oc get events -A -o yaml > results/cluster/events.yaml 2>&1 || warn 'could not collect cluster events'
   echo 'Starting must-gather (20 minute limit)'
-  timeout --kill-after=1m 20m oc adm must-gather --dest-dir=results/cluster/must-gather \
-    > results/cluster/must-gather.log 2>&1 || warn 'must-gather did not complete successfully'
+  started=${SECONDS}
+  deadline=$((started + 1200))
+  must_gather_result=1
+  : > results/cluster/must-gather.log
+  for attempt in 1 2 3; do
+    remaining=$((deadline - SECONDS))
+    if (( remaining <= 0 )); then
+      break
+    fi
+
+    printf 'Must-gather startup: attempt %s of 3, elapsed %ss of 1200s\n' "${attempt}" "$((SECONDS - started))"
+    attempt_log="results/cluster/must-gather-attempt-${attempt}.log"
+    if timeout --kill-after=1m "${remaining}s" oc adm must-gather --dest-dir=results/cluster/must-gather \
+        > "${attempt_log}" 2>&1; then
+      must_gather_result=0
+    else
+      must_gather_result=$?
+    fi
+    printf 'Must-gather attempt %s (exit %s)\n' "${attempt}" "${must_gather_result}" >> results/cluster/must-gather.log
+    cat "${attempt_log}" >> results/cluster/must-gather.log || warn 'could not append a must-gather attempt log'
+    if (( must_gather_result == 0 )); then
+      echo 'Must-gather completed successfully'
+      break
+    fi
+
+    # A new namespace's default account may not exist at the first pod create.
+    # Retry only that startup race, using this attempt's log rather than old errors.
+    if (( attempt == 3 || must_gather_result == 124 || must_gather_result == 137 )) ||
+      ! grep -Eq 'error looking up service account.*serviceaccounts?[[:space:]]+"?default"?[[:space:]]+not found' "${attempt_log}"; then
+      break
+    fi
+    remaining=$((deadline - SECONDS))
+    if (( remaining <= 0 )); then
+      break
+    fi
+    retry_delay=10
+    if (( remaining < retry_delay )); then
+      retry_delay=${remaining}
+    fi
+    printf 'Must-gather service account startup pending; retrying in %ss\n' "${retry_delay}"
+    sleep "${retry_delay}"
+  done
+  if (( must_gather_result != 0 )); then
+    warn 'must-gather did not complete successfully'
+  fi
 else
   echo 'Skipping cluster collection: no kubeconfig is available'
 fi

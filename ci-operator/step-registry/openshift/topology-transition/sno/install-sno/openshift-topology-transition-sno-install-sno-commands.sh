@@ -672,7 +672,41 @@ os_image=$(oc adm release info --registry-config=pull-secret --image-for=machine
 oc image extract --registry-config=pull-secret "${os_image}" --path=/coreos/coreos-x86_64.iso:. --confirm
 mv coreos-x86_64.iso rhcos-live.iso
 echo 'Waiting for the installed node to be ready (10 minute limit)'
-oc wait node --all --for=condition=Ready --timeout=10m >/dev/null
+started=${SECONDS}
+deadline=$((started + 600))
+attempt=0
+while true; do
+  remaining=$((deadline - SECONDS))
+  if (( remaining <= 0 )); then
+    echo 'Timed out waiting for the installed node to be ready' >&2
+    exit 1
+  fi
+
+  attempt=$((attempt + 1))
+  printf 'Installed node readiness: attempt %s, elapsed %ss of 600s\n' "${attempt}" "$((SECONDS - started))"
+  request_timeout=30
+  if (( remaining < request_timeout )); then
+    request_timeout=${remaining}
+  fi
+  if timeout --kill-after=5s "${remaining}s" oc --request-timeout="${request_timeout}s" get nodes -o json 2>/dev/null |
+    jq -e '.items | length > 0 and all(.[];
+      any(.status.conditions[]?; .type == "Ready" and .status == "True"))' >/dev/null 2>&1; then
+    echo 'Installed node readiness checks passed'
+    break
+  fi
+
+  remaining=$((deadline - SECONDS))
+  if (( remaining <= 0 )); then
+    echo 'Timed out waiting for the installed node to be ready' >&2
+    exit 1
+  fi
+  retry_delay=10
+  if (( remaining < retry_delay )); then
+    retry_delay=${remaining}
+  fi
+  printf 'Installed node readiness pending; retrying in %ss\n' "${retry_delay}"
+  sleep "${retry_delay}"
+done
 # Operators can start another rollout just after the installer reports success.
 echo 'Waiting for cluster operators to settle'
 started=${SECONDS}
