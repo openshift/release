@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Offline fixtures for the delivered step: python3 hack/test_rosa_ocm_fvt_artifacts.py.
 
-Only the ref's commands script is copied into the fixture, matching step delivery.
+The ref's commands script and prepared helper match the step delivery path.
 Metadata describes the outer collector identity, not the nested image's identity.
 Scans stop at 128 entries, 16 result locations and 32 reports per location; labels
 omit result names and phase timestamps. Report contents are never read by collection.
@@ -26,8 +26,13 @@ SECRET = "FIXTURE_SECRET_DO_NOT_PRINT"
 DIGEST = "sha256:" + "a" * 64
 
 
+def fixture_output(base):
+    recorded = base / "output-path"
+    return Path(recorded.read_text(encoding="utf-8")) if recorded.exists() else base / "artifacts/ocm-fvt-results"
+
+
 def mock_artifact_command(command, arguments, base, case):
-    output = base / "artifacts/ocm-fvt-results"
+    output = fixture_output(base)
     if command == "find":
         if case == "find-failure" and arguments == [
                 str(output), "-type", "f", "-name", "report.xml", "-print0"]:
@@ -42,7 +47,8 @@ def mock_artifact_command(command, arguments, base, case):
         os.execv("/bin/cp", ["cp", *arguments])
     if command == "python3":
         if case == "collector-failure" and arguments == [
-                "-", str(output), str(base / "artifacts/ocm-fvt-artifact-metadata.json")]:
+                str(base / "shared/ocm-fvt-artifacts.py"), "metadata", str(output),
+                str(base / "artifacts/ocm-fvt-artifact-metadata.json")]:
             return 92
         os.execv(sys.executable, [sys.executable, *arguments])
     raise AssertionError("Unexpected artifact fixture command")
@@ -51,7 +57,6 @@ def mock_artifact_command(command, arguments, base, case):
 def mock_command(command, arguments):
     base = Path(os.environ["FIXTURE_DIR"])
     case = os.environ["FIXTURE_CASE"]
-    output = base / "artifacts/ocm-fvt-results"
     if command in ("cat", "env"):
         if ((command == "cat" and arguments[0].startswith("/usr/local/cs-qe-credentials/"))
                 or (command == "env" and arguments[0] == "-i")):
@@ -73,6 +78,9 @@ def mock_command(command, arguments):
         return 93 if case == "inspect-failure" else 0
     if arguments[0] != "run":
         raise AssertionError("Unexpected podman operation")
+    mount = next(argument for argument in arguments if argument.endswith(":/ocm-backend-tests/output:z"))
+    output = Path(mount.removesuffix(":/ocm-backend-tests/output:z"))
+    (base / "output-path").write_text(str(output), encoding="utf-8")
     if case == "missing":
         output.rmdir()
     elif case == "root-symlink":
@@ -126,6 +134,8 @@ class ArtifactFixture(unittest.TestCase):
         self.artifacts.mkdir()
         self.shared = self.base / "shared"
         self.shared.mkdir()
+        subprocess.run([sys.executable, str(STEP / "prepare/rosa-e2e-ocm-fvt-prepare-commands.py")],
+                       check=True, timeout=30, env={**os.environ, "SHARED_DIR": str(self.shared)})
         (self.base / "outside").mkdir()
         (self.base / "outside/secret").write_text(SECRET, encoding="utf-8")
         ref = (STEP / "rosa-e2e-ocm-fvt-ref.yaml").read_text(encoding="utf-8")
@@ -170,7 +180,7 @@ class ArtifactFixture(unittest.TestCase):
         return json.loads(contents)
 
     def tearDown(self):
-        output = self.artifacts / "ocm-fvt-results"
+        output = fixture_output(self.base)
         if output.is_dir() and not output.is_symlink():
             output.chmod(0o700)
             result = output / "test-result-fixture"

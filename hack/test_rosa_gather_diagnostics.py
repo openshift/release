@@ -26,8 +26,6 @@ CLUSTER = "a" * 32
 SECRET = "FIXTURE_SECRET_MUST_NOT_APPEAR"
 CONTAINER_OUTPUT = "/ocm-backend-tests/output"
 OUTPUT_MOUNT = ":" + CONTAINER_OUTPUT + ":z"
-PREPARE = ROOT / ("ci-operator/step-registry/rosa/e2e/ocm-fvt/prepare/"
-                  "rosa-e2e-ocm-fvt-prepare-commands.py")
 KUBECONFIG = "apiVersion: v1\nkind: Config\n"
 
 
@@ -511,14 +509,6 @@ os.scandir = lambda unused: LimitedScan()
         self.assertEqual(manifest["outcome"], "invalid_or_incomplete_recording")
         self.assertEqual(manifest["ids"], [])
         self.assertEqual((self.shared / "scan-closed").read_text(encoding="utf-8"), "129")
-
-    def setUp(self):
-        super().setUp()
-        # rosa-e2e-ocm-fvt-prepare delivers itself as the artifact helper the
-        # producer requires before it stages or publishes anything. Run that
-        # delivery rather than copying, so the fixture covers prepare too.
-        subprocess.run([sys.executable, str(PREPARE)], check=True, timeout=30,
-                       env={**os.environ, "SHARED_DIR": str(self.shared)})
 
     def test_utf8_recording_under_ascii_locale(self):
         output = self.artifacts / "utf8-recordings"
