@@ -28,6 +28,16 @@ if [[ -s "${SHARED_DIR}/bp-kubeconfig" ]]; then
   log "Backplane hosted-cluster kubeconfig available at BP_KUBECONFIG=${BP_KUBECONFIG}"
 fi
 
+# The management-cluster kubeconfig (mc-kubeconfig, also written by
+# rosa-backplane-login) is exported as MC_KUBECONFIG so the suite can verify
+# management-cluster state, e.g. the hypershift NodePool CR autoscaling bounds
+# for the Feature:Autoscaling spec. Not all provisioner heads run
+# rosa-backplane-login, so this is optional.
+if [[ -s "${SHARED_DIR}/mc-kubeconfig" ]]; then
+  export MC_KUBECONFIG="${SHARED_DIR}/mc-kubeconfig"
+  log "Management cluster kubeconfig available at MC_KUBECONFIG=${MC_KUBECONFIG}"
+fi
+
 # Customer plane validates from the guest cluster kubeconfig. Prefer the
 # provisioner-written kubeconfig (direct API), and fall back to BP_KUBECONFIG for
 # private-link clusters until the suite consumes BP_KUBECONFIG on its own.
@@ -48,6 +58,30 @@ if [[ -f "${AWSCRED}" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
   export AWS_DEFAULT_REGION="${REGION:-${LEASED_RESOURCE}}"
   export AWS_REGION="${REGION:-${LEASED_RESOURCE}}"
+fi
+
+# Shared VPC inputs (ROSAENG-63353): when the head provisioned the cluster in
+# a shared VPC (ENABLE_SHARED_VPC=yes), publish the cross-account private
+# hosted zone and shared role references so the Feature:SharedVPC specs can
+# validate them. The specs skip themselves when these are absent, so this
+# block is a no-op for the rest of the matrix. Credential file contents are
+# never echoed.
+if [[ -s "${SHARED_DIR}/hosted_zone_id" && -s "${SHARED_DIR}/hosted_zone_role_arn" && -s "${SHARED_DIR}/rosa_dns_domain" ]]; then
+  SHARED_VPC_HOSTED_ZONE_ID="$(head -n 1 "${SHARED_DIR}/hosted_zone_id")"
+  SHARED_VPC_ROLE_ARN="$(head -n 1 "${SHARED_DIR}/hosted_zone_role_arn")"
+  SHARED_VPC_BASE_DOMAIN="$(head -n 1 "${SHARED_DIR}/rosa_dns_domain")"
+  export SHARED_VPC_HOSTED_ZONE_ID SHARED_VPC_ROLE_ARN SHARED_VPC_BASE_DOMAIN
+  if [[ -s "${SHARED_DIR}/account-roles-arns" ]]; then
+    SHARED_VPC_INSTALLER_ROLE_ARN="$(grep "Installer-Role" "${SHARED_DIR}/account-roles-arns" | head -n 1 || true)"
+    [[ -n "${SHARED_VPC_INSTALLER_ROLE_ARN}" ]] && export SHARED_VPC_INSTALLER_ROLE_ARN
+  fi
+  if [[ -f "${CLUSTER_PROFILE_DIR}/.awscred_shared_account" ]]; then
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+  else
+    log "WARNING: shared VPC inputs present but ${CLUSTER_PROFILE_DIR}/.awscred_shared_account not found;"
+    log "         cross-account specs will skip themselves"
+  fi
+  log "Shared VPC inputs exported (hosted zone: ${SHARED_VPC_HOSTED_ZONE_ID})"
 fi
 
 # OCM credentials for the suite's BeforeSuite (config.Load requires OCM_TOKEN or
@@ -97,6 +131,10 @@ log "LABEL_FILTER='${LABEL_FILTER:-}'"
 if [[ -n "${LABEL_FILTER:-}" ]]; then
   GINKGO_ARGS+=("--ginkgo.label-filter=${LABEL_FILTER}")
 fi
+# A filter that selects no specs at all (e.g. the image predates the spec a
+# dedicated workflow scopes to) must fail instead of silently passing.
+# Skipped specs still count as selected, so this only fires on an empty match.
+GINKGO_ARGS+=("--ginkgo.fail-on-empty")
 
 log "Running customer-plane validation: /usr/local/bin/e2e.test ${GINKGO_ARGS[*]}"
 /usr/local/bin/e2e.test "${GINKGO_ARGS[@]}"

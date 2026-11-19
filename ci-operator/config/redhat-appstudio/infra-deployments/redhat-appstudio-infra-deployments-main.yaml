@@ -44,22 +44,6 @@ tests:
     - ref: redhat-appstudio-install-konflux
     - ref: redhat-appstudio-hac-e2e
     workflow: redhat-appstudio-claim
-- as: appstudio-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-west-2
-    owner: konflux
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.19"
-  skip_if_only_changed: ^configs/[^/]+/rings/ring-0/|^components/[^/]+/rings/|^docs/|^\.github/|^\.tekton/|^infra-tools/|^openspec/|^argo-cd-apps/.*/(.*production|staging)|^components/[^/]*-rd/|^components/[^/]+/rings/ring-[^0][^/]*/|^components/(authentication|hac-pact-broker|konflux-ci|konflux-operator|quality-dashboard|sandbox|smee|sprayproxy|tekton-ci|.*/(production|staging|production-downstream|staging-downstream))/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|_config\.yml|staging-app\.yaml|index\.html)$
-  steps:
-    test:
-    - ref: konflux-ci-install-konflux
-    - ref: redhat-appstudio-conformance-tests
-    workflow: redhat-appstudio-claim-failure-analysis
 - as: konflux-ring-deployments-conformance-tests
   cluster_claim:
     architecture: amd64
@@ -123,31 +107,6 @@ tests:
     test:
     - ref: redhat-appstudio-load-test-infra-deployments
     workflow: redhat-appstudio-load-test
-- as: appstudio-e2e-tests-periodic
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    labels:
-      region: us-west-2
-    owner: konflux
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.19"
-  cron: 0 0 * * *
-  reporter_config:
-    channel: '#infra-deployments-ci-reports'
-    job_states_to_report:
-    - success
-    - failure
-    - error
-    report_template: '{{ if eq .Status.State "success" }} :success-kid: {{ else }}
-      :fuuuuuu: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-      logs>'
-  steps:
-    test:
-    - ref: konflux-ci-install-konflux
-    - ref: redhat-appstudio-conformance-tests
-    workflow: redhat-appstudio-claim-failure-analysis
 - always_run: false
   as: konflux-e2e-v420-optional
   cluster_claim:

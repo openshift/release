@@ -23,6 +23,11 @@ chain:
           STORAGE_CLASS_FLAG="--e2e.etcd-storage-class=${ETCD_STORAGE_CLASS}"
         fi
 
+        ROOT_VOLUME_MODE_FLAG=""
+        if [[ -n ${KUBEVIRT_ROOT_VOLUME_VOLUME_MODE} ]]; then
+          ROOT_VOLUME_MODE_FLAG="--e2e.kubevirt-root-volume-volume-mode=${KUBEVIRT_ROOT_VOLUME_VOLUME_MODE}"
+        fi
+
         export EVENTUALLY_VERBOSE="false"
 
         # run the test
@@ -37,6 +42,7 @@ chain:
                   --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
                   --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
                   ${STORAGE_CLASS_FLAG} \
+                  ${ROOT_VOLUME_MODE_FLAG} \
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
 
     credentials:
@@ -57,6 +63,17 @@ chain:
         name: E2E_TEST_REGEX
       - default: "false"
         name: SKIP_E2E_LOCAL
+      - default: ""
+        name: KUBEVIRT_ROOT_VOLUME_VOLUME_MODE
+        documentation: |-
+          volumeMode of the PVC backing the root disk of the guest cluster nodes,
+          "Block" or "Filesystem". Empty leaves the e2e binary's own default, which
+          is Filesystem. Set it to Block on storage where a Filesystem root disk is
+          not stable: with volumeMode=Filesystem the disk is an image file sized to
+          the free space of the PVC's filesystem, so it can come back smaller after
+          the node reboots out of its Ignition first boot, which invalidates the GPT
+          that first boot grew to the old end of the disk and leaves the node in the
+          dracut emergency shell.
     from: hypershift-tests
     grace_period: 30m0s
     resources:

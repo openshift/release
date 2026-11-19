@@ -3,6 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "9"
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   ocm-cli:
     name: ocm-cli
     namespace: ci
@@ -23,7 +27,7 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.25-openshift-4.22
+    tag: rhel-9-golang-1.26-openshift-4.22
 images:
   items:
   - additional_architectures:
@@ -596,7 +600,7 @@ tests:
 - as: e2e-aws-tailoring
   run_if_changed: ^(tests/e2e/(tailoring_tests|framework)/|pkg/controller/(tailoredprofile|scansettingbinding|profilebundle|compliancescan|compliancesuite|complianceremediation)/|pkg/apis/compliance/|pkg/profileparser/)
   steps:
-    cluster_profile: quay-aws
+    cluster_profile: aws-stackrox
     env:
       BASE_DOMAIN: quay.devcluster.openshift.com
     test:
@@ -618,7 +622,7 @@ tests:
 - as: e2e-aws-parsing
   run_if_changed: ^(tests/e2e/(parsing_tests|framework)/|pkg/controller/(profilebundle|tailoredprofile|compliancescan)/|pkg/apis/compliance/|pkg/profileparser/)
   steps:
-    cluster_profile: quay-aws
+    cluster_profile: aws-stackrox
     env:
       BASE_DOMAIN: quay.devcluster.openshift.com
     test:
@@ -640,7 +644,7 @@ tests:
 - as: e2e-aws-cel
   run_if_changed: ^(tests/e2e/(cel_tests|framework)/|pkg/controller/(customrule|tailoredprofile|scansettingbinding|compliancescan|compliancesuite)/|pkg/apis/compliance/|pkg/celcontent/|cmd/cel-bundler/|cmd/celctl/)
   steps:
-    cluster_profile: quay-aws
+    cluster_profile: aws-stackrox
     env:
       BASE_DOMAIN: quay.devcluster.openshift.com
     test:
@@ -659,6 +663,28 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- always_run: false
+  as: e2e-hypershift
+  optional: true
+  run_if_changed: ^tests/e2e/hypershift/
+  steps:
+    cluster_profile: aws-stackrox
+    test:
+    - as: e2e-hypershift
+      cli: latest
+      commands: export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig && SKIP_MCP_SETUP=1
+        make e2e-hypershift
+      dependencies:
+      - env: IMAGE_FROM_CI
+        name: compliance-operator
+      from: src
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 5h0m0s
+    workflow: hypershift-aws-conformance
 - always_run: false
   as: e2e-rosa
   optional: true
@@ -688,7 +714,7 @@ tests:
   as: e2e-aws-serial-arm
   optional: true
   steps:
-    cluster_profile: quay-aws
+    cluster_profile: aws-stackrox
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:

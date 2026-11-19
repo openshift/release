@@ -28,10 +28,140 @@ read_profile_file() {
 bin_dir="$(mktemp -d /tmp/backplane-bin.XXXXXX)"
 export PATH="${bin_dir}:${PATH}"
 bp_ver="${BACKPLANE_CLI_VERSION:-0.12.0}"
-log "Installing ocm-backplane CLI v${bp_ver}"
+bp_asset="ocm-backplane_${bp_ver}_Linux_x86_64.tar.gz"
+bp_url="https://github.com/openshift/backplane-cli/releases/download/v${bp_ver}/${bp_asset}"
 bp_tar="$(mktemp /tmp/ocm-backplane.XXXXXX.tar.gz)"
-curl -sSL --fail --connect-timeout 30 --max-time 300 -o "${bp_tar}" \
-  "https://github.com/openshift/backplane-cli/releases/download/v${bp_ver}/ocm-backplane_${bp_ver}_Linux_x86_64.tar.gz"
+bp_dl_retries_default=5
+bp_dl_retries="${BACKPLANE_DOWNLOAD_RETRIES:-${bp_dl_retries_default}}"
+# Bash arithmetic reads a non-numeric limit as a variable name (which aborts the
+# step under `set -o nounset`), a leading zero as octal, and never satisfies the
+# attempt limit for 0 or an out-of-range value. Accept only 1..999 and fall back
+# to the default. The rejected value is not echoed back: the override is
+# free-form text and this log is published with the job artifacts.
+if [[ ! "${bp_dl_retries}" =~ ^[1-9][0-9]{0,2}$ ]]; then
+  echo "WARN: BACKPLANE_DOWNLOAD_RETRIES is not an integer in 1..999;" \
+    "using the default ${bp_dl_retries_default}" >&2
+  bp_dl_retries="${bp_dl_retries_default}"
+fi
+# Upper bound on the whole download, so a hanging mirror cannot stretch the step
+# to retries x --max-time.
+bp_dl_max_seconds=600
+bp_dl_evidence=""
+
+# Download evidence for the step artifacts. It is deliberately limited to the
+# pinned asset name, HTTP status codes, curl exit codes and timings: never
+# credentials, request headers, (possibly signed) redirect targets or the
+# cluster id.
+write_download_diagnostics() {
+  local outcome="${1}"
+  if [[ -z "${ARTIFACT_DIR:-}" ]]; then
+    return 0
+  fi
+  {
+    echo "asset: ${bp_asset}"
+    echo "max_attempts: ${bp_dl_retries}"
+    echo "outcome: ${outcome}"
+    echo "attempts:"
+    printf '%s' "${bp_dl_evidence}"
+    if [[ "${outcome}" != "succeeded" ]]; then
+      echo "note: ocm-backplane CLI bootstrap unavailable, so this step wrote no"
+      echo "      kubeconfig to SHARED_DIR and collected no cluster data."
+    fi
+  } > "${ARTIFACT_DIR}/backplane-cli-download.txt"
+}
+
+record_attempt() {
+  local line="attempt=${1} http_code=${2:-none} curl_exit=${3} elapsed=${4}s result=${5}"
+  bp_dl_evidence+="  ${line}"$'\n'
+  log "ocm-backplane download ${line}"
+}
+
+# The download used to run exactly once, so a single transient gateway error
+# (curl exit 22 on HTTP 504) failed the step and the whole private-cluster
+# workflow. Retry the retryable failures with bounded exponential backoff, keep
+# failing immediately on a permanent one (404 for an unpublished pin, 401/403
+# for a blocked download), and only ever extract an archive that downloaded
+# completely, so a failed or partial download is never executed.
+download_backplane_cli() {
+  local attempt=1 delay=5 curl_rc http_code started deadline elapsed outcome retryable
+  local remaining max_time
+  deadline=$(( $(date +%s) + bp_dl_max_seconds ))
+  while :; do
+    # No single attempt may outlive the budget: cap --max-time at what is left
+    # (it also bounds the connect phase), and stop before starting an attempt
+    # that has no time at all.
+    remaining=$(( deadline - $(date +%s) ))
+    if [[ "${remaining}" -le 0 ]]; then
+      log "ocm-backplane download budget of ${bp_dl_max_seconds}s exhausted before attempt ${attempt}"
+      rm -f "${bp_tar}"
+      write_download_diagnostics "failed-exhausted"
+      return 1
+    fi
+    max_time=300
+    if [[ "${remaining}" -lt "${max_time}" ]]; then
+      max_time="${remaining}"
+    fi
+    started="$(date +%s)"
+    rm -f "${bp_tar}"
+    curl_rc=0
+    http_code="$(curl -sSL --fail --connect-timeout 30 --max-time "${max_time}" \
+      --write-out '%{http_code}' -o "${bp_tar}" "${bp_url}")" || curl_rc=$?
+    elapsed=$(( $(date +%s) - started ))
+
+    if [[ "${curl_rc}" -eq 0 ]] && tar -tzf "${bp_tar}" ocm-backplane >/dev/null 2>&1; then
+      record_attempt "${attempt}" "${http_code}" "${curl_rc}" "${elapsed}" "succeeded"
+      log "Installed ocm-backplane v${bp_ver} from the pinned release"
+      write_download_diagnostics "succeeded"
+      return 0
+    fi
+
+    # curl exit 22 means --fail rejected an HTTP status; anything else is a
+    # transport-level failure. A complete download whose archive does not list
+    # is truncated or corrupt, which is retryable too.
+    retryable="true"
+    if [[ "${curl_rc}" -eq 22 ]]; then
+      case "${http_code}" in
+        408|429|5??) ;;
+        *) retryable="false" ;;
+      esac
+    elif [[ "${curl_rc}" -ne 0 ]]; then
+      case "${curl_rc}" in
+        # resolve, connect, partial transfer, timeout, TLS and recv failures
+        6|7|16|18|28|35|52|55|56|92) ;;
+        *) retryable="false" ;;
+      esac
+    fi
+
+    outcome="retrying"
+    if [[ "${retryable}" != "true" ]]; then
+      outcome="failed-permanent"
+    elif [[ "${attempt}" -ge "${bp_dl_retries}" ]] ||
+         [[ $(( $(date +%s) + delay )) -ge "${deadline}" ]]; then
+      outcome="failed-exhausted"
+    fi
+    record_attempt "${attempt}" "${http_code}" "${curl_rc}" "${elapsed}" "${outcome}"
+    rm -f "${bp_tar}"
+
+    if [[ "${outcome}" != "retrying" ]]; then
+      write_download_diagnostics "${outcome}"
+      return 1
+    fi
+
+    log "Retrying ocm-backplane download in ${delay}s"
+    sleep "${delay}"
+    delay=$(( delay * 2 ))
+    if [[ "${delay}" -gt 30 ]]; then
+      delay=30
+    fi
+    attempt=$(( attempt + 1 ))
+  done
+}
+
+log "Installing ocm-backplane CLI v${bp_ver}"
+if ! download_backplane_cli; then
+  echo "ERROR: failed to install the pinned ocm-backplane CLI v${bp_ver}" >&2
+  exit 1
+fi
 tar -xzf "${bp_tar}" -C "${bin_dir}" ocm-backplane
 chmod 0755 "${bin_dir}/ocm-backplane"
 rm -f "${bp_tar}"

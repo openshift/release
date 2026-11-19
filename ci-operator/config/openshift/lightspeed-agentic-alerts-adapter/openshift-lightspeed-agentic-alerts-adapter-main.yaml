@@ -31,6 +31,21 @@ tests:
     group: ols-codecov-token-lightspeed-agentic-alerts-adapter
     mount_path: /tmp/secret
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
+- as: unit-arm64
+  capabilities:
+  - arm64
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    GOFLAGS="-mod=readonly" GOMODCACHE=/tmp/gomodcache make test
+  container:
+    from: src
+  node_architecture: arm64
+  optional: true
+  secret:
+    collection: openshift-lightspeed-service-creds
+    group: ols-codecov-token-lightspeed-agentic-alerts-adapter
+    mount_path: /tmp/secret
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
 - as: lint
   commands: GOFLAGS="-mod=readonly" GOMODCACHE=/tmp/gomodcache GOLANGCI_LINT_CACHE=/tmp/.cache
     make lint

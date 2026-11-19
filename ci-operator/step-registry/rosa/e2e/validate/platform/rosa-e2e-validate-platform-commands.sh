@@ -44,6 +44,38 @@ fi
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 export CLUSTER_ID OCM_ENV="${OCM_LOGIN_ENV}"
 
+# AWS credentials for specs that validate cloud resources directly (e.g. the
+# KMS key health spec queries the KMS API). Mirrors rosa-e2e-validate-customer.
+AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+if [[ -f "${AWSCRED}" ]]; then
+  export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
+  export AWS_DEFAULT_REGION="${REGION:-${LEASED_RESOURCE}}"
+  export AWS_REGION="${REGION:-${LEASED_RESOURCE}}"
+fi
+
+# Shared VPC inputs (ROSAENG-63353): publish the cross-account private hosted
+# zone and shared role references for the Feature:SharedVPC management-plane
+# specs (shared role trust validation). Specs skip themselves when absent, so
+# this block is a no-op for the rest of the matrix. Credential file contents
+# are never echoed. Mirrors rosa-e2e-validate-customer.
+if [[ -s "${SHARED_DIR}/hosted_zone_id" && -s "${SHARED_DIR}/hosted_zone_role_arn" && -s "${SHARED_DIR}/rosa_dns_domain" ]]; then
+  SHARED_VPC_HOSTED_ZONE_ID="$(head -n 1 "${SHARED_DIR}/hosted_zone_id")"
+  SHARED_VPC_ROLE_ARN="$(head -n 1 "${SHARED_DIR}/hosted_zone_role_arn")"
+  SHARED_VPC_BASE_DOMAIN="$(head -n 1 "${SHARED_DIR}/rosa_dns_domain")"
+  export SHARED_VPC_HOSTED_ZONE_ID SHARED_VPC_ROLE_ARN SHARED_VPC_BASE_DOMAIN
+  if [[ -s "${SHARED_DIR}/account-roles-arns" ]]; then
+    SHARED_VPC_INSTALLER_ROLE_ARN="$(grep "Installer-Role" "${SHARED_DIR}/account-roles-arns" | head -n 1 || true)"
+    [[ -n "${SHARED_VPC_INSTALLER_ROLE_ARN}" ]] && export SHARED_VPC_INSTALLER_ROLE_ARN
+  fi
+  if [[ -f "${CLUSTER_PROFILE_DIR}/.awscred_shared_account" ]]; then
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+  else
+    log "WARNING: shared VPC inputs present but ${CLUSTER_PROFILE_DIR}/.awscred_shared_account not found;"
+    log "         cross-account specs will skip themselves"
+  fi
+  log "Shared VPC inputs exported (hosted zone: ${SHARED_VPC_HOSTED_ZONE_ID})"
+fi
+
 # OCM credentials for the suite's BeforeSuite (config.Load requires OCM_TOKEN or
 # OCM_CLIENT_ID/OCM_CLIENT_SECRET to open the SDK connection; specs also query OCM
 # directly). Read from the cluster profile, never echoed. Mirrors rosa-e2e-test.

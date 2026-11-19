@@ -70,7 +70,7 @@ do
   oc wait --for=condition=Ready pods --all -n ${namespace} --timeout 60s || (oc get pods -n ${namespace}; oc describe pods -n ${namespace}; exit 1)
 done
 # enable monitoring in demo apps
-hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n "alpha beta default bookinfo sleep" -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
+hack/use-openshift-prometheus.sh -in ${ISTIO_NAMESPACE} -n "alpha beta bookinfo sleep" -ml ossm-3 -kcns ${ISTIO_NAMESPACE} -np false
 # install custom grafana
 oc apply -n ${ISTIO_NAMESPACE} -f https://raw.githubusercontent.com/istio/istio/${ISTIO_SAMPLE_APP_VERSION}/samples/addons/grafana.yaml
 oc wait -n ${ISTIO_NAMESPACE} --for=condition=available deployment/grafana --timeout=150s

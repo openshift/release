@@ -16,4 +16,11 @@ if [[ -f "${SHARED_DIR}/test-plan.yaml" ]]; then
     export TEST_PLAN="${SHARED_DIR}/test-plan.yaml"
 fi
 
+# Keep this step compatible with HyperShift branches that predate the
+# resource-label flag while enabling resource-label coverage where supported.
+resource_label_help="$("${HYPERSHIFT_BINARY}" create cluster gcp --help 2>&1 || true)"
+if [[ "${resource_label_help}" == *"--resource-labels"* ]]; then
+    export EXTRA_ARGS="${EXTRA_ARGS} --resource-labels hypershift-e2e-resource-labels=enabled"
+fi
+
 /hypershift/bin/create-guests

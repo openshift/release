@@ -2,7 +2,7 @@
 {#- Shared Quay config features for every lane (e2e-install and upgrade). A flag
     added here reaches both lanes. Render under `QUAY_EXTRA_CONFIG: |` with
     `| indent(8, true)`. -#}
-{% macro quay_extra_config(fips=false, quay_version="") -%}
+{% macro quay_extra_config(fips=false, dualstack=false, quay_version="") -%}
 FEATURE_PROGRAMMATIC_BOOTSTRAP: false
 FEATURE_USER_METADATA: true
 FEATURE_IMMUTABLE_TAGS: true
@@ -23,6 +23,9 @@ GLOBAL_READONLY_SUPER_USERS:
   - readonly
 {%- if fips %}
 FEATURE_FIPS: true
+{%- endif %}
+{%- if dualstack %}
+FEATURE_LISTEN_IP_VERSION: dual-stack
 {%- endif %}
 {%- if quay_version is defined and quay_version.split(".")[0] | int >= 5 %}
 FEATURE_ROBOT_API_TOKENS: true

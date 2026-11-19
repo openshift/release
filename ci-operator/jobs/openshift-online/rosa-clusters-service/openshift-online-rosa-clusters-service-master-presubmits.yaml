@@ -6,6 +6,55 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build09
+    context: ci/prow/commits-signed
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    extra_refs:
+    - base_ref: main
+      clone_depth: 1
+      org: openshift
+      path_alias: github.com/openshift/release-signing-checker
+      repo: release
+      skip_submodules: true
+      sparse_checkout_files:
+      - hack
+      workdir: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-online-rosa-clusters-service-master-commits-signed
+    optional: true
+    rerun_command: /test commits-signed
+    spec:
+      containers:
+      - command:
+        - hack/verify-commits-signed.py
+        env:
+        - name: GITHUB_TOKEN_PATH
+          value: /etc/github/oauth
+        image: quay.io/openshift/ci-public:ci_python-validation_latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: token
+          readOnly: true
+      volumes:
+      - name: token
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    trigger: (?m)^/test( | .* )commits-signed,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build09
     context: ci/prow/go-unit-coverage
     decorate: true
     decoration_config:
@@ -226,7 +275,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build09
     context: ci/prow/pr-check-aws
     decorate: true
     decoration_config:
@@ -234,7 +283,6 @@ presubmits:
     labels:
       capability/intranet: intranet
       capability/nested-podman: nested-podman
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-online-rosa-clusters-service-master-pr-check-aws
@@ -529,7 +577,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build09
     context: ci/prow/pr-check-core
     decorate: true
     decoration_config:
@@ -537,7 +585,6 @@ presubmits:
     labels:
       capability/intranet: intranet
       capability/nested-podman: nested-podman
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-online-rosa-clusters-service-master-pr-check-core
@@ -618,11 +665,82 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )pr-check-core,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build09
+    context: ci/prow/pr-check-database
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      capability/nested-podman: nested-podman
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-online-rosa-clusters-service-master-pr-check-database
+    rerun_command: /test pr-check-database
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=pr-check-database
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
+        secret:
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )pr-check-database,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build09
     context: ci/prow/pr-check-gcp
     decorate: true
     decoration_config:
@@ -630,7 +748,6 @@ presubmits:
     labels:
       capability/intranet: intranet
       capability/nested-podman: nested-podman
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-online-rosa-clusters-service-master-pr-check-gcp
@@ -715,7 +832,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build09
     context: ci/prow/pr-check-rosa-classic
     decorate: true
     decoration_config:
@@ -723,7 +840,6 @@ presubmits:
     labels:
       capability/intranet: intranet
       capability/nested-podman: nested-podman
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-online-rosa-clusters-service-master-pr-check-rosa-classic
@@ -808,7 +924,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build05
+    cluster: build09
     context: ci/prow/pr-check-rosa-hcp
     decorate: true
     decoration_config:
@@ -816,7 +932,6 @@ presubmits:
     labels:
       capability/intranet: intranet
       capability/nested-podman: nested-podman
-      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-online-rosa-clusters-service-master-pr-check-rosa-hcp

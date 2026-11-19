@@ -4,6 +4,55 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Keep tag selection in sync with the gather-must-gather step. The image must
+# be resolved before mirroring so the later post step uses the same build.
+resolve_must_gather_image() {
+    local image="$1"
+    local repository="quay.io/redhat-user-workloads/ose-osc-tenant/osc-must-gather"
+    local api_url="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-must-gather/tag/"
+    local page=1 response candidate epoch best_tag="" best_epoch=0 additional
+
+    if [[ "${image}" != "${repository}:latest" ]]; then
+        printf '%s\n' "${image}"
+        return
+    fi
+
+    while (( page <= 100 )); do
+        if ! response=$(curl -fsS --retry 3 --max-time 30 "${api_url}?limit=100&page=${page}&onlyActiveTags=true"); then
+            echo "ERROR: Could not query Quay for must-gather build tags (page ${page})" >&2
+            return 1
+        fi
+        if ! grep -qE '"tags"[[:space:]]*:[[:space:]]*\[' <<< "${response}" ||
+           ! grep -qE '"has_additional"[[:space:]]*:[[:space:]]*(true|false)' <<< "${response}"; then
+            echo "ERROR: Invalid Quay tag response (page ${page})" >&2
+            return 1
+        fi
+        # Keep parsing compatible with the gather step's cli image (no jq).
+        candidate=$(grep -oE '"name"[[:space:]]*:[[:space:]]*"[0-9]+\.[0-9]+(\.[0-9]+)?-[0-9]+"' <<< "${response}" |
+            sed -E 's/.*"([0-9]+\.[0-9]+(\.[0-9]+)?-([0-9]+))"/\3 \1/' |
+            sort -n -k1,1 | tail -n 1 | cut -d ' ' -f 2 || true)
+        if [[ -n "${candidate}" ]]; then
+            epoch="${candidate##*-}"
+            if (( 10#${epoch} > best_epoch )); then
+                best_epoch=$((10#${epoch}))
+                best_tag="${candidate}"
+            fi
+        fi
+        additional=$(grep -oE '"has_additional"[[:space:]]*:[[:space:]]*(true|false)' <<< "${response}" | sed -E 's/.*:[[:space:]]*//')
+        if [[ "${additional}" == "false" ]]; then
+            if [[ -z "${best_tag}" ]]; then
+                echo "ERROR: No active version-epoch must-gather build tag found" >&2
+                return 1
+            fi
+            printf '%s:%s\n' "${repository}" "${best_tag}"
+            return
+        fi
+        page=$((page + 1))
+    done
+    echo "ERROR: Exceeded 100 pages while searching for must-gather build tags" >&2
+    return 1
+}
+
 if test -s "${SHARED_DIR}/proxy-conf.sh"; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
@@ -50,6 +99,21 @@ else
 fi
 printf '%s' "${redhat_auth_password}" | skopeo login registry.redhat.io -u "${redhat_auth_user}" --password-stdin
 
+# Peer-pod workloads pull images inside the pod VM (guest pull), which only
+# receives credentials through the pod's imagePullSecrets: the cluster-wide
+# pull secret used by the nodes does not apply there. Publish the mirror
+# credentials as a dockerconfigjson Secret in the default namespace and link
+# it to the default ServiceAccount, so workloads running with that
+# ServiceAccount can pull mirrored images inside their pod VMs. Harnesses
+# that create their own namespaces must deliver the secret there too (the
+# osc e2e suite does; see the testsuites/osc step).
+oc create secret docker-registry osc-mirror-pull-secret \
+    --docker-server="${MIRROR_REGISTRY_HOST}" \
+    --docker-username="${mirror_registry_user}" \
+    --docker-password="${mirror_registry_password}" \
+    -n default --dry-run=client -o yaml | oc apply -f -
+oc secrets link default osc-mirror-pull-secret --for=pull -n default
+
 OPERATORS_TO_MIRROR="${OPERATORS_TO_MIRROR:-sandboxed-containers-operator}"
 
 cat > "${work_dir}/imageset-config.yaml" <<EOF
@@ -75,6 +139,15 @@ cat "${work_dir}/imageset-config.yaml"
 DEST_TLS_ARGS=()
 if [[ "${USE_ACR}" != "true" ]]; then
     DEST_TLS_ARGS=(--dest-tls-verify=false --src-tls-verify=false)
+fi
+
+if [[ "${ENABLE_MUST_GATHER:-false}" == "true" ]]; then
+    must_gather_source=$(resolve_must_gather_image "${MUST_GATHER_IMAGE}")
+    must_gather_mirror="${MIRROR_REGISTRY_HOST}/extra/osc-must-gather:ci-must-gather"
+    echo "Mirroring must-gather image ${must_gather_source}"
+    skopeo copy --all "docker://${must_gather_source}" "docker://${must_gather_mirror}" "${DEST_TLS_ARGS[@]}"
+    printf '%s\n' "${must_gather_source}" > "${SHARED_DIR}/must-gather-source-image"
+    printf '%s\n' "${must_gather_mirror}" > "${SHARED_DIR}/must-gather-mirrored-image"
 fi
 
 EXTRA_IMAGES="${EXTRA_IMAGES_TO_MIRROR:-ghcr.io/nginxinc/nginx-unprivileged:alpine}"

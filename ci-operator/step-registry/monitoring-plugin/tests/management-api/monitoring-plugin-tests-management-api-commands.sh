@@ -58,6 +58,24 @@ cat << EOF | oc apply -f -
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  name: monitoring-plugin-metrics-leader-election
+  namespace: openshift-monitoring
+rules:
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  resourceNames: ["monitoring-plugin-metrics"]
+  verbs: ["get", "update"]
+# create cannot be scoped by resourceNames: the Lease does not exist yet
+# when the leader elector first tries to acquire it.
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"]
+  verbs: ["create"]
+EOF
+oc adm policy add-role-to-user monitoring-plugin-metrics-leader-election -z monitoring-plugin -n openshift-monitoring --role-namespace openshift-monitoring
+cat << EOF | oc apply -f -
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
   name: monitoring-plugin-routes-reader
   namespace: openshift-monitoring
 rules:

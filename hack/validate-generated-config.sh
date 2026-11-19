@@ -23,6 +23,7 @@ cp -r "${ci_operator_dir}" "${workdir}"
 
 ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${workdir}/ci-operator/jobs" \
 --registry "${ci_operator_dir}/step-registry" \
+--managed-repos-config "${base_dir}/core-services/prow/_managed-repos.yaml" \
 --known-infra-file infra-build-farm-periodics.yaml \
 --known-infra-file infra-periodics.yaml \
 --known-infra-file infra-periodics-migrated.yaml \
@@ -30,7 +31,7 @@ ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${workdir}/
 --known-infra-file infra-periodics-origin-release-images.yaml
 
 if ! diff -Naupr "${ci_operator_dir}/jobs/" "${workdir}/ci-operator/jobs/"> "${workdir}/diff"; then
-	cat << EOF
+	cat << 'EOF'
 ERROR: This check enforces that Prow Job configuration YAML files are generated
 ERROR: correctly. We have automation in place that generates these configs and
 ERROR: new changes to these job configurations should occur from a re-generation.

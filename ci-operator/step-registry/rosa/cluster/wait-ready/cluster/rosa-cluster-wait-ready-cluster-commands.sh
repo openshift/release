@@ -407,37 +407,40 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
       cluster_name=$(jq -r '.name // empty' "${ARTIFACT_DIR}/cluster-description.json" 2>/dev/null || true)
       base_domain=$(jq -r '.dns.base_domain // empty' "${ARTIFACT_DIR}/cluster-description.json" 2>/dev/null || true)
 
+      cluster_zone=""
+      if [[ -n "${cluster_name}" && -n "${base_domain}" ]]; then
+        cluster_zone="${cluster_name}.${base_domain}"
+        echo "Cluster DNS zone: ${cluster_zone}"
+      fi
+
       api_host=""
       if [[ -n "${api_url}" ]]; then
         api_host=$(echo "${api_url}" | sed -e 's|https\?://||' -e 's|:[0-9]*$||')
         echo "API URL: ${api_url}"
         echo "API hostname: ${api_host}"
+      elif [[ -n "${cluster_zone}" ]]; then
+        api_host="api.${cluster_zone}"
+        echo "API URL not available; derived API hostname: ${api_host}"
       else
-        echo "API URL not available in cluster description"
-      fi
-
-      cluster_zone=""
-      if [[ -n "${cluster_name}" && -n "${base_domain}" ]]; then
-        cluster_zone="${cluster_name}.${base_domain}"
-        echo "Cluster DNS zone: ${cluster_zone}"
+        echo "API URL and cluster DNS zone not available; skipping DNS probes"
       fi
       echo ""
 
       # Resolve the API hostname via the default resolver (CoreDNS on the management cluster)
       if [[ -n "${api_host}" ]]; then
         echo "=== dig ${api_host} (default resolver) ==="
-        dig "${api_host}" 2>&1 || true
+        timeout 10 dig +time=2 +tries=1 "${api_host}" 2>&1 || true
         echo ""
 
         # Look up authoritative nameservers for the cluster zone and query them directly
         ns_zone="${cluster_zone:-$(echo "${api_host}" | cut -d. -f2-)}"
         echo "=== Authoritative NS lookup for ${ns_zone} ==="
-        dig NS "${ns_zone}" +short 2>&1 || true
+        timeout 10 dig +time=2 +tries=1 NS "${ns_zone}" +short 2>&1 || true
         echo ""
-        auth_ns=$(dig NS "${ns_zone}" +short 2>/dev/null | head -1 || true)
+        auth_ns=$(timeout 10 dig +time=2 +tries=1 NS "${ns_zone}" +short 2>/dev/null | head -1 || true)
         if [[ -n "${auth_ns}" ]]; then
           echo "=== dig @${auth_ns} ${api_host} (authoritative) ==="
-          dig "@${auth_ns}" "${api_host}" 2>&1 || true
+          timeout 10 dig +time=2 +tries=1 "@${auth_ns}" "${api_host}" 2>&1 || true
           echo ""
         else
           echo "No authoritative nameservers found for ${ns_zone}"

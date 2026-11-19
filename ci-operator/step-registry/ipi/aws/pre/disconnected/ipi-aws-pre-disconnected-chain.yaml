@@ -19,6 +19,7 @@ chain:
   - ref: ipi-install-hosted-loki
   - ref: ipi-install-install-aws
   - ref: ipi-install-times-collection
+  - ref: mirror-images-trust-registry-ca
   - ref: nodes-readiness
   - ref: multiarch-validate-nodes
   - as: disable-default-sources
@@ -55,4 +56,8 @@ chain:
     and no direct internet access, a bastion host on the public subnet
     providing a mirror registry, egress proxy, and SSH jump host, then
     mirrors the release payload and installs the cluster using manual CCO
-    credentials.
+    credentials. After the install it also trusts the bastion mirror
+    registry's CA for in-cluster consumers (e.g. the image-stream import
+    controller) by patching image.config.openshift.io/cluster's
+    spec.additionalTrustedCA, so payload imagestreams like openshift/tools
+    import successfully.

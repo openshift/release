@@ -30,8 +30,13 @@ AWS region is **not** a step env var. The job must lease `MANAGED_CLUSTER_LEASED
 | `ACM_SPOKE_WORKER_TYPE` | `c5n.metal` | Worker instance type |
 | `ACM_SPOKE_CP_TYPE` | `m6a.2xlarge` | Control plane instance type |
 | `ACM_SPOKE_NETWORK_TYPE` | `OVNKubernetes` | Cluster network type |
-| `ACM_SPOKE_INSTALL_TIMEOUT_MINUTES` | `150` | Provisioned wait timeout |
+| `ACM_SPOKE_INSTALL_TIMEOUT_MINUTES` | `450` | Flat Provisioned wait per cluster. Default sized for 3 attempts × 150 min. Not derived from `ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT`; adjust both together. |
+| `ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT` | `3` | Maximum Hive install attempts (3 = one initial attempt and two retries) |
 | `ACM_SPOKE_CLUSTER_INITIAL_VERSION` | `""` | Target OCP X.Y (job must set) |
+
+## Timeouts
+
+The 11h install ceiling and the 4h uninstall ceiling are diagnostic backstops. They are not added to the other step ceilings or to the 15h job deadline. The job deadline follows the internal waits (one 450m provisioning budget, then uninstall's 10m detach plus two 90m deprovision waits). A step that rides its full ceiling can still exhaust the job deadline.
 
 ## Failure diagnostics
 

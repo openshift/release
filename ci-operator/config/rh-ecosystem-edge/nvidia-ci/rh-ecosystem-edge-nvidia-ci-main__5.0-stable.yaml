@@ -15,14 +15,14 @@ releases:
       product: ocp
       version_bounds:
         lower: 5.0.0-0
-        stream: 4-stable
+        stream: 5-stable
         upper: 5.1.0-0
   latest:
     prerelease:
       product: ocp
       version_bounds:
         lower: 5.0.0-0
-        stream: 4-stable
+        stream: 5-stable
         upper: 5.1.0-0
 resources:
   '*':
@@ -39,8 +39,21 @@ tests:
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: edge-sro.rhecoeng.com
-      NFD_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: registry.redhat.io/redhat/redhat-operator-index:v4.22
       NVIDIAGPU_DEPLOY_FROM_BUNDLE: "true"
+      NVIDIAGPU_GPU_CLUSTER_POLICY_PATCH: '[{"op": "add", "path": "/spec/driver/version",
+        "value": "615.71.10"},{"op": "add", "path": "/spec/driver/image", "value":
+        "driver"},{"op": "add", "path": "/spec/driver/repository", "value": "nvcr.io/nvidia"}]'
+    workflow: nvidia-gpu-operator-e2e-aws
+- always_run: false
+  as: nvidia-gpu-operator-e2e-master-signed
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AWS_SECUREBOOT_ENABLED: "true"
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      NVIDIAGPU_DEPLOY_FROM_BUNDLE: "true"
+      NVIDIAGPU_USE_PRECOMPILED_DRIVER: "true"
     workflow: nvidia-gpu-operator-e2e-aws
 - always_run: false
   as: nvidia-gpu-operator-e2e-26-3-x
@@ -49,9 +62,23 @@ tests:
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: edge-sro.rhecoeng.com
-      NFD_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: registry.redhat.io/redhat/redhat-operator-index:v4.22
+      NVIDIAGPU_GPU_CLUSTER_POLICY_PATCH: '[{"op": "add", "path": "/spec/driver/version",
+        "value": "615.71.10"},{"op": "add", "path": "/spec/driver/image", "value":
+        "driver"},{"op": "add", "path": "/spec/driver/repository", "value": "nvcr.io/nvidia"}]'
       NVIDIAGPU_GPU_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: registry.redhat.io/redhat/certified-operator-index:v4.22
       NVIDIAGPU_SUBSCRIPTION_CHANNEL: v26.3
+    workflow: nvidia-gpu-operator-e2e-aws
+- always_run: false
+  as: nvidia-gpu-operator-e2e-26-3-x-signed
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AWS_SECUREBOOT_ENABLED: "true"
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      NVIDIAGPU_GPU_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: registry.redhat.io/redhat/certified-operator-index:v4.22
+      NVIDIAGPU_SUBSCRIPTION_CHANNEL: v26.3
+      NVIDIAGPU_USE_PRECOMPILED_DRIVER: "true"
     workflow: nvidia-gpu-operator-e2e-aws
 - always_run: false
   as: nvidia-gpu-operator-e2e-26-7-x
@@ -60,9 +87,23 @@ tests:
     env:
       AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       BASE_DOMAIN: edge-sro.rhecoeng.com
-      NFD_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: registry.redhat.io/redhat/redhat-operator-index:v4.22
+      NVIDIAGPU_GPU_CLUSTER_POLICY_PATCH: '[{"op": "add", "path": "/spec/driver/version",
+        "value": "615.71.10"},{"op": "add", "path": "/spec/driver/image", "value":
+        "driver"},{"op": "add", "path": "/spec/driver/repository", "value": "nvcr.io/nvidia"}]'
       NVIDIAGPU_GPU_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: registry.redhat.io/redhat/certified-operator-index:v4.22
       NVIDIAGPU_SUBSCRIPTION_CHANNEL: v26.7
+    workflow: nvidia-gpu-operator-e2e-aws
+- always_run: false
+  as: nvidia-gpu-operator-e2e-26-7-x-signed
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AWS_SECUREBOOT_ENABLED: "true"
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      NVIDIAGPU_GPU_FALLBACK_CATALOGSOURCE_INDEX_IMAGE: registry.redhat.io/redhat/certified-operator-index:v4.22
+      NVIDIAGPU_SUBSCRIPTION_CHANNEL: v26.7
+      NVIDIAGPU_USE_PRECOMPILED_DRIVER: "true"
     workflow: nvidia-gpu-operator-e2e-aws
 - always_run: false
   as: nvidia-gpu-operator-e2e-arm64
@@ -76,6 +117,9 @@ tests:
       BASE_DOMAIN: edge-sro.rhecoeng.com
       COMPUTE_NODE_TYPE: g5g.2xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      NVIDIAGPU_GPU_CLUSTER_POLICY_PATCH: '[{"op": "add", "path": "/spec/driver/version",
+        "value": "615.71.10"},{"op": "add", "path": "/spec/driver/image", "value":
+        "driver"},{"op": "add", "path": "/spec/driver/repository", "value": "nvcr.io/nvidia"}]'
       OCP_ARCH: arm64
     workflow: nvidia-gpu-operator-e2e-aws
 zz_generated_metadata:

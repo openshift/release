@@ -9,6 +9,7 @@ readonly wait_timeout="${PR_IMAGES_WAIT_TIMEOUT:-1800}"
 component_for_repo() {
   case "$1" in
     openshift-online/gecko) echo "gecko" ;;
+    openshift-online/kube-applier-gcp) echo "kube-applier" ;;
     *) return 1 ;;
   esac
 }
@@ -17,6 +18,7 @@ component_for_repo() {
 images_for_component() {
   case "$1" in
     gecko) echo "gecko-controllers gecko-platform-api-server" ;;
+    kube-applier) echo "kube-applier-gcp" ;;
     *) return 1 ;;
   esac
 }
@@ -46,7 +48,7 @@ while read -r repo pull_count sha; do
     continue
   fi
   if ! component="$(component_for_repo "${repo}")"; then
-    echo "ERROR: ${repo} does not publish pull request images for e2e yet; only these repositories can be tested: openshift-online/gecko" >&2
+    echo "ERROR: ${repo} does not publish pull request images for e2e yet; only these repositories can be tested: openshift-online/gecko openshift-online/kube-applier-gcp" >&2
     exit 1
   fi
   if (( pull_count != 1 )); then

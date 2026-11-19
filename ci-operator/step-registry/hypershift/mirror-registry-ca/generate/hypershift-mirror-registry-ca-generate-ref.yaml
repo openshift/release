@@ -1,0 +1,17 @@
+ref:
+  as: hypershift-mirror-registry-ca-generate
+  from: hypershift-tests
+  commands: hypershift-mirror-registry-ca-generate-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 50Mi
+  documentation: |-
+    Generates a short-lived CA for the HyperShift e2e v2 mirror registry fixture and writes it to SHARED_DIR. The CA
+    must exist before the management cluster and the HyperShift operator, because they have to trust a registry that
+    the tests deploy later.
+
+    It writes SHARED_DIR/mirror-registry-ho-ca.crt and SHARED_DIR/mirror-registry-ho-ca.key. These fixed names are
+    a contract with openshift/hypershift: the e2e v2 tests pass this CA to the mirror registry fixture
+    (test/e2e/v2/util/mirrorregistry, Options.CA), and workflows create the nested management cluster trusting the
+    certificate (hypershift-setup-nested-management-cluster, HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE).

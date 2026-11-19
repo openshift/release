@@ -14,4 +14,6 @@ export LOCATION="${SELECTED_LOCATION:-${LOCATION:-}}"
 
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 
+export TEMPLATIZE_USE_PREBUILT=1
+
 exec hack/ci/provision-environment.sh

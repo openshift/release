@@ -1,0 +1,47 @@
+ref:
+  as: telcov10n-functional-cnf-ran-arm-ibx-deploy-spoke-sno-target
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-arm-ibx-deploy-spoke-sno-target-commands.sh
+  timeout: 5h
+  grace_period: 10s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: ARM_IBX_DEPLOY_ROLE
+    default: "target"
+    documentation: Deployment role; target selects the target paths in job config
+  - name: CLUSTER_NAME
+    default: ""
+    documentation: Hub cluster name; uses the hub inventory saved in SHARED_DIR
+  - name: TARGET_SPOKE_CLUSTER
+    default: ""
+    documentation: Target SNO cluster name
+  - name: VERSION
+    default: "4.20"
+    documentation: OpenShift version for the ARM IBX spoke
+  - name: SPOKE_ARCH
+    default: "multi"
+    documentation: Required multi-architecture payload; enables mirrored release, Ironic Agent, and ARM64 boot-image preparation
+  - name: ZTP_GIT_REPO
+    default: "https://gitlab.cee.redhat.com/telcov10n/ztp-site-configs-ci.git"
+    documentation: Git repository containing the ZTP configuration
+  - name: ZTP_GIT_BRANCH
+    default: ""
+    documentation: Required Git revision containing the configured ZTP paths
+  - name: ZTP_TARGET_CLUSTERS_PATH
+    default: ""
+    documentation: Required target clusters path relative to the Git repository root
+  - name: ZTP_TARGET_POLICIES_PATH
+    default: ""
+    documentation: Required target policies path relative to the Git repository root
+  documentation: |-
+    Deploy the ARM IBX target spoke via ZTP on the existing hub using
+    ZTP_TARGET_CLUSTERS_PATH and ZTP_TARGET_POLICIES_PATH from job config.
+    Calls deploy-spoke-ztp-mno.yaml directly with a single-master SNO inventory,
+    matching the working MNO ARM deployment's multi-architecture preparation.
+    The deployment playbook waits for installation and policy compliance.

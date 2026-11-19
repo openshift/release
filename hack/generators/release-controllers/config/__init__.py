@@ -74,7 +74,9 @@ class Config:
         self.products = [self.ocp, self.okd]
 
     def _get_releases(self):
-        releases = set()
+        # Retain existing legacy release resources after their periodic jobs retire.
+        # ImageStreams and their access permissions have an independent lifecycle.
+        releases = {'4.6', '4.7', '4.8', '4.9', '4.10', '4.11'}
 
         # Collect the 4.x and 5.x releases...
         for major in ('4', '5'):

@@ -16,7 +16,7 @@ Once you select the pool template based on your component needs, it is time to a
 In case you choose the template with **Higher Tests Load - us-west-2** add the claim to your configuration following [infra-deployments config](/ci-operator/config/redhat-appstudio/infra-deployments/redhat-appstudio-infra-deployments-main.yaml) example:
 
 ```yaml
-- as: appstudio-e2e-tests
+- as: konflux-ring-deployments-conformance-tests
   cluster_claim:
     architecture: amd64
     cloud: aws

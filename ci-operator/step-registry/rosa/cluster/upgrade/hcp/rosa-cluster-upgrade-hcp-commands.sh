@@ -18,6 +18,10 @@ cluster_id=$(cat "${SHARED_DIR}/cluster-id")
 
 HOLD_TIME_BEFORE_UPGRADE=${HOLD_TIME_BEFORE_UPGRADE:-"0"}
 CP_UPGRADE_TIMEOUT=${CP_UPGRADE_TIMEOUT:-"14400"}
+# Channel group discovery queries. This step only discovers when UPGRADE_CHANNEL is empty,
+# so it is always UPGRADE_CHANNEL_PREFIX; it stays "<not queried>" for an explicit channel
+# or target, or a Z-stream upgrade, so the artifact never names an unqueried group.
+DISCOVERY_CHANNEL_GROUP="<not queried>"
 UPGRADE_START_EPOCH=""
 UPGRADE_START_ISO=""
 UPGRADE_FROM_VERSION=""
@@ -153,6 +157,68 @@ function unset_proxy () {
     else
         log "no proxy setting found."
     fi
+}
+
+# Print the HCP Y-streams (X.Y) offered by DISCOVERY_CHANNEL_GROUP, version-sorted and
+# de-duplicated. That is the group of the channel the cluster will be moved to, so a
+# stream existing only there (a candidate release absent from the stable install catalog)
+# is still a reachable target. Null and non-X.Y ids are dropped, so a malformed response
+# yields an empty list. Returns non-zero when the ROSA query fails, so callers can fail
+# closed instead of guessing.
+list_available_y_streams() {
+  local raw
+  raw=$(rosa list versions --channel-group "${DISCOVERY_CHANNEL_GROUP}" --hosted-cp -o json) || return 1
+  # `.raw_id // empty` drops a null or absent raw_id that a bare `.[].raw_id` would render
+  # as the string "null" and turn into a bogus "<prefix>-null" channel.
+  echo "${raw}" | jq -r '.[].raw_id // empty' | cut -d '.' -f1,2 \
+    | { grep -E '^[0-9]+\.[0-9]+$' || true; } | sort -Vu
+}
+
+# Print the oldest Y-stream in the list that is strictly newer than the cluster's current
+# version, comparing with `sort -V` so a major boundary (4.22 -> 5.0) needs no minor-number
+# arithmetic. Returns non-zero (printing nothing) when no newer stream exists, so the
+# caller can fail closed rather than re-running the same version or downgrading.
+next_y_stream_after() {
+  local current_version="$1" y_stream_list="$2"
+  local current_stream stream older
+  current_stream=$(echo "${current_version}" | cut -d '.' -f1,2)
+  if [[ ! "${current_stream}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    return 1
+  fi
+  while IFS= read -r stream; do
+    # Skip blanks and anything that is not a well-formed X.Y stream, so a malformed
+    # discovery response can never be selected as an upgrade target.
+    if [[ ! "${stream}" =~ ^[0-9]+\.[0-9]+$ || "${stream}" == "${current_stream}" ]]; then
+      continue
+    fi
+    older=$(printf '%s\n%s\n' "${current_stream}" "${stream}" | sort -V | head -n1)
+    if [[ "${older}" == "${current_stream}" ]]; then
+      echo "${stream}"
+      return 0
+    fi
+  done <<< "$(printf '%s\n' "${y_stream_list}" | sort -V)"
+  return 1
+}
+
+# Record how the upgrade channel was chosen, including on the failure paths, so an early
+# exit is still diagnosable from the job artifacts. Publishes only version strings and the
+# channel prefix: no cluster or account identifiers, no credentials and no raw command
+# output. Never aborts the step.
+write_target_selection_diagnostics() {
+  local current_stream="$1" target="$2" channel="$3" streams="$4"
+  if [[ -z "${ARTIFACT_DIR:-}" ]]; then
+    return 0
+  fi
+  mkdir -p "${ARTIFACT_DIR}" || return 0
+  if ! {
+    printf 'discovery_channel_group: %s\n' "${DISCOVERY_CHANNEL_GROUP}"
+    printf 'current_y_stream: %s\n' "${current_stream}"
+    printf 'selected_target: %s\n' "${target:-<none>}"
+    printf 'selected_channel: %s\n' "${channel:-<none>}"
+    printf 'available_y_streams: %s\n' "$(printf '%s' "${streams}" | tr '\n' ' ')"
+  } > "${ARTIFACT_DIR}/upgrade-target-selection.txt"; then
+    log "WARNING: failed to write upgrade-target-selection.txt"
+  fi
 }
 
 function get_cluster_upgrade_path () {
@@ -300,12 +366,56 @@ UPGRADE_START_ISO="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 UPGRADE_CHANNEL=${UPGRADE_CHANNEL:-}
 UPGRADE_CHANNEL_PREFIX=${UPGRADE_CHANNEL_PREFIX:-candidate}
+UPGRADED_TO_VERSION=${UPGRADED_TO_VERSION:-}
+# Auto-derive the upgrade channel when it is not explicitly set and this is not a
+# Z-stream upgrade. Precedence: an explicit UPGRADED_TO_VERSION wins, otherwise discovery
+# picks the next Y-stream after the cluster's current version from the
+# UPGRADE_CHANNEL_PREFIX channel group -- the same group the channel is built from, so a
+# candidate-only stream missing from the stable install catalog is still reachable. The
+# channel only opens the hop: get_cluster_upgrade_path below remains the authority on
+# which version is actually taken.
+current_y_stream=$(echo "$init_version" | cut -d '.' -f1,2)
 if [[ -z "${UPGRADE_CHANNEL}" && "${Z_STREAM_UPGRADE:-false}" != "true" ]]; then
-  current_x=$(echo "$init_version" | cut -d '.' -f1)
-  current_y=$(echo "$init_version" | cut -d '.' -f2)
-  UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${current_x}.$((current_y + 1))"
-  log "Auto-derived upgrade channel: ${UPGRADE_CHANNEL}"
+  if [[ -n "${UPGRADED_TO_VERSION}" ]]; then
+    # An explicit target pins the hop, so no discovery runs: get_cluster_upgrade_path
+    # filters the recommendations by UPGRADED_TO_VERSION, and a channel for any other
+    # stream could not contain it (the step would report "No available version for
+    # upgrade" and exit 0 without upgrading). A catalog query failure must likewise not
+    # abort a hop the job already specified in full.
+    #
+    # The target must be major.minor: that filter matches with a trailing separator, so a
+    # patch-level value such as 4.18.7 can never match. Reject it rather than narrowing it
+    # silently, so the misconfiguration is visible.
+    if [[ ! "${UPGRADED_TO_VERSION}" =~ ^[0-9]+\.[0-9]+$ ]]; then
+      write_target_selection_diagnostics "${current_y_stream}" "" "" ""
+      log "Error: UPGRADED_TO_VERSION='${UPGRADED_TO_VERSION}' must be a major.minor Y-stream such as 4.18; a patch-level or malformed value cannot be matched against the recommended upgrades."
+      exit 1
+    fi
+    next_y_stream="${UPGRADED_TO_VERSION}"
+    UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${UPGRADED_TO_VERSION}"
+    log "Upgrade channel from explicit UPGRADED_TO_VERSION ${UPGRADED_TO_VERSION}: ${UPGRADE_CHANNEL}"
+  else
+    DISCOVERY_CHANNEL_GROUP="${UPGRADE_CHANNEL_PREFIX}"
+    if ! y_stream_list=$(list_available_y_streams); then
+      write_target_selection_diagnostics "${current_y_stream}" "" "" ""
+      log "Error: could not list versions for channel group ${DISCOVERY_CHANNEL_GROUP}; refusing to guess an upgrade channel."
+      exit 1
+    fi
+    if [[ -z "${y_stream_list}" ]]; then
+      write_target_selection_diagnostics "${current_y_stream}" "" "" ""
+      log "Error: no Y-streams available in channel group ${DISCOVERY_CHANNEL_GROUP}; refusing to guess an upgrade channel."
+      exit 1
+    fi
+    if ! next_y_stream=$(next_y_stream_after "${init_version}" "${y_stream_list}"); then
+      write_target_selection_diagnostics "${current_y_stream}" "" "" "${y_stream_list}"
+      log "Error: no Y-stream newer than ${init_version} in channel group ${DISCOVERY_CHANNEL_GROUP}; available: $(echo "${y_stream_list}" | tr '\n' ' ')"
+      exit 1
+    fi
+    UPGRADE_CHANNEL="${UPGRADE_CHANNEL_PREFIX}-${next_y_stream}"
+    log "Auto-derived upgrade channel: ${UPGRADE_CHANNEL} (available Y-streams: $(echo "${y_stream_list}" | tr '\n' ' '))"
+  fi
 fi
+write_target_selection_diagnostics "${current_y_stream}" "${next_y_stream:-}" "${UPGRADE_CHANNEL}" "${y_stream_list:-}"
 if [[ -n "${UPGRADE_CHANNEL}" ]]; then
   log "Changing cluster channel to ${UPGRADE_CHANNEL}"
   rosa edit cluster -c $cluster_id --channel "${UPGRADE_CHANNEL}"

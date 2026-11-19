@@ -699,7 +699,7 @@ def verify():
     env = cluster_env()
     env['ARTIFACT_DIR'] = str(ROOT / 'private-artifacts')
     for label, command in (
-        ('lint', ['yarn', 'eslint', *[path.removeprefix('frontend/') for path in paths if path.endswith(('.ts', '.tsx'))]]),
+        ('lint', ['yarn', 'oxlint', *[path.removeprefix('frontend/') for path in paths if path.endswith(('.ts', '.tsx'))]]),
         ('typecheck', ['yarn', 'tsc', '--noEmit', '-p', 'e2e/tsconfig.json']),
     ):
         if label == 'lint' and len(command) == 2:

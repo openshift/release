@@ -6,7 +6,7 @@
 |-------|-------|
 | **Alerts** | `TriggeredProwJobsPileup`, `SchedulingProwJobsPileup` |
 | **Cluster** | `app.ci` |
-| **Rules** | [`ci-alerts_prometheusrule.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — `prow` group; definitions in [`prow_alerts.libsonnet`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/_prometheus/prow_alerts.libsonnet) |
+| **Rules** | [`ci-alerts_prometheusrule.yaml`](../../clusters/core-ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — `prow` group; definitions in [`prow_alerts.libsonnet`](../../clusters/core-ci/openshift-user-workload-monitoring/mixins/_prometheus/prow_alerts.libsonnet) |
 | **Thresholds** | **Triggered**: `max_over_time(sum(prowjobs{job="prow-controller-manager",state="triggered"})[5m:]) > 450`. **Scheduling**: same with **`state="scheduling"`**, threshold **`300`**. |
 | **Severity** | `Triggered…` **critical**, `Scheduling…` **warning** |
 | **Related** | Build farm Pending / pressure — [`build-farm-scheduling-pressure.md`](build-farm-scheduling-pressure.md). |
@@ -41,7 +41,7 @@ oc --context "$CTX" logs -n ci deploy/prow-controller-manager --tail=200 \
 
 **Query:** PromQL **`workqueue_depth{name=~"crier.*|plank"}`** — [pre-filled Query browser on app.ci](https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/query-browser?query0=workqueue_depth%7Bname%3D~%22crier.*%7Cplank%22%7D).
 
-**Alert rule:** [`ci-alerts_prometheusrule.yaml`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — alert **`Controller backlog is not being drained`** (`workqueue_depth{name=~"crier.*|plank"} > 100`).
+**Alert rule:** [`ci-alerts_prometheusrule.yaml`](../../clusters/core-ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) — alert **`Controller backlog is not being drained`** (`workqueue_depth{name=~"crier.*|plank"} > 100`).
 
 **On-cluster targets:** **`plank`** runs inside **`deploy/prow-controller-manager`** when enabled (**`--enable-controller=plank`** in [`prow-controller-manager.yaml`](../../clusters/app.ci/prow/03_deployment/prow-controller-manager.yaml)); **`crier`** is **`deploy/crier`**. For **`workqueue_depth`** series whose **`name`** matches **`plank`**, follow **`prow-controller-manager`** logs (§1); for **`crier.*`**, follow **`crier`** logs.
 
