@@ -108,4 +108,48 @@ for dir in test-results playwright-report ../tests/cypress/results; do
   fi
 done
 
+# INTEROP-9598: assertiveness floor plus carrier guarantee. Playwright's global
+# setup can abort before a single spec runs (known cause: the AAP operator
+# preflight) and still leave a well-formed zero-test test-results/junit.xml, so
+# the step exits green and prow renders nothing. Whenever no runner report
+# carries a test case, add one failing row that names the condition and fail
+# the step. The carrier is a sibling artifact and the runner's bytes are never
+# overwritten: the zero-test report is the evidence for the abort and stays
+# where the runner wrote it, while the failure row lands in
+# `junit_acm-tests-alc.xml`, which the EXIT trap merge and the prow gather both
+# pick up by the same `*.xml` glob.
+typeset _junit_report="${ARTIFACT_DIR}/test-results/junit.xml"
+typeset _junit_carrier="${ARTIFACT_DIR}/junit_acm-tests-alc.xml"
+typeset -i _junit_cases=0
+while IFS= read -r -d '' _junit_file; do
+    # Count every XML artifact, not just `junit*.xml`: the copy loop above
+    # also ships `results/` (legacy Cypress) and `playwright-report/`, whose
+    # report names are not junit-prefixed, and a run with real rows in one of
+    # those would have been failed red as "asserted nothing". The root-element
+    # guard keeps non-JUnit XML out of the count in both directions: a
+    # CI-Operator artifact or a must-gather dump cannot manufacture a row, and
+    # a stray `<testcase` in a non-report cannot mask a truly empty run.
+    if grep -qE '<testsuites?[[:space:]>]' "${_junit_file}" 2>/dev/null; then
+        _junit_cases+=$(grep -c '<testcase' "${_junit_file}" 2>/dev/null || true)
+    fi
+done < <(find "${ARTIFACT_DIR}" -type f -iname '*.xml' -print0 2>/dev/null)
+
+if (( _junit_cases == 0 )); then
+    if [[ -f "${_junit_report}" ]]; then
+        _junit_condition="the JUnit report declares zero test cases"
+    else
+        _junit_condition="the runner wrote no JUnit report"
+    fi
+    cat > "${_junit_carrier}" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="acm-tests-alc" tests="1" failures="1" errors="0" skipped="0" time="0">
+  <testcase name="acm-tests-alc: runner asserted nothing" classname="acm-tests-alc" time="0">
+    <failure message="${_junit_condition}" type="empty-junit-carrier">${_junit_condition}, so this step asserted nothing. Look for the runner abort in the step build log; a known cause is the AAP operator preflight in the runner global setup (INTEROP-9598).</failure>
+  </testcase>
+</testsuite>
+EOF
+    echo "ERROR: ${_junit_condition}; failing the step and recording a JUnit row that names it (INTEROP-9598)." >&2
+    _test_rc=1
+fi
+
 exit "${_test_rc}"
