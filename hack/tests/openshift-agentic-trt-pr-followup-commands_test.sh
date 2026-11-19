@@ -82,6 +82,7 @@ fi
 
 head_owner=bot
 head_repo=widgets
+state=OPEN
 url="https://github.com/acme/widgets/pull/${number}"
 if [[ "${MOCK_SCENARIO}" == "fork_mismatch" ]]; then
     head_owner=someone-else
@@ -91,10 +92,12 @@ elif [[ "${MOCK_SCENARIO}" == "case_difference" ]]; then
     head_owner=Bot
     head_repo=Widgets
     url="https://github.com/Acme/Widgets/pull/${number}"
+elif [[ "${MOCK_SCENARIO}" == "incomplete_metadata" ]]; then
+    state=""
 fi
 
-printf '{"number":%s,"state":"OPEN","title":"test","url":"%s","headRefName":"feature-%s","headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","headRepository":{"name":"%s"},"headRepositoryOwner":{"login":"%s"}}\n' \
-    "${number}" "${url}" "${number}" "${head_repo}" "${head_owner}"
+printf '{"number":%s,"state":"%s","title":"test","url":"%s","headRefName":"feature-%s","headRefOid":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","headRepository":{"name":"%s"},"headRepositoryOwner":{"login":"%s"}}\n' \
+    "${number}" "${state}" "${url}" "${number}" "${head_repo}" "${head_owner}"
 EOF
 
     cat > "${case_dir}/mock-bin/jq" <<'EOF'
@@ -104,33 +107,50 @@ set -o errexit
 
 input=$(cat)
 expression="${!#}"
+
+emit_nonempty() {
+    local value="$1"
+    [[ -n "${value}" ]] || exit 1
+    printf '%s\n' "${value}"
+}
+
 case "${expression}" in
     length)
-        [[ "${input}" == "[]" ]] && printf '0\n' || printf '1\n'
+        case "${input}" in
+            '[]') printf '0\n' ;;
+            '[{'*'}]') printf '1\n' ;;
+            *) exit 1 ;;
+        esac
         ;;
     '.[0].number'*)
-        sed -n 's/.*"number":\([0-9][0-9]*\).*/\1/p' <<< "${input}"
+        value=$(sed -n 's/.*"number":\([0-9][0-9]*\).*/\1/p' <<< "${input}")
+        [[ "${value}" =~ ^[1-9][0-9]*$ ]] || exit 1
+        printf '%s\n' "${value}"
         ;;
     '.number'*)
-        sed -n 's/.*"number":\([0-9][0-9]*\).*/\1/p' <<< "${input}"
+        value=$(sed -n 's/.*"number":\([0-9][0-9]*\).*/\1/p' <<< "${input}")
+        [[ "${value}" =~ ^[1-9][0-9]*$ ]] || exit 1
+        printf '%s\n' "${value}"
         ;;
     '.url'*)
-        sed -n 's/.*"url":"\([^"]*\)".*/\1/p' <<< "${input}"
+        emit_nonempty "$(sed -n 's/.*"url":"\([^"]*\)".*/\1/p' <<< "${input}")"
         ;;
     '.state'*)
-        sed -n 's/.*"state":"\([^"]*\)".*/\1/p' <<< "${input}"
+        emit_nonempty "$(sed -n 's/.*"state":"\([^"]*\)".*/\1/p' <<< "${input}")"
         ;;
     '.headRefName'*)
-        sed -n 's/.*"headRefName":"\([^"]*\)".*/\1/p' <<< "${input}"
+        emit_nonempty "$(sed -n 's/.*"headRefName":"\([^"]*\)".*/\1/p' <<< "${input}")"
         ;;
     '.headRefOid'*)
-        sed -n 's/.*"headRefOid":"\([^"]*\)".*/\1/p' <<< "${input}"
+        value=$(sed -n 's/.*"headRefOid":"\([^"]*\)".*/\1/p' <<< "${input}")
+        [[ "${value}" =~ ^[0-9a-f]{40}$ ]] || exit 1
+        printf '%s\n' "${value}"
         ;;
     '.headRepository.name'*)
-        sed -n 's/.*"headRepository":{"name":"\([^"]*\)"}.*/\1/p' <<< "${input}"
+        emit_nonempty "$(sed -n 's/.*"headRepository":{"name":"\([^"]*\)"}.*/\1/p' <<< "${input}")"
         ;;
     '.headRepositoryOwner.login'*)
-        sed -n 's/.*"headRepositoryOwner":{"login":"\([^"]*\)"}.*/\1/p' <<< "${input}"
+        emit_nonempty "$(sed -n 's/.*"headRepositoryOwner":{"login":"\([^"]*\)"}.*/\1/p' <<< "${input}")"
         ;;
     *)
         echo "unexpected jq expression: ${expression}" >&2
@@ -193,6 +213,14 @@ set -o errexit
 grep -Fq 'subprocess diagnostic sentinel' <<< "${diagnostic}" || fail "captured subprocess output was not reported"
 echo "PASS: status failures report captured subprocess output"
 
+jq_case_dir=$(make_case jq_contract)
+set +o errexit
+printf '%s\n' '{}' | "${jq_case_dir}/mock-bin/jq" -er '.unsupported' >/dev/null 2>&1
+jq_status=$?
+set -o errexit
+[[ "${jq_status}" -ne 0 ]] || fail "jq mock accepted an unsupported expression"
+echo "PASS: jq mock rejects unsupported expressions"
+
 read -r status case_dir < <(run_case explicit 123 "")
 assert_status "${status}" 0 "explicit PR selection" "${case_dir}/output"
 assert_contains "${case_dir}/gh-calls" "pr view 123 --repo acme/widgets"
@@ -222,6 +250,13 @@ assert_contains "${case_dir}/gh-calls" "pr view 404 --repo acme/widgets"
 assert_not_contains "${case_dir}/gh-calls" "pr list"
 assert_file_absent "${case_dir}/shared/pr-number"
 echo "PASS: missing explicit PR does not fall back"
+
+read -r status case_dir < <(run_case incomplete_metadata 123 "")
+[[ "${status}" -ne 0 ]] || fail "incomplete PR metadata unexpectedly succeeded"
+assert_not_contains "${case_dir}/git-calls" "fetch"
+assert_file_absent "${case_dir}/shared/pr-number"
+assert_contains "${case_dir}/output" "metadata is incomplete or invalid"
+echo "PASS: incomplete PR metadata fails closed"
 
 read -r status case_dir < <(run_case fallback "" "")
 assert_status "${status}" 0 "Jira-key fallback" "${case_dir}/output"
