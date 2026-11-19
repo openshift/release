@@ -196,6 +196,31 @@ run-ci --color=yes -o cache_dir=/tmp tests/ -m 'acceptance and not ui' -k '' \
   ${EXTRA_ARGS} \
   || /bin/true
 
+# Rewrite JUnit classname to step name (INTEROP-9729): preserve name and suite
+python3 <<'PYEOF' 2>/dev/null || true
+import os, pathlib, xml.etree.ElementTree as ET
+artifact_dir = os.environ.get("ARTIFACT_DIR", "/tmp/artifacts")
+candidates = []
+candidates.extend(pathlib.Path(f"{artifact_dir}/ocs-tests").glob("junit*.xml"))
+candidates.extend(pathlib.Path(f"{artifact_dir}/ocs-tests").glob("junit-*.xml"))
+seen = set()
+for jf in candidates:
+    if str(jf) in seen:
+        continue
+    seen.add(str(jf))
+    try:
+        tree = ET.parse(str(jf))
+        root = tree.getroot()
+        changed = 0
+        for tc in root.iter("testcase"):
+            tc.set("classname", "interop-tests-ocs-tests")
+            changed += 1
+        if changed:
+            tree.write(str(jf), encoding="utf-8", xml_declaration=True)
+    except Exception:
+        continue
+PYEOF
+
 FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
 
