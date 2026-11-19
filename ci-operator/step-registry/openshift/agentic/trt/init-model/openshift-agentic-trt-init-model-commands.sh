@@ -791,6 +791,14 @@ configure_codex_project_mcp() {
     return "${rc}"
 }
 
+agentic_harness() {
+    local model harness
+    model=$(select_agent_model) || return $?
+    harness=$(select_agent_harness "${model}") || return $?
+    echo "${harness}"
+}
+
+
 agentic_ci() {
     # Installation tokens last 1h; mint a fresh one before each long child.
     if declare -F refresh_github_tokens >/dev/null 2>&1; then
@@ -1383,22 +1391,22 @@ setup_agent_settings() {
 
 # run_agent_with_timeout <prompt> <timeout-secs> <nudge-prompt> [extra-args...]
 #   Invokes agentic_ci with timeout handling and a nudge continuation on
-#   timeout. Sets CLAUDE_EXIT.
+#   timeout. Sets AGENT_EXIT.
 run_agent_with_timeout() {
     local prompt="$1" timeout_secs="$2" nudge_prompt="$3"
     shift 3
 
-    CLAUDE_EXIT=0
+    AGENT_EXIT=0
     agentic_ci --timeout "${timeout_secs}" \
         "${prompt}" \
         --settings "${AGENT_SETTINGS}" \
         --output-format stream-json \
         --append-system-prompt-file "${SYSTEM_PROMPT}" \
         "$@" \
-        || CLAUDE_EXIT=$?
+        || AGENT_EXIT=$?
 
-    if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
-        echo "Claude timed out. Nudging to wrap up..."
+    if [[ "${AGENT_EXIT}" -eq 124 ]]; then
+        echo "Agent timed out. Nudging to wrap up..."
         agentic_ci --timeout 600 \
             "${nudge_prompt}" \
             --continue \
@@ -1416,7 +1424,7 @@ run_agent_with_timeout() {
 validate_agent_branch() {
     BRANCH_NAME=$(git branch --show-current 2>/dev/null || echo "")
     if [[ -z "${BRANCH_NAME}" || "${BRANCH_NAME}" == "main" || "${BRANCH_NAME}" == "master" || "${BRANCH_NAME}" == "${START_BRANCH}" ]]; then
-        echo "ERROR: Claude did not create a feature branch."
+        echo "ERROR: Agent did not create a feature branch."
         exit 1
     fi
     if git diff --quiet "${START_COMMIT}" HEAD; then
@@ -1432,7 +1440,7 @@ validate_agent_branch() {
         local base_branch
         base_branch=$(cat "${SHARED_DIR}/eval-base-branch" 2>/dev/null || echo "")
         if [[ -n "${base_branch}" && "${BRANCH_NAME}" == "${base_branch}" ]]; then
-            echo "ERROR: Claude did not create a feature branch (still on base branch ${base_branch})."
+            echo "ERROR: Agent did not create a feature branch (still on base branch ${base_branch})."
             exit 1
         fi
         local eval_branch="${BRANCH_NAME}-eval-$(date +%Y%m%d-%H%M%S)"
@@ -1459,7 +1467,17 @@ publish_agent_pr() {
             printf '%s\n' "${default_pr_body}" > "${PR_BODY_FILE}"
         fi
     fi
-    printf '\n---\nGenerated with [Claude Code](https://claude.com/claude-code)\n\n<!-- coderabbit-review -->\n' >> "${PR_BODY_FILE}"
+
+    local harness
+    harness=$(agentic_harness) || {
+        echo "ERROR: Failed to determine agentic harness"
+        exit 1
+    }
+    local tagline="[Claude Code](https://claude.com/claude-code)"
+    if [[ "${harness}" == "codex" ]]; then
+        tagline="[Codex](https://openai.com/codex/)"
+    fi
+    printf '\n---\nGenerated with %s\n\n<!-- coderabbit-review -->\n' "${tagline}" >> "${PR_BODY_FILE}"
 
     local base_args=()
     if [[ "${EVAL_MODE:-}" == "true" && -f "${SHARED_DIR}/eval-base-branch" ]]; then

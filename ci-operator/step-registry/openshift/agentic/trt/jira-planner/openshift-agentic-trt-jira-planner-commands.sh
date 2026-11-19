@@ -31,7 +31,7 @@ planner_cleanup() {
             --arg pr_url "" \
             --arg upstream_repo "${UPSTREAM_REPO:-}" \
             --arg started_at "${PLAN_STARTED_AT:-}" \
-            --argjson claude_exit "${CLAUDE_EXIT:-1}" \
+            --argjson agent_exit "${AGENT_EXIT:-1}" \
             --argjson phase_durations "$(jq -n \
                 --argjson setup "${PHASE_SETUP_DURATION:-0}" \
                 --argjson plan "$(( ${PHASE_PLAN_DURATION:-$(( $(date +%s) - ${PHASE_PLAN_START:-$(date +%s)} ))} ))" \
@@ -41,7 +41,7 @@ planner_cleanup() {
               planning_key: $planning_key, result: $result, pr_url: $pr_url,
               upstream_repo: $upstream_repo, started_at: $started_at,
               pr_status: "", merged_at: "",
-              claude_exit: $claude_exit, phase_durations: $phase_durations
+              agent_exit: $agent_exit, phase_durations: $phase_durations
             }' > "${SHARED_DIR}/metrics-metadata-plan.json" 2>/dev/null \
             || echo "WARNING: failed to write failure metadata" >&2
         finalize_session_metrics plan 2>/dev/null || true
@@ -152,10 +152,10 @@ cat >> "${SYSTEM_PROMPT}" <<'CI_POLICY'
 - Report actual validation results, including failed or unrun checks; component passes are not a passing full target.
 CI_POLICY
 
-# --- Run Claude to create the plan ---
+# --- Run agent to create the plan ---
 PHASE_SETUP_DURATION=$(( $(date +%s) - PHASE_SETUP_START ))
 PHASE_PLAN_START=$(date +%s)
-echo "Invoking Claude to plan ${JIRA_ISSUE_KEY} (subtask ${PLANNING_ISSUE_KEY})..."
+echo "Invoking agent to plan ${JIRA_ISSUE_KEY} (subtask ${PLANNING_ISSUE_KEY})..."
 PLAN_PHASE_STARTED=true
 
 run_agent_with_timeout \
@@ -170,8 +170,8 @@ PHASE_PLAN_DURATION=$(( $(date +%s) - PHASE_PLAN_START ))
 
 refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
 
-if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
-    echo "ERROR: Claude exited with code ${CLAUDE_EXIT}."
+if [[ "${AGENT_EXIT}" -ne 0 ]]; then
+    echo "ERROR: Agent exited with code ${AGENT_EXIT}."
     write_agent_metrics plan \
         --arg agent "trt-jira-planner" \
         --arg phase "plan" \
@@ -183,7 +183,7 @@ if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
         --arg started_at "${PLAN_STARTED_AT}" \
         --arg pr_status "" \
         --arg merged_at "" \
-        --argjson claude_exit "${CLAUDE_EXIT}" \
+        --argjson agent_exit "${AGENT_EXIT}" \
         --argjson phase_durations "$(jq -n \
             --argjson setup "${PHASE_SETUP_DURATION}" \
             --argjson plan "${PHASE_PLAN_DURATION}" \
@@ -193,9 +193,9 @@ if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
           planning_key: $planning_key, result: $result, pr_url: $pr_url,
           upstream_repo: $upstream_repo, started_at: $started_at,
           pr_status: $pr_status, merged_at: $merged_at,
-          claude_exit: $claude_exit, phase_durations: $phase_durations
+          agent_exit: $agent_exit, phase_durations: $phase_durations
         }'
-    exit "${CLAUDE_EXIT}"
+    exit "${AGENT_EXIT}"
 fi
 
 # --- Create PR ---
@@ -225,7 +225,7 @@ PHASE_PR_DURATION=$(( $(date +%s) - PHASE_PR_START ))
 
 # --- Write metrics metadata for post-step ---
 PR_RESULT="success"
-[[ "${CLAUDE_EXIT}" -ne 0 ]] && PR_RESULT="failed"
+[[ "${AGENT_EXIT}" -ne 0 ]] && PR_RESULT="failed"
 
 write_agent_metrics plan \
     --arg agent "trt-jira-planner" \
@@ -238,7 +238,7 @@ write_agent_metrics plan \
     --arg started_at "${PLAN_STARTED_AT}" \
     --arg pr_status "open" \
     --arg merged_at "" \
-    --argjson claude_exit "${CLAUDE_EXIT}" \
+    --argjson agent_exit "${AGENT_EXIT}" \
     --argjson phase_durations "$(jq -n \
         --argjson setup "${PHASE_SETUP_DURATION}" \
         --argjson plan "${PHASE_PLAN_DURATION}" \
@@ -249,7 +249,7 @@ write_agent_metrics plan \
       planning_key: $planning_key, result: $result, pr_url: $pr_url,
       upstream_repo: $upstream_repo, started_at: $started_at,
       pr_status: $pr_status, merged_at: $merged_at,
-      claude_exit: $claude_exit, phase_durations: $phase_durations
+      agent_exit: $agent_exit, phase_durations: $phase_durations
     }'
 
 echo "=== TRT Jira Planner Complete ==="

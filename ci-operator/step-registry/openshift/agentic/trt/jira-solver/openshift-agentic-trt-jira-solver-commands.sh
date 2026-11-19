@@ -108,10 +108,10 @@ cat >> "${SYSTEM_PROMPT}" <<'CI_POLICY'
 - Report actual validation results, including failed or unrun checks; component passes are not a passing full target.
 CI_POLICY
 
-# --- Run Claude to solve the issue ---
+# --- Run agent to solve the issue ---
 PHASE_SETUP_DURATION=$(( $(date +%s) - PHASE_SETUP_START ))
 PHASE_SOLVE_START=$(date +%s)
-echo "Invoking Claude to solve ${JIRA_ISSUE_KEY}..."
+echo "Invoking agent to solve ${JIRA_ISSUE_KEY}..."
 
 run_agent_with_timeout \
     "Solve Jira issue ${JIRA_ISSUE_KEY}. Follow the Solve Process instructions in your system prompt.
@@ -125,8 +125,8 @@ PHASE_SOLVE_DURATION=$(( $(date +%s) - PHASE_SOLVE_START ))
 
 refresh_github_tokens || echo "WARNING: GitHub App token refresh failed; continuing with existing tokens"
 
-if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
-    echo "ERROR: Claude exited with code ${CLAUDE_EXIT}."
+if [[ "${AGENT_EXIT}" -ne 0 ]]; then
+    echo "ERROR: Agent exited with code ${AGENT_EXIT}."
     write_agent_metrics solve \
         --arg agent "trt-jira-solver" \
         --arg phase "solve" \
@@ -137,7 +137,7 @@ if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
         --arg started_at "${SOLVE_STARTED_AT}" \
         --arg pr_status "" \
         --arg merged_at "" \
-        --argjson claude_exit "${CLAUDE_EXIT}" \
+        --argjson agent_exit "${AGENT_EXIT}" \
         --argjson phase_durations "$(jq -n \
             --argjson setup "${PHASE_SETUP_DURATION}" \
             --argjson solve "${PHASE_SOLVE_DURATION}" \
@@ -146,9 +146,9 @@ if [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
           agent: $agent, phase: $phase, issue_key: $issue_key,
           result: $result, pr_url: $pr_url, upstream_repo: $upstream_repo,
           started_at: $started_at, pr_status: $pr_status, merged_at: $merged_at,
-          claude_exit: $claude_exit, phase_durations: $phase_durations
+          agent_exit: $agent_exit, phase_durations: $phase_durations
         }'
-    exit "${CLAUDE_EXIT}"
+    exit "${AGENT_EXIT}"
 fi
 
 # --- Create PR ---
@@ -164,7 +164,7 @@ PHASE_PR_DURATION=$(( $(date +%s) - PHASE_PR_START ))
 
 # --- Write metrics metadata for post-step ---
 PR_RESULT="success"
-[[ "${CLAUDE_EXIT}" -ne 0 ]] && PR_RESULT="failed"
+[[ "${AGENT_EXIT}" -ne 0 ]] && PR_RESULT="failed"
 
 write_agent_metrics solve \
     --arg agent "trt-jira-solver" \
@@ -176,7 +176,7 @@ write_agent_metrics solve \
     --arg started_at "${SOLVE_STARTED_AT}" \
     --arg pr_status "open" \
     --arg merged_at "" \
-    --argjson claude_exit "${CLAUDE_EXIT}" \
+    --argjson agent_exit "${AGENT_EXIT}" \
     --argjson phase_durations "$(jq -n \
         --argjson setup "${PHASE_SETUP_DURATION}" \
         --argjson solve "${PHASE_SOLVE_DURATION}" \
@@ -186,7 +186,7 @@ write_agent_metrics solve \
       agent: $agent, phase: $phase, issue_key: $issue_key,
       result: $result, pr_url: $pr_url, upstream_repo: $upstream_repo,
       started_at: $started_at, pr_status: $pr_status, merged_at: $merged_at,
-      claude_exit: $claude_exit, phase_durations: $phase_durations
+      agent_exit: $agent_exit, phase_durations: $phase_durations
     }'
 
 echo "=== TRT Jira Solver Complete ==="

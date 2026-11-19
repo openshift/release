@@ -126,17 +126,17 @@ if [[ "${AGENT}" == "trt-jira-solver" ]]; then
     PHASE_SOLVE=$(echo "${PHASE_DURATIONS}" | jq -r '.solve // 0')
     PHASE_PR=$(echo "${PHASE_DURATIONS}" | jq -r '.pr // 0')
     TOTAL_DURATION=$(( PHASE_SETUP + PHASE_SOLVE + PHASE_PR ))
-    CLAUDE_EXIT=$(echo "${METADATA}" | jq -r '.claude_exit // 0')
+    AGENT_EXIT=$(echo "${METADATA}" | jq -r '.agent_exit // 0')
 
     FAILURE_COUNT=0
     TIMEOUT_CASE=""
-    if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+    if [[ "${AGENT_EXIT}" -eq 124 ]]; then
         FAILURE_COUNT=1
-        TIMEOUT_CASE="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_SOLVE}\">
-    <failure message=\"Claude timed out.\">Claude exceeded the time limit and had to be nudged to wrap up.</failure>
+        TIMEOUT_CASE="  <testcase name=\"${PHASE_PREFIX} Agent should complete in a reasonable time\" time=\"${PHASE_SOLVE}\">
+    <failure message=\"Agent timed out.\">Agent exceeded the time limit and had to be nudged to wrap up.</failure>
   </testcase>"
     else
-        TIMEOUT_CASE="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_SOLVE}\"/>"
+        TIMEOUT_CASE="  <testcase name=\"${PHASE_PREFIX} Agent should complete in a reasonable time\" time=\"${PHASE_SOLVE}\"/>"
     fi
 
     # 3 phase testcases + 1 timeout testcase = 4 total
@@ -156,17 +156,17 @@ elif [[ "${AGENT}" == "trt-jira-planner" ]]; then
     PHASE_PLAN=$(echo "${PHASE_DURATIONS}" | jq -r '.plan // 0')
     PHASE_PR=$(echo "${PHASE_DURATIONS}" | jq -r '.pr // 0')
     TOTAL_DURATION=$(( PHASE_SETUP + PHASE_PLAN + PHASE_PR ))
-    CLAUDE_EXIT=$(echo "${METADATA}" | jq -r '.claude_exit // 0')
+    AGENT_EXIT=$(echo "${METADATA}" | jq -r '.agent_exit // 0')
 
     FAILURE_COUNT=0
     TIMEOUT_CASE=""
-    if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
+    if [[ "${AGENT_EXIT}" -eq 124 ]]; then
         FAILURE_COUNT=1
-        TIMEOUT_CASE="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_PLAN}\">
-    <failure message=\"Claude timed out.\">Claude exceeded the time limit and had to be nudged to wrap up.</failure>
+        TIMEOUT_CASE="  <testcase name=\"${PHASE_PREFIX} Agent should complete in a reasonable time\" time=\"${PHASE_PLAN}\">
+    <failure message=\"Agent timed out.\">Agent exceeded the time limit and had to be nudged to wrap up.</failure>
   </testcase>"
     else
-        TIMEOUT_CASE="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_PLAN}\"/>"
+        TIMEOUT_CASE="  <testcase name=\"${PHASE_PREFIX} Agent should complete in a reasonable time\" time=\"${PHASE_PLAN}\"/>"
     fi
 
     cat > "${JUNIT_FILE}" <<EOF
