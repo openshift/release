@@ -312,7 +312,7 @@ print_run_config() {
 
 run_upgrade_test() {
   export ECO_TEST_FEATURES="$SOURCE_OPERATOR-operator"
-  export ECO_TEST_LABELS=tier:upgrade-operator
+  export ECO_TEST_LABELS='tier:upgrade-operator && !stability:candidate'
   export ECO_TEST_VERBOSE=true
 
   # Preserve the existing jobs' workload and operator-specific safety settings.

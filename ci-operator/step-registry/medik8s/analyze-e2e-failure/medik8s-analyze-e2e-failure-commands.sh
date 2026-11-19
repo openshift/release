@@ -3,6 +3,13 @@ set -euo pipefail
 
 echo "=== Medik8s E2E Failure Analyzer ==="
 
+# When label-filter preflight fails, e2e-test is skipped and never uploads
+# finished.json. Exit immediately so ipi-aws-post is not delayed by the poll loop.
+if [[ -n "${SHARED_DIR:-}" && -f "${SHARED_DIR}/e2e-test-skipped-by-preflight" ]]; then
+  echo "e2e-test was skipped by label-filter preflight — skipping analysis."
+  exit 0
+fi
+
 # ---------------------------------------------------------------------------
 # 1. Construct GCS base path and wait for test step artifacts
 # ---------------------------------------------------------------------------

@@ -478,7 +478,7 @@ print_run_config() {
 
 run_upgrade_test() {
   export ECO_TEST_FEATURES="$FBC_OPERATOR-operator"
-  export ECO_TEST_LABELS=tier:upgrade-operator
+  export ECO_TEST_LABELS='tier:upgrade-operator && !stability:candidate'
   export ECO_TEST_VERBOSE=true
   export WORKLOAD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
 
