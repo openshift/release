@@ -9,25 +9,57 @@ log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m" >&2
 }
 
+# Reports which credential inputs the cluster profile supplied, by input name
+# only. Each input is reported as "present" or "missing"; the values are tested
+# but never stored or printed, so this stays safe for publicly retained Prow
+# logs while still separating "no credential was mounted" from "the credential
+# was rejected".
+ocm_credential_inventory() {
+    local entry variable file
+    local -a inventory=()
+    for entry in SSO_CLIENT_ID:sso-client-id SSO_CLIENT_SECRET:sso-client-secret OCM_TOKEN:ocm-token; do
+        variable="${entry%%:*}"
+        file="${entry#*:}"
+        # Defaulted because the callers below short-circuit: a credential the
+        # caller never expanded may legitimately be unset under `set -u`, and
+        # this inventory must still describe it rather than abort the message.
+        if [[ -n "${!variable:-}" ]]; then
+            inventory+=("${file}=present")
+        else
+            inventory+=("${file}=missing")
+        fi
+    done
+    echo "${inventory[*]}"
+}
+
 ocm_login() {
-    local target_env="$1" attempt exit_code
+    local target_env="$1" attempt exit_code credential_source
     local -a credentials
     if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+        credential_source="sso-client-credentials"
         credentials=(--client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}")
     elif [[ -n "${OCM_TOKEN}" ]]; then
+        credential_source="ocm-token"
         credentials=(--token "${OCM_TOKEN}")
     else
+        log "ERROR: OCM login to ${target_env} cannot be attempted: no usable credential in the cluster profile ($(ocm_credential_inventory))"
         return 1
     fi
 
     for attempt in 1 2 3; do
         if ocm login --url "${target_env}" "${credentials[@]}" > /dev/null 2>&1; then
             CURRENT_OCM_ENV="${target_env}"
+            log "OCM login to ${target_env} using ${credential_source} succeeded on attempt ${attempt}/3"
             return 0
         else
             exit_code=$?
         fi
+        # The ocm output stays suppressed above: this log is publicly retained
+        # and the output has not been shown to be free of the credential it was
+        # given. The exit status is reported instead.
+        log "WARNING: OCM login to ${target_env} failed on attempt ${attempt}/3 with exit status ${exit_code} (ocm output suppressed as unvetted for credentials)"
         if [[ "${attempt}" -eq 3 ]]; then
+            log "ERROR: OCM login to ${target_env} failed after 3 attempts using ${credential_source}; final exit status ${exit_code}"
             return "${exit_code}"
         fi
         sleep 10
@@ -35,11 +67,20 @@ ocm_login() {
 }
 
 ocm_authenticate() {
+    local exit_code=0
     SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id" 2>/dev/null || true)
     SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
     OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)
     CURRENT_OCM_ENV=""
-    ocm_login "${OCM_LOGIN_ENV}"
+    # This phase runs before the controller report exists, so its only record is
+    # the step log; say where the run is and how it ended.
+    log "Phase 0: Authenticating to OCM (${OCM_LOGIN_ENV})"
+    ocm_login "${OCM_LOGIN_ENV}" || exit_code=$?
+    if (( exit_code != 0 )); then
+        log "ERROR: Phase 0 failed: OCM authentication to ${OCM_LOGIN_ENV} did not succeed; exiting with status ${exit_code}"
+        return "${exit_code}"
+    fi
+    return 0
 }
 
 ocm_ensure_env() {

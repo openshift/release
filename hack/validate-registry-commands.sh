@@ -70,40 +70,49 @@ fi
 
 find "${registry_dir}" -name "*.sh" -print0 | xargs -0 -n1 shellcheck -S warning
 
-# The downstream-sync behavioral tests intentionally live outside the step
-# registry because registry validation only accepts registered step files.
-downstream_sync_test_path="hack/tests/github-downstream-sync-commands_test.sh"
-downstream_sync_test="${base_dir}/${downstream_sync_test_path}"
-downstream_sync_test_dir="${base_dir}/hack/tests"
-created_downstream_sync_test=false
-created_downstream_sync_test_dir=false
+# Behavioral tests for registry command scripts intentionally live outside the
+# step registry because registry validation only accepts registered step files.
+registry_command_tests=(
+  hack/tests/github-downstream-sync-commands_test.sh
+  hack/tests/rosa-cluster-lease-auth_test.sh
+)
 
-cleanup_downstream_sync_test() {
-  if [[ "${created_downstream_sync_test}" == true ]]; then
-    rm -f "${downstream_sync_test}"
-  fi
-  if [[ "${created_downstream_sync_test_dir}" == true ]]; then
-    rmdir "${downstream_sync_test_dir}" 2>/dev/null || true
-  fi
+created_test_files=()
+created_test_dirs=()
+
+cleanup_materialized_tests() {
+  local created index
+  for created in ${created_test_files[@]+"${created_test_files[@]}"}; do
+    rm -f "${created}"
+  done
+  # In reverse, so a nested directory is removed before its parent.
+  for (( index = ${#created_test_dirs[@]} - 1; index >= 0; index-- )); do
+    rmdir "${created_test_dirs[index]}" 2>/dev/null || true
+  done
 }
-trap cleanup_downstream_sync_test EXIT
+trap cleanup_materialized_tests EXIT
 
-if ! git -C "${base_dir}" cat-file -e "HEAD:${downstream_sync_test_path}"; then
-  echo "ERROR: ${downstream_sync_test_path} does not exist in HEAD" >&2
-  exit 1
-fi
+for test_path in "${registry_command_tests[@]}"; do
+  test_file="${base_dir}/${test_path}"
+  test_dir=$(dirname "${test_file}")
 
-# Prow derives sparse-checkout paths from the base branch configuration, so a
-# test added by the PR can exist in HEAD while still being absent from disk.
-if [[ ! -e "${downstream_sync_test}" ]]; then
-  if [[ ! -d "${downstream_sync_test_dir}" ]]; then
-    mkdir -p "${downstream_sync_test_dir}"
-    created_downstream_sync_test_dir=true
+  if ! git -C "${base_dir}" cat-file -e "HEAD:${test_path}"; then
+    echo "ERROR: ${test_path} does not exist in HEAD" >&2
+    exit 1
   fi
-  created_downstream_sync_test=true
-  git -C "${base_dir}" show "HEAD:${downstream_sync_test_path}" > "${downstream_sync_test}"
-  chmod 0755 "${downstream_sync_test}"
-fi
 
-shellcheck -S warning "${downstream_sync_test}"
-"${downstream_sync_test}"
+  # Prow derives sparse-checkout paths from the base branch configuration, so a
+  # test added by the PR can exist in HEAD while still being absent from disk.
+  if [[ ! -e "${test_file}" ]]; then
+    if [[ ! -d "${test_dir}" ]]; then
+      mkdir -p "${test_dir}"
+      created_test_dirs+=("${test_dir}")
+    fi
+    created_test_files+=("${test_file}")
+    git -C "${base_dir}" show "HEAD:${test_path}" > "${test_file}"
+    chmod 0755 "${test_file}"
+  fi
+
+  shellcheck -S warning "${test_file}"
+  "${test_file}"
+done
