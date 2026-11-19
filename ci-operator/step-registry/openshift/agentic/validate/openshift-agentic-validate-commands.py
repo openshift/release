@@ -39,6 +39,8 @@ JIRA_URL = "https://redhat.atlassian.net"
 ISSUE_KEY = re.compile(r"\b[A-Z][A-Z0-9]+-[0-9]+\b")
 SHA = re.compile(r"[a-f0-9]{40}")
 CHECK_ID = re.compile(r"[a-z][a-z0-9-]{0,63}")
+# Structured decoders can full-match patterns; permit the complete page citation.
+SOURCE_REFERENCE = re.compile(r"^https://[^/\s]+/\S.*$")
 
 PREPARE_PROMPT = """Produce a focused validation plan for the assigned ephemeral
 OpenShift cluster. First select the requirements: when supervisor-provided
@@ -102,7 +104,7 @@ builds a product image.
 PLAN_CHECK_FIELDS = {
     "id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$"},
     "source": {"type": "string", "enum": ["jira", "pr", "inference"]},
-    "reference": {"type": "string", "pattern": r"^https://[^/\s]+/"},
+    "reference": {"type": "string", "pattern": SOURCE_REFERENCE.pattern},
     "issue": {"type": "string"},
     "requirement": {"type": "string", "minLength": 1},
     "prerequisites": {"type": "array", "items": {"type": "string", "minLength": 1}},
@@ -737,8 +739,8 @@ def validate_check_text(check):
         value = check[field]
         if not isinstance(value, str) or not value.strip():
             raise ValidationError(f"check {check_id} lacks {field}")
-    if not re.match(r"^https://[^/\s]+/", check["reference"]):
-        raise ValidationError(f"check {check_id} reference must start with an HTTPS source URL")
+    if not SOURCE_REFERENCE.fullmatch(check["reference"]):
+        raise ValidationError(f"check {check_id} reference must cite an HTTPS page URL")
     for field in ("actions", "prerequisites"):
         values = check[field]
         if not isinstance(values, list):
