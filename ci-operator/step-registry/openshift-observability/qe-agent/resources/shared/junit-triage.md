@@ -17,6 +17,10 @@ When `junit_truncated` is `true` in `${SHARED_DIR}/qe-agent-context.json`, the r
 
 If no `${QE_JUNIT_DIR}/qe-agent-junit-*` files exist, exit with a clear message: the test step did not run or produced no results, its reports were too large for `SHARED_DIR` (`junit_truncated` is `true` in the context file), or its image could not reduce them (`junit_skipped` names the reason — `no-xsltproc`, `xsl-unwritable` or `reduce-failed`). Name the reason from the context file, do not guess.
 
+## Reruns are serial
+
+Never overlap reruns: when several tests failed, finish the full rerun sequence of one test — the flakiness loop of the skill's Step 3 included — before you start the reruns of the next test. Running one rerun in the background is fine when your skill's steps require it (the UI suites do, to work around the 10-minute Bash limit); starting a second while one is still running is not. Overlapped reruns starve the claimed cluster, which is sized for the serial load of the original run: they cause API-server timeouts and pods stuck in `ContainerCreating`, and corrupt the pass/fail pattern that the flakiness classification depends on.
+
 ## High-failure triage: more than 5 failures total
 
 When more than 5 tests fail, they very likely share one root cause (an operator crash, a missing CRD, an install failure, a broken dependency) rather than being independent bugs. Look for a common pattern:

@@ -73,7 +73,7 @@ Shared Loki helpers live in [test/e2e/loki_utils.go](https://github.com/openshif
 
 ## Step 3 — Rerun the Failing Tests
 
-Rerun only the specific failing test(s), not the entire suite.
+Rerun only the specific failing test(s), not the entire suite. Run them one test at a time: when several tests failed, finish the full rerun sequence of one test — the flakiness loop below included — before you start the next test. Do not overlap reruns with background tasks or parallel Bash calls. The suite itself runs with `--max-concurrency 1` because each spec deploys its own collector DaemonSet and often a LokiStack, which exhausts the CPU of the claimed cluster's 3 worker nodes. Overlapped reruns starve the cluster (API-server timeouts, pods stuck `ContainerCreating`) and corrupt the pass/fail pattern that the flakiness classification depends on.
 
 ```bash
 export HOME=/tmp/home
