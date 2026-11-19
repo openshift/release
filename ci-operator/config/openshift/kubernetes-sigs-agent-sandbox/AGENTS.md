@@ -23,16 +23,15 @@ openshift-kubernetes-sigs-agent-sandbox-main__<variant>.yaml
 
 ### Config Variants
 
+One file per OCP version, all test types (kata, standalone, peerpods) grouped together:
+
 | Variant | Contents | OCP version |
 |---|---|---|
-| `__kata-422` | Azure + GCP kata e2e | 4.22 |
-| `__kata-421` | Azure + GCP kata e2e | 4.21 |
-| `__kata-500` | Azure + GCP kata e2e | 5.0 |
-| `__peerpods` | Azure + AWS peer-pods e2e | 4.22 |
-| `__standalone` | Azure e2e without OSC (default runtime) | 4.22 |
+| `__422` | Azure kata + GCP kata + Azure standalone | 4.22 |
+| `__421` | Azure kata + GCP kata | 4.21 |
+| `__500` | Azure kata + GCP kata | 5.0 |
 
-Kata variants test local kata sandboxes (`SANDBOX_RUNTIME_CLASS=kata`).
-Peerpods variants test cloud API adaptor sandboxes (`SANDBOX_RUNTIME_CLASS=kata-remote`).
+Peerpods tests will be added to the version files once profile access is granted.
 
 ## Pipeline Images
 
@@ -53,15 +52,14 @@ When updating, change the image reference in every variant file.
 
 Jobs are staggered by weekday to avoid overlapping cluster provisioning:
 
-| Day | Variant |
-|---|---|
-| Monday | `__kata-422` (OCP 4.22) |
-| Tuesday | `__kata-421` (OCP 4.21) |
-| Wednesday | `__kata-500` (OCP 5.0) |
-| Thursday | `__peerpods` (OCP 4.22) |
-| Friday | `__standalone` (OCP 4.22) |
+| Day | Jobs | Variant |
+|---|---|---|
+| Monday | kata-e2e-azure, kata-e2e-gcp | `__422` |
+| Tuesday | kata-e2e-azure, kata-e2e-gcp | `__421` |
+| Wednesday | kata-e2e-azure, kata-e2e-gcp | `__500` |
+| Friday | e2e-azure (standalone) | `__422` |
 
-All jobs run at 06:00 UTC. Cron format: `0 6 * * <day>` where day is 1-5.
+All jobs run at 06:00 UTC. Cron format: `0 6 * * <day>`.
 
 ## Cluster Profiles
 
@@ -77,12 +75,13 @@ team. Profile ownership for this repo is pending approval in a separate PR.
 
 ## Adding a New OCP Version
 
-1. Copy an existing kata variant file and rename with the version suffix
-   (e.g., `__kata-510.yaml`)
+1. Copy an existing version file and rename with the version number
+   (e.g., `__510.yaml`)
 2. Update `releases.latest` to the target version
 3. For OCP 5.0+: use `release` mode and add `base_images: upi-installer`
-4. Stagger cron to an unused weekday
-5. Run `make update`
+4. Add all test types (kata, standalone, peerpods) as test entries
+5. Stagger cron schedules to avoid overlap
+6. Run `make update`
 
 ## Verify Changes
 
