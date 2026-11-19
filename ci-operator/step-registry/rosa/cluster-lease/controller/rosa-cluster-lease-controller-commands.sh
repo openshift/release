@@ -12,15 +12,25 @@ log(){
 ocm_login() {
     local target_env="$1" attempt exit_code
     local -a credentials
+    # OCM_LOGIN_MODE and OCM_LOGIN_ATTEMPTS exist purely for diagnostics: they
+    # name the credential kind in use and count the attempts made. Neither ever
+    # holds credential material, so both are safe to log.
+    OCM_LOGIN_MODE="none"
+    OCM_LOGIN_ATTEMPTS=0
     if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
         credentials=(--client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}")
+        OCM_LOGIN_MODE="sso-client-credentials"
     elif [[ -n "${OCM_TOKEN}" ]]; then
         credentials=(--token "${OCM_TOKEN}")
+        OCM_LOGIN_MODE="ocm-token"
     else
         return 1
     fi
 
     for attempt in 1 2 3; do
+        OCM_LOGIN_ATTEMPTS="${attempt}"
+        # ocm login output is discarded on purpose: it can echo back the
+        # credentials it was given.
         if ocm login --url "${target_env}" "${credentials[@]}" > /dev/null 2>&1; then
             CURRENT_OCM_ENV="${target_env}"
             return 0
@@ -35,6 +45,16 @@ ocm_login() {
 }
 
 ocm_authenticate() {
+    local credential_file
+    # Record which credential files the cluster profile does not provide, i.e.
+    # which ones are absent or empty. Only the file names are kept, never their
+    # contents.
+    OCM_MISSING_CREDENTIAL_FILES=""
+    for credential_file in sso-client-id sso-client-secret ocm-token; do
+        if [[ ! -s "${CLUSTER_PROFILE_DIR}/${credential_file}" ]]; then
+            OCM_MISSING_CREDENTIAL_FILES+="${OCM_MISSING_CREDENTIAL_FILES:+,}${credential_file}"
+        fi
+    done
     SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id" 2>/dev/null || true)
     SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
     OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)
@@ -54,8 +74,81 @@ if [[ "${BASH_SOURCE[0]:-$0}" != "$0" ]]; then
     return 0
 fi
 
+# ---------------------------------------------------------------
+# Startup diagnostics
+#
+# The fallible startup steps (prerequisite checks, OCM authentication) used to
+# run before the report was created, and ocm login output is discarded on
+# purpose, so a startup failure left an empty build log and no artifact at all.
+# Create the report first and leave a breadcrumb for every startup step.
+#
+# Everything these helpers publish is a fixed label chosen by this script, a
+# numeric exit status or attempt count, or a value normalized against a closed
+# allowlist. No environment value, path, argument, command output or credential
+# is ever interpolated into them, so a diagnostic cannot echo back whatever a
+# job happens to put in the environment.
+# ---------------------------------------------------------------
+if [[ -z "${ARTIFACT_DIR:-}" ]]; then
+    echo "FAILED: stage=init exit_status=1 detail=artifact-dir-not-set"
+    exit 1
+fi
+mkdir -p "${ARTIFACT_DIR}"
+REPORT="${ARTIFACT_DIR}/controller-report.txt"
+echo "Lease Controller Report - $(date -u)" > "${REPORT}"
+echo "======================================" >> "${REPORT}"
+
+STARTUP_STAGE="prerequisites"
+STARTUP_REPORTED="false"
+
+# Write a credential-safe line to both stdout and the report.
+report_note() {
+    printf '%s\n' "$1"
+    printf '%s\n' "$1" >> "${REPORT}"
+}
+
+# OCM_LOGIN_ENV is job-supplied and ocm also accepts a full URL there, so a
+# diagnostic reports it only when it matches a known environment name.
+ocm_env_label() {
+    case "${OCM_LOGIN_ENV}" in
+        production|staging|integration|local)
+            echo "${OCM_LOGIN_ENV}"
+            ;;
+        *)
+            echo "other"
+            ;;
+    esac
+}
+
+# Report the stage that failed and exit with its status unchanged.
+fail_stage() {
+    local stage="$1" exit_code="$2" detail="${3:-}"
+    STARTUP_REPORTED="true"
+    # Best effort: a failure to write the note must never replace the status of
+    # the failure it describes.
+    report_note "FAILED: stage=${stage} exit_status=${exit_code}${detail:+ ${detail}}" || true
+    exit "${exit_code}"
+}
+
+# Catch startup failures that exit without calling fail_stage (for example an
+# errexit abort) so they are still visible in the build log and the report.
+startup_exit_trap() {
+    local exit_code=$?
+    trap - EXIT
+    if [[ "${STARTUP_REPORTED}" == "false" && "${exit_code}" -ne 0 ]]; then
+        # Best effort: a failure to write the note must never replace the
+        # status of the failure it describes.
+        report_note "FAILED: stage=${STARTUP_STAGE} exit_status=${exit_code} detail=no-stage-diagnostics" || true
+    fi
+    exit "${exit_code}"
+}
+trap startup_exit_trap EXIT
+
 LEASE_NAMESPACE="${LEASE_NAMESPACE:-rosa-cluster-lease}"
-LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
+# The credential bundle mounts the lease host kubeconfig at a fixed path. The
+# override is a test seam for exercising the startup paths offline: it is not
+# declared in the step ref, so ci-operator never sets it and a CI run always
+# takes the default below.
+LEASE_HOST_KUBECONFIG="${LEASE_HOST_KUBECONFIG:-/etc/rosa-cluster-lease-manager/kubeconfig}"
 OCM_LOGIN_ENV="${OCM_LOGIN_ENV:-staging}"
 STALE_LEASE_HOURS="${STALE_LEASE_HOURS:-1}"
 ERROR_REPLACE_HOURS="${ERROR_REPLACE_HOURS:-1}"
@@ -66,7 +159,7 @@ DRY_RUN="${DRY_RUN:-false}"
 
 if [[ ! -f "${LEASE_HOST_KUBECONFIG}" ]]; then
     log "ERROR: Lease host kubeconfig not found at ${LEASE_HOST_KUBECONFIG}"
-    exit 1
+    fail_stage "prerequisites" 1 "detail=file-not-found file=lease-host-kubeconfig"
 fi
 
 lease_oc() {
@@ -407,14 +500,22 @@ schedule_upgrade() {
     fi
 }
 
-ocm_authenticate || exit $?
+STARTUP_STAGE="ocm-authenticate"
+AUTH_EXIT_CODE=0
+ocm_authenticate || AUTH_EXIT_CODE=$?
+if [[ "${AUTH_EXIT_CODE}" -ne 0 ]]; then
+    fail_stage "ocm-authenticate" "${AUTH_EXIT_CODE}" \
+        "auth_mode=${OCM_LOGIN_MODE} attempts=${OCM_LOGIN_ATTEMPTS} ocm_env=$(ocm_env_label) missing_credential_files=${OCM_MISSING_CREDENTIAL_FILES:-none}"
+fi
+report_note "OK: stage=ocm-authenticate auth_mode=${OCM_LOGIN_MODE} attempts=${OCM_LOGIN_ATTEMPTS} ocm_env=$(ocm_env_label)"
+
+# Startup finished: later failures are reconciliation failures, which already
+# log and report for themselves.
+trap - EXIT
 
 NOW_EPOCH=$(date +%s)
 STALE_THRESHOLD=$((STALE_LEASE_HOURS * 3600))
 ERROR_THRESHOLD=$((ERROR_REPLACE_HOURS * 3600))
-REPORT="${ARTIFACT_DIR}/controller-report.txt"
-echo "Lease Controller Report - $(date -u)" > "${REPORT}"
-echo "======================================" >> "${REPORT}"
 
 # ---------------------------------------------------------------
 # Phase 1: Read desired state
