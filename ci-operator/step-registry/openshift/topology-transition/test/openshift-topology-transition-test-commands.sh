@@ -119,11 +119,33 @@ for attempt in 1 2 3; do
 done
 
 printf 'Running test suite: %s\n' "${suite}"
-# Keep operator placement unchanged before the topology suite's health checks.
+
+# Setup can leave operators settling before either suite. Skip the runner's
+# generic startup health check; the transition test checks operators, nodes,
+# etcd and workloads after the topology change.
+export OPENSHIFT_TESTS_SKIP_STABLE_CLUSTER=true
+
+# Avoid the optional operator-pod rebalance adding more setup disruption.
 export OPENSHIFT_TESTS_SKIP_SINGLETON_REBALANCE=true
+
+# This workflow deliberately restarts and reconfigures cluster components.
+# Disable general monitor assertions for both suites, keeping data collectors
+# so logs and timelines remain available for debugging.
+monitor_collectors=(
+  event-collector
+  clusteroperator-collector
+  watch-namespaces
+  timeline-serializer
+  interval-serializer
+  tracked-resources-serializer
+  cluster-info-serializer
+)
+printf -v monitor_names '%s,' "${monitor_collectors[@]}"
+monitor_names=${monitor_names%,}
+
 # Origin retains its 45/195-minute suite limits and five-minute CLI limit.
 timeout --signal=TERM --kill-after=2m "${suite_timeout}" openshift-tests run "${suite}" \
-  -o "${artifacts}/e2e.log" --junit-dir="${artifacts}/junit" 2>&1 | tee "${artifacts}/output.log"
+  --monitor="${monitor_names}" -o "${artifacts}/e2e.log" --junit-dir="${artifacts}/junit" 2>&1 | tee "${artifacts}/output.log"
 REMOTE
 suite_result=$?
 set -e
