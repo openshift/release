@@ -961,31 +961,37 @@ if [ $ret -ne 0 ]; then
   exit "$ret"
 fi
 
-# Swap cloud-provider-config to the legacy INI form inside bootstrap.ign, now
-# that cluster-config-operator's bootstrap-time render (triggered by the
-# `create ignition-configs` above, via bootkube.sh's "config-bootstrap"
-# stage) has already consumed the installer's native (modern) YAML left in
-# place by the staging above. cluster-config-operator's render has no
-# vSphere-specific transformer, so whatever is in that ConfigMap when it
-# runs is copied byte-for-byte into ControllerConfig.Spec.CloudProviderConfig;
-# letting it see the installer's own YAML there is a no-op once
-# vcenters/failureDomains are empty (both that render and the in-cluster
-# cluster-cloud-controller-manager-operator transform converge on the same
-# content for that case), so bootstrap and in-cluster agree (SPLAT-3028).
+# Swap cloud-provider-config to the legacy INI form inside bootstrap.ign. That
+# file is what bootkube's "config-bootstrap" stage (cluster-config-operator's
+# bootstrap-time render) turns into ControllerConfig.Spec.CloudProviderConfig,
+# and what "cb-bootstrap" later applies to the API server as the live
+# openshift-config/cloud-provider-config.
 #
-# The merged systemd unit below waits for /opt/openshift/config-bootstrap.done:
-# the marker for the very stage whose cluster-config-operator render reads
-# this ConfigMap, and several bootkube stages before "cb-bootstrap", the
-# generic manifest-apply step that actually creates the live ConfigMap object.
-# It must not gate on a later marker: observed in a real bootstrap,
-# "cco-bootstrap" completes and "cb-bootstrap" starts within the same second,
-# so gating there let the swap land ~4s after cluster-bootstrap had begun
-# reading manifests/. That lateness is not recoverable: EnsureManifestsCreated()
-# loads the directory once, before its retry loop, and the loop then reuses
-# those in-memory objects rather than re-reading the files, so a swap that
-# misses the load is never applied and the live ConfigMap keeps the
-# installer's modern form. "config-bootstrap" finishes several bootkube
-# stages earlier, which is after the render and before that load.
+# Two independent renders consume it and must agree byte-for-byte, or MCD's
+# one-time bootstrap-vs-in-cluster MachineConfig check degrades the master pool
+# permanently: the bootstrap one reads manifests/cloud-provider-config.yaml,
+# while MCO's syncCloudConfig() reads
+# openshift-config-managed/kube-cloud-config, key cloud.conf.
+#
+# The in-cluster format is decided by whoever writes that managed copy, and
+# that flips on the VSphereMultiVCenterDay2 feature gate:
+#
+#   gate disabled (4.19/4.20/4.21 defaults): cluster-config-operator copies
+#     openshift-config/<Infrastructure.spec.cloudConfig.name> VERBATIM, so the
+#     in-cluster format equals the live ConfigMap's. The manifest must be INI
+#     at render time too, so the unit is ordered Before=bootkube.service
+#     (VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER=pre-bootstrap).
+#
+#   gate enabled (GA from 4.22 / 5.x): CCMO owns that copy and rewrites it
+#     through its vSphere transformer, which emits normalized YAML from either
+#     input. The in-cluster render is YAML regardless, so the manifest must stay
+#     the installer's modern YAML at render time and the swap must wait for
+#     config-bootstrap.done (post-bootstrap, the default).
+#
+# VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER selects which; gate-off releases set
+# it per-test in the release config. Either way the live ConfigMap ends up INI
+# (pre: from the start; post: cb-bootstrap applies manifests/ after
+# config-bootstrap.done, observed on 5.x). Getting it wrong costs a full job.
 if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
   echo "$(date -u --rfc-3339=seconds) - injecting the legacy cloud-provider-config swap into bootstrap.ign (SPLAT-3028)"
 
@@ -994,6 +1000,27 @@ if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
     exit 1
   fi
 
+  vsphere_legacy_swap_order="${VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER:-post-bootstrap}"
+  case "${vsphere_legacy_swap_order}" in
+    pre-bootstrap)
+      vsphere_legacy_unit_description="Swap cloud-provider-config to the legacy INI form before bootkube derives the bootstrap cloud config (SPLAT-3028)"
+      vsphere_legacy_before_line="        Before=bootkube.service"$'\n'
+      ;;
+    post-bootstrap)
+      vsphere_legacy_unit_description="Swap cloud-provider-config to the legacy INI form once cluster-config-operator's bootstrap render has consumed the modern YAML (SPLAT-3028)"
+      vsphere_legacy_before_line=""
+      ;;
+    *)
+      echo "ERROR: VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER must be 'pre-bootstrap' or 'post-bootstrap', got '${vsphere_legacy_swap_order}'" >&2
+      exit 1
+      ;;
+  esac
+
+  if [[ "${vsphere_legacy_swap_order}" == "pre-bootstrap" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - legacy cloud-provider-config swap order: vsphere_legacy_swap_order=${vsphere_legacy_swap_order} (assumes VSphereMultiVCenterDay2 is DISABLED on this payload: cluster-config-operator copies openshift-config-managed/kube-cloud-config verbatim, so the bootstrap render must see INI)"
+  else
+    echo "$(date -u --rfc-3339=seconds) - legacy cloud-provider-config swap order: vsphere_legacy_swap_order=${vsphere_legacy_swap_order} (assumes VSphereMultiVCenterDay2 is ENABLED on this payload: CCMO normalizes openshift-config-managed/kube-cloud-config to YAML, so the bootstrap render must see the installer YAML)"
+  fi
   vsphere_legacy_cc_dir=/tmp/vsphere-legacy-cloud-config
   mkdir -p "${vsphere_legacy_cc_dir}"
   cp "${staged_ccm_manifest}" "${vsphere_legacy_cc_dir}/cloud-provider-config-legacy.yaml"
@@ -1003,27 +1030,47 @@ if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
 set -o nounset
 set -o pipefail
 
-marker=/opt/openshift/config-bootstrap.done
+mode="${1:-post-bootstrap}"
 target=/opt/openshift/manifests/cloud-provider-config.yaml
 source_file=/opt/openshift/cloud-provider-config-legacy.yaml
-timeout_seconds=900
+
+# pre-bootstrap: the unit is ordered Before=bootkube.service, so bootkube
+#   cannot read the manifest until this finishes; wait only for the
+#   ignition-written layout to appear.
+# post-bootstrap: wait for the marker of the very stage whose render must
+#   consume the installer's YAML first; the swap then still lands before
+#   cb-bootstrap reads manifests/, several bootkube stages later.
+if [[ "${mode}" == "pre-bootstrap" ]]; then
+  marker="${target}"
+  timeout_seconds=120
+  poll_seconds=2
+else
+  marker=/opt/openshift/config-bootstrap.done
+  timeout_seconds=900
+  poll_seconds=5
+fi
 elapsed=0
 
-echo "$(date -u --rfc-3339=seconds) - waiting for ${marker} before swapping cloud-provider-config to legacy INI (SPLAT-3028)"
+if [[ ! -s "${source_file}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - ERROR: ${source_file} is missing or empty; the legacy INI staging in the install step must have failed" >&2
+  exit 1
+fi
+
+echo "$(date -u --rfc-3339=seconds) - [${mode}] waiting for ${marker} before swapping cloud-provider-config to legacy INI (SPLAT-3028)"
 until [[ -f "${marker}" ]]; do
   if (( elapsed >= timeout_seconds )); then
     echo "$(date -u --rfc-3339=seconds) - ERROR: ${marker} did not appear within ${timeout_seconds}s; leaving cloud-provider-config.yaml in its modern (non-legacy) form. The legacy vSphere infra simulation did NOT take effect for cloud-provider-config (SPLAT-3028)." >&2
     exit 1
   fi
-  sleep 5
-  elapsed=$((elapsed + 5))
+  sleep "${poll_seconds}"
+  elapsed=$((elapsed + poll_seconds))
 done
 
 if ! cp "${source_file}" "${target}"; then
   echo "$(date -u --rfc-3339=seconds) - ERROR: failed to overwrite ${target} with ${source_file}" >&2
   exit 1
 fi
-echo "$(date -u --rfc-3339=seconds) - overwrote ${target} with the legacy INI ConfigMap after a ${elapsed}s wait for ${marker} (SPLAT-3028)"
+echo "$(date -u --rfc-3339=seconds) - [${mode}] overwrote ${target} with the legacy INI ConfigMap after a ${elapsed}s wait for ${marker} (SPLAT-3028)"
 SCRIPT_EOF
 
   cat > "${vsphere_legacy_cc_dir}/fcct.yml" << EOF
@@ -1051,14 +1098,14 @@ systemd:
       enabled: true
       contents: |
         [Unit]
-        Description=Swap cloud-provider-config to the legacy INI form once cluster-config-operator's bootstrap render has consumed the modern YAML (SPLAT-3028)
+        Description=${vsphere_legacy_unit_description}
         After=network-online.target
         Wants=network-online.target
-
+${vsphere_legacy_before_line}
         [Service]
         Type=oneshot
         RemainAfterExit=yes
-        ExecStart=/usr/local/bin/swap-vsphere-cloud-provider-config.sh
+        ExecStart=/usr/local/bin/swap-vsphere-cloud-provider-config.sh ${vsphere_legacy_swap_order}
 
         [Install]
         WantedBy=multi-user.target
