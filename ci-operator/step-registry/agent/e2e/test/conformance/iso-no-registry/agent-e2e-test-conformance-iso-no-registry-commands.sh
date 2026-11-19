@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 date +%s > "${SHARED_DIR}/TEST_TIME_TEST_START"
