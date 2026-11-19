@@ -250,57 +250,23 @@ export AZURE_TOKEN_CREDENTIALS=prod
 
 readonly SCORES="${ARTIFACT_DIR}/priority-scores.json"
 readonly CHANGES="${ARTIFACT_DIR}/priority-changes.json"
-readonly OBSERVATIONS="${PRIVATE_DIR}/observations-${build_id:-local}.json"
 
 info "collecting ${PRIORITIES_LOOKBACK} of E2E results from ${KUSTO_CLUSTER}.${KUSTO_REGION}/${KUSTO_DATABASE}"
-"${RUNNER}" priorities \
-    --kusto "${KUSTO_CLUSTER}" \
-    --region "${KUSTO_REGION}" \
-    --database "${KUSTO_DATABASE}" \
-    --job-filter e2e-parallel \
-    --since "${PRIORITIES_LOOKBACK}" \
-    --min-samples "${PRIORITIES_MIN_SAMPLES}" \
-    --timeout 10m \
-    --save-input "${OBSERVATIONS}" \
-    --output json >"${SCORES}" || error "priority collection failed"
-
-window_to=$(jq -r '.selection.to // empty' "${SCORES}") || error "cannot read the score window"
-[[ -n "${window_to}" ]] || error "the score report has no selection window"
-window_to_epoch=$(date -u -d "${window_to}" +%s) || error "cannot parse the score window end '${window_to}'"
-jq -e '.quality.reason == null' "${SCORES}" >/dev/null ||
-    error "the score report has no usable history: $(jq -r '.quality.reason // "unknown"' "${SCORES}")"
-jq -e '.selection.job_filter == "e2e-parallel"' "${SCORES}" >/dev/null ||
-    error "the score report does not use the configured job filter"
-
-for environment in dev int stg prod; do
-    builds=$(jq -r --arg env "${environment}" \
-        '[.environments[]? | select(.environment == $env) | .eligible_build_count] | first // 0' "${SCORES}") ||
-        error "cannot read ${environment} coverage"
-    latest=$(jq -r --arg env "${environment}" \
-        '[.environments[]? | select(.environment == $env) | .latest_eligible_completion] | first // empty' "${SCORES}") ||
-        error "cannot read ${environment} freshness"
-    if [[ -z "${latest}" ]]; then
-        error "no eligible ${environment} builds in the report; refusing to refresh on partial coverage"
-    fi
-    if ((builds < PRIORITIES_MIN_SAMPLES)); then
-        error "only ${builds} eligible ${environment} builds, need ${PRIORITIES_MIN_SAMPLES}; refusing to refresh"
-    fi
-    latest_epoch=$(date -u -d "${latest}" +%s) || error "cannot parse ${environment} freshness '${latest}'"
-    if (((window_to_epoch - latest_epoch) > LOOKBACK_DAYS * 86400)); then
-        error "the newest eligible ${environment} build finished at ${latest}, more than ${LOOKBACK_DAYS} days before the window end ${window_to}"
-    fi
-    info "coverage ${environment}: ${builds} eligible builds, latest ${latest}"
-done
-
+# One command collects, scores, enforces coverage and plans against this
+# checkout. The catalog is listed first because verification below compares the
+# rebuilt catalog against it.
 "${RUNNER}" list tests --output json >"${PRIVATE_DIR}/catalog-before.json" ||
     error "cannot list the before catalog"
 
-refresh_args=(--report "${SCORES}" --catalog "${PRIVATE_DIR}/catalog-before.json" --repo "${REPO_DIR}")
+run_args=(--kusto "${KUSTO_CLUSTER}" --region "${KUSTO_REGION}" --database "${KUSTO_DATABASE}"
+    --since "${PRIORITIES_LOOKBACK}" --job-filter e2e-parallel
+    --min-samples "${PRIORITIES_MIN_SAMPLES}" --timeout 10m
+    --repo "${REPO_DIR}" --artifact-dir "${ARTIFACT_DIR}" --max-age "$((LOOKBACK_DAYS * 24))h")
 if [[ "${publish}" == true ]]; then
-    refresh_args+=(--write)
+    run_args+=(--write)
 fi
-"${RUNNER}" refresh-priorities "${refresh_args[@]}" >"${CHANGES}" ||
-    error "priority refresh failed; no source or GitHub write was published"
+"${RUNNER}" priorities-run "${run_args[@]}" ||
+    error "the priority refresh failed; no source or GitHub write was published"
 
 changed_count=$(jq '.changes | length' "${CHANGES}") || error "cannot read the change summary"
 info "planned ${changed_count} source changes"
@@ -432,7 +398,8 @@ fi
 
 mapfile -t env_rows < <(jq -r '.environments[]? | "| \(.environment) | \(.eligible_build_count) | \(.eligible_sample_count) | \(.median_minutes) | \(.latest_eligible_completion) |"' "${SCORES}")
 mapfile -t change_rows < <(jq -r '.changes[]? | "| \(.name | gsub("\\|"; "\\|")) | \(.old_priority) | \(.new_priority) | \(.score_minutes) | \(.eligible_build_count) | \(.environments | join(", ")) |"' "${CHANGES}")
-window_from=$(jq -r '.selection.from' "${SCORES}")
+window_from=$(jq -r '.selection.from' "${SCORES}") || error "cannot read the score window start"
+window_to=$(jq -r '.selection.to' "${SCORES}") || error "cannot read the score window end"
 origin=$(jq -r '.selection.origin' "${SCORES}")
 algorithm=$(jq -r '.algorithm' "${SCORES}")
 global_median=$(jq -r '.global_median_minutes' "${SCORES}")
