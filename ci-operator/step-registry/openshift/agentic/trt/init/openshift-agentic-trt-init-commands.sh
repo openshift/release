@@ -34,7 +34,7 @@ echo "${JIRA_ISSUE_KEY}" > "${SHARED_DIR}/jira-issue-key"
 # --- Fetch Jira issue ---
 echo "Fetching issue details from Jira..."
 curl -sf --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 5 \
-    "https://redhat.atlassian.net/rest/api/2/issue/${JIRA_ISSUE_KEY}?fields=summary,description,status,labels,comment,issuetype,priority" \
+    "https://redhat.atlassian.net/rest/api/2/issue/${JIRA_ISSUE_KEY}?fields=summary,description,status,labels,comment,attachment,issuetype,priority" \
     > "${SHARED_DIR}/jira-issue.json" || {
     echo "ERROR: Failed to fetch issue ${JIRA_ISSUE_KEY} from Jira."; exit 1;
 }
@@ -48,7 +48,7 @@ if [[ -n "${PLANNING_ISSUE_KEY:-}" ]]; then
 
     echo "Fetching planning subtask details from Jira..."
     curl -sf --connect-timeout 10 --max-time 30 --retry 3 --retry-delay 5 \
-        "https://redhat.atlassian.net/rest/api/2/issue/${PLANNING_ISSUE_KEY}?fields=summary,description,status,labels,comment,issuetype,priority" \
+        "https://redhat.atlassian.net/rest/api/2/issue/${PLANNING_ISSUE_KEY}?fields=summary,description,status,labels,comment,attachment,issuetype,priority" \
         > "${SHARED_DIR}/planning-issue.json" || {
         echo "ERROR: Failed to fetch planning subtask ${PLANNING_ISSUE_KEY} from Jira."; exit 1;
     }
