@@ -248,20 +248,26 @@ class ExitCodeArtifactTests(unittest.TestCase):
                 f'--mock {command} "$@"\n', encoding="utf-8")
             executable.chmod(0o755)
 
-    def run_step(self, exit_code=0, umask=0o022):
-        process = subprocess.run(["bash", str(self.script)], env={
+    def run_step_raw(self, exit_code, umask=0o022):
+        """Run the step script itself; the only env the fixture needs."""
+        return subprocess.run(["bash", str(self.script)], env={
             "PATH": str(self.bin) + os.pathsep + os.defpath,
             "HOME": str(self.base), "ARTIFACT_DIR": str(self.artifacts),
             "SHARED_DIR": str(self.shared), "JOB_NAME": "fixture", "BUILD_ID": "1",
             "OCM_FVT_JOB_NAME": "fixture", "FIXTURE_DIR": str(self.base),
             "FIXTURE_EXIT": str(exit_code),
         }, capture_output=True, text=True, timeout=120, umask=umask, check=False)
+
+    def run_step(self, exit_code=0, umask=0o022):
+        process = self.run_step_raw(exit_code, umask)
         # The mirror must never become the thing that decides the step's status.
         self.assertEqual(process.returncode, exit_code, process.stderr)
         self.assertNotIn(SECRET, process.stdout + process.stderr)
         # The OSDFM stage-promotion post step reads this copy.
         self.assertEqual((self.shared / EXIT_CODE_ARTIFACT).read_text().strip(),
                          str(exit_code))
+        self.assertNotIn("WARNING: could not record the ocm-fvt exit status",
+                         process.stdout)
         return process
 
     def published(self):
@@ -280,7 +286,7 @@ class ExitCodeArtifactTests(unittest.TestCase):
                 self.assertEqual(self.published()[1], str(exit_code))
 
     def test_published_copy_is_collector_readable_under_a_restrictive_umask(self):
-        """cp takes the mode from the source, which a 0077 umask makes 0600."""
+        """The published mode comes from the explicit chmod, not from the umask."""
         self.run_step(1, umask=0o077)
         path, value = self.published()
         self.assertEqual(value, "1")
@@ -297,7 +303,7 @@ class ExitCodeArtifactTests(unittest.TestCase):
         existing.write_text(SECRET, encoding="utf-8")
         existing.chmod(0o400)
         # Restrictive umask too, so the mode assertion below is load-bearing
-        # rather than something a 0022 umask would have produced anyway.
+        # rather than something the ambient umask would have produced anyway.
         self.run_step(42, umask=0o077)
         path, value = self.published()
         self.assertEqual(value, "42")
@@ -307,39 +313,76 @@ class ExitCodeArtifactTests(unittest.TestCase):
         """Run the step with SHARED_DIR read-only, so both writes fail."""
         self.shared.chmod(0o500)
         self.addCleanup(self.shared.chmod, 0o700)
-        process = subprocess.run(["bash", str(self.script)], env={
-            "PATH": str(self.bin) + os.pathsep + os.defpath,
-            "HOME": str(self.base), "ARTIFACT_DIR": str(self.artifacts),
-            "SHARED_DIR": str(self.shared), "JOB_NAME": "fixture", "BUILD_ID": "1",
-            "OCM_FVT_JOB_NAME": "fixture", "FIXTURE_DIR": str(self.base),
-            "FIXTURE_EXIT": str(exit_code),
-        }, capture_output=True, text=True, timeout=120, check=False)
+        process = self.run_step_raw(exit_code)
         self.assertEqual(process.returncode, exit_code, process.stderr)
         self.assertNotIn(SECRET, process.stdout + process.stderr)
         self.assertFalse((self.shared / EXIT_CODE_ARTIFACT).exists())
         return process
 
     @UNPRIVILEGED
-    def test_a_failed_mirror_does_not_publish_a_stale_status(self):
-        """An artifact already holding 0 must not be published for a suite that failed."""
+    def test_a_failed_shared_write_still_publishes_this_run_s_status(self):
+        """The artifact comes from the run's own status, not from the shared copy."""
         (self.artifacts / EXIT_CODE_ARTIFACT).write_text("0\n", encoding="utf-8")
-        self.run_step_without_a_shared_write()
-        self.assertFalse((self.artifacts / EXIT_CODE_ARTIFACT).exists(),
-                         "a mirror that did not happen must leave no status artifact")
+        process = self.run_step_without_a_shared_write()
+        self.assertEqual(self.published()[1], "42")
+        self.assertIn("WARNING: could not record the ocm-fvt exit status", process.stdout)
 
     @UNPRIVILEGED
-    def test_a_failed_mirror_does_not_follow_an_existing_symlink(self):
+    def test_a_stale_unwritable_shared_status_is_not_republished(self):
+        """A readable 0 this step cannot overwrite must not become the published status.
+
+        The shared copy pre-exists holding 0 at mode 0444, so the step's write
+        to it fails while the file stays readable. Publishing a copy of it
+        would report 0 for a suite that exited 42.
+        """
+        stale = self.shared / EXIT_CODE_ARTIFACT
+        stale.write_text("0\n", encoding="utf-8")
+        stale.chmod(0o444)
+        self.addCleanup(lambda: stale.chmod(0o600) if stale.exists() else None)
+        process = self.run_step_raw(42)
+        self.assertEqual(process.returncode, 42, process.stderr)
+        self.assertNotIn(SECRET, process.stdout + process.stderr)
+        self.assertEqual(self.published()[1], "42")
+        # The stale value is removed, so the OSDFM stage-promotion post step
+        # takes its existing "not found" path instead of reading a 0 that is
+        # not this run's. That step's own behaviour is unchanged.
+        self.assertFalse(stale.exists(),
+                         "a shared status this run could not write must not survive")
+        self.assertIn("WARNING: could not record the ocm-fvt exit status", process.stdout)
+
+    @UNPRIVILEGED
+    def test_a_failed_shared_write_does_not_follow_an_existing_symlink(self):
         """The link is cleared without being followed; its target is untouched."""
         self.outside.chmod(0o600)
         (self.artifacts / EXIT_CODE_ARTIFACT).symlink_to(self.outside)
         self.run_step_without_a_shared_write()
-        self.assertFalse((self.artifacts / EXIT_CODE_ARTIFACT).is_symlink())
-        self.assertFalse((self.artifacts / EXIT_CODE_ARTIFACT).exists())
+        self.assertEqual(self.published()[1], "42")
         self.assertEqual(stat.S_IMODE(self.outside.stat().st_mode), 0o600)
         self.assertEqual(self.outside.read_text(), SECRET)
 
-    def test_published_copy_replaces_a_symlink_to_a_directory(self):
-        """cp resolves such a link to the directory; clearing the name first does not."""
+    @UNPRIVILEGED
+    def test_a_name_that_cannot_be_cleared_is_not_written_through(self):
+        """When rm cannot unlink the name, the exclusive write must refuse it.
+
+        An unwritable ARTIFACT_DIR is the case where rm fails but a plain
+        redirection would still succeed, following the symlink and destroying
+        whatever it points at outside the artifact tree.
+        """
+        self.outside.chmod(0o600)
+        (self.artifacts / EXIT_CODE_ARTIFACT).symlink_to(self.outside)
+        self.artifacts.chmod(0o555)
+        self.addCleanup(self.artifacts.chmod, 0o755)
+        process = self.run_step_raw(42)
+        self.assertEqual(process.returncode, 42, process.stderr)
+        self.assertNotIn(SECRET, process.stdout + process.stderr)
+        self.assertTrue((self.artifacts / EXIT_CODE_ARTIFACT).is_symlink())
+        self.assertEqual(self.outside.read_text(), SECRET)
+        self.assertEqual(stat.S_IMODE(self.outside.stat().st_mode), 0o600)
+        # The in-job handoff is in a different directory and is unaffected.
+        self.assertEqual((self.shared / EXIT_CODE_ARTIFACT).read_text().strip(), "42")
+
+    def test_published_artifact_replaces_a_symlink_to_a_directory(self):
+        """A plain redirection would follow such a link; clearing the name first does not."""
         external = self.base / "external"
         external.mkdir(mode=0o700)
         (external / "pre-existing").write_text(SECRET, encoding="utf-8")
@@ -352,7 +395,7 @@ class ExitCodeArtifactTests(unittest.TestCase):
         self.assertEqual([entry.name for entry in external.iterdir()], ["pre-existing"])
 
     def test_a_directory_at_the_artifact_name_is_left_intact(self):
-        """rm refuses a directory and -T refuses to copy into one."""
+        """rm refuses a directory and the exclusive write refuses to replace one."""
         occupied = self.artifacts / EXIT_CODE_ARTIFACT
         occupied.mkdir()
         # Explicit, because mkdir's mode argument is masked by the umask the
