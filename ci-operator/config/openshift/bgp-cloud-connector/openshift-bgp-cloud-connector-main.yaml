@@ -787,19 +787,50 @@ tests:
     post:
     - ref: osd-ccs-cluster-deprovision
     pre:
-    - ref: osd-ccs-cluster-provision-gcp
-    test:
-    - as: nodes
-      cli: latest
+    - as: profile
       commands: |
-        # PROBE ONLY. e2e-gcp-osd-workload-identity-operator's cluster
-        # settings with ENABLE_WIF=no, to tell whether its workers fail
-        # to join because of workload identity or because of this
-        # profile. Reaching this step at all answers that; the listing
-        # records what joined.
-        oc get clusterversion
-        oc get nodes -o wide
-        oc -n openshift-machine-api get machines -o wide
+        set -uo pipefail
+        # PROBE ONLY. Read-only, before anything is created: what the
+        # profile's credential may read, and what the project already
+        # holds. It never stops early, so one run reports everything.
+        profile="$(mktemp -d)"
+        ln -s "${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json" "${profile}/gce.json"
+        export CLUSTER_PROFILE_DIR="${profile}"
+        source hack/gcp/ci.sh
+        ci_make_workdir
+        trap ci_remove_workdir EXIT
+        ci_gcp_credentials
+        ci_ensure_gcloud
+        project="$(jq -r .project_id "${CLUSTER_PROFILE_DIR}/gce.json")"
+        echo "project $(gcp_project_fingerprint "${project}"), region ${REGION}"
+
+        # getSerialPortOutput is what osd-ccs-gather-gcp-boot-diagnostics
+        # needs and does not know it holds; the rest is what the nodes
+        # step reads.
+        perms=(compute.instances.getSerialPortOutput compute.instances.get
+          compute.instances.list compute.firewalls.list compute.networks.get
+          compute.subnetworks.get iam.serviceAccounts.list
+          iam.workloadIdentityPools.list)
+        echo "== permissions"
+        if held="$(gcp_permissions_held "${project}" "${perms[@]}")"; then
+          for p in "${perms[@]}"; do
+            if grep -Fxq -- "${p}" <<<"${held}"; then echo "  granted  ${p}"; else echo "  DENIED   ${p}"; fi
+          done
+        else
+          echo "  could not ask GCP"
+        fi
+
+        echo "== instances in the project, by zone and status"
+        gcloud compute instances list --project "${project}" --format='value(zone.basename(),status)' \
+          | sort | uniq -c | sed 's/^/  /' || echo "  could not list instances"
+        echo "== workload identity pools in the project, by state"
+        gcloud iam workload-identity-pools list --project "${project}" --location=global \
+          --show-deleted --format='value(state)' | sort | uniq -c | sed 's/^/  /' \
+          || echo "  could not list pools"
+        exit 0
+      env:
+      - default: us-east1
+        name: REGION
       from: e2e-runner
       grace_period: 1m0s
       resources:
@@ -807,6 +838,62 @@ tests:
           cpu: 100m
           memory: 200Mi
       timeout: 10m0s
+    - ref: osd-ccs-cluster-provision-gcp
+    test:
+    - as: nodes
+      cli: latest
+      commands: |
+        set -uo pipefail
+        # PROBE ONLY. e2e-gcp-osd-workload-identity-operator's cluster
+        # settings with ENABLE_WIF=no, to tell whether its workers fail
+        # to join because of workload identity or because of this
+        # profile. Reaching this step at all answers that. What follows
+        # records how a cluster whose workers joined is put together,
+        # for comparison with a WIF cluster; it prints no instance
+        # metadata, which carries the ignition config.
+        oc get clusterversion
+        oc get clusteroperators
+        oc get nodes -o wide
+        oc get csr --no-headers | awk '{print $NF}' | sort | uniq -c
+        oc -n openshift-machine-api get machinesets,machines -o wide
+        echo "== worker machineset providerSpec"
+        oc -n openshift-machine-api get machinesets -o json | jq '.items[]
+          | {name: .metadata.name, spec: (.spec.template.spec.providerSpec.value
+          | {machineType, region, zone, serviceAccounts, tags, networkInterfaces,
+             disks: [.disks[]? | {image, type, sizeGb}], shieldedInstanceConfig,
+             confidentialCompute, onHostMaintenance})}'
+
+        profile="$(mktemp -d)"
+        ln -s "${CLUSTER_PROFILE_DIR}/osd-ccs-gcp.json" "${profile}/gce.json"
+        export CLUSTER_PROFILE_DIR="${profile}"
+        source hack/gcp/ci.sh
+        ci_make_workdir
+        trap ci_remove_workdir EXIT
+        ci_gcp_credentials
+        ci_ensure_gcloud
+        project="$(jq -r .project_id "${CLUSTER_PROFILE_DIR}/gce.json")"
+        infra="$(oc get infrastructure cluster -o jsonpath='{.status.infrastructureName}')"
+        echo "== this cluster's instances in GCP (${infra})"
+        gcloud compute instances list --project "${project}" --filter="name~^${infra}-" --format=json \
+          | jq '.[] | {name, status, machineType: (.machineType | split("/")[-1]),
+              zone: (.zone | split("/")[-1]), tags: .tags.items,
+              serviceAccounts: [.serviceAccounts[]? | {email, scopes}],
+              network: [.networkInterfaces[]? | {network: (.network | split("/")[-1]),
+                subnetwork: (.subnetwork | split("/")[-1])}],
+              metadataKeys: [.metadata.items[]?.key]}' \
+          || echo "  could not list instances"
+        echo "== firewall rules naming ${infra}"
+        gcloud compute firewall-rules list --project "${project}" --filter="name~${infra}" \
+          --format='table(name,direction,sourceRanges.list(),sourceTags.list(),targetTags.list(),allowed[].map().firewall_rule().list())' \
+          || echo "  could not list firewall rules"
+        exit 0
+      from: e2e-runner
+      grace_period: 1m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 15m0s
 - as: e2e-rosa-operator
   skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
