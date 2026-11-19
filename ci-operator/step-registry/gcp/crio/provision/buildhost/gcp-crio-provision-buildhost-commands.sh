@@ -40,6 +40,18 @@ curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -
 #####################################
 #########Save Login As Script###########
 #####################################
+if [[ "${CRIO_JOBS2_WIF:-false}" == true ]]; then
+  source "${SHARED_DIR}/jobs2-login.sh"
+  # The test and gather pods can leave build07 through different addresses.
+  cat > "${SHARED_DIR}/login_script.sh" <<'LOGIN'
+#!/bin/bash
+set -euo pipefail
+source "${SHARED_DIR}/jobs2-login.sh"
+cidr=$(jobs2_ssh_source)
+gcloud compute firewall-rules update "${NAMESPACE}-${UNIQUE_HASH}-buildhost-ingress-allow" --source-ranges="$cidr"
+LOGIN
+  chmod +x "${SHARED_DIR}/login_script.sh"
+else
 cat >"${SHARED_DIR}/login_script.sh" <<EOF
     #!/bin/sh
     ####################################
@@ -74,6 +86,7 @@ sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
 if ! gcloud auth list | grep -E "\*\s+${sa_email}"; then
 	gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
 	gcloud config set project "${GOOGLE_PROJECT_ID}"
+fi
 fi
 
 # TODO: temporary workaround for GCP us-central1 capacity exhaustion
@@ -118,10 +131,17 @@ if [[ "${USE_IGNITION:-false}" == "true" ]]; then
 	}' >"${workdir}/user-data.ign"
 	USER_DATA_ARGS="--metadata-from-file=user-data=${workdir}/user-data.ign"
 fi
+vm_identity=()
+firewall_source=()
+if [[ "${CRIO_JOBS2_WIF:-false}" == true ]]; then
+  vm_identity=(--no-service-account --no-scopes)
+  cidr=$(jobs2_ssh_source)
+  firewall_source=("--source-ranges=$cidr")
+fi
 CREATED_ZONE=""
 for zone in ${ZONES}; do
 	echo "Trying zone ${zone}..."
-	if gcloud compute instances create "${server_name}" \
+	if gcloud compute instances create "${server_name}" "${vm_identity[@]}" \
 		${IMAGE_ARGS} \
 		--boot-disk-type hyperdisk-balanced \
 		--boot-disk-size=${BOOT_DISK_SIZE:-200GB} \
@@ -146,7 +166,7 @@ fi
 ZONE_0="${CREATED_ZONE}"
 echo "Created Server instance in zone ${ZONE_0}"
 
-gcloud compute firewall-rules create "${server_name}-ingress-allow" \
+gcloud compute firewall-rules create "${server_name}-ingress-allow" "${firewall_source[@]}" \
 	--network ${NETWORK} \
 	--allow tcp:22,icmp \
 	--target-tags="${server_name}"
