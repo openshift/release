@@ -145,6 +145,15 @@ chain:
       if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
         source "${SHARED_DIR}/proxy-conf.sh"
       fi
+      if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
+        # The Nutanix API name is under openshift.com, but CI must reach its private IP through Squid.
+        for proxy_var in NO_PROXY no_proxy; do
+          proxy_list=",${!proxy_var},"
+          proxy_list="${proxy_list//,openshift.com,/,}"
+          proxy_list="${proxy_list#,}"
+          export "${proxy_var}=${proxy_list%,}"
+        done
+      fi
       if [ -f "${SHARED_DIR}/ds-vars.conf" ] ; then
         source "${SHARED_DIR}/ds-vars.conf"
       fi
