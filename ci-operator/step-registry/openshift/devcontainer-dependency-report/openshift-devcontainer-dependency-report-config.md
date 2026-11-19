@@ -108,7 +108,7 @@
           "name": "gotestsum",
           "classification": "pinned",
           "file": ".devcontainer/Dockerfile",
-          "extract": {"kind": "regex", "pattern": "gotest\\.tools/gotestsum@v(?P<version>\\S+)(?=$|\\s)"},
+          "extract": {"kind": "regex", "pattern": "(?P<quote>[\"']?)gotest\\.tools/gotestsum@v(?P<version>[^\"'\\s]+)(?P=quote)(?=$|\\s)"},
           "source": "gotestsum",
           "policy": {"min_inclusive": "1.0.0", "max_exclusive": "2.0.0"},
           "rationale": "Report a stable 1.x candidate only; maintainers must validate repository tests."
@@ -117,7 +117,7 @@
           "name": "gopls",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "golang\\.org/x/tools/gopls@v(?P<version>\\S+)(?=$|\\s)"},
+          "extract": {"kind": "regex", "pattern": "(?P<quote>[\"']?)golang\\.org/x/tools/gopls@v(?P<version>[^\"'\\s]+)(?P=quote)(?=$|\\s)"},
           "source": "gopls",
           "policy": {"min_inclusive": "0.21.0", "max_exclusive": "0.22.0"},
           "rationale": "Report a stable candidate only within the explicitly approved 0.21 line."
@@ -126,7 +126,7 @@
           "name": "delve",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "github\\.com/go-delve/delve/cmd/dlv@v(?P<version>\\S+)(?=$|\\s)"},
+          "extract": {"kind": "regex", "pattern": "(?P<quote>[\"']?)github\\.com/go-delve/delve/cmd/dlv@v(?P<version>[^\"'\\s]+)(?P=quote)(?=$|\\s)"},
           "source": "delve",
           "policy": {"min_inclusive": "1.27.0", "max_exclusive": "2.0.0"},
           "rationale": "Report a stable 1.x candidate only; maintainers must validate debugger support."
@@ -135,7 +135,7 @@
           "name": "staticcheck",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "honnef\\.co/go/tools/cmd/staticcheck@v(?P<version>\\S+)(?=$|\\s)"},
+          "extract": {"kind": "regex", "pattern": "(?P<quote>[\"']?)honnef\\.co/go/tools/cmd/staticcheck@v(?P<version>[^\"'\\s]+)(?P=quote)(?=$|\\s)"},
           "source": "staticcheck",
           "policy": {"min_inclusive": "0.7.0", "max_exclusive": "0.8.0"},
           "rationale": "Report a stable candidate only within the explicitly approved 0.7 line."
@@ -248,7 +248,7 @@
           "name": "gotestsum",
           "classification": "pinned",
           "file": ".devcontainer/Dockerfile",
-          "extract": {"kind": "regex", "pattern": "gotest\\.tools/gotestsum@v(?P<version>\\S+)(?=$|\\s)"},
+          "extract": {"kind": "regex", "pattern": "(?P<quote>[\"']?)gotest\\.tools/gotestsum@v(?P<version>[^\"'\\s]+)(?P=quote)(?=$|\\s)"},
           "source": "gotestsum",
           "policy": {"min_inclusive": "1.0.0", "max_exclusive": "2.0.0"},
           "rationale": "Report a stable 1.x candidate only; maintainers must validate repository tests."
@@ -257,7 +257,7 @@
           "name": "gopls",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "golang\\.org/x/tools/gopls@v(?P<version>\\S+)(?=$|\\s)"},
+          "extract": {"kind": "regex", "pattern": "(?P<quote>[\"']?)golang\\.org/x/tools/gopls@v(?P<version>[^\"'\\s]+)(?P=quote)(?=$|\\s)"},
           "source": "gopls",
           "policy": {"min_inclusive": "0.21.0", "max_exclusive": "0.22.0"},
           "rationale": "Report a stable candidate only within the explicitly approved 0.21 line."
@@ -266,7 +266,7 @@
           "name": "delve",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "github\\.com/go-delve/delve/cmd/dlv@v(?P<version>\\S+)(?=$|\\s)"},
+          "extract": {"kind": "regex", "pattern": "(?P<quote>[\"']?)github\\.com/go-delve/delve/cmd/dlv@v(?P<version>[^\"'\\s]+)(?P=quote)(?=$|\\s)"},
           "source": "delve",
           "policy": {"min_inclusive": "1.27.0", "max_exclusive": "2.0.0"},
           "rationale": "Report a stable 1.x candidate only; maintainers must validate debugger support."
@@ -275,7 +275,7 @@
           "name": "staticcheck",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "honnef\\.co/go/tools/cmd/staticcheck@v(?P<version>\\S+)(?=$|\\s)"},
+          "extract": {"kind": "regex", "pattern": "(?P<quote>[\"']?)honnef\\.co/go/tools/cmd/staticcheck@v(?P<version>[^\"'\\s]+)(?P=quote)(?=$|\\s)"},
           "source": "staticcheck",
           "policy": {"min_inclusive": "0.7.0", "max_exclusive": "0.8.0"},
           "rationale": "Report a stable candidate only within the explicitly approved 0.7 line."
@@ -399,7 +399,7 @@
           "name": "gopls",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "golang\\.org/x/tools/gopls@v(?P<version>\\S+)(?=$|\\s)"},
+          "extract": {"kind": "regex", "pattern": "(?P<quote>[\"']?)golang\\.org/x/tools/gopls@v(?P<version>[^\"'\\s]+)(?P=quote)(?=$|\\s)"},
           "source": "gopls",
           "policy": {"min_inclusive": "0.21.0", "max_exclusive": "0.22.0"},
           "rationale": "Report a stable candidate only within the explicitly approved 0.21 line."
@@ -408,7 +408,7 @@
           "name": "delve",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "github\\.com/go-delve/delve/cmd/dlv@v(?P<version>\\S+)(?=$|\\s)"},
+          "extract": {"kind": "regex", "pattern": "(?P<quote>[\"']?)github\\.com/go-delve/delve/cmd/dlv@v(?P<version>[^\"'\\s]+)(?P=quote)(?=$|\\s)"},
           "source": "delve",
           "policy": {"min_inclusive": "1.27.0", "max_exclusive": "2.0.0"},
           "rationale": "Report a stable 1.x candidate only; maintainers must validate debugger support."
@@ -417,7 +417,7 @@
           "name": "staticcheck",
           "classification": "pinned",
           "file": ".devcontainer/post-create.sh",
-          "extract": {"kind": "regex", "pattern": "honnef\\.co/go/tools/cmd/staticcheck@v(?P<version>\\S+)(?=$|\\s)"},
+          "extract": {"kind": "regex", "pattern": "(?P<quote>[\"']?)honnef\\.co/go/tools/cmd/staticcheck@v(?P<version>[^\"'\\s]+)(?P=quote)(?=$|\\s)"},
           "source": "staticcheck",
           "policy": {"min_inclusive": "0.7.0", "max_exclusive": "0.8.0"},
           "rationale": "Report a stable candidate only within the explicitly approved 0.7 line."

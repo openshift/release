@@ -20,6 +20,8 @@ The registry resolver delivers the checker script through the ci-operator
 configuration. The script fetches the shared policy from public
 `openshift/release` at an exact revision: the release pull revision from
 `JOB_SPEC` in a rehearsal, or the resolved `main` revision in a normal periodic.
+For a fork-based rehearsal, the report records the validated public fork as the
+policy repository alongside that exact pull revision.
 The target source is not downloaded again: ci-operator builds `agentic-dev` from
 the selected job ref and that image places the repository at `/workspace`.
 The checker reads declarations only from that local directory and records the
@@ -39,6 +41,14 @@ python3 ci-operator/step-registry/openshift/devcontainer-dependency-report/opens
   --policy-revision "${revision}" \
   --output-dir /tmp/devcontainer-dependency-report
 ```
+
+An on-demand run reads the selected local working-tree files. It records the
+local `HEAD` as the base revision and records whether those inventoried files
+are clean or dirty as `local-working-tree-clean` or
+`local-working-tree-dirty`; it never describes working-tree content as commit
+content. If `--repository-revision` is supplied, it must match local `HEAD`.
+Prow runs instead record `job-spec-exact`, because ci-operator builds the source
+image from the exact target revision in `JOB_SPEC`.
 
 ## Rehearsal procedure
 
@@ -72,7 +82,9 @@ with a log summary ending in `errors=0`, and both
 selected repository and record both the policy and target revisions. This
 procedure is the dry run; the checker has no publication or mutation mode.
 
-The checker uses only the Python standard library. Inventory and extraction
-policy live in `openshift-devcontainer-dependency-report-config.md` (raw JSON with
-a registry-compatible documentation extension); add a new repository
-or declaration there rather than adding repository-specific code.
+The checker is syntax-compatible with Python 3.9 and uses only the standard
+library. Current `agentic-dev` images install the distribution Python from their
+Fedora 44 base. Inventory and extraction policy live in
+`openshift-devcontainer-dependency-report-config.md` (raw JSON with a
+registry-compatible documentation extension); add a new repository or
+declaration there rather than adding repository-specific code.

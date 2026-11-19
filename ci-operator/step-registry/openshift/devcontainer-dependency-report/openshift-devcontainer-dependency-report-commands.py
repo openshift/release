@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Report public devcontainer dependency versions without changing repositories."""
 
+# Keep annotations and UTC handling compatible with Python 3.9.
+# ruff: noqa: UP007, UP017, UP045
+
 from __future__ import annotations
 
 import argparse
@@ -10,11 +13,12 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional, Union
 
 STABLE_COMPONENT = r"(?:0|[1-9]\d*)"
 STABLE_VERSION = re.compile(
@@ -30,10 +34,73 @@ POLICY_PATH = (
 )
 REPOSITORY_NAME = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
+GITHUB_API_PATH = re.compile(
+    r"^/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
+    r"(?:commits/[^/]+|pulls/[1-9]\d*|releases|tags)$"
+)
+RAW_GITHUB_PATH = re.compile(r"^/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/[0-9a-f]{40}/.+$")
+NPM_PATH = re.compile(
+    r"^/(?:[A-Za-z0-9_.~-]+|@[A-Za-z0-9_.~-]+%2[fF][A-Za-z0-9_.~-]+)$"
+)
+PYPI_PATH = re.compile(r"^/pypi/[A-Za-z0-9_.-]+/json$")
 
 
 class CheckError(RuntimeError):
     """An expected lookup, extraction, or policy failure."""
+
+
+def parsed_public_https_url(url: str) -> urllib.parse.SplitResult:
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        port = parsed.port
+    except (TypeError, ValueError) as exc:
+        raise CheckError(f"invalid lookup URL {url!r}: {exc}") from exc
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise CheckError("lookup URL must use public HTTPS")
+    if parsed.username is not None or parsed.password is not None:
+        raise CheckError("lookup URL must not contain credentials")
+    if port not in {None, 443}:
+        raise CheckError("lookup URL must not use a nonstandard port")
+    if parsed.fragment:
+        raise CheckError("lookup URL must not include a fragment")
+    return parsed
+
+
+def validate_lookup_url(url: str) -> None:
+    parsed = parsed_public_https_url(url)
+    host = parsed.hostname.lower()
+    query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+    if host == "api.github.com":
+        if not GITHUB_API_PATH.fullmatch(parsed.path):
+            raise CheckError("GitHub API lookup URL has an unsupported path")
+        if any(key not in {"page", "per_page"} for key, _ in query):
+            raise CheckError("GitHub API lookup URL has unsupported query parameters")
+        if any(not value.isdigit() for _, value in query):
+            raise CheckError("GitHub API pagination values must be integers")
+        return
+    if query:
+        raise CheckError("lookup URL must not include query parameters")
+    if host == "raw.githubusercontent.com" and RAW_GITHUB_PATH.fullmatch(parsed.path):
+        return
+    if host == "registry.npmjs.org" and NPM_PATH.fullmatch(parsed.path):
+        return
+    if host == "pypi.org" and PYPI_PATH.fullmatch(parsed.path):
+        return
+    raise CheckError(f"lookup URL uses an unsupported public endpoint: {url}")
+
+
+class ValidatingRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> Optional[urllib.request.Request]:
+        validate_lookup_url(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def parse_version(value: str, prefix: str = "") -> tuple[int, int, int]:
@@ -72,8 +139,10 @@ def extract_current(content: str, dependency: dict[str, Any]) -> str:
 class Fetcher:
     def __init__(self) -> None:
         self.cache: dict[str, Any] = {}
+        self.opener = urllib.request.build_opener(ValidatingRedirectHandler())
 
     def get(self, url: str, *, as_json: bool) -> Any:
+        validate_lookup_url(url)
         if url in self.cache:
             return self.cache[url]
         request = urllib.request.Request(
@@ -84,7 +153,8 @@ class Fetcher:
             },
         )
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
+            with self.opener.open(request, timeout=30) as response:
+                validate_lookup_url(response.geturl())
                 body = response.read().decode("utf-8")
         except (OSError, UnicodeError, urllib.error.HTTPError) as exc:
             raise CheckError(f"lookup failed for {url}: {exc}") from exc
@@ -123,7 +193,7 @@ def resolve_github_revision(repository: str, ref: str, fetcher: Fetcher) -> str:
     return revision
 
 
-def job_spec_repository_revision(repository: str, requested_ref: str) -> str | None:
+def job_spec_repository_revision(repository: str, requested_ref: str) -> Optional[str]:
     job_spec = os.environ.get("JOB_SPEC")
     if not job_spec:
         return None
@@ -185,23 +255,53 @@ def local_repository_revision(repository_root: Path) -> str:
     return revision
 
 
+def local_inventory_source(repository_root: Path, file_paths: list[str]) -> str:
+    try:
+        completed = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repository_root),
+                "status",
+                "--porcelain=v1",
+                "--untracked-files=all",
+                "--",
+                *sorted(set(file_paths)),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise CheckError(f"could not inspect the local working tree: {exc}") from exc
+    if completed.returncode != 0:
+        raise CheckError("could not inspect the local working tree")
+    state = "dirty" if completed.stdout else "clean"
+    return f"local-working-tree-{state}"
+
+
 def selected_repository_revision(
     repository: str,
     requested_ref: str,
     repository_root: Path,
-    explicit_revision: str | None,
-) -> str:
-    if explicit_revision:
-        if not COMMIT_SHA.fullmatch(explicit_revision):
-            raise CheckError("--repository-revision must be a 40-character commit SHA")
-        return explicit_revision
+    explicit_revision: Optional[str],
+    file_paths: list[str],
+) -> tuple[str, str]:
+    if explicit_revision and not COMMIT_SHA.fullmatch(explicit_revision):
+        raise CheckError("--repository-revision must be a 40-character commit SHA")
     job_revision = job_spec_repository_revision(repository, requested_ref)
     if job_revision:
-        return job_revision
-    return local_repository_revision(repository_root)
+        if explicit_revision and explicit_revision != job_revision:
+            raise CheckError("--repository-revision does not match JOB_SPEC")
+        return job_revision, "job-spec-exact"
+    local_revision = local_repository_revision(repository_root)
+    if explicit_revision and explicit_revision != local_revision:
+        raise CheckError("--repository-revision does not match local HEAD")
+    return local_revision, local_inventory_source(repository_root, file_paths)
 
 
-def rehearsal_policy_source(fetcher: Fetcher) -> tuple[str, str] | None:
+def rehearsal_policy_source(fetcher: Fetcher) -> Optional[tuple[str, str]]:
     job_spec = os.environ.get("JOB_SPEC")
     if not job_spec:
         return None
@@ -397,10 +497,35 @@ def latest_allowed(
     return rendered, parsed
 
 
+def validate_source_url(source_name: str, source: dict[str, Any]) -> None:
+    kind = source.get("kind")
+    url = source.get("url")
+    if not isinstance(kind, str) or not isinstance(url, str):
+        raise CheckError(f"source {source_name!r} requires kind and URL strings")
+    validate_lookup_url(url)
+    parsed = urllib.parse.urlsplit(url)
+    if kind in {"github_releases", "github_tags"}:
+        github_page_url(url, kind, 1)
+        return
+    expected_host = {"npm": "registry.npmjs.org", "pypi": "pypi.org"}.get(kind)
+    if expected_host is None:
+        raise CheckError(f"source {source_name!r} has unsupported kind {kind!r}")
+    if parsed.hostname != expected_host:
+        raise CheckError(
+            f"source {source_name!r} kind {kind!r} requires host {expected_host}"
+        )
+
+
 def validate_config(config: dict[str, Any]) -> None:
     if config.get("schema_version") != 1:
         raise CheckError("only config schema_version 1 is supported")
     sources = config.get("sources", {})
+    if not isinstance(sources, dict):
+        raise CheckError("config sources must be an object")
+    for source_name, source in sources.items():
+        if not isinstance(source_name, str) or not isinstance(source, dict):
+            raise CheckError("each source requires a string name and object value")
+        validate_source_url(source_name, source)
     repositories = config.get("repositories")
     if not isinstance(repositories, list) or not repositories:
         raise CheckError("config must contain at least one repository")
@@ -501,8 +626,8 @@ def selected_config(
     config: dict[str, Any],
     repository_name: str,
     repository_root: Path,
-    explicit_revision: str | None,
-) -> tuple[dict[str, Any], str, str]:
+    explicit_revision: Optional[str],
+) -> tuple[dict[str, Any], str, str, str]:
     validate_config(config)
     matches = [
         repository
@@ -515,19 +640,34 @@ def selected_config(
         )
     repository = dict(matches[0])
     requested_ref = repository["ref"]
-    revision = selected_repository_revision(
-        repository_name, requested_ref, repository_root, explicit_revision
+    file_paths = [dependency["file"] for dependency in repository["dependencies"]]
+    revision, inventory_source = selected_repository_revision(
+        repository_name,
+        requested_ref,
+        repository_root,
+        explicit_revision,
+        file_paths,
     )
     repository["revision"] = revision
-    return {**config, "repositories": [repository]}, requested_ref, revision
+    return (
+        {**config, "repositories": [repository]},
+        requested_ref,
+        revision,
+        inventory_source,
+    )
 
 
 def repository_file(repository_root: Path, file_path: str) -> Path:
     relative = Path(file_path)
     if relative.is_absolute() or ".." in relative.parts:
         raise CheckError(f"repository file must be a safe relative path: {file_path!r}")
-    root = repository_root.resolve()
-    candidate = (root / relative).resolve()
+    try:
+        root = repository_root.resolve()
+        candidate = (root / relative).resolve()
+    except (OSError, RuntimeError) as exc:
+        raise CheckError(
+            f"could not resolve local repository file {file_path!r}: {exc}"
+        ) from exc
     try:
         candidate.relative_to(root)
     except ValueError as exc:
@@ -538,8 +678,13 @@ def repository_file(repository_root: Path, file_path: str) -> Path:
 
 
 def ensure_output_outside_repository(output_dir: Path, repository_root: Path) -> None:
-    root = repository_root.resolve()
-    output = output_dir.resolve()
+    try:
+        root = repository_root.resolve()
+        output = output_dir.resolve()
+    except (OSError, RuntimeError) as exc:
+        raise CheckError(
+            f"could not resolve repository or output directory: {exc}"
+        ) from exc
     try:
         output.relative_to(root)
     except ValueError:
@@ -547,6 +692,29 @@ def ensure_output_outside_repository(output_dir: Path, repository_root: Path) ->
     raise CheckError(
         f"output directory {output} is inside target repository {root}; refusing to write"
     )
+
+
+def atomic_write_text(destination: Path, content: str) -> None:
+    temporary: Optional[Path] = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=destination.parent,
+            prefix=f".{destination.name}.",
+            delete=False,
+        ) as stream:
+            temporary = Path(stream.name)
+            stream.write(content)
+        temporary.chmod(0o644)
+        temporary.replace(destination)
+    except BaseException:
+        if temporary is not None:
+            try:
+                temporary.unlink()
+            except OSError:
+                pass
+        raise
 
 
 def check(
@@ -559,7 +727,7 @@ def check(
     results: list[dict[str, Any]] = []
     source_cache: dict[tuple[str, str, str], tuple[str, tuple[int, int, int]]] = {}
     for repository in config["repositories"]:
-        file_cache: dict[str, str | CheckError] = {}
+        file_cache: dict[str, Union[str, CheckError]] = {}
         for dependency in repository["dependencies"]:
             file_path = dependency["file"]
             row: dict[str, Any] = {
@@ -649,18 +817,20 @@ def write_reports(
     results: list[dict[str, Any]],
     output_dir: Path,
     *,
+    policy_repository: str,
     policy_revision: str,
     repository: str,
     requested_ref: str,
     repository_revision: str,
+    inventory_source: str,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    generated_at = dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat()
+    generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
     document = {
         "schema_version": 1,
         "generated_at": generated_at,
         "policy": {
-            "repository": POLICY_REPOSITORY,
+            "repository": policy_repository,
             "path": POLICY_PATH,
             "revision": policy_revision,
         },
@@ -668,11 +838,13 @@ def write_reports(
             "name": repository,
             "requested_ref": requested_ref,
             "revision": repository_revision,
+            "inventory_source": inventory_source,
         },
         "results": results,
     }
-    (output_dir / "devcontainer-dependency-report.json").write_text(
-        json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    atomic_write_text(
+        output_dir / "devcontainer-dependency-report.json",
+        json.dumps(document, indent=2, sort_keys=True) + "\n",
     )
     counts: dict[str, int] = {}
     for row in results:
@@ -682,9 +854,11 @@ def write_reports(
         "",
         f"Generated: {generated_at}",
         "",
-        f"Policy revision: `{POLICY_REPOSITORY}@{policy_revision}`",
+        f"Policy revision: `{policy_repository}@{policy_revision}`",
         "",
         f"Repository revision: `{repository}@{repository_revision}` (requested `{requested_ref}`)",
+        "",
+        f"Inventory source: `{inventory_source}`",
         "",
         "This report is advisory. It does not claim compatibility or modify dependencies.",
         "",
@@ -720,8 +894,8 @@ def write_reports(
             )
             + " |"
         )
-    (output_dir / "devcontainer-dependency-report.md").write_text(
-        "\n".join(lines) + "\n", encoding="utf-8"
+    atomic_write_text(
+        output_dir / "devcontainer-dependency-report.md", "\n".join(lines) + "\n"
     )
 
 
@@ -743,7 +917,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     )
     parser.add_argument(
         "--repository-revision",
-        help="exact local repository commit (normally read from JOB_SPEC or git)",
+        help="exact revision assertion; must match JOB_SPEC or local HEAD",
     )
     parser.add_argument("--config", type=Path, help="use a local policy file")
     parser.add_argument(
@@ -757,7 +931,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(argv or sys.argv[1:])
     fetcher = Fetcher()
     try:
@@ -765,6 +939,7 @@ def main(argv: list[str] | None = None) -> int:
             raise CheckError(
                 "--repository or DEVCONTAINER_DEPENDENCY_REPOSITORY is required"
             )
+        policy_source_repository = POLICY_REPOSITORY
         if args.config:
             if not args.policy_revision:
                 raise CheckError("--policy-revision is required with --config")
@@ -776,7 +951,6 @@ def main(argv: list[str] | None = None) -> int:
             if args.policy_revision:
                 raise CheckError("--policy-revision may only be used with --config")
             rehearsal_source = rehearsal_policy_source(fetcher)
-            policy_source_repository = POLICY_REPOSITORY
             if rehearsal_source:
                 policy_source_repository, policy_revision = rehearsal_source
             else:
@@ -788,7 +962,9 @@ def main(argv: list[str] | None = None) -> int:
                 as_json=False,
             )
         config = json.loads(config_text)
-        config, requested_ref, repository_revision = selected_config(
+        if not isinstance(config, dict):
+            raise CheckError("policy document root must be an object")
+        config, requested_ref, repository_revision, inventory_source = selected_config(
             config,
             args.repository,
             args.repository_root,
@@ -802,10 +978,12 @@ def main(argv: list[str] | None = None) -> int:
     write_reports(
         results,
         args.output_dir,
+        policy_repository=policy_source_repository,
         policy_revision=policy_revision,
         repository=args.repository,
         requested_ref=requested_ref,
         repository_revision=repository_revision,
+        inventory_source=inventory_source,
     )
     for row in results:
         suffix = f": {row['error']}" if row["error"] else ""
