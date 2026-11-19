@@ -1,0 +1,34 @@
+workflow:
+  as: agent-sandbox-peerpods-e2e-aws
+  steps:
+    env:
+      OSC_INSTALL: "true"
+      AGENT_SANDBOX_INSTALL: "true"
+      SANDBOX_RUNTIME_CLASS: "kata-remote"
+      ENABLEPEERPODS: "true"
+      RUNTIMECLASS: "kata-remote"
+      WORKLOAD_TO_TEST: "peer-pods"
+      COMPUTE_NODE_TYPE: "t3a.xlarge"
+      COMPUTE_NODE_REPLICAS: "2"
+      SPOT_INSTANCES: "false"
+    pre:
+    - chain: ipi-conf-aws
+    - chain: aws-provision-iam-user-minimal-permission
+    - ref: sandboxed-containers-operator-aws-region-override
+    - chain: ipi-install
+    - ref: sandboxed-containers-operator-peerpods-param-cm
+    - ref: sandboxed-containers-operator-env-cm
+    - ref: sandboxed-containers-operator-install-osc-operator
+    - ref: agent-sandbox-install-operator
+    test:
+    - ref: agent-sandbox-e2e-test
+    post:
+    - ref: sandboxed-containers-operator-gather-must-gather
+      best_effort: true
+      optional_on_success: true
+    - chain: ipi-aws-post
+  documentation: |-
+    Provisions an AWS OCP cluster, configures peer-pods networking and
+    security groups, installs OSC (kata-remote runtime) and the
+    agent-sandbox operator, then runs runtime-class e2e tests against
+    peer-pod sandboxes.
