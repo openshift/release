@@ -18,34 +18,40 @@ check_pods_running() {
   local namespace=$1
 
   echo "$(date -u --rfc-3339=seconds) - Checking pod health in namespace ${namespace}..."
-  local pods_json
-  if ! pods_json=$(oc get pods -n "${namespace}" -o json 2>&1); then
+  # One line per pod: "<name> <phase> <ready>,<ready>,..." -- parsed with
+  # plain bash below. Deliberately no jq: this step runs from the cli image,
+  # which does not ship it (a rehearsal failed with "jq: command not found",
+  # exit 127). jsonpath is served by oc itself, so it is always present.
+  local pods
+  if ! pods=$(oc get pods -n "${namespace}" -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.phase}{" "}{range .status.containerStatuses[*]}{.ready}{","}{end}{"\n"}{end}' 2>&1); then
     echo "$(date -u --rfc-3339=seconds) - ERROR: failed to list pods in ${namespace}"
-    echo "${pods_json}"
+    echo "${pods}"
     VALIDATION_FAILED=1
     return
   fi
 
-  local pod_count
-  pod_count=$(jq -r '.items | length' <<< "${pods_json}")
-  if [[ "${pod_count}" -eq 0 ]]; then
+  if [[ -z "${pods//[[:space:]]/}" ]]; then
     echo "$(date -u --rfc-3339=seconds) - ERROR: no pods found in ${namespace}"
     VALIDATION_FAILED=1
     return
   fi
 
-  local not_ready
-  # A pod with no containerStatuses (e.g. still initializing) is treated as
-  # not ready too, rather than vacuously passing because no container was
-  # found to be explicitly not-ready.
-  not_ready=$(jq -r '
-    .items[] |
-    select(
-      .status.phase != "Running" or
-      ((.status.containerStatuses // []) | length == 0) or
-      ((.status.containerStatuses // []) | any(.ready == false))
-    ) |
-    .metadata.name' <<< "${pods_json}")
+  local not_ready=""
+  local name phase readies
+  while IFS= read -r line; do
+    [[ -z "${line//[[:space:]]/}" ]] && continue
+    name=""
+    phase=""
+    readies=""
+    read -r name phase readies <<< "${line}"
+    # A pod with no containerStatuses (e.g. still initializing) arrives with
+    # an empty readies list and is treated as not ready too, rather than
+    # vacuously passing because no container was found to be explicitly
+    # not-ready.
+    if [[ "${phase}" != "Running" || -z "${readies//,/}" || "${readies}" == *false* ]]; then
+      not_ready+="${name}"$'\n'
+    fi
+  done <<< "${pods}"
 
   if [[ -n "${not_ready}" ]]; then
     echo "$(date -u --rfc-3339=seconds) - ERROR: unhealthy pod(s) in ${namespace}:"
