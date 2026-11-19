@@ -3,6 +3,11 @@ set -euo pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
+# Make sure we use the injected cli, rather than the one from the base image
+export PATH="${CLI_DIR:-/cli}:${PATH}"
+command -v oc
+oc version --client
+
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
   # shellcheck disable=SC1090
   source "${SHARED_DIR}/proxy-conf.sh"
