@@ -14,6 +14,19 @@ Assumes an ACM hub is already reachable (`KUBECONFIG` from CI Operator).
 6. Wait for `ClusterDeployment` condition **Provisioned=True** (`ACM_SPOKE_INSTALL_TIMEOUT_MINUTES`).
 7. Write `${SHARED_DIR}/managed-cluster-kubeconfig` and `${SHARED_DIR}/managed.cluster.metadata.json`.
 
+## Nightly image policy
+
+When the job sets `OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true`
+(same env as hub IPI), this step:
+
+1. Builds a spoke `ClusterImageSet` from the hub `ClusterVersion` release image.
+2. Injects that env into `ClusterDeployment.spec.provisioning.installerEnv` so
+   Hive/`openshift-install` can pull unsigned `ocp-v*.0-art-dev` images during
+   bootstrap (without this, masters hit signature rejection / BootstrapFailed).
+3. After provision, marks spoke `openshift` ClusterImagePolicy unmanaged.
+
+SSH private key uses Hive field `provisioning.sshPrivateKeySecretRef`.
+
 ## Region
 
 AWS region is **not** a step env var. The job must lease `MANAGED_CLUSTER_LEASED_RESOURCE`; the script exports it as `ACM_SPOKE_CLUSTER_REGION`.
