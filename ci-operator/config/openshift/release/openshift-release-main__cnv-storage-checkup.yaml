@@ -217,6 +217,140 @@ tests:
     - ref: cnv-storage-checkup-snapshot-sources
     workflow: cnv-storage-checkup-gcp
   timeout: 5h0m0s
+- as: storage-checkup-aws-migration
+  cron: 0 3 * * 2
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      CHECKUP_EXPECTED_PROVISIONER: ebs.csi.aws.com
+      CHECKUP_EXPECTED_RESULTS: |-
+        {
+          "vmSnapshot": "(^|\\n)ReadyToUse=true(\\n|$)",
+          "vmRestore": "(^|\\n)Complete=true(\\n|$)"
+        }
+      CHECKUP_JOB_TIMEOUT_SECONDS: "900"
+      CHECKUP_NUM_VMS: "10"
+      CHECKUP_REQUIRE_LIVE_MIGRATION: "true"
+      CHECKUP_STORAGE_CLASS: checkup-ebs-io2
+      CHECKUP_STORAGE_CLASS_PARAMETERS: '{"type":"io2","iops":"1000"}'
+      CHECKUP_TIMEOUT: 10m
+      CHECKUP_VMI_TIMEOUT: 3m
+      CNV_CATALOG_IMAGE: ""
+      CNV_CATALOG_SOURCE: cnv-iib-catalog
+      CNV_OPERATOR_CHANNEL: dev-preview
+      CNV_VERSION: "4.99"
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m8i.4xlarge
+      ZONES_COUNT: "1"
+    pre:
+    - ref: ipi-conf-cpu-manager
+    - chain: ipi-aws-pre
+    - ref: cnv-enable-nested-virtualization-aws
+    - ref: cnv-storage-checkup-pull-secret
+    - ref: cnv-storage-checkup-configure-storage
+    - ref: cnv-deploy-cnv
+    - ref: cnv-storage-checkup-prepare
+    - ref: cnv-storage-checkup-snapshot-sources
+    workflow: cnv-storage-checkup-aws
+  timeout: 5h0m0s
+- as: storage-checkup-azure-migration
+  cron: 0 6 * * 2
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      CHECKUP_EXPECTED_PROVISIONER: file.csi.azure.com
+      CHECKUP_EXPECTED_RESULTS: |-
+        {
+          "vmSnapshot": "(^|\\n)ReadyToUse=true(\\n|$)",
+          "vmRestore": "(^|\\n)Complete=true(\\n|$)"
+        }
+      CHECKUP_JOB_TIMEOUT_SECONDS: "900"
+      CHECKUP_NUM_VMS: "10"
+      CHECKUP_REQUIRE_LIVE_MIGRATION: "true"
+      CHECKUP_STORAGE_CLASS: azurefile-csi
+      CHECKUP_TIMEOUT: 10m
+      CHECKUP_VMI_TIMEOUT: 3m
+      CNV_CATALOG_IMAGE: ""
+      CNV_CATALOG_SOURCE: cnv-iib-catalog
+      CNV_OPERATOR_CHANNEL: dev-preview
+      CNV_VERSION: "4.99"
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: Standard_D16s_v5
+    pre:
+    - ref: ipi-conf-cpu-manager
+    - chain: ipi-azure-pre
+    - ref: cnv-storage-checkup-pull-secret
+    - ref: cnv-storage-checkup-configure-storage
+    - ref: cnv-deploy-cnv
+    - ref: cnv-storage-checkup-prepare
+    - ref: cnv-storage-checkup-snapshot-sources
+    workflow: cnv-storage-checkup-azure
+  timeout: 5h0m0s
+- as: storage-checkup-gcp-migration
+  cron: 0 9 * * 2
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      CHECKUP_EXPECTED_GOLDEN_IMAGE_SNAPSHOT_CLASS: csi-gce-pd-vsc-images
+      CHECKUP_EXPECTED_PROVISIONER: pd.csi.storage.gke.io
+      CHECKUP_EXPECTED_RESULTS: |-
+        {
+          "pvcBound": "^PVC \"checkup-pvc\" bound$",
+          "vmBootFromGoldenImage": "^VMI \"[^\"]+\" successfully booted$",
+          "vmVolumeClone": "^DV cloneType: snapshot$",
+          "vmHotplugVolume": "^VMI \"[^\"]+\" hotplug volume ready\\nVMI \"[^\"]+\" hotplug volume removed$",
+          "vmSnapshot": "(^|\\n)ReadyToUse=true(\\n|$)",
+          "vmRestore": "(^|\\n)Complete=true(\\n|$)",
+          "concurrentVMBoot": "^Boot completed on all VMs on time$"
+        }
+      CHECKUP_EXPECTED_RWX_BLOCK_SNAPSHOT_CLASS: csi-gce-pd-vsc
+      CHECKUP_JOB_TIMEOUT_SECONDS: "900"
+      CHECKUP_NUM_VMS: "10"
+      CHECKUP_REQUIRE_LIVE_MIGRATION: "true"
+      CHECKUP_SKIP_TEARDOWN: always
+      CHECKUP_STORAGE_CLASS: hyperdisk-balanced
+      CHECKUP_TIMEOUT: 10m
+      CHECKUP_VMI_TIMEOUT: 3m
+      CNV_CATALOG_IMAGE: ""
+      CNV_CATALOG_SOURCE: cnv-iib-catalog
+      CNV_OPERATOR_CHANNEL: dev-preview
+      CNV_VERSION: "4.99"
+      COMPUTE_DISK_TYPE: hyperdisk-balanced
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: c3-standard-8
+      CONTROL_PLANE_DISK_TYPE: hyperdisk-balanced
+      CONTROL_PLANE_NODE_TYPE: c3-standard-4
+    pre:
+    - ref: ipi-conf-cpu-manager
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-gcp-osdisk-disktype
+    - as: colocate-gcp-workers
+      commands: |
+        set -euo pipefail
+        config="${SHARED_DIR}/install-config.yaml"
+        # ipi-conf-gcp-zones already selected zones that support the worker type.
+        # Both hosts must be in the disk's zone during a live migration.
+        zone=$(yq-v4 eval -e '.compute[0].platform.gcp.zones[0]' "${config}")
+        WORKER_ZONE="${zone}" yq-v4 eval -i '.compute[0].platform.gcp.zones = [strenv(WORKER_ZONE)]' "${config}"
+        echo "Selected ${zone} for the Hyperdisk workers"
+      from_image:
+        name: "4.18"
+        namespace: ocp
+        tag: upi-installer
+      resources:
+        requests:
+          cpu: 10m
+          memory: 100Mi
+    - ref: storage-conf-storageclass-pre-set-default-gcp-hyperdisk
+    - ref: rhcos-conf-osstream
+    - chain: ipi-install
+    - ref: cnv-storage-checkup-pull-secret
+    - ref: cnv-storage-checkup-configure-storage
+    - ref: cnv-deploy-cnv
+    - ref: cnv-storage-checkup-prepare
+    - ref: cnv-storage-checkup-snapshot-sources
+    workflow: cnv-storage-checkup-gcp
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift

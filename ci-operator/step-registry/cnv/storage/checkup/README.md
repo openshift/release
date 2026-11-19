@@ -66,13 +66,57 @@ The separate VM snapshot and restore checks remain required. Ten-VM rehearsals p
 [AWS](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2119749852416970752),
 [Azure](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-azure/2119749854933553152),
 and [GCP](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-gcp/2119749857445941248)
-with the longer checkup budgets described below. Azure and GCP used their prior
-boot-source configuration in those runs; the shared snapshot-source step needs
-rehearsal on both platforms.
+with the longer checkup budgets described below. A later
+[GCP rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-gcp/2120521427516919808)
+verified snapshot-backed golden images and VM snapshot and restore on `standard-csi`.
 
 For ODF or HPP, insert backend installation and default-class configuration
-before checkup preparation. A workflow `pre` override replaces the entire list;
-include the provisioning and CNV installation steps in that list as well.
+before installing CNV so CDI imports the golden images to the selected backend.
+A workflow `pre` override replaces the entire list; include provisioning and
+CNV installation in that list as well.
+
+### Live migration coverage
+
+The Monday jobs exercise each cloud's default CSI block storage directly. Their
+rehearsals selected `gp3-csi`, `managed-csi`, and `standard-csi`. The VM disks
+were provisioned as nonshared PVCs, so the product skipped live migration.
+The Azure rehearsal also listed `azurefile-csi` as RWX; the checkup VM used
+`managed-csi` instead.
+
+[CDI's StorageClass capabilities](https://github.com/kubevirt/containerized-data-importer/blob/2711c053918b325c1fa0b3981d27e92ec83d63e9/pkg/storagecapabilities/storagecapabilities.go#L78-L95)
+include RWX block for AWS EBS `io2` and GCP Hyperdisk, and RWX filesystem for
+Azure File (`file.csi.azure.com`).
+
+The `storage-checkup-{aws,azure,gcp}-migration` jobs run Tuesdays at 03:00,
+06:00, and 09:00 UTC respectively. The shared storage setup selects an existing
+class or creates one from `CHECKUP_STORAGE_CLASS_PARAMETERS`. For the full
+checkup it selects the virtualization default before CNV imports golden images.
+
+- AWS creates `checkup-ebs-io2` with `type: io2` and runs the workers in one
+  availability zone for EBS Multi-Attach.
+- Azure selects the existing `azurefile-csi` class from Azure File CSI.
+- GCP runs one shipped checkup on zonal `hyperdisk-balanced`. Three C3
+  workers share one zone so the source and destination can attach the same
+  RWX Block guest disk during live migration. CDI imports the golden image
+  on RWO storage and publishes it through `csi-gce-pd-vsc-images`.
+  The checkup boots a VM from that image, exercises volume hotplug and
+  unplug, migrates the VM, and snapshots and restores its disks. The same
+  invocation also runs the ten-VM boot test.
+
+`CHECKUP_REQUIRE_LIVE_MIGRATION=true` requires the checkup's migration completion
+result and a matching KubeVirt success event for the migration in the checkup
+namespace. All three migration jobs require this evidence and a successful
+VM snapshot and restore.
+
+The GCP migration job requires the snapshot of the VM's RWX Block disk to
+use `csi-gce-pd-vsc`. Its `vm-disk-snapshots.json` artifact links the VM
+snapshot to its boot PVC, access mode, volume mode, and CSI snapshot class.
+The runner reads these from the retained checkup resources. The post step
+collects artifacts and deletes the checkup namespace. Google documents standard snapshots of
+multi-writer Hyperdisks, while the OpenShift storage guide still lists an RWX
+snapshot limitation. The GCP rehearsal tests that combination on the installed
+payload. [Google Compute Engine release notes](https://docs.cloud.google.com/compute/docs/release-notes#July_18_2025)
+and [OpenShift storage guide](https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/storage/understanding-persistent-storage).
 
 ## Results and artifacts
 
@@ -87,7 +131,7 @@ shipped product's result schema when defining the job's coverage expectations.
 
 ### Main job expectations
 
-Each cloud source job configures `CHECKUP_EXPECTED_RESULTS` to require these complete
+Each job that runs the shipped checkup configures `CHECKUP_EXPECTED_RESULTS` to require these complete
 lines in the multiline result values:
 
 | Result | Required line |
@@ -100,8 +144,8 @@ expectations. The expressions allow generated resource names, timestamps, and
 durations to vary. These checks supplement the runner's required Job completion,
 successful overall result, empty failure reason, and core operation results.
 They match the result format observed in the successful manual CNV 5.0.0 run.
-These jobs require snapshot/restore support from the selected backend. AWS,
-Azure, and GCP set `CHECKUP_EXPECTED_PROVISIONER` to `ebs.csi.aws.com`,
+These jobs require snapshot/restore support from the selected backend. The Monday jobs
+set `CHECKUP_EXPECTED_PROVISIONER` to `ebs.csi.aws.com`,
 `disk.csi.azure.com`, and `pd.csi.storage.gke.io`, respectively. Automatic
 default-class selection remains enabled. Preparation fails if the selected
 class does not use the lane's CSI driver. The resolved class and provisioner
@@ -110,11 +154,10 @@ are captured in the run context.
 The selected backend determines the clone strategy and migration capability.
 The common policy requires a non-skipped clone result and a reported migration
 outcome, accepts capability-dependent migration skips, and propagates checkup
-failures. A lane requiring migration completion can add
-`"vmLiveMigration": "(^|\\n)VMI \"[^\"]+\" migration completed(\\n|$)"`
-to the same expectations object. Keep the snapshot/restore entries when adding
-backend requirements: the job supplies the complete object. Review and adapt
-this policy when cascading to a release with a different checkup result schema.
+failures. Set `CHECKUP_REQUIRE_LIVE_MIGRATION=true` when migration must succeed.
+Keep the snapshot/restore entries when adding backend requirements: the job
+supplies the complete object. Review and adapt this policy when cascading to a
+release with a different checkup result schema.
 
 ### Timeout budgets
 
@@ -204,7 +247,7 @@ provisioning and maintenance ownership with the GCP QE owners during review.
 
 Each job adds the existing CNV CI Brew and Konflux credentials to the cluster pull
 secret before CNV installation using a helper pinned to a reviewed CNV CI commit.
-It does not install ODF or HPP. Generated Prow jobs live under
+Generated Prow jobs live under
 `ci-operator/jobs/openshift/release/`. Previous four-VM rehearsals passed on
 [AWS](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2118636387866513408),
 [Azure](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-azure/2118706420693078016),

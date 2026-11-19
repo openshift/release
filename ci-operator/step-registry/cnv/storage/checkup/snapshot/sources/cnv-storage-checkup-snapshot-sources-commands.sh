@@ -30,7 +30,8 @@ for ((attempt=1; attempt<=40; attempt++)); do
       > "${scratch}/data-sources.json" 2>/dev/null &&
      oc --request-timeout=30s -n "${CHECKUP_GOLDEN_IMAGES_NAMESPACE}" get volumesnapshots -o json \
       > "${scratch}/volume-snapshots.json" 2>/dev/null &&
-     jq -e --slurpfile sources "${scratch}/data-sources.json" \
+     jq -e --arg expected_class "${CHECKUP_EXPECTED_GOLDEN_IMAGE_SNAPSHOT_CLASS:-}" \
+       --slurpfile sources "${scratch}/data-sources.json" \
        --slurpfile snapshots "${scratch}/volume-snapshots.json" '
        (.items | length) > 0 and all(.items[];
          . as $cron |
@@ -42,7 +43,8 @@ for ((attempt=1; attempt<=40; attempt++)); do
            ((.spec.source.snapshot.name // "") as $snapshot |
              $snapshot != "" and
              any($snapshots[0].items[];
-               .metadata.name == $snapshot and .status.readyToUse == true))))
+               .metadata.name == $snapshot and .status.readyToUse == true and
+               ($expected_class == "" or .spec.volumeSnapshotClassName == $expected_class)))))
      ' "${scratch}/data-import-crons.json" >/dev/null 2>&1 &&
      jq -e '.status.dataImportCronSourceFormat == "snapshot"' \
        "${scratch}/storage-profile.json" >/dev/null 2>&1; then
@@ -52,5 +54,5 @@ for ((attempt=1; attempt<=40; attempt++)); do
   sleep 30
 done
 
-echo "Golden image DataSources did not switch to ready snapshots" >&2
+echo "Golden image DataSources did not switch to ready snapshots${CHECKUP_EXPECTED_GOLDEN_IMAGE_SNAPSHOT_CLASS:+ using ${CHECKUP_EXPECTED_GOLDEN_IMAGE_SNAPSHOT_CLASS}}" >&2
 exit 1

@@ -16,6 +16,10 @@ failure_category=setup
 job_complete=false
 namespace=""
 started=${SECONDS}
+require_live_migration=${CHECKUP_REQUIRE_LIVE_MIGRATION:-false}
+expected_snapshot_class=${CHECKUP_EXPECTED_RWX_BLOCK_SNAPSHOT_CLASS:-}
+disk_snapshot_file="${ARTIFACT_DIR}/vm-disk-snapshots.json"
+migration_success_pattern='(^|\n)VMI "[^"]+" migration completed(\n|$)'
 
 capture_result() {
   # A failed API request can leave partial output. Keep the last complete JSON
@@ -29,11 +33,59 @@ capture_result() {
   fi
 }
 
+verify_live_migration_event() {
+  local attempt
+  # The product can delete the migration object with the VM. Its Event remains
+  # in the dedicated namespace and gives an independent completion signal.
+  for attempt in 1 2 3 4; do
+    if oc --request-timeout=5s -n "${namespace}" get events -o json 2>/dev/null |
+      jq -e --arg namespace "${namespace}" 'any(.items[]?;
+        .type == "Normal" and .reason == "SuccessfulMigration" and
+        .source.component == "virtualmachine-controller" and
+        .involvedObject.kind == "VirtualMachineInstanceMigration" and
+        .involvedObject.name == "vmim" and .involvedObject.namespace == $namespace and
+        ((.involvedObject.uid // "") | length > 0)
+      )' >/dev/null 2>&1; then
+      return 0
+    fi
+    if (( attempt < 4 )); then
+      sleep 5
+    fi
+  done
+  return 1
+}
+
+capture_vm_disk_snapshots() {
+  # Restore can replace the original PVC. KubeVirt preserves its bound spec
+  # and its link to the VM volume in VirtualMachineSnapshotContent.
+  oc --request-timeout=30s -n "${namespace}" get \
+    virtualmachinesnapshotcontents.snapshot.kubevirt.io,volumesnapshots.snapshot.storage.k8s.io -o json |
+    jq '[.items as $items |
+      $items[] | select(.kind == "VirtualMachineSnapshotContent") | . as $content |
+      .spec.source.virtualMachine as $vm |
+      $vm.spec.dataVolumeTemplates[]? | select(.spec.source.snapshot.name // .spec.source.pvc.name // .spec.sourceRef.name) |
+      .metadata.name as $dv |
+      $vm.spec.template.spec.volumes[]? | select(.dataVolume.name == $dv) | .name as $volume |
+      $content.spec.volumeBackups[]? | select(.volumeName == $volume) | . as $backup |
+      .persistentVolumeClaim as $pvc |
+      $items[] | select(.kind == "VolumeSnapshot" and .metadata.name == $backup.volumeSnapshotName
+        and .spec.source.persistentVolumeClaimName == $pvc.metadata.name
+        and any(.metadata.ownerReferences[]?; .kind == "VirtualMachineSnapshotContent" and .uid == $content.metadata.uid)) |
+      {vm: $vm.metadata.name, vm_snapshot: $content.spec.virtualMachineSnapshotName,
+       pvc: $pvc.metadata.name, storage_class: $pvc.spec.storageClassName,
+       access_modes: $pvc.spec.accessModes, volume_mode: $pvc.spec.volumeMode,
+       volume_snapshot: .metadata.name, snapshot_class: .spec.volumeSnapshotClassName, ready: .status.readyToUse}
+    ]' > "${disk_snapshot_file}.tmp" && mv "${disk_snapshot_file}.tmp" "${disk_snapshot_file}"
+}
+
 finish() {
   local exit_code=$?
   trap - EXIT
   if [[ -n ${namespace} && ${exit_code} != 0 ]]; then
     capture_result || true
+    if [[ -n ${expected_snapshot_class} && ! -f ${disk_snapshot_file} ]]; then
+      capture_vm_disk_snapshots || true
+    fi
   fi
   if [[ -n ${namespace} ]]; then
     # Record the actual runtime image IDs as well as the CSV pullspec. An API
@@ -126,6 +178,13 @@ case ${CHECKUP_SKIP_TEARDOWN} in
   never|onfailure|always) ;;
   *) fail "CHECKUP_SKIP_TEARDOWN must be never, onfailure, or always" ;;
 esac
+if [[ -n ${expected_snapshot_class} && ${CHECKUP_SKIP_TEARDOWN} != always ]]; then
+  fail "Verifying the VM disk snapshot requires CHECKUP_SKIP_TEARDOWN=always for evidence collection"
+fi
+case ${require_live_migration} in
+  true|false) ;;
+  *) fail "CHECKUP_REQUIRE_LIVE_MIGRATION must be true or false" ;;
+esac
 jq -en --argjson expected "${CHECKUP_EXPECTED_RESULTS}" '
   $expected | type == "object" and all(.[];
     . as $pattern | type == "string" and ("" | test($pattern) | true))
@@ -187,7 +246,23 @@ done
 
 failure_category=results
 capture_result || fail "Could not retrieve a complete storage checkup result ConfigMap"
-jq --argjson expected "${CHECKUP_EXPECTED_RESULTS}" '
+disk_snapshots='[]'
+if [[ -n ${expected_snapshot_class} ]]; then
+  capture_vm_disk_snapshots || fail "Could not collect the VM disk snapshot evidence"
+  disk_snapshots=$(<"${disk_snapshot_file}")
+fi
+migration_event=false
+if [[ ${require_live_migration} == true ]] &&
+  jq -e --arg pattern "${migration_success_pattern}" '
+    (.data["status.result.vmLiveMigration"] // "") | strings | test($pattern)
+  ' "${result_file}" >/dev/null && verify_live_migration_event; then
+  migration_event=true
+fi
+jq --argjson expected "${CHECKUP_EXPECTED_RESULTS}" \
+  --arg storage_class "${storage_class}" --arg snapshot_class "${expected_snapshot_class}" --argjson disk_snapshots "${disk_snapshots}" \
+  --argjson require_migration "${require_live_migration}" \
+  --argjson migration_event "${migration_event}" \
+  --arg migration_pattern "${migration_success_pattern}" '
   def nonempty_string: if type == "string" then length > 0 else false end;
   .data as $data |
   [
@@ -202,10 +277,25 @@ jq --argjson expected "${CHECKUP_EXPECTED_RESULTS}" '
     map(. as $name | ($data["status.result." + $name] // "") as $value |
       {name: $name, category: "operations", value: $value,
         passed: (if ($value | nonempty_string) then
-          $name == "vmLiveMigration" or ($value | test("^skip"; "i") | not) else false end),
-        skipped: (if $name == "vmLiveMigration" and ($value | nonempty_string) then
+          if $name == "vmLiveMigration" then
+            ($require_migration | not) or ($value | test($migration_pattern))
+          else ($value | test("^skip"; "i") | not) end else false end),
+        skipped: (if $name == "vmLiveMigration" and ($require_migration | not) and ($value | nonempty_string) then
           ($value | test("(^|\\n)(VMI \\\"[^\\\"]+\\\" )?migration completed(\\n|$)") | not)
           else false end)})) +
+  (if $require_migration then [{name: "vmLiveMigrationEvent", category: "operations",
+    passed: $migration_event, message: (if $migration_event then
+      "KubeVirt reported successful live migration" else
+      "No successful live migration event was verified" end)}] else [] end) +
+  (if $snapshot_class != "" then
+    (($data["status.result.vmSnapshot"] // "") | split("\n")) as $reported |
+    [{name: "vmDiskSnapshot", category: "operations", message: ("Require an RWX Block boot disk on " + $storage_class
+        + " and a ready CSI snapshot using " + $snapshot_class + ". See vm-disk-snapshots.json."),
+      passed: any($disk_snapshots[]; . as $disk |
+        ($reported | index("VMSnapshot name: " + $disk.vm_snapshot)) != null and
+        .storage_class == $storage_class and .volume_mode == "Block" and (.access_modes | index("ReadWriteMany")) != null and
+        .snapshot_class == $snapshot_class and .ready == true)}]
+   else [] end) +
   ($expected | to_entries | map(. as $entry |
     ($data["status.result." + $entry.key] // "") as $value |
     {name: ("expectation: " + $entry.key), category: "expectations", value: $value,
