@@ -42,6 +42,8 @@ supervisor.
 3. `generate_plan` requests schema-constrained JSON for focused checks, attaches
    trusted source metadata, validates every check, and computes the plan hash.
    Ready plans rejected by validation receive at most two correction attempts.
+   Correction feedback repeats the selected scope and exact source-page URLs
+   alongside the rejected field; it does not repeat private issue bodies.
    Plans declaring unresolved gaps remain fatal and are not forced into readiness.
    Readiness means that the plan is executable; installation and runtime
    prerequisites are verified by execution, not by planning.

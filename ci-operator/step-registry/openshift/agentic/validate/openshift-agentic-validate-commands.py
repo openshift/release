@@ -880,8 +880,18 @@ def generate_plan(model, sources, context, secrets):
             messages.append(message)
             messages.append({"role": "user", "content": json.dumps({
                 "validation_error": str(error),
-                "linked_issues": sources["issues"],
-                "instruction": "Correct the rejected plan. Cover each linked issue using its actual key and requirements. "
+                "scope": sources.get("scope", "Complete requirements of every linked issue"),
+                "source_pages": {
+                    "pr": sources["url"],
+                    "jira": [{"key": issue["key"], "url": issue["url"], "status": issue["status"]}
+                             for issue in sources["issues"]],
+                },
+                "instruction": "Correct the reported structural error while preserving every selected requirement. "
+                               "The exact captured page URLs are repeated in source_pages: cite the PR page for "
+                               "source=pr, the matching issue page for source=jira, or either for inference. "
+                               "Append the relevant criterion or section. These URLs are provided, not missing. "
+                               "Preserve the supervisor-selected scope and its explicit boundary; excluded epic "
+                               "deliverables and unobserved runtime prerequisites are not planning gaps. "
                                "Do not replace Jira requirements with runner fixtures or examples from the diff. "
                                "If the requirements cannot be checked, set ready=false and describe the gaps; do not invent coverage.",
             })})
