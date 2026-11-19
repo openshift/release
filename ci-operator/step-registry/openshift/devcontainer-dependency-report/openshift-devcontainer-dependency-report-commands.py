@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import http.client
 import json
 import os
 import re
@@ -24,83 +25,277 @@ STABLE_COMPONENT = r"(?:0|[1-9]\d*)"
 STABLE_VERSION = re.compile(
     rf"^({STABLE_COMPONENT})\.({STABLE_COMPONENT})\.({STABLE_COMPONENT})$"
 )
-CLASSIFICATIONS = {"pinned", "floating", "repo-coupled", "manual", "unsupported"}
-GITHUB_PAGE_LIMIT = 10
-POLICY_REPOSITORY = "openshift/release"
-POLICY_REF = "main"
-POLICY_PATH = (
-    "ci-operator/step-registry/openshift/devcontainer-dependency-report/"
-    "openshift-devcontainer-dependency-report-config.md"
-)
-REPOSITORY_NAME = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
-GITHUB_API_PATH = re.compile(
-    r"^/repos/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/"
-    r"(?:commits/[^/]+|pulls/[1-9]\d*|releases|tags)$"
-)
-RAW_GITHUB_PATH = re.compile(r"^/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/[0-9a-f]{40}/.+$")
-NPM_PATH = re.compile(
-    r"^/(?:[A-Za-z0-9_.~-]+|@[A-Za-z0-9_.~-]+%2[fF][A-Za-z0-9_.~-]+)$"
-)
-PYPI_PATH = re.compile(r"^/pypi/[A-Za-z0-9_.-]+/json$")
+REPOSITORY_NAME = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+NPM_PACKAGE = re.compile(r"^(?:[A-Za-z0-9_.~-]+|@[A-Za-z0-9_.~-]+/[A-Za-z0-9_.~-]+)$")
+PYPI_PACKAGE = re.compile(r"^[A-Za-z0-9_.-]+$")
+CLASSIFICATIONS = {"pinned", "floating", "repo-coupled", "manual"}
+
+SOURCES: dict[str, dict[str, str]] = {
+    "apm-cli": {"kind": "pypi", "package": "apm-cli"},
+    "delve": {
+        "kind": "git_tags",
+        "repository": "go-delve/delve",
+        "tag_prefix": "v",
+    },
+    "gh": {"kind": "git_tags", "repository": "cli/cli", "tag_prefix": "v"},
+    "golangci-lint": {
+        "kind": "git_tags",
+        "repository": "golangci/golangci-lint",
+        "tag_prefix": "v",
+    },
+    "gopls": {
+        "kind": "git_tags",
+        "repository": "golang/tools",
+        "tag_prefix": "gopls/v",
+    },
+    "gotestsum": {
+        "kind": "git_tags",
+        "repository": "gotestyourself/gotestsum",
+        "tag_prefix": "v",
+    },
+    "playwright": {"kind": "npm", "package": "playwright"},
+    "prometheus": {
+        "kind": "git_tags",
+        "repository": "prometheus/prometheus",
+        "tag_prefix": "v",
+    },
+    "staticcheck": {
+        "kind": "git_tags",
+        "repository": "dominikh/go-tools",
+        "tag_prefix": "v",
+    },
+    "uv": {"kind": "pypi", "package": "uv"},
+}
+
+DEPENDENCIES: dict[str, dict[str, Any]] = {
+    "fedora-base": {
+        "name": "fedora-base",
+        "classification": "manual",
+        "file": ".devcontainer/Dockerfile",
+        "pattern": r"^FROM registry\.fedoraproject\.org/fedora:(?P<version>[0-9]+)$",
+        "version_source": "registry.fedoraproject.org/fedora tags",
+        "rationale": (
+            "Base-image changes also change the distribution toolchain and require "
+            "target-repository compatibility validation; no automatic proposal is made."
+        ),
+    },
+    "golangci-lint": {
+        "name": "golangci-lint",
+        "classification": "pinned",
+        "file": ".devcontainer/Dockerfile",
+        "pattern": r"^ARG GOLANGCI_LINT_VERSION=(?P<version>\S+)$",
+        "source": "golangci-lint",
+        "policy": {"min_inclusive": "2.0.0", "max_exclusive": "3.0.0"},
+        "rationale": (
+            "Report a stable 2.x candidate only; maintainers must validate the lint "
+            "configuration and repository code."
+        ),
+    },
+    "github-cli": {
+        "name": "github-cli",
+        "classification": "pinned",
+        "file": ".devcontainer/Dockerfile",
+        "pattern": r"^ARG GH_VERSION=(?P<version>\S+)$",
+        "source": "gh",
+        "policy": {"min_inclusive": "2.0.0", "max_exclusive": "3.0.0"},
+        "rationale": "Report a stable 2.x tag only; this is not a compatibility claim.",
+    },
+    "gotestsum-pinned": {
+        "name": "gotestsum",
+        "classification": "pinned",
+        "file": ".devcontainer/Dockerfile",
+        "pattern": (
+            r"(?P<quote>[\"']?)gotest\.tools/gotestsum@v"
+            r"(?P<version>[^\"'\s]+)(?P=quote)(?=$|\s)"
+        ),
+        "source": "gotestsum",
+        "policy": {"min_inclusive": "1.0.0", "max_exclusive": "2.0.0"},
+        "rationale": (
+            "Report a stable 1.x tag only; maintainers must validate repository tests."
+        ),
+    },
+    "gotestsum-floating": {
+        "name": "gotestsum",
+        "classification": "floating",
+        "file": ".devcontainer/Dockerfile",
+        "pattern": r"gotest\.tools/gotestsum@(?P<version>latest)",
+        "version_source": "https://github.com/gotestyourself/gotestsum.git tags",
+        "rationale": (
+            "The declaration explicitly tracks latest; the report records that token "
+            "without inventing a deterministic current version."
+        ),
+    },
+    "gopls": {
+        "name": "gopls",
+        "classification": "pinned",
+        "file": ".devcontainer/post-create.sh",
+        "pattern": (
+            r"(?P<quote>[\"']?)golang\.org/x/tools/gopls@v"
+            r"(?P<version>[^\"'\s]+)(?P=quote)(?=$|\s)"
+        ),
+        "source": "gopls",
+        "policy": {"min_inclusive": "0.21.0", "max_exclusive": "0.22.0"},
+        "rationale": "Report a stable tag only within the explicitly approved 0.21 line.",
+    },
+    "delve": {
+        "name": "delve",
+        "classification": "pinned",
+        "file": ".devcontainer/post-create.sh",
+        "pattern": (
+            r"(?P<quote>[\"']?)github\.com/go-delve/delve/cmd/dlv@v"
+            r"(?P<version>[^\"'\s]+)(?P=quote)(?=$|\s)"
+        ),
+        "source": "delve",
+        "policy": {"min_inclusive": "1.27.0", "max_exclusive": "2.0.0"},
+        "rationale": (
+            "Report a stable 1.x tag only; maintainers must validate debugger support."
+        ),
+    },
+    "staticcheck": {
+        "name": "staticcheck",
+        "classification": "pinned",
+        "file": ".devcontainer/post-create.sh",
+        "pattern": (
+            r"(?P<quote>[\"']?)honnef\.co/go/tools/cmd/staticcheck@v"
+            r"(?P<version>[^\"'\s]+)(?P=quote)(?=$|\s)"
+        ),
+        "source": "staticcheck",
+        "policy": {"min_inclusive": "0.7.0", "max_exclusive": "0.8.0"},
+        "rationale": "Report a stable tag only within the explicitly approved 0.7 line.",
+    },
+    "uv": {
+        "name": "uv",
+        "classification": "pinned",
+        "file": ".devcontainer/Dockerfile",
+        "pattern": r"^ARG UV_VERSION=(?P<version>\S+)$",
+        "source": "uv",
+        "policy": {"min_inclusive": "0.7.0", "max_exclusive": "0.8.0"},
+        "rationale": "Report a stable candidate only within the approved 0.7 line.",
+    },
+    "playwright": {
+        "name": "playwright",
+        "classification": "pinned",
+        "file": ".devcontainer/Dockerfile",
+        "pattern": r"npx playwright@(?P<version>\S+) install",
+        "source": "playwright",
+        "policy": {"min_inclusive": "1.62.0", "max_exclusive": "1.63.0"},
+        "rationale": (
+            "Report a stable candidate only within the approved 1.62 line; browser "
+            "compatibility must be validated."
+        ),
+    },
+    "prometheus": {
+        "name": "prometheus",
+        "classification": "pinned",
+        "file": ".devcontainer/Dockerfile",
+        "pattern": r"^ARG PROMETHEUS_VERSION=(?P<version>\S+)$",
+        "source": "prometheus",
+        "policy": {"min_inclusive": "3.4.0", "max_exclusive": "4.0.0"},
+        "rationale": (
+            "Report a stable 3.x tag only; maintainers must validate Prometheus data "
+            "and flags."
+        ),
+    },
+    "opencode-cli": {
+        "name": "opencode-cli",
+        "classification": "floating",
+        "file": ".devcontainer/post-create.sh",
+        "pattern": r"@opencode/cli@\$\{OPENCODE_VERSION:-(?P<version>latest)\}",
+        "version_source": "registry.npmjs.org/@opencode/cli",
+        "rationale": (
+            "The default is latest and can be overridden by users; the report does not "
+            "reinterpret that policy."
+        ),
+    },
+    "postgres-service-image": {
+        "name": "postgres-service-image",
+        "classification": "repo-coupled",
+        "file": ".devcontainer/init-services.sh",
+        "pattern": r"^POSTGRES_IMAGE=(?P<version>\S+)$",
+        "authority": "OpenShift CI image promotion configuration",
+        "rationale": (
+            "The explicit CI image tag is promotion-coupled and requires its owning "
+            "authority; no independent bump is proposed."
+        ),
+    },
+    "redis-service-image": {
+        "name": "redis-service-image",
+        "classification": "repo-coupled",
+        "file": ".devcontainer/init-services.sh",
+        "pattern": r"^REDIS_IMAGE=(?P<version>\S+)$",
+        "authority": "OpenShift CI image promotion configuration",
+        "rationale": (
+            "The explicit CI image tag is promotion-coupled and requires its owning "
+            "authority; no independent bump is proposed."
+        ),
+    },
+    "apm-cli": {
+        "name": "apm-cli",
+        "classification": "pinned",
+        "file": ".devcontainer/post-create.sh",
+        "pattern": r"apm-cli==(?P<version>\S+)(?=$|\s)",
+        "source": "apm-cli",
+        "policy": {"min_inclusive": "0.11.0", "max_exclusive": "0.12.0"},
+        "rationale": "Report a stable candidate only within the approved 0.11 line.",
+    },
+}
+
+REPOSITORIES: dict[str, list[str]] = {
+    "openshift/sippy": [
+        "fedora-base",
+        "golangci-lint",
+        "github-cli",
+        "gotestsum-pinned",
+        "gopls",
+        "delve",
+        "staticcheck",
+        "opencode-cli",
+        "postgres-service-image",
+        "redis-service-image",
+    ],
+    "openshift/origin": [
+        "fedora-base",
+        "golangci-lint",
+        "github-cli",
+        "gotestsum-pinned",
+        "gopls",
+        "delve",
+        "staticcheck",
+        "opencode-cli",
+    ],
+    "openshift-eng/ship-status-dash": [
+        "fedora-base",
+        "golangci-lint",
+        "github-cli",
+        "uv",
+        "playwright",
+        "gotestsum-floating",
+        "prometheus",
+        "gopls",
+        "delve",
+        "staticcheck",
+        "opencode-cli",
+        "apm-cli",
+    ],
+}
+
+REPORT_NOTES = [
+    "Only declarations with an explicit version token are inventoried.",
+    (
+        "Unversioned OS package sets, installer URLs, module graphs, lockfiles, and "
+        "repository build targets remain owned by the target repository and are not "
+        "represented as pseudo-version rows."
+    ),
+    (
+        "Repository-coupled values are reported only when an explicit token exists; "
+        "they never receive an independent update proposal."
+    ),
+]
 
 
 class CheckError(RuntimeError):
     """An expected lookup, extraction, or policy failure."""
-
-
-def parsed_public_https_url(url: str) -> urllib.parse.SplitResult:
-    try:
-        parsed = urllib.parse.urlsplit(url)
-        port = parsed.port
-    except (TypeError, ValueError) as exc:
-        raise CheckError(f"invalid lookup URL {url!r}: {exc}") from exc
-    if parsed.scheme != "https" or not parsed.hostname:
-        raise CheckError("lookup URL must use public HTTPS")
-    if parsed.username is not None or parsed.password is not None:
-        raise CheckError("lookup URL must not contain credentials")
-    if port is not None:
-        raise CheckError("lookup URL must not include an explicit port")
-    if parsed.fragment:
-        raise CheckError("lookup URL must not include a fragment")
-    return parsed
-
-
-def validate_lookup_url(url: str) -> None:
-    parsed = parsed_public_https_url(url)
-    host = parsed.hostname.lower()
-    query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
-    if host == "api.github.com":
-        if not GITHUB_API_PATH.fullmatch(parsed.path):
-            raise CheckError("GitHub API lookup URL has an unsupported path")
-        if any(key not in {"page", "per_page"} for key, _ in query):
-            raise CheckError("GitHub API lookup URL has unsupported query parameters")
-        if any(not value.isdigit() for _, value in query):
-            raise CheckError("GitHub API pagination values must be integers")
-        return
-    if query:
-        raise CheckError("lookup URL must not include query parameters")
-    if host == "raw.githubusercontent.com" and RAW_GITHUB_PATH.fullmatch(parsed.path):
-        return
-    if host == "registry.npmjs.org" and NPM_PATH.fullmatch(parsed.path):
-        return
-    if host == "pypi.org" and PYPI_PATH.fullmatch(parsed.path):
-        return
-    raise CheckError(f"lookup URL uses an unsupported public endpoint: {url}")
-
-
-class ValidatingRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def redirect_request(
-        self,
-        req: urllib.request.Request,
-        fp: Any,
-        code: int,
-        msg: str,
-        headers: Any,
-        newurl: str,
-    ) -> Optional[urllib.request.Request]:
-        validate_lookup_url(newurl)
-        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def parse_version(value: str, prefix: str = "") -> tuple[int, int, int]:
@@ -114,61 +309,11 @@ def parse_version(value: str, prefix: str = "") -> tuple[int, int, int]:
 
 
 def version_in_policy(version: tuple[int, int, int], policy: dict[str, str]) -> bool:
-    minimum = parse_version(policy["min_inclusive"])
-    maximum = parse_version(policy["max_exclusive"])
-    return minimum <= version < maximum
-
-
-def extract_current(content: str, dependency: dict[str, Any]) -> str:
-    extraction = dependency["extract"]
-    matches = list(re.finditer(extraction["pattern"], content, re.MULTILINE))
-    if len(matches) != 1:
-        raise CheckError(
-            f"extraction pattern matched {len(matches)} times; exactly one match is required"
-        )
-    if extraction["kind"] == "presence":
-        return extraction["current"]
-    if extraction["kind"] != "regex":
-        raise CheckError(f"unsupported extraction kind {extraction['kind']!r}")
-    try:
-        return matches[0].group("version")
-    except (IndexError, KeyError) as exc:
-        raise CheckError("regex extraction requires a named 'version' group") from exc
-
-
-class Fetcher:
-    def __init__(self) -> None:
-        self.cache: dict[str, Any] = {}
-        self.opener = urllib.request.build_opener(ValidatingRedirectHandler())
-
-    def get(self, url: str, *, as_json: bool) -> Any:
-        validate_lookup_url(url)
-        if url in self.cache:
-            return self.cache[url]
-        request = urllib.request.Request(
-            url,
-            headers={
-                "Accept": "application/vnd.github+json, application/json",
-                "User-Agent": "openshift-release-devcontainer-dependency-report/1",
-            },
-        )
-        try:
-            with self.opener.open(request, timeout=30) as response:
-                validate_lookup_url(response.geturl())
-                body = response.read().decode("utf-8")
-        except (OSError, UnicodeError, urllib.error.HTTPError) as exc:
-            raise CheckError(f"lookup failed for {url}: {exc}") from exc
-        if as_json:
-            try:
-                value = json.loads(body)
-            except json.JSONDecodeError as exc:
-                raise CheckError(
-                    f"lookup failed for {url}: invalid JSON: {exc}"
-                ) from exc
-        else:
-            value = body
-        self.cache[url] = value
-        return value
+    return (
+        parse_version(policy["min_inclusive"])
+        <= version
+        < parse_version(policy["max_exclusive"])
+    )
 
 
 def validate_repository_name(repository: str) -> None:
@@ -176,143 +321,363 @@ def validate_repository_name(repository: str) -> None:
         raise CheckError(f"invalid public GitHub repository name {repository!r}")
 
 
-def resolve_github_revision(repository: str, ref: str, fetcher: Fetcher) -> str:
-    validate_repository_name(repository)
-    url = (
-        f"https://api.github.com/repos/{repository}/commits/"
-        f"{urllib.parse.quote(ref, safe='')}"
-    )
-    payload = fetcher.get(url, as_json=True)
-    if not isinstance(payload, dict) or not isinstance(payload.get("sha"), str):
-        raise CheckError(f"commit lookup for {repository}@{ref} returned no revision")
-    revision = payload["sha"]
-    if not COMMIT_SHA.fullmatch(revision):
-        raise CheckError(
-            f"commit lookup for {repository}@{ref} returned an invalid revision"
-        )
-    return revision
+def require_string(value: Any, description: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise CheckError(f"{description} must be a non-empty string")
+    return value
 
 
-def job_spec_repository_revision(
-    repository: str, requested_ref: str, repository_root: Path
-) -> Optional[tuple[str, str]]:
-    job_spec = os.environ.get("JOB_SPEC")
-    if not job_spec:
-        return None
+def validate_policy() -> dict[str, re.Pattern[str]]:
+    for source_name, source in SOURCES.items():
+        require_string(source_name, "source name")
+        if not isinstance(source, dict):
+            raise CheckError(f"source {source_name!r} must be an object")
+        kind = source.get("kind")
+        if kind == "git_tags":
+            repository = require_string(
+                source.get("repository"), f"source {source_name!r} repository"
+            )
+            validate_repository_name(repository)
+            require_string(
+                source.get("tag_prefix"), f"source {source_name!r} tag_prefix"
+            )
+        elif kind == "npm":
+            package = require_string(
+                source.get("package"), f"source {source_name!r} package"
+            )
+            if not NPM_PACKAGE.fullmatch(package):
+                raise CheckError(f"source {source_name!r} has an invalid npm package")
+        elif kind == "pypi":
+            package = require_string(
+                source.get("package"), f"source {source_name!r} package"
+            )
+            if not PYPI_PACKAGE.fullmatch(package):
+                raise CheckError(f"source {source_name!r} has an invalid PyPI package")
+        else:
+            raise CheckError(f"source {source_name!r} has unsupported kind {kind!r}")
+
+    patterns: dict[str, re.Pattern[str]] = {}
+    for dependency_id, dependency in DEPENDENCIES.items():
+        require_string(dependency_id, "dependency identifier")
+        if not isinstance(dependency, dict):
+            raise CheckError(f"dependency {dependency_id!r} must be an object")
+        for field in ("name", "file", "pattern", "rationale"):
+            require_string(
+                dependency.get(field), f"dependency {dependency_id!r} field {field}"
+            )
+        classification = dependency.get("classification")
+        if classification not in CLASSIFICATIONS:
+            raise CheckError(
+                f"dependency {dependency_id!r} has invalid classification {classification!r}"
+            )
+        try:
+            pattern = re.compile(dependency["pattern"], re.MULTILINE)
+        except re.error as exc:
+            raise CheckError(
+                f"dependency {dependency_id!r} has invalid extraction regex: {exc}"
+            ) from exc
+        if "version" not in pattern.groupindex:
+            raise CheckError(
+                f"dependency {dependency_id!r} extraction requires a named version group"
+            )
+        patterns[dependency_id] = pattern
+        if classification == "pinned":
+            source_name = require_string(
+                dependency.get("source"), f"dependency {dependency_id!r} source"
+            )
+            if source_name not in SOURCES:
+                raise CheckError(
+                    f"dependency {dependency_id!r} references unknown source {source_name!r}"
+                )
+            policy = dependency.get("policy")
+            if not isinstance(policy, dict):
+                raise CheckError(f"dependency {dependency_id!r} requires policy bounds")
+            minimum = require_string(
+                policy.get("min_inclusive"),
+                f"dependency {dependency_id!r} minimum policy bound",
+            )
+            maximum = require_string(
+                policy.get("max_exclusive"),
+                f"dependency {dependency_id!r} maximum policy bound",
+            )
+            if parse_version(minimum) >= parse_version(maximum):
+                raise CheckError(f"dependency {dependency_id!r} policy range is empty")
+        elif "source" in dependency or "policy" in dependency:
+            raise CheckError(
+                f"dependency {dependency_id!r} may not define source or policy"
+            )
+        if classification == "repo-coupled":
+            require_string(
+                dependency.get("authority"), f"dependency {dependency_id!r} authority"
+            )
+        elif classification != "pinned":
+            require_string(
+                dependency.get("version_source"),
+                f"dependency {dependency_id!r} version_source",
+            )
+
+    for repository, dependency_ids in REPOSITORIES.items():
+        validate_repository_name(repository)
+        if not isinstance(dependency_ids, list) or not dependency_ids:
+            raise CheckError(f"repository {repository!r} requires dependencies")
+        if not all(isinstance(item, str) for item in dependency_ids):
+            raise CheckError(
+                f"repository {repository!r} dependency names must be strings"
+            )
+        if len(dependency_ids) != len(set(dependency_ids)):
+            raise CheckError(f"repository {repository!r} has duplicate dependencies")
+        missing = sorted(set(dependency_ids) - set(DEPENDENCIES))
+        if missing:
+            raise CheckError(
+                f"repository {repository!r} references unknown dependencies: "
+                + ", ".join(missing)
+            )
+    return patterns
+
+
+def source_url(source: dict[str, str]) -> str:
+    if source["kind"] == "git_tags":
+        return f"https://github.com/{source['repository']}.git"
+    if source["kind"] == "npm":
+        package = urllib.parse.quote(source["package"], safe="@")
+        return f"https://registry.npmjs.org/{package}"
+    if source["kind"] == "pypi":
+        return f"https://pypi.org/pypi/{source['package']}/json"
+    raise CheckError(f"unsupported source kind {source['kind']!r}")
+
+
+def source_description(source: dict[str, str]) -> str:
+    url = source_url(source)
+    return f"{url} tags" if source["kind"] == "git_tags" else url
+
+
+def validate_fixed_endpoint(url: str, expected_url: str) -> None:
     try:
-        spec = json.loads(job_spec)
+        parsed = urllib.parse.urlsplit(url)
+        expected = urllib.parse.urlsplit(expected_url)
+        port = parsed.port
+    except (TypeError, ValueError) as exc:
+        raise CheckError(f"invalid package lookup URL: {exc}") from exc
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != expected.hostname
+        or parsed.path != expected.path
+        or parsed.query
+        or parsed.fragment
+        or parsed.username is not None
+        or parsed.password is not None
+        or port is not None
+    ):
+        raise CheckError("package lookup redirected outside its fixed public endpoint")
+
+
+class FixedEndpointRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def __init__(self, expected_url: str) -> None:
+        self.expected_url = expected_url
+        super().__init__()
+
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> Optional[urllib.request.Request]:
+        validate_fixed_endpoint(newurl, self.expected_url)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+class Fetcher:
+    def __init__(self) -> None:
+        self.cache: dict[str, Any] = {}
+
+    def get_package_json(self, source: dict[str, str]) -> dict[str, Any]:
+        url = source_url(source)
+        if url in self.cache:
+            return self.cache[url]
+        validate_fixed_endpoint(url, url)
+        accept = (
+            "application/vnd.npm.install-v1+json"
+            if source["kind"] == "npm"
+            else "application/json"
+        )
+        request = urllib.request.Request(
+            url,
+            headers={
+                "Accept": accept,
+                "User-Agent": "openshift-release-devcontainer-dependency-report/1",
+            },
+        )
+        opener = urllib.request.build_opener(FixedEndpointRedirectHandler(url))
+        try:
+            with opener.open(request, timeout=30) as response:
+                validate_fixed_endpoint(response.geturl(), url)
+                body = response.read().decode("utf-8")
+        except (
+            OSError,
+            UnicodeError,
+            urllib.error.HTTPError,
+            http.client.HTTPException,
+        ) as exc:
+            raise CheckError(
+                f"package lookup failed for {source_description(source)}: {exc}"
+            ) from exc
+        try:
+            payload = json.loads(body)
+        except json.JSONDecodeError as exc:
+            raise CheckError(
+                f"package lookup returned invalid JSON for {source_description(source)}: {exc}"
+            ) from exc
+        if not isinstance(payload, dict):
+            raise CheckError(
+                f"package lookup returned a non-object for {source_description(source)}"
+            )
+        self.cache[url] = payload
+        return payload
+
+
+def sanitize_git_stderr(stderr: str) -> str:
+    message = " ".join(stderr.splitlines())
+    message = re.sub(r"(https?://)[^/@\s]+@", r"\1<redacted>@", message)
+    message = re.sub(r"(ssh://)[^@\s]+@", r"\1<redacted>@", message)
+    return message[-500:] or "no stderr"
+
+
+def run_git(
+    repository_root: Optional[Path], arguments: list[str]
+) -> subprocess.CompletedProcess[str]:
+    command = ["git"]
+    if repository_root is not None:
+        command.extend(["-C", str(repository_root)])
+    command.extend(arguments)
+    try:
+        return subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise CheckError(f"could not run git: {exc}") from exc
+
+
+def checked_git(
+    repository_root: Optional[Path], arguments: list[str], operation: str
+) -> str:
+    completed = run_git(repository_root, arguments)
+    if completed.returncode != 0:
+        raise CheckError(
+            f"{operation} failed (git exit {completed.returncode}): "
+            f"{sanitize_git_stderr(completed.stderr)}"
+        )
+    return completed.stdout
+
+
+def repository_from_remote(remote: str) -> Optional[str]:
+    scp_match = re.fullmatch(
+        r"git@github\.com:([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?)(?:\.git)?", remote
+    )
+    if scp_match:
+        return scp_match.group(1)
+    try:
+        parsed = urllib.parse.urlsplit(remote)
+        port = parsed.port
+    except ValueError:
+        return None
+    if (
+        parsed.scheme not in {"https", "ssh"}
+        or parsed.hostname != "github.com"
+        or parsed.query
+        or parsed.fragment
+        or port is not None
+    ):
+        return None
+    if parsed.scheme == "https" and (
+        parsed.username is not None or parsed.password is not None
+    ):
+        return None
+    if parsed.scheme == "ssh" and parsed.username not in {None, "git"}:
+        return None
+    path = parsed.path.removeprefix("/").removesuffix(".git")
+    return path if REPOSITORY_NAME.fullmatch(path) else None
+
+
+def job_spec_workdir_repository() -> str:
+    raw_spec = os.environ.get("JOB_SPEC")
+    if not raw_spec:
+        raise CheckError(
+            "checkout has no public origin remote and JOB_SPEC is unavailable for identity"
+        )
+    try:
+        spec = json.loads(raw_spec)
     except json.JSONDecodeError as exc:
         raise CheckError(f"JOB_SPEC is not valid JSON: {exc}") from exc
     if not isinstance(spec, dict):
         raise CheckError("JOB_SPEC root is not an object")
-    primary_ref = spec.get("refs")
-    if "refs" in spec and not isinstance(primary_ref, dict):
-        raise CheckError("JOB_SPEC refs is not a reference object")
     refs: list[dict[str, Any]] = []
-    if isinstance(primary_ref, dict):
-        refs.append(primary_ref)
+    primary = spec.get("refs")
+    if "refs" in spec:
+        if not isinstance(primary, dict):
+            raise CheckError("JOB_SPEC refs is not a reference object")
+        refs.append(primary)
     extra_refs = spec.get("extra_refs", [])
     if not isinstance(extra_refs, list) or not all(
         isinstance(ref, dict) for ref in extra_refs
     ):
-        raise CheckError("JOB_SPEC extra_refs is not a list of references")
+        raise CheckError("JOB_SPEC extra_refs is not a list of reference objects")
     refs.extend(extra_refs)
-    matches = [
-        ref for ref in refs if f"{ref.get('org')}/{ref.get('repo')}" == repository
-    ]
-    if len(matches) != 1:
-        raise CheckError(
-            f"JOB_SPEC has {len(matches)} references for selected repository {repository}; "
-            "exactly one is required"
-        )
-    selected = matches[0]
-    if selected.get("base_ref") != requested_ref:
-        raise CheckError(
-            f"JOB_SPEC selected {repository}@{selected.get('base_ref')}, "
-            f"but policy requires {requested_ref}"
-        )
-    revision = selected.get("base_sha")
-    if isinstance(revision, str) and COMMIT_SHA.fullmatch(revision):
-        return revision, "job-spec-exact"
-    if "base_sha" in selected:
-        raise CheckError(
-            f"JOB_SPEC has no valid exact revision for selected repository {repository}"
-        )
-    org, repo = repository.split("/", 1)
-    periodic_job = (
-        f"periodic-ci-{org}-{repo}-{requested_ref}-agentic-"
-        f"periodic-{repo}-devcontainer-dependency-report"
-    )
-    checkout_ref = (
-        len(extra_refs) == 1
-        and selected is extra_refs[0]
-        and "pulls" not in selected
-        and repository_root == Path("/workspace")
-    )
-    periodic_checkout = (
-        spec.get("type") == "periodic"
-        and spec.get("job") == periodic_job
-        and primary_ref is None
-        and "workdir" not in selected
-        and checkout_ref
-    )
-    rehearsal_checkout = False
-    if isinstance(primary_ref, dict):
-        pulls = primary_ref.get("pulls")
-        if isinstance(pulls, list) and len(pulls) == 1 and isinstance(pulls[0], dict):
-            pull = pulls[0]
-            pull_number = pull.get("number")
-            rehearsal_checkout = (
-                spec.get("type") == "presubmit"
-                and isinstance(pull_number, int)
-                and not isinstance(pull_number, bool)
-                and pull_number > 0
-                and spec.get("job") == f"rehearse-{pull_number}-{periodic_job}"
-                and f"{primary_ref.get('org')}/{primary_ref.get('repo')}"
-                == POLICY_REPOSITORY
-                and primary_ref.get("base_ref") == POLICY_REF
-                and isinstance(primary_ref.get("base_sha"), str)
-                and COMMIT_SHA.fullmatch(primary_ref["base_sha"]) is not None
-                and isinstance(pull.get("sha"), str)
-                and COMMIT_SHA.fullmatch(pull["sha"]) is not None
-                and selected.get("workdir") is True
-                and checkout_ref
+    if not refs:
+        raise CheckError("JOB_SPEC contains no checkout references")
+    for ref in refs:
+        if "workdir" in ref and not isinstance(ref["workdir"], bool):
+            raise CheckError("JOB_SPEC reference workdir must be boolean")
+    explicit_workdirs = [ref for ref in refs if ref.get("workdir") is True]
+    if len(explicit_workdirs) > 1:
+        raise CheckError("JOB_SPEC contains multiple workdir references")
+    workdir_ref = explicit_workdirs[0] if explicit_workdirs else refs[0]
+    org = workdir_ref.get("org")
+    repo = workdir_ref.get("repo")
+    if not isinstance(org, str) or not isinstance(repo, str):
+        raise CheckError("JOB_SPEC workdir reference has no repository identity")
+    repository = f"{org}/{repo}"
+    validate_repository_name(repository)
+    return repository
+
+
+def validate_checkout_identity(repository: str, repository_root: Path) -> str:
+    remote = run_git(repository_root, ["config", "--get", "remote.origin.url"])
+    if remote.returncode == 0:
+        remote_repository = repository_from_remote(remote.stdout.strip())
+        if remote_repository != repository:
+            raise CheckError(
+                "local checkout origin does not match the selected public repository"
             )
-    if not periodic_checkout and not rehearsal_checkout:
+        return "public-origin-remote"
+    if remote.returncode != 1 or remote.stdout.strip() or remote.stderr.strip():
         raise CheckError(
-            f"JOB_SPEC has no valid exact revision for selected repository {repository}"
+            f"could not inspect checkout origin (git exit {remote.returncode}): "
+            f"{sanitize_git_stderr(remote.stderr)}"
         )
-    provenance = (
-        "periodic-checkout-head" if periodic_checkout else "rehearsal-checkout-head"
-    )
-    return local_repository_revision(repository_root), provenance
+    if repository_root != Path("/workspace"):
+        raise CheckError(
+            "local checkout without a public origin remote must be the CI /workspace workdir"
+        )
+    if job_spec_workdir_repository() != repository:
+        raise CheckError("JOB_SPEC workdir does not match the selected repository")
+    return "job-spec-workdir"
 
 
 def local_repository_revision(repository_root: Path) -> str:
-    try:
-        completed = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(repository_root),
-                "rev-parse",
-                "--show-toplevel",
-                "HEAD",
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
-        raise CheckError(
-            f"could not determine local repository revision: {exc}"
-        ) from exc
-    output = completed.stdout.splitlines()
-    if completed.returncode != 0 or len(output) != 2:
-        raise CheckError(
-            "could not determine an exact revision for the local repository"
-        )
+    output = checked_git(
+        repository_root,
+        ["rev-parse", "--show-toplevel", "HEAD"],
+        "determining local checkout revision",
+    ).splitlines()
+    if len(output) != 2:
+        raise CheckError("git returned an unexpected checkout root/revision response")
     checkout_root, revision = output
     try:
         root_matches = Path(checkout_root).resolve() == repository_root.resolve()
@@ -320,242 +685,84 @@ def local_repository_revision(repository_root: Path) -> str:
         raise CheckError(
             f"could not validate the local Git checkout root: {exc}"
         ) from exc
-    if not root_matches or not COMMIT_SHA.fullmatch(revision):
-        raise CheckError(
-            "local repository root or exact revision does not match the selected checkout"
-        )
+    if not root_matches:
+        raise CheckError("--repository-root is not the selected Git checkout root")
+    if not COMMIT_SHA.fullmatch(revision):
+        raise CheckError("git returned an invalid local HEAD revision")
     return revision
 
 
 def local_inventory_source(repository_root: Path, file_paths: list[str]) -> str:
-    try:
-        completed = subprocess.run(
-            [
-                "git",
-                "-C",
-                str(repository_root),
-                "status",
-                "--porcelain=v1",
-                "--untracked-files=all",
-                "--",
-                *sorted(set(file_paths)),
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
-        raise CheckError(f"could not inspect the local working tree: {exc}") from exc
-    if completed.returncode != 0:
-        raise CheckError("could not inspect the local working tree")
-    state = "dirty" if completed.stdout else "clean"
-    return f"local-working-tree-{state}"
-
-
-def selected_repository_revision(
-    repository: str,
-    requested_ref: str,
-    repository_root: Path,
-    explicit_revision: Optional[str],
-    file_paths: list[str],
-) -> tuple[str, str]:
-    if explicit_revision and not COMMIT_SHA.fullmatch(explicit_revision):
-        raise CheckError("--repository-revision must be a 40-character commit SHA")
-    job_revision = job_spec_repository_revision(
-        repository, requested_ref, repository_root
+    output = checked_git(
+        repository_root,
+        [
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+            "--",
+            *sorted(set(file_paths)),
+        ],
+        "inspecting local working tree",
     )
-    if job_revision:
-        revision, inventory_source = job_revision
-        if explicit_revision and explicit_revision != revision:
-            raise CheckError("--repository-revision does not match JOB_SPEC")
-        return revision, inventory_source
-    local_revision = local_repository_revision(repository_root)
-    if explicit_revision and explicit_revision != local_revision:
-        raise CheckError("--repository-revision does not match local HEAD")
-    return local_revision, local_inventory_source(repository_root, file_paths)
+    return "local-checkout-dirty" if output else "local-checkout-clean"
 
 
-def rehearsal_policy_source(fetcher: Fetcher) -> Optional[tuple[str, str]]:
-    job_spec = os.environ.get("JOB_SPEC")
-    if not job_spec:
-        return None
-    try:
-        spec = json.loads(job_spec)
-    except json.JSONDecodeError as exc:
-        raise CheckError(f"JOB_SPEC is not valid JSON: {exc}") from exc
-    if not isinstance(spec, dict):
-        raise CheckError("JOB_SPEC root is not an object")
-    refs = spec.get("refs")
-    if not isinstance(refs, dict):
-        return None
-    if f"{refs.get('org')}/{refs.get('repo')}" != POLICY_REPOSITORY:
-        return None
-    pulls = refs.get("pulls")
-    if not isinstance(pulls, list) or len(pulls) != 1 or not isinstance(pulls[0], dict):
-        raise CheckError(
-            "release rehearsal JOB_SPEC does not have exactly one pull revision"
-        )
-    pull = pulls[0]
-    revision = pull.get("sha")
-    if not isinstance(revision, str) or not COMMIT_SHA.fullmatch(revision):
-        raise CheckError("release rehearsal JOB_SPEC has an invalid pull revision")
-    number = pull.get("number")
-    if not isinstance(number, int) or isinstance(number, bool) or number <= 0:
-        raise CheckError("release rehearsal JOB_SPEC has an invalid pull number")
-    payload = fetcher.get(
-        f"https://api.github.com/repos/{POLICY_REPOSITORY}/pulls/{number}",
-        as_json=True,
+def git_tag_versions(source: dict[str, str]) -> list[str]:
+    prefix = source["tag_prefix"]
+    output = checked_git(
+        None,
+        [
+            "ls-remote",
+            "--tags",
+            "--refs",
+            source_url(source),
+            f"refs/tags/{prefix}*",
+        ],
+        f"listing public tags for source {source['repository']}",
     )
-    if not isinstance(payload, dict) or not isinstance(payload.get("head"), dict):
-        raise CheckError("release pull lookup returned no head revision")
-    head = payload["head"]
-    head_repository = head.get("repo")
-    if not isinstance(head_repository, dict):
-        raise CheckError("release pull lookup returned no public head repository")
-    repository = head_repository.get("full_name")
-    if not isinstance(repository, str):
-        raise CheckError("release pull lookup returned no public head repository")
-    validate_repository_name(repository)
-    if head.get("sha") != revision:
-        raise CheckError("release pull head does not match the rehearsal revision")
-    return repository, revision
+    versions: list[str] = []
+    for line in output.splitlines():
+        fields = line.split()
+        if len(fields) != 2 or not fields[1].startswith("refs/tags/"):
+            raise CheckError("git ls-remote returned an unexpected tag record")
+        versions.append(fields[1].removeprefix("refs/tags/"))
+    return versions
 
 
-def raw_github_url(repository: str, revision: str, path: str) -> str:
-    validate_repository_name(repository)
-    if not COMMIT_SHA.fullmatch(revision):
-        raise CheckError(f"invalid GitHub revision for {repository}: {revision!r}")
-    encoded_path = "/".join(
-        urllib.parse.quote(part, safe="") for part in path.split("/")
-    )
-    return f"https://raw.githubusercontent.com/{repository}/{revision}/{encoded_path}"
-
-
-def github_page_url(url: str, kind: str, page: int) -> tuple[str, int]:
-    try:
-        parsed = urllib.parse.urlsplit(url)
-        port = parsed.port
-    except ValueError as exc:
-        raise CheckError(f"invalid GitHub source URL {url!r}: {exc}") from exc
-    if parsed.scheme != "https" or parsed.hostname != "api.github.com":
-        raise CheckError("GitHub source URL must use https://api.github.com")
-    if parsed.username is not None or parsed.password is not None:
-        raise CheckError("GitHub source URL must be public HTTPS without credentials")
-    if port is not None:
-        raise CheckError("GitHub source URL must not include an explicit port")
-    if parsed.fragment:
-        raise CheckError("GitHub source URL must not include a fragment")
-    expected_endpoint = {
-        "github_releases": "releases",
-        "github_tags": "tags",
-    }.get(kind)
-    path_parts = parsed.path.strip("/").split("/")
-    if expected_endpoint is None:
-        raise CheckError(f"invalid GitHub source kind {kind!r}")
-    if len(path_parts) != 4 or path_parts[0] != "repos":
-        raise CheckError(f"invalid GitHub {kind} API path")
-    if not path_parts[1] or not path_parts[2] or path_parts[3] != expected_endpoint:
-        raise CheckError(f"invalid GitHub {kind} API path")
-    query = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
-    unsupported_parameters = {key for key, _ in query} - {"page", "per_page"}
-    if unsupported_parameters:
-        raise CheckError(
-            "GitHub source URL has unsupported query parameters: "
-            + ", ".join(sorted(unsupported_parameters))
-        )
-    per_page_values = [value for key, value in query if key == "per_page"]
-    page_values = [value for key, value in query if key == "page"]
-    if len(per_page_values) > 1 or len(page_values) > 1:
-        raise CheckError("GitHub source URL has duplicate pagination parameters")
-    try:
-        per_page = int(per_page_values[0]) if per_page_values else 30
-    except ValueError as exc:
-        raise CheckError("GitHub source URL per_page must be an integer") from exc
-    if not 1 <= per_page <= 100:
-        raise CheckError("GitHub source URL per_page must be between 1 and 100")
-    if page_values and page_values[0] != "1":
-        raise CheckError("GitHub source URL pagination must start at page 1")
-    if page == 1:
-        return url, per_page
-    query = [(key, value) for key, value in query if key != "page"]
-    query.append(("page", str(page)))
-    return urllib.parse.urlunsplit(
-        parsed._replace(query=urllib.parse.urlencode(query))
-    ), per_page
-
-
-def github_items(source: dict[str, Any], fetcher: Fetcher) -> list[dict[str, Any]]:
-    url = source["url"]
+def source_versions(source: dict[str, str], fetcher: Fetcher) -> list[str]:
     kind = source["kind"]
-    _, per_page = github_page_url(url, kind, 1)
-    items: list[dict[str, Any]] = []
-    for page in range(1, GITHUB_PAGE_LIMIT + 1):
-        page_url, _ = github_page_url(url, kind, page)
-        payload = fetcher.get(page_url, as_json=True)
-        if not isinstance(payload, list):
-            raise CheckError(
-                f"GitHub {source['kind']} page {page} response is not a list"
-            )
-        for index, item in enumerate(payload):
-            if not isinstance(item, dict):
-                raise CheckError(
-                    f"GitHub {source['kind']} page {page} item {index} is not an object"
-                )
-            items.append(item)
-        if len(payload) < per_page:
-            return items
-    raise CheckError(
-        f"GitHub pagination reached the safety limit of {GITHUB_PAGE_LIMIT} pages; "
-        "refusing to select from partial version data"
-    )
-
-
-def source_versions(source: dict[str, Any], fetcher: Fetcher) -> list[str]:
-    kind = source["kind"]
-    if kind == "github_releases":
-        payload = github_items(source, fetcher)
-        return [
-            item["tag_name"]
-            for item in payload
-            if not item.get("draft")
-            and not item.get("prerelease")
-            and isinstance(item.get("tag_name"), str)
-            and item["tag_name"]
-        ]
-    if kind == "github_tags":
-        payload = github_items(source, fetcher)
-        return [
-            item["name"]
-            for item in payload
-            if isinstance(item.get("name"), str) and item["name"]
-        ]
-    payload = fetcher.get(source["url"], as_json=True)
+    if kind == "git_tags":
+        return git_tag_versions(source)
+    payload = fetcher.get_package_json(source)
     if kind == "npm":
         releases = payload.get("versions")
         if not isinstance(releases, dict):
             raise CheckError("npm response has no version map")
-        return [
-            version
-            for version, metadata in releases.items()
-            if isinstance(metadata, dict) and not metadata.get("deprecated")
-        ]
+        versions: list[str] = []
+        for version, metadata in releases.items():
+            if not isinstance(version, str) or not isinstance(metadata, dict):
+                raise CheckError("npm version map has an invalid entry")
+            if not metadata.get("deprecated"):
+                versions.append(version)
+        return versions
     if kind == "pypi":
         releases = payload.get("releases")
         if not isinstance(releases, dict):
-            raise CheckError("pypi response has no version map")
-        return [
-            version
-            for version, files in releases.items()
-            if isinstance(files, list)
-            and files
-            and any(isinstance(item, dict) and not item.get("yanked") for item in files)
-        ]
+            raise CheckError("PyPI response has no version map")
+        versions = []
+        for version, files in releases.items():
+            if not isinstance(version, str) or not isinstance(files, list):
+                raise CheckError("PyPI version map has an invalid entry")
+            if not all(isinstance(item, dict) for item in files):
+                raise CheckError("PyPI version file list has an invalid entry")
+            if files and any(not item.get("yanked") for item in files):
+                versions.append(version)
+        return versions
     raise CheckError(f"unsupported source kind {kind!r}")
 
 
 def latest_allowed(
-    source: dict[str, Any], policy: dict[str, str], fetcher: Fetcher
+    source: dict[str, str], policy: dict[str, str], fetcher: Fetcher
 ) -> tuple[str, tuple[int, int, int]]:
     prefix = source.get("tag_prefix", "")
     candidates: list[tuple[tuple[int, int, int], str]] = []
@@ -574,164 +781,16 @@ def latest_allowed(
     return rendered, parsed
 
 
-def validate_source_url(source_name: str, source: dict[str, Any]) -> None:
-    kind = source.get("kind")
-    url = source.get("url")
-    if not isinstance(kind, str) or not isinstance(url, str):
-        raise CheckError(f"source {source_name!r} requires kind and URL strings")
-    validate_lookup_url(url)
-    parsed = urllib.parse.urlsplit(url)
-    if kind in {"github_releases", "github_tags"}:
-        github_page_url(url, kind, 1)
-        return
-    expected_host = {"npm": "registry.npmjs.org", "pypi": "pypi.org"}.get(kind)
-    if expected_host is None:
-        raise CheckError(f"source {source_name!r} has unsupported kind {kind!r}")
-    if parsed.hostname != expected_host:
+def selected_dependencies(repository: str) -> list[tuple[str, dict[str, Any]]]:
+    validate_repository_name(repository)
+    dependency_ids = REPOSITORIES.get(repository)
+    if dependency_ids is None:
         raise CheckError(
-            f"source {source_name!r} kind {kind!r} requires host {expected_host}"
+            f"selected repository {repository!r} is not in embedded policy"
         )
-
-
-def validate_config(config: dict[str, Any]) -> None:
-    if config.get("schema_version") != 1:
-        raise CheckError("only config schema_version 1 is supported")
-    sources = config.get("sources", {})
-    if not isinstance(sources, dict):
-        raise CheckError("config sources must be an object")
-    for source_name, source in sources.items():
-        if not isinstance(source_name, str) or not isinstance(source, dict):
-            raise CheckError("each source requires a string name and object value")
-        validate_source_url(source_name, source)
-    repositories = config.get("repositories")
-    if not isinstance(repositories, list) or not repositories:
-        raise CheckError("config must contain at least one repository")
-    seen_repositories: set[str] = set()
-    for repository in repositories:
-        if not isinstance(repository, dict):
-            raise CheckError("each repository declaration must be an object")
-        repository_name = repository.get("name")
-        if not repository_name or not repository.get("ref"):
-            raise CheckError("each repository requires name and ref")
-        if repository_name in seen_repositories:
-            raise CheckError(f"duplicate repository declaration: {repository_name}")
-        seen_repositories.add(repository_name)
-        dependencies = repository.get("dependencies")
-        if not isinstance(dependencies, list) or not dependencies:
-            raise CheckError(f"{repository_name}: at least one dependency is required")
-        seen_dependencies: set[tuple[str, str]] = set()
-        for dependency in dependencies:
-            if not isinstance(dependency, dict):
-                raise CheckError(
-                    f"{repository_name}: each dependency must be an object"
-                )
-            dependency_name = dependency.get("name")
-            file_path = dependency.get("file")
-            if not dependency_name or not file_path or not dependency.get("rationale"):
-                raise CheckError(
-                    f"{repository_name}: each dependency requires name, file, and rationale"
-                )
-            identity = (file_path, dependency_name)
-            if identity in seen_dependencies:
-                raise CheckError(
-                    f"{repository_name}: duplicate dependency declaration: "
-                    f"{file_path} {dependency_name}"
-                )
-            seen_dependencies.add(identity)
-            extraction = dependency.get("extract")
-            if not isinstance(extraction, dict) or not extraction.get("pattern"):
-                raise CheckError(
-                    f"{repository_name}/{dependency_name}: extraction requires a pattern"
-                )
-            if extraction.get("kind") not in {"presence", "regex"}:
-                raise CheckError(
-                    f"{repository_name}/{dependency_name}: invalid extraction kind"
-                )
-            if extraction["kind"] == "presence" and not extraction.get("current"):
-                raise CheckError(
-                    f"{repository_name}/{dependency_name}: presence extraction requires current"
-                )
-            classification = dependency.get("classification")
-            if classification not in CLASSIFICATIONS:
-                raise CheckError(
-                    f"{repository_name}/{dependency_name}: invalid classification"
-                )
-            if classification == "pinned":
-                source = sources.get(dependency.get("source"))
-                policy = dependency.get("policy")
-                if (
-                    not isinstance(source, dict)
-                    or not source.get("kind")
-                    or not source.get("url")
-                ):
-                    raise CheckError(
-                        f"{repository_name}/{dependency_name}: pinned entries require a valid source"
-                    )
-                if (
-                    not isinstance(policy, dict)
-                    or not isinstance(policy.get("min_inclusive"), str)
-                    or not isinstance(policy.get("max_exclusive"), str)
-                ):
-                    raise CheckError(
-                        f"{repository_name}/{dependency_name}: pinned entries require policy bounds"
-                    )
-                minimum = parse_version(policy["min_inclusive"])
-                maximum = parse_version(policy["max_exclusive"])
-                if minimum >= maximum:
-                    raise CheckError(
-                        f"{repository_name}/{dependency_name}: policy range must be non-empty"
-                    )
-            elif dependency.get("source") or dependency.get("policy"):
-                raise CheckError(
-                    f"{repository_name}/{dependency_name}: only pinned entries may define source/policy"
-                )
-            if classification == "repo-coupled" and not dependency.get("authority"):
-                raise CheckError(
-                    f"{repository_name}/{dependency_name}: repo-coupled entries require authority"
-                )
-            if (
-                classification != "repo-coupled"
-                and classification != "pinned"
-                and not dependency.get("version_source")
-            ):
-                raise CheckError(
-                    f"{repository_name}/{dependency_name}: {classification} entries require version_source"
-                )
-
-
-def selected_config(
-    config: dict[str, Any],
-    repository_name: str,
-    repository_root: Path,
-    explicit_revision: Optional[str],
-) -> tuple[dict[str, Any], str, str, str]:
-    validate_config(config)
-    matches = [
-        repository
-        for repository in config["repositories"]
-        if repository["name"] == repository_name
+    return [
+        (dependency_id, DEPENDENCIES[dependency_id]) for dependency_id in dependency_ids
     ]
-    if len(matches) != 1:
-        raise CheckError(
-            f"selected repository {repository_name!r} does not have exactly one policy entry"
-        )
-    repository = dict(matches[0])
-    requested_ref = repository["ref"]
-    file_paths = [dependency["file"] for dependency in repository["dependencies"]]
-    revision, inventory_source = selected_repository_revision(
-        repository_name,
-        requested_ref,
-        repository_root,
-        explicit_revision,
-        file_paths,
-    )
-    repository["revision"] = revision
-    return (
-        {**config, "repositories": [repository]},
-        requested_ref,
-        revision,
-        inventory_source,
-    )
 
 
 def repository_file(repository_root: Path, file_path: str) -> Path:
@@ -749,7 +808,7 @@ def repository_file(repository_root: Path, file_path: str) -> Path:
         candidate.relative_to(root)
     except ValueError as exc:
         raise CheckError(
-            f"repository file escapes the local workspace: {file_path!r}"
+            f"repository file escapes the local checkout: {file_path!r}"
         ) from exc
     return candidate
 
@@ -794,99 +853,96 @@ def atomic_write_text(destination: Path, content: str) -> None:
         raise
 
 
-def check(
-    config: dict[str, Any], fetcher: Fetcher, repository_root: Path
-) -> list[dict[str, Any]]:
-    if not repository_root.is_dir():
+def extract_current(content: str, pattern: re.Pattern[str]) -> str:
+    matches = list(pattern.finditer(content))
+    if len(matches) != 1:
         raise CheckError(
-            f"target repository workspace does not exist: {repository_root}"
+            f"extraction pattern matched {len(matches)} times; exactly one match is required"
         )
+    return matches[0].group("version")
+
+
+def check(
+    repository: str,
+    dependencies: list[tuple[str, dict[str, Any]]],
+    patterns: dict[str, re.Pattern[str]],
+    fetcher: Fetcher,
+    repository_root: Path,
+    repository_revision: str,
+) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
+    file_cache: dict[str, Union[str, CheckError]] = {}
     source_cache: dict[tuple[str, str, str], tuple[str, tuple[int, int, int]]] = {}
-    for repository in config["repositories"]:
-        file_cache: dict[str, Union[str, CheckError]] = {}
-        for dependency in repository["dependencies"]:
-            file_path = dependency["file"]
-            row: dict[str, Any] = {
-                "repository": repository["name"],
-                "ref": repository["ref"],
-                "revision": repository["revision"],
-                "file": file_path,
-                "dependency": dependency["name"],
-                "classification": dependency["classification"],
-                "current": None,
-                "proposed": None,
-                "version_source": dependency.get("version_source")
-                or dependency.get("authority"),
-                "authority": dependency.get("authority"),
-                "status": dependency["classification"],
-                "rationale": dependency["rationale"],
-                "error": None,
-            }
-            try:
-                if file_path not in file_cache:
-                    try:
-                        file_cache[file_path] = repository_file(
-                            repository_root, file_path
-                        ).read_text(encoding="utf-8")
-                    except (CheckError, OSError, UnicodeError) as exc:
-                        file_cache[file_path] = CheckError(
-                            f"could not read local repository file {file_path}: {exc}"
-                        )
-                content = file_cache[file_path]
-                if isinstance(content, CheckError):
-                    raise content
-                current = extract_current(content, dependency)
-                row["current"] = current
-                if dependency["classification"] == "pinned":
-                    source = config["sources"][dependency["source"]]
-                    row["version_source"] = source["url"]
-                    current_parsed = parse_version(
-                        current, dependency.get("current_prefix", "")
+    for dependency_id, dependency in dependencies:
+        file_path = dependency["file"]
+        row: dict[str, Any] = {
+            "repository": repository,
+            "revision": repository_revision,
+            "file": file_path,
+            "dependency": dependency["name"],
+            "classification": dependency["classification"],
+            "current": None,
+            "proposed": None,
+            "version_source": dependency.get("version_source")
+            or dependency.get("authority"),
+            "authority": dependency.get("authority"),
+            "status": dependency["classification"],
+            "rationale": dependency["rationale"],
+            "error": None,
+        }
+        try:
+            if file_path not in file_cache:
+                try:
+                    file_cache[file_path] = repository_file(
+                        repository_root, file_path
+                    ).read_text(encoding="utf-8")
+                except (CheckError, OSError, UnicodeError) as exc:
+                    file_cache[file_path] = CheckError(
+                        f"could not read local repository file {file_path}: {exc}"
                     )
-                    if not version_in_policy(current_parsed, dependency["policy"]):
-                        raise CheckError(
-                            "current version is outside the explicit policy range"
-                        )
-                    cache_key = (
-                        dependency["source"],
-                        dependency["policy"]["min_inclusive"],
-                        dependency["policy"]["max_exclusive"],
+            content = file_cache[file_path]
+            if isinstance(content, CheckError):
+                raise content
+            current = extract_current(content, patterns[dependency_id])
+            row["current"] = current
+            if dependency["classification"] == "pinned":
+                source_name = dependency["source"]
+                source = SOURCES[source_name]
+                row["version_source"] = source_description(source)
+                current_parsed = parse_version(current)
+                if not version_in_policy(current_parsed, dependency["policy"]):
+                    raise CheckError(
+                        "current version is outside the explicit policy range"
                     )
-                    if cache_key not in source_cache:
-                        source_cache[cache_key] = latest_allowed(
-                            source, dependency["policy"], fetcher
-                        )
-                    proposed, proposed_parsed = source_cache[cache_key]
-                    if proposed_parsed > current_parsed:
-                        row["proposed"] = proposed
-                        row["status"] = "update_available"
-                        row["rationale"] = (
-                            f"{dependency['rationale']} Newest stable version inside "
-                            f"[{dependency['policy']['min_inclusive']}, "
-                            f"{dependency['policy']['max_exclusive']}) is {proposed}."
-                        )
-                    else:
-                        row["proposed"] = current
-                        row["status"] = "no_change"
-                        row["rationale"] = (
-                            f"{dependency['rationale']} No newer stable version was found "
-                            "inside the explicit policy range; downgrades are never proposed."
-                        )
-            except (
-                AttributeError,
-                CheckError,
-                KeyError,
-                TypeError,
-                ValueError,
-                json.JSONDecodeError,
-                re.error,
-            ) as exc:
-                row["status"] = "error"
-                row["proposed"] = None
-                row["error"] = str(exc)
-                row["rationale"] = f"Check failed: {exc}"
-            results.append(row)
+                cache_key = (
+                    source_name,
+                    dependency["policy"]["min_inclusive"],
+                    dependency["policy"]["max_exclusive"],
+                )
+                if cache_key not in source_cache:
+                    source_cache[cache_key] = latest_allowed(
+                        source, dependency["policy"], fetcher
+                    )
+                proposed, proposed_parsed = source_cache[cache_key]
+                if proposed_parsed > current_parsed:
+                    row["proposed"] = proposed
+                    row["status"] = "update_available"
+                    row["rationale"] = (
+                        f"{dependency['rationale']} Newest stable version inside "
+                        f"[{dependency['policy']['min_inclusive']}, "
+                        f"{dependency['policy']['max_exclusive']}) is {proposed}."
+                    )
+                else:
+                    row["proposed"] = current
+                    row["status"] = "no_change"
+                    row["rationale"] = (
+                        f"{dependency['rationale']} No newer stable version was found "
+                        "inside the explicit policy range; downgrades are never proposed."
+                    )
+        except (CheckError, re.error) as exc:
+            row["status"] = "error"
+            row["error"] = str(exc)
+        results.append(row)
     return results
 
 
@@ -894,12 +950,10 @@ def write_reports(
     results: list[dict[str, Any]],
     output_dir: Path,
     *,
-    policy_repository: str,
-    policy_revision: str,
     repository: str,
-    requested_ref: str,
     repository_revision: str,
     inventory_source: str,
+    checkout_identity: str,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
@@ -907,16 +961,16 @@ def write_reports(
         "schema_version": 1,
         "generated_at": generated_at,
         "policy": {
-            "repository": policy_repository,
-            "path": POLICY_PATH,
-            "revision": policy_revision,
+            "source": "embedded in openshift-devcontainer-dependency-report-commands.py",
+            "schema_version": 1,
         },
         "repository": {
             "name": repository,
-            "requested_ref": requested_ref,
             "revision": repository_revision,
             "inventory_source": inventory_source,
+            "checkout_identity": checkout_identity,
         },
+        "scope_notes": REPORT_NOTES,
         "results": results,
     }
     atomic_write_text(
@@ -931,13 +985,19 @@ def write_reports(
         "",
         f"Generated: {generated_at}",
         "",
-        f"Policy revision: `{policy_repository}@{policy_revision}`",
+        "Policy: embedded and co-versioned with the checker script",
         "",
-        f"Repository revision: `{repository}@{repository_revision}` (requested `{requested_ref}`)",
+        f"Repository revision: `{repository}@{repository_revision}`",
         "",
         f"Inventory source: `{inventory_source}`",
         "",
+        f"Checkout identity: `{checkout_identity}`",
+        "",
         "This report is advisory. It does not claim compatibility or modify dependencies.",
+        "",
+        "## Scope notes",
+        "",
+        *[f"- {note}" for note in REPORT_NOTES],
         "",
         "## Summary",
         "",
@@ -984,22 +1044,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--repository",
         default=os.environ.get("DEVCONTAINER_DEPENDENCY_REPOSITORY"),
-        help="one public repository named in the shared policy",
+        help="one public repository named in the embedded policy",
     )
     parser.add_argument(
         "--repository-root",
-        default=os.environ.get("DEVCONTAINER_DEPENDENCY_ROOT", "/workspace"),
+        default=Path("/workspace"),
         type=Path,
         help="local checkout of the selected repository (default: /workspace)",
-    )
-    parser.add_argument(
-        "--repository-revision",
-        help="exact revision assertion; must match JOB_SPEC or local HEAD",
-    )
-    parser.add_argument("--config", type=Path, help="use a local policy file")
-    parser.add_argument(
-        "--policy-revision",
-        help="revision recorded for a local policy file (required with --config)",
     )
     parser.add_argument("--output-dir", default=default_output, type=Path)
     parser.add_argument(
@@ -1010,58 +1061,51 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(argv or sys.argv[1:])
-    fetcher = Fetcher()
+    phase = "validating embedded policy"
     try:
+        patterns = validate_policy()
         if not args.repository:
             raise CheckError(
                 "--repository or DEVCONTAINER_DEPENDENCY_REPOSITORY is required"
             )
-        policy_source_repository = POLICY_REPOSITORY
-        if args.config:
-            if not args.policy_revision:
-                raise CheckError("--policy-revision is required with --config")
-            if not COMMIT_SHA.fullmatch(args.policy_revision):
-                raise CheckError("--policy-revision must be a 40-character commit SHA")
-            config_text = args.config.read_text(encoding="utf-8")
-            policy_revision = args.policy_revision
-        else:
-            if args.policy_revision:
-                raise CheckError("--policy-revision may only be used with --config")
-            rehearsal_source = rehearsal_policy_source(fetcher)
-            if rehearsal_source:
-                policy_source_repository, policy_revision = rehearsal_source
-            else:
-                policy_revision = resolve_github_revision(
-                    POLICY_REPOSITORY, POLICY_REF, fetcher
-                )
-            config_text = fetcher.get(
-                raw_github_url(policy_source_repository, policy_revision, POLICY_PATH),
-                as_json=False,
+        phase = "selecting repository policy"
+        dependencies = selected_dependencies(args.repository)
+        file_paths = [dependency["file"] for _, dependency in dependencies]
+        phase = "validating target checkout"
+        if not args.repository_root.is_dir():
+            raise CheckError(
+                f"target repository checkout does not exist: {args.repository_root}"
             )
-        config = json.loads(config_text)
-        if not isinstance(config, dict):
-            raise CheckError("policy document root must be an object")
-        config, requested_ref, repository_revision, inventory_source = selected_config(
-            config,
-            args.repository,
-            args.repository_root,
-            args.repository_revision,
+        revision = local_repository_revision(args.repository_root)
+        checkout_identity = validate_checkout_identity(
+            args.repository, args.repository_root
         )
+        inventory_source = local_inventory_source(args.repository_root, file_paths)
         ensure_output_outside_repository(args.output_dir, args.repository_root)
-        results = check(config, fetcher, args.repository_root)
-    except (OSError, json.JSONDecodeError, CheckError) as exc:
-        print(f"configuration error: {exc}", file=sys.stderr)
+        phase = "checking dependency versions"
+        results = check(
+            args.repository,
+            dependencies,
+            patterns,
+            Fetcher(),
+            args.repository_root,
+            revision,
+        )
+        phase = "writing report artifacts"
+        write_reports(
+            results,
+            args.output_dir,
+            repository=args.repository,
+            repository_revision=revision,
+            inventory_source=inventory_source,
+            checkout_identity=checkout_identity,
+        )
+    except (OSError, CheckError) as exc:
+        print(
+            f"devcontainer dependency report failed during {phase}: {exc}",
+            file=sys.stderr,
+        )
         return 2
-    write_reports(
-        results,
-        args.output_dir,
-        policy_repository=policy_source_repository,
-        policy_revision=policy_revision,
-        repository=args.repository,
-        requested_ref=requested_ref,
-        repository_revision=repository_revision,
-        inventory_source=inventory_source,
-    )
     for row in results:
         suffix = f": {row['error']}" if row["error"] else ""
         print(
