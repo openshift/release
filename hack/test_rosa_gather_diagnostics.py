@@ -23,6 +23,10 @@ SCRIPT = ROOT / ("ci-operator/step-registry/rosa/e2e/gather-cluster-diagnostics/
                  "rosa-e2e-gather-cluster-diagnostics-commands.sh")
 CLUSTER = "a" * 32
 SECRET = "FIXTURE_SECRET_MUST_NOT_APPEAR"
+CONTAINER_OUTPUT = "/ocm-backend-tests/output"
+OUTPUT_MOUNT = ":" + CONTAINER_OUTPUT + ":z"
+PREPARE = ROOT / ("ci-operator/step-registry/rosa/e2e/ocm-fvt/prepare/"
+                  "rosa-e2e-ocm-fvt-prepare-commands.py")
 
 
 def mock_curl(base, case, arguments):
@@ -99,6 +103,43 @@ def mock_ocm(base, case, arguments):
     return 0
 
 
+def mock_podman(base, case, arguments):
+    """Stand in for the FVT container run.
+
+    The producer mounts its output directory into the container, so the fixture
+    resolves that bind mount instead of assuming a fixed path: the step stages
+    the directory privately and only publishes a filtered copy of it.
+    """
+    with (base / "calls.jsonl").open("a", encoding="utf-8") as calls:
+        calls.write(json.dumps(arguments) + "\n")
+    if arguments[0] == "pull":
+        return 0
+    if arguments[0] == "inspect":
+        print("fixture@" + producer.DIGEST)
+        return 0
+    if arguments[0] != "run":
+        raise AssertionError("Unexpected podman operation")
+    mount = next((argument for argument in arguments
+                  if argument.endswith(OUTPUT_MOUNT)), None)
+    if mount is None:
+        raise AssertionError("podman run must bind-mount " + CONTAINER_OUTPUT)
+    profile = Path(mount.removesuffix(OUTPUT_MOUNT)) / "test-result-fixture"
+    profile.mkdir(mode=0o755)
+    (profile / "report.xml").write_text("<testsuites/>\n", encoding="utf-8")
+    # An unreadable secret-bearing report keeps the leak assertions meaningful.
+    (profile / "pre-cluster-creation_123456.json").write_text(producer.SECRET, encoding="utf-8")
+    (profile / "pre-cluster-creation_123456.json").chmod(0)
+    (profile / "cluster.ini").write_text("[Cluster]\nName=fixture-run-name\nID=" + CLUSTER +
+                                         "\nState=pending\n[OtherResource]\nID=not-a-cluster\n",
+                                         encoding="utf-8")
+    if case == "multi-cluster":
+        second = profile.parent / "another-profile"
+        second.mkdir(mode=0o755)
+        (second / "cluster.ini").write_text("Name=another-run-name\nID=" + "b" * 32 + "\n",
+                                            encoding="utf-8")
+    return int(os.environ["FIXTURE_EXIT"])
+
+
 def mock(command, arguments):
     base = Path(os.environ["FIXTURE_DIR"])
     case = os.environ["FIXTURE_CASE"]
@@ -127,16 +168,7 @@ def mock(command, arguments):
                 "phase": "Pending", "message": SECRET, "conditions": [{"type": "Ready", "status": "False"}]}}]}))
         return 0
     if command == "podman":
-        result = producer.mock_command(command, arguments)
-        if arguments[0] == "run":
-            recording = base / "artifacts/ocm-fvt-results/test-result-fixture/cluster.ini"
-            recording.write_text("[Cluster]\nName=fixture-run-name\nID=" + CLUSTER +
-                                 "\nState=pending\n[OtherResource]\nID=not-a-cluster\n")
-            if case == "multi-cluster":
-                second = recording.parent.parent / "another-profile"
-                second.mkdir()
-                (second / "cluster.ini").write_text("Name=another-run-name\nID=" + "b" * 32 + "\n")
-        return result
+        return mock_podman(base, case, arguments)
     raise AssertionError("Unexpected fixture command")
 
 
@@ -341,6 +373,14 @@ class CollectorTests(unittest.TestCase):
 
 
 class ProducerHandoffTests(producer.ArtifactFixture):
+    def setUp(self):
+        super().setUp()
+        # rosa-e2e-ocm-fvt-prepare delivers itself as the artifact helper the
+        # producer requires before it stages or publishes anything. Run that
+        # delivery rather than copying, so the fixture covers prepare too.
+        subprocess.run([sys.executable, str(PREPARE)], check=True, timeout=30,
+                       env={**os.environ, "SHARED_DIR": str(self.shared)})
+
     def test_utf8_recording_under_ascii_locale(self):
         output = self.artifacts / "utf8-recordings"
         recording = output / "profile" / "cluster.ini"
