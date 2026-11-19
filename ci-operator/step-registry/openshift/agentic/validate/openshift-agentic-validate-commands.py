@@ -39,8 +39,8 @@ JIRA_URL = "https://redhat.atlassian.net"
 ISSUE_KEY = re.compile(r"\b[A-Z][A-Z0-9]+-[0-9]+\b")
 SHA = re.compile(r"[a-f0-9]{40}")
 CHECK_ID = re.compile(r"[a-z][a-z0-9-]{0,63}")
-# Structured decoders can full-match patterns; permit the complete page citation.
-SOURCE_REFERENCE = re.compile(r"^https://[^/\s]+/\S.*$")
+# Permit full-page citations without consuming the JSON string's closing quote.
+SOURCE_REFERENCE = re.compile(r'^https://[^/\s"]+/[^"\s][^"\r\n]*$')
 
 PREPARE_PROMPT = """Produce a focused validation plan for the assigned ephemeral
 OpenShift cluster. First select the requirements: when supervisor-provided
@@ -580,7 +580,7 @@ class Model:  # pylint: disable=too-few-public-methods
         self.ca_file = os.environ.get("VALIDATION_MODEL_CA_FILE") or None
         self.usage = {"requests": 0, "prompt_tokens": 0, "completion_tokens": 0}
 
-    def request_payload(self, messages, tools):
+    def request_payload(self, messages, tools, response_format=None):
         """Build one bounded request without exposing more job settings."""
         payload = {
             "model": self.model,
@@ -593,7 +593,7 @@ class Model:  # pylint: disable=too-few-public-methods
             payload["tool_choice"] = "required"
             payload["parallel_tool_calls"] = False
         elif self.phase == "prepare":
-            payload["response_format"] = PLAN_RESPONSE_FORMAT
+            payload["response_format"] = response_format or PLAN_RESPONSE_FORMAT
         if len(json.dumps(payload).encode()) > MAX_MODEL_INPUT_BYTES:
             raise ValidationError("model input exceeds size limit")
         return payload
@@ -605,8 +605,8 @@ class Model:  # pylint: disable=too-few-public-methods
         for field in ("prompt_tokens", "completion_tokens"):
             self.usage[field] += max(0, int(usage.get(field, 0)))
 
-    def complete(self, messages, tools=None):
-        payload = self.request_payload(messages, tools)
+    def complete(self, messages, tools=None, response_format=None):
+        payload = self.request_payload(messages, tools, response_format)
         headers = {"Authorization": f"Bearer {self.token}"}
         response = request_json(self.url, headers, payload, ca_file=self.ca_file)
         self.record_usage(response)
@@ -854,6 +854,16 @@ def public_sources(sources):
     return public
 
 
+def plan_response_format(sources):
+    """Permit only captured page citations during constrained generation."""
+    urls = [sources["url"]] + [issue["url"] for issue in sources["issues"]]
+    pages = "|".join(re.escape(url) for url in urls)
+    response_format = copy.deepcopy(PLAN_RESPONSE_FORMAT)
+    reference = response_format["json_schema"]["schema"]["properties"]["checks"]["items"]["properties"]["reference"]
+    reference["pattern"] = "^(" + pages + r')([# ][^"\r\n]*)?$'
+    return response_format
+
+
 def generate_plan(model, sources, context, secrets):
     """Generate and validate a revision-bound plan from captured source input."""
     pr_context = dict(context)
@@ -866,8 +876,9 @@ def generate_plan(model, sources, context, secrets):
             "pr": pr_context,
         })},
     ]
+    response_format = plan_response_format(sources)
     for attempt in range(3):
-        message = model.complete(messages)
+        message = model.complete(messages, response_format=response_format)
         plan = redact_json(json.loads(message.get("content") or ""), secrets)
         if isinstance(plan, dict) and ("sources" in plan or "hash" in plan):
             raise ValidationError("model must not set trusted source metadata")

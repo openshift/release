@@ -47,13 +47,15 @@ supervisor.
    Plans declaring unresolved gaps remain fatal and are not forced into readiness.
    Readiness means that the plan is executable; installation and runtime
    prerequisites are verified by execution, not by planning.
-   Response-schema constraints require nonempty check fields and HTTPS source
-   citations. The validator independently requires the captured Jira issue URL
+   Response-schema constraints require nonempty check fields and restrict
+   citations to captured page URLs, with optional criteria or section suffixes.
+   The validator independently requires the captured Jira issue URL
    for Jira checks and the captured PR URL for PR checks. Inferred checks cite
    one of those captured pages; site roots and unrelated pages are rejected.
    Product prerequisites exclude model access, image publication and CI setup.
    The citation pattern permits the complete page path and section even when
-   a structured-output backend treats its regex as a full-string match.
+   a structured-output backend treats its regex as a full-string match. It
+   excludes quotes and line breaks so decoding can terminate the JSON string.
    PR Git revisions identify CI source; deployed image identities are supplied by
    the execution supervisor and must not be invented during planning.
 4. `write_plan` writes `validation.json`, `validation.md` and public source
