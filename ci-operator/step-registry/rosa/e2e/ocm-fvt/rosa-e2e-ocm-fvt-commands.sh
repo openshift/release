@@ -502,20 +502,33 @@ trap 'cleanup_ocm_fvt || true; exit "${exit_code}"' EXIT
 # executes publishes no report, and the step's finished.json cannot say whether
 # the suite exited non-zero or the step scaffolding around it did. Written
 # before publication so the audit manifest's handoff inventory lists it.
-# --remove-destination so an artifact name that already exists as a symlink is
-# replaced rather than written through, matching the O_NOFOLLOW writes the
-# collector uses. cp takes the mode from the source, and the SHARED_DIR copy is
-# written under whatever umask the step inherited, so the mode is set
-# explicitly rather than left to umask, matching the 0644 the collector gives
-# its own artifacts. The chmod is chained to a successful copy: errexit is
-# suspended inside this subshell, and a cp that fails early leaves whatever
-# already occupied the name in place, so an unconditional chmod would act on
-# that instead - following a pre-existing symlink, which is exactly what
-# --remove-destination is here to avoid.
+# The artifact name is cleared before the copy rather than during it. Both
+# writes above are best effort, so the copy can fail with something already at
+# that name, and a status artifact that survives a failed mirror is worse than
+# no artifact at all: publication would report a stale exit code as this run's.
+# rm -f removes a regular file or a symlink without following it and without
+# touching a symlink's target, and refuses a directory, so it cannot delete a
+# tree that something else owns.
+#
+# cp alone is not enough to clear the name. --remove-destination resolves the
+# destination first, so a symlink pointing at a directory is treated as that
+# directory: cp writes inside it and the chmod then re-modes it. -T refuses a
+# directory destination outright, which leaves a directory rm would not remove
+# intact and unpublished.
+#
+# cp takes the mode from the source, and the SHARED_DIR copy is written under
+# whatever umask the step inherited, so the mode is set explicitly rather than
+# left to umask, matching the 0644 the collector gives its own artifacts. The
+# chmod is chained to a successful copy, since errexit is suspended inside this
+# subshell and an unconditional chmod would otherwise re-mode whatever a
+# refused copy left behind.
+artifact_exit_code="${ARTIFACT_DIR}/ocm-fvt-exit-code"
 (
   umask 022
-  cp --remove-destination "${SHARED_DIR}/ocm-fvt-exit-code" "${ARTIFACT_DIR}/ocm-fvt-exit-code" &&
-    chmod 0644 "${ARTIFACT_DIR}/ocm-fvt-exit-code"
+  rm -f -- "${artifact_exit_code}"
+  cp --no-target-directory --remove-destination -- \
+    "${SHARED_DIR}/ocm-fvt-exit-code" "${artifact_exit_code}" &&
+    chmod 0644 -- "${artifact_exit_code}"
 ) 2>/dev/null || true
 
 (

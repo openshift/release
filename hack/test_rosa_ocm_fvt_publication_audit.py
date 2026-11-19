@@ -303,17 +303,8 @@ class ExitCodeArtifactTests(unittest.TestCase):
         self.assertEqual(value, "42")
         self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o644)
 
-    @UNPRIVILEGED
-    def test_a_failed_mirror_does_not_follow_an_existing_symlink(self):
-        """A mirror that cannot be written changes nothing and keeps the return.
-
-        The SHARED_DIR write is best effort, so the source can be absent with a
-        link already at the artifact name. cp must refuse, the chmod chained to
-        it must not run, and the link's target must keep its own mode and
-        content.
-        """
-        self.outside.chmod(0o600)
-        (self.artifacts / EXIT_CODE_ARTIFACT).symlink_to(self.outside)
+    def run_step_without_a_shared_write(self, exit_code=42):
+        """Run the step with SHARED_DIR read-only, so both writes fail."""
         self.shared.chmod(0o500)
         self.addCleanup(self.shared.chmod, 0o700)
         process = subprocess.run(["bash", str(self.script)], env={
@@ -321,13 +312,57 @@ class ExitCodeArtifactTests(unittest.TestCase):
             "HOME": str(self.base), "ARTIFACT_DIR": str(self.artifacts),
             "SHARED_DIR": str(self.shared), "JOB_NAME": "fixture", "BUILD_ID": "1",
             "OCM_FVT_JOB_NAME": "fixture", "FIXTURE_DIR": str(self.base),
-            "FIXTURE_EXIT": "42",
+            "FIXTURE_EXIT": str(exit_code),
         }, capture_output=True, text=True, timeout=120, check=False)
-        self.assertEqual(process.returncode, 42, process.stderr)
+        self.assertEqual(process.returncode, exit_code, process.stderr)
+        self.assertNotIn(SECRET, process.stdout + process.stderr)
         self.assertFalse((self.shared / EXIT_CODE_ARTIFACT).exists())
-        self.assertTrue((self.artifacts / EXIT_CODE_ARTIFACT).is_symlink())
+        return process
+
+    @UNPRIVILEGED
+    def test_a_failed_mirror_does_not_publish_a_stale_status(self):
+        """An artifact already holding 0 must not be published for a suite that failed."""
+        (self.artifacts / EXIT_CODE_ARTIFACT).write_text("0\n", encoding="utf-8")
+        self.run_step_without_a_shared_write()
+        self.assertFalse((self.artifacts / EXIT_CODE_ARTIFACT).exists(),
+                         "a mirror that did not happen must leave no status artifact")
+
+    @UNPRIVILEGED
+    def test_a_failed_mirror_does_not_follow_an_existing_symlink(self):
+        """The link is cleared without being followed; its target is untouched."""
+        self.outside.chmod(0o600)
+        (self.artifacts / EXIT_CODE_ARTIFACT).symlink_to(self.outside)
+        self.run_step_without_a_shared_write()
+        self.assertFalse((self.artifacts / EXIT_CODE_ARTIFACT).is_symlink())
+        self.assertFalse((self.artifacts / EXIT_CODE_ARTIFACT).exists())
         self.assertEqual(stat.S_IMODE(self.outside.stat().st_mode), 0o600)
         self.assertEqual(self.outside.read_text(), SECRET)
+
+    def test_published_copy_replaces_a_symlink_to_a_directory(self):
+        """cp resolves such a link to the directory; clearing the name first does not."""
+        external = self.base / "external"
+        external.mkdir(mode=0o700)
+        (external / "pre-existing").write_text(SECRET, encoding="utf-8")
+        (self.artifacts / EXIT_CODE_ARTIFACT).symlink_to(external)
+        self.run_step(42)
+        path, value = self.published()
+        self.assertEqual(value, "42")
+        self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o644)
+        self.assertEqual(stat.S_IMODE(external.stat().st_mode), 0o700)
+        self.assertEqual([entry.name for entry in external.iterdir()], ["pre-existing"])
+
+    def test_a_directory_at_the_artifact_name_is_left_intact(self):
+        """rm refuses a directory and -T refuses to copy into one."""
+        occupied = self.artifacts / EXIT_CODE_ARTIFACT
+        occupied.mkdir()
+        # Explicit, because mkdir's mode argument is masked by the umask the
+        # test runner happens to have.
+        occupied.chmod(0o755)
+        (occupied / "keep").write_text("x", encoding="utf-8")
+        self.run_step(42)
+        self.assertTrue(occupied.is_dir())
+        self.assertEqual(stat.S_IMODE(occupied.stat().st_mode), 0o755)
+        self.assertEqual([entry.name for entry in occupied.iterdir()], ["keep"])
 
     def test_the_artifact_is_listed_in_the_publication_handoff(self):
         self.run_step(1)
