@@ -20,6 +20,15 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: image-mirror-postsubmit
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: installer-ai-dev
+    env:
+      IMAGE_REPO: installer-ai-dev
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
@@ -28,6 +37,21 @@ tests:
     env:
       IMAGE_REPO: installer-ai-dev
       REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - collection: ocm-secrets
+        group: acm-cicd-github
+        mount_path: /etc/github
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: main
