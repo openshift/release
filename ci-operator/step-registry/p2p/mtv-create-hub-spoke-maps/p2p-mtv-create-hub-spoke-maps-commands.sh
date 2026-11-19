@@ -16,7 +16,7 @@
 #     MTV_HS_HUB_TO_SPOKE_* / MTV_HS_SPOKE_TO_HUB_*
 #     MTV_HS_HUB_STORAGE_NAME / MTV_HS_SPOKE_STORAGE_CLASS (etc.)
 #
-# Requires interop-acm-cclm-mtv-register-providers (providers Ready) and ODF Available on
+# Requires interop-acm-policy-set-acm-virt-bundle-mtv-register-providers (providers Ready) and ODF Available on
 # both clusters before this step.
 #
 set -Eeuxo pipefail; shopt -s inherit_errexit
