@@ -30,10 +30,10 @@ process_inventory() {
     local varname
     varname=$(basename "${filename}")
     if [[ "$content" == *$'\n'* ]]; then
-      echo "${varname}: |"
-      echo "$content" | sed 's/^/  /'
+      printf '%s: |\n' "${varname}"
+      printf '%s\n' "$content" | sed 's/^/  /'
     else
-      echo "${varname}": \'"${content}"\'
+      printf "%s: '%s'\n" "${varname}" "${content//\'/\'\'}"
     fi
   done > "${dest_file}"
 }

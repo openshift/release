@@ -7,7 +7,13 @@ OCP_DEPLOYMENT_INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
 CNF_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
 
 cleanup() {
-  rm -rf -- "$ARTIFACT_WORK"
+  local status=$? cleanup_rc=0
+  rm -rf -- "$ARTIFACT_WORK" || cleanup_rc=$?
+  if (( cleanup_rc != 0 )); then
+    echo "Failed to remove private seed artifact files." >&2
+    (( status != 0 )) || status=$cleanup_rc
+  fi
+  exit "$status"
 }
 
 restore_seed_inventory() {
@@ -70,14 +76,20 @@ prepare_seedgeneration() {
 }
 
 prepare_capture_access() {
+  local bastion_identity
   ARTIFACT_WORK=$(mktemp -d /tmp/ibi-seed-artifacts.XXXXXX)
   trap cleanup EXIT
   cp /var/group_variables/common/all/ansible_ssh_private_key "$ARTIFACT_WORK/ssh-key"
   chmod 600 "$ARTIFACT_WORK/ssh-key"
 
-  BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${CNF_INVENTORY_PATH}/host_vars/bastion.yaml" | sed "s/'//g")
-  BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | sed "s/'//g")
-  [[ "$BASTION_IP" =~ ^[a-zA-Z0-9.-]+$ && "$BASTION_USER" =~ ^[a-zA-Z0-9_-]+$ ]]
+  # Resolve inventory precedence without printing private inventory variables.
+  bastion_identity=$(
+    exec 2>"${ARTIFACT_WORK}/inventory.log" || exit 1
+    ansible-inventory -i "${CNF_INVENTORY_PATH}/switch-config.yaml" --host bastion |
+      jq -er '[.ansible_host, .ansible_user] | join(" ")'
+  )
+  read -r BASTION_IP BASTION_USER <<< "$bastion_identity"
+  [[ -n "$BASTION_IP" && -n "$BASTION_USER" ]]
   [[ "$CLUSTER_NAME" =~ ^[a-z0-9-]+$ && "$SEED_SPOKE_CLUSTER" =~ ^[a-z0-9-]+$ ]]
 }
 
@@ -106,15 +118,20 @@ run_seedgeneration() {
 }
 
 collect_reports() {
+  local bastion_address="$BASTION_IP"
   echo "Gather artifacts from bastion"
-  mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests"
+  mkdir -p "${ARTIFACT_DIR}/junit_eco_gotests" || return $?
+  if [[ "$bastion_address" == *:* && "$bastion_address" != \[*\] ]]; then
+    bastion_address="[$bastion_address]"
+  fi
   scp -r -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
     -i "$ARTIFACT_WORK/ssh-key" \
-    "${BASTION_USER}@${BASTION_IP}:/tmp/eco_gotests/report/*.xml" \
-    "${ARTIFACT_DIR}/junit_eco_gotests/" || true
+    "${BASTION_USER}@${bastion_address}:/tmp/eco_gotests/report/*.xml" \
+    "${ARTIFACT_DIR}/junit_eco_gotests/"
 }
 
 main() {
+  local run_rc=0 report_rc=0
   echo "Checking if the job should be skipped..."
   if [ -f "${SHARED_DIR}/skip.txt" ]; then
     echo "Detected skip.txt file — skipping the job"
@@ -135,8 +152,11 @@ main() {
   prepare_seedgeneration
   prepare_capture_access
   capture_catalogs
-  run_seedgeneration
-  collect_reports
+  run_seedgeneration || run_rc=$?
+  collect_reports || report_rc=$?
+  printf 'Seed generation: %s; report collection: %s\n' "$run_rc" "$report_rc"
+  (( run_rc == 0 )) || return "$run_rc"
+  (( report_rc == 0 )) || return "$report_rc"
 
   echo "=== IBI Seed Eco-Gotests Complete ==="
   echo "Seed image: ${MIRROR_REGISTRY}/ibu/seed:${VERSION}"

@@ -8,6 +8,13 @@ fi
 
 MOUNTED_HOST_INVENTORY="/var/host_variables"
 
+cleanup() {
+  local rc=$?
+  trap - EXIT
+  rm -rf -- "${TEMP_DIR}" || rc=1
+  exit "${rc}"
+}
+
 process_inventory() {
   local directory="$1"
   local dest_file="$2"
@@ -25,8 +32,15 @@ process_inventory() {
   find "$directory" -type f | while IFS= read -r filename; do
     if [[ $filename == *"secretsync-vault-source-path"* ]]; then
       continue
+    fi
+    local content varname
+    content=$(cat "$filename")
+    varname=$(basename "${filename}")
+    if [[ "$content" == *$'\n'* ]]; then
+      printf '%s: |\n' "${varname}"
+      printf '%s\n' "$content" | sed 's/^/  /'
     else
-      echo "$(basename "${filename}")": \'"$(cat "$filename")"\'
+      printf "%s: '%s'\n" "${varname}" "${content//\'/\'\'}"
     fi
   done > "${dest_file}"
 }
@@ -88,15 +102,22 @@ done
 echo "Getting target hub cluster version"
 HUB_KUBECONFIG="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/kubeconfig"
 
-BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion | sed "s/'//g")
-BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' /eco-ci-cd/inventories/ocp-deployment/group_vars/all | sed "s/'//g")
+TEMP_DIR=$(mktemp -d /tmp/ibi-target-hub-deploy.XXXXXX)
+trap cleanup EXIT
+install -m 600 /var/group_variables/common/all/ansible_ssh_private_key "${TEMP_DIR}/ssh-key"
 
-cat /var/group_variables/common/all/ansible_ssh_private_key > "/tmp/temp_ssh_key"
-chmod 600 "/tmp/temp_ssh_key"
+BASTION_IDENTITY=$(
+  exec 2>"${TEMP_DIR}/inventory.log" || exit 1
+  ansible-inventory -i ./inventories/ocp-deployment/build-inventory.py --host bastion |
+    jq -er '[.ansible_host, .ansible_user] | join(" ")'
+)
+read -r BASTION_IP BASTION_USER <<< "${BASTION_IDENTITY}"
+[[ -n "${BASTION_IP}" && -n "${BASTION_USER}" ]]
 
 CLUSTER_VERSION=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-  -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}" \
-  "KUBECONFIG=${HUB_KUBECONFIG} oc get clusterversion version -ojsonpath='{.status.desired.version}'")
+  -i "${TEMP_DIR}/ssh-key" "${BASTION_USER}@${BASTION_IP}" \
+  "KUBECONFIG=${HUB_KUBECONFIG} oc get clusterversion version -ojsonpath='{.status.desired.version}'" \
+  2>"${TEMP_DIR}/version.log")
 
 echo "Target hub cluster version: ${CLUSTER_VERSION}"
 echo "${CLUSTER_VERSION}" > "${SHARED_DIR}/target_hub_version"
