@@ -66,6 +66,128 @@ network=$(jq -er '.network // "transitionbm"' state.json 2>/dev/null) || network
 virsh net-dumpxml "${network}" > results/host/network.xml 2>/dev/null || warn 'could not collect VM network state'
 journalctl --no-pager -u libvirtd -u virtqemud -u virtnetworkd -u haproxy > results/host/services.log 2>/dev/null || warn 'could not collect host service logs'
 cp /var/log/libvirt/qemu/*.log results/host/ 2>/dev/null || warn 'VM logs are unavailable'
+
+echo 'Collecting a filtered dev-scripts error summary'
+# Dev-scripts logs include shell tracing and credential/config dumps. Extract
+# diagnostics before writing artifacts; never copy the raw logs or nearby lines.
+if ! python3 - 2>/dev/null <<'DEV_SCRIPTS_ERRORS'
+from collections import deque
+import json
+from pathlib import Path
+import re
+
+phases = (
+    'make', '01_agent_requirements', '01_install_requirements', '02_configure_host',
+    '03_agent_build_installer', '03_build_installer', '04_agent_prepare_release',
+    '05_agent_configure', '06_agent_create_cluster',
+)
+phase, exit_code = 'unknown', 'unknown'
+status = Path('results/host/dev-scripts-status.txt')
+if status.is_file():
+    for line in status.read_text(errors='replace').splitlines():
+        key, _, value = line.partition('=')
+        if key == 'phase' and value in phases:
+            phase = value
+        if key == 'exit' and re.fullmatch(r'[0-9]{1,3}', value) and int(value) <= 255:
+            exit_code = str(int(value))
+
+sources = [('make', Path('dev-scripts.log'))]
+if phase in phases[1:]:
+    # Match the known phase only. Keep names, paths and command arguments private.
+    sources.extend((phase, path) for path in sorted(Path('dev-scripts/logs').glob(phase + '-*.log'))[-2:])
+
+ansi = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
+timestamp = re.compile(r'^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+')
+diagnostic = re.compile(
+    r'\b(?:error|fatal|failed|failure|panic|exception|timed out|permission denied|'
+    r'not found|no such file|unbound variable)\b|\b\w+(?:Error|Exception):', re.I)
+sensitive = re.compile(
+    r'\b(?:password|passwd|secret|auth|api[-_ ]?key|credentials?|pull[-_ ]?secret|authorization|bearer|token|'
+    r'client[-_ ]?key|private[-_ ]?key|kubeconfig|dockerconfigjson|auths|'
+    r'identitytoken|activation[-_ ]?key|subscription[-_ ]?manager[-_ ]?org)\b', re.I)
+credential_assignment = re.compile(
+    r'(?:^|[^\w])[-\w.]*(?:password|passwd|token|secret|auth|credential|key)[-\w.]*'
+    r'["\']?\s*[:=]', re.I)
+messages = deque(maxlen=80)
+read_count, omitted = 0, 0
+
+for label, path in sources:
+    if not path.is_file() or path.is_symlink():
+        continue
+
+    read_count += 1
+    # Bound reads even when make has produced hours of verbose output.
+    with path.open('rb') as stream:
+        stream.seek(0, 2)
+        offset = max(0, stream.tell() - 4 * 1024 * 1024)
+        stream.seek(offset)
+        if offset:
+            stream.readline()
+        lines = stream.read().decode('utf-8', errors='replace').splitlines()
+
+    for raw in lines:
+        line = timestamp.sub('', ansi.sub('', raw).strip())
+        if not line or line.startswith(('+', '++', '---', '>>>')):
+            continue
+
+        # Select only the message from structured loggers, never their fields.
+        if line.startswith('{'):
+            try:
+                record = json.loads(line)
+            except (ValueError, TypeError):
+                continue
+            if not isinstance(record, dict) or str(record.get('level', '')).lower() not in ('error', 'fatal', 'panic'):
+                continue
+            line = record.get('msg', record.get('message', ''))
+            if not isinstance(line, str):
+                continue
+            cause = record.get('error')
+            if isinstance(cause, str) and cause:
+                line += '; cause: ' + cause
+        elif re.search(r'\blevel=(?:error|fatal|panic)\b', line, re.I):
+            fields = []
+            for match in re.finditer(r'\b(msg|message|error)=("(?:\\.|[^"\\])*"|[^\s]+)', line):
+                value = match.group(2)
+                try:
+                    fields.append(json.loads(value) if value.startswith('"') else value)
+                except ValueError:
+                    continue
+            if not fields:
+                continue
+            line = '; cause: '.join(fields)
+        elif not diagnostic.search(line) and not re.match(r'^make(?:\[\d+\])?: \*\*\*', line):
+            continue
+
+        # A diagnostic that embeds credential material is unsafe even if one
+        # value could be masked: config dumps can span lines or contain JSON.
+        if (sensitive.search(line) or credential_assignment.search(line) or
+                re.search(r'\b[A-Z_][A-Z0-9_]*=', line) or any(char in line for char in '{}')):
+            omitted += 1
+            continue
+
+        line = re.sub(r'\b[a-zA-Z][a-zA-Z0-9+.-]*://[^\s<>"\']+', '[URL]', line)
+        line = re.sub(r'\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\b', '[ADDRESS]', line)
+        line = re.sub(r'\b[0-9a-fA-F]*:[0-9a-fA-F:]+(?:%[\w.-]+)?\b', '[ADDRESS]', line)
+        line = re.sub(r'(?<!\w)(?:/|\./|\.\./)[^\s:;,)\]"\']+', '[PATH]', line)
+        line = re.sub(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|`[^`]*`', '[VALUE]', line)
+        line = re.sub(r'\b[\w-]+(?:\.[\w-]+)+\b|\b(?:[\w-]+[_-])?(?:master|worker|infra)[_-]\d+\b', '[NAME]', line)
+        line = re.sub(r'(?<!\w)[A-Za-z0-9_+/=-]{24,}(?!\w)', '[VALUE]', line)
+        line = ''.join(char for char in line if char.isprintable())[:500]
+        if line:
+            item = f'{label}: {line}'
+            if not messages or messages[-1] != item:
+                messages.append(item)
+
+report = [f'phase={phase}', f'exit={exit_code}', f'logs_read={read_count}',
+          f'credential_or_config_diagnostics_omitted={omitted}']
+report.extend(messages or ['No safe error diagnostics found in the available log tails.'])
+Path('results/host/dev-scripts-errors.txt').write_text('\n'.join(report) + '\n')
+print(f'Dev-scripts error summary saved: {read_count} logs checked, {len(messages)} diagnostics retained')
+DEV_SCRIPTS_ERRORS
+then
+  warn 'could not collect the dev-scripts error summary'
+fi
+
 echo 'Collecting the redacted installer log'
 if [[ -s install/.openshift_install.log ]]; then
   # Redact before writing artifacts; keep the surrounding log text intact.
