@@ -20,18 +20,26 @@ unset GOVC_TLS_CA_CERTS
 echo "Data center is ${GOVC_DATACENTER}"
 TEMPLATE_PATH="/${GOVC_DATACENTER}/vm/assisted-test-infra-ci/assisted-test-infra-machine-template"
 
-# TEMPORARY - remove once the template has been rebuilt in every datacenter.
-# The CI SSH key (edge-group/assisted-installer-ci) was rotated on 2026-11-17.
-# Templates created before the cutoff contain the old public key, so delete them
-# and let packer rebuild below. Templates created after the cutoff are kept.
-TEMPLATE_KEY_CUTOFF="2026-11-17T12:00:00Z"
+# TEMPORARY - DELETE-ONLY MODE. Revert before merging.
+# The CI SSH key (edge-group/assisted-installer-ci) was rotated on 2026-11-17, and
+# any template built with the old public key still accepts the old key.
+# Delete the template from the vCenter this job is connected to, then stop without
+# rebuilding it. The later assisted-vsphere-setup-machine step will fail with
+# "template does not exist" - that is expected in this mode.
+TEMPLATE_DELETE_ONLY="true"
+echo "vCenter is ${GOVC_URL}, template path is ${TEMPLATE_PATH}"
 if govc object.collect "${TEMPLATE_PATH}" >/dev/null 2>&1; then
-    template_created="$(govc vm.info -json "${TEMPLATE_PATH}" | jq -r '(.virtualMachines // .VirtualMachines)[0] | (.config // .Config) | (.createDate // .CreateDate) // empty')"
-    echo "Existing template create date: ${template_created:-unknown}"
-    if [[ -z "${template_created}" ]] || [[ "$(date -d "${template_created}" +%s)" -lt "$(date -d "${TEMPLATE_KEY_CUTOFF}" +%s)" ]]; then
-        echo "Template predates the SSH key rotation (${TEMPLATE_KEY_CUTOFF}) - deleting it"
-        govc object.destroy "${TEMPLATE_PATH}"
-    fi
+    echo "Template found - details:"
+    govc vm.info "${TEMPLATE_PATH}"
+    echo "Deleting template ${TEMPLATE_PATH}"
+    govc object.destroy "${TEMPLATE_PATH}"
+    echo "Template deleted"
+else
+    echo "Template not found in ${GOVC_DATACENTER} - nothing to delete"
+fi
+if [[ "${TEMPLATE_DELETE_ONLY}" == "true" ]]; then
+    echo "Delete-only mode - skipping the packer build"
+    exit 0
 fi
 # END TEMPORARY
 
