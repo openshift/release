@@ -33,6 +33,12 @@ SSO_CLIENT_ID_VALUE='SSO_CLIENT_ID_ARGV_SENTINEL'
 SSO_CLIENT_SECRET_VALUE='SSO_CLIENT_SECRET_ARGV_SENTINEL'
 OCM_TOKEN_VALUE='OCM_TOKEN_ARGV_SENTINEL'
 
+# `log` closes every message with the ANSI reset, so that sequence is where a
+# diagnostic line ends. Anchoring a pattern there is what makes "nothing was
+# appended after this" provable -- a substring match would still accept a value
+# tacked on to the end of the line.
+LOG_LINE_END=$'\033''\[0m$'
+
 cleanup() {
   rm -rf "${TEST_ROOT}"
 }
@@ -73,6 +79,17 @@ assert_not_contains() {
   if grep -Fq -- "${unexpected}" "${file}" 2>/dev/null; then
     dump "${file}"
     fail "did not expect '${unexpected}' in ${file}"
+  fi
+}
+
+assert_matches() {
+  local file="$1" expected="$2"
+  # Guarded like assert_not_contains: a missing file must read as a failure
+  # rather than as a pattern that happened not to match.
+  [[ -f "${file}" ]] || fail "expected ${file} to exist"
+  if ! grep -Eq -- "${expected}" "${file}" 2>/dev/null; then
+    dump "${file}"
+    fail "expected pattern '${expected}' in ${file}"
   fi
 }
 
@@ -130,6 +147,12 @@ assert_no_secrets() {
   assert_not_contains "${log}" "${SSO_CLIENT_ID_VALUE}"
   assert_not_contains "${log}" "${SSO_CLIENT_SECRET_VALUE}"
   assert_not_contains "${log}" "${OCM_TOKEN_VALUE}"
+  # Prefixes and truncations leak too: a diagnostic that printed only the first
+  # characters of a credential would slip past a whole-value check.
+  assert_not_contains "${log}" "${SSO_CLIENT_ID_VALUE:0:8}"
+  assert_not_contains "${log}" "${SSO_CLIENT_SECRET_VALUE:0:8}"
+  assert_not_contains "${log}" "${OCM_TOKEN_VALUE:0:8}"
+  assert_not_contains "${log}" '--client-id'
   assert_not_contains "${log}" '--client-secret'
   assert_not_contains "${log}" '--token'
   # Whatever ocm itself printed, including any credential echoed back.
@@ -241,6 +264,7 @@ run_authenticate() {
   [[ "${trace}" != "true" ]] || trace_args=(-x)
   env \
     PATH="${case_dir}/bin:${PATH}" \
+    PS4='+ ' \
     MOCK_SCENARIO="${scenario}" \
     MOCK_STATE_DIR="${case_dir}/state" \
     CLUSTER_PROFILE_DIR="${case_dir}/profile" \
@@ -311,6 +335,13 @@ test_exhausted_login_reports_final_status_and_propagates_it() {
     "OCM login to staging failed on attempt 3/3 with exit status 7"
   assert_contains "${case_dir}/output.log" \
     "OCM login to staging failed after 3 attempts using sso-client-credentials; final exit status 7"
+  # A rejected credential reports the inventory too, so the log also says which
+  # inputs the selected source did not use -- here, that no token was mounted
+  # to fall back to. Anchored at the end of the line, which is what proves the
+  # diagnostic stops at the inventory: a value appended after it would not
+  # match, where a substring assertion would still accept one.
+  assert_matches "${case_dir}/output.log" \
+    "final exit status 7 \(sso-client-id=present sso-client-secret=present ocm-token=missing\)${LOG_LINE_END}"
   assert_contains "${case_dir}/output.log" \
     "Phase 0 failed: OCM authentication to staging did not succeed; exiting with status 7"
   assert_not_contains "${case_dir}/output.log" "succeeded on attempt"
@@ -318,6 +349,36 @@ test_exhausted_login_reports_final_status_and_propagates_it() {
   assert_retry_waits "${case_dir}" $'10\n10'
   assert_login_invocation_but_not_logged "${case_dir}" \
     "staging --client-id ${SSO_CLIENT_ID_VALUE} --client-secret ${SSO_CLIENT_SECRET_VALUE}"
+}
+
+# The counterpart to the SSO case: the rejected input is the token, and the
+# inventory has to report the mounted one as present and the absent ones as
+# missing. This is the case the exit status alone cannot describe -- a rejected
+# token and a rejected SSO pair both surface as the same status.
+test_rejected_token_reports_inventory_without_values() {
+  local case_dir="${TEST_ROOT}/token-rejected"
+  local rc=0
+  new_case "${case_dir}" token
+  run_authenticate login_always_fails "${case_dir}" || rc=$?
+
+  assert_status "${rc}" 7 "rejected token credential"
+  assert_contains "${case_dir}/output.log" \
+    "OCM login to staging failed after 3 attempts using ocm-token; final exit status 7"
+  # Anchored for the same reason as the SSO case: it pins that the line ends at
+  # the inventory, so no value can be appended without failing this assertion.
+  assert_matches "${case_dir}/output.log" \
+    "final exit status 7 \(sso-client-id=missing sso-client-secret=missing ocm-token=present\)${LOG_LINE_END}"
+  # The named source has to be the one actually used, or the inventory beside
+  # it would describe a selection that never happened.
+  assert_not_contains "${case_dir}/output.log" "sso-client-credentials"
+  assert_contains "${case_dir}/output.log" \
+    "Phase 0 failed: OCM authentication to staging did not succeed; exiting with status 7"
+  # The retry shape and the propagated status are unchanged by the inventory.
+  assert_login_attempts "${case_dir}" 3
+  assert_retry_waits "${case_dir}" $'10\n10'
+  # The credential still reached ocm, and still never reached the log -- so the
+  # inventory above is the only credential-shaped thing the log gained.
+  assert_login_invocation_but_not_logged "${case_dir}" "staging --token ${OCM_TOKEN_VALUE}"
 }
 
 # Without a usable credential the step used to exit 1 having written nothing at
@@ -412,7 +473,10 @@ test_xtrace_never_exposes_credentials() {
   assert_status "${rc}" 7 "exhausted authentication under xtrace"
   # Proves tracing really was on and that the script's own `set +x` is what
   # turned it off; without this the case could pass with xtrace never enabled.
-  assert_contains "${case_dir}/output.log" "++ set +x"
+  # `run_authenticate` pins PS4 so the prefix is the default `+ `, repeated
+  # once per source depth -- the depth itself is left free so that sourcing the
+  # script differently does not break the assertion.
+  assert_matches "${case_dir}/output.log" '^\++ set \+x$'
   assert_contains "${case_dir}/output.log" \
     "OCM login to staging failed after 3 attempts using sso-client-credentials; final exit status 7"
   assert_no_secrets "${case_dir}/output.log"
@@ -422,6 +486,7 @@ test_successful_login_reports_phase_and_credential_source
 test_token_credentials_are_named_not_printed
 test_transient_failures_are_reported_per_attempt_and_recover
 test_exhausted_login_reports_final_status_and_propagates_it
+test_rejected_token_reports_inventory_without_values
 test_missing_credentials_are_reported_by_input_name
 test_partial_credentials_are_reported_by_input_name
 test_sso_credentials_take_precedence_over_the_token

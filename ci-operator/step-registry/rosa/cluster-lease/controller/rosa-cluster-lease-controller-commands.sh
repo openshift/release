@@ -13,7 +13,8 @@ log(){
 # only. Each input is reported as "present" or "missing"; the values are tested
 # but never stored or printed, so this stays safe for publicly retained Prow
 # logs while still separating "no credential was mounted" from "the credential
-# was rejected".
+# was rejected". Both of those failure paths report it, so the two are
+# distinguishable in the step log without the values ever appearing there.
 ocm_credential_inventory() {
     local entry variable file
     local -a inventory=()
@@ -59,7 +60,13 @@ ocm_login() {
         # given. The exit status is reported instead.
         log "WARNING: OCM login to ${target_env} failed on attempt ${attempt}/3 with exit status ${exit_code} (ocm output suppressed as unvetted for credentials)"
         if [[ "${attempt}" -eq 3 ]]; then
-            log "ERROR: OCM login to ${target_env} failed after 3 attempts using ${credential_source}; final exit status ${exit_code}"
+            # A credential was mounted and rejected. ${credential_source} names
+            # the input that was used; the inventory adds the ones that were
+            # not, which is what the exit status cannot convey -- a rejected
+            # SSO pair with a token also mounted is a different situation from
+            # a rejected SSO pair that was the only credential available.
+            # Names and presence only, never values.
+            log "ERROR: OCM login to ${target_env} failed after 3 attempts using ${credential_source}; final exit status ${exit_code} ($(ocm_credential_inventory))"
             return "${exit_code}"
         fi
         sleep 10
