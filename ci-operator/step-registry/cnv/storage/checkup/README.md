@@ -77,17 +77,15 @@ CNV installation in that list as well.
 
 ### Live migration coverage
 
-The Monday jobs exercise each cloud's default CSI block storage directly. Their
-rehearsals selected `gp3-csi`, `managed-csi`, and `standard-csi`. The VM disks
-were provisioned as nonshared PVCs, so the product skipped live migration.
-The Azure rehearsal also listed `azurefile-csi` as RWX; the checkup VM used
-`managed-csi` instead.
+Earlier rehearsals selected `gp3-csi`, `managed-csi`, and `standard-csi`.
+Those VM disks were nonshared and the checkup skipped live migration.
+The weekly jobs now select storage configured for shared VM disks.
 
 [CDI's StorageClass capabilities](https://github.com/kubevirt/containerized-data-importer/blob/2711c053918b325c1fa0b3981d27e92ec83d63e9/pkg/storagecapabilities/storagecapabilities.go#L78-L95)
 include RWX block for AWS EBS `io2` and GCP Hyperdisk, and RWX filesystem for
 Azure File (`file.csi.azure.com`).
 
-The `storage-checkup-{aws,azure,gcp}-migration` jobs run Tuesdays at 03:00,
+The `storage-checkup-{aws,azure,gcp}` jobs run Mondays at 03:00,
 06:00, and 09:00 UTC respectively. The shared storage setup selects an existing
 class or creates one from `CHECKUP_STORAGE_CLASS_PARAMETERS`. For the full
 checkup it selects the virtualization default before CNV imports golden images.
@@ -105,10 +103,10 @@ checkup it selects the virtualization default before CNV imports golden images.
 
 `CHECKUP_REQUIRE_LIVE_MIGRATION=true` requires the checkup's migration completion
 result and a matching KubeVirt success event for the migration in the checkup
-namespace. All three migration jobs require this evidence and a successful
+namespace. All three jobs require this evidence and a successful
 VM snapshot and restore.
 
-The GCP migration job requires the snapshot of the VM's RWX Block disk to
+The GCP job requires the snapshot of the VM's RWX Block disk to
 use `csi-gce-pd-vsc`. Its `vm-disk-snapshots.json` artifact links the VM
 snapshot to its boot PVC, access mode, volume mode, and CSI snapshot class.
 The runner reads these from the retained checkup resources. The post step
@@ -146,18 +144,14 @@ successful overall result, empty failure reason, and core operation results.
 They match the result format observed in the successful manual CNV 5.0.0 run.
 These jobs require snapshot/restore support from the selected backend. The Monday jobs
 set `CHECKUP_EXPECTED_PROVISIONER` to `ebs.csi.aws.com`,
-`disk.csi.azure.com`, and `pd.csi.storage.gke.io`, respectively. Automatic
-default-class selection remains enabled. Preparation fails if the selected
+`file.csi.azure.com`, and `pd.csi.storage.gke.io`, respectively. Preparation fails if the selected
 class does not use the lane's CSI driver. The resolved class and provisioner
 are captured in the run context.
 
-The selected backend determines the clone strategy and migration capability.
-The common policy requires a non-skipped clone result and a reported migration
-outcome, accepts capability-dependent migration skips, and propagates checkup
-failures. Set `CHECKUP_REQUIRE_LIVE_MIGRATION=true` when migration must succeed.
-Keep the snapshot/restore entries when adding backend requirements: the job
-supplies the complete object. Review and adapt this policy when cascading to a
-release with a different checkup result schema.
+Each job requires a successful migration and VM snapshot and restore. It also
+requires positive results for PVC binding, golden-image boot, hotplug and
+unplug, and ten concurrent VM boots. The runner requires the checkup's overall
+success and an empty failure reason.
 
 ### Timeout budgets
 
@@ -227,14 +221,14 @@ multi-architecture image index can resolve to a different platform digest.
 ## Initial periodic configuration
 
 The [cloud jobs](../../../../config/openshift/release/openshift-release-main__cnv-storage-checkup.yaml)
-use shared profiles, three VM-capable workers per cluster, automatic StorageClass
-selection, and ten checkup VMs. Their schedules are staggered in UTC:
+use shared profiles, three VM-capable workers per cluster, selected RWX StorageClasses,
+and ten checkup VMs. Their schedules are staggered in UTC:
 
 | Job | Profile | Worker type | Expected CSI provisioner | Schedule |
 | --- | --- | --- | --- | --- |
 | AWS | `openshift-org-aws` | `m8i.4xlarge` | `ebs.csi.aws.com` | Mondays 03:00 UTC |
-| Azure | `openshift-org-azure` | `Standard_D16s_v5` | `disk.csi.azure.com` | Mondays 06:00 UTC |
-| GCP | `openshift-org-gcp` | `n2-standard-8` | `pd.csi.storage.gke.io` | Mondays 09:00 UTC |
+| Azure | `openshift-org-azure` | `Standard_D16s_v5` | `file.csi.azure.com` | Mondays 06:00 UTC |
+| GCP | `openshift-org-gcp` | `c3-standard-8` | `pd.csi.storage.gke.io` | Mondays 09:00 UTC |
 
 The OCP 5.0 nightly baseline follows the manually verified cluster; the CNV
 build is selected separately. Ten-VM rehearsals confirmed driver selection,
