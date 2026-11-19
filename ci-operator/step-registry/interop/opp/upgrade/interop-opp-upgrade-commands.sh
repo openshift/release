@@ -56,6 +56,113 @@ typeset sourceVersion=""
 typeset -i sourceMinorVersion=0
 typeset isForceUpdate="false"
 
+# ---------------------------------------------------------------------------
+# OPP operator pod readiness predicate (INTEROP-9672).
+#
+# Single-shot CVO upgrade artifacts -- installer-N / installer-N-retry-N pods
+# -- exit (often to Error) once their upgrade batch completes and are not OPP
+# operator workload. They must not count against readiness: the 5.0 and 5.1
+# upgrade lanes failed ValidateOppOperators on exactly these pods while CVO,
+# ClusterOperators and MachineConfigPools were all healthy.
+#
+# The exclusion is keyed to the CVO artifacts' structural naming - a numeric
+# batch id, an optional -retry-N, and the node hostname (installer-N
+# [-retry-N]-ip-<host>) - NOT to the bare installer-/bootstrap- prefix: a
+# genuinely failing OPP pod that merely starts with those words (e.g.
+# installer-quay-helper) must stay visible to readiness. Bootstrap pods
+# follow the same tightened shape when they carry it; a bootstrap-named pod
+# without the hostname suffix stays visible.
+# ---------------------------------------------------------------------------
+function NotReadyOppPods () {
+    # $1: `oc get pods --no-headers` output; prints the not-ready lines.
+    #
+    # `oc get pods --no-headers` columns: NAME READY STATUS RESTARTS AGE.
+    # The decision is made from those columns, never from a row-wide word
+    # match: STATUS `Running` alone does not mean ready, so a pod whose READY
+    # count is short (0/1 with a failing readiness probe, 1/2 with a
+    # crash-looping sidecar) must stay visible to the readiness check.
+    # Completed/Succeeded rows are terminated work, not failure.
+    # The CVO single-shot artifact exclusions (installer-N, bootstrap-N,
+    # optional -retry-N, -ip-<node hostname>) are name-column only.
+    awk '
+        $1 ~ /^installer-[0-9]+(-retry-[0-9]+)?-ip-/ { next }
+        $1 ~ /^bootstrap-[0-9]+(-retry-[0-9]+)?-ip-/ { next }
+        $3 == "Completed" || $3 == "Succeeded" { next }
+        $3 == "Running" && split($2, ready, "/") == 2 \
+            && ready[1] + 0 == ready[2] + 0 && ready[2] + 0 > 0 { next }
+        { print }
+    ' <<< "$1"
+}
+
+# --- Offline predicate self-test (phase 0) ----------------------------------
+# Pins the readiness predicate on fixtures so a later edit that changes the
+# step semantics reports a FATAL log line and a failing JUnit row instead of
+# silently re-reding or re-greening lanes. The installer/bootstrap lines
+# reproduce the observed not-ready shape (numeric batch id, optional -retry-N,
+# the -ip-<node hostname> suffix); the node hostnames are synthetic
+# example.internal names, not the ones seen in those lanes, so no internal
+# hostname is published here or traced below. Control lines are synthetic
+# inputs too.
+# shellcheck disable=SC2317  # invoked from Main
+function PredicateSelfTest () {
+    # BASH-3: typeset, not the non-POSIX `local` builtin, and initialised at
+    # declaration so `set -u` cannot trip on a partially assigned set.
+    typeset fixture='' expected='' got=''
+    typeset -i failures=0
+
+    fixture="installer-2-ip-10-0-0-11.example.internal                                 0/1   Error       0     65m
+installer-2-retry-1-ip-10-0-0-11.example.internal                         0/1   Error       0     64m
+installer-2-retry-2-ip-10-0-0-11.example.internal                         0/1   Error       0     63m
+installer-3-ip-10-0-0-12.example.internal                                 0/1   Error       0     58m
+installer-3-retry-1-ip-10-0-0-12.example.internal                         0/1   Error       0     57m
+installer-3-retry-2-ip-10-0-0-12.example.internal                         0/1   Error       0     56m"
+    expected=""
+    got="$(NotReadyOppPods "${fixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: installer-only fixture must filter to empty; got:"
+        echo "${got}"
+        (( failures += 1 ))
+    fi
+
+    fixture="cluster-version-operator-864d9f7c5-abcde      1/1     Running            0     65m
+bootstrap-1234567-deploy-pod                 0/1     Completed         0     58m
+quay-operator-v4-9d8f7c6b5-x2k9l              0/1     CrashLoopBackOff   6     12m
+rhacs-operator-controller-7f6d8b9c-pqrst      1/1     Running            0     60m
+installer-3-ip-10-0-0-12.example.internal     0/1   Error       0     58m
+installer-quay-helper-7c4d8e9f2-abcde         0/1     CrashLoopBackOff   3     21m
+bootstrap-controller-5f8d2c6b9-pqrst          0/1     Error             2     9m"
+    expected="quay-operator-v4-9d8f7c6b5-x2k9l              0/1     CrashLoopBackOff   6     12m
+installer-quay-helper-7c4d8e9f2-abcde         0/1     CrashLoopBackOff   3     21m
+bootstrap-controller-5f8d2c6b9-pqrst          0/1     Error             2     9m"
+    got="$(NotReadyOppPods "${fixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: mixed fixture must keep the CrashLoopBackOff line and the similarly-named OPP pods; got:"
+        echo "${got}"
+        (( failures += 1 ))
+    fi
+
+    # Readiness case: STATUS `Running` is not proof of readiness. A pod whose
+    # READY count is short (failing readiness probe, crash-looping sidecar)
+    # must remain visible; only a fully ready x/y Running pod is filtered.
+    fixture="rhacs-operator-controller-7f6d8b9c-k2wqz      0/1     Running     0     12m
+rhacs-operator-controller-7f6d8b9c-t9m4c      1/2     Running     3     20m
+rhacs-operator-controller-7f6d8b9c-r5v8d      2/2     Running     0     60m"
+    expected="rhacs-operator-controller-7f6d8b9c-k2wqz      0/1     Running     0     12m
+rhacs-operator-controller-7f6d8b9c-t9m4c      1/2     Running     3     20m"
+    got="$(NotReadyOppPods "${fixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: partially ready Running pods must stay visible and a fully ready Running pod must be filtered; got:"
+        echo "${got}"
+        (( failures += 1 ))
+    fi
+
+    if (( failures > 0 )); then
+        echo "FATAL: pod-readiness predicate self-test failed; step semantics are not the reviewed ones."
+        return 1
+    fi
+    echo ">>> selftest: pod-readiness predicate OK (installer/bootstrap excluded, real failures kept, partially ready Running pods kept)"
+}
+
 function DebugOnExit () {
     if (( exitCode != 0 )); then
         echo "### DEBUG: Upgrade failure diagnostics ###"
@@ -391,14 +498,62 @@ function ValidatePlatformHealth () {
     true
 }
 
+function SettleOppOperatorCsvs () {
+    # Best-effort bounded settle for the operators this step validates.
+    # The previous form slept a fixed 300s unconditionally: 5 minutes of wall
+    # clock on every run, including the runs where every CSV had already
+    # reported a terminal phase, and it could not distinguish a converged
+    # operator from one stuck mid-Replacing.  Poll the requested operators
+    # only (an `oc wait --all` would block on unrelated CSVs that are
+    # legitimately Replacing), require the same phase on two consecutive
+    # reads, and never fail: ValidateOppOperators makes the verdict.
+    typeset -i window="${1:-300}"
+    typeset -i deadline=$((SECONDS + window))
+    typeset -a settleOpsArr=()
+    IFS=',' read -ra settleOpsArr <<< "${OPP_OPERATORS}"
+    typeset -A settlePrevMap=()
+    typeset -i stableCount=0
+    typeset -i elapsed=0
+    typeset settleCsvs='' settleOp='' settlePhase=''
+    while (( SECONDS < deadline )); do
+        typeset -i _remaining=$(( deadline - SECONDS ))
+        (( _remaining <= 0 )) && break
+        settleCsvs="$(oc get csv -A --request-timeout="${_remaining}s" -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.phase}}{{end}}{{"\n"}}{{end}}' 2>/dev/null || true)"
+        stableCount=0
+        for settleOp in "${settleOpsArr[@]}"; do
+            settlePhase="$(awk -F'\t' -v op="${settleOp}" 'index($2, op) == 1 {print $3; exit}' <<< "${settleCsvs}")"
+            # Only a terminal phase counts as settled: a CSV stuck in
+            # Replacing/InstallReady must keep the full window (that is the
+            # convergence tolerance the fixed sleep provided), while a CSV
+            # already reporting Succeeded/Failed shortens the settle.
+            if [[ "${settlePhase}" == "Succeeded" || "${settlePhase}" == "Failed" ]]; then
+                if [[ "${settlePrevMap[${settleOp}]:-}" == "${settlePhase}" ]]; then
+                    (( stableCount += 1 ))
+                fi
+            fi
+            settlePrevMap["${settleOp}"]="${settlePhase}"
+        done
+        if (( stableCount == ${#settleOpsArr[@]} )); then
+            elapsed=$(( window - (deadline - SECONDS) ))
+            : "Operator CSVs stable after ${elapsed}s of the ${window}s settle window"
+            return 0
+        fi
+        typeset -i _sleepFor=15
+        _remaining=$(( deadline - SECONDS ))
+        (( _sleepFor > _remaining )) && _sleepFor=${_remaining}
+        (( _sleepFor > 0 )) && sleep "${_sleepFor}"
+    done
+    : "Operator CSV settle window (${window}s) expired; validating the phases as read"
+    return 0
+}
+
 function ValidateOppOperators () {
     echo ">>> PHASE: Validating OPP operators"
     : "Validating OPP operator health"
     typeset -a operatorsArr=()
     IFS=',' read -ra operatorsArr <<< "${OPP_OPERATORS}"
 
-    : "Waiting 5 minutes for operator settling"
-    sleep 300
+    SettleOppOperatorCsvs 300
 
     typeset allCsvsJson=""
     typeset -i failCount=0
@@ -438,7 +593,7 @@ function ValidateOppOperators () {
             (( failCount += 1 ))
             continue
         fi
-        notReady="$(awk '!/Completed/ && !/Running/ && !/Succeeded/' <<< "${podList}")"
+        notReady="$(NotReadyOppPods "${podList}")"
         if [[ -n "${notReady}" ]]; then
             : "WARNING: Non-running pods in ${ns}:"
             echo "${notReady}"
@@ -458,6 +613,14 @@ function ValidateOppOperators () {
 }
 
 function Main () {
+    echo ">>> PHASE: phase 0 - offline predicate self-test"
+    # xtrace stays off around the self-test: the trace log is copied to
+    # ARTIFACT_DIR when the step fails, and fixture content must not ride
+    # along in it.
+    set +x
+    PredicateSelfTest
+    set -x
+
     if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
     fi
@@ -498,7 +661,7 @@ SUITE_NAME="${SUITE_NAME:-ocp-upgrade}"
 # --- JUnit wrapper ---
 # shellcheck disable=SC2317  # invoked via trap
 WriteJunit() {
-  local rc=${1:-0}
+  typeset rc=${1:-0}
   TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   JUNIT_FILE="${ARTIFACT_DIR}/junit_${SUITE_NAME}.xml"
   if [[ $rc -eq 0 ]]; then
