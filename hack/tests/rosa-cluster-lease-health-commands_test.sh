@@ -171,6 +171,13 @@ if [[ "${1:-}" == "login" ]]; then
       ;;
   esac
 fi
+# As with the inventory, the body is opaque and the jq stand-in resolves the
+# fields a test asked for from fixture files.
+case "$*" in
+  "get /api/clusters_mgmt/v1/clusters/"*)
+    printf 'OCM-CLUSTER\n'
+    ;;
+esac
 exit 0
 EOF
 
@@ -230,6 +237,9 @@ case "${filter}" in
   '.data["ocm-env"] // "staging"')
     field ocm-env staging
     ;;
+  '.status.state // "unknown"')
+    field state unknown
+    ;;
   *)
     printf 'the jq fixture has no answer for the filter: %s\n' "${filter}" >&2
     exit 90
@@ -263,6 +273,13 @@ add_lease_fixture() {
   printf '%s\n' "${cluster_id}" > "${CASE_DIR}/state/cluster-${index}-cluster-id"
   printf '%s\n' "${ocm_env}" > "${CASE_DIR}/state/cluster-${index}-ocm-env"
   printf '%s' "$((index + 1))" > "${CASE_DIR}/state/inventory-count"
+}
+
+# The cluster state OCM reports back. Anything but "ready" stops the step
+# before the ClusterPackage checks, which this suite, scoped to the
+# authentication paths, deliberately leaves uncovered.
+set_ocm_cluster_state() {
+  printf '%s\n' "$1" > "${CASE_DIR}/state/OCM-CLUSTER-state"
 }
 
 write_sso_credentials() {
@@ -480,6 +497,25 @@ test_reauthentication_records_its_own_stage_and_environment() {
   assert_no_leaked_credentials
 }
 
+test_successful_reauthentication_records_its_own_succeeded_stage() {
+  setup_case reauth-succeeded
+  write_sso_credentials
+  # An available lease in another environment makes the step log in again.
+  add_lease_fixture lease-fixture available "" "" fixture-cluster-id production
+  set_ocm_cluster_state error
+  run_health login_succeeds
+
+  assert_status "${STATUS}" 0 "health check that re-authenticates successfully"
+  assert_file_contents "${CASE_DIR}/state/ocm-login-count" "2"
+  assert_diagnostics_at_login 2 ocm-reauth sso-client-pair production
+  # The second login worked, so the artifact advances past the stage it names
+  # while that login is in flight.
+  assert_diagnostics ocm-reauth-succeeded sso-client-pair production
+  assert_contains "${CASE_DIR}/stderr.log" \
+    "OCM auth: stage=ocm-reauth-succeeded auth-mode=sso-client-pair ocm-env=production"
+  assert_no_leaked_credentials
+}
+
 test_reauthentication_environment_outside_the_allowlist_is_other() {
   setup_case reauth-unrecognized-env
   write_sso_credentials
@@ -532,6 +568,7 @@ test_undeliverable_diagnostics_do_not_change_the_exit_status
 test_absent_artifact_dir_does_not_change_the_exit_status
 test_the_default_kubeconfig_path_is_used_when_unset
 test_reauthentication_records_its_own_stage_and_environment
+test_successful_reauthentication_records_its_own_succeeded_stage
 test_reauthentication_environment_outside_the_allowlist_is_other
 test_lease_health_reporting_is_unchanged
 
