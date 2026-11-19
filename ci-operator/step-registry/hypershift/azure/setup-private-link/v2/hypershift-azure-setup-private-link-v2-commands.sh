@@ -1,0 +1,1 @@
+../hypershift-azure-setup-private-link-commands.sh

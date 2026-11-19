@@ -51,7 +51,10 @@ if [[ "${CLOUD_PROVIDER}" == "Azure" ]]; then
   echo "Creating Azure management cluster ${CLUSTER_NAME} with ${HYPERSHIFT_NODE_COUNT} nodes"
   AZURE_WORKLOAD_IDENTITIES_FILE="/etc/hypershift-ci-jobs-self-managed-azure-e2e-mc/workload-identities.json"
   AZURE_OIDC_ISSUER_URL="https://smazure.blob.core.windows.net/smazure"
-  AZURE_SA_TOKEN_ISSUER_KEY_PATH="/etc/hypershift-ci-jobs-self-managed-azure/serviceaccount-signer.private"
+  if [[ -n "${AZURE_OIDC_ISSUER_URL_FILE:-}" ]]; then
+    AZURE_OIDC_ISSUER_URL="$(cat "${AZURE_OIDC_ISSUER_URL_FILE}")"
+  fi
+  AZURE_SA_TOKEN_ISSUER_KEY_PATH="${AZURE_SA_TOKEN_ISSUER_KEY_PATH:-/etc/hypershift-ci-jobs-self-managed-azure/serviceaccount-signer.private}"
   # Ensure Premium SSD v2 StorageClass exists on the ops cluster for mgmt cluster etcd
   oc apply -f - <<'EOF'
 apiVersion: storage.k8s.io/v1
