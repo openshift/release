@@ -115,7 +115,7 @@ function ResolveSpokeKubeconfigs () {
     [[ -r "${destKubeconfig}" ]]
 }
 
-# ResolveProviderName — read a provider name resolved by p2p-mtv-wait-acm-providers from
+# ResolveProviderName — read a provider name resolved by interop-acm-cclm-mtv-wait-providers from
 # SHARED_DIR/mtv-acm-provider-name-<spokeIndex> when the caller did not pin an explicit name.
 function ResolveProviderName () {
     typeset -n _out="${1:?}"; (($#)) && shift
@@ -125,14 +125,14 @@ function ResolveProviderName () {
     [[ -n "${_out}" ]] && return 0
     [[ -s "${sharedFile}" ]] || {
         printf 'ERROR: no provider name for spoke index %s (set MTV_SOURCE_PROVIDER/' "${spokeIndex}" >&2
-        printf 'MTV_DESTINATION_PROVIDER, or run p2p-mtv-wait-acm-providers first)\n' >&2
+        printf 'MTV_DESTINATION_PROVIDER, or run interop-acm-cclm-mtv-wait-providers first)\n' >&2
         return 1
     }
     _out="$(tr -d '[:space:]' < "${sharedFile}")"
 }
 
 # ResolveProviderNames — fill in sourceProvider/destinationProvider from ACM discovery
-# (p2p-mtv-wait-acm-providers), keyed by the same spoke index used for kubeconfig resolution,
+# (interop-acm-cclm-mtv-wait-providers), keyed by the same spoke index used for kubeconfig resolution,
 # unless MTV_SOURCE_PROVIDER/MTV_DESTINATION_PROVIDER pinned them explicitly.
 function ResolveProviderNames () {
     ResolveProviderName sourceProvider "${sourceSpokeIndex}"

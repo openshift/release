@@ -7,14 +7,17 @@ gi## Table of Contents<!-- omit from toc -->
   - [CNV+ODF Interop Tests](#cnvodf-interop-tests)
   - [IBM Fusion Access Operator Interop Tests](#ibm-fusion-access-operator-interop-tests)
   - [Goldman Sachs Configured Bare-Metal Cluster OpenShift Virtualization Tests](#goldman-sachs-configured-bare-metal-cluster-openshift-virtualization-tests)
+  - [ACM+Virt Interop Tests](#acmvirt-interop-tests)
 - [Process](#process)
     - [CNV+ODF Test Execution](#cnvodf-test-execution)
+    - [ACM+Virt Test Execution](#acmvirt-test-execution)
 - [Prerequisites](#prerequisites)
 - [Test Configurations](#test-configurations)
   - [CNV+ODF Configurations](#cnvodf-configurations)
   - [IBM Fusion Access Operator Interop Tests](#ibm-fusion-access-operator-interop-tests-1)
     - [Test Chains](#test-chains)
   - [GS Bare-Metal Configurations](#gs-bare-metal-configurations)
+  - [ACM+Virt Configurations](#acmvirt-configurations)
 
 ## General Information
 
@@ -40,6 +43,12 @@ The IBM Fusion Access Operator tests the integration of the Fusion Access Operat
 
 Refer to [`gs-baremetal-localnet-test`](../../../step-registry/gs-baremetal/localnet-test/gs-baremetal-localnet-test-ref.yaml) and [`README`](../../../step-registry/gs-baremetal/localnet-test/README.md) to execute OpenShift Virtualization Networking tests on bare-metal cluster configured for Goldman Sachs
 
+### ACM+Virt Interop Tests
+
+ACM+Virt jobs exercise Advanced Cluster Management with OpenShift Virtualization. Cross-cluster live migration (CCLM) covers spoke-to-spoke and hub-to-spoke migration. The product-to-product and upgrade jobs install a spoke, ODF, and CNV, then upgrade and run ACM tests.
+
+Step layout and ref names are in the [ACM CCLM step README](../../../step-registry/interop/acm/cclm/README.md).
+
 ## Process
 
 #### CNV+ODF Test Execution
@@ -53,6 +62,24 @@ Following cluster provisioning, the following steps are executed in order:
 3. [`deploy-cnv`](../../../step-registry/interop-tests/deploy-cnv/README.md) ([ref](../../../step-registry/interop-tests/deploy-cnv/interop-tests-deploy-cnv-ref.yaml)) - Deploy CNV operator
 4. [`cnv-tests-e2e-deploy`](../../../step-registry/interop-tests/cnv-tests-e2e-deploy/README.md) ([ref](../../../step-registry/interop-tests/cnv-tests-e2e-deploy/interop-tests-cnv-tests-e2e-deploy-ref.yaml)) - Execute CNV e2e tests
 5. [`openshift-virtualization-tests`](../../../step-registry/interop-tests/openshift-virtualization-tests/README.md) ([ref](../../../step-registry/interop-tests/openshift-virtualization-tests/interop-tests-openshift-virtualization-tests-ref.yaml)) - Execute OpenShift Virtualization tests
+
+#### ACM+Virt Test Execution
+
+CCLM spoke-to-spoke (`cr--2spoke-mig--aws`) runs these steps after the hub is installed:
+
+1. [`interop-acm-cclm-mtv-integration`](../../../step-registry/interop/acm/cclm/mtv/integration/interop-acm-cclm-mtv-integration-ref.yaml) — hand MTV to ACM
+2. [`interop-acm-cclm-spoke-cluster-install`](../../../step-registry/interop/acm/cclm/spoke/cluster-install/README.md) — provision spokes
+3. [`interop-acm-cclm-cnv-addon-install`](../../../step-registry/interop/acm/cclm/cnv/addon-install/interop-acm-cclm-cnv-addon-install-ref.yaml) — CNV on spokes
+4. [`interop-acm-cclm-odf-spoke-install`](../../../step-registry/interop/acm/cclm/odf/spoke-install/interop-acm-cclm-odf-spoke-install-ref.yaml) — ODF on spokes
+5. [`interop-acm-cclm-submariner-install`](../../../step-registry/interop/acm/cclm/submariner/install/interop-acm-cclm-submariner-install-chain.yaml) — Submariner
+6. [`interop-acm-cclm-cnv-exchange-ca`](../../../step-registry/interop/acm/cclm/cnv/exchange-ca/interop-acm-cclm-cnv-exchange-ca-ref.yaml) — KubeVirt CA exchange
+7. [`interop-acm-cclm-mtv-wait-providers`](../../../step-registry/interop/acm/cclm/mtv/wait-providers/interop-acm-cclm-mtv-wait-providers-ref.yaml) — ACM MTV providers
+8. [`interop-acm-cclm-mtv-migration-maps`](../../../step-registry/interop/acm/cclm/mtv/migration-maps/interop-acm-cclm-mtv-migration-maps-ref.yaml) and [`interop-acm-cclm-mtv-return-maps`](../../../step-registry/interop/acm/cclm/mtv/return-maps/interop-acm-cclm-mtv-return-maps-ref.yaml)
+9. [`interop-acm-cclm-cnv-mtv-bidir`](../../../step-registry/interop/acm/cclm/cnv-mtv/bidir/interop-acm-cclm-cnv-mtv-bidir-chain.yaml) — bidirectional live migration
+
+Hub-spoke CCLM (`cr--hub-spoke-mig--aws`) uses the [`interop-acm-cclm-cnv-mtv-hub-spoke`](../../../step-registry/interop/acm/cclm/cnv-mtv/hub-spoke/interop-acm-cclm-cnv-mtv-hub-spoke-workflow.yaml) workflow. Post steps call [`interop-acm-cclm-spoke-cluster-uninstall`](../../../step-registry/interop/acm/cclm/spoke/cluster-uninstall/README.md).
+
+The p2p and EUS jobs use `interop-acm-cclm-odf-hub-install`, spoke install, ODF spoke install, `interop-acm-cclm-cnv-install-policy`, and spoke uninstall. Spoke OCP upgrade is `interop-acm-upgrade-spoke-prehealthcheck`, `interop-acm-upgrade-spoke-upgrade`, then `interop-acm-upgrade-spoke-healthcheck`, followed by the ACM test steps.
 
 ## Prerequisites
 
@@ -86,3 +113,13 @@ For detailed documentation on individual steps and configuration options, see th
     - Runs on existing Goldman Sachs bare-metal cluster
     - Uses `external-cluster` workflow
     - Tests OpenShift Virtualization localnet networking with single NIC configuration
+
+### ACM+Virt Configurations
+
+- **OCP 4.22 CCLM**: `RedHatQE-interop-testing-master__ocp-4.22-lpMainline-lp-interop--acm-virt--cclm.yaml`
+    - `cr--2spoke-mig--aws` — spoke-to-spoke bidirectional CCLM
+    - `cr--hub-spoke-mig--aws` — hub-spoke CCLM via `interop-acm-cclm-cnv-mtv-hub-spoke`
+- **OCP 4.22 p2p**: `RedHatQE-interop-testing-master__ocp-4.22-lpMainline-lp-interop--acm-virt--p2p.yaml`
+- **OCP 4.22 EUS upgrade from 4.20**: `RedHatQE-interop-testing-master__ocp-4.22-lpMainline-lp-interop--acm-virt--eus-upgrade-from-4.20.yaml`
+- **OCP 5.0 p2p**: `RedHatQE-interop-testing-master__ocp-5.0-lpMainline-lp-interop--acm-virt--p2p.yaml`
+- **OCP 4.21 ACM+CNV p2p**: `RedHatQE-interop-testing-master__acm-cnv-ocp-4.21-p2p.yaml`
