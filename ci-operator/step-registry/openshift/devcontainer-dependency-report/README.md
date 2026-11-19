@@ -36,8 +36,10 @@ The checker verifies that the requested root is the Git top level and always
 records the actual local `HEAD`, including merged-pull checkouts. It validates
 repository identity from a public GitHub `origin` for on-demand runs, or from
 the Prow `JOB_SPEC` workdir reference when clonerefs has no configured remote.
-It also records whether the inventoried files are clean or dirty, so working-tree
-content is never mislabeled as committed content.
+It captures every inventoried file once before public version lookups, hashes
+those bytes with the file's Git attributes, and compares the result with the
+recorded `HEAD`. This keeps later working-tree edits from being mislabeled as
+committed content.
 
 ## JSON report contract
 

@@ -119,7 +119,10 @@ DEPENDENCIES: dict[str, dict[str, Any]] = {
         "name": "gotestsum",
         "classification": "floating",
         "file": ".devcontainer/Dockerfile",
-        "pattern": r"gotest\.tools/gotestsum@(?P<version>latest)",
+        "pattern": (
+            r"(?P<quote>[\"']?)gotest\.tools/gotestsum@(?P<version>latest)"
+            r"(?P=quote)(?=$|\s)"
+        ),
         "version_source": "https://github.com/gotestyourself/gotestsum.git tags",
         "rationale": (
             "The declaration explicitly tracks latest; the report records that token "
@@ -131,6 +134,7 @@ DEPENDENCIES: dict[str, dict[str, Any]] = {
         "classification": "pinned",
         "file": ".devcontainer/post-create.sh",
         "pattern": (
+            r"^[ \t]*go[ \t]+install(?:[ \t]+|[ \t]*\\\r?\n[ \t]+)"
             r"(?P<quote>[\"']?)golang\.org/x/tools/gopls@v"
             r"(?P<version>[^\"'\s]+)(?P=quote)(?=$|\s)"
         ),
@@ -234,7 +238,10 @@ DEPENDENCIES: dict[str, dict[str, Any]] = {
         "name": "apm-cli",
         "classification": "pinned",
         "file": ".devcontainer/post-create.sh",
-        "pattern": r"apm-cli==(?P<version>\S+)(?=$|\s)",
+        "pattern": (
+            r"(?P<quote>[\"']?)apm-cli==(?P<version>[^\"'\s]+)"
+            r"(?P=quote)(?=$|\s)"
+        ),
         "source": "apm-cli",
         "policy": {"min_inclusive": "0.11.0", "max_exclusive": "0.12.0"},
         "rationale": "Report a stable candidate only within the approved 0.11 line.",
@@ -305,7 +312,10 @@ def parse_version(value: str, prefix: str = "") -> tuple[int, int, int]:
     match = STABLE_VERSION.fullmatch(candidate)
     if not match:
         raise CheckError(f"{value!r} is not a stable three-part version")
-    return tuple(int(part) for part in match.groups())
+    try:
+        return tuple(int(part) for part in match.groups())
+    except ValueError as exc:
+        raise CheckError(f"{value!r} has an invalid numeric component") from exc
 
 
 def version_in_policy(version: tuple[int, int, int], policy: dict[str, str]) -> bool:
@@ -692,10 +702,16 @@ def local_repository_revision(repository_root: Path) -> str:
     return revision
 
 
-def local_inventory_source(repository_root: Path, file_paths: list[str]) -> str:
+def local_inventory_source(
+    repository_root: Path,
+    file_paths: list[str],
+    revision: str,
+    captured_files: dict[str, Union[bytes, CheckError]],
+) -> str:
     output = checked_git(
         repository_root,
         [
+            "--no-optional-locks",
             "status",
             "--porcelain=v1",
             "--untracked-files=all",
@@ -704,7 +720,50 @@ def local_inventory_source(repository_root: Path, file_paths: list[str]) -> str:
         ],
         "inspecting local working tree",
     )
-    return "local-checkout-dirty" if output else "local-checkout-clean"
+    dirty = bool(output)
+    for file_path, captured in captured_files.items():
+        if isinstance(captured, CheckError):
+            dirty = True
+            continue
+        entry = checked_git(
+            repository_root,
+            ["ls-tree", "--full-tree", revision, "--", file_path],
+            f"finding committed input {file_path}",
+        ).strip()
+        if not entry:
+            dirty = True
+            continue
+        fields = entry.partition("\t")[0].split()
+        if len(fields) != 3 or fields[1] != "blob":
+            raise CheckError(f"git returned an invalid tree entry for {file_path}")
+        try:
+            hashed = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repository_root),
+                    "hash-object",
+                    f"--path={file_path}",
+                    "--stdin",
+                ],
+                input=captured,
+                check=False,
+                capture_output=True,
+                timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise CheckError(
+                f"could not hash captured input {file_path}: {exc}"
+            ) from exc
+        if hashed.returncode != 0:
+            raise CheckError(
+                f"hashing captured input {file_path} failed (git exit "
+                f"{hashed.returncode}): "
+                f"{sanitize_git_stderr(hashed.stderr.decode('utf-8', errors='replace'))}"
+            )
+        if hashed.stdout.decode("ascii", errors="replace").strip() != fields[2]:
+            dirty = True
+    return "local-checkout-dirty" if dirty else "local-checkout-clean"
 
 
 def git_tag_versions(source: dict[str, str]) -> list[str]:
@@ -813,6 +872,22 @@ def repository_file(repository_root: Path, file_path: str) -> Path:
     return candidate
 
 
+def capture_repository_files(
+    repository_root: Path, file_paths: list[str]
+) -> dict[str, Union[bytes, CheckError]]:
+    captured: dict[str, Union[bytes, CheckError]] = {}
+    for file_path in sorted(set(file_paths)):
+        try:
+            captured[file_path] = repository_file(
+                repository_root, file_path
+            ).read_bytes()
+        except (CheckError, OSError) as exc:
+            captured[file_path] = CheckError(
+                f"could not read local repository file {file_path}: {exc}"
+            )
+    return captured
+
+
 def ensure_output_outside_repository(output_dir: Path, repository_root: Path) -> None:
     try:
         root = repository_root.resolve()
@@ -867,7 +942,7 @@ def check(
     dependencies: list[tuple[str, dict[str, Any]]],
     patterns: dict[str, re.Pattern[str]],
     fetcher: Fetcher,
-    repository_root: Path,
+    captured_files: dict[str, Union[bytes, CheckError]],
     repository_revision: str,
 ) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
@@ -893,10 +968,11 @@ def check(
         try:
             if file_path not in file_cache:
                 try:
-                    file_cache[file_path] = repository_file(
-                        repository_root, file_path
-                    ).read_text(encoding="utf-8")
-                except (CheckError, OSError, UnicodeError) as exc:
+                    captured = captured_files[file_path]
+                    if isinstance(captured, CheckError):
+                        raise captured
+                    file_cache[file_path] = captured.decode("utf-8")
+                except (CheckError, UnicodeError) as exc:
                     file_cache[file_path] = CheckError(
                         f"could not read local repository file {file_path}: {exc}"
                     )
@@ -1080,7 +1156,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         checkout_identity = validate_checkout_identity(
             args.repository, args.repository_root
         )
-        inventory_source = local_inventory_source(args.repository_root, file_paths)
+        captured_files = capture_repository_files(args.repository_root, file_paths)
+        inventory_source = local_inventory_source(
+            args.repository_root, file_paths, revision, captured_files
+        )
         ensure_output_outside_repository(args.output_dir, args.repository_root)
         phase = "checking dependency versions"
         results = check(
@@ -1088,7 +1167,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             dependencies,
             patterns,
             Fetcher(),
-            args.repository_root,
+            captured_files,
             revision,
         )
         phase = "writing report artifacts"
