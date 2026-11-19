@@ -76,6 +76,10 @@ imageTag="${BUILD_ID:-$(date +%s)}"
 # process-substitution curl configs, removed in Main.
 typeset acsPassFile='/tmp/acs-admin-password'
 
+EscapeForCurlUser() {
+    sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
 typeset -A testStatus=()
 typeset -A testDuration=()
 typeset -A testFailureMsg=()
@@ -537,7 +541,8 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
         # session cookie and the CSRF token refreshed for that session,
         # otherwise this request goes out with an empty bearer header and the
         # push below has no organization.
-        orgRaw="$(curl -sSL --fail-with-body "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
+        # no -L: the CSRF token must not follow a redirect, and %{http_code} must report the initial response
+        orgRaw="$(curl -sS --fail-with-body "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
             -w '\n%{http_code}' \
             "https://${QUAY_HOST}/api/v1/organization/" \
             -b "${cookieFile}" \
@@ -546,7 +551,8 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
     else
         # The bearer token is handed to curl through a process-substitution
         # config, so it never appears in the curl argv.
-        orgRaw="$(curl -sSL --fail-with-body "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
+        # no -L: the CSRF token must not follow a redirect, and %{http_code} must report the initial response
+        orgRaw="$(curl -sS --fail-with-body "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
             -w '\n%{http_code}' \
             "https://${QUAY_HOST}/api/v1/organization/" \
             --config <(printf 'header = "Authorization: Bearer %s"\n' "${QUAY_TOKEN}") \
@@ -816,7 +822,7 @@ function RegisterQuayInAcs () {
     ( set +x
       typeset response=''
       if ! response=$(curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 60 \
-          --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+          --config <(printf 'user = "admin:%s"\n' "$(EscapeForCurlUser < "${acsPassFile}")") \
           "https://${acsHost}/v1/imageintegrations"); then
           echo "ERROR: Failed to query ACS image integrations" >&2
           exit 1
@@ -873,7 +879,7 @@ print(json.dumps(payload))
       regCode=$(printf '%s' "${regPayload}" | curl -s "${acsTlsOpts[@]}" -o /dev/null -w '%{http_code}' \
           --connect-timeout 15 --max-time 60 \
           -X POST "https://${acsHost}/v1/imageintegrations" \
-          --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+          --config <(printf 'user = "admin:%s"\n' "$(EscapeForCurlUser < "${acsPassFile}")") \
           -H "Content-Type: application/json" \
           -d @-) || regCode="000"
       if [[ "${regCode}" != 2* ]]; then
@@ -902,7 +908,7 @@ print(json.dumps(payload))
       scanCode=$(curl -s "${acsTlsOpts[@]}" -o /dev/null -w '%{http_code}' \
           --connect-timeout 15 --max-time 60 \
           -X POST "https://${acsHost}/v1/images/scan" \
-          --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+          --config <(printf 'user = "admin:%s"\n' "$(EscapeForCurlUser < "${acsPassFile}")") \
           -H "Content-Type: application/json" \
           -d "${scanPayload}") || scanCode="000"
       if [[ "${scanCode}" != 2* ]]; then
@@ -1024,7 +1030,7 @@ function RunAcsScan () {
         scanResult="$(
             set +x
             curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 30 \
-                --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+                --config <(printf 'user = "admin:%s"\n' "$(EscapeForCurlUser < "${acsPassFile}")") \
                 "https://${acsHost}/v1/images?query=Image:${pushTarget}" 2>"${scanErrFile}"
         )" || scanRc=$?
 
@@ -1120,17 +1126,17 @@ function Main () {
         done
         exit 1
     fi
-    if ! GetQuayAuth; then
-        for t in "${allTests[@]}"; do
-            RecordResult "${t}" "failed" "Quay credential retrieval failed"
-        done
-        exit 1
-    fi
     if ! PreflightCheck; then
         echo "FATAL: Quay not reachable; skipping all tests" >&2
         RecordResult "${testNamePushPull}" "failed" "Quay registry discovery endpoint not reachable"
         RecordResult "${testNameOdf}" "skipped" "Skipped: Quay preflight (discovery endpoint) failed"
         RecordResult "${testNameAcs}" "skipped" "Skipped: Quay preflight (discovery endpoint) failed"
+        exit 1
+    fi
+    if ! GetQuayAuth; then
+        for t in "${allTests[@]}"; do
+            RecordResult "${t}" "failed" "Quay credential retrieval failed"
+        done
         exit 1
     fi
     # The organization request is what makes the push target writable, so a

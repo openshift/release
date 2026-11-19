@@ -147,7 +147,7 @@ print(len(json.load(sys.stdin).get('items',[])))
     true
 }
 
-function GetQuayAuth () {
+function GetQuayAuthOnce () {
     QUAY_USER=""
     QUAY_PASSWORD=""
     QUAY_TOKEN=""
@@ -200,6 +200,39 @@ function GetQuayAuth () {
     echo "ERROR: Could not obtain Quay credentials from any source" >&2
     export QUAY_USER QUAY_PASSWORD QUAY_TOKEN
     return 1
+}
+
+function GetQuayAuth () {
+    # The quayadmin secret is provisioned by the create-admin-user Job from
+    # the policy-config-quay policy, which can still be running when the
+    # smoke starts. Wait for the object instead of polling the credential
+    # sources with a fixed sleep: --for=create covers the not-yet-created
+    # case, and the jsonpath wait covers the window where the secret exists
+    # but the Job has not written its token yet. Both stages share one
+    # bounded budget. A miss is not fatal here: GetQuayAuthOnce still tries
+    # the quaydevel secret and the user-initialize endpoint.
+    typeset -i authBudgetSeconds=600
+    typeset -i authDeadline=0
+    typeset -i authWait=0
+    # Check existing credential before waiting for quayadmin (avoid 600s wait when quaydevel already present)
+    if oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.token}' 2>/dev/null | grep -q .; then
+        : "existing quayadmin token present, skipping wait"
+    elif oc get secret quaydevel -n "${QUAY_NS}" -o jsonpath='{.data.password}' 2>/dev/null | grep -q .; then
+        : "existing quaydevel credential present, skipping quayadmin wait"
+    else
+        authDeadline=$(( $(date +%s) + authBudgetSeconds ))
+        authWait=$(( authDeadline - $(date +%s) ))
+        if ! oc wait secret/quayadmin -n "${QUAY_NS}" --for=create --timeout="${authWait}s"; then
+        echo "WARN: quayadmin secret was not created within $(( authBudgetSeconds / 60 ))m; falling back to the other credential sources" >&2
+    else
+        authWait=$(( authDeadline - $(date +%s) ))
+        if (( authWait > 0 )) && ! oc wait secret/quayadmin -n "${QUAY_NS}" \
+            --for=jsonpath='{.data.token}' --timeout="${authWait}s"; then
+            echo "WARN: quayadmin token was not written within $(( authBudgetSeconds / 60 ))m; falling back to the other credential sources" >&2
+        fi
+    fi
+    fi
+    GetQuayAuthOnce
 }
 
 function PreflightCheck () {
