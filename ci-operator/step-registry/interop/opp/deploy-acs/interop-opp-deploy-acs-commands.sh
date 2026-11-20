@@ -1028,6 +1028,9 @@ else
   # variable, so it never reaches the manifest as raw text.
   typeset _sub_create_err="" _sub_create_rc=0
   _sub_create_err=$(mktemp)
+  # PRRT_kwDOBHvUUM65TpMp: bare pipeline under set -e with pipefail exits before rc capture; disable errexit/pipefail around it
+  set +e
+  set +o pipefail
   jq -cn --arg ns "${ACS_NAMESPACE}" --arg ch "${ACS_CHANNEL}" \
       '{apiVersion:"operators.coreos.com/v1alpha1",
         kind:"Subscription",
@@ -1038,7 +1041,9 @@ else
               source:"redhat-operators",
               sourceNamespace:"openshift-marketplace"}}' |
       ( set +x; oc create -f - 2>"${_sub_create_err}" )
-  _sub_create_rc=$?
+  _sub_create_rc=${PIPESTATUS[1]:-${PIPESTATUS[0]}}
+  set -o pipefail
+  set -e
   if (( _sub_create_rc != 0 )); then
     typeset _sub_create_err_text=""
     _sub_create_err_text=$(cat "${_sub_create_err}" 2>/dev/null || echo unknown)
