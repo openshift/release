@@ -32,6 +32,29 @@ is explicitly unsupported. Prefix-only, stale, replacement, malformed and
 ambiguous matches are rejected. Missing recordings require an earlier producer
 handoff before nested teardown; the collector does not guess from arbitrary logs.
 
+Standalone immutable IDs retain the existing workflow trust boundary, not a
+claim that ID syntax or a namespace name proves ownership. ci-operator deletes
+and recreates the multistage shared Secret before execution; each serialized
+step receives its contents and publishes its resulting writable shared directory
+before the next step. See `openshift/ci-tools` at
+[`f6a3775`, shared initialization](https://github.com/openshift/ci-tools/blob/f6a37750355c09d581419b03ef9690b2d7e4021a/pkg/steps/multi_stage/init.go#L49),
+[step sequencing](https://github.com/openshift/ci-tools/blob/f6a37750355c09d581419b03ef9690b2d7e4021a/pkg/steps/multi_stage/run.go#L84),
+and [shared-state publication](https://github.com/openshift/ci-tools/blob/f6a37750355c09d581419b03ef9690b2d7e4021a/cmd/entrypoint-wrapper/main.go#L159).
+The namespace is reusable: this association assumes trusted workflow producers
+and no overlapping invocation of the same namespace/test pair. It is not a
+certificate for arbitrary imported shared data or malicious preceding steps.
+An absent manifest preserves existing single-ID collection. A present invalid,
+empty or ambiguous manifest cannot be bypassed by a legacy ID.
+
+The FVT handoff format is version 2: `started_ns` and `finished_ns` are integer
+Unix epoch nanoseconds captured with `time.time_ns()`. The collector compares both
+bounds exactly with RFC3339 creation times, including 1–9 fractional digits and
+timezone offsets. Legacy unversioned second/float windows cannot recover their
+discarded start precision and are rejected as `invalid_run_window`, without
+falling back to a shared ID when such a manifest exists. Producer and collector
+are delivered from the same job configuration; the standalone shared-ID path
+without a manifest remains supported.
+
 When a recording includes both an immutable ID and a name, the exact-name
 cross-check is mandatory even if a legacy shared ID agrees. An unavailable,
 timed-out, oversized or malformed lookup cannot establish that association, so
@@ -66,6 +89,11 @@ current/previous oauth-apiserver and etcd logs become fixed error/panic/timeout
 counts, with bounded Normal/Warning event counts, not raw text. This deliberately
 trades arbitrary log text for safe public
 artifacts; full root-cause coverage is not claimed.
+
+JSON depth failures invalidate only the affected response or resource, preserving
+valid siblings and continuing safe collection. Rejected backplane archives are
+never executed; they record `invalid_tool_archive` and use only the existing CMS
+credentials fallback, recording `access_unavailable` if that also fails.
 
 Each CLI operation has a 20-second limit (downloads 65 seconds), stdout is capped
 at 1 MiB, downloads at 200 MiB, and the total command budget is 450 seconds within

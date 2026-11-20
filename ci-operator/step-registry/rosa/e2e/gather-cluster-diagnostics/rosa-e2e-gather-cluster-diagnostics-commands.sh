@@ -95,7 +95,7 @@ def get_json(path):
     try:
         value = json.loads(data)
         return (value, "ok") if isinstance(value, dict) else (None, "invalid_response")
-    except (ValueError, UnicodeError):
+    except (ValueError, UnicodeError, RecursionError):
         return None, "invalid_response"
 
 
@@ -121,7 +121,11 @@ def identity():
             OUTCOME["identity"] = "shared_id"
             return identifiers.pop()
         raise ValueError("missing_identity: preserve run-bound FVT identity handoff")
-    manifest = json.loads(local_file("ocm-fvt-diagnostic-identity.json"))
+    encoded_manifest = local_file("ocm-fvt-diagnostic-identity.json")
+    try:
+        manifest = json.loads(encoded_manifest)
+    except (ValueError, RecursionError):
+        raise ValueError("invalid_identity_handoff") from None
     if not isinstance(manifest, dict) or manifest.get("outcome") != "ok":
         raise ValueError("invalid_identity_handoff")
     run = os.environ.get("BUILD_ID", "")
@@ -133,6 +137,8 @@ def identity():
     if (not isinstance(names, list) or len(names) > 1 or not isinstance(recorded_ids, list)
             or len(recorded_ids) > 1):
         raise ValueError("ambiguous_or_missing_name")
+    if not names and not recorded_ids:
+        raise ValueError("missing_identity: preserve run-bound FVT identity handoff")
     if names and (not isinstance(names[0], str) or not NAME.fullmatch(names[0])):
         raise ValueError("malformed_name")
     if recorded_ids and (not isinstance(recorded_ids[0], str) or not IDENTIFIER.fullmatch(recorded_ids[0])):
@@ -143,9 +149,11 @@ def identity():
     if not identifiers:
         raise ValueError("unverified_name_identity" if names else "missing_identity: preserve run-bound FVT identity handoff")
     expected_id = identifiers.pop()
-    started, finished = manifest.get("started"), manifest.get("finished")
-    if (type(started) is not int or type(finished) not in (int, float) or
-            not 0 < started <= finished <= time.time() + 60 or finished - started > 86400):
+    started, finished = manifest.get("started_ns"), manifest.get("finished_ns")
+    if (type(manifest.get("version")) is not int or manifest["version"] != 2 or
+            type(started) is not int or type(finished) is not int or
+            not 0 < started <= finished <= time.time_ns() + 60_000_000_000 or
+            finished - started > 86_400_000_000_000):
         raise ValueError("invalid_run_window")
     if recorded_ids:
         OUTCOME["identity"] = "recorded_id"
@@ -175,7 +183,7 @@ def identity():
             raise ValueError()
         created = datetime.datetime.fromisoformat(timestamp[1] + timestamp[3].replace("Z", "+00:00"))
         created_seconds = Decimal(int(created.timestamp())) + Decimal("0." + (timestamp[2] or "0"))
-        if not Decimal(started) <= created_seconds <= Decimal(str(finished)):
+        if not Decimal(started) / 1_000_000_000 <= created_seconds <= Decimal(finished) / 1_000_000_000:
             raise ValueError()
     except (KeyError, TypeError, AttributeError, ValueError):
         raise ValueError("unscoped_creation_time") from None
@@ -240,7 +248,7 @@ def preinstall(cluster_id):
                             (isinstance(link, dict) and isinstance(link.get("name"), str) and bool(link["name"])
                              and isinstance(link.get("namespace"), str) and bool(link["namespace"])) for link in links)
                     result["resources"].append(item)
-                except (TypeError, ValueError):
+                except (TypeError, ValueError, RecursionError):
                     result["outcome"] = "invalid_resource"
             if not result["resources"] and result["outcome"] == "ok":
                 result["outcome"] = "no_supported_resources"
@@ -274,10 +282,14 @@ def guest(cluster_id, work):
                              "--no-same-permissions", "--keep-old-files", "--", "ocm-backplane"])
         if status == "ok":
             binary = work / "ocm-backplane"
-            metadata = binary.lstat()
-            if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1 or metadata.st_size > 200 * LIMIT:
-                raise ValueError("invalid_tool_archive")
-            binary.chmod(0o700)
+            try:
+                metadata = binary.lstat()
+                if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1 or metadata.st_size > 200 * LIMIT:
+                    status = "invalid_tool_archive"
+                else:
+                    binary.chmod(0o700)
+            except OSError:
+                status = "invalid_tool_archive"
     config = work / "backplane-config.json"
     config.write_text(json.dumps({"proxy-url": os.environ.get("GATHER_BACKPLANE_PROXY_URL", "")}))
     os.environ["BACKPLANE_CONFIG"] = str(config)
@@ -323,7 +335,7 @@ def guest(cluster_id, work):
                                          signal: len(re.findall(pattern, logs or b"", re.IGNORECASE))
                                          for signal, pattern in (("error", rb"\berror\b"), ("panic", rb"\bpanic\b"),
                                                                  ("timeout", rb"\btimeout\b"))}})
-            except (ValueError, AttributeError, TypeError):
+            except (ValueError, AttributeError, TypeError, RecursionError):
                 result = {"outcome": "invalid_response"}
         artifact(label + ".json", result)
     for namespace in ("openshift-oauth-apiserver", "openshift-etcd"):
@@ -337,7 +349,7 @@ def guest(cluster_id, work):
                 result["types"] = {event_type: sum(isinstance(item, dict) and item.get("type") == event_type
                                                  for item in items[:128]) for event_type in ("Normal", "Warning")}
                 result["truncated"] = len(items) > 128
-            except (ValueError, KeyError, TypeError):
+            except (ValueError, KeyError, TypeError, RecursionError):
                 result = {"outcome": "invalid_response"}
         artifact(namespace + "-events.json", result)
 

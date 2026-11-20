@@ -298,7 +298,7 @@ if ! ocm_fvt_workdir="$(python3 "${ocm_fvt_helpers}" stage "${ARTIFACT_DIR}" 2>/
   echo "ERROR: failed to prepare private ocm-fvt artifact staging" >&2
   exit 1
 fi
-ocm_fvt_started="$(date +%s)"
+ocm_fvt_started="$(python3 -c 'import time; print(time.time_ns())')"
 ocm_fvt_output="${ocm_fvt_workdir}/output"
 mkdir -p "${ocm_fvt_output}"
 chmod 1777 "${ocm_fvt_output}"
@@ -467,8 +467,8 @@ except (OSError, ValueError, configparser.Error):
 descriptor = os.open(shared / "ocm-fvt-diagnostic-identity.json",
                      os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
 with os.fdopen(descriptor, "w", encoding="utf-8") as manifest:
-    json.dump({"run": os.environ.get("BUILD_ID"), "job": os.environ.get("JOB_NAME"),
-               "started": int(os.sys.argv[3]), "finished": time.time(),
+    json.dump({"version": 2, "run": os.environ.get("BUILD_ID"), "job": os.environ.get("JOB_NAME"),
+               "started_ns": int(os.sys.argv[3]), "finished_ns": time.time_ns(),
                "names": sorted(names), "ids": sorted(identifiers), "outcome": outcome}, manifest)
 PY
 (echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code") 2>/dev/null || true
