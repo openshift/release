@@ -971,14 +971,19 @@ def prepare(shared, artifacts):
     try:
         for filename in ("validation.json", "validation.md", "sources.json"):
             (shared / filename).unlink(missing_ok=True)
+        print("Capturing validation sources.", flush=True)
         sources, context, secrets = capture_sources()
         model = Model("prepare")
         secrets.append(model.token)
+        print("Generating the validation plan.", flush=True)
         plan = generate_plan(model, sources, context, secrets)
         for directory in (shared, artifacts):
             write_plan(directory, plan)
+        print("Preparation: ready\n", flush=True)
+        print(plan_markdown(plan), flush=True)
     except Exception as error:
         write_json(artifacts / "preparation-error.json", {"status": "unable_to_verify", "reason": safe_error(error)})
+        print(f"Preparation: unable_to_verify\n{safe_error(error)}", flush=True)
         raise
     finally:
         write_json(artifacts / "preparation-metrics.json", model_metrics(started, model))
@@ -1394,6 +1399,7 @@ def main():
     configure_runtime(args.phase)
     shared, artifacts = Path(required("SHARED_DIR")), Path(required("ARTIFACT_DIR"))
     artifacts.mkdir(parents=True, exist_ok=True)
+    print(f"Starting agentic validation: {args.phase}.", flush=True)
     if args.phase == "prepare":
         prepare(shared, artifacts)
         return 0

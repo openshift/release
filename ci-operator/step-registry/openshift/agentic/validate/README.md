@@ -88,6 +88,11 @@ planner's own source code or prompt examples as product validation actions.
 
 ## Execution and reporting
 
+Both phases print a startup message immediately. Preparation logs source-capture
+and model-generation progress, then prints the checked `validation.md` plan or
+a safe failure reason. Raw Jira descriptions, model prompts and credentials are
+kept out of the log.
+
 1. `load_plan` checks the hash, rendered Markdown and job revision.
 2. `prepare_cluster` flattens the target kubeconfig and verifies that a ready
    container runs the tested payload component digest. Execution receives those
