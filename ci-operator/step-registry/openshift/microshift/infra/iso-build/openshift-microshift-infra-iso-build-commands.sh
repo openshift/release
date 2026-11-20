@@ -40,7 +40,11 @@ chmod +x /tmp/iso.sh
 # GBRN=mybranch
 # git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
 #
-ci_clone_src
+# TEMP — USHIFT-7642 rehearsal: build agullon/#7759 branch instead of PR refs. REVERT before merge.
+GUSR=agullon
+GBRN=agullon/ushift-7642-4-4-remove-symlink-only-presubmit-di
+git clone "https://github.com/${GUSR}/microshift.git" -b "${GBRN}" /go/src/github.com/openshift/microshift
+#ci_clone_src
 
 download_brew_rpms() {
     # See BREW_RPM_SOURCE variable definition in test/bin/common.sh
