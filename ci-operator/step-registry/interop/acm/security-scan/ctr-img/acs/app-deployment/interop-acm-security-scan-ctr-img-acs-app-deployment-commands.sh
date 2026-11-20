@@ -755,7 +755,7 @@ def lastn($d): split("/") | .[-$d:] | join("/");
             fi
         done
         # If all retries exhausted without success, mark as query failure not empty
-        if (( _acsQueryOk == 0 )) && [[ "${httpdImageJson}" == '[]' ]]; then
+        if (( _acsQueryOk == 0 )) && [[ "${httpdImageJson}" != '__QUERY_FAILED__' ]]; then
             httpdImageJson='__QUERY_FAILED__'
         fi
         if [[ "${httpdImageJson}" == '__QUERY_FAILED__' ]]; then
