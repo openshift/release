@@ -306,7 +306,6 @@ function IsMcpProgressing () {
     typeset -i last=${updatedHistory[len - 1]}
     if (( last > first )); then
         for (( i = windowStart + 1; i < len; ++i )); do
-            (( updatedHistory[i] < updatedHistory[i-1] )) && return 1
             # PRRT_kwDOBHvUUM65Mrk3: verify ready counts recover after updated dip
             if (( updatedHistory[i] < updatedHistory[i-1] )); then
                 (( readyHistory[i] < readyHistory[i-1] )) && return 1
@@ -925,6 +924,7 @@ PY
     # counts as a history sample.
     if [[ "${statusDetail}" == "python parse error" ]]; then
         echo "WARNING: MCP status parse error; retaining last valid generation fingerprint" >&2
+        consecutivePasses=0
         continue
     fi
     # Validate as plain strings first: a typeset -i target evaluates its input
