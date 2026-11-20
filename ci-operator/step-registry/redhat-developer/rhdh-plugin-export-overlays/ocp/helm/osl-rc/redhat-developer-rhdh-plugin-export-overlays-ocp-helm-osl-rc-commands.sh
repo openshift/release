@@ -1,17 +1,36 @@
 #!/bin/bash
 set -euo pipefail
 
-case "${MULTISTAGE_PARAM_OVERRIDE_OSL_MODE:-}" in
-    "") echo "Skipping OSL RC for nightly run"; exit 0 ;;
-    rc) [[ "${JOB_TYPE:-}" == periodic ]] || { echo "ERROR: OSL RC mode requires a periodic job" >&2; exit 1; } ;;
-    *) echo "ERROR: invalid OSL mode" >&2; exit 1 ;;
-esac
+LOGIC_IIB="${MULTISTAGE_PARAM_OVERRIDE_OSL_IIB:-}"
+OCP_VERSION="${MULTISTAGE_PARAM_OVERRIDE_OSL_OCP_VERSION:-}"
+LOGIC_STARTING_CSV="${MULTISTAGE_PARAM_OVERRIDE_OSL_STARTING_CSV:-}"
+LOGIC_CHANNEL="${MULTISTAGE_PARAM_OVERRIDE_OSL_CHANNEL:-}"
+LOGIC_DIGEST="${MULTISTAGE_PARAM_OVERRIDE_OSL_OPERATOR_DIGEST:-}"
+
+if [[ "${JOB_TYPE:-}" == presubmit && "${JOB_NAME:-}" == rehearse-* &&
+    -z "${LOGIC_IIB}${OCP_VERSION}${LOGIC_STARTING_CSV}${LOGIC_CHANNEL}${LOGIC_DIGEST}" ]]; then
+    echo "No OSL candidate supplied; running GA tests for rehearsal"
+    exit 0
+fi
+
+LOGIC_PACKAGE=logic-operator
+LOGIC_CHANNEL="${LOGIC_CHANNEL:-stable}"
+if [[ ! "${LOGIC_IIB}" =~ ^registry-proxy\.engineering\.redhat\.com/rh-osbs/iib@sha256:[0-9a-f]{64}$ ]]; then
+    echo "ERROR: OSL_IIB must be a digest-pinned Logic IIB pullspec" >&2
+    exit 1
+fi
+if [[ "${JOB_TYPE:-}" != periodic || ! "${OCP_VERSION}" =~ ^[0-9]+\.[0-9]+$ ||
+    ! "${LOGIC_STARTING_CSV}" =~ ^logic-operator\.v[A-Za-z0-9][A-Za-z0-9._-]*$ ||
+    ! "${LOGIC_CHANNEL}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ||
+    ( -n "${LOGIC_DIGEST}" && ! "${LOGIC_DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ) ]]; then
+    echo "ERROR: invalid OSL job type, OCP minor, starting CSV, channel, or operator digest" >&2
+    exit 1
+fi
 
 MIRROR_REGISTRY_DIR=/var/run/vault/mirror-registry
 BREW_REGISTRY="${MIRROR_REGISTRY_DIR}/registry_brew.json"
 STAGE_REGISTRY="${MIRROR_REGISTRY_DIR}/registry_stage.json"
 WORKDIR=$(mktemp -d)
-MANIFEST="${WORKDIR}/release.json"
 CATALOG_NAMESPACE=openshift-marketplace
 LOGIC_CATALOG=osl-rc-logic
 SERVERLESS_PACKAGE=serverless-operator
@@ -20,30 +39,6 @@ SERVERLESS_SOURCE=redhat-operators
 SERVERLESS_SOURCE_NAMESPACE=openshift-marketplace
 
 trap 'rm -rf "${WORKDIR}"' EXIT
-
-validate_release_json() {
-    if ! jq -s -e '
-        def token: type == "string" and test("^[A-Za-z0-9][A-Za-z0-9._-]*\\z");
-        def dns_label: type == "string" and test("^[a-z0-9]([a-z0-9-]*[a-z0-9])?\\z");
-        length == 1 and (.[0] |
-        type == "object"
-        and (keys == ["logic", "ocpVersion", "rhdhVersion"])
-        and (.rhdhVersion | token)
-        and (.ocpVersion | type == "string" and test("^[0-9]+\\.[0-9]+\\z"))
-        and (.logic | . as $logic
-            | type == "object"
-            and (keys == ["channel", "expectedVersion", "iib", "package", "startingCSV"])
-            and (.iib | type == "string" and test("^registry-proxy\\.engineering\\.redhat\\.com/rh-osbs/iib@sha256:[0-9a-f]{64}\\z"))
-            and (.package | dns_label)
-            and (.channel | token)
-            and (.startingCSV | token)
-            and ($logic.startingCSV | startswith($logic.package + ".v"))
-            and (.expectedVersion | type == "string" and test("^[0-9]+(\\.[0-9]+)+([.+-][A-Za-z0-9]+)*\\z"))))
-    ' "${MANIFEST}" >/dev/null; then
-        echo "ERROR: invalid OSL release JSON Gangway override; check the seven fields and the pinned Logic catalog image" >&2
-        return 1
-    fi
-}
 
 require_registry_credentials() {
     local path="$1"
@@ -105,33 +100,22 @@ worker_config_has_osl_mirror() {
 }
 
 worker_config_has_registry_credentials() {
-    local config="$1"
-    local machine_config
-    machine_config=$(oc get mc "${config}" -o json 2>/dev/null) || return 1
-    jq -e --slurpfile expected "${AUTHFILE}" '
-        [.spec.config.storage.files[]?
-            | select(.path == "/var/lib/kubelet/config.json")
-            | .contents.source
-            | select(type == "string" and startswith("data:") and contains(";base64,"))
-            | split(",")[1] | @base64d | fromjson
-            | select(.auths["brew.registry.redhat.io"].auth == $expected[0].auths["brew.registry.redhat.io"].auth
-                and .auths["registry.stage.redhat.io"].auth == $expected[0].auths["registry.stage.redhat.io"].auth)]
-        | length > 0
-    ' <<< "${machine_config}" >/dev/null 2>&1
-}
+    oc get mc "$1" -o json 2>/dev/null | node -e '
+        const { readFileSync } = require("node:fs");
+        const mc = JSON.parse(readFileSync(0, "utf8"));
+        const url = mc.spec.config.storage.files
+            .find(file => file.path === "/var/lib/kubelet/config.json")?.contents?.source;
+        const match = /^data:([^,]*),(.*)$/.exec(url);
+        if (!match) process.exit(1);
 
-sanitize_playwright_counts() {
-    jq -cs '
-        def safe_count: if type == "number" and . >= 0 and floor == . then . else null end;
-        if length != 1 then {expected: null, unexpected: null, flaky: null, skipped: null}
-        else .[0].stats as $stats
-            | {expected: ($stats.expected | safe_count), unexpected: ($stats.unexpected | safe_count), flaky: ($stats.flaky | safe_count), skipped: ($stats.skipped | safe_count)}
-        end
-    ' "${1:?results file is required}" 2>/dev/null
-}
-
-run_playwright() {
-    CI=1 bash ./run-e2e.sh -w orchestrator --workers=1 >/dev/null 2>&1
+        const body = decodeURIComponent(match[2]);
+        const actual = JSON.parse(match[1].endsWith(";base64") ? Buffer.from(body, "base64").toString("utf8") : body);
+        const expected = JSON.parse(readFileSync(process.argv[1], "utf8"));
+        process.exitCode = ["brew.registry.redhat.io", "registry.stage.redhat.io"].every(registry => {
+            const auth = expected.auths?.[registry]?.auth;
+            return typeof auth === "string" && auth !== "" && actual.auths?.[registry]?.auth === auth;
+        }) ? 0 : 1;
+    ' "${AUTHFILE}" >/dev/null 2>&1
 }
 
 catalog_diagnostics() {
@@ -187,9 +171,6 @@ spec:
   image: ${image}
   publisher: Red Hat
   sourceType: grpc
-  updateStrategy:
-    registryPoll:
-      interval: 15m
 EOF
     then
         echo "ERROR: failed to create CatalogSource ${CATALOG_NAMESPACE}/${name}" >&2
@@ -212,7 +193,7 @@ kind: Subscription
 metadata:
   name: ${name}
 spec:
-  channel: ${channel}
+  channel: "${channel}"
   installPlanApproval: ${approval}
   name: ${package}
   source: ${source}
@@ -228,27 +209,33 @@ EOF
 wait_for_subscription() {
     local name="$1"
     local namespace="$2"
-    local expected_version="${3:-}"
-    local expected_csv="${4:-}"
+    local expected_csv="${3:-}"
+    local expected_digest="${4:-}"
     local csv csv_state
     for _ in $(seq 1 90); do
         csv=$(oc -n "${namespace}" get subscription "${name}" -o jsonpath='{.status.installedCSV}' 2>/dev/null || true)
         if [[ -n "${csv}" ]]; then
             if [[ -n "${expected_csv}" && "${csv}" != "${expected_csv}" ]]; then
                 echo "Waiting for Subscription ${namespace}/${name}: expected CSV is not installed yet"
-            elif csv_state=$(oc -n "${namespace}" get csv "${csv}" -o json 2>/dev/null) && jq -e --arg version "${expected_version}" \
-                '.status.phase == "Succeeded" and ($version == "" or .spec.version == $version)' <<< "${csv_state}" >/dev/null 2>&1; then
-                echo "Installed Subscription ${namespace}/${name} at the requested version"
+            elif csv_state=$(oc -n "${namespace}" get csv "${csv}" -o json 2>/dev/null) &&
+                jq -e '.status.phase == "Succeeded"' <<< "${csv_state}" >/dev/null; then
+                if [[ -n "${expected_digest}" ]] && ! jq -e --arg digest "${expected_digest}" '
+                    any(.spec.install.spec.deployments[]?.spec.template.spec.containers[]?.image;
+                        endswith("@" + $digest))' <<< "${csv_state}" >/dev/null; then
+                    echo "ERROR: installed CSV for ${namespace}/${name} does not contain the expected operator image digest" >&2
+                    return 1
+                fi
+                echo "Installed Subscription ${namespace}/${name}"
                 return 0
             else
-                echo "Waiting for Subscription ${namespace}/${name}: installed CSV is not Succeeded at the requested version"
+                echo "Waiting for Subscription ${namespace}/${name}: installed CSV is not Succeeded"
             fi
         else
             echo "Waiting for Subscription ${namespace}/${name}: no installed CSV"
         fi
         sleep 10
     done
-    echo "ERROR: Subscription ${namespace}/${name} did not install expected Succeeded CSV ${expected_csv:-from the selected channel} with version ${expected_version:-latest available}" >&2
+    echo "ERROR: Subscription ${namespace}/${name} did not install expected Succeeded CSV ${expected_csv:-from the selected channel}" >&2
     subscription_diagnostics "${name}" "${namespace}"
     return 1
 }
@@ -390,34 +377,14 @@ EOF
     fi
 }
 
-if [[ -z "${MULTISTAGE_PARAM_OVERRIDE_OSL_RELEASE_JSON:-}" ]]; then
-    echo "ERROR: provide MULTISTAGE_PARAM_OVERRIDE_OSL_RELEASE_JSON through Gangway" >&2
+ACTUAL_OCP=$(oc version -o json | jq -r '.openshiftVersion')
+if [[ "${ACTUAL_OCP}" != "${OCP_VERSION}."* ]]; then
+    echo "ERROR: candidate targets OCP ${OCP_VERSION}, but claimed cluster is ${ACTUAL_OCP}" >&2
     exit 1
 fi
-printf '%s\n' "${MULTISTAGE_PARAM_OVERRIDE_OSL_RELEASE_JSON}" > "${MANIFEST}"
-validate_release_json
-OVERLAYS_BRANCH=$(jq -r '.extra_refs[]? | select(.org == "redhat-developer" and .repo == "rhdh-plugin-export-overlays") | .base_ref' <<<"${JOB_SPEC:-}")
-case "${OVERLAYS_BRANCH}" in
-    main|release-2.1) ;;
-    *) echo "ERROR: expected one overlays main or release-2.1 branch in JOB_SPEC" >&2; exit 1 ;;
-esac
 
 require_registry_credentials "${BREW_REGISTRY}" registry_brew.json
 require_registry_credentials "${STAGE_REGISTRY}" registry_stage.json
-
-RHDH_VERSION=$(jq -r '.rhdhVersion' "${MANIFEST}")
-OCP_VERSION=$(jq -r '.ocpVersion' "${MANIFEST}")
-LOGIC_IIB=$(jq -r '.logic.iib' "${MANIFEST}")
-LOGIC_PACKAGE=$(jq -r '.logic.package' "${MANIFEST}")
-LOGIC_CHANNEL=$(jq -r '.logic.channel' "${MANIFEST}")
-LOGIC_STARTING_CSV=$(jq -r '.logic.startingCSV' "${MANIFEST}")
-LOGIC_VERSION=$(jq -r '.logic.expectedVersion' "${MANIFEST}")
-
-ACTUAL_OCP=$(oc version -o json | jq -r '.openshiftVersion')
-if [[ "${ACTUAL_OCP}" != "${OCP_VERSION}."* ]]; then
-    echo "ERROR: manifest requests OCP ${OCP_VERSION}, but claimed cluster is ${ACTUAL_OCP}" >&2
-    exit 1
-fi
 
 CLUSTER_AUTH="${WORKDIR}/cluster-auth.json"
 AUTHFILE="${WORKDIR}/auth.json"
@@ -464,40 +431,5 @@ wait_for_subscription "${SERVERLESS_PACKAGE}" openshift-operators
 install_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_PACKAGE}" "${LOGIC_CHANNEL}" "${LOGIC_CATALOG}" "${CATALOG_NAMESPACE}" "${LOGIC_STARTING_CSV}" Manual
 verify_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_CHANNEL}" "${LOGIC_CATALOG}" "${CATALOG_NAMESPACE}" "${LOGIC_STARTING_CSV}" Manual
 approve_initial_install_plan "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_STARTING_CSV}"
-wait_for_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_VERSION}" "${LOGIC_STARTING_CSV}"
-
-export E2E_COLLECT_COVERAGE=false RHDH_VERSION IS_OPENSHIFT=true
-OVERLAYS_REPO=https://github.com/redhat-developer/rhdh-plugin-export-overlays.git
-git init "${WORKDIR}/rhdh-plugin-export-overlays"
-git -C "${WORKDIR}/rhdh-plugin-export-overlays" remote add origin "${OVERLAYS_REPO}"
-git -C "${WORKDIR}/rhdh-plugin-export-overlays" fetch --depth 1 origin "refs/heads/${OVERLAYS_BRANCH}"
-git -C "${WORKDIR}/rhdh-plugin-export-overlays" checkout --detach FETCH_HEAD
-echo "Testing overlays ${OVERLAYS_BRANCH} at $(git -C "${WORKDIR}/rhdh-plugin-export-overlays" rev-parse HEAD)"
-cd "${WORKDIR}/rhdh-plugin-export-overlays"
-TEST_EXIT=0
-oc create serviceaccount tester-sa-2 -n default >/dev/null 2>&1 || true
-if ! oc adm policy add-cluster-role-to-user cluster-admin system:serviceaccount:default:tester-sa-2 >/dev/null 2>&1; then
-    echo "ERROR: failed to grant the test service account cluster-admin access" >&2
-    exit 1
-fi
-export AUTH_TOKEN
-if ! AUTH_TOKEN=$(oc create token tester-sa-2 -n default --duration=4h 2>/dev/null); then
-    echo "ERROR: failed to create a token for the test service account" >&2
-    exit 1
-fi
-# Preserve the namespace for Prow's must-gather post-step.
-# "1" is truthy to Playwright but does not match the reporter's strict CI=="true" check.
-run_playwright || TEST_EXIT=$?
-if [[ ! -s playwright-report/results.json ]]; then
-    echo "ERROR: Playwright did not create playwright-report/results.json (test exit ${TEST_EXIT})" >&2
-    exit 1
-fi
-if ! RESULTS_COUNTS=$(sanitize_playwright_counts playwright-report/results.json); then
-    echo "ERROR: Playwright results could not be summarized safely" >&2
-    exit 1
-fi
-if ! jq -e '.unexpected == 0' <<<"${RESULTS_COUNTS}" >/dev/null; then
-    echo "ERROR: expected 0 failed tests; got ${RESULTS_COUNTS}" >&2
-    exit 1
-fi
-exit "${TEST_EXIT}"
+wait_for_subscription "${LOGIC_PACKAGE}" openshift-operators "${LOGIC_STARTING_CSV}" "${LOGIC_DIGEST}"
+touch "${SHARED_DIR}/osl-rc-installed"

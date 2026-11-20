@@ -1,23 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-if [[ -n "${MULTISTAGE_PARAM_OVERRIDE_OSL_MODE:-}" ]]; then
-    if [[ "${MULTISTAGE_PARAM_OVERRIDE_OSL_MODE}" != rc || "${JOB_TYPE:-}" != periodic ]]; then
-        echo "ERROR: invalid OSL mode for the standard E2E step" >&2
-        exit 1
-    fi
-    case "${JOB_NAME:-}" in
-        periodic-ci-redhat-developer-rhdh-plugin-export-overlays-main-e2e-ocp-helm-nightly|periodic-ci-redhat-developer-rhdh-plugin-export-overlays-release-2.1-e2e-ocp-helm-nightly)
-            echo "Skipping standard E2E for OSL RC"
-            exit 0
-            ;;
-        *)
-            echo "ERROR: OSL RC mode is available only on the main and release-2.1 Helm nightlies" >&2
-            exit 1
-            ;;
-    esac
-fi
-
 # =============================================================================
 # RHDH Plugin Export Overlays - E2E Test Runner (OpenShift CI)
 #
@@ -95,8 +78,21 @@ done
 
 RELEASE_BRANCH_NAME=$(echo "${JOB_SPEC}" | jq -r '.extra_refs[].base_ref' 2>/dev/null || echo "${JOB_SPEC}" | jq -r '.refs.base_ref')
 
+if [[ -f "${SHARED_DIR}/osl-rc-installed" ]]; then
+    if [[ "${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}" != redhat-developer/rhdh-plugin-export-overlays ]]; then
+        echo "ERROR: RC runs must use redhat-developer/rhdh-plugin-export-overlays" >&2
+        exit 1
+    fi
+    if [[ -n "${OVERLAY_BRANCH}" && "${OVERLAY_BRANCH}" != "${RELEASE_BRANCH_NAME}" ]]; then
+        echo "ERROR: RC branch override must match the configured overlays branch (${RELEASE_BRANCH_NAME})" >&2
+        exit 1
+    fi
+fi
+
 # Determine job mode
-if [[ "$JOB_NAME" == *-nightly-pr-scoped ]]; then
+if [[ -n "${E2E_WORKSPACE:-}" ]]; then
+    JOB_MODE="nightly"
+elif [[ "$JOB_NAME" == *-nightly-pr-scoped ]]; then
     JOB_MODE="nightly-pr-scoped"
 elif [[ "$JOB_TYPE" == "periodic" ]] || [[ "$JOB_NAME" == *nightly* ]]; then
     JOB_MODE="nightly"
@@ -107,7 +103,7 @@ fi
 # Parse PR number for presubmit jobs (needed for checkout)
 # Rehearse jobs get PR number from release repo (not overlay), so use REHEARSE_PR_NUMBER override
 GIT_PR_NUMBER=""
-if [[ "$JOB_TYPE" == "presubmit" ]]; then
+if [[ -z "${E2E_WORKSPACE:-}" && "$JOB_TYPE" == "presubmit" ]]; then
     if [[ "$JOB_NAME" == rehearse-* ]]; then
         GIT_PR_NUMBER="${REHEARSE_PR_NUMBER:-}"
     else
@@ -281,7 +277,23 @@ if [[ "$JOB_MODE" == "nightly" ]]; then
     echo "Nightly mode: running selected workspace E2E tests..."
     export E2E_NIGHTLY_MODE="true"
 
-    bash ./run-e2e.sh --workers=4 || TEST_EXIT_CODE=$?
+    if [[ -n "${E2E_WORKSPACE:-}" ]]; then
+        export E2E_COLLECT_COVERAGE=false
+        if [[ -f "${SHARED_DIR}/osl-rc-installed" ]]; then
+            # shortcut: source check for the two current branches; replace if the suite exposes a capability flag.
+            if ! grep -Fq 'process.env.ORCHESTRATOR_STRICT_DATA_INDEX === "true"' \
+                workspaces/orchestrator/e2e-tests/tests/support/utils/orchestrator-workflow-helpers.ts; then
+                echo "ERROR: the checked-out Overlays revision does not support strict Data Index checks" >&2
+                exit 1
+            fi
+            # The teardown reporter deletes test namespaces only with CI=true.
+            export CI=1 ORCHESTRATOR_STRICT_DATA_INDEX=true
+        fi
+        echo "Testing ${E2E_WORKSPACE} at $(git rev-parse HEAD)"
+        bash ./run-e2e.sh -w "${E2E_WORKSPACE}" --workers=1 || TEST_EXIT_CODE=$?
+    else
+        bash ./run-e2e.sh --workers=4 || TEST_EXIT_CODE=$?
+    fi
     collect_artifacts
     post_github_comment "Nightly E2E Tests" || echo "WARNING: Failed to post GitHub comment"
     exit $TEST_EXIT_CODE

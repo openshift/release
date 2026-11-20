@@ -7,12 +7,21 @@ ref:
     group: mirror-registry
     mount_path: /var/run/vault/mirror-registry
   env:
-  - name: MULTISTAGE_PARAM_OVERRIDE_OSL_MODE
+  - name: MULTISTAGE_PARAM_OVERRIDE_OSL_IIB
     default: ""
-    documentation: Set to rc through Gangway to run this step in a Helm nightly periodic.
-  - name: MULTISTAGE_PARAM_OVERRIDE_OSL_RELEASE_JSON
+    documentation: Required for RC. Digest-pinned Logic catalog pullspec from registry-proxy.engineering.redhat.com/rh-osbs/iib.
+  - name: MULTISTAGE_PARAM_OVERRIDE_OSL_OCP_VERSION
     default: ""
-    documentation: Required. OSL release JSON passed through Gangway; contains no credentials.
+    documentation: Required for RC. OCP minor targeted by the candidate catalog (for example, 4.22).
+  - name: MULTISTAGE_PARAM_OVERRIDE_OSL_STARTING_CSV
+    default: ""
+    documentation: Required for RC. Exact logic-operator CSV to install from the candidate catalog.
+  - name: MULTISTAGE_PARAM_OVERRIDE_OSL_CHANNEL
+    default: ""
+    documentation: Optional. Logic channel; defaults to stable.
+  - name: MULTISTAGE_PARAM_OVERRIDE_OSL_OPERATOR_DIGEST
+    default: ""
+    documentation: Optional. Expected sha256 digest of the operator image in the installed CSV.
   from_image:
     name: rhdh-e2e-runner
     namespace: ci
@@ -27,33 +36,6 @@ ref:
       memory: 1Gi
   timeout: 1h55m0s
   documentation: |-
-    Runs the OSL RC smoke test on an OCP cluster.
-
-    The Gangway MULTISTAGE_PARAM_OVERRIDE_OSL_RELEASE_JSON variable must provide:
-    - rhdhVersion and ocpVersion.
-    - A digest-pinned Logic IIB image in logic.iib.
-    - Exact Logic subscription and CSV expectations: logic.package,
-      logic.channel, logic.startingCSV, and logic.expectedVersion.
-      Logic uses manual InstallPlan approval; the initial plan is approved
-      only when it contains the expected Logic CSV and any other CSV is the
-      Serverless operator.
-
-    The Serverless subscription always uses serverless-operator from the stable
-    channel of redhat-operators in openshift-marketplace. It is installed in
-    openshift-operators with automatic approval and no starting CSV, so OLM
-    selects the latest version available in that channel. Successful installation
-    is logged without exposing CSV details. Serverless is not configured through
-    the release JSON override.
-
-    Candidate Logic images referenced from registry.redhat.io are mirrored to
-    the matching Brew rh-osbs images named in the OSL release email.
-
-    Runs the full default Orchestrator E2E project with one worker. Playwright
-    must exit successfully and report zero failed tests.
-
-    The job creates the same short-lived cluster-admin tester-sa-2 token used by
-    the standard RHDH E2E jobs and exposes it as AUTH_TOKEN for Loki queries.
-
-    Credentials are mounted from openshift-qe/mirror-registry at
-    /var/run/vault/mirror-registry and must provide registry_brew.json and
-    registry_stage.json.
+    Prepares an OCP cluster for the OSL release-candidate smoke test. Installs
+    stable Serverless and approves only the initial InstallPlan for the exact
+    Logic candidate CSV. Rehearsals with no candidate parameters use GA operators.
