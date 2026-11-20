@@ -1,0 +1,64 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM gcr.io/google.com/cloudsdktool/google-cloud-cli@sha256:54e711173abf8aebf025d0a20815088bfb6ab627eae39d8d0ab6df6ec114cbf6 AS sdk
+      RUN cp -a "$(gcloud info --format='value(installation.sdk_root)')" /export-sdk
+      FROM registry.access.redhat.com/ubi9/python-312@sha256:19e1e927138b40454858f297884c2c4e2f13f5ba95b3f55faea174d3cbb57067
+      COPY --from=sdk /export-sdk /opt/google-cloud-sdk
+      ENV PATH="/opt/google-cloud-sdk/bin:${PATH}" CLOUDSDK_PYTHON=python3
+      USER 0
+      RUN install -d -o 1001 -g 0 -m 0775 /go
+      USER 1001
+releases:
+  latest:
+    release:
+      channel: candidate
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 256Mi
+test_binary_build_commands: |
+  python3 -m venv /opt/app-root/src/gcp-wif-venv
+  /opt/app-root/src/gcp-wif-venv/bin/pip install --no-cache-dir -r ci-operator/config/openshift/release/_gcp-federation/requirements.txt
+  gcloud --version
+tests:
+- always_run: false
+  as: jobs2-gcloud
+  cluster: build07
+  optional: true
+  restrict_network_access: true
+  steps:
+    cluster_profile: openshift-org-aws
+    test:
+    - as: check-gcloud-wif
+      commands: |
+        #!/bin/bash
+        set -euo pipefail
+        harness="$PWD/ci-operator/config/openshift/release/_gcp-federation"
+        export GOOGLE_APPLICATION_CREDENTIALS="$harness/gcp-creds.json"
+        export CLOUDSDK_CONFIG="$(mktemp -d)"
+        python=/opt/app-root/src/gcp-wif-venv/bin/python
+        "$python" "$harness/gcloud_bridge.py" &
+        bridge=$!
+        trap 'kill "$bridge" 2>/dev/null || true' EXIT
+        for ((attempt=0; attempt<60; attempt++)); do
+          kill -0 "$bridge"
+          if curl -fs --max-time 2 http://127.0.0.1:8085/healthz >/dev/null; then break; fi
+          sleep 1
+        done
+        curl -fs --max-time 2 http://127.0.0.1:8085/healthz >/dev/null
+        "$python" "$harness/gcloud_check.py" | tee "$ARTIFACT_DIR/gcloud-wif.jsonl"
+      from: test-bin
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      timeout: 20m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: release
+  variant: gcp-hub-profile-check
