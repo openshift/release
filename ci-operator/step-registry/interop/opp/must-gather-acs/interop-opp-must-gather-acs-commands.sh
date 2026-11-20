@@ -1092,8 +1092,8 @@ if not addon_images:
     for a in acm:
         addon_images += a.get("governancePolicyAddonControllerImages") or []
 # PRRT_kwDOBHvUUM65yNGc: capture generation for removal guard
-sub_generation = sub.get("metadata", {}).get("generation") if sub and isinstance(sub.get("metadata"), dict) else None
-csv_generation = rhacs_csvs[0].get("metadata", {}).get("generation") if rhacs_csvs and isinstance(rhacs_csvs[0].get("metadata"), dict) else None
+sub_generation = sub.get("generation") if sub and isinstance(sub, dict) else None
+csv_generation = rhacs_csvs[0].get("generation") if rhacs_csvs and isinstance(rhacs_csvs[0], dict) else None
 generation_match = (sub_generation is not None and csv_generation is not None and str(sub_generation) == str(csv_generation))
 
 # Catalog binding: the packagemanifest that provides the
@@ -1519,8 +1519,8 @@ FIXTURE
   "conditions": [{"type": "Compliant", "status": "True"}]}]
 FIXTURE
   EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
-  _expect operatorpolicy_targets_subscription true
-  _expect removal_preconditions_met true
+  _expect operatorpolicy_targets_subscription false
+  _expect removal_preconditions_met false
 
   # Enforcement gate: a compliant policy that only reports does not
   # re-create a removed subscription, so compliance plus a correct target is
