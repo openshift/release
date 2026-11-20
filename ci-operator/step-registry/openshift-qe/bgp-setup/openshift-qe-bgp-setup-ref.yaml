@@ -36,6 +36,15 @@ ref:
     documentation: |-
       Fallback CIDR for the EVPN VTEP resource on baremetal. On AWS the VTEP is
       created by openshift-qe-installer-aws-provision-bastion.
+  - name: UDN_BGP_IMPORT_CIDR
+    # Default covers the workload's connected /24s generated at:
+    # https://github.com/kube-burner/kube-burner-ocp/blob/bcabb38456b9c8819382f4a5d01e3faaa80d283c/pkg/measurements/routeadvertisement-latency_linux.go#L614-L620
+    # The UDN-BGP profile sets 10 interfaces and 20 addresses each:
+    # https://github.com/kube-burner/kube-burner-ocp/blob/bcabb38456b9c8819382f4a5d01e3faaa80d283c/cmd/config/udn-bgp/udn-bgp.yml#L118-L119
+    default: "20.0.0.0/12"
+    documentation: |-
+      IPv4 range whose connected /24 routes the external FRR may advertise
+      to the cluster for the UDN-BGP route import test.
   commands: openshift-qe-bgp-setup-commands.sh
   timeout: 2h
   resources:

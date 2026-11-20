@@ -111,10 +111,69 @@ configure_evpn_security_groups() {
   echo "EVPN security group rules configured"
 }
 
+# Allow nodes to route ClusterUserDefinedNetwork (CUDN) traffic whose source or
+# destination addresses are not assigned to their AWS network interfaces.
+# Uses the current oc cluster and AWS credentials in REGION; takes no arguments.
+# Disables and verifies source/destination checking on each existing node's
+# primary ENI, including control-plane nodes. Nodes added later are not covered.
+# Fails on missing nodes, invalid provider IDs, missing ENIs, or failed verification;
+# API errors abort the script under errexit. Earlier updates are not rolled back.
+disable_node_source_dest_checks() {
+  local node_provider_ids node_name provider_id instance_id eni_id source_dest_check attempt
+  node_provider_ids=$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.spec.providerID}{"\n"}{end}')
+  if [[ -z "${node_provider_ids}" ]]; then
+    echo "ERROR: No cluster nodes found" >&2
+    return 1
+  fi
+
+  while read -r node_name provider_id; do
+    if [[ "${provider_id}" != aws://*/i-* ]]; then
+      echo "ERROR: Node ${node_name} has an invalid AWS provider ID: ${provider_id}" >&2
+      return 1
+    fi
+    # The final component of an AWS provider ID is the EC2 instance ID.
+    instance_id=${provider_id##*/}
+    # Device index 0 selects the primary ENI used for the node's machine network.
+    eni_id=$(aws --region "${REGION}" ec2 describe-network-interfaces \
+      --filters "Name=attachment.instance-id,Values=${instance_id}" "Name=attachment.device-index,Values=0" \
+      --query 'NetworkInterfaces[0].NetworkInterfaceId' --output text)
+    if [[ -z "${eni_id}" || "${eni_id}" == "None" ]]; then
+      echo "ERROR: No primary ENI found for node ${node_name} (${instance_id})" >&2
+      return 1
+    fi
+
+    echo "Disabling source/destination checking on node ${node_name} primary ENI ${eni_id}"
+    aws --region "${REGION}" ec2 modify-network-interface-attribute \
+      --network-interface-id "${eni_id}" --no-source-dest-check
+    # EC2 reads can briefly return the old value after a successful update.
+    # Check immediately, then retry five times with 5-second waits (25s total
+    # waiting per node, plus API call time). API errors still fail immediately.
+    for attempt in {1..6}; do
+      source_dest_check=$(aws --region "${REGION}" ec2 describe-network-interfaces \
+        --network-interface-ids "${eni_id}" \
+        --query 'NetworkInterfaces[0].SourceDestCheck' --output text)
+      if [[ "${source_dest_check,,}" == "false" ]]; then
+        break
+      fi
+      if (( attempt < 6 )); then
+        sleep 5
+      fi
+    done
+    if [[ "${source_dest_check,,}" != "false" ]]; then
+      echo "ERROR: Source/destination checking remains enabled or unknown on ${eni_id}: ${source_dest_check}" >&2
+      return 1
+    fi
+    echo "Verified node ${node_name} primary ENI ${eni_id}: SourceDestCheck=${source_dest_check}"
+  done <<< "${node_provider_ids}"
+}
+
 echo "=== Provisioning AWS bastion instance ==="
 
 INFRA_ID=$(oc get -o jsonpath='{.status.infrastructureName}' infrastructure cluster)
 echo "Cluster infra ID: ${INFRA_ID}"
+
+# Nodes route traffic for CUDN addresses that are not assigned to their ENIs.
+disable_node_source_dest_checks
 
 # Get a worker node's AWS instance ID
 WORKER_AWS_ID=$(oc get nodes -l node-role.kubernetes.io/worker \
@@ -386,12 +445,14 @@ set -o pipefail
 
 echo "--- Installing system packages ---"
 # iproute: ip/bridge for FRR setup scripts
+# make: build kube-burner-ocp from source in e2e-benchmarking run.sh
 # tar: extract kube-burner-ocp binary in e2e-benchmarking run.sh
 # util-linux: uuidgen used by run.sh when UUID is not preset
 # jq, wget, git: cluster/FRR tooling and repo clone on bastion
+# tcpdump: bastion-side ICMP capture for UDN-BGP diagnostics
 # python3: e2e-benchmarking utils/index.sh (metadata indexing helpers)
 # curl: AL2023 ships curl-minimal (provides /usr/bin/curl); do not install full curl.
-for pkg in iproute jq wget git tar util-linux python3; do
+for pkg in iproute jq wget git make tar util-linux python3 tcpdump; do
   rpm -q "${pkg}" &>/dev/null || dnf install -y "${pkg}"
 done
 if ! command -v curl &>/dev/null; then
@@ -420,6 +481,151 @@ curl -sSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" | tar -C /usr/l
 # Symlink into /usr/local/bin so 'go' is on the default SSH PATH
 ln -sf /usr/local/go/bin/go /usr/local/bin/go
 echo "go: $(go version)"
+
+echo "--- Installing UDN-BGP bastion diagnostics ---"
+install -d -m 0755 /var/lib/udn-bgp-diagnostics
+cat > /usr/local/sbin/udn-bgp-route-dump <<'ROUTE_SCRIPT'
+#!/bin/bash
+set -o nounset
+set -o pipefail
+
+output=/var/lib/udn-bgp-diagnostics/route-tables.txt
+while true; do
+  printf '\n=== %s main ===\n' "$(date -u --rfc-3339=seconds)"
+  ip route show || true
+  printf '\n=== %s all tables ===\n' "$(date -u --rfc-3339=seconds)"
+  ip route show table all || true
+  printf '\n=== %s failing-target route ===\n' "$(date -u --rfc-3339=seconds)"
+  ip route get 40.1.0.3 || true
+  printf '\n=== %s working-target route ===\n' "$(date -u --rfc-3339=seconds)"
+  ip route get 40.2.0.3 || true
+  sleep 5
+done >> "${output}" 2>&1
+ROUTE_SCRIPT
+chmod 0755 /usr/local/sbin/udn-bgp-route-dump
+
+cat > /etc/systemd/system/udn-bgp-route-dump.service <<'ROUTE_UNIT'
+[Unit]
+Description=UDN-BGP bastion routing table sampler
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/udn-bgp-route-dump
+Restart=always
+RestartSec=5s
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
+ROUTE_UNIT
+
+cat > /usr/local/sbin/udn-bgp-icmp-capture <<'ICMP_SCRIPT'
+#!/bin/bash
+set -o nounset
+set -o pipefail
+
+output_dir=/var/lib/udn-bgp-diagnostics
+log_file="${output_dir}/icmp-capture.log"
+declare -A capture_pid=()
+sleep_pid=
+
+log() {
+  printf '%s %s\n' "$(date -u --rfc-3339=seconds)" "$*" >> "${log_file}"
+}
+
+cleanup() {
+  local iface attempt alive
+  if [[ -n "${sleep_pid}" ]]; then
+    kill "${sleep_pid}" 2>/dev/null || true
+  fi
+  for iface in "${!capture_pid[@]}"; do
+    kill -INT "${capture_pid[${iface}]}" 2>/dev/null || true
+  done
+  # SIGINT makes tcpdump flush and close its file; escalate to SIGTERM when a
+  # capture does not exit, and never block teardown waiting for it.
+  for attempt in 1 2 3 4 5; do
+    alive=0
+    for iface in "${!capture_pid[@]}"; do
+      if kill -0 "${capture_pid[${iface}]}" 2>/dev/null; then
+        alive=1
+      fi
+    done
+    if [[ "${alive}" -eq 0 ]]; then
+      break
+    fi
+    sleep 0.2
+  done
+  for iface in "${!capture_pid[@]}"; do
+    kill -TERM "${capture_pid[${iface}]}" 2>/dev/null || true
+  done
+  capture_pid=()
+}
+trap 'cleanup; exit 0' EXIT TERM INT
+
+if ! command -v tcpdump > /dev/null; then
+  log "ERROR: tcpdump is not available"
+  exit 1
+fi
+
+log "starting ICMP capture supervisor"
+while :; do
+  # Re-scan every cycle so interfaces that appear later (for example the
+  # worker ENI once it carries traffic) are captured too. Interfaces in
+  # state UNKNOWN are administratively up and must not be skipped.
+  while read -r iface; do
+    if [[ -z "${iface}" || "${iface}" == "lo" ]]; then
+      continue
+    fi
+    if [[ -n "${capture_pid[${iface}]:-}" ]] && kill -0 "${capture_pid[${iface}]}" 2>/dev/null; then
+      continue
+    fi
+    tcpdump -i "${iface}" -nn -s 256 -Z root -W 4 -C 10 \
+      -w "${output_dir}/bastion-icmp-${iface}.pcap" icmp &
+    capture_pid[${iface}]=$!
+    log "started ICMP capture on ${iface} (pid ${capture_pid[${iface}]})"
+  done < <(ip -o link show up | awk -F': ' '{print $2}' | grep -v '^lo$')
+  # Background the sleep and wait on it so a stop signal is handled at once.
+  sleep 15 &
+  sleep_pid=$!
+  wait "${sleep_pid}" || true
+  sleep_pid=
+done
+ICMP_SCRIPT
+chmod 0755 /usr/local/sbin/udn-bgp-icmp-capture
+
+cat > /etc/systemd/system/udn-bgp-icmp-capture.service <<'ICMP_UNIT'
+[Unit]
+Description=UDN-BGP bastion ICMP capture on all connected interfaces
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/udn-bgp-icmp-capture
+Restart=always
+RestartSec=5s
+KillSignal=SIGINT
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
+ICMP_UNIT
+
+systemctl daemon-reload
+systemctl enable --now udn-bgp-route-dump.service udn-bgp-icmp-capture.service || true
+
+# Diagnostics must never fail provisioning. Surface the unit state and journal
+# in the build log (the bastion is destroyed on failure, so the journal is
+# otherwise lost) and only warn when a unit is not active.
+sleep 5
+for unit in udn-bgp-route-dump.service udn-bgp-icmp-capture.service; do
+  if ! systemctl is-active --quiet "${unit}"; then
+    echo "WARNING: ${unit} is not active, diagnostics may be incomplete" >&2
+  fi
+  echo "--- ${unit} ---"
+  systemctl status --no-pager --full "${unit}" || true
+  journalctl --no-pager --unit "${unit}" --lines 50 || true
+done
 
 echo "--- Tool versions ---"
 command -v podman >/dev/null && podman --version
