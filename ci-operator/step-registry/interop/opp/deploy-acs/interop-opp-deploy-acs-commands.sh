@@ -332,6 +332,12 @@ _clamp_deadline() {
 # messages are API-controlled text: they stay out of the step log and so out
 # of the trace copied into artifacts. Sizes are capped as before.
 _dump_diagnostics() {
+  typeset -i _remaining=$(( _work_deadline - $(date +%s) ))
+  if (( _remaining < _diag_reserve + _oc_overrun_reserve )); then
+    echo ">>> DIAG: skipped, remaining budget ${_remaining}s < reserve $(( _diag_reserve + _oc_overrun_reserve ))s" >&2
+    _api_loud
+    return 0
+  fi
   _api_quiet
   echo ">>> DIAG: Subscription rhacs-operator in ${ACS_NAMESPACE} (allowlisted fields):"
   _diag_get oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
@@ -1022,9 +1028,7 @@ else
   # variable, so it never reaches the manifest as raw text.
   typeset _sub_create_err="" _sub_create_rc=0
   _sub_create_err=$(mktemp)
-  # Restructured to separate success/recovery branches (PRRT_kwDOBHvUUM65TpMp): capture rc without || trick
-  _sub_create_rc=0
-  if ! jq -cn --arg ns "${ACS_NAMESPACE}" --arg ch "${ACS_CHANNEL}" \
+  jq -cn --arg ns "${ACS_NAMESPACE}" --arg ch "${ACS_CHANNEL}" \
       '{apiVersion:"operators.coreos.com/v1alpha1",
         kind:"Subscription",
         metadata:{name:"rhacs-operator",namespace:$ns},
@@ -1033,9 +1037,8 @@ else
               name:"rhacs-operator",
               source:"redhat-operators",
               sourceNamespace:"openshift-marketplace"}}' |
-      ( set +x; oc create -f - 2>"${_sub_create_err}" ); then
-    _sub_create_rc=$?
-  fi
+      ( set +x; oc create -f - 2>"${_sub_create_err}" )
+  _sub_create_rc=$?
   if (( _sub_create_rc != 0 )); then
     typeset _sub_create_err_text=""
     _sub_create_err_text=$(cat "${_sub_create_err}" 2>/dev/null || echo unknown)
