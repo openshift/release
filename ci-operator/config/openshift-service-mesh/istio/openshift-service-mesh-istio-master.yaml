@@ -27,6 +27,18 @@ tests:
   steps:
     test:
     - ref: servicemesh-istio-release-branches
+- as: setup-midstream-minor-release-branches
+  cron: 0 7 * * 1-5
+  reporter_config:
+    channel: '#istio-notifications'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    test:
+    - ref: servicemesh-minor-setup
 - as: sync-upstream-istio-master
   commands: |
     git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git

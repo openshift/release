@@ -1,0 +1,30 @@
+ref:
+  as: servicemesh-minor-setup
+  from: src
+  commands: servicemesh-minor-setup-commands.sh
+  credentials:
+  - collection: openshift-service-mesh
+    group: github-ossm-bot-simple-job
+    mount_path: /creds-github
+  resources:
+    requests:
+      cpu: 100m
+      memory: 1Gi
+  timeout: 1h0m0s
+  grace_period: 1m0s
+  documentation: |-
+    Detect new upstream Istio release-X.Y branches and set up the corresponding
+    midstream lines for istio, proxy, ztunnel, and sail-operator.
+
+    For each upstream release-X.Y (X.Y >= 1.30) that lacks a midstream branch:
+    1. Create midstream release-X.Y (istio/proxy/ztunnel) from the upstream tip.
+       Sail Operator maps release-1.Y to midstream release-3.(Y-26).
+    2. Open or update a bot PR against openshift/release that:
+       - Adds ci-operator configs (and periodics) cloned from the previous minor,
+         including sync-upstream jobs where the previous line had them.
+       - Appends the new Istio line to the z-stream supported_versions list.
+
+    Idempotent: existing midstream branches are left alone. Presubmit rehearsals
+    and DRY_RUN=true only log actions. Requires git, gh, and jq. The bot token
+    needs contents write on openshift-service-mesh repos and push access to
+    openshift-service-mesh-bot/release.
