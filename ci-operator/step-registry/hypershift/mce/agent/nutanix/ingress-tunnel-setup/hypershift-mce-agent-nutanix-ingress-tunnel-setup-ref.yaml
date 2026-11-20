@@ -1,0 +1,33 @@
+ref:
+  as: hypershift-mce-agent-nutanix-ingress-tunnel-setup
+  from: upi-installer
+  commands: hypershift-mce-agent-nutanix-ingress-tunnel-setup-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 60m0s
+  grace_period: 10m0s
+  env:
+  - name: NUTANIX_TUNNEL_PORT
+    default: "51820"
+    documentation: UDP port on the leased baremetal proxy host for this run's WireGuard peer.
+  - name: NUTANIX_TUNNEL_ADDRESS_PREFIX
+    default: "100.127.255"
+    documentation: First three octets of an unused /30 tunnel network; .1 is the proxy host and .2 is the gateway.
+  - name: NUTANIX_TUNNEL_ENDPOINT_IP
+    default: ""
+    documentation: Gateway-reachable proxy-host IPv4 address; defaults to the leased host IP when locally assigned, otherwise the host's route-selected source address toward the ingress VIP.
+  - name: NUTANIX_TUNNEL_FIREWALL_ZONE
+    default: ""
+    documentation: Optional firewalld zone receiving gateway UDP packets; defaults to the zone of the host's route toward the gateway VM.
+  - name: NUTANIX_TUNNEL_IMAGE_URI
+    default: ""
+    documentation: Optional Nutanix RHCOS qcow2 URL; defaults to the current openshift-install coreos stream artifact.
+  documentation: >-
+    Creates a lease-owned Nutanix gateway VM on SUBNET_UUID using the bastion VM lifecycle pattern,
+    bootstraps a NetworkManager WireGuard peer and narrowly scoped ingress forwarding/NAT with ignition,
+    and connects the leased baremetal Squid host to the ingress VIP through a /32 route.
+    Uses the identity file written by the context step for run-owned resource names.
+    Before creating any resources, verifies that the VIP is outside every DHCP pool reported for the subnet by Prism.
+    Setup stops if Prism does not report a valid DHCP pool.
