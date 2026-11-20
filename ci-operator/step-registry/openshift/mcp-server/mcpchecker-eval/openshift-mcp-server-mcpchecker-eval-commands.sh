@@ -29,6 +29,8 @@ export MCP_CONFIG_DIR=dev/config/mcp-configs
 
 netobserv_mock=false
 netobserv_port_forward=false
+kiali_port_forward=false
+kiali_suite=false
 cleanup() {
     make stop-server || true
     if [[ "${netobserv_port_forward}" == true ]]; then
@@ -36,6 +38,14 @@ cleanup() {
     fi
     if [[ "${netobserv_mock}" == true ]]; then
         make teardown-netobserv || true
+    fi
+    if [[ "${kiali_port_forward}" == true ]] && [[ -f .kiali-pf.pid ]]; then
+        kill "$(cat .kiali-pf.pid)" 2>/dev/null || true
+    fi
+    if [[ "${kiali_suite}" == true ]]; then
+        make clean-kiali-openshift KUBERNETES_CLI=oc \
+            BOOKINFO_CP_NAMESPACE="${kiali_cp_namespace:-istio-system}" \
+            BOOKINFO_NAMESPACE="${bookinfo_namespace:-bookinfo}" || true
     fi
 }
 trap cleanup EXIT
@@ -108,6 +118,53 @@ case "${EVAL_SUITE:-}" in
             --field-selector=status.phase=Running -o name | grep -q .; then
             echo "ERROR: ovn-kubernetes eval requires running ovnkube-node pods" >&2
             exit 1
+        fi
+        ;;
+    kiali)
+        kiali_cp_namespace="${KIALI_CP_NAMESPACE:-istio-system}"
+        bookinfo_namespace="${BOOKINFO_NAMESPACE:-bookinfo}"
+        bookinfo_istio_revision="${BOOKINFO_ISTIO_REVISION:-default}"
+        # Make targets use BOOKINFO_CP_NAMESPACE (default istio-system). Keep
+        # setup/cleanup/port-forward on the same control-plane namespace.
+        if ! oc -n "${kiali_cp_namespace}" get deployment/kiali >/dev/null 2>&1; then
+            # Mark before setup so partial failures still run clean-kiali-openshift.
+            kiali_suite=true
+            make setup-kiali-openshift KUBERNETES_CLI=oc \
+                BOOKINFO_CP_NAMESPACE="${kiali_cp_namespace}" \
+                BOOKINFO_NAMESPACE="${bookinfo_namespace}"
+        elif ! oc -n "${bookinfo_namespace}" get deployment/productpage-v1 >/dev/null 2>&1; then
+            if ! oc get istiorevisiontag "${bookinfo_istio_revision}" >/dev/null 2>&1 \
+                && ! oc get istio "${bookinfo_istio_revision}" >/dev/null 2>&1; then
+                echo "ERROR: Bookinfo eval requires Istio revision ${bookinfo_istio_revision} (IstioRevisionTag or Istio CR)" >&2
+                exit 1
+            fi
+            make install-bookinfo-openshift KUBERNETES_CLI=oc \
+                BOOKINFO_CP_NAMESPACE="${kiali_cp_namespace}" \
+                BOOKINFO_NAMESPACE="${bookinfo_namespace}" \
+                BOOKINFO_ISTIO_REVISION="${bookinfo_istio_revision}"
+            make validate-bookinfo-kiali-health KUBERNETES_CLI=oc \
+                BOOKINFO_CP_NAMESPACE="${kiali_cp_namespace}" \
+                BOOKINFO_NAMESPACE="${bookinfo_namespace}"
+        fi
+        if ! ( : > /dev/tcp/127.0.0.1/20001 ) 2>/dev/null; then
+            oc -n "${kiali_cp_namespace}" port-forward svc/kiali 20001:20001 >/dev/null 2>&1 &
+            pf_pid=$!
+            echo "${pf_pid}" > .kiali-pf.pid
+            kiali_port_forward=true
+            for ((attempt=0; attempt<60; attempt++)); do
+                if ! kill -0 "${pf_pid}" 2>/dev/null; then
+                    echo "ERROR: Kiali port-forward exited before localhost:20001 was ready" >&2
+                    exit 1
+                fi
+                if ( : > /dev/tcp/127.0.0.1/20001 ) 2>/dev/null; then
+                    break
+                fi
+                sleep 2
+            done
+            if (( attempt == 60 )); then
+                echo "ERROR: Kiali port-forward did not reach localhost:20001 within 120 seconds" >&2
+                exit 1
+            fi
         fi
         ;;
     *)
