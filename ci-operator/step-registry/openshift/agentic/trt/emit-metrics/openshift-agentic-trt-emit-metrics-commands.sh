@@ -29,6 +29,7 @@ for metadata_file in "${METADATA_FILES[@]}"; do
     AGENT=$(echo "${METADATA}" | jq -r '.agent')
     PHASE=$(echo "${METADATA}" | jq -r '.phase')
     ISSUE_KEY=$(echo "${METADATA}" | jq -r '.issue_key')
+    PLANNING_KEY=$(echo "${METADATA}" | jq -r '.planning_key // ""')
     RESULT=$(echo "${METADATA}" | jq -r '.result')
     SESSION_ID=$(echo "${METADATA}" | jq -r '.session_id // ""')
     PR_URL=$(echo "${METADATA}" | jq -r '.pr_url // ""')
@@ -45,6 +46,7 @@ for metadata_file in "${METADATA_FILES[@]}"; do
         --arg session_id "${SESSION_ID}" \
         --arg phase "${PHASE}" \
         --arg issue_key "${ISSUE_KEY}" \
+        --arg planning_key "${PLANNING_KEY}" \
         --arg pr_url "${PR_URL}" \
         --arg result "${RESULT}" \
         --arg upstream_repo "${UPSTREAM_REPO}" \
@@ -59,6 +61,7 @@ for metadata_file in "${METADATA_FILES[@]}"; do
           agent: $agent,
           phase: $phase,
           issue_key: $issue_key,
+          planning_key: $planning_key,
           pr_url: $pr_url,
           result: $result,
           upstream_repo: $upstream_repo,
@@ -88,6 +91,7 @@ jq -n \
         agent: "string",
         phase: "string",
         issue_key: "string",
+        planning_key: "string",
         pr_url: "string",
         result: "string",
         upstream_repo: "string",
