@@ -18,10 +18,10 @@ workflow:
 
     Test selection comes from TEST_PLAN in the job configuration.
 
-    The registry-overrides specs come from openshift/hypershift#10206. Until that change is on the tested branch,
-    the registry-overrides label filter selects no specs and Ginkgo passes an empty selection, so a green run covers
-    only the setup path and the smoke step. The test plan steps will set failOnEmpty (added by the same change) so
-    that an empty selection fails the job.
+    The job's test plan runs one sequential lane: the registry-overrides specs on the "public" cluster (they mirror
+    the releases and patch the operator), a smoke step, then an upgrade of the "upgrade" cluster from the previous
+    minor (OCP_IMAGE_N1) to the tested release under the overrides, checked by the registry-overrides-upgrade specs
+    (CNTRLPLANE-3931). Every step sets failOnEmpty, so a step whose label filter selects no specs fails the job.
 
     The HyperShift launch capability is currently supported by the HyperShift
     team. For now, please direct all questions and comments to:
