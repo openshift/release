@@ -14,7 +14,11 @@ trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_
 
 function run_command() {
     local CMD="$1"
-    echo "Running Command: ${CMD}"
+    # Redact credentials from logged commands (OCPBUGS-123786).
+    local safe_cmd
+    safe_cmd=$(sed -E -e "s/(--account-key|--password)[= ][^ ]+/\1 <redacted>/g" \
+                      -e "s/(sig=)[^&'\"]+/\1<redacted>/g" <<< "${CMD}")
+    echo "Running Command: ${safe_cmd}"
     eval "${CMD}"
 }
 
@@ -250,24 +254,29 @@ if [[ -z "${BASTION_BOOT_IMAGE}" ]]; then
     sa_name="${sa_name_prefix}${UNIQUE_HASH}basa"
     run_command_with_retries "az storage account create -g ${bastion_rg} --name ${sa_name} --kind StorageV2 --sku Standard_LRS" "5"
     account_key=$(az storage account keys list -g "${bastion_rg}" --account-name "${sa_name}" --query "[0].value" -o tsv)
+    # Pass the key via env so it never lands in an echoed command (OCPBUGS-123786).
+    export AZURE_STORAGE_ACCOUNT="${sa_name}"
+    export AZURE_STORAGE_KEY="${account_key}"
 
     echo "Copy bastion vhd from public blob URI to the bastion Storage Account"
     storage_contnainer="${bastion_name}vhd"
     vhd_name=$(basename "${bastion_source_vhd_uri}")
     status="unknown"
-    run_command "az storage container create --name ${storage_contnainer} --account-name ${sa_name} --account-key ${account_key}" &&
-    run_command "az storage blob copy start --account-name ${sa_name} --account-key ${account_key} --destination-blob ${vhd_name} --destination-container ${storage_contnainer} --source-uri '${bastion_source_vhd_uri}'" || exit 2
+    run_command "az storage container create --name ${storage_contnainer} --account-name ${sa_name}" &&
+    run_command "az storage blob copy start --account-name ${sa_name} --destination-blob ${vhd_name} --destination-container ${storage_contnainer} --source-uri '${bastion_source_vhd_uri}'" || exit 2
     bastion_url_expiry=$(date -u -d "10 hours" '+%Y-%m-%dT%H:%MZ')
-    bastion_url=$(az storage blob generate-sas -c "${storage_contnainer}" -n "${vhd_name}" --https-only --full-uri --permissions r --expiry "${bastion_url_expiry}" --account-name "${sa_name}" --account-key "${account_key}" -o tsv)
+    bastion_url=$(az storage blob generate-sas -c "${storage_contnainer}" -n "${vhd_name}" --https-only --full-uri --permissions r --expiry "${bastion_url_expiry}" --account-name "${sa_name}" -o tsv)
     try=0 retries=30 interval=60
     while [ "${status}" != "success" ] && [ "$try" -lt "$retries" ]; do
         echo "check copy complete, ${try} try..."
         if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
-            cmd="az storage blob show --container-name ${storage_contnainer} --name '${vhd_name}' --account-name ${sa_name} --account-key ${account_key} -o tsv --query properties.copy.status"
+            cmd="az storage blob show --container-name ${storage_contnainer} --name '${vhd_name}' --account-name ${sa_name} -o tsv --query properties.copy.status"
+            echo "Command: ${cmd}"
         else
             cmd="az storage blob show --blob-url '${bastion_url}' -o tsv --query properties.copy.status"
+            # bastion_url embeds a SAS token, so log it without the query string.
+            echo "Command: az storage blob show --blob-url '${bastion_url%%\?*}?<redacted SAS>' -o tsv --query properties.copy.status"
         fi
-        echo "Command: $cmd"
         status=$(eval "$cmd" || echo "pending")
         echo "Status: $status"
         sleep "$interval"
@@ -277,7 +286,8 @@ if [[ -z "${BASTION_BOOT_IMAGE}" ]]; then
         echo  "Something wrong, copy timeout or failed!"
         exit 2
     fi
-    vhd_blob_url=$(az storage blob url --account-name "${sa_name}" --account-key "${account_key}" -c "${storage_contnainer}" -n "${vhd_name}" -o tsv)
+    vhd_blob_url=$(az storage blob url --account-name "${sa_name}" -c "${storage_contnainer}" -n "${vhd_name}" -o tsv)
+    unset AZURE_STORAGE_ACCOUNT AZURE_STORAGE_KEY
 
     echo "Deploy the bastion image from bastion vhd"
     run_command "az image create --resource-group ${bastion_rg} --name '${bastion_name}-image' --source ${vhd_blob_url} --os-type Linux --storage-sku Standard_LRS" || exit 2
