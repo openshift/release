@@ -128,6 +128,8 @@ setting. Model requests have fixed implementation limits of 512 KiB input,
 The preparation limit includes reasoning and the complete structured plan;
 truncated responses cannot pass. Metrics retain the limit and service-reported
 token usage.
+Preparation requests allow 180 seconds for reasoning and the structured plan;
+execution requests allow 90 seconds. The overall phase deadlines still apply.
 
 Model HTTP 429 responses retry the same inference request at most three times,
 waiting 60, 120 and 240 seconds, or longer when `Retry-After` requests it.

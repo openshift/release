@@ -35,6 +35,7 @@ MAX_RESPONSE = 2 * 1024 * 1024
 MAX_MODEL_INPUT_BYTES = 512 * 1024
 MODEL_OUTPUT_TOKENS = 4096
 PLANNING_OUTPUT_TOKENS = 16384
+PLANNING_REQUEST_TIMEOUT_SECONDS = 180
 MODEL_RATE_LIMIT_RETRIES = 3
 MAX_RATE_LIMIT_WAIT_SECONDS = 300
 COMMAND_TIMEOUT_SECONDS = 90
@@ -96,12 +97,20 @@ available even though planning does not browse additional pages.
 sources.revision is the CI PR's Git commit, never a deployed image digest.
 The execution supervisor supplies verified component image identities at runtime;
 refer to that identity as a prerequisite instead of inventing a digest.
+Execution receives verified_deployment as structured context, not as a file.
+Never invent supervisor files, resource names or container names. Discover names
+at runtime and use the verified_deployment entries supplied to execution.
 Use the linked issue key, or an empty issue string for PR-only checks. Give every
 check a descriptive issue-specific ID, never an example/schema placeholder.
 Give it a requirement, prerequisites, concrete actions, expected
 observable result with a wait bound, and the evidence to retain.
 Preserve supplied reproduction procedures: name each input value, resource field,
 observation location and timeout instead of saying only "verify the requirement".
+Every explicit assertion in a supplied procedure must appear in a check's expected
+result, including allowed formats, types, values and cardinality. Do not drop an
+assertion when grouping operations into checks. Describe executable operations
+and comparisons in plain language; do not invent untested shell implementations
+of the procedure. The executor chooses commands using its actual runtime context.
 Use PR procedures to make Jira requirements executable. The job selects the
 release to observe during execution. A source change in this CI configuration PR
 is not a prerequisite for observing its deployed behavior. Do not assume the PR
@@ -513,7 +522,7 @@ def retry_after_seconds(value):
     return None
 
 
-def request_json(url, headers=None, payload=None, ca_file=None):
+def request_json(url, headers=None, payload=None, ca_file=None, timeout=90):
     parsed = urllib.parse.urlsplit(url)
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
         raise ValidationError("API endpoints must be HTTPS URLs without credentials")
@@ -529,7 +538,7 @@ def request_json(url, headers=None, payload=None, ca_file=None):
         context.load_verify_locations(cafile=ca_file)
         handlers.append(urllib.request.HTTPSHandler(context=context))
     try:
-        with urllib.request.build_opener(*handlers).open(request, timeout=90) as response:
+        with urllib.request.build_opener(*handlers).open(request, timeout=timeout) as response:
             result = response.read(MAX_RESPONSE + 1)
     except urllib.error.HTTPError as error:
         # Response bodies can contain credentials or private issue content.
@@ -642,6 +651,7 @@ class Model:  # pylint: disable=too-few-public-methods,too-many-instance-attribu
     def __init__(self, phase):
         self.phase = phase
         self.max_output_tokens = PLANNING_OUTPUT_TOKENS if phase == "prepare" else MODEL_OUTPUT_TOKENS
+        self.request_timeout = PLANNING_REQUEST_TIMEOUT_SECONDS if phase == "prepare" else 90
         self.url = required("VALIDATION_MODEL_URL")
         self.model = required(f"VALIDATION_{phase.upper()}_MODEL")
         self.sampling = model_sampling(phase)
@@ -686,7 +696,8 @@ class Model:  # pylint: disable=too-few-public-methods,too-many-instance-attribu
         headers = {"Authorization": f"Bearer {self.token}"}
         for attempt in range(MODEL_RATE_LIMIT_RETRIES + 1):
             try:
-                response = request_json(self.url, headers, payload, ca_file=self.ca_file)
+                response = request_json(self.url, headers, payload, ca_file=self.ca_file,
+                                        timeout=self.request_timeout)
             except RateLimitError as error:
                 if attempt == MODEL_RATE_LIMIT_RETRIES:
                     raise ValidationError("model rate limit persisted after 3 retries (HTTP 429)") from None
