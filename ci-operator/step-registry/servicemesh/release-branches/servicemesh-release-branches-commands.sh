@@ -73,10 +73,11 @@ find_cut_point() {
 
 # restore_istio_pins keeps the downstream proxy/ztunnel pins from the cut point in
 # the merged istio.deps, amending the merge commit if they differ from upstream's.
+# merge_tag runs in a || list, where set -e is ignored, so every step checks its status.
 restore_istio_pins() {
   local cut_point=$1
-  git show "${cut_point}:istio.deps" > "${workdir}/downstream-deps"
-  git show "HEAD^2:istio.deps" > "${workdir}/upstream-deps"
+  git show "${cut_point}:istio.deps" > "${workdir}/downstream-deps" || return 1
+  git show "HEAD^2:istio.deps" > "${workdir}/upstream-deps" || return 1
   jq -e --slurpfile downstream "${workdir}/downstream-deps" '
     reduce ["PROXY_REPO_SHA", "ZTUNNEL_REPO_SHA"][] as $name (. ;
       ($downstream[0] | map(select(.name == $name))) as $pin
@@ -87,11 +88,11 @@ restore_istio_pins() {
         then error("Missing, duplicate, or invalid pin: " + $name)
         else map(if .name == $name then .lastStableSHA = $pin[0].lastStableSHA else . end)
         end)
-  ' "${workdir}/upstream-deps" > "${workdir}/merged-deps"
-  cp "${workdir}/merged-deps" istio.deps
-  git add istio.deps
+  ' "${workdir}/upstream-deps" > "${workdir}/merged-deps" || return 1
+  cp "${workdir}/merged-deps" istio.deps || return 1
+  git add istio.deps || return 1
   if ! git diff --cached --quiet -- istio.deps; then
-    git commit --quiet --amend --no-edit
+    git commit --quiet --amend --no-edit || return 1
   fi
 }
 
@@ -133,7 +134,7 @@ Resolve the merge in a new branch from ${cut_point} and push it as ${target}."
       exit 1
     fi
     if [[ ${component} == istio ]]; then
-      restore_istio_pins "${cut_point}"
+      restore_istio_pins "${cut_point}" || exit 1
     fi
     # Never publish a z-stream branch containing upstream changes made after its branch point.
     merge_base=$(git merge-base HEAD "${upstream_ref}")
