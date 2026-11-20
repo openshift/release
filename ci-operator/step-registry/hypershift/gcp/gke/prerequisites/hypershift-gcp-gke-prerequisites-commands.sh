@@ -7,18 +7,32 @@ set -euo pipefail
 # 1. CRDs (Prometheus operator, OpenShift Route)
 # 2. cert-manager with GKE Autopilot compatibility
 
-set -x
+MANIFEST_TMP_FILE=$(mktemp)
+trap 'rm -f "${MANIFEST_TMP_FILE}"' EXIT
 
-CURL_CMD="curl --fail --retry 3 --retry-all-errors --retry-delay 5 -sL"
+download_manifest() {
+  local url="$1" output="$2" rc
+  echo "Downloading prerequisite manifest: ${url}"
+  # Without --retry-delay, curl backs off exponentially (1, 2, 4, 8, 16s).
+  # Bound each attempt and the retry window; keep errors visible in CI logs.
+  if curl --fail --show-error --silent --location \
+    --retry 5 --retry-all-errors --retry-max-time 90 \
+    --connect-timeout 10 --max-time 30 \
+    "${url}" --output "${output}"; then
+    return 0
+  else
+    rc=$?
+    echo "ERROR: Failed to download prerequisite manifest ${url} (curl exit ${rc})" >&2
+    return "${rc}"
+  fi
+}
 
 fetch_and_apply() {
-  local url="$1"
-  local tmpfile
-  tmpfile=$(mktemp)
-  ${CURL_CMD} "${url}" -o "${tmpfile}"
-  oc apply -f "${tmpfile}"
-  rm -f "${tmpfile}"
+  download_manifest "$1" "${MANIFEST_TMP_FILE}"
+  oc apply -f "${MANIFEST_TMP_FILE}"
 }
+
+set -x
 
 # ============================================================================
 # Step 1: Install CRDs
@@ -26,9 +40,12 @@ fetch_and_apply() {
 echo "Installing required CRDs..."
 
 # Prometheus operator CRDs (for monitoring resources)
-fetch_and_apply https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml
-fetch_and_apply https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_prometheusrules.yaml
-fetch_and_apply https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/main/example/prometheus-operator-crd/monitoring.coreos.com_podmonitors.yaml
+# Keep all three CRDs on the same immutable revision when updating.
+PROMETHEUS_OPERATOR_REVISION="854d33a40caad1dd773f73deb55726732803bcb8"
+PROMETHEUS_CRD_URL="https://raw.githubusercontent.com/prometheus-operator/prometheus-operator/${PROMETHEUS_OPERATOR_REVISION}/example/prometheus-operator-crd"
+fetch_and_apply "${PROMETHEUS_CRD_URL}/monitoring.coreos.com_servicemonitors.yaml"
+fetch_and_apply "${PROMETHEUS_CRD_URL}/monitoring.coreos.com_prometheusrules.yaml"
+fetch_and_apply "${PROMETHEUS_CRD_URL}/monitoring.coreos.com_podmonitors.yaml"
 
 # OpenShift Route CRD (for hosted cluster ingress)
 fetch_and_apply https://raw.githubusercontent.com/openshift/api/6bababe9164ea6c78274fd79c94a3f951f8d5ab2/route/v1/zz_generated.crd-manifests/routes.crd.yaml
@@ -47,8 +64,8 @@ fetch_and_apply https://raw.githubusercontent.com/openshift/api/6bababe9164ea6c7
 # ============================================================================
 CERT_MANAGER_VERSION="v1.14.0"
 echo "Installing cert-manager ${CERT_MANAGER_VERSION}..."
-CERT_MANAGER_YAML=$(mktemp)
-${CURL_CMD} "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml" -o "${CERT_MANAGER_YAML}"
+CERT_MANAGER_YAML="${MANIFEST_TMP_FILE}"
+download_manifest "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml" "${CERT_MANAGER_YAML}"
 sed -i 's/kube-system/cert-manager/g' "${CERT_MANAGER_YAML}"
 oc apply -f "${CERT_MANAGER_YAML}"
 rm -f "${CERT_MANAGER_YAML}"

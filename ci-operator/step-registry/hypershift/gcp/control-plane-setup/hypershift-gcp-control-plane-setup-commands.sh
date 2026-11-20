@@ -2,6 +2,29 @@
 
 set -euo pipefail
 
+# Keep in sync with the helper in hypershift-gcp-gke-deprovision-commands.sh.
+# Each gcloud invocation must re-read the policy, not retry a stale setIamPolicy.
+# A subshell preserves the caller's tracing state without exposing policy output.
+retry_iam_policy_binding() (
+  set +x
+  local attempt delay=1 error rc
+  for attempt in {1..5}; do
+    if error=$("$@" 2>&1 >/dev/null); then
+      return 0
+    else
+      rc=$?
+    fi
+    printf '%s\n' "${error}" >&2
+    if [[ "${error}" != *"ABORTED: There were concurrent policy changes."* ]] || (( attempt == 5 )); then
+      return "${rc}"
+    fi
+    local pause=$((1 + RANDOM % delay))
+    echo "IAM policy conflict (attempt ${attempt}/5); retrying in ${pause}s." >&2
+    sleep "${pause}"
+    delay=$((delay * 2))
+  done
+)
+
 # This step configures the HyperShift control plane on GKE:
 # 1. HyperShift operator WIF - PSC operations (create/manage service attachments)
 # 2. ExternalDNS WIF - DNS record management via cross-project WIF
@@ -58,7 +81,7 @@ fi
 # Step 3: Bind Custom Role to Service Account
 # ============================================================================
 echo "Binding custom role to service account"
-gcloud projects add-iam-policy-binding "${CP_PROJECT_ID}" \
+retry_iam_policy_binding gcloud projects add-iam-policy-binding "${CP_PROJECT_ID}" \
   --member="serviceAccount:${SA_EMAIL}" \
   --role="projects/${CP_PROJECT_ID}/roles/${ROLE_NAME}" \
   --condition=None \
@@ -68,7 +91,7 @@ gcloud projects add-iam-policy-binding "${CP_PROJECT_ID}" \
 # Step 4: Configure Operator Workload Identity Binding
 # ============================================================================
 echo "Configuring Workload Identity binding"
-gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
+retry_iam_policy_binding gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
   --project="${CP_PROJECT_ID}" \
   --member="serviceAccount:${CP_PROJECT_ID}.svc.id.goog[hypershift/operator]" \
   --role="roles/iam.workloadIdentityUser" \
@@ -102,13 +125,13 @@ echo "Configuring ExternalDNS Workload Identity..."
 # Tracing disabled to protect project ID in the member string
 set +x
 WIF_MEMBER="serviceAccount:${CP_PROJECT_ID}.svc.id.goog[hypershift/external-dns]"
-gcloud iam service-accounts add-iam-policy-binding "${EXTERNAL_DNS_GSA}" \
+retry_iam_policy_binding gcloud iam service-accounts add-iam-policy-binding "${EXTERNAL_DNS_GSA}" \
   --role=roles/iam.workloadIdentityUser \
   --member="${WIF_MEMBER}" \
   --project="${HYPERSHIFT_GCP_CI_PROJECT}" \
   --condition=None \
   --quiet
-gcloud iam service-accounts add-iam-policy-binding "${EXTERNAL_DNS_GSA}" \
+retry_iam_policy_binding gcloud iam service-accounts add-iam-policy-binding "${EXTERNAL_DNS_GSA}" \
   --role=roles/iam.serviceAccountTokenCreator \
   --member="${WIF_MEMBER}" \
   --project="${HYPERSHIFT_GCP_CI_PROJECT}" \
