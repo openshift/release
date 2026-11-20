@@ -61,6 +61,97 @@ set -x
 
 unset CYPRESS_OPTIONS_HUB_PASSWORD
 
+# INTEROP-9749: tag CLC-created opp-aws-* VPCs with expirationDate for collector GC.
+# Leak evidence: 15 untagged opp-aws-* clusters (4 full + 11 shells, all us-east-2)
+# cleaned in INTEROP-9746; creator identified as CLC Hive/CAPI path which never runs
+# ipi-conf-aws (spoke evidence: acm-interop-p2p-cluster-install has no userTags;
+# CLC path is same defect class — options.yaml has no tag surface, confirmed in
+# 07-clc-tag-surface-recon.md §3).
+# Mechanism: Hive ClusterDeployment -> install-config.yaml rendered server-side by
+# Hive, never via ipi-conf-aws-commands.sh:33,272-273, so VPCs lack expirationDate
+# and are invisible to aws-deprovision-collector (collector-commands.sh:209).
+# Fix: post-creation aws ec2 create-tags after CLC automation returns, using the
+# hub kubeconfig (oc get clusterdeployments) + AWS creds already in CLUSTER_PROFILE_DIR/.awscred.
+# TTL 8h (date -d '8 hours' --iso=minutes --utc) gives 5h+ headroom over greens 45-48m
+# / watchdog-capped 75m and matches ipi-conf-aws house convention; collector adds
+# 30m grace via CLUSTER_TTL="30 minutes ago" -> reap >=8.5h after creation.
+# Landing spot: step-wrapper fallback (c) — rhpit/interop-tests is a near-empty shim
+# (no execute_clc_interop_commands.sh in any branch: main/ascerra/PR heads all 4 files)
+# and stolostron/clc-ui-e2e is private (404 via gh api repos/stolostron/clc-ui-e2e).
+# This wrapper is team-owned (OWNERS cspi-qe-ocp-lp/dtthuynh/vboulos), runs even when
+# automation returns nonzero (_test_rc captured), and is the only guaranteed-landable
+# spot this cycle. Upstream image fix (stolostron/clc-ui-e2e) should follow.
+# Limitation: hard pod aborts (8h timeout, node eviction) before this block never tag;
+# the collector periodic (INTEROP-9751) plus eventual upstream fix close that window.
+: "Tagging CLC-created opp-aws-* VPCs with expirationDate for collector GC (INTEROP-9749)..."
+set +e
+# Credentials for aws CLI — same file the step injects into options.yaml.
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR:-}/.awscred"
+export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
+typeset expirationDate=""
+expirationDate="$(date -d '8 hours' --iso=minutes --utc 2>/dev/null)" || true
+if [[ -z "${expirationDate:-}" ]]; then
+    echo "WARNING: failed to compute expirationDate, skipping VPC tagging" >&2
+elif [[ ! -f "${AWS_SHARED_CREDENTIALS_FILE:-}" ]]; then
+    echo "WARNING: AWS credentials not found at ${AWS_SHARED_CREDENTIALS_FILE}, skipping VPC tagging" >&2
+elif ! command -v aws >/dev/null 2>&1; then
+    echo "WARNING: aws CLI not found, skipping VPC tagging" >&2
+elif ! command -v oc >/dev/null 2>&1; then
+    echo "WARNING: oc not found, skipping ClusterDeployment discovery" >&2
+elif ! command -v jq >/dev/null 2>&1; then
+    echo "WARNING: jq not found, skipping ClusterDeployment discovery" >&2
+else
+    echo "Tagging VPCs with expirationDate=${expirationDate} (TTL 8h, --iso=minutes --utc)" 
+    typeset clusterNames=""
+    # Prefer live ClusterDeployments from the hub (has hub kubeconfig via SHARED_DIR).
+    clusterNames="$(oc get clusterdeployments -A -o json 2>/dev/null | jq -r '.items[] | select(.metadata.name | test("^opp-aws-")) | .metadata.name' 2>/dev/null || true)"
+    if [[ -z "${clusterNames:-}" ]]; then
+        echo "No opp-aws-* ClusterDeployments via oc, checking reports for cluster names..." 
+        if [[ -d reports ]]; then
+            clusterNames="$(grep -rho 'opp-aws-[0-9]\+' reports 2>/dev/null | sort -u || true)"
+        fi
+    fi
+    if [[ -z "${clusterNames:-}" ]]; then
+        echo "No CLC-created opp-aws-* clusters discovered, skipping VPC tagging" 
+    else
+        typeset taggedCount=0
+        # Region: active account regions (leaked inventory was all us-east-2); scan 3 to cover rotation.
+        typeset regions="us-east-2 us-east-1 us-west-2"
+        # Allow optionFile to override if it carries a region (not proven to exist, best-effort).
+        if [[ -f "${optionFile:-}" ]]; then
+            typeset optionRegion=""
+            optionRegion="$(yq eval '.options.region // .platform.aws.region // ""' "${optionFile}" 2>/dev/null || true)"
+            if [[ -n "${optionRegion:-}" && "${optionRegion}" != "null" ]]; then
+                regions="${optionRegion} ${regions}"
+            fi
+        fi
+        for clusterName in ${clusterNames}; do
+            [[ -z "${clusterName:-}" ]] && continue
+            echo "Processing CLC cluster ${clusterName}..." 
+            for region in ${regions}; do
+                [[ -z "${region:-}" ]] && continue
+                typeset vpcIds=""
+                vpcIds="$(aws ec2 describe-vpcs --region "${region}" --filters "Name=tag:Name,Values=${clusterName}-*-vpc" --query 'Vpcs[].VpcId' --output text 2>/dev/null || true)"
+                if [[ -z "${vpcIds:-}" || "${vpcIds}" == "None" ]]; then
+                    continue
+                fi
+                for vpcId in ${vpcIds}; do
+                    [[ -z "${vpcId:-}" || "${vpcId}" == "None" ]] && continue
+                    echo "Tagging VPC ${vpcId} in ${region} for cluster ${clusterName} with expirationDate=${expirationDate}" 
+                    if aws ec2 create-tags --region "${region}" --resources "${vpcId}" --tags "Key=expirationDate,Value=${expirationDate}" "Key=clusterName,Value=${clusterName}" 2>&1; then
+                        echo "Tagged VPC ${vpcId} in ${region} (cluster ${clusterName})" 
+                        taggedCount=$((taggedCount + 1))
+                    else
+                        echo "WARNING: failed to tag VPC ${vpcId} in ${region} for ${clusterName}" >&2 || true
+                    fi
+                done
+            done
+        done
+        echo "VPC tagging complete: ${taggedCount} VPC(s) tagged with expirationDate=${expirationDate}" 
+    fi
+fi
+set -e
+
 : "Copying artifacts..."
 cp -r reports "${ARTIFACT_DIR}/"
 
