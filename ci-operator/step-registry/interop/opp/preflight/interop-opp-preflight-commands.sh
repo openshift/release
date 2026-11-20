@@ -297,7 +297,11 @@ function CheckOppCompatibility () {
         # Gating here reds every upgrade lane at pre-flight on the reviewed
         # baseline (first seen after #87865 + #87963 combined).
         : "${belowFloor} operator(s) below the target-version compatibility floor (pre-upgrade baseline)"
+        # PRRT_kwDOBHvUUM65TpMz: re-enforce compatibility floor after product upgrades (post-upgrade check tracked INTEROP-9553)
+        # Pre-flight is informational; post-upgrade floor enforcement must happen in product-upgrade/smoke steps
         AppendCheck "opp_compatibility_matrix" "warn" "${details}"
+        # Mark for post-upgrade re-enforcement
+        echo "WARN: operator below target floor ${ocpKey} will be re-checked post-upgrade" > "${ARTIFACT_DIR}/compat-floor-preflight-warn.txt" 2>/dev/null || true
     else
         : "All OPP operators are compatible with OCP ${ocpKey}"
         AppendCheck "opp_compatibility_matrix" "pass" "${details}"
