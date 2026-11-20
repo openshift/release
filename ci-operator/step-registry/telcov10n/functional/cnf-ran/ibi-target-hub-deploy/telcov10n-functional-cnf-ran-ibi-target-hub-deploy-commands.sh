@@ -108,18 +108,41 @@ TEMP_DIR=$(mktemp -d /tmp/ibi-target-hub-deploy.XXXXXX)
 trap cleanup EXIT
 install -m 600 /var/group_variables/common/all/ansible_ssh_private_key "${TEMP_DIR}/ssh-key"
 
-BASTION_IDENTITY=$(
-  exec 2>"${TEMP_DIR}/inventory.log" || exit 1
-  ansible-inventory -i ./inventories/ocp-deployment/build-inventory.py --host bastion |
-    jq -er '[.ansible_host, .ansible_user] | join(" ")'
-)
+# Resolve inventory precedence locally without exposing inventory or requiring jq.
+if ansible bastion -i ./inventories/ocp-deployment/build-inventory.py \
+  -m ansible.builtin.copy \
+  -a "dest=${TEMP_DIR}/bastion-identity mode=0600 content='{{ ansible_host }} {{ ansible_user }}'" \
+  --extra-vars '{"ansible_connection":"local","ansible_become":false,"ansible_python_interpreter":"{{ ansible_playbook_python }}"}' \
+  >"${TEMP_DIR}/inventory.log" 2>&1; then
+  if [[ ! -s "${TEMP_DIR}/bastion-identity" ]]; then
+    echo "Target bastion inventory resolution produced no connection identity." >&2
+    exit 1
+  fi
+else
+  status=$?
+  echo "Could not resolve target bastion inventory (Ansible exit status ${status})." >&2
+  exit "${status}"
+fi
+BASTION_IDENTITY=$(cat "${TEMP_DIR}/bastion-identity")
+if [[ ! "${BASTION_IDENTITY}" =~ ^[^[:space:]]+[[:blank:]][^[:space:]]+$ ]]; then
+  echo "Target bastion inventory must provide one address and one user." >&2
+  exit 1
+fi
 read -r BASTION_IP BASTION_USER <<< "${BASTION_IDENTITY}"
-[[ -n "${BASTION_IP}" && -n "${BASTION_USER}" ]]
 
-CLUSTER_VERSION=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+if CLUSTER_VERSION=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   -i "${TEMP_DIR}/ssh-key" "${BASTION_USER}@${BASTION_IP}" \
   "KUBECONFIG=${HUB_KUBECONFIG} oc get clusterversion version -ojsonpath='{.status.desired.version}'" \
-  2>"${TEMP_DIR}/version.log")
+  2>"${TEMP_DIR}/version.log"); then
+  if [[ -z "${CLUSTER_VERSION}" ]]; then
+    echo "Target hub cluster version query returned an empty result." >&2
+    exit 1
+  fi
+else
+  status=$?
+  echo "Could not read target hub cluster version (SSH/oc exit status ${status})." >&2
+  exit "${status}"
+fi
 
 echo "Target hub cluster version: ${CLUSTER_VERSION}"
 echo "${CLUSTER_VERSION}" > "${SHARED_DIR}/target_hub_version"
