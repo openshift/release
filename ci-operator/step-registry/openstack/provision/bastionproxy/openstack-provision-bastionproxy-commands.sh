@@ -32,6 +32,7 @@ WORK_DIR=${WORK_DIR:-$(mktemp -d -t shiftstack-ci-XXXXXXXXXX)}
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
 MACHINES_NET_ID=$(<"${SHARED_DIR}"/MACHINES_NET_ID)
 MACHINES_SUBNET_ID=$(<"${SHARED_DIR}"/MACHINES_SUBNET_ID)
+MACHINES_SUBNET_RANGE=$(<"${SHARED_DIR}"/MACHINES_SUBNET_RANGE)
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
 BASTION_FLAVOR="${BASTION_FLAVOR:-$(<"${SHARED_DIR}/BASTION_FLAVOR")}"
 BASTION_USER=${BASTION_USER:-cloud-user}
@@ -65,6 +66,7 @@ sg_id="$(openstack security group create -f value -c id bastionproxy-${CLUSTER_N
 >&2 echo "Created bastion security group for ${CLUSTER_NAME}: ${sg_id}"
 openstack security group rule create --ingress --protocol tcp --dst-port 22 --description "${CLUSTER_NAME} SSH" "$sg_id" >/dev/null
 openstack security group rule create --ingress --protocol udp --dst-port 53 --description "${CLUSTER_NAME} DNS" "$sg_id" >/dev/null
+openstack security group rule create --ingress --protocol udp --dst-port 123 --remote-ip "${MACHINES_SUBNET_RANGE}" --description "${CLUSTER_NAME} NTP" "$sg_id" >/dev/null
 openstack security group rule create --ingress --protocol tcp --dst-port 3128 --remote-ip 0.0.0.0/0 --description "${CLUSTER_NAME} squid" "$sg_id" >/dev/null
 openstack security group rule create --ingress --protocol tcp --dst-port 3130 --remote-ip 0.0.0.0/0 --description "${CLUSTER_NAME} squid" "$sg_id" >/dev/null
 if [[ "$CONFIG_TYPE" == *"externallb"* ]]; then
@@ -211,6 +213,70 @@ if [[ -f "${SHARED_DIR}/osp-ca.crt" ]]; then
   printf "\n" >> "${SHARED_DIR}/osp-ca.crt"
   cat "${SHARED_DIR}"/domain.crt >> "${SHARED_DIR}/osp-ca.crt"
 fi
+
+# HTTP(S) proxies cannot carry NTP. Serve time on the isolated machines
+# network instead, retaining the bastion image's upstream Chrony sources.
+cat > "${WORK_DIR}/deploy_ntp.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+sudo dnf install -y chrony
+sudo tee -a /etc/chrony.conf >/dev/null <<CHRONY
+bindaddress ${PROXY_INTERFACE}
+allow ${MACHINES_SUBNET_RANGE}
+CHRONY
+
+if command -v firewall-cmd >/dev/null && sudo firewall-cmd --state >/dev/null 2>&1; then
+  sudo firewall-cmd --add-rich-rule='rule family="ipv4" source address="${MACHINES_SUBNET_RANGE}" port port="123" protocol="udp" accept'
+  sudo firewall-cmd --permanent --add-rich-rule='rule family="ipv4" source address="${MACHINES_SUBNET_RANGE}" port port="123" protocol="udp" accept'
+fi
+sudo systemctl enable chronyd
+sudo systemctl restart chronyd
+# Do not serve an unsynchronized local clock as a substitute for real NTP.
+# Fail here with diagnostics if the bastion cannot synchronize upstream.
+if ! sudo chronyc waitsync 60 0.1 0 5; then
+  sudo chronyc tracking
+  sudo chronyc sources -v
+  sudo journalctl -u chronyd --no-pager -n 100
+  exit 1
+fi
+sudo chronyc tracking
+sudo chronyc sources -v
+EOF
+$SCP_CMD "${WORK_DIR}/deploy_ntp.sh" "$BASTION_USER@$bastion_fip:/tmp/deploy_ntp.sh"
+$SSH_CMD bash /tmp/deploy_ntp.sh | tee "${ARTIFACT_DIR}/bastion-chrony.txt"
+
+# ipi-install-install copies manifest_*.yaml into the install directory after
+# creating manifests and before generating ignition. Configure both node roles
+# to use only the bastion, not unreachable public or DHCP-provided NTP sources.
+chrony_config=$(base64 -w0 <<EOF
+server ${PROXY_INTERFACE} iburst
+driftfile /var/lib/chrony/drift
+makestep 1.0 3
+rtcsync
+EOF
+)
+for role in master worker; do
+  cat > "${SHARED_DIR}/manifest_99-chrony-${role}.yaml" <<EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  name: 99-chrony-${role}
+  labels:
+    machineconfiguration.openshift.io/role: ${role}
+spec:
+  config:
+    ignition:
+      version: "${IGNITIONVERSION}"
+    storage:
+      files:
+      - path: /etc/chrony.conf
+        mode: 420
+        overwrite: true
+        contents:
+          source: data:text/plain;charset=utf-8;base64,${chrony_config}
+EOF
+  cp "${SHARED_DIR}/manifest_99-chrony-${role}.yaml" "${ARTIFACT_DIR}/"
+done
 
 echo "Bastion proxy is ready!"
 
