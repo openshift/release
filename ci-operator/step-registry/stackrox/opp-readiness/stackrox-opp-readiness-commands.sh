@@ -355,8 +355,7 @@ function SecuredClusterDiscoveryFailureDiagnostics () {
     echo "[readiness] --- SecuredCluster CRs in any state, all namespaces ---"
     # PRRT_kwDOBHvUUM65on2Z: capture real rc not negated status
     typeset -i _scListRc=0
-    oc get securedclusters.platform.stackrox.io --all-namespaces -o json > /tmp/sc-list.json 2> /tmp/sc-list-err.log
-    _scListRc=$?
+    oc get securedclusters.platform.stackrox.io --all-namespaces -o json > /tmp/sc-list.json 2> /tmp/sc-list-err.log || _scListRc=$?
     if (( _scListRc != 0 )); then
         echo "[readiness]   SecuredCluster query failed rc=${_scListRc}" >&2
     else
