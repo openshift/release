@@ -61,7 +61,7 @@ wait_for_catalogsource () {
         CATSRC_STATE=$(oc get catalogsources/"$CATSRC" -n "$CS_NAMESPACE" -o jsonpath='{.status.connectionState.lastObservedState}')
         echo $CATSRC_STATE
         if [ "$CATSRC_STATE" = "READY" ] ; then
-            echo "[$(date --utc +%FT%T.%3NZ)] Catalogsource created successfully after waiting $((5*i)) seconds"
+            echo "[$(date --utc +%FT%T.%3NZ)] Catalogsource created successfully after waiting $((5*i)) seconds "
             echo "[$(date --utc +%FT%T.%3NZ)] current state of catalogsource is \"$CATSRC_STATE\""
             IS_CATSRC_CREATED=true
             break
