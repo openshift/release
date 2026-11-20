@@ -231,8 +231,15 @@ spec:
           azure.workload.identity/use: "true"
 EOF
 
-# Wait for Velero pod to be ready
-echo "Waiting for Velero pod to be ready..."
+# The DPA is reconciled asynchronously, so wait for the Deployment to exist
+# before waiting for its Available condition.
+echo "Waiting for Velero Deployment to be created..."
+if ! timeout 5m bash -c 'until oc get deployment/velero -n openshift-adp >/dev/null 2>&1; do sleep 5; done'; then
+  echo "!!! Velero Deployment was not created within 5 minutes" >&2
+  exit 1
+fi
+
+echo "Waiting for Velero Deployment to be available..."
 oc wait --for=condition=Available deployment/velero -n openshift-adp --timeout=300s
 
 # Safety net: the OADP operator's own ServiceAccount reconcile could in
