@@ -79,10 +79,11 @@ tests:
         # Minimal tracking server: sqlite + local PVC, no separate artifact server.
         # The MLflow CR is cluster-scoped; operands land in the operator namespace.
         oc apply -f config/samples/mlflow_v1_mlflow_minimal.yaml
-        # Available does not wait for a missing object. The controller creates
-        # this deployment after the CR is applied.
+        # The controller creates this Deployment at 0 replicas while the
+        # database migration Job runs. Available is true at zero replicas, so
+        # that wait can return before any tracking pod exists.
         oc -n "${NS}" wait --for=create --timeout=10m deployment/mlflow
-        oc -n "${NS}" wait --for=condition=Available --timeout=15m deployment/mlflow
+        oc -n "${NS}" wait --for=jsonpath='{.status.availableReplicas}'=1 --timeout=20m deployment/mlflow
       dependencies:
       - env: MLFLOW_OPERATOR_IMAGE
         name: mlflow-operator
