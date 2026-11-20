@@ -129,7 +129,7 @@ while IFS= read -r -d '' _junit_file; do
     # guard keeps non-JUnit XML out of the count in both directions: a
     # CI-Operator artifact or a must-gather dump cannot manufacture a row, and
     # a stray `<testcase` in a non-report cannot mask a truly empty run.
-    if grep -qE '<testsuites?[[:space:]>]' "${_junit_file}" 2>/dev/null; then
+    if python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1]).getroot().tag in ('testsuite','testsuites') or sys.exit(1)" "${_junit_file}" 2>/dev/null; then
         _junit_cases+=$(grep -c '<testcase' "${_junit_file}" 2>/dev/null || true)
     fi
 done < <(find "${ARTIFACT_DIR}" -type f -iname '*.xml' -print0 2>/dev/null)
