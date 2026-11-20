@@ -33,6 +33,7 @@ import xml.etree.ElementTree as ET
 MAX_RESPONSE = 2 * 1024 * 1024
 MAX_MODEL_INPUT_BYTES = 512 * 1024
 MODEL_OUTPUT_TOKENS = 4096
+PLANNING_OUTPUT_TOKENS = 16384
 COMMAND_TIMEOUT_SECONDS = 90
 MAX_COMMAND_OUTPUT_BYTES = 65536
 JIRA_URL = "https://redhat.atlassian.net"
@@ -611,6 +612,7 @@ class Model:  # pylint: disable=too-few-public-methods,too-many-instance-attribu
 
     def __init__(self, phase):
         self.phase = phase
+        self.max_output_tokens = PLANNING_OUTPUT_TOKENS if phase == "prepare" else MODEL_OUTPUT_TOKENS
         self.url = required("VALIDATION_MODEL_URL")
         self.model = required(f"VALIDATION_{phase.upper()}_MODEL")
         self.sampling = model_sampling(phase)
@@ -626,7 +628,7 @@ class Model:  # pylint: disable=too-few-public-methods,too-many-instance-attribu
         payload = {
             "model": self.model,
             "messages": messages,
-            "max_tokens": MODEL_OUTPUT_TOKENS,
+            "max_tokens": self.max_output_tokens,
         }
         payload.update(self.sampling)
         if self.reasoning_effort:
@@ -650,7 +652,8 @@ class Model:  # pylint: disable=too-few-public-methods,too-many-instance-attribu
 
     def complete(self, messages, tools=None, response_format=None):
         payload = self.request_payload(messages, tools, response_format)
-        print(f"Requesting {self.phase} model {self.model} (request {self.usage['requests'] + 1}).", flush=True)
+        print(f"Requesting {self.phase} model {self.model} "
+              f"(request {self.usage['requests'] + 1}, output limit {self.max_output_tokens}).", flush=True)
         headers = {"Authorization": f"Bearer {self.token}"}
         response = request_json(self.url, headers, payload, ca_file=self.ca_file)
         self.record_usage(response)
@@ -980,6 +983,7 @@ def model_metrics(started, model):
         "model": model.model if model else None,
         "reasoning_effort": (model.reasoning_effort or None) if model else None,
         "sampling": model.sampling if model else {},
+        "max_output_tokens": model.max_output_tokens if model else None,
         "usage": model.usage if model else {},
     }
 

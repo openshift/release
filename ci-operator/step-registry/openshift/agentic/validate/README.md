@@ -123,8 +123,11 @@ observations, including requirements inferred without Jira.
 The configurable inputs are model endpoint and model IDs, credential locations,
 the payload component to verify, the execution turn limit and the overall deadline.
 Jira's origin is fixed. There is no custom acceptance-field setting or token-budget
-setting. Model requests have fixed implementation limits of 512 KiB input and
-4096 output tokens. Metrics retain service-reported token usage.
+setting. Model requests have fixed implementation limits of 512 KiB input,
+16,384 output tokens for preparation and 4,096 output tokens for execution.
+The preparation limit includes reasoning and the complete structured plan;
+truncated responses cannot pass. Metrics retain the limit and service-reported
+token usage.
 
 `VALIDATION_EXECUTE_REASONING_EFFORT` optionally sends the standard
 `reasoning_effort` field for a supporting execution model. Empty omits the field;
