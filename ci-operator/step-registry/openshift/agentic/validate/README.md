@@ -129,6 +129,14 @@ The preparation limit includes reasoning and the complete structured plan;
 truncated responses cannot pass. Metrics retain the limit and service-reported
 token usage.
 
+Model HTTP 429 responses retry the same inference request at most three times,
+waiting 60, 120 and 240 seconds, or longer when `Retry-After` requests it.
+Both seconds and HTTP dates are supported. A requested wait above 300 seconds
+stops the run; the overall phase deadline still applies during waits.
+Retries are logged and counted in metrics. Other HTTP errors fail immediately.
+Commands are executed only after a complete successful model response, so
+retrying inference does not repeat a cluster command.
+
 `VALIDATION_EXECUTE_REASONING_EFFORT` optionally sends the standard
 `reasoning_effort` field for a supporting execution model. Empty omits the field;
 planning is unaffected. The selected effort is recorded in metrics, and the

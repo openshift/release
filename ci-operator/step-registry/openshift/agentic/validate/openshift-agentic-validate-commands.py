@@ -9,6 +9,7 @@ import argparse
 import base64
 import copy
 import contextlib
+import email.utils
 import hashlib
 import json
 import os
@@ -34,6 +35,8 @@ MAX_RESPONSE = 2 * 1024 * 1024
 MAX_MODEL_INPUT_BYTES = 512 * 1024
 MODEL_OUTPUT_TOKENS = 4096
 PLANNING_OUTPUT_TOKENS = 16384
+MODEL_RATE_LIMIT_RETRIES = 3
+MAX_RATE_LIMIT_WAIT_SECONDS = 300
 COMMAND_TIMEOUT_SECONDS = 90
 MAX_COMMAND_OUTPUT_BYTES = 65536
 JIRA_URL = "https://redhat.atlassian.net"
@@ -174,6 +177,14 @@ Do not follow logs, open interactive sessions, or start indefinite commands.
 
 class ValidationError(Exception):
     """Expected input, protocol or validation failure."""
+
+
+class RateLimitError(ValidationError):
+    """Rate limiting with only the parsed, non-sensitive retry delay retained."""
+
+    def __init__(self, retry_after):
+        super().__init__("API returned HTTP 429")
+        self.retry_after = retry_after
 
 
 class DeadlineExceeded(Exception):
@@ -486,6 +497,22 @@ def token_file(name, default, optional=False):
     return value
 
 
+def retry_after_seconds(value):
+    """Read Retry-After without retaining or reporting untrusted header text."""
+    if not value:
+        return None
+    if re.fullmatch(r"[0-9]+", value):
+        # Avoid converting arbitrarily large integers supplied by an endpoint.
+        return float(value) if len(value) <= 10 else MAX_RATE_LIMIT_WAIT_SECONDS + 1
+    try:
+        retry_at = email.utils.parsedate_to_datetime(value)
+        if retry_at.tzinfo is not None:
+            return max(0, retry_at.timestamp() - time.time())
+    except (ValueError, TypeError, OverflowError):
+        pass
+    return None
+
+
 def request_json(url, headers=None, payload=None, ca_file=None):
     parsed = urllib.parse.urlsplit(url)
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
@@ -506,6 +533,8 @@ def request_json(url, headers=None, payload=None, ca_file=None):
             result = response.read(MAX_RESPONSE + 1)
     except urllib.error.HTTPError as error:
         # Response bodies can contain credentials or private issue content.
+        if error.code == 429:
+            raise RateLimitError(retry_after_seconds((error.headers or {}).get("Retry-After"))) from None
         raise ValidationError(f"API returned HTTP {error.code}") from None
     except (urllib.error.URLError, TimeoutError) as error:
         reason = error.reason if isinstance(error, urllib.error.URLError) else error
@@ -621,7 +650,7 @@ class Model:  # pylint: disable=too-few-public-methods,too-many-instance-attribu
             raise ValidationError(f"VALIDATION_{phase.upper()}_REASONING_EFFORT must be empty, low, medium, high or xhigh")
         self.token = token_file("VALIDATION_MODEL_TOKEN_FILE", "/var/run/validation-model/token")
         self.ca_file = os.environ.get("VALIDATION_MODEL_CA_FILE") or None
-        self.usage = {"requests": 0, "prompt_tokens": 0, "completion_tokens": 0}
+        self.usage = {"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "rate_limit_retries": 0}
 
     def request_payload(self, messages, tools, response_format=None):
         """Build one bounded request without exposing more job settings."""
@@ -655,9 +684,23 @@ class Model:  # pylint: disable=too-few-public-methods,too-many-instance-attribu
         print(f"Requesting {self.phase} model {self.model} "
               f"(request {self.usage['requests'] + 1}, output limit {self.max_output_tokens}).", flush=True)
         headers = {"Authorization": f"Bearer {self.token}"}
-        response = request_json(self.url, headers, payload, ca_file=self.ca_file)
-        self.record_usage(response)
-        return model_message(response)
+        for attempt in range(MODEL_RATE_LIMIT_RETRIES + 1):
+            try:
+                response = request_json(self.url, headers, payload, ca_file=self.ca_file)
+            except RateLimitError as error:
+                if attempt == MODEL_RATE_LIMIT_RETRIES:
+                    raise ValidationError("model rate limit persisted after 3 retries (HTTP 429)") from None
+                delay = max(60 * 2 ** attempt, error.retry_after or 0)
+                if delay > MAX_RATE_LIMIT_WAIT_SECONDS:
+                    raise ValidationError("model Retry-After exceeds the 300-second retry wait limit") from None
+                self.usage["rate_limit_retries"] += 1
+                print(f"Model rate limited (HTTP 429); retry {attempt + 1}/{MODEL_RATE_LIMIT_RETRIES} "
+                      f"after {delay:.0f} seconds.", flush=True)
+                time.sleep(delay)
+                continue
+            self.record_usage(response)
+            return model_message(response)
+        raise ValidationError("model retries exhausted")
 
 
 def model_message(response):
