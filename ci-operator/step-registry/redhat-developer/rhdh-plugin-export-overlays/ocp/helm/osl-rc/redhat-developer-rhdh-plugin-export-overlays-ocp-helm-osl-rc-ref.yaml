@@ -1,0 +1,41 @@
+ref:
+  as: redhat-developer-rhdh-plugin-export-overlays-ocp-helm-osl-rc
+  cli: latest
+  commands: redhat-developer-rhdh-plugin-export-overlays-ocp-helm-osl-rc-commands.sh
+  credentials:
+  - collection: openshift-qe
+    group: mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  env:
+  - name: MULTISTAGE_PARAM_OVERRIDE_OSL_IIB
+    default: ""
+    documentation: Required for RC. Digest-pinned Logic catalog pullspec from registry-proxy.engineering.redhat.com/rh-osbs/iib.
+  - name: MULTISTAGE_PARAM_OVERRIDE_OSL_OCP_VERSION
+    default: ""
+    documentation: Required for RC. OCP minor targeted by the candidate catalog (for example, 4.22).
+  - name: MULTISTAGE_PARAM_OVERRIDE_OSL_STARTING_CSV
+    default: ""
+    documentation: Required for RC. Exact logic-operator CSV to install from the candidate catalog.
+  - name: MULTISTAGE_PARAM_OVERRIDE_OSL_CHANNEL
+    default: ""
+    documentation: Optional. Logic channel; defaults to stable.
+  - name: MULTISTAGE_PARAM_OVERRIDE_OSL_OPERATOR_DIGEST
+    default: ""
+    documentation: Optional. Expected sha256 digest of the operator image in the installed CSV.
+  from_image:
+    name: rhdh-e2e-runner
+    namespace: ci
+    tag: main
+  grace_period: 5m
+  resources:
+    limits:
+      cpu: "10"
+      memory: 5Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+  timeout: 1h55m0s
+  documentation: |-
+    Prepares an OCP cluster for the OSL release-candidate smoke test. Installs
+    stable Serverless and approves only the initial InstallPlan for the exact
+    Logic candidate CSV. Rehearsals with no candidate parameters use GA operators.
