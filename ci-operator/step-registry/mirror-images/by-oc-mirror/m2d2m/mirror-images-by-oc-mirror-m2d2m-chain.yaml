@@ -1,0 +1,26 @@
+chain:
+  as: mirror-images-by-oc-mirror-m2d2m
+  steps:
+  - ref: mirror-images-by-oc-mirror-to-disk
+  - ref: mirror-images-by-oc-mirror-from-disk
+  - ref: mirror-images-by-oc-mirror-conf-mirror
+  documentation: |-
+    Two-phase oc-mirror mirror-to-disk/disk-to-mirror (m2d2m) chain.
+
+    Phase 1 (mirror-images-by-oc-mirror-to-disk): mirrors the release payload
+    from the source registry to a local disk archive, then transfers the archive
+    and the oc-mirror binary to the bastion host over SSH.
+
+    Phase 2 (mirror-images-by-oc-mirror-from-disk): SSHes into the bastion and
+    runs oc-mirror in disk-to-mirror mode, pushing from the archive into the
+    bastion's local mirror registry with public internet access blocked via
+    iptables. Runs an isolation acceptance test before the import. Copies the
+    generated IDMS/ITMS cluster-resources to SHARED_DIR.
+
+    Patch (mirror-images-by-oc-mirror-conf-mirror): converts the IDMS produced
+    by Phase 2 into the install-config.yaml imageContentSources/imageDigestSources
+    patch consumed by the installer.
+
+    Use this chain in place of mirror-images-by-oc-mirror (the direct
+    mirror-to-mirror chain) in pre-install workflows that require a fully
+    disconnected import phase.
