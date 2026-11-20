@@ -47,6 +47,8 @@ Each job:
 - adds `AWS_REGION_OVERWRITE: me-west-1` and `BASE_DOMAIN: qe.devcluster.openshift.com` to the env (except custom-dns which inherits BASE_DOMAIN from the workflow).
 - all jobs run the `openshift-e2e-test` conformance suite **except** private and disconnected.
 
+Custom DNS is derived from `e2e-aws-custom-dns-techpreview` but drops its `FEATURE_SET: TechPreviewNoUpgrade`: AWS `userProvisionedDNS` is GA on all five branches, so the job qualifies the GA path with only `USER_PROVISIONED_DNS: "yes"`.
+
 | Plan item | New test `as:` | Source | E2E suite |
 |---|---|---|---|
 | P0 default (conformance) | `e2e-aws-mewest1-ipi` | `openshift-e2e-aws` | yes |
