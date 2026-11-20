@@ -33,22 +33,96 @@ publish_rc="NOT_RUN"
 publish_reason="NOT_RUN"
 indexer_rc="NOT_RUN"
 
-# check_plugin_gate return contract:
-#   0 = all intended plugins passed
-#   1 = valid intent, at least one required plugin missing or non-passed
-#   2 = untrustworthy intent or parse error (processing problem)
-plugin_gate_rc="NOT_RUN"
-plugin_gate_reason=""
+# check_runtime_gate return contract:
+#   0 = none of the gated OPCT checks failed
+#   1 = at least one gated check failed (runtime failure)
+#   2 = report missing or malformed (processing problem)
+runtime_gate_rc="NOT_RUN"
+runtime_gate_reason=""
 
 # Exit classes:
 #   0 = success (all stages passed)
-#   1 = plugin_failure (intended plugin(s) did not pass)
+#   1 = runtime_failure (a gated OPCT check reported a failed execution)
 #   2 = processing_failure (infrastructure/processing error)
-#   3 = both (plugin failure AND processing failure)
+#   3 = both (runtime failure AND processing failure)
 exit_class=0
 
 # Set by _signal_handler when a signal is caught.
 _caught_signal=""
+
+# --- JUnit reporting -------------------------------------------------------
+# Prow auto-discovers junit*.xml under ARTIFACT_DIR and renders each testcase
+# in Spyglass, so the reviewer sees which stage broke without reading the raw
+# step log.
+#
+# Scope is deliberately limited to this step's own runtime stages and the
+# OPCT checks gated below. Individual conformance test results are NOT
+# emitted here: a testcase carrying a <failure> is a real failed test to
+# Prow/sippy/TRT and would inject e2e conformance failures -- which are OCP
+# engineering's to fix, not this job's verdict -- into flake tracking.
+# Conformance detail stays in opct-report.json (uploaded as an artifact).
+# Per OPCT maintainer direction, Slack G012C6LKVM2/p1795183372863719.
+JUNIT_CASES_FILE="/tmp/opct-junit-cases.xml"
+: >"${JUNIT_CASES_FILE}"
+junit_tests=0
+junit_failures=0
+
+# xml_escape escapes the five XML predefined entities. Error text reaches
+# the XML body verbatim and routinely contains jq output, JSON fragments and
+# paths, so an unescaped '<' or '&' would make the whole file unparseable and
+# silently drop the report.
+function xml_escape() {
+  printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g' -e "s/'/\&#39;/g"
+}
+
+# junit_case records one testcase. With a second argument the case is a
+# failure carrying that message; without one it passed.
+function junit_case() {
+  local name="$1"
+  local failure_msg="${2:-}"
+  junit_tests=$((junit_tests + 1))
+  {
+    printf '  <testcase name="%s" classname="opct-conformance-test-results">\n' "$(xml_escape "${name}")"
+    if [[ -n "${failure_msg}" ]]; then
+      junit_failures=$((junit_failures + 1))
+      printf '    <failure message="">%s</failure>\n' "$(xml_escape "${failure_msg}")"
+    fi
+    printf '  </testcase>\n'
+  } >>"${JUNIT_CASES_FILE}"
+}
+
+# junit_skip records a stage that never executed, so the testcase-name set
+# stays stable across runs and run modes (upgrade jobs skip several stages).
+function junit_skip() {
+  local name="$1"
+  local reason="${2:-not executed}"
+  junit_tests=$((junit_tests + 1))
+  {
+    printf '  <testcase name="%s" classname="opct-conformance-test-results">\n' "$(xml_escape "${name}")"
+    printf '    <skipped message="%s"/>\n' "$(xml_escape "${reason}")"
+    printf '  </testcase>\n'
+  } >>"${JUNIT_CASES_FILE}"
+}
+
+# emit_junit wraps the accumulated testcases in a testsuite element. Called
+# from the EXIT trap so the file is written on every path, including early
+# returns and the signal handler.
+junit_emitted=""
+function emit_junit() {
+  [[ -n "${junit_emitted}" ]] && return 0
+  junit_emitted=1
+  [[ -n "${ARTIFACT_DIR:-}" ]] || return 0
+  [[ -s "${JUNIT_CASES_FILE}" ]] || return 0
+
+  {
+    printf '<?xml version="1.0" encoding="UTF-8"?>\n'
+    printf '<testsuite name="OPCT results processing" tests="%d" failures="%d" errors="0" time="%d">\n' \
+      "${junit_tests}" "${junit_failures}" "${SECONDS}"
+    cat "${JUNIT_CASES_FILE}"
+    printf '</testsuite>\n'
+  } >"${ARTIFACT_DIR}/junit_opct_results.xml" 2>/dev/null \
+    || show_msg "WARNING: failed to write ${ARTIFACT_DIR}/junit_opct_results.xml"
+}
 
 # emit_summary writes the structured summary block to both console and
 # ARTIFACT_DIR (durable).  It is called in the normal flow and from the
@@ -59,9 +133,9 @@ function emit_summary() {
   [[ -n "${summary_emitted}" ]] && return
   summary_emitted=1
 
-  # Quote plugin_gate_reason: replace newlines and single-quotes so the
+  # Quote runtime_gate_reason: replace newlines and single-quotes so the
   # block stays parseable as a simple key=value list.
-  local safe_reason="${plugin_gate_reason//$'\n'/ }"
+  local safe_reason="${runtime_gate_reason//$'\n'/ }"
   safe_reason="${safe_reason//\'/\'\\\'\'}"
 
   # Build raw_status and raw_reason for unexpected/signal conditions.
@@ -74,7 +148,7 @@ function emit_summary() {
       *)    raw_status="signal-${_caught_signal}" ;;
     esac
     raw_reason="caught SIG${_caught_signal}"
-  elif [[ ${exit_class} -ne 0 && -z "${plugin_gate_reason}" && "${plugin_gate_rc}" == "0" ]]; then
+  elif [[ ${exit_class} -ne 0 && -z "${runtime_gate_reason}" && "${runtime_gate_rc}" == "0" ]]; then
     raw_status="late-failure"
     raw_reason="exit_class set to ${exit_class} after passing gate"
   fi
@@ -91,8 +165,8 @@ report_rc=${report_rc}
 publish_rc=${publish_rc}
 publish_reason=${publish_reason}
 indexer_rc=${indexer_rc}
-plugin_gate_rc=${plugin_gate_rc}
-plugin_gate_reason='${safe_reason}'
+runtime_gate_rc=${runtime_gate_rc}
+runtime_gate_reason='${safe_reason}'
 exit_class=${exit_class}
 caught_signal=${_caught_signal:-none}
 raw_status=${raw_status:-normal}
@@ -138,6 +212,9 @@ function _exit_handler() {
     exit_class=2
   fi
   emit_summary || true
+  # Written here rather than in the main flow so the report still lands on
+  # early-return and signal paths.
+  emit_junit || true
   # Namespace dump is best-effort; its failure must not change the
   # original exit_class outcome.  The shared dump_opct_namespace helper
   # (from opct-pre-init) captures rc=$? and calls 'exit $rc'.  Two
@@ -249,209 +326,98 @@ function show_results() {
   fi
 }
 
-# extract_intended_plugins prints, one per line, the authoritative set of
-# plugins the run intended to execute, read from the result archive's
-# meta/info.json.
+# Checks that gate the job. These are OPCT's own execution-validity checks,
+# read from the report rather than recomputed here, so CI inherits OPCT's
+# definition of a broken run instead of duplicating the logic.
+# Per OPCT maintainer direction, Slack G012C6LKVM2/p1795182222655659.
 #
-# This is Sonobuoy's own record of what it loaded for the run, written by
-# pkg/discovery/discovery.go (runInfo.LoadedPlugins, appended from
-# cfg.LoadedPlugins) and declared in pkg/discovery/discovery.go as
-#     LoadedPlugins []string  json:"plugins,omitempty"
-# -- note the on-disk key is "plugins", not "LoadedPlugins". The archive
-# path is meta/info.json (pkg/client/results/reader.go: metadataDir "meta/"
-# + InfoFile "info.json"), the same file OPCT itself reads in
-# internal/opct/summary/result.go getPluginList().
+#   OPCT-022  "Detected one or more plugin(s) with potential invalid result"
+#             internal/report/slo.go. Mode-aware: checks plugins 05+99 in
+#             upgrade mode, 10+20+99 otherwise. Fails when a plugin has
+#             Stat.Total == Stat.Failed (every result a failure, i.e. the
+#             suite never really ran) or when an expected plugin is absent
+#             from the report entirely (crashed before emitting a summary).
+#   OPCT-023A "Sanity [10-openshift-kube-conformance]: potential missing
+#             tests in suite" -- plugin 10 must report more than 300 tests.
+#   OPCT-023B "Sanity [20-openshift-conformance-validated]: potential
+#             missing tests in suite" -- plugin 20 must report more than
+#             3000 tests.
 #
-# The names it contains are the same plugin names used as keys under
-# .provider.plugins in opct-report.json, so the two sets are directly
-# comparable.
+# 023A/023B report "skip" in upgrade mode, where those plugins do not run,
+# so they never produce a false positive there.
 #
-# Returns non-zero when the member is missing, unreadable, or does not parse
-# into a non-empty array of strings.
-function extract_intended_plugins() {
-  local archive="$1"
-  local info_json
+# The set is deliberately explicit. Most OPCT checks describe cluster
+# quality rather than execution validity and fail routinely on healthy runs
+# -- OPCT-010A/010B (etcd slow-request latency) fail on nearly every run
+# observed, including clean ones -- so gating on "any failed check" would
+# red every job.
+GATED_CHECK_IDS=("OPCT-022" "OPCT-023A" "OPCT-023B")
 
-  # Sonobuoy writes members without a leading "./", but tolerate both forms
-  # rather than depending on the archiver's path style.
-  info_json=$(tar -xzOf "${archive}" meta/info.json 2>/dev/null) \
-    || info_json=$(tar -xzOf "${archive}" ./meta/info.json 2>/dev/null) \
-    || return 1
-
-  [[ -n "${info_json}" ]] || return 1
-
-  # "plugins" is omitempty, so an absent key means Sonobuoy loaded no
-  # plugins at all -- an anomaly, not an empty-but-valid run.
-  echo "${info_json}" | jq -e -r '
-    .plugins
-    | if type != "array" then error("meta/info.json .plugins is not an array: \(type)") else . end
-    | if length == 0 then error("meta/info.json .plugins is empty") else . end
-    | .[]
-  ' 2>/dev/null || return 1
-}
-
-# check_plugin_gate validates that every plugin the run intended to execute
-# reports stat.result == "passed", reading the structured opct-report.json
-# produced by 'opct report --save-to' -- the same data contract the OPCT
-# web UI consumes (internal/report/data.go ReportFileNameIndexJSON).
-#
-# The report alone is not sufficient to establish intent. OPCT builds
-# .provider.plugins by iterating a fixed list of known plugins and calling
-# populatePluginConformance for each (internal/report/data.go), which
-# returns early without writing a map entry when the plugin produced no
-# summary:
-#
-#     if pluginSum == nil || pluginSum.Name == "" { return nil }
-#
-# So a plugin that was loaded for the run but crashed hard enough to emit no
-# summary is simply absent from the report, and a gate that only iterates
-# the keys present would pass it silently -- the exact false-green this step
-# exists to prevent. The gate therefore cross-checks the report's key set
-# against the archive's own manifest (see extract_intended_plugins) and
-# treats any intended-but-absent plugin as a plugin failure.
-#
-# Deliberately omitted plugins are not affected: meta/info.json records what
-# Sonobuoy actually loaded for this run, so e.g. upgrade mode genuinely
-# omitting plugins 10/20/80 yields an intended set that already excludes
-# them.
-#
-# Per OPCT maintainer direction (Slack thread G012C6LKVM2/p1793807889222619):
-# gate on the report API's .stat.result, not the raw Sonobuoy status.
-# .stat.status mirrors the Sonobuoy plugin status verbatim, while
-# .stat.result is the OPCT-computed verdict: internal/report/data.go
-# populatePluginConformance sets Result = "passed" when FilterFailures == 0,
-# i.e. after the known-failures/baseline/flake/replay filter pipeline has
-# excluded failures OPCT's rules consider acceptable. Gating on Result gives
-# CI that same tolerance instead of failing the job on every single test
-# failure. If Result itself is failing, the failure survived OPCT's rules
-# and the job must be red. If .stat.result is absent from an older report
-# shape, fall back to .stat.status (raw Sonobuoy verdict).
-#
-# Replay plugin exclusion: 80-openshift-tests-replay is NOT gated. Per OPCT
-# maintainer direction (same thread): replay re-exercises e2e tests in the
-# same workflow to spare partners a manual re-run -- in CI the suite runs
-# 10 times statically while replay runs only once -- so its Result carries
-# no certification verdict. It is still listed in the executed-plugins log
-# for visibility, but never counted toward pass/fail.
+# check_runtime_gate fails the job when OPCT reports that a plugin did not
+# execute validly. Conformance test outcomes are deliberately NOT gated:
+# a surviving e2e failure is OCP engineering's to fix and gives the OPCT
+# job reviewer nothing to act on, so it stays in opct-report.json rather
+# than reding CI. Per OPCT maintainer direction, Slack
+# G012C6LKVM2/p1795173987516569.
 #
 # Return values (contract):
-#   0 = every intended plugin (excluding Replay) is present in the report
-#       and reports stat.result == "passed"
-#   1 = valid report parsed, but at least one plugin is non-passed or is
-#       missing from the report entirely (plugin failure)
-#   2 = report or archive manifest missing or malformed (processing problem)
+#   0 = no gated check failed
+#   1 = at least one gated check failed (runtime failure)
+#   2 = report missing or malformed (processing problem)
 #
 # The caller must capture the return value directly; using 'if !' would
 # lose the distinction between 1 and 2.
-function check_plugin_gate() {
-  show_reader "Checking plugin results gate"
+function check_runtime_gate() {
+  show_reader "Checking OPCT execution-validity checks"
 
   local report_json="${ARTIFACT_DIR}/opct-report/opct-report.json"
   if [[ ! -f "${report_json}" ]]; then
-    plugin_gate_reason="opct-report.json missing at ${report_json}"
-
-    # opct-report.json is only written on a successful 'opct report' run, so
-    # its absence is always a processing failure (gate still returns 2 below).
-    # But 'opct report' can crash (e.g. the known SIGSEGV in
-    # GetClusterVersion) after 'opct results' already wrote its plain-text
-    # summary, in which case a real plugin failure is still knowable. Fold
-    # that into exit_class directly (best-effort, diagnostic only -- not a
-    # substitute for the opct-report.json gate above) so a genuine plugin
-    # failure isn't masked behind "report processing crashed".
-    local fallback_failed
-    fallback_failed=$(awk '
-      /^Plugin: / { plugin = $2 }
-      /^Status: / { if ($2 != "passed" && plugin != "") print plugin": "$2 }
-    ' "${ARTIFACT_DIR}/log-results.txt" 2>/dev/null)
-    if [[ -n "${fallback_failed}" ]]; then
-      # Replay stays in the diagnostic text but, consistent with the main
-      # gate below, never sets the plugin-failure bit.
-      if [[ -n "$(printf '%s\n' "${fallback_failed}" | awk '$1 != "80-openshift-tests-replay:"')" ]]; then
-        exit_class=$((exit_class | 1))
-      fi
-      plugin_gate_reason="${plugin_gate_reason}; fallback from log-results.txt found non-passed plugin(s): $(echo "${fallback_failed}" | paste -sd'; ' -)"
-    fi
-
-    show_msg "ERROR: ${plugin_gate_reason}"
+    runtime_gate_reason="opct-report.json missing at ${report_json}"
+    show_msg "ERROR: ${runtime_gate_reason}"
+    junit_case "[opct] OPCT execution-validity checks" "${runtime_gate_reason}"
     return 2
   fi
 
-  # Parse with jq.  This step uses the 'upi-installer' image (already a
-  # base_images dependency of every consuming config) because it ships jq,
-  # unlike the base 'cli' image.
-  local plugins_json
-  plugins_json=$(jq -e -c '
-    .provider.plugins
-    | if type != "object" then error("provider.plugins is not an object: \(type)") else . end
-    | if length == 0 then error("provider.plugins is empty") else . end
-    | to_entries
-    | map({
-        name: .key,
-        status: .value.stat.status,
-        # OPCT-computed verdict; fall back to raw Sonobuoy status when the
-        # report shape predates the result field.
-        result: (.value.stat.result // .value.stat.status)
-      })
+  # .checks.failures holds the checks that evaluated to "fail". Parse with
+  # jq from the 'upi-installer' image (already a base_images dependency of
+  # every consuming config) because it ships jq, unlike the base 'cli'.
+  local failed_ids
+  failed_ids=$(jq -e -r '
+    .checks.failures
+    | if type != "array" then error("checks.failures is not an array: \(type)") else . end
+    | map(.id)
+    | join(" ")
   ' "${report_json}" 2>&1) || {
-    plugin_gate_reason="failed to parse ${report_json}: ${plugins_json}"
-    show_msg "ERROR: ${plugin_gate_reason}"
+    runtime_gate_reason="failed to parse checks.failures from ${report_json}: ${failed_ids}"
+    show_msg "ERROR: ${runtime_gate_reason}"
+    junit_case "[opct] OPCT execution-validity checks" "${runtime_gate_reason}"
     return 2
   }
 
-  show_msg "Executed plugins (from opct-report.json): $(echo "${plugins_json}" | jq -r '[.[].name] | join(" ")')"
+  show_msg "Failed OPCT checks (all): ${failed_ids:-none}"
+  show_msg "Checks gating this job: ${GATED_CHECK_IDS[*]}"
 
-  # Cross-check the report's key set against the run's own manifest, so a
-  # plugin that was loaded but produced no summary cannot pass by being
-  # absent (see function comment).
-  local intended_plugins
-  if ! intended_plugins=$(extract_intended_plugins "${RESULT_FILE}"); then
-    plugin_gate_reason="unable to read intended plugin set from meta/info.json in ${RESULT_FILE}"
-    show_msg "ERROR: ${plugin_gate_reason}"
-    return 2
-  fi
-
-  show_msg "Intended plugins (from archive meta/info.json): $(echo "${intended_plugins}" | paste -sd' ' -)"
-
-  # Replay is excluded from the gate entirely (see function comment), so it
-  # is not required to be present either.
-  local missing_plugins=()
-  local p
-  while IFS= read -r p; do
-    [[ -n "${p}" ]] || continue
-    [[ "${p}" != "80-openshift-tests-replay" ]] || continue
-    if ! echo "${plugins_json}" | jq -e --arg p "${p}" 'any(.[]; .name == $p)' >/dev/null; then
-      missing_plugins+=("${p}")
+  local gated_hits=()
+  local id
+  for id in "${GATED_CHECK_IDS[@]}"; do
+    # Match on whole words so e.g. OPCT-023A cannot satisfy OPCT-023.
+    if [[ " ${failed_ids} " == *" ${id} "* ]]; then
+      gated_hits+=("${id}")
     fi
-  done <<< "${intended_plugins}"
+  done
 
-  if [[ ${#missing_plugins[@]} -ne 0 ]]; then
-    plugin_gate_reason="plugin(s) intended by the run but absent from opct-report.json (no results produced): ${missing_plugins[*]}"
-    show_msg "ERROR: Plugin gate FAILED: ${plugin_gate_reason}"
+  if [[ ${#gated_hits[@]} -ne 0 ]]; then
+    runtime_gate_reason="OPCT reported invalid plugin execution; failed check(s): ${gated_hits[*]}"
+    show_msg "ERROR: Runtime gate FAILED: ${runtime_gate_reason}"
+    for id in "${gated_hits[@]}"; do
+      junit_case "[opct] check ${id}" "${id} failed: see opct-report.json (.checks.failures) and the plugin logs"
+    done
+    junit_case "[opct] OPCT execution-validity checks" "${runtime_gate_reason}"
     return 1
   fi
 
-  # A plugin passes the gate when its OPCT-computed result is "passed".
-  # The Replay plugin is excluded from the gate entirely (see function
-  # comment); it is listed for visibility only.
-  local gated_json
-  gated_json=$(echo "${plugins_json}" | jq -c '[.[] | select(.name != "80-openshift-tests-replay")]')
-
-  local failed_json
-  failed_json=$(echo "${gated_json}" | jq -c '[.[] | select(.result != "passed")]')
-  local failed_count
-  failed_count=$(echo "${failed_json}" | jq 'length')
-
-  if [[ ${failed_count} -ne 0 ]]; then
-    plugin_gate_reason=$(echo "${failed_json}" | jq -r '
-      [.[] | "plugin \u0027\(.name)\u0027 result: \(.result) (sonobuoy status: \(.status), expected passed)"] | join("; ")
-    ')
-    show_msg "ERROR: Plugin gate FAILED: ${plugin_gate_reason}"
-    return 1
-  fi
-
-  local gated_total
-  gated_total=$(echo "${gated_json}" | jq 'length')
-  show_msg "Plugin gate passed: all ${gated_total} gated plugin(s) report stat.result: passed (Replay excluded from gate)"
+  show_msg "Runtime gate passed: none of ${GATED_CHECK_IDS[*]} failed"
+  junit_case "[opct] OPCT execution-validity checks"
   return 0
 }
 
@@ -511,6 +477,13 @@ if ! retrieve_artifact; then
   show_msg "ERROR: Failed to retrieve result artifact."
   # retrieve_rc / retrieve_tee_rc / retrieve_pipe_rc were set inside retrieve_artifact
   exit_class=$((exit_class | 2))
+  # retrieve_artifact also fails when the archive is missing or ambiguous,
+  # in which case both codes are 0 -- report them without implying the
+  # command itself returned nonzero.
+  junit_case "[opct] retrieve result archive" \
+    "failed to retrieve a single result archive (retrieve_rc=${retrieve_rc}, tee_rc=${retrieve_tee_rc}); see log-retrieve.txt and the errors above"
+else
+  junit_case "[opct] retrieve result archive"
 fi
 
 # Required: generate results summary and report.
@@ -521,31 +494,48 @@ if [[ -n "${RESULT_FILE:-}" ]]; then
     # results_rc / report_rc were set inside show_results
     exit_class=$((exit_class | 2))
   fi
+  # results_rc / report_rc distinguish which of the two stages broke; a
+  # stage that never ran stays NOT_RUN and is reported as skipped.
+  case "${results_rc}" in
+    0)       junit_case "[opct] run opct results" ;;
+    NOT_RUN) junit_skip "[opct] run opct results" "not executed" ;;
+    *)       junit_case "[opct] run opct results" \
+               "'${OPCT_CLI} results' exited with code ${results_rc}; see log-results.txt" ;;
+  esac
+  case "${report_rc}" in
+    0)       junit_case "[opct] run opct report" ;;
+    NOT_RUN) junit_skip "[opct] run opct report" "not executed ('opct results' failed first)" ;;
+    *)       junit_case "[opct] run opct report" \
+               "'${OPCT_CLI} report' exited with code ${report_rc}; see log-report.txt" ;;
+  esac
 else
   show_msg "WARNING: Skipping results generation -- no result archive available."
   results_rc="NOT_RUN"
   report_rc="NOT_RUN"
+  junit_skip "[opct] run opct results" "no result archive available"
+  junit_skip "[opct] run opct report" "no result archive available"
 fi
 
 # Diagnostic-only: extract container logs from the archive (best-effort).
 extract_container_logs || true
 
-# Required: check plugin results gate.
+# Required: check OPCT's own execution-validity checks.
 # Capture the return value directly to preserve the 0/1/2 contract.
 if [[ -n "${RESULT_FILE:-}" ]]; then
   local_gate_rc=0
-  check_plugin_gate || local_gate_rc=$?
-  plugin_gate_rc=${local_gate_rc}
+  check_runtime_gate || local_gate_rc=$?
+  runtime_gate_rc=${local_gate_rc}
   case ${local_gate_rc} in
-    0) ;;  # all plugins passed
-    1) exit_class=$((exit_class | 1))  # plugin failure
-       show_msg "ERROR: Required plugin results contain failures." ;;
+    0) ;;  # no gated check failed
+    1) exit_class=$((exit_class | 1))  # runtime failure
+       show_msg "ERROR: OPCT reported one or more plugins with invalid execution." ;;
     *) exit_class=$((exit_class | 2))  # processing/parse error
-       show_msg "ERROR: Plugin gate encountered a processing error." ;;
+       show_msg "ERROR: Runtime gate encountered a processing error." ;;
   esac
 else
-  plugin_gate_rc="NOT_RUN"
-  plugin_gate_reason="no archive available"
+  runtime_gate_rc="NOT_RUN"
+  runtime_gate_reason="no archive available"
+  junit_skip "[opct] OPCT execution-validity checks" "no result archive available"
 fi
 
 # Exit now if any required operation failed.  Inspect and container logs
@@ -572,6 +562,8 @@ done
 # Ignore persisting data from unexpected jobs
 if [[ "${INVALID_OPCT_REPO}" == "true" ]]; then
   show_msg "# WARNING: Job $JOB_NAME is not allowed to persist baseline results, ignoring it."
+  junit_skip "[opct] publish baseline" "job not allowed to persist baseline results"
+  junit_skip "[opct] reindex baseline" "job not allowed to persist baseline results"
   emit_summary
   exit 0
 fi
@@ -622,22 +614,33 @@ if grep -qE 'error (processing results|populating report|saving consolidated sum
   exit_class=$((exit_class | 2))
   # Indexer depends on a trustworthy publish -- mark NOT_RUN.
   indexer_rc="NOT_RUN"
+  junit_case "[opct] publish baseline" \
+    "'${OPCT_CLI} adm baseline publish' logged a processing error (exit code ${local_publish_rc}); see log-publish.txt"
+  junit_skip "[opct] reindex baseline" "not executed (publish failed)"
   emit_summary
   exit ${exit_class}
 elif [[ ${local_publish_rc} -ne 0 ]]; then
   if grep -qF 'baseline rejected, see the logs for more details.' "${ARTIFACT_DIR}/log-publish.txt" 2>/dev/null; then
     publish_reason="rejected"
     show_msg "WARNING: '${OPCT_CLI} adm baseline publish' rejected the baseline (not an infra/processing failure, not failing the job): see log-publish.txt"
+    # A rejected baseline is OPCT correctly declining a bad conformance
+    # result, so the testcase passes -- the rejection is recorded as a skip
+    # of the publish rather than a failure of this step.
+    junit_skip "[opct] publish baseline" "baseline rejected by OPCT SLO checks (not an infra failure)"
   else
     publish_reason="processing_error"
     show_msg "ERROR: '${OPCT_CLI} adm baseline publish' failed with exit code ${local_publish_rc}"
     exit_class=$((exit_class | 2))
+    junit_case "[opct] publish baseline" \
+      "'${OPCT_CLI} adm baseline publish' failed with exit code ${local_publish_rc}; see log-publish.txt"
   fi
   # Indexer depends on successful publish -- mark NOT_RUN either way.
   indexer_rc="NOT_RUN"
+  junit_skip "[opct] reindex baseline" "not executed (publish did not succeed)"
   emit_summary
   exit ${exit_class}
 fi
+junit_case "[opct] publish baseline"
 
 # re-index the result to expose the valid baseline.
 show_msg "\n\t> Re-indexing the baseline artifacts to be consumed by 'report' and 'opct adm baseline list'\n"
@@ -649,8 +652,11 @@ show_msg "> Debug log saved at {ARTIFACT_DIR}/log-publish-indexer.txt\n"
 if [[ ${local_indexer_rc} -ne 0 ]]; then
   show_msg "ERROR: '${OPCT_CLI} adm baseline indexer' failed with exit code ${local_indexer_rc}"
   exit_class=$((exit_class | 2))
+  junit_case "[opct] reindex baseline" \
+    "'${OPCT_CLI} adm baseline indexer' failed with exit code ${local_indexer_rc}; see log-publish-indexer.txt"
   emit_summary
   exit ${exit_class}
 fi
+junit_case "[opct] reindex baseline"
 
 emit_summary
