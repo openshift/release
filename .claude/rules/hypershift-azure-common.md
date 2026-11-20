@@ -1,6 +1,7 @@
 ---
 paths:
   - "ci-operator/step-registry/hypershift/azure/**"
+  - "ci-operator/step-registry/hypershift/self-managed-azure/**"
 ---
 
 # HyperShift Azure — Common Context
@@ -28,15 +29,17 @@ Azure HyperShift has two deployment models. See the model-specific rules for det
 
 ### Create Chain Credentials
 
-These credentials are used by the `hypershift-azure-create` chain. The primary self-managed e2e workflow uses different credential paths (see `hypershift-azure-self-managed.md`), but some cucushift-based self-managed workflows also use this chain.
+These credentials are mounted by the `hypershift-azure-create` chain. The self-managed OADP backup/restore workflow uses this chain; the legacy and v2 self-managed e2e workflows use their own guest-creation steps.
 
 | Mount Path | Contents |
 |---|---|
 | `/etc/hypershift-ci-jobs-azurecreds/credentials.json` | Azure service principal |
 | `/etc/hypershift-ci-jobs-azurecreds/oidc-issuer-url.json` | OIDC issuer URL for WIF |
 | `/etc/hypershift-ci-jobs-azurecreds/serviceaccount-signer.private` | SA token signing key |
+| `/etc/hypershift-ci-jobs-self-managed-azure/credentials.json` | Self-managed Azure service principal |
+| `/etc/hypershift-ci-jobs-self-managed-azure-e2e/` | Self-managed Azure workload identities and signing key |
 | `/etc/hypershift-aro-azurecreds/` | ARO Azure creds (fallback when `USE_HYPERSHIFT_AZURE_CREDS` is false) |
-| `/etc/hypershift-selfmanaged-azurecreds/workload-identities.json` | Self-managed workload identities (when `HYPERSHIFT_AZURE_SELF_MANAGED=true`) |
+| `/etc/hypershift-selfmanaged-azurecreds/workload-identities.json` | Azure QE workload identities (when `HYPERSHIFT_USE_AZURE_QE_WORKLOAD_IDENTITIES=true`) |
 
 ## Shared Environment Variables (Both Models)
 
@@ -53,8 +56,10 @@ These env vars are defined in the `hypershift-azure-create` chain.
 | Variable | Purpose |
 |---|---|
 | `USE_HYPERSHIFT_AZURE_CREDS` | Select HyperShift OSD credential set (true/false) |
+| `HYPERSHIFT_USE_SELF_MANAGED_AZURE_CREDS` | Use the self-managed Azure service principal credentials (true/false) |
+| `HYPERSHIFT_USE_SELF_MANAGED_WORKLOAD_IDENTITIES` | Use workload identities from `/etc/hypershift-ci-jobs-self-managed-azure-e2e` (true/false) |
 | `HYPERSHIFT_AZURE_CP_MI` | Enable managed identity auth (true/false) |
-| `HYPERSHIFT_AZURE_SELF_MANAGED` | Use self-managed workload identities file (true/false) |
+| `HYPERSHIFT_USE_AZURE_QE_WORKLOAD_IDENTITIES` | Use workload identities from `/etc/hypershift-selfmanaged-azurecreds` (true/false); intended for the `azure-qe` profile |
 | `HYPERSHIFT_DYNAMIC_DNS` | Custom KAS DNS name |
 | `HYPERSHIFT_CUSTOM_RESOURCE_GROUP` | Use custom resource group from `${SHARED_DIR}/resourcegroup` |
 | `HYPERSHIFT_CUSTOM_VNET` | BYO VNet from `${SHARED_DIR}/azure_vnet_id` |
@@ -67,6 +72,8 @@ These env vars are defined in the `hypershift-azure-create` chain.
 | `HYPERSHIFT_AZURE_FIPS` | Enable FIPS mode |
 | `HYPERSHIFT_NODE_COUNT` | NodePool replica count (default: 3 in create chain) |
 | `DNS_ZONE_RG_NAME` | DNS zone resource group (default: os4-common; also used by destroy chain) |
+
+The application IDs in the Azure QE workload identity bundle must be registered in the Azure tenant used by the selected Azure credentials.
 
 ## Shared SHARED_DIR Artifacts (Both Models)
 
@@ -95,4 +102,4 @@ These artifacts are consumed by the `hypershift-azure-create` chain from upstrea
 
 ### Destroy Chain
 
-The `hypershift-azure-destroy` chain mounts `hypershift-ci-jobs-azurecreds` and uses the following env vars: `USE_HYPERSHIFT_AZURE_CREDS`, `HYPERSHIFT_AZURE_LOCATION`, `HYPERSHIFT_CUSTOM_RESOURCE_GROUP`, and `DNS_ZONE_RG_NAME`.
+The `hypershift-azure-destroy` chain mounts both `hypershift-ci-jobs-azurecreds` and `hypershift-ci-jobs-self-managed-azure`. It selects the credential file using `USE_HYPERSHIFT_AZURE_CREDS` or `HYPERSHIFT_USE_SELF_MANAGED_AZURE_CREDS`, falling back to the cluster profile credentials; `HYPERSHIFT_AZURE_LOCATION`, `HYPERSHIFT_CUSTOM_RESOURCE_GROUP`, and `DNS_ZONE_RG_NAME` control the remaining destroy options.

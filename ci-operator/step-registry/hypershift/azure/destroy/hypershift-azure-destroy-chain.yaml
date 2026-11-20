@@ -16,6 +16,9 @@ chain:
     - name: USE_HYPERSHIFT_AZURE_CREDS
       default: "false"
       documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters"
+    - name: HYPERSHIFT_USE_SELF_MANAGED_AZURE_CREDS
+      default: "false"
+      documentation: "Whether to use the self-managed Azure service principal for guest cluster infrastructure."
     - name: DNS_ZONE_RG_NAME
       default: "os4-common"
       documentation: "dns zone resource group"
@@ -26,7 +29,12 @@ chain:
       set -exuo pipefail
 
       AZURE_CREDS=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
-      if [[ $USE_HYPERSHIFT_AZURE_CREDS == "true" ]]; then
+      if [[ "${USE_HYPERSHIFT_AZURE_CREDS}" == "true" && "${HYPERSHIFT_USE_SELF_MANAGED_AZURE_CREDS}" == "true" ]]; then
+        echo "USE_HYPERSHIFT_AZURE_CREDS and HYPERSHIFT_USE_SELF_MANAGED_AZURE_CREDS cannot both be true" >&2
+        exit 1
+      elif [[ "${HYPERSHIFT_USE_SELF_MANAGED_AZURE_CREDS}" == "true" ]]; then
+        AZURE_CREDS="/etc/hypershift-ci-jobs-self-managed-azure/credentials.json"
+      elif [[ $USE_HYPERSHIFT_AZURE_CREDS == "true" ]]; then
         AZURE_CREDS="/etc/hypershift-ci-jobs-azurecreds/credentials.json"
       fi
 
@@ -63,4 +71,7 @@ chain:
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-azurecreds
       group: ops/hypershift-ci-jobs-azurecreds
+      collection: hypershift-team
+    - mount_path: /etc/hypershift-ci-jobs-self-managed-azure
+      group: ops/hypershift-ci-jobs-self-managed-azure
       collection: hypershift-team

@@ -1,8 +1,14 @@
 ---
 paths:
+  - "ci-operator/step-registry/hypershift/azure/create-selfmanaged-guests/**"
+  - "ci-operator/step-registry/hypershift/azure/destroy-selfmanaged-guests/**"
+  - "ci-operator/step-registry/hypershift/azure/dump-selfmanaged-guests/**"
   - "ci-operator/step-registry/hypershift/azure/e2e/self-managed/**"
+  - "ci-operator/step-registry/hypershift/azure/e2e/v2-self-managed/**"
   - "ci-operator/step-registry/hypershift/azure/run-e2e-self-managed/**"
+  - "ci-operator/step-registry/hypershift/azure/run-e2e-v2-selfmanaged/**"
   - "ci-operator/step-registry/hypershift/azure/setup-private-link/**"
+  - "ci-operator/step-registry/hypershift/self-managed-azure/**"
 ---
 
 # HyperShift Azure Self-Managed
@@ -19,13 +25,11 @@ Key distinction: self-managed sets `AZURE_SELF_MANAGED=true`, which skips the `-
 
 ## Workflow
 
-`hypershift-azure-e2e-self-managed`:
-1. RBAC setup via `ipi-install-rbac`
-2. Set up nested OpenShift management cluster via `hypershift-setup-nested-management-cluster` (with `CLOUD_PROVIDER=Azure`)
-3. Configure Azure Private Link via `hypershift-azure-setup-private-link`
-4. Install HyperShift operator via `hypershift-install` (with `AZURE_SELF_MANAGED=true`)
-5. Run e2e tests via `hypershift-azure-run-e2e-self-managed`
-6. Destroy management cluster via `hypershift-destroy-nested-management-cluster`
+- `hypershift-azure-e2e-self-managed` runs the legacy e2e ref against a nested OpenShift management cluster.
+- `hypershift-azure-e2e-v2-self-managed` creates three guest clusters, runs the v2 e2e suite, and destroys the guests and nested management cluster.
+- `hypershift-self-managed-azure-e2e-backuprestore` enables the self-managed credential and workload identity selectors, uses `hypershift-azure-create`, `hypershift-self-managed-azure-oadp-setup`, backup/restore and conformance tests, then `hypershift-self-managed-azure-oadp-destroy` and `hypershift-azure-destroy`. The OADP workflow and refs live under `hypershift/self-managed-azure/`.
+
+Each workflow sets `CLOUD_PROVIDER=Azure` and `AZURE_SELF_MANAGED=true` and provisions a nested management cluster before guest cluster creation.
 
 ## Cluster Profile
 
@@ -36,7 +40,7 @@ Key distinction: self-managed sets `AZURE_SELF_MANAGED=true`, which skips the `-
 - Root cluster kubeconfig: `/etc/hypershift-kubeconfig-azure/hypershift-ops-admin.kubeconfig`
 - Cluster name: derived from `PROW_JOB_ID` hash (same pattern as AWS)
 - Instance type: `Standard_D16s_v5` (default)
-- Etcd storage class: `managed-csi-premium-v2` (Premium SSD v2, created during setup)
+- Nested management cluster etcd storage class: `managed-csi-premium-v2` (Premium SSD v2, created during setup)
 - Base domain: `hcp-sm-azure.azure.devcluster.openshift.com`
 - Location: `centralus`
 
@@ -53,7 +57,7 @@ Private Link artifacts in SHARED_DIR:
 
 ## Self-Managed-Specific Credentials
 
-In addition to the shared credentials in `hypershift-azure-common.md`:
+Self-managed steps use these mounts; each step declares the ones it needs:
 
 | Mount Path | Contents |
 |---|---|
@@ -66,19 +70,21 @@ In addition to the shared credentials in `hypershift-azure-common.md`:
 
 In addition to the shared env vars in `hypershift-azure-common.md`:
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `AZURE_SELF_MANAGED` | true | Self-managed mode (skips `--managed-service=ARO-HCP`) |
-| `CLOUD_PROVIDER` | Azure | Cloud provider for management cluster setup |
-| `HYPERSHIFT_ETCD_STORAGE_CLASS` | managed-csi-premium-v2 | Storage class for etcd |
-| `HYPERSHIFT_NODE_COUNT` | 2 | Worker node count |
-| `AZURE_PRIVATE_CREDS_FILE` | | Path to Private Link credentials |
-| `AZURE_PLS_RESOURCE_GROUP` | | Resource group for Private Link Services |
-| `AZURE_PRIVATE_NAT_SUBNET_ID` | (empty) | NAT subnet for private endpoints (alternative to SHARED_DIR file) |
-| `CI_TESTS_RUN` | (empty) | Regex filter for e2e test selection |
-| `HYPERSHIFT_EXTERNAL_DNS_DOMAIN` | aks-e2e.hypershift.azure.devcluster.openshift.com | External DNS domain (workflow default) |
-| `HYPERSHIFT_AZURE_ZONES` | (empty) | Availability zones for hosted cluster |
-| `E2E_RESOURCE_REQUEST_OVERRIDES` | (empty) | Resource request overrides for e2e tests |
+| Variable | Purpose |
+|---|---|
+| `AZURE_SELF_MANAGED` | Self-managed mode (skips `--managed-service=ARO-HCP`) |
+| `CLOUD_PROVIDER` | Select Azure management cluster setup |
+| `HYPERSHIFT_ETCD_STORAGE_CLASS` | Guest cluster etcd storage class |
+| `HYPERSHIFT_NODE_COUNT` | Node count requested by the active setup/create steps; set per workflow |
+| `AZURE_PRIVATE_CREDS_FILE` | Path to Private Link credentials |
+| `AZURE_PLS_RESOURCE_GROUP` | Resource group for Private Link Services |
+| `AZURE_PRIVATE_NAT_SUBNET_ID` | NAT subnet for private endpoints (alternative to SHARED_DIR file) |
+| `CI_TESTS_RUN` | Regex filter for e2e test selection |
+| `HYPERSHIFT_EXTERNAL_DNS_DOMAIN` | External DNS domain; set per workflow |
+| `HYPERSHIFT_AZURE_ZONES` | Availability zones for hosted cluster |
+| `E2E_RESOURCE_REQUEST_OVERRIDES` | Resource request overrides for e2e tests |
+
+The `hypershift-azure-create` chain and `hypershift-azure-run-e2e-self-managed` ref default `HYPERSHIFT_ETCD_STORAGE_CLASS` to `""`, so the flag is omitted when unset. The legacy, v2, and OADP self-managed workflows each set it to `managed-csi-premium-v2`.
 
 ## Self-Managed-Specific SHARED_DIR Artifacts
 
@@ -93,6 +99,10 @@ In addition to the shared artifacts in `hypershift-azure-common.md`:
 
 ## Self-Managed Subdirectories
 
-- `e2e/self-managed/` — self-managed e2e workflow definition
-- `run-e2e-self-managed/` — e2e test execution (ref + commands script)
-- `setup-private-link/` — Azure Private Link/Private Endpoint setup
+- `azure/e2e/self-managed/` — legacy e2e workflow
+- `azure/e2e/v2-self-managed/` — v2 e2e workflow
+- `azure/run-e2e-self-managed/` — legacy e2e test execution
+- `azure/create-selfmanaged-guests/`, `azure/run-e2e-v2-selfmanaged/`, `azure/dump-selfmanaged-guests/`, and `azure/destroy-selfmanaged-guests/` — v2 guest lifecycle and tests
+- `azure/setup-private-link/` — Azure Private Link setup
+- `self-managed-azure/e2e-backuprestore/` — OADP backup/restore workflow
+- `self-managed-azure/oadp-setup/` and `self-managed-azure/oadp-destroy/` — OADP resource lifecycle
