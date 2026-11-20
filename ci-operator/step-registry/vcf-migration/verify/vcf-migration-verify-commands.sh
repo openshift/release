@@ -18,6 +18,7 @@ function fail_with_details() {
   oc get nodes -o wide || true
   oc get infrastructure cluster -o name || true
   oc -n openshift-machine-api get machinesets,machines -o name || true
+  oc get machineconfigpools -o wide || true
   oc -n "${MIGRATION_NAMESPACE}" get "vmwarecloudfoundationmigration/${MIGRATION_NAME}" \
     -o jsonpath='{range .status.conditions[*]}{.type}={.status} {.reason}{"\n"}{end}' || true
   exit 1
@@ -31,17 +32,58 @@ fi
 
 target_vcenter="$(<"${SHARED_DIR}/vcf-migration-target-vcenter.txt")"
 
-unhealthy_operators="$(oc get clusteroperators -o json | jq -r '
-  [.items[]
-   | select(
-       any(.status.conditions[]?; .type == "Available" and .status != "True")
-       or any(.status.conditions[]?; .type == "Progressing" and .status != "False")
-       or any(.status.conditions[]?; .type == "Degraded" and .status != "False")
-     )
-   | .metadata.name] | join(",")')"
-if [[ -n "${unhealthy_operators}" ]]; then
-  fail_with_details "cluster operators are unhealthy: ${unhealthy_operators}"
-fi
+# wait_for_cluster_operators_settled enforces the strict operator gate —
+# Available=True, Progressing=False, Degraded=False for every
+# clusteroperator; a fully settled cluster is the CI end-state — but
+# re-evaluates it for up to 15 minutes before failing: a control plane
+# replacement is followed by a static-pod revision roll (etcd,
+# kube-apiserver, openshift-apiserver report Progressing while nodes move
+# to the new revision) that settles on its own within minutes. Failed reads
+# are retried within the same window; if the window expires while the latest
+# read failed (and with any operator list it would have reported cleared,
+# so it is never reported stale) the step fails loudly rather than passing
+# on an unreadable state.
+function wait_for_cluster_operators_settled() {
+  local co_json unhealthy_operators co_read_ok=false
+  local settle_deadline=$(( $(date +%s) + 900 ))
+
+  while :; do
+    if co_json="$(oc get clusteroperators -o json 2>/dev/null)"; then
+      co_read_ok=true
+      unhealthy_operators="$(jq -r '
+        [.items[]
+         | select(
+             any(.status.conditions[]?; .type == "Available" and .status != "True")
+             or any(.status.conditions[]?; .type == "Progressing" and .status != "False")
+             or any(.status.conditions[]?; .type == "Degraded" and .status != "False")
+           )
+         | .metadata.name] | join(",")' <<< "${co_json}")"
+      if [[ -z "${unhealthy_operators}" ]]; then
+        return 0
+      fi
+      log "cluster operators still settling: ${unhealthy_operators}"
+    else
+      # A failed read invalidates the last operator list: without this the
+      # deadline check below could fail on names up to 30s stale.
+      unhealthy_operators=""
+      co_read_ok=false
+      log "failed to read cluster operators; retrying"
+    fi
+    if (( $(date +%s) >= settle_deadline )); then
+      break
+    fi
+    sleep 30
+  done
+
+  if [[ -n "${unhealthy_operators:-}" ]]; then
+    fail_with_details "cluster operators are unhealthy: ${unhealthy_operators}"
+  fi
+  if [[ "${co_read_ok}" != true ]]; then
+    fail_with_details "failed to read cluster operators within the settle window"
+  fi
+}
+
+wait_for_cluster_operators_settled
 
 not_ready_nodes="$(oc get nodes -o json | jq -r '
   [.items[]
@@ -71,10 +113,26 @@ if [[ -n "${unexpected_machine_servers}" ]]; then
   fail_with_details "machines still reference non-target vCenters: ${unexpected_machine_servers}"
 fi
 
-migration_ready="$(oc -n "${MIGRATION_NAMESPACE}" get "vmwarecloudfoundationmigration/${MIGRATION_NAME}" -o json | jq -r '
-  .status.conditions[]? | select(.type == "Ready") | .status')"
-if [[ "${migration_ready}" != "True" ]]; then
-  fail_with_details "migration resource Ready condition is ${migration_ready:-unset}"
+# The manual workflow never deploys the operator, so the migration resource
+# (and its namespace) do not exist there; only enforce the Ready condition
+# when the resource is present (operator-driven workflow). The manual
+# variant also has no CRD, so the not-found family — a missing resource or a
+# missing resource type — is the expected absence; any other error (RBAC,
+# apiserver, timeout) must fail the verification instead of silently
+# skipping the Ready gate.
+migration_get_status=0
+migration_get_output="$(oc -n "${MIGRATION_NAMESPACE}" get "vmwarecloudfoundationmigration/${MIGRATION_NAME}" 2>&1)" \
+  || migration_get_status=$?
+if [[ "${migration_get_status}" -eq 0 ]]; then
+  migration_ready="$(oc -n "${MIGRATION_NAMESPACE}" get "vmwarecloudfoundationmigration/${MIGRATION_NAME}" -o json | jq -r '
+    .status.conditions[]? | select(.type == "Ready") | .status')"
+  if [[ "${migration_ready}" != "True" ]]; then
+    fail_with_details "migration resource Ready condition is ${migration_ready:-unset}"
+  fi
+elif grep -qiE "NotFound|not found|doesn't have a resource type|has no resource type" <<< "${migration_get_output}"; then
+  log "no VmwareCloudFoundationMigration resource; skipping the operator Ready check (manual migration)"
+else
+  fail_with_details "failed to read the migration resource: ${migration_get_output}"
 fi
 
 # Verify node region/zone labels match target failure domain tags
@@ -112,16 +170,51 @@ if [[ -f "${SHARED_DIR}/vcf-migration-target-fds.json" ]]; then
   done < <(jq -c '.[]' "${SHARED_DIR}/vcf-migration-target-fds.json")
 fi
 
-# Verify MachineConfigPools are Updated and not Degraded
-degraded_mcps="$(oc get machineconfigpools -o json | jq -r '
+# wait_for_machine_config_pools_settled enforces the strict pool gate -
+# Updated=True and Degraded=False for every MachineConfigPool - but
+# re-evaluates it for up to 15 minutes before failing, in the same shape as
+# wait_for_cluster_operators_settled: the control plane replacement re-rolls
+# mcp/master (each new master must receive its machine config), so
+# Updated=False can persist past the operator settle window. The manual
+# migration step itself tolerates 30 minutes at its own MCP wait.
+function wait_for_machine_config_pools_settled() {
+  local mcp_json degraded_mcps mcp_read_ok=false
+  local settle_deadline=$(( $(date +%s) + 900 ))
+
+  while :; do
+    if mcp_json="$(oc get machineconfigpools -o json 2>/dev/null)"; then
+      mcp_read_ok=true
+      degraded_mcps="$(jq -r '
   [.items[]
    | select(
        any(.status.conditions[]?; .type == "Updated" and .status != "True")
        or any(.status.conditions[]?; .type == "Degraded" and .status != "False")
      )
-   | .metadata.name] | join(",")')"
-if [[ -n "${degraded_mcps}" ]]; then
-  fail_with_details "MachineConfigPools are not converged: ${degraded_mcps}"
-fi
+   | .metadata.name] | join(",")' <<< "${mcp_json}")"
+      if [[ -z "${degraded_mcps}" ]]; then
+        return 0
+      fi
+      log "machine config pools still settling: ${degraded_mcps}"
+    else
+      # A failed read invalidates the last pool list, as above.
+      degraded_mcps=""
+      mcp_read_ok=false
+      log "failed to read machine config pools; retrying"
+    fi
+    if (( $(date +%s) >= settle_deadline )); then
+      break
+    fi
+    sleep 30
+  done
+
+  if [[ -n "${degraded_mcps:-}" ]]; then
+    fail_with_details "MachineConfigPools are not converged: ${degraded_mcps}"
+  fi
+  if [[ "${mcp_read_ok}" != true ]]; then
+    fail_with_details "failed to read machine config pools within the settle window"
+  fi
+}
+
+wait_for_machine_config_pools_settled
 
 log "verification succeeded; cluster now references only the target vCenter"
