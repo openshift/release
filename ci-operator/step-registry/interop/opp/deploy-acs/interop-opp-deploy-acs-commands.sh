@@ -618,8 +618,19 @@ except Exception:
       if _sd_csv=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.status.currentCSV}' 2>/dev/null) && [[ -n "${_sd_csv}" ]]; then
         _existing_csv=$(oc get csv "${_sd_csv}" -n "${ACS_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null) || _existing_csv=""
       fi
-      if [[ "${_existing_csv}" == "Succeeded" ]]; then
-        echo ">>> workaround_removal_ready=true (OperatorPolicy Compliant, current CSV ${_sd_csv} Succeeded) - not installing"
+      # Verify namespace creation event separate from removal signal (PRRT_kwDOBHvUUM65yNGJ): require independent creator proof
+      typeset _ns_created_recent=false
+      typeset _ns_create_time=""
+      _ns_create_time="$(oc get namespace "${ACS_NAMESPACE}" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || echo "")"
+      if [[ -n "${_ns_create_time}" ]]; then
+        typeset -i _ns_epoch=$(date -d "${_ns_create_time}" +%s 2>/dev/null || echo 0)
+        # If namespace created within step window (last 2h) consider independent proof, else fresh installability not proven
+        if (( _ns_epoch >= _junit_start )); then
+          _ns_created_recent=true
+        fi
+      fi
+      if [[ "${_existing_csv}" == "Succeeded" ]] && [[ "${_ns_created_recent}" == "true" ]]; then
+        echo ">>> workaround_removal_ready=true (OperatorPolicy Compliant, current CSV ${_sd_csv} Succeeded, namespace creation verified) - not installing"
         _prop "workaround_removal_ready" "true"
         _prop "acs_subscription" "adopted"
         _prop "csv_name" "${_sd_csv}"
@@ -963,9 +974,14 @@ else
     # Re-list on create failure: a live OperatorPolicy (or any other writer)
     # can create the group between the list and this create. Adopt whatever is
     # there now; classify only when nothing was created.
+    # Retry post-create list with bounded backoff (PRRT_kwDOBHvUUM65LZ23)
     _og_relist=""
     _og_relist_ok=false
-    if _og_relist=$(_og_names); then _og_relist_ok=true; fi
+    typeset -i _og_retry=0
+    for _og_retry in 1 2 3; do
+      if _og_relist=$(_og_names); then _og_relist_ok=true; break; fi
+      sleep $(( _og_retry * 2 ))
+    done
     _og_relist_objs=""
     if [[ "${_og_relist_ok}" == "true" ]]; then
       _og_relist_objs=$(printf '%s\n' "${_og_relist}" | grep '^operatorgroup' || true)
@@ -1006,6 +1022,8 @@ else
   # variable, so it never reaches the manifest as raw text.
   typeset _sub_create_err="" _sub_create_rc=0
   _sub_create_err=$(mktemp)
+  # Restructured to separate success/recovery branches (PRRT_kwDOBHvUUM65TpMp): capture rc without || trick
+  _sub_create_rc=0
   if ! jq -cn --arg ns "${ACS_NAMESPACE}" --arg ch "${ACS_CHANNEL}" \
       '{apiVersion:"operators.coreos.com/v1alpha1",
         kind:"Subscription",
@@ -1015,8 +1033,10 @@ else
               name:"rhacs-operator",
               source:"redhat-operators",
               sourceNamespace:"openshift-marketplace"}}' |
-      ( set +x; oc create -f - 2>"${_sub_create_err}" ) || _sub_create_rc=$?
-  then
+      ( set +x; oc create -f - 2>"${_sub_create_err}" ); then
+    _sub_create_rc=$?
+  fi
+  if (( _sub_create_rc != 0 )); then
     typeset _sub_create_err_text=""
     _sub_create_err_text=$(cat "${_sub_create_err}" 2>/dev/null || echo unknown)
     if [[ -s "${_sub_create_err}" ]]; then
@@ -1178,7 +1198,19 @@ typeset _wait2_err="" _wait2_rc=0
       printf '  (succeeded wait failed: %s)\n' "$(_api_err_class "$(cat "${_wait2_err}")")" >&2
     fi
     rm -f "${_wait2_err}"
-    _phase=$(oc get csv "${csvName}" -n "${ACS_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null) || _phase="unknown"
+    # Retain query rc to distinguish Forbidden vs timeout (PRRT_kwDOBHvUUM65yNGO)
+    typeset -i _phase_rc=0
+    _phase=$(oc get csv "${csvName}" -n "${ACS_NAMESPACE}" -o jsonpath='{.status.phase}' 2>"${_wait2_err}.phase" ) || _phase_rc=$?
+    if (( _phase_rc != 0 )); then
+      typeset _phase_err=""
+      _phase_err=$(cat "${_wait2_err}.phase" 2>/dev/null || echo unknown)
+      if [[ "${_phase_err}" == *"Forbidden"* || "${_phase_err}" == *"forbidden"* ]]; then
+        _phase="query-failed"
+      else
+        _phase="unknown"
+      fi
+    fi
+    rm -f "${_wait2_err}.phase"
     _probe_notfound=0
     _api_quiet
     # Same shape test as the precondition: a missing helper or a wrapper
@@ -1197,8 +1229,10 @@ typeset _wait2_err="" _wait2_rc=0
       _classify "${_cond_class}" "${_cond_detail} (CSV ${csvName}, phase ${_phase})"
     elif [[ "${_phase}" == "Failed" ]]; then
       _classify "acs-csv-failed" "CSV ${csvName} reached phase Failed"
+    elif [[ "${_phase}" == "query-failed" ]]; then
+      _classify "acs-csv-query-failed" "CSV ${csvName} query failed (rc=${_phase_rc}: $(_api_err_class "${_phase_err}"))"
     elif [[ "${_phase}" == "unknown" ]] && (( _probe_notfound )); then
-      _classify "acs-csv-timeout" "CSV object ${csvName} never created within ${ACS_INSTALL_TIMEOUT}s (currentCSV published, object absent)"
+      _classify "acs-csv-timeout" "CSV object ${csvName} never created within ${ACS_INSTALL_TIMEOUT}s (currentCSV published, object absent)" 
     else
       _classify "acs-csv-timeout" "CSV ${csvName} not Succeeded after ${ACS_INSTALL_TIMEOUT}s (phase: ${_phase})"
     fi
