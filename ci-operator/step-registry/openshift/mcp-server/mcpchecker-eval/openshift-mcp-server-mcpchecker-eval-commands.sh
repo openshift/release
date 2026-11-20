@@ -123,16 +123,26 @@ case "${EVAL_SUITE:-}" in
     kiali)
         kiali_cp_namespace="${KIALI_CP_NAMESPACE:-istio-system}"
         bookinfo_namespace="${BOOKINFO_NAMESPACE:-bookinfo}"
+        bookinfo_istio_revision="${BOOKINFO_ISTIO_REVISION:-default}"
         # Make targets use BOOKINFO_CP_NAMESPACE (default istio-system). Keep
         # setup/cleanup/port-forward on the same control-plane namespace.
-        # Kiali evals assume Bookinfo workloads (e.g. productpage); require both.
-        if ! oc -n "${kiali_cp_namespace}" get deployment/kiali >/dev/null 2>&1 \
-            || ! oc -n "${bookinfo_namespace}" get deployment/productpage-v1 >/dev/null 2>&1; then
+        if ! oc -n "${kiali_cp_namespace}" get deployment/kiali >/dev/null 2>&1; then
             # Mark before setup so partial failures still run clean-kiali-openshift.
-            # Leave unset when reusing a complete install so cleanup does not
-            # tear down preinstalled OSSM/Kiali/Bookinfo.
             kiali_suite=true
             make setup-kiali-openshift KUBERNETES_CLI=oc \
+                BOOKINFO_CP_NAMESPACE="${kiali_cp_namespace}" \
+                BOOKINFO_NAMESPACE="${bookinfo_namespace}"
+        elif ! oc -n "${bookinfo_namespace}" get deployment/productpage-v1 >/dev/null 2>&1; then
+            if ! oc get istiorevisiontag "${bookinfo_istio_revision}" >/dev/null 2>&1 \
+                && ! oc get istio "${bookinfo_istio_revision}" >/dev/null 2>&1; then
+                echo "ERROR: Bookinfo eval requires Istio revision ${bookinfo_istio_revision} (IstioRevisionTag or Istio CR)" >&2
+                exit 1
+            fi
+            make install-bookinfo-openshift KUBERNETES_CLI=oc \
+                BOOKINFO_CP_NAMESPACE="${kiali_cp_namespace}" \
+                BOOKINFO_NAMESPACE="${bookinfo_namespace}" \
+                BOOKINFO_ISTIO_REVISION="${bookinfo_istio_revision}"
+            make validate-bookinfo-kiali-health KUBERNETES_CLI=oc \
                 BOOKINFO_CP_NAMESPACE="${kiali_cp_namespace}" \
                 BOOKINFO_NAMESPACE="${bookinfo_namespace}"
         fi
