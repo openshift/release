@@ -168,12 +168,26 @@ else
                 fi
                 for vpcId in ${vpcIds}; do
                     [[ -z "${vpcId:-}" || "${vpcId}" == "None" ]] && continue
-                    echo "Tagging VPC ${vpcId} in ${region} for cluster ${clusterName} with expirationDate=${expirationDate}" 
-                    if aws ec2 create-tags --region "${region}" --resources "${vpcId}" --tags "Key=expirationDate,Value=${expirationDate}" "Key=clusterName,Value=${clusterName}" 2>&1; then
-                        echo "Tagged VPC ${vpcId} in ${region} (cluster ${clusterName})" 
-                        taggedCount=$((taggedCount + 1))
+                    typeset existingExpiration=""
+                    if ! existingExpiration="$(aws ec2 describe-tags --region "${region}" --filters "Name=resource-id,Values=${vpcId}" "Name=key,Values=expirationDate" --query 'Tags[0].Value' --output text 2>/dev/null)"; then
+                        echo "WARNING: failed to read expirationDate for VPC ${vpcId} in ${region}, skipping" >&2 || true
+                        continue
+                    fi
+                    if [[ -n "${existingExpiration:-}" && "${existingExpiration}" != "None" ]]; then
+                        echo "VPC ${vpcId} in ${region} already has expirationDate=${existingExpiration}, preserving (not overwriting)" 
+                        if aws ec2 create-tags --region "${region}" --resources "${vpcId}" --tags "Key=clusterName,Value=${clusterName}" 2>&1; then
+                            echo "Tagged VPC ${vpcId} in ${region} clusterName=${clusterName} (expirationDate preserved)" 
+                        else
+                            echo "WARNING: failed to tag VPC ${vpcId} clusterName in ${region} for ${clusterName}" >&2 || true
+                        fi
                     else
-                        echo "WARNING: failed to tag VPC ${vpcId} in ${region} for ${clusterName}" >&2 || true
+                        echo "Tagging VPC ${vpcId} in ${region} for cluster ${clusterName} with expirationDate=${expirationDate}" 
+                        if aws ec2 create-tags --region "${region}" --resources "${vpcId}" --tags "Key=expirationDate,Value=${expirationDate}" "Key=clusterName,Value=${clusterName}" 2>&1; then
+                            echo "Tagged VPC ${vpcId} in ${region} (cluster ${clusterName})" 
+                            taggedCount=$((taggedCount + 1))
+                        else
+                            echo "WARNING: failed to tag VPC ${vpcId} in ${region} for ${clusterName}" >&2 || true
+                        fi
                     fi
                 done
             done
