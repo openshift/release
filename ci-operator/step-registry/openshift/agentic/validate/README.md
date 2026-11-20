@@ -105,6 +105,9 @@ planner's own source code or prompt examples as product validation actions.
 4. `finalize` fills in unexecuted checks and writes JSON, Markdown and JUnit from
    the same outcomes. Product failures take precedence over unfinished checks.
    Only complete passing checks without a runner error produce exit code zero.
+   It also prints `report.md` to the build log on success or failure, including
+   the overall outcome, each check's observations, evidence paths and any runner
+   error. The artifacts retain `report.md`, `results.json` and command evidence.
 
 The execution agent does not fetch more issues or change the implementation.
 Results are pass, fail or unable to verify; reports describe the limits of the

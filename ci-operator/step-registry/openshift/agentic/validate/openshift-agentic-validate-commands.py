@@ -1318,8 +1318,10 @@ def finalize(plan, results, artifacts, runner_error, metrics):
     if "diff_included" in plan.get("sources", {}):
         report["diff_included"] = plan["sources"]["diff_included"]
     write_json(artifacts / "results.json", report)
-    atomic_write(artifacts / "report.md", report_markdown(report))
+    markdown = report_markdown(report)
+    atomic_write(artifacts / "report.md", markdown)
     atomic_write(artifacts / "junit_agent_validation.xml", junit_report(checks, runner_error))
+    print(markdown, flush=True)
     return 0 if report["overall"] == "pass" else 1
 
 
