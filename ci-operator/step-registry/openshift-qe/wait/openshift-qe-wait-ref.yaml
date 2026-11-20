@@ -1,0 +1,21 @@
+ref:
+  as: openshift-qe-wait
+  from: cli
+  commands: openshift-qe-wait-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  timeout: 24h
+  env:
+    - name: CLUSTER_DURATION
+      default: "1800"
+      documentation: >-
+        This configures how long this step waits for in seconds. Set it to a little less than the 24h timeout above, to save for scaledown time
+    - name: TEST_SKIPS
+      default: ""
+      documentation: >-
+        Unused env var needed to prevent ci-operator from complaining about workflows that set this environment variable
+        but have the test step that uses it overridden by this step.
+  documentation: >-
+    This step is used by openshift-qe and simply sleeps for as $(CLUSTER_DURATION) seconds before scaling down workers to 1 per machineset.
