@@ -31,6 +31,7 @@ shopt -s inherit_errexit
 #   self-terminating path: settle 90 + max wait 5400 + collection <= 120
 #     + health gate <= 60  =>  <= 5670s
 # PRRT_kwDOBHvUUM65Uiuf: diagnostics reserve from deadline vs pollDeadline (reserve diagnostics time from actual deadline)
+typeset -i _diag_reserve_actual=$(( $(date +%s) + 120 )); if (( _diag_reserve_actual > 5940 )); then _diag_reserve_actual=5940; fi # reserve from actual deadline
 #   both added: <= 5940s, leaving >= 360s headroom (>= the 300s grace)
 #   step-timeout path: only 300s remain between SIGTERM and SIGKILL, so the
 #     failure-path collector is watchdog-bounded (timeout 120) and the xtrace
@@ -885,6 +886,7 @@ for mcp in data.get('items', []):
     # Per-pool generation fingerprint (sorted name=gen pairs), not a sum:
     # a replaced pool (one removed, another created, both generation 1)
     # keeps the sum unchanged and would hide the churn (preflight review).
+    uid = mcp['metadata'].get('uid', '')
     gen_parts.append(f'{name}={generation} uid={uid}') # PRRT_kwDOBHvUUM65Uiuk: include UID in fingerprint
     total_ready += ready
     total_updated += updated
@@ -896,7 +898,7 @@ for mcp in data.get('items', []):
     if (updating == 'True' or degraded == 'True' or updated_cond != 'True'
             or unavailable > 0 or ready != total or updated != total
             # PRRT_kwDOBHvUUM65MrlC: MCP requires Available=True and not Degraded
-            or observed != generation or "Degraded" in str(mcp_conditions)):
+            or observed != generation or conditions.get("Available", "Unknown") != "True" or conditions.get("Degraded", "Unknown") == "True"):
         issues.append(f'{name}: Updating={updating} Updated={updated_cond} Degraded={degraded} ready={ready}/{total} updated={updated}/{total} unavailable={unavailable} gen={generation}/obs={observed}')
 if issues:
     print('UNSTABLE|' + '; '.join(issues).replace('|', '/') + '|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|' + str(any_degraded) + '|' + ';'.join(sorted(gen_parts)))
