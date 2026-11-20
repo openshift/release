@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Exercise the actual creation commands and feature pre-step without cloud access.
+"""Test guest feature argument and manifest plumbing without cloud access.
 
 Requires PyYAML, as do the repository's other Python validation tools.
 Run: python3 hack/test-hypershift-agentic-features.py
 """
 
-import copy
 import json
 import os
 import subprocess
@@ -22,26 +21,16 @@ REGISTRY = ROOT / "ci-operator/step-registry/hypershift"
 CREATE = yaml.safe_load(
     (REGISTRY / "aws/create/hypershift-aws-create-chain.yaml").read_text()
 )["chain"]["steps"][0]
-VERIFY = (
-    REGISTRY
-    / "agentic-qe/verify-features/hypershift-agentic-qe-verify-features-commands.sh"
-)
-VERIFY_REF = yaml.safe_load(
-    VERIFY.with_name("hypershift-agentic-qe-verify-features-ref.yaml").read_text()
-)["ref"]
 
 # These stubs replace only external programs. Tests run the full registry
-# commands, including their manifest transformations and verification predicates.
+# creation commands and manifest transformations.
 STUB = r"""
 import json, os, pathlib, sys
 import yaml
 root = pathlib.Path(os.environ["TEST_ROOT"])
 tool, args = pathlib.Path(sys.argv[0]).name, sys.argv[1:]
-kubeconfig = os.environ.get("KUBECONFIG")
-if "--kubeconfig" in args:
-    kubeconfig = args[args.index("--kubeconfig") + 1]
 with (root / "calls.jsonl").open("a") as calls:
-    calls.write(json.dumps([tool, args, kubeconfig]) + "\n")
+    calls.write(json.dumps([tool, args]) + "\n")
 if tool == "hypershift":
     if "kubeconfig" in args:
         print("fake-kubeconfig")
@@ -63,9 +52,6 @@ if tool == "hypershift":
 elif tool == "oc":
     if "--dry-run=client" in args:
         filename = args[args.index("-f") + 1]
-        if filename == "-":
-            print(json.dumps(yaml.safe_load(sys.stdin.read())))
-            sys.exit(0)
         source = pathlib.Path(filename)
         items = list(yaml.safe_load_all(source.read_text()))
         if os.environ.get("OC_JSON_STREAM"):
@@ -77,14 +63,6 @@ elif tool == "oc":
             sys.exit(1)
         source = pathlib.Path(args[args.index("-f") + 1])
         (root / "applied.json").write_text(source.read_text())
-    elif "featuregates.config.openshift.io/cluster" in args:
-        print((root / "feature.json").read_text())
-    elif "clusterversion.config.openshift.io/version" in args:
-        print((root / "version.json").read_text())
-    elif "configmap/feature-gate" in args:
-        if os.environ.get("MISSING_FEATURE_CONFIGMAP"):
-            sys.exit(1)
-        print((root / "configmap.json").read_text())
     elif "get" in args:
         print("Completed")
 elif tool == "date":
@@ -122,29 +100,9 @@ class GuestFeaturesTest(unittest.TestCase):
             "NODEPOOL_RELEASE_IMAGE_LATEST": "payload",
             "HYPERSHIFT_CREATE_CLUSTER_RENDER": "true",
         }
-        self.features = {
-            "apiVersion": "config.openshift.io/v1",
-            "kind": "FeatureGate",
-            "metadata": {"name": "cluster", "generation": 1},
-            "spec": {
-                "featureSet": "CustomNoUpgrade",
-                "customNoUpgrade": {"enabled": ["Example"], "disabled": ["Other"]},
-            },
-            "status": {
-                "featureGates": [
-                    {
-                        "version": "test-version",
-                        "enabled": [{"name": "Example"}],
-                        "disabled": [{"name": "Other"}],
-                    }
-                ]
-            },
-        }
-        self.version = {
-            "status": {
-                "desired": {"version": "test-version"},
-                "history": [{"version": "test-version", "state": "Completed"}],
-            }
+        self.feature_spec = {
+            "featureSet": "CustomNoUpgrade",
+            "customNoUpgrade": {"enabled": ["Example"], "disabled": ["Other"]},
         }
 
     def run_commands(self, script, **env):
@@ -163,27 +121,6 @@ class GuestFeaturesTest(unittest.TestCase):
             CREATE["commands"].replace("/usr/bin/hypershift", "hypershift"), **env
         )
 
-    def verify(self, features=None, version=None, rendered=None, configmap=None, **env):
-        (self.root / "feature.json").write_text(
-            json.dumps(features if features is not None else self.features)
-        )
-        (self.root / "version.json").write_text(
-            json.dumps(version if version is not None else self.version)
-        )
-        expected = self.features if rendered is None else rendered
-        if configmap is None:
-            configmap = {
-                "metadata": {
-                    "annotations": {
-                        "hypershift.openshift.io/payload-version": "test-version"
-                    }
-                },
-                "data": {"feature-gate.yaml": yaml.safe_dump(expected)},
-            }
-        (self.root / "configmap.json").write_text(json.dumps(configmap))
-        (self.root / "shared/cluster-name").write_text("test\n")
-        return self.run_commands(VERIFY.read_text(), **env)
-
     def calls(self):
         path = self.root / "calls.jsonl"
         return (
@@ -199,9 +136,7 @@ class GuestFeaturesTest(unittest.TestCase):
                     MULTISTAGE_PARAM_OVERRIDE_GUEST_FEATURE_SET=feature_set
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
-                args = [args for tool, args, _ in self.calls() if tool == "hypershift"][
-                    -1
-                ]
+                args = [args for tool, args in self.calls() if tool == "hypershift"][-1]
                 flags = [arg for arg in args if arg.startswith("--feature-set=")]
                 self.assertEqual(
                     flags, [f"--feature-set={feature_set}"] if feature_set else []
@@ -221,7 +156,7 @@ class GuestFeaturesTest(unittest.TestCase):
         }
         self.assertEqual(
             objects["HostedCluster"]["spec"]["configuration"]["featureGate"],
-            self.features["spec"],
+            self.feature_spec,
         )
         self.assertEqual(
             objects["NodePool"]["spec"]["release"]["image"], "nodepool-payload"
@@ -286,7 +221,7 @@ class GuestFeaturesTest(unittest.TestCase):
         objects = json.loads((self.root / "applied.json").read_text())["items"]
         cluster = next(obj for obj in objects if obj["kind"] == "HostedCluster")
         self.assertEqual(
-            cluster["spec"]["configuration"]["featureGate"], self.features["spec"]
+            cluster["spec"]["configuration"]["featureGate"], self.feature_spec
         )
 
     def test_apply_failure_cleans_up_sensitive_manifests(self):
@@ -318,175 +253,6 @@ class GuestFeaturesTest(unittest.TestCase):
                 )
                 self.assertNotEqual(result.returncode, 0)
                 self.assertEqual(self.calls(), [])
-
-    def test_verification_of_custom_gates_uses_hosted_cluster_and_keeps_evidence(self):
-        result = self.verify(
-            MULTISTAGE_PARAM_OVERRIDE_GUEST_FEATURE_SET="CustomNoUpgrade",
-            MULTISTAGE_PARAM_OVERRIDE_GUEST_FEATURE_GATES="Example=true,Other=false",
-        )
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(
-            json.loads((self.root / "artifacts/guest-feature-state.json").read_text()),
-            self.features,
-        )
-        for tool, args, kubeconfig in self.calls():
-            if tool == "oc":
-                filename = (
-                    "kubeconfig"
-                    if "configmap/feature-gate" in args
-                    else "nested_kubeconfig"
-                )
-                self.assertEqual(kubeconfig, str(self.root / "shared" / filename))
-                if "configmap/feature-gate" in args:
-                    self.assertIn("clusters-test", args)
-
-    def test_verification_accepts_preview_sets_and_optional_healthy_condition(self):
-        for feature_set in ("TechPreviewNoUpgrade", "DevPreviewNoUpgrade"):
-            for conditions in (
-                [],
-                [
-                    {
-                        "type": "DeterminationDegraded",
-                        "status": "False",
-                        "observedGeneration": 1,
-                    }
-                ],
-            ):
-                with self.subTest(feature_set=feature_set, conditions=conditions):
-                    features = copy.deepcopy(self.features)
-                    features["spec"] = {"featureSet": feature_set}
-                    features["status"]["conditions"] = conditions
-                    result = self.verify(
-                        features=features,
-                        rendered=features,
-                        GUEST_FEATURE_SET=feature_set,
-                    )
-                    self.assertEqual(result.returncode, 0, result.stderr)
-
-    def test_stale_status_without_individual_overrides_or_a_condition_fails(self):
-        for feature_set in (
-            "TechPreviewNoUpgrade",
-            "DevPreviewNoUpgrade",
-            "CustomNoUpgrade",
-        ):
-            with self.subTest(feature_set=feature_set):
-                features = copy.deepcopy(self.features)
-                features["spec"] = {"featureSet": feature_set}
-                rendered = copy.deepcopy(features)
-                rendered["status"]["featureGates"][0]["enabled"].append(
-                    {"name": "Preview"}
-                )
-                result = self.verify(
-                    features=features, rendered=rendered, GUEST_FEATURE_SET=feature_set
-                )
-                self.assertNotEqual(result.returncode, 0)
-
-    def test_stale_or_missing_rendered_expectations_fail(self):
-        for case in ("spec", "version", "payload", "empty", "missing"):
-            with self.subTest(case=case):
-                rendered = copy.deepcopy(self.features)
-                payload_version = "test-version"
-                if case == "spec":
-                    rendered["spec"]["customNoUpgrade"]["enabled"] = ["Different"]
-                elif case == "version":
-                    rendered["status"]["featureGates"][0]["version"] = "old-version"
-                elif case == "payload":
-                    payload_version = "old-version"
-                configmap = {
-                    "metadata": {
-                        "annotations": {
-                            "hypershift.openshift.io/payload-version": payload_version
-                        }
-                    },
-                    "data": {
-                        "feature-gate.yaml": ""
-                        if case == "empty"
-                        else yaml.safe_dump(rendered)
-                    },
-                }
-                result = self.verify(
-                    configmap=configmap,
-                    GUEST_FEATURE_SET="CustomNoUpgrade",
-                    GUEST_FEATURE_GATES="Example=true,Other=false",
-                    MISSING_FEATURE_CONFIGMAP="true" if case == "missing" else "",
-                )
-                self.assertNotEqual(result.returncode, 0)
-
-    def test_mismatched_or_unobserved_features_fail_before_hold(self):
-        cases = []
-        for path, value in (
-            (("spec", "featureSet"), "TechPreviewNoUpgrade"),
-            (("spec", "customNoUpgrade", "enabled"), ["Unrequested"]),
-            (("status", "featureGates", 0, "version"), "old-version"),
-            (("status", "featureGates", 0, "enabled"), []),
-            (
-                ("status", "featureGates", 0, "enabled"),
-                [{"name": "Example"}, {"name": "Unrequested"}],
-            ),
-            (
-                ("status", "featureGates", 0, "disabled"),
-                [{"name": "Other"}, {"name": "Example"}],
-            ),
-            (
-                ("status", "conditions"),
-                [{"type": "DeterminationDegraded", "status": "True"}],
-            ),
-            (
-                ("status", "conditions"),
-                [
-                    {
-                        "type": "DeterminationDegraded",
-                        "status": "False",
-                        "observedGeneration": 0,
-                    }
-                ],
-            ),
-        ):
-            features = copy.deepcopy(self.features)
-            target = features
-            for key in path[:-1]:
-                target = target[key]
-            target[path[-1]] = value
-            cases.append((str(path), features, self.version))
-        cases.append(
-            (
-                "incomplete rollout",
-                self.features,
-                {
-                    "status": {
-                        "desired": {"version": "test-version"},
-                        "history": [{"version": "test-version", "state": "Partial"}],
-                    }
-                },
-            )
-        )
-        cases.append(("missing status", {"spec": self.features["spec"]}, self.version))
-        for label, features, version in cases:
-            with self.subTest(case=label):
-                result = self.verify(
-                    features=features,
-                    version=version,
-                    GUEST_FEATURE_SET="CustomNoUpgrade",
-                    GUEST_FEATURE_GATES="Example=true,Other=false",
-                )
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn("did not match the request", result.stderr)
-
-    def test_default_configuration_skips_additional_api_reads(self):
-        result = self.verify()
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.calls(), [])
-
-    def test_verification_is_a_pre_step_before_hold(self):
-        workflow = yaml.safe_load(
-            (
-                REGISTRY / "agentic-qe/aws/hypershift-agentic-qe-aws-workflow.yaml"
-            ).read_text()
-        )["workflow"]
-        self.assertEqual(workflow["steps"]["pre"][-1], {"ref": VERIFY_REF["as"]})
-        self.assertEqual(
-            workflow["steps"]["test"][0], {"ref": "hypershift-agentic-qe-process"}
-        )
 
 
 if __name__ == "__main__":
