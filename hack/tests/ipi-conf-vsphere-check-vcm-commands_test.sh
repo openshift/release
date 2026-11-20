@@ -126,6 +126,15 @@ test_release_lease_limits() {
   )
 }
 
+test_min_vcenters_validation() {
+  assert_eq "$(min_vcenters_error 0 1 3 '')" "" "disabled minimum"
+  assert_eq "$(min_vcenters_error 1 3 1 '')" "" "minimum 1 is valid after capping to a single vCenter"
+  assert_eq "$(min_vcenters_error 1 1 1 '')" "" "minimum 1 with one pool and one vCenter"
+  assert_eq "$(min_vcenters_error 2 3 1 '')" "MIN_VCENTERS (2) must not exceed MAX_VCENTERS (1)" "minimum 2 is rejected after capping"
+  assert_eq "$(min_vcenters_error 3 2 3 '')" "MIN_VCENTERS (3) must not exceed POOL_COUNT (2)" "minimum above the pool count is rejected"
+  assert_eq "$(min_vcenters_error 2 2 3 'pool-a pool-b')" "MIN_VCENTERS cannot be used with POOLS; it requires the single-lease POOL_COUNT path" "explicit pools are rejected"
+}
+
 make_mocks() {
   local mock_dir="$1"
   mkdir -p "${mock_dir}"
@@ -280,6 +289,7 @@ test_ocp_version_number
 test_release_version_from_image_reference
 test_multi_vcenter_support
 test_release_lease_limits
+test_min_vcenters_validation
 test_upgrade_uses_initial_release
 test_newer_initial_keeps_multi_vcenter
 test_falls_back_to_latest_when_initial_missing

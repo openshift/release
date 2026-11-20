@@ -193,6 +193,35 @@ function apply_release_lease_limits() {
   printf '%s %s\n' "${max_vcenters}" "${pool_count}"
 }
 
+# Echo the reason MIN_VCENTERS cannot be satisfied by the requested lease
+# shape, or nothing when it is valid.  MIN_VCENTERS=0 disables the request.
+# The vCenter comparison runs against the post-cap MAX_VCENTERS, so a minimum
+# of 1 is valid on a single-vCenter lease while 2 is rejected.
+function min_vcenters_error() {
+  local min_vcenters="$1"
+  local pool_count="$2"
+  local max_vcenters="$3"
+  local pools="$4"
+
+  if [[ "${min_vcenters}" == "0" ]]; then
+    return 0
+  fi
+
+  if [[ -n "${pools}" ]]; then
+    echo "MIN_VCENTERS cannot be used with POOLS; it requires the single-lease POOL_COUNT path"
+    return 0
+  fi
+
+  if (( 10#${min_vcenters} > 10#${pool_count} )); then
+    echo "MIN_VCENTERS (${min_vcenters}) must not exceed POOL_COUNT (${pool_count})"
+    return 0
+  fi
+
+  if (( 10#${min_vcenters} > 10#${max_vcenters} )); then
+    echo "MIN_VCENTERS (${min_vcenters}) must not exceed MAX_VCENTERS (${max_vcenters})"
+  fi
+}
+
 # Keep this marker directly above the first statement that has side effects:
 # hack/tests/ipi-conf-vsphere-check-vcm-commands_test.sh sources this file up to
 # the marker to exercise the release-capability helpers on their own.
@@ -249,36 +278,21 @@ requested_pool_count=${POOL_COUNT}
 read -r MAX_VCENTERS POOL_COUNT <<<"$(apply_release_lease_limits \
   "${INSTALL_RELEASE_OCP_VERSION}" "${MAX_VCENTERS}" "${POOL_COUNT}" "${POOLS}")"
 
-MAX_VCENTERS_CLAMPED="false"
 if [[ -z "${INSTALL_RELEASE_OCP_VERSION}" ]]; then
   log "WARNING: unable to determine the release being installed; keeping MAX_VCENTERS=${MAX_VCENTERS} and POOL_COUNT=${POOL_COUNT}"
 elif multi_vcenter_install_supported "${INSTALL_RELEASE_OCP_VERSION}"; then
   log "release ${INSTALL_RELEASE_VERSION} supports multiple vCenters; keeping MAX_VCENTERS=${MAX_VCENTERS} and POOL_COUNT=${POOL_COUNT}"
 else
-  MAX_VCENTERS_CLAMPED="true"
   log "release ${INSTALL_RELEASE_VERSION} (OCP ${INSTALL_RELEASE_OCP_VERSION}) does not support multiple vCenters; using MAX_VCENTERS=${MAX_VCENTERS} and POOL_COUNT=${POOL_COUNT} (requested ${requested_max_vcenters} and ${requested_pool_count})"
 fi
 
 # MIN_VCENTERS requires the single-lease (POOL_COUNT) path and must respect the
 # same bounds VCM enforces on spec.min-vcenters: it cannot exceed the number of
-# pools requested or the vCenters cap.
-if [[ "${MIN_VCENTERS}" != "0" ]]; then
-  if [[ "${POOLS}" != "" ]]; then
-    echo "MIN_VCENTERS cannot be used with POOLS; it requires the single-lease POOL_COUNT path"
-    exit 1
-  fi
-  if [[ "${MAX_VCENTERS_CLAMPED}" == "true" ]]; then
-    echo "MIN_VCENTERS (${MIN_VCENTERS}) requires multiple vCenters, but release ${INSTALL_RELEASE_VERSION} (OCP ${INSTALL_RELEASE_OCP_VERSION}) does not support them; MAX_VCENTERS is capped at 1"
-    exit 1
-  fi
-  if (( 10#${MIN_VCENTERS} > 10#${POOL_COUNT} )); then
-    echo "MIN_VCENTERS (${MIN_VCENTERS}) must not exceed POOL_COUNT (${POOL_COUNT})"
-    exit 1
-  fi
-  if (( 10#${MIN_VCENTERS} > 10#${MAX_VCENTERS} )); then
-    echo "MIN_VCENTERS (${MIN_VCENTERS}) must not exceed MAX_VCENTERS (${MAX_VCENTERS})"
-    exit 1
-  fi
+# pools requested or the (possibly capped) vCenters limit.
+min_vcenters_error_message=$(min_vcenters_error "${MIN_VCENTERS}" "${POOL_COUNT}" "${MAX_VCENTERS}" "${POOLS}")
+if [[ -n "${min_vcenters_error_message}" ]]; then
+  echo "${min_vcenters_error_message}"
+  exit 1
 fi
 
 export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
