@@ -74,31 +74,32 @@ Common `from` alias values: `cli`, `tests`, or another image alias from the cons
 
 ## Validate and regenerate
 
-For a step-only change, regenerate metadata and run the repo-wide local check.
-It covers all ci-operator configs, the registry, cluster profiles, and
-cluster-claim owners; it does not run test steps and may report unrelated config
-problems:
+For a registry-only change, regenerate metadata, validate the config and
+registry, and regenerate and validate Prow jobs. Registry changes can affect
+generated Prow jobs, for example when a workflow's inherited cluster profile
+changes generated cloud/profile labels:
 
 ```bash
 make registry-metadata
 make validate-step-registry
+make jobs
+make checkconfig
 ```
 
-For a config-wired change in the same PR, run:
+If the same PR also edits a ci-operator config, use this instead of the
+standalone commands above:
 
 ```bash
 make update
 make checkconfig
 ```
 
-`make update` runs `make jobs` (including `ci-operator-checkconfig`), then runs
-`make ci-operator-config`, `make prow-config`, `make registry-metadata`,
-`make release-controllers`, and `make boskos-config`. It can update generated
-files outside the component being changed, so review the full diff. When running
-`make update`, skip the standalone commands above to avoid repeating validation
-and metadata generation. The `ci/prow/step-registry-metadata` presubmit checks
-that generated metadata is current. `make checkconfig` remains a separate Prow
-configuration check.
+`make update` includes config/registry validation and metadata generation. For
+details on these validation targets, see the root AGENTS.md sections on
+[CI Job Configuration](../../../AGENTS.md#ci-job-configuration) and
+[Step Registry Validation](../../../AGENTS.md#step-registry-validation).
+The `ci/prow/step-registry-metadata` presubmit checks that generated metadata is
+current.
 
 ## Wire into a test (same or follow-up PR)
 
@@ -124,9 +125,8 @@ This skill scaffolds **steps** only. For chains/workflows:
 - **Workflow**: new `*-workflow.yaml` with `pre` / `test` / `post` phases.
 
 Copy structure from an existing chain/workflow in the same platform area. For a
-chain-only or workflow-only change, run `make registry-metadata` and
-`make validate-step-registry`. Those commands are sufficient unless you are
-also changing ci-operator configs or regenerating Prow jobs.
+chain-only or workflow-only change, use the same step-registry validation and
+Prow job commands listed above.
 
 ## Checklist
 
@@ -134,7 +134,8 @@ also changing ci-operator configs or regenerating Prow jobs.
 - [ ] `-ref.yaml` + `-commands.sh` created and named consistently
 - [ ] documentation field describes behavior
 - [ ] secrets handled safely in shell
-- [ ] For a registry-only change, `make registry-metadata` and
-      `make validate-step-registry` pass; for a config-wired change, run
+- [ ] For a registry-only change, run `make registry-metadata`,
+      `make validate-step-registry`, `make jobs`, and `make checkconfig`
+- [ ] If the registry change also edits a ci-operator config, run
       `make update` and `make checkconfig`
 - [ ] referenced from config/chain/workflow if intended for use

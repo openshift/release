@@ -177,8 +177,7 @@ new-repo:
 test-tls-scanner:
 	python3 hack/test_tls_scanner.py
 
-# configresolver rejects the old --prow-config flag. Its --validate-only path
-# also requires in-cluster config, so use ci-operator-checkconfig locally.
+# Use the same local config and registry validation as make jobs.
 validate-step-registry: ci-operator-checkconfig
 
 python-validation: 

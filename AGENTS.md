@@ -195,21 +195,23 @@ The release controller configurations that define acceptance gates for these str
    - `<name>-commands.sh` (script to execute)
 2. Reference the step in a workflow chain or workflow, or directly in a
    ci-operator config if wiring it into a job.
-3. For a registry-only change that does not edit `ci-operator/config/`, run
-   `make registry-metadata` and `make validate-step-registry`.
-4. If wiring the step into a ci-operator config, run `make update` and then
-   `make checkconfig`. `make update` includes the config/registry validation and
-   registry metadata generation.
+3. For a registry-only change, run `make registry-metadata`,
+   `make validate-step-registry`, `make jobs`, and `make checkconfig`.
+   Registry changes can affect generated Prow jobs, for example when a
+   workflow's inherited cluster profile changes generated cloud/profile labels.
+   See [CI Job Configuration](#ci-job-configuration) and
+   [Step Registry Validation](#step-registry-validation) for what these targets
+   validate. If the change also edits a ci-operator config, use `make update`
+   and `make checkconfig` instead; `make update` includes config/registry
+   validation and registry metadata generation.
 
 ### Creating a New Workflow
 1. Define individual steps if needed
 2. Create a workflow file: `<name>-workflow.yaml`
 3. Define `pre`, `test`, and `post` phases using existing steps/chains
-4. For a registry-only workflow change, run `make registry-metadata` and
-   `make validate-step-registry`. If you also wire the workflow into a
-   ci-operator config, run `make update` and then `make checkconfig`.
-   `make update` includes the config/registry validation and metadata
-   generation.
+4. Follow the validation instructions in [Adding a New Test Step](#adding-a-new-test-step),
+   including its `make update` path if the change also edits a ci-operator
+   config.
 
 ### Creating Variant Periodic Configurations
 CI analytical tooling requires release specific configuration.   Branch fast-forwarding from main to the active release duplicates configuration and job execution for periodics defined in the default configuration.  For jobs producing test data that will be processed by CI analytical tooling, periodic jobs should be configured separately from the main config:

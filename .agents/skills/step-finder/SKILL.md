@@ -45,6 +45,10 @@ All query tokens must match (name, path, or documentation).
    through `make jobs`.
 5. Validate generated Prow configuration: `make checkconfig`.
 
+For details on these validation targets, see the root AGENTS.md sections on
+[CI Job Configuration](../../../AGENTS.md#ci-job-configuration) and
+[Step Registry Validation](../../../AGENTS.md#step-registry-validation).
+
 ## Component types
 
 | Type | Files | Config reference |
