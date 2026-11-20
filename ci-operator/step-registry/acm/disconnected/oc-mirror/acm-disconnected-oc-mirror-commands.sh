@@ -124,6 +124,7 @@ mirror_operators() {
         "docker://${MIRROR_REGISTRY_HOST}" \
         --src-tls-verify=false \
         --dest-tls-verify=false \
+        --retry-times=5 \
         --log-level=debug 2>&1 | tee "${ARTIFACT_DIR}/acm_mce_mirror.log" || {
         log "ERROR: oc-mirror failed"
         return 1
