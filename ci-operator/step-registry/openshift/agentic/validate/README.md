@@ -191,14 +191,12 @@ The manual, optional `aws-ipi` job in
 installs an OpenShift 5.1 nightly on AWS with `ipi-aws` and the
 `openshift-org-aws` cluster profile. Its current case is NE-2126 / router PR #867:
 the router test extension must be a raw gzip-compressed executable.
-`openshift-agentic-test-extension` first finds a ready container running the
-payload's `haproxy-router` digest and reads `/usr/bin/router-tests-ext.gz` from
-that container through the target API. It checks gzip integrity, raw ELF format,
-host architecture and nonempty `list tests -o json` metadata with source
-`openshift:payload:router`. It publishes deployment evidence and JUnit. The raw
-format check rejects the former tar.gz packaging even when renamed to `.gz`.
-After that deterministic product check, the job runs the actual
+After cluster installation, the job runs the generic
 `openshift-agentic-prepare-validation` and `openshift-agentic-validate` references.
+The preparation step captures the Jira issue and PR procedure; the execution
+agent generates commands to check the selected requirements. The router's
+archive path, packaging expectations and test-discovery assertions belong to
+that example procedure. The reusable steps contain no extension-specific checks.
 Execution uses the installed cluster's kubeconfig and verifies the deployed
 `haproxy-router` payload digest. The inherited `ipi-aws` post chain gathers and
 destroys the cluster, including when validation fails.
