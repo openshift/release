@@ -453,11 +453,6 @@ else
   set -x
 fi
 
-# PRRT_kwDOBHvUUM65ui2E: fixture mode dispatched before setup so fixture determines setup path
-if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" == "1" ]]; then
-  self_test
-  exit $?
-fi
 # 2. CatalogSource - capture name, status.connectionState, spec.image
 echo "[2/10] CatalogSource..."
 oc get catalogsource -n openshift-marketplace -o json 2>/dev/null | \
@@ -499,7 +494,8 @@ for i in data.get("items", []):
         "conditions": i.get("status", {}).get("conditions"),
         "channel": i.get("spec", {}).get("channel"),
         "source": i.get("spec", {}).get("source"),
-        "sourceNamespace": i.get("spec", {}).get("sourceNamespace")
+        "sourceNamespace": i.get("spec", {}).get("sourceNamespace"),
+        "generation": i.get("metadata", {}).get("generation")
     })
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/03-subscription.json" 2>&1 || \
@@ -536,7 +532,8 @@ for i in data.get("items", []):
         "namespace": i["metadata"].get("namespace", ""),
         "phase": i.get("status", {}).get("phase"),
         "reason": i.get("status", {}).get("reason"),
-        "message": i.get("status", {}).get("message")
+        "message": i.get("status", {}).get("message"),
+        "generation": i.get("metadata", {}).get("generation")
     })
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/05-csv.json" 2>&1 || \
@@ -994,10 +991,8 @@ else:
 
 sub_name = sub.get("name") if sub else None
 sub_ns = sub.get("namespace") if sub else None
-# PRRT_kwDOBHvUUM65yNGT: verify subscription name/namespace exact before status - filter by subscription identity
-rhacs_op = [o for o in ops if o.get("name") == "operatorpolicy-rhacs-operator" and (not sub_name or o.get("spec", {}).get("subscriptionName") in (None, sub_name)) and (not sub_ns or o.get("spec", {}).get("subscriptionNamespace") in (None, sub_ns))]
-if not rhacs_op:
-    rhacs_op = [o for o in ops if o.get("name") == "operatorpolicy-rhacs-operator"]
+# PRRT_kwDOBHvUUM65yNGT: select OperatorPolicy by full Subscription identity, no name-only fallback
+rhacs_op = [o for o in ops if o.get("name") == "operatorpolicy-rhacs-operator" and o.get("spec", {}).get("subscriptionName") == sub_name and o.get("spec", {}).get("subscriptionNamespace") == sub_ns] if sub_name and sub_ns else []
 
 sub_channel = sub.get("channel") if sub else None
 op_spec = (rhacs_op[0].get("spec") or {}) if rhacs_op else {}
@@ -1419,9 +1414,9 @@ FIXTURE
 [{"name": "rhacs-operator", "namespace": "rhacs-operator",
   "apiVersion": "operators.coreos.com/v1alpha1",
   "currentCSV": "rhacs-operator.v4.11.6", "state": "AtLatestKnown",
-  "conditions": [], "channel": "stable", "source": "redhat-operators"}]
+  "conditions": [], "channel": "stable", "source": "redhat-operators", "generation": 1}]
 FIXTURE
-  echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "rhacs-operator", "phase": "Succeeded", "reason": "Succeeded"}]' > "${tmp}/05-csv.json"
+  echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "rhacs-operator", "phase": "Succeeded", "reason": "Succeeded", "generation": 1}]' > "${tmp}/05-csv.json"
   echo '[{"name": "central", "namespace": "stackrox", "available": {"type": "Available", "status": "True"}}]' > "${tmp}/07-central-cr.json"
   echo '{"name": "rhacs-operator", "catalogSource": "redhat-operators", "catalogSourceNamespace": "openshift-marketplace", "channels": [{"name": "stable", "currentCSV": "rhacs-operator.v4.11.6"}]}' > "${tmp}/08-packagemanifest-rhacs.json"
   echo '[{"name": "advanced-cluster-management.v2.17.4", "version": "2.17.4", "governancePolicyAddonControllerImages": [{"name": "governance-policy-addon-controller", "image": "registry.redhat.io/acm2/governance-policy-addon-controller-rhel9:v2.17.4"}]}]' > "${tmp}/11-acm-csv-addon-controller.json"
