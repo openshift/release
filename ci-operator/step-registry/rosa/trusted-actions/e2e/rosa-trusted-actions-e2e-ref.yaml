@@ -1,0 +1,165 @@
+ref:
+  as: rosa-trusted-actions-e2e
+  from: src
+  cli: latest
+  grace_period: 10m
+  timeout: 1h0m0s
+  commands: rosa-trusted-actions-e2e-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  credentials:
+  # RTA's own service account. Deliberately NOT taken from the cluster
+  # profile: the profile holds cluster-provisioning credentials, which RTA
+  # must never be given. In production RTA holds no cluster access and obtains
+  # scoped, time-limited access from backplane; the test configures it the
+  # same way.
+  #
+  # The whole group is mounted, so this directory also contains the other
+  # secrets that share it. CLIENT_ID_FILE and CLIENT_SECRET_FILE below name
+  # the two files this step actually reads.
+  - collection: rosa-boundary
+    group: ci
+    mount_path: /secrets/rta-ci
+  env:
+  - name: OCM_BASE_URL
+    default: "https://api.stage.openshift.com"
+    documentation: |-
+      Staging OCM. Set explicitly because RTA defaults ROSA_TA_OCM_BASE_URL to
+      https://api.openshift.com, which is PRODUCTION. The step refuses to run
+      against a URL that does not look like staging. Never point this at
+      production.
+  - name: BACKPLANE_URL
+    default: "https://api.stage.backplane.openshift.com"
+    documentation: |-
+      Staging backplane. Must be HTTPS: cmd/server/main.go refuses to start
+      otherwise. Confirm the exact hostname against the
+      api-stage-backplane-openshift-com route before relying on this default.
+  - name: BACKPLANE_PROXY_URL
+    default: "http://squid.corp.redhat.com:3128"
+    documentation: |-
+      Corp proxy the server reaches backplane through. Staging backplane is
+      not reachable directly from the build farm — the request dials its
+      address and times out — which is why rosa-cluster-credentials-backplane
+      routes through the same proxy. Exported to the server process only, as
+      HTTPS_PROXY and as ROSA_TA_BACKPLANE_PROXY_URL, which is what the AWS
+      credential flow reads. Named without the ROSA_TA_ prefix like the other
+      knobs on this step, because the step maps it onto more than one setting.
+      Set to an empty string to reach backplane directly.
+  - name: SSO_TOKEN_URL
+    default: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
+    documentation: |-
+      Token endpoint the caller's access token is minted from. It has to be
+      the issuer whose JWKS is named by JWK_CERT_URL, or the server rejects
+      every request's signature.
+  - name: SSO_SCOPE
+    default: ""
+    documentation: |-
+      Scope requested for the caller's token, with the client-credentials
+      grant. Empty, and sent only when set: that token is presented to the
+      trusted-actions API, which validates its signature and reads the email
+      and preferred_username claims the account already carries.
+  - name: OCM_SCOPES
+    default: "api.ocm"
+    documentation: |-
+      Scopes the server requests for its own OCM and backplane tokens, passed
+      through as ROSA_TA_OCM_SCOPES. Comma-separated, and it replaces the
+      SDK's "openid" default rather than adding to it, so list "openid" too
+      if it is needed. Unlike the caller's token above, these are the tokens
+      that reach AWS STS by way of backplane's cloud-credential flow, where
+      the audience claim is checked. Set empty to keep the SDK default.
+  - name: JWK_CERT_URL
+    default: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/certs"
+    documentation: |-
+      JWKS the server validates caller tokens against. Must correspond to
+      SSO_TOKEN_URL. This is also RTA's own default, repeated here so that
+      changing the issuer is a single, visible decision.
+  - name: CLIENT_ID_FILE
+    default: "trusted-actions/stage-client-id"
+    documentation: |-
+      Path, relative to the mounted credentials directory, of the file holding
+      the service account's client ID. A path rather than a bare name because
+      the item sits under trusted-actions/ within the group; override if the
+      secret is ever mounted flat.
+  - name: CLIENT_SECRET_FILE
+    default: "trusted-actions/stage-client-secret"
+    documentation: |-
+      As CLIENT_ID_FILE, for the client secret. The same account is used as
+      the OCM client and the backplane client.
+  - name: CALLER_CLIENT_ID_FILE
+    default: "trusted-actions/e2e-user-client-id"
+    documentation: |-
+      Path, relative to the mounted credentials directory, of the file holding
+      the E2E service account's client ID, i.e. the user that calls the TA API
+      in E2E jobs. A path rather than a bare name because the item sits under
+      trusted-actions/ within the group; override if the secret is ever
+      mounted flat.
+  - name: CALLER_CLIENT_SECRET_FILE
+    default: "trusted-actions/e2e-user-client-secret"
+    documentation: |-
+      As CALLER_CLIENT_ID_FILE, for the E2E client secret.
+  - name: SOURCE_DIR
+    default: "."
+    documentation: |-
+      Directory within the cloned repository holding the trusted-actions
+      source, relative to its root. It is its own Go module, so everything
+      below runs with this as the working directory. "." when the repository
+      is the module itself; "components/trusted-actions" inside rosa-boundary.
+  - name: RTA_CONFIG_FILE
+    default: "config/ci.yaml"
+    documentation: |-
+      Server configuration, from the repository under test. It carries the
+      role mappings, which are required when auth is enabled, and the
+      namespace allowlist every target the suite names must appear in.
+  - name: RTA_LOG_LEVEL
+    default: "debug"
+    documentation: |-
+      Server log level. Debug by default because the API does not expose why
+      an execution failed, which makes the archived server log the only
+      diagnosis a red test has.
+  - name: ENABLE_AWS_WRITES
+    default: "false"
+    documentation: |-
+      Whether the server is configured to permit AWS mutations. False leaves
+      ROSA_TA_AWS_ALLOWED_OPERATIONS unset, so a write is refused by policy
+      however the suite is filtered.
+  - name: AWS_ALLOWED_OPERATIONS
+    default: "reboot"
+    documentation: |-
+      Which mutations are permitted when ENABLE_AWS_WRITES is true, passed as
+      ROSA_TA_AWS_ALLOWED_OPERATIONS: a comma-separated list of "reboot" and
+      "terminate".
+  - name: TEST_FILTER
+    default: ""
+    documentation: |-
+      Go test -run pattern, for targeting one action or one group of them in
+      an on-demand run.
+  - name: TEST_TIMEOUT
+    default: "30m"
+    documentation: Go test timeout for the suite.
+  - name: REGION
+    default: ""
+    documentation: |-
+      AWS region the cluster was provisioned in; empty means the lease. It
+      becomes the server's region allowlist, which has no default and no
+      permissive mode.
+  documentation: |-
+    Runs the ROSA Trusted Actions end-to-end suite (tests/e2e, build tag
+    `e2e`) against a provisioned ROSA cluster.
+
+    The suite drives the server's HTTP API rather than calling actions
+    in-process, so a run covers the whole path a caller takes: JWT
+    authentication, the AMS access review, the per-action role allowlist, the
+    worker pipeline, a real backplane session, and the action itself against a
+    real cluster. The server is built from the source under test and started
+    by this step.
+
+    Credentials boundary: the step discards the cluster-admin kubeconfig left
+    behind by provisioning, along with any ambient KUBECONFIG, and configures
+    RTA only with its own service-account credentials from GSM. The fixtures
+    the writing actions need are created by
+    rosa-trusted-actions-seed-fixtures, which holds that kubeconfig instead.
+
+    Emits JUnit XML and JSON into ARTIFACT_DIR for Spyglass and Sippy, plus
+    the server log.
