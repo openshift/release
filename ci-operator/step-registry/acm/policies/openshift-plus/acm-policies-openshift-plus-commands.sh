@@ -12,14 +12,6 @@ if [[ ! "${POLICY_COLLECTION_REF}" =~ ^[0-9a-f]{40}$ ]]; then
   echo "ERROR: POLICY_COLLECTION_REF must be a 40-char SHA, got '${POLICY_COLLECTION_REF}'" >&2
   exit 1
 fi
-# Single-channel assertion guard: fail closed if more than one ref is resolved
-typeset -i _pc_ref_count
-_pc_ref_count=$(git ls-remote https://github.com/stolostron/policy-collection.git "${POLICY_COLLECTION_REF}" 2>/dev/null | wc -l)
-if (( _pc_ref_count > 1 )); then
-  echo "ERROR: POLICY_COLLECTION_REF '${POLICY_COLLECTION_REF}' matches ${_pc_ref_count} refs (expected 0 or 1 for SHA); failing closed" >&2
-  exit 1
-fi
-
 cd /tmp/
 git clone https://github.com/stolostron/policy-collection.git
 cd policy-collection
@@ -78,7 +70,49 @@ fi
 sed -i '/local-cluster.*NotIn/d' \
   ../policygenerator/policy-sets/stable/openshift-plus/input/clusters-placement.yaml
 
-echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -b "${POLICY_COLLECTION_REF}" -a openshift-plus
+# Deploy with a real branch and pin the immutable commit via the Subscription annotation.
+# deploy.sh -b sets apps.open-cluster-management.io/git-branch (branch name only); ACM
+# fetches a commit via apps.open-cluster-management.io/git-desired-commit. Using the SHA
+# as git-branch would make ACM look for refs/heads/<SHA> which does not exist.
+# Generate manifests, patch in the desired commit and a clone depth that can reach it
+# even after the branch advances, then apply. See
+# https://github.com/stolostron/multicloud-operators-subscription/blob/main/docs/gitrepo_subscription.md#subscribing-to-a-specific-commit
+typeset _pc_branch="main"
+echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -b "${_pc_branch}" -a openshift-plus --dry-run >/dev/null
+python3 <<PY
+import os, pathlib, re, sys
+ref = os.environ.get("POLICY_COLLECTION_REF", "")
+if not ref:
+    print("ERROR: POLICY_COLLECTION_REF not set for manifest patch", file=sys.stderr)
+    sys.exit(1)
+p = pathlib.Path("manifests.yaml")
+if not p.is_file():
+    print("ERROR: manifests.yaml not found after deploy.sh --dry-run", file=sys.stderr)
+    sys.exit(1)
+txt = p.read_text()
+m = re.search(r"\n(\s+)apps.open-cluster-management.io/git-branch:", txt)
+if not m:
+    print("ERROR: git-branch annotation not found in manifests.yaml", file=sys.stderr)
+    sys.exit(1)
+indent = m.group(1)
+if "apps.open-cluster-management.io/git-desired-commit" not in txt:
+    txt = txt.replace(
+        f"\n{indent}apps.open-cluster-management.io/git-branch:",
+        f"\n{indent}apps.open-cluster-management.io/git-desired-commit: {ref}\n{indent}apps.open-cluster-management.io/git-clone-depth: \"100\"\n{indent}apps.open-cluster-management.io/git-branch:"
+    )
+else:
+    txt = re.sub(r"apps.open-cluster-management.io/git-desired-commit:.*", f"apps.open-cluster-management.io/git-desired-commit: {ref}", txt)
+    if "apps.open-cluster-management.io/git-clone-depth" not in txt:
+        txt = txt.replace(
+            f"\n{indent}apps.open-cluster-management.io/git-branch:",
+            f"\n{indent}apps.open-cluster-management.io/git-clone-depth: \"100\"\n{indent}apps.open-cluster-management.io/git-branch:"
+        )
+p.write_text(txt)
+PY
+# Ensure target namespace exists (deploy.sh skips this in --dry-run)
+kubectl get ns policies >/dev/null 2>&1 || kubectl create ns policies
+kubectl apply -f manifests.yaml
+rm -f manifests.yaml
 
 # openshift-plus generates ~25 policies; require 4+ before oc wait to avoid
 # racing the GitOps Subscription propagation (stolostron/policy-collection#174)
