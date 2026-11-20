@@ -544,8 +544,10 @@ function SettleOppOperatorCsvs () {
         if (( stableCount == ${#settleOpsArr[@]} )); then
             elapsed=$(( window - (deadline - SECONDS) ))
             : "Operator CSVs stable after ${elapsed}s of the ${window}s settle window"
-            # PRRT_kwDOBHvUUM65Mrko: verify operator pods Ready before ending settle
-            if ! oc get pods -n "${ACS_NAMESPACE}" -l app.kubernetes.io/name=rhacs-operator --field-selector=status.phase=Running 2>/dev/null | grep -q Running; then
+            # PRRT_kwDOBHvUUM65Mrko: wait for operator pods Ready (not just phase Running) — L-1: no oc wait inside polling loop, use oc get + jsonpath
+            typeset _podReady=""
+            _podReady=$(oc get pods -n "${ACS_NAMESPACE}" -l app.kubernetes.io/name=rhacs-operator -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
+            if [[ "${_podReady}" != *"True"* ]]; then
                 echo "Operator pods not yet Ready, continuing settle" >&2
                 continue
             fi
