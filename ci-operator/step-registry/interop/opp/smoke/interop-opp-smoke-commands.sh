@@ -572,7 +572,8 @@ TestQuayPull() {
             quayEndpoint="${qrEndpoint2}"
         fi
         if ! qrCount="$(printf '%s' "${qrJson2}" | jq '.items | length')"; then
-            if ! grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/qr.err"; then
+            # PRRT_kwDOBHvUUM65RJop: align error file with second read (qr2.err holds second query's stderr)
+            if ! grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/qr2.err"; then
                 AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources"
                 return
             fi
