@@ -268,6 +268,7 @@ print(len(json.load(sys.stdin).get('items',[])))
 
     QUAY_NS="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['namespace'])")"
     QUAY_REGISTRY="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['name'])")"
+    QUAY_UID="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['uid'])")"
 
     QUAY_HOST="$(oc get quayregistry -n "${QUAY_NS}" "${QUAY_REGISTRY}" -o jsonpath='{.status.registryEndpoint}')"
     QUAY_HOST="${QUAY_HOST#https://}"
@@ -277,7 +278,7 @@ print(len(json.load(sys.stdin).get('items',[])))
         # not deployed), so the caller fails instead of reporting a skip.
         return 2
     fi
-    export QUAY_NS QUAY_REGISTRY QUAY_HOST
+    export QUAY_NS QUAY_REGISTRY QUAY_HOST QUAY_UID
     true
 }
 
@@ -695,10 +696,16 @@ function RunPushPull () {
     # still pass.  Copy the image into a local dir transport instead.
     typeset pullDir='/tmp/quay-pull-verify'
     rm -rf "${pullDir}"
+    typeset pushTargetDigest="${pushTarget%%:*}@${imageDigest}"
+    if [[ "${pushTarget}" == *":"* && "${pushTarget}" != *":/"* ]]; then
+        pushTargetDigest="${pushTarget%%:*}@${imageDigest}"
+    else
+        pushTargetDigest="${pushTarget}@${imageDigest}"
+    fi
     if ! SSL_CERT_FILE="${quayCaFile}" skopeo copy --src-tls-verify=true \
         --src-authfile="${authFile}" \
         # PRRT_kwDOBHvUUM65TpNJ: pull digest not tag to avoid TOCTOU
-        "docker://${pushTarget}@${imageDigest}" \
+        "docker://${pushTargetDigest}" \
         "dir:${pullDir}"; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "Image layers not pullable from Quay after push" "${elapsed}"
@@ -814,8 +821,12 @@ sys.exit(1)
                 (( $(date +%s) >= _claimDeadline )) && break
                 sleep 5
                 typeset -i _obcRetryRc=0
+                typeset -i _claimRemain=$(( _claimDeadline - $(date +%s) ))
+                (( _claimRemain > 0 )) || _claimRemain=1
                 # PRRT_kwDOBHvUUM65ui2G: refreshed OBC list bounded by remaining claim budget
-                obcJson=$(timeout "${claimRemain:-30}s" oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>"${ARTIFACT_DIR:-/tmp}/obc-err.log") || _obcRetryRc=$?
+                if ! obcJson=$(timeout "${_claimRemain}s" oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>"${ARTIFACT_DIR:-/tmp}/obc-err.log"); then
+                    _obcRetryRc=$?
+                fi
                 if (( _obcRetryRc != 0 )); then
                     # obc list query produced an error, do not treat as no-match
                     quayObc=""
@@ -898,7 +909,8 @@ sys.exit(1)
     unboundPvcs=$(printf '%s' "${pvcJson}" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-items = [i for i in data.get('items', []) if any(o.get('uid')==quay_uid for o in i.get('metadata',{}).get('ownerReferences',[]))] # PRRT_kwDOBHvUUM65Mrmi: PVC via ownerReference
+quay_uid = os.environ.get('QUAY_UID', '')
+items = [i for i in data.get('items', []) if any(o.get('uid')==quay_uid for o in i.get('metadata',{}).get('ownerReferences',[]))] # PRRT_kwDOBHvUUM65Mrmi: PVC via ownerReference with QUAY_UID
 unbound = [i['metadata']['name'] for i in items if i.get('status', {}).get('phase') != 'Bound']
 print(' '.join(unbound))
 ") || { elapsed=$(( $(date +%s) - start )); RecordResult "${testName}" "failed" "PVC filter script error" "${elapsed}"; return 1; }
