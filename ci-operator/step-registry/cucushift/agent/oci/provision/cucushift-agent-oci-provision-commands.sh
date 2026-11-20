@@ -54,18 +54,18 @@ pushd ${INSTALL_DIR}
 cp -t "${INSTALL_DIR}" "${SHARED_DIR}"/{install-config.yaml,agent-config.yaml}
 
 echo "Installing from initial release $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
-oc adm release extract -a "$pull_secret_path" "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" \
-  --command=openshift-install --to=/tmp
+#oc adm release extract -a "$pull_secret_path" "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" \
+#  --command=openshift-install --to=/tmp
 rm ${pull_secret_path}
-echo "Copying Custom Manifest"
-oci resource-manager job-output-summary list-job-outputs \
---job-id "${JOB_ID}" \
---query "data.items[?\"output-name\"=='dynamic_custom_manifest'].\"output-value\" | [0]" \
---raw-output > "${INSTALL_DIR}"/openshift/custom-manifest.yaml
+#echo "Copying Custom Manifest"
+#oci resource-manager job-output-summary list-job-outputs \
+#--job-id "${JOB_ID}" \
+#--query "data.items[?\"output-name\"=='dynamic_custom_manifest'].\"output-value\" | [0]" \
+#--raw-output > "${INSTALL_DIR}"/openshift/custom-manifest.yaml
 
-if [ "${FIPS_ENABLED:-false}" = "true" ]; then
-    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
-fi
+#if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+#    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+#fi
 
 if [ "${IMAGE_POLICY_DISABLED:-true}" = "true" ]; then
     ### Disable image policy for nightly build
@@ -74,89 +74,90 @@ fi
 grep -v "password\|username\|pullSecret\|httpProxy\|httpsProxy" "${SHARED_DIR}/install-config.yaml" > "${ARTIFACT_DIR}/install-config.yaml" || true
 grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${ARTIFACT_DIR}/agent-config.yaml" || true
 
-/tmp/openshift-install agent create image --dir="${INSTALL_DIR}" --log-level debug
+sleep 4.5h
+#/tmp/openshift-install agent create image --dir="${INSTALL_DIR}" --log-level debug
 
-echo "Copying kubeconfig to the shared directory..."
-cp -t "${SHARED_DIR}" \
-  "${INSTALL_DIR}/auth/kubeadmin-password" \
-  "${INSTALL_DIR}/auth/kubeconfig"
+#echo "Copying kubeconfig to the shared directory..."
+#cp -t "${SHARED_DIR}" \
+#  "${INSTALL_DIR}/auth/kubeadmin-password" \
+#  "${INSTALL_DIR}/auth/kubeconfig"
 
-AGENT_IMAGE="agent.x86_64_${CLUSTER_NAME}.iso"
-mv "${INSTALL_DIR}"/agent.x86_64.iso "${INSTALL_DIR}"/"${AGENT_IMAGE}"
-echo "${AGENT_IMAGE}" > "${SHARED_DIR}"/agent-image.txt
+#AGENT_IMAGE="agent.x86_64_${CLUSTER_NAME}.iso"
+#mv "${INSTALL_DIR}"/agent.x86_64.iso "${INSTALL_DIR}"/"${AGENT_IMAGE}"
+#echo "${AGENT_IMAGE}" > "${SHARED_DIR}"/agent-image.txt
 
-oci os object put -bn "${BUCKET_NAME}" --file "${INSTALL_DIR}"/"${AGENT_IMAGE}" -ns "${NAMESPACE_NAME}"
+#oci os object put -bn "${BUCKET_NAME}" --file "${INSTALL_DIR}"/"${AGENT_IMAGE}" -ns "${NAMESPACE_NAME}"
+#
+#EXPIRE_DATE=$(date -d "+7 days" +"%Y-%m-%d")
+#
+#echo "Creating Pre-auth Request"
+#IMAGE_URI=$(oci os preauth-request create \
+#-bn "${BUCKET_NAME}" \
+#-ns "${NAMESPACE_NAME}" \
+#--access-type ObjectRead \
+#--object-name "${AGENT_IMAGE}" \
+#--name "${CLUSTER_NAME}" \
+#--time-expires "${EXPIRE_DATE}" \
+#--query 'data."full-path"' --raw-output)
+#
+#VARIABLES=$(cat <<EOF
+#{"openshift_image_source_uri":"${IMAGE_URI}",
+#"zone_dns":"${BASE_DOMAIN}",
+#"installation_method":"Agent-based",
+#"control_plane_count":"${MASTERS}",
+#"compute_count":"${WORKERS}",
+#"cluster_name":"${CLUSTER_NAME}",
+#"tenancy_ocid":"${OCI_CLI_TENANCY}",
+#"create_openshift_instances":true,
+#"compartment_ocid":"${COMPARTMENT_ID}",
+#"region":"${OCI_CLI_REGION}",
+#"tag_namespace_name":"openshift-ci-abi",
+#"enable_public_api_lb":true,
+#"use_existing_tags":true,
+#"tag_namespace_compartment_ocid":"${COMPARTMENT_ID}",
+#"tag_namespace_compartment_ocid_resource_tagging":"${OCI_CLI_TENANCY}"}
+#EOF
+#)
+#
+#if [ "${ISCSI:-false}" = "true" ]; then
+#    VARIABLES=$(echo "${VARIABLES}" | jq '. + {control_plane_shape:"BM.Standard2.52",compute_shape:"BM.Standard3.64",rendezvous_ip:"10.0.16.20"}')
+#fi
+#
+#echo "Updating Stack Variables"
+#oci resource-manager stack update \
+#--stack-id "${STACK_ID}" \
+#--variables "${VARIABLES}" \
+#--query 'data.id' --raw-output \
+#--force
+#
+##echo "Creating Apply Job"
+#oci resource-manager job create-apply-job \
+#--stack-id "${STACK_ID}" \
+#--execution-plan-strategy AUTO_APPROVED \
+#--max-wait-seconds 2400 \
+#--wait-for-state SUCCEEDED \
+#--query 'data."lifecycle-state"'
 
-EXPIRE_DATE=$(date -d "+7 days" +"%Y-%m-%d")
-
-echo "Creating Pre-auth Request"
-IMAGE_URI=$(oci os preauth-request create \
--bn "${BUCKET_NAME}" \
--ns "${NAMESPACE_NAME}" \
---access-type ObjectRead \
---object-name "${AGENT_IMAGE}" \
---name "${CLUSTER_NAME}" \
---time-expires "${EXPIRE_DATE}" \
---query 'data."full-path"' --raw-output)
-
-VARIABLES=$(cat <<EOF
-{"openshift_image_source_uri":"${IMAGE_URI}",
-"zone_dns":"${BASE_DOMAIN}",
-"installation_method":"Agent-based",
-"control_plane_count":"${MASTERS}",
-"compute_count":"${WORKERS}",
-"cluster_name":"${CLUSTER_NAME}",
-"tenancy_ocid":"${OCI_CLI_TENANCY}",
-"create_openshift_instances":true,
-"compartment_ocid":"${COMPARTMENT_ID}",
-"region":"${OCI_CLI_REGION}",
-"tag_namespace_name":"openshift-ci-abi",
-"enable_public_api_lb":true,
-"use_existing_tags":true,
-"tag_namespace_compartment_ocid":"${COMPARTMENT_ID}",
-"tag_namespace_compartment_ocid_resource_tagging":"${OCI_CLI_TENANCY}"}
-EOF
-)
-
-if [ "${ISCSI:-false}" = "true" ]; then
-    VARIABLES=$(echo "${VARIABLES}" | jq '. + {control_plane_shape:"BM.Standard2.52",compute_shape:"BM.Standard3.64",rendezvous_ip:"10.0.16.20"}')
-fi
-
-echo "Updating Stack Variables"
-oci resource-manager stack update \
---stack-id "${STACK_ID}" \
---variables "${VARIABLES}" \
---query 'data.id' --raw-output \
---force
-
-echo "Creating Apply Job"
-oci resource-manager job create-apply-job \
---stack-id "${STACK_ID}" \
---execution-plan-strategy AUTO_APPROVED \
---max-wait-seconds 2400 \
---wait-for-state SUCCEEDED \
---query 'data."lifecycle-state"'
-
-## Monitor for `bootstrap-complete`
-echo "$(date -u --rfc-3339=seconds) - Monitoring for bootstrap to complete"
-/tmp/openshift-install --dir="${INSTALL_DIR}" agent wait-for bootstrap-complete &
-
-if ! wait $!; then
-  echo "ERROR: Bootstrap failed. Aborting execution."
-  exit 1
-fi
-
-## Monitor for cluster completion
-echo "$(date -u --rfc-3339=seconds) - Monitoring for cluster completion..."
-
-# When using line-buffering there is a potential issue that the buffer is not filled (or no new line) and this waits forever
-# or in our case until the four hour CI timer is up.
-/tmp/openshift-install --dir="${INSTALL_DIR}" agent wait-for install-complete --log-level=debug 2>&1 | stdbuf -o0 grep -v password &
-
-if ! wait "$!"; then
-  echo "ERROR: Installation failed. Aborting execution."
-  exit 1
-fi
-
-echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
-oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m
+### Monitor for `bootstrap-complete`
+#echo "$(date -u --rfc-3339=seconds) - Monitoring for bootstrap to complete"
+#/tmp/openshift-install --dir="${INSTALL_DIR}" agent wait-for bootstrap-complete &
+#
+#if ! wait $!; then
+#  echo "ERROR: Bootstrap failed. Aborting execution."
+#  exit 1
+#fi
+#
+### Monitor for cluster completion
+#echo "$(date -u --rfc-3339=seconds) - Monitoring for cluster completion..."
+#
+## When using line-buffering there is a potential issue that the buffer is not filled (or no new line) and this waits forever
+## or in our case until the four hour CI timer is up.
+#/tmp/openshift-install --dir="${INSTALL_DIR}" agent wait-for install-complete --log-level=debug 2>&1 | stdbuf -o0 grep -v password &
+#
+#if ! wait "$!"; then
+#  echo "ERROR: Installation failed. Aborting execution."
+#  exit 1
+#fi
+#
+#echo "Ensure that all the cluster operators remain stable and ready until OCPBUGS-18658 is fixed."
+#oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=60m

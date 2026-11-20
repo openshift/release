@@ -150,6 +150,8 @@ cp -t "${dir}" "${SHARED_DIR}"/nodes-config.yaml
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
+sleep 3h
+
 oc adm node-image create --dir="${dir}" --insecure=true
 
 echo "node_${folder_name}.iso" >"${SHARED_DIR}"/node-iso.txt
