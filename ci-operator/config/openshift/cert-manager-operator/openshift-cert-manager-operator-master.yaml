@@ -502,6 +502,33 @@ tests:
     - ref: tls-scanner-run
     workflow: optional-operators-ci-operator-sdk-aws
 - always_run: false
+  as: tls-compliance-scan
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+      SCAN_NAMESPACES: cert-manager-operator,cert-manager
+      SCANNER_CPU_LIMIT: "4"
+      SCANNER_CPU_REQUEST: 500m
+      SCANNER_MEM_LIMIT: 4Gi
+      SCANNER_MEM_REQUEST: 1Gi
+    test:
+    - as: deploy-operand
+      cli: latest
+      commands: make deploy-trust-manager --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: tls-13
+    - ref: tls-compliance-run
+    workflow: optional-operators-ci-operator-sdk-aws
+- always_run: false
   as: tls-pqc-readiness
   optional: true
   steps:

@@ -1,0 +1,114 @@
+ref:
+  as: tls-compliance-run
+  from: cli
+  cli: latest
+  commands: tls-compliance-run-commands.sh
+  env:
+    - name: SCAN_NAMESPACES
+      default: ""
+      documentation: |-
+        Comma-separated list of namespaces to scan. Empty scans all namespaces.
+        Passed to the operator as --include-namespaces, which also scopes the
+        exported report and the pass/fail verdict to those namespaces.
+    - name: SCAN_ALL_PORTS
+      default: "false"
+      documentation: |-
+        When "true", scan every declared TCP container port on pods and services
+        instead of only the ports known to serve TLS (--scan-all-ports). This is
+        the closest equivalent to tls-scanner's --all-pods behavior.
+    - name: REQUIRE_PQC
+      default: "false"
+      documentation: |-
+        When "true", the report's verdict requires every scannable endpoint to be
+        PQCReady (TLS 1.3 with hybrid ML-KEM key exchange) instead of general TLS
+        compliance (--require-pqc). Endpoints that cannot be scanned are skipped
+        and counted, not failed.
+    - name: EXPECTED_GROUPS
+      default: ""
+      documentation: |-
+        Comma-separated TLS named groups/curves every endpoint must offer, e.g.
+        X25519MLKEM768,x25519 (--expected-groups). Independent of REQUIRE_PQC.
+        Whitespace is stripped.
+    - name: EXPECTED_GROUPS_MODE
+      default: "contains"
+      documentation: |-
+        How EXPECTED_GROUPS is evaluated: contains (required subset) or exact
+        (observed set must equal the expected set). Passed through as
+        --expected-groups-mode. Only read when EXPECTED_GROUPS is set.
+    - name: FAIL_ON_GROUP_MISMATCH
+      default: "false"
+      documentation: |-
+        When "true", a group mismatch marks the endpoint as a failing testcase in
+        the report (--fail-on-group-mismatch). Requires EXPECTED_GROUPS. Like every
+        other finding, this does not fail the Prow job; see the ref documentation.
+    - name: SCANNER_NAMESPACE
+      default: "tls-compliance-scan"
+      documentation: |-
+        Namespace the scan Job is created in. Must be tls-compliance-scan or
+        tls-compliance-scan-<suffix>; the step creates it and deletes it, along
+        with any CRDs it installed, on exit.
+    - name: SCANNER_CPU_REQUEST
+      default: "500m"
+      documentation: "CPU request for the scan container."
+    - name: SCANNER_CPU_LIMIT
+      default: "4"
+      documentation: "CPU limit for the scan container."
+    - name: SCANNER_MEM_REQUEST
+      default: "1Gi"
+      documentation: "Memory request for the scan container."
+    - name: SCANNER_MEM_LIMIT
+      default: "4Gi"
+      documentation: "Memory limit for the scan container."
+    - name: SCAN_TIMEOUT_SECONDS
+      default: "1800"
+      documentation: |-
+        Upper bound on how long the step waits for the scan container to finish.
+        Capped at 3000 so the report can still be collected inside the ref's 1h
+        timeout. A scan that hits this bound fails the step, whereas scan findings
+        do not.
+    - name: KEEPER_IMAGE
+      default: "registry.access.redhat.com/ubi9/ubi-minimal:latest"
+      documentation: |-
+        Sidecar that keeps the scan pod alive after the scan container exits so
+        the report can be read out of the shared emptyDir. Override for
+        disconnected clusters that cannot pull from registry.access.redhat.com.
+    - name: TLS_COMPLIANCE_OPERATOR_IMAGE
+      default: "quay.io/bapalm/tls-compliance-operator@sha256:b4f2602bf37decd4dbdbc1b195f440b4c11a0c7c734f9ea5ac2a67290ac1241b"
+      documentation: |-
+        Operator image the scan Job runs, pinned to the v1.2.0 multi-arch digest
+        so a moved tag cannot substitute different code for the cluster-admin
+        scan. The scan pod pulls it directly, so no base_images entry is required;
+        override it with another digest, or a mirrored copy for disconnected
+        clusters. Keep it in sync with TLS_COMPLIANCE_MANIFEST_REF.
+    - name: TLS_COMPLIANCE_MANIFEST_REF
+      default: "v1.2.0"
+      documentation: |-
+        Git tag of github.com/sebrandon1/tls-compliance-operator whose CRDs are
+        installed before the scan. Keep this in sync with
+        TLS_COMPLIANCE_OPERATOR_IMAGE.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 1h0m0s
+  grace_period: 5m0s
+  documentation: |-
+    Runs a single TLS compliance scan of the cluster with the tls-compliance-operator
+    (--run-once) and publishes the per-endpoint JUnit report to Spyglass.
+
+    The step installs the operator's CRDs and creates a disposable namespace whose
+    default service account is granted cluster-admin, so the operator can list
+    endpoints and workloads cluster-wide. It then runs the scan as a one-shot Job,
+    copies the JUnit report to ARTIFACT_DIR as junit_tls_compliance_scan.xml, and
+    tears everything down.
+
+    Findings are informational: a non-compliant endpoint is rendered as a failing
+    testcase in the report, but the step still exits 0 so the job does not gate
+    merges. Only a scan that cannot run at all (operator exit code 2, timeout, or an
+    unreadable report) fails the step. The operator's own exit code is echoed in the
+    build log, written to ARTIFACT_DIR/tls-compliance/summary.txt, and stored in
+    ${SHARED_DIR}/tls-compliance-exit-code for later steps.
+
+    The scan pod pulls the operator image straight from quay.io, so the consuming
+    config does not need a base_images entry. Point TLS_COMPLIANCE_OPERATOR_IMAGE
+    at a mirrored copy for disconnected clusters.
