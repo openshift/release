@@ -1,26 +1,24 @@
 postsubmits:
-  openshift-priv/loki:
+  openshift-priv/loki-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^upstream-v3\.6\.12$
-    cluster: build12
+    - ^release-6\.7$
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
       sparse_checkout_files:
-      - Dockerfile.ocp
-      - Dockerfile.promtail.ocp
+      - Dockerfile
+      - passthrough-gateway.Dockerfile
     hidden: true
     labels:
-      capability/arm64: arm64
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-priv-loki-upstream-v3.6.12-images
-    path_alias: github.com/openshift/loki
+    name: branch-ci-openshift-priv-loki-operator-release-6.7-images
+    path_alias: github.com/openshift/loki-operator
     spec:
       containers:
       - args:
@@ -31,6 +29,7 @@ postsubmits:
         - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=loki-operator-bundle
         command:
         - ci-operator
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
