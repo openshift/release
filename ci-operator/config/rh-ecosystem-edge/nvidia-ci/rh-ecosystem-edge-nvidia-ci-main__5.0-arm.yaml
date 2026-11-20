@@ -1,0 +1,64 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 2000m
+      memory: 2Gi
+tests:
+- always_run: false
+  as: e2e-aws-arm-check
+  steps:
+    cluster_profile: aws-edge-infra
+    env:
+      BASE_DOMAIN: edge-sro.rhecoeng.com
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      OCP_ARCH: arm64
+    test:
+    - as: verify-arm-rhcos10
+      cli: latest
+      commands: |
+        # Cluster-only baseline for the ovs-doca el10/arm plan on OCP 5.0:
+        # verify every node is arm64 running RHCOS 10. Unlike 4.21/4.22,
+        # RHCOS 10 is the DEFAULT node OS in 5.0 -- no osImageStream install
+        # parameter and no TechPreviewNoUpgrade feature gate are needed.
+        # Counts only -- node names are never printed
+        # (No-Sensitive-Data-In-Logs). All oc calls are wrapped in timeout so
+        # a hung API connection can never wedge the whole job (prow's default
+        # timeout is 24h).
+        set -o pipefail
+        echo "Node arch | osImage (counts):"
+        timeout 300 oc get nodes -o jsonpath='{range .items[*]}{.status.nodeInfo.architecture}{" | "}{.status.nodeInfo.osImage}{"\n"}{end}' | sort | uniq -c
+        BAD=$(timeout 300 oc get nodes -o jsonpath='{range .items[*]}{.status.nodeInfo.architecture}{": "}{.status.nodeInfo.osImage}{"\n"}{end}' | grep -vcE '^arm64: Red Hat Enterprise Linux CoreOS 10' || true)
+        if [ "${BAD}" -eq 0 ]; then
+          echo "PASS: all nodes are arm64 running RHCOS 10"
+        else
+          echo "FAIL: ${BAD} node(s) not arm64/RHCOS 10 -- see breakdown above"
+          exit 1
+        fi
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: rh-ecosystem-edge
+  repo: nvidia-ci
+  variant: 5.0-arm
