@@ -78,9 +78,11 @@ if [ "${DISABLE_INSIGHTS}" = "true" ]; then
   EXTRA_VARS="${EXTRA_VARS} disable_insights=true"
 fi
 
+# Inventory preserves PEM newlines; extra-var precedence overrides the legacy certificate formatter.
 ansible-playbook ./playbooks/deploy-ocp-sno.yml \
   -i ./inventories/ocp-deployment/build-inventory.py \
-  --extra-vars "${EXTRA_VARS}"
+  --extra-vars "${EXTRA_VARS}" \
+  --extra-vars '{"disconnected_registry_cert_formatted":"{{ disconnected_registry_cert }}"}'
 
 # Write target hub inventory to SHARED_DIR (used by downstream steps).
 # host_vars are copied flat — no prefix, as these are the "primary" hub files.
