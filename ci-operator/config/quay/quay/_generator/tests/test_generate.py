@@ -144,6 +144,18 @@ def test_e2e_install_template_inverts_full_default_filter() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("ocp_version", "sts", "expected"),
+    [("4.12", True, "false"), ("4.13", True, "false"), ("4.14", True, None), ("4.13", False, None)],
+)
+def test_aws_sts_skips_included_manifest_extract_before_ocp_414(
+    ocp_version: str, sts: bool, expected: str | None
+) -> None:
+    env = jinja_env(GENERATOR_DIR / "templates")
+    rendered = render_template(env, "clouds/aws.yaml.j2", _phase0_cell(ocp_version=ocp_version, sts=sts).context())
+    assert rendered["tests"][0]["steps"]["env"].get("EXTRACT_MANIFEST_INCLUDED") == expected
+
+
 def test_presubmit_test_layer_inherits_periodic_defaults() -> None:
     presubmit_cell = _phase0_cell(
         branch="master",
@@ -196,6 +208,24 @@ def test_kind_settings_periodic_passes_through_resolved_cron() -> None:
         _phase0_cell(cron="17 3 * * 1"),
     )
     assert custom["tests"][0]["cron"] == "17 3 * * 1"
+
+
+def test_kind_settings_downstream_periodic_reports_failures_to_slack() -> None:
+    downstream = apply_kind_settings({"tests": [{"steps": {}}]}, _phase0_cell())
+    reporter = downstream["tests"][0]["reporter_config"]
+    assert reporter["channel"] == "#team-quay-downstream-interruptions"
+    assert reporter["job_states_to_report"] == ["failure", "error"]
+    assert "{{.Status.URL}}" in reporter["report_template"]
+
+    upstream = apply_kind_settings(
+        {"tests": [{"steps": {}}]}, _phase0_cell(branch="master", quay_version=None)
+    )
+    assert "reporter_config" not in upstream["tests"][0]
+
+    presubmit = apply_kind_settings(
+        {"tests": [{"steps": {}}]}, _phase0_cell(kind="presubmit", cron=None)
+    )
+    assert "reporter_config" not in presubmit["tests"][0]
 
 
 def test_cron_alias_resolves_to_interval() -> None:
@@ -263,7 +293,13 @@ def test_kind_settings_presubmit_leaves_unset_trigger_fields_absent() -> None:
         _phase0_cell(test="api-test", kind="presubmit", cron=None, as_name=None),
     )
     test = presubmit["tests"][0]
-    for field_name in ("always_run", "optional", "run_if_changed", "skip_if_only_changed"):
+    for field_name in (
+        "always_run",
+        "optional",
+        "run_if_changed",
+        "skip_if_only_changed",
+        "pipeline_run_if_changed",
+    ):
         assert field_name not in test
 
 
@@ -350,6 +386,31 @@ def test_redhat_318_libvirt_s390x_cell() -> None:
     post_refs = [step.get("ref") or step.get("chain") for step in test["steps"]["post"]]
     assert post_refs[-1] == "upi-libvirt-cleanup-post"
     assert "ipi-aws-post" not in post_refs
+
+
+def test_redhat_50_aws_metal_cell() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    filename = "quay-quay-redhat-5.0__aws-metal-ocp50-e2e-install.yaml"
+    assert filename in by_name
+    config = by_name[filename]
+    test = config["tests"][0]
+    # Naming derives from the cloud key: variant and as carry the aws-metal token.
+    assert test["as"] == "aws-metal-s3-nightly"
+    assert test["cron"] == "@weekly"
+    steps = test["steps"]
+    assert steps["cluster_profile"] == "aws-quay-qe"
+    assert steps["workflow"] == "ipi-aws"
+    # The only metal-specific input: full physical hosts as workers.
+    assert steps["env"]["COMPUTE_NODE_TYPE"] == "c5.metal"
+    assert steps["env"]["BASE_DOMAIN"] == "quayqe.devcluster.openshift.com"
+    # Like every other ipi-aws cell in this fleet, the lane installs via STS.
+    assert steps["pre"][0] == {"chain": "ipi-aws-pre-manual-oidc-sts"}
+    assert {"chain": "ipi-aws-post-manual-oidc-sts"} in steps["post"]
+    test_refs = [step["ref"] for step in steps["test"] if "ref" in step]
+    assert "quay-deploy-aws-s3" in test_refs
+    # No Equinix machinery on this lane.
+    assert "dev-scripts" not in config.get("base_images", {})
 
 
 def test_upgrade_requires_upgrade_from() -> None:
@@ -446,7 +507,6 @@ def test_upgrade_edge_is_derived_from_versions() -> None:
     env = config["tests"][0]["steps"]["env"]
     assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == "stable-3.16"
     assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == "stable-3.18"
-    assert env["PLAYWRIGHT_N_GIT_BRANCH"] == "redhat-3.18"
     assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == "redhat-3.16"
 
 
@@ -533,8 +593,13 @@ def test_redhat_318_aws_upgrade_cell() -> None:
     assert "QUAY_OPERATOR_CHANNEL" not in env
     assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == "stable-3.17"
     assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == "stable-3.18"
-    assert env["PLAYWRIGHT_N_GIT_BRANCH"] == "redhat-3.18"
+    # Seed and verify run branch tips; functional runs the n image's commit label.
     assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == "redhat-3.17"
+    assert env["PLAYWRIGHT_N_VERIFY_GIT_BRANCH"] == "redhat-3.18"
+    assert "PLAYWRIGHT_N_GIT_BRANCH" not in env
+    assert env["PLAYWRIGHT_REF_MODE"] == "strict"
+    # The chains default the guard to "true", which fails any phase without a branch.
+    assert env["PLAYWRIGHT_REQUIRE_EXPLICIT_REF"] == "false"
     assert env["PLAYWRIGHT_WORKERS"] == "4"
     assert env["QUAYNAMESPACE"] == "quay"
     # ART FBC env still comes from the nightly source layer.
@@ -604,6 +669,22 @@ def test_e2e_legacy_runs_cypress_smoke_without_playwright() -> None:
     ]
     post = [step.get("ref") or step.get("chain") for step in steps["post"]]
     assert post == ["quay-gather-jaeger-traces", "quay-gather", "quay-deprovision", "ipi-aws-post-manual-oidc-sts"]
+
+
+@pytest.mark.parametrize(("quay", "ocp"), [("3.14", "4.19"), ("3.12", "4.17"), ("3.10", "4.15"), ("3.9", "4.14")])
+def test_e2e_legacy_eus_streams(quay: str, ocp: str) -> None:
+    results, _retired = generate_all()
+    name = f"quay-quay-redhat-{quay}__aws-ocp{ocp.replace('.', '')}-e2e-legacy.yaml"
+    config = {filename: cfg for _group, filename, cfg in results}[name]
+    assert "images" not in config
+    assert config["releases"]["latest"]["candidate"]["version"] == ocp
+    (test,) = config["tests"]
+    assert test["as"] == "aws-s3"
+    assert test["cron"] == "@daily"
+    env = test["steps"]["env"]
+    assert env["QUAY_VERSION"] == quay
+    assert env["QUAY_OPERATOR_CHANNEL"] == f"stable-{quay}"
+    assert env["QUAY_OPERATOR_SOURCE"] == "redhat-operators"
 
 
 def test_master_presubmit_expands_all_clouds() -> None:
@@ -1216,6 +1297,21 @@ def test_presubmit_rejects_always_run_true_with_filter() -> None:
         expand_cells(matrix)
 
 
+def test_kind_settings_presubmit_copies_pipeline_run_if_changed() -> None:
+    presubmit = apply_kind_settings(
+        {"tests": [{"steps": {}}]},
+        _phase0_cell(
+            test="api-test",
+            kind="presubmit",
+            cron=None,
+            as_name=None,
+            always_run=False,
+            pipeline_run_if_changed="^requirements\\.txt$",
+        ),
+    )
+    assert presubmit["tests"][0]["pipeline_run_if_changed"] == "^requirements\\.txt$"
+
+
 def test_layout_must_be_variant_or_base() -> None:
     matrix = _matrix_with_job(
         {"cron": "daily", "clouds": ["aws"], "ocp": ["4.22"], "test": "e2e-install"},
@@ -1618,6 +1714,52 @@ def test_sts_rejected_without_aws() -> None:
     )
     with pytest.raises(ValueError, match="sts is only valid when clouds include aws"):
         expand_cells(matrix)
+
+
+def test_redhat_318_aws_ocp50_dualstack_shares_aws_file() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    tests = {
+        test["as"]: test
+        for test in by_name["quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml"]["tests"]
+    }
+
+    dualstack = tests["aws-s3-nightly-dualstack"]
+    assert dualstack["cron"] == "@weekly"
+    assert dualstack["steps"]["env"]["IP_FAMILY"] == "DualStackIPv6Primary"
+    extra = dualstack["steps"]["env"]["QUAY_EXTRA_CONFIG"].splitlines()
+    assert "FEATURE_LISTEN_IP_VERSION: dual-stack" in extra
+    steps = dualstack["steps"]["test"]
+    deploy = steps.index({"ref": "quay-deploy-aws-s3"})
+    assert steps[deploy + 1] == {"ref": "quay-check-dualstack"}
+    assert steps[:deploy + 1] + steps[deploy + 2:] == tests["aws-s3-nightly"]["steps"]["test"]
+
+    plain = tests["aws-s3-nightly"]["steps"]
+    assert "IP_FAMILY" not in plain["env"]
+    assert "FEATURE_LISTEN_IP_VERSION" not in plain["env"]["QUAY_EXTRA_CONFIG"]
+
+
+def test_dualstack_only_on_aws_periodic() -> None:
+    job = {
+        "cron": "daily",
+        "source": "nightly",
+        "clouds": ["gcp"],
+        "ocp": ["5.0"],
+        "test": "e2e-install",
+        "dualstack": True,
+    }
+    with pytest.raises(ValueError, match="dualstack is only valid for clouds"):
+        expand_cells(_matrix_with_job(job))
+    presubmit = {"kind": "presubmit", "clouds": ["aws"], "ocp": ["4.22"], "test": "e2e-install"}
+    matrix = _matrix_with_job(
+        {**presubmit, "dualstack": True},
+        release_overrides={"branch": "master", "layout": "base"},
+    )
+    with pytest.raises(ValueError, match="dualstack is only valid for kind: periodic"):
+        expand_cells(matrix)
+    upgrade = {**job, "clouds": ["aws"], "test": "upgrade", "upgrade_from": "3.17"}
+    with pytest.raises(ValueError, match="dualstack is not supported for test: upgrade"):
+        expand_cells(_matrix_with_job(upgrade))
 
 
 def test_storage_odf_allowed_only_on_aws() -> None:

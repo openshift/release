@@ -185,12 +185,46 @@ if [[ ! "${HC_INFRA_ID}" =~ ^ci[0-9a-f]{11}$ ]]; then
 fi
 
 if [[ "${DNS_CLEANUP_FAILED}" == "false" ]]; then
-  echo "Cleaning up DNS records for infrastructure ID ${HC_INFRA_ID}..."
   HOSTED_CLUSTER_NAME="gcp-hc-${HC_INFRA_ID: -8}"
+
+  # Multi-cluster e2e-v2 guests are named <variant>-<hash> (e.g. default-ab4aff6679)
+  # by create-guests, so their DNS records match neither the infrastructure ID nor
+  # the legacy gcp-hc-<suffix> name. The manifest is written before provisioning,
+  # so this also covers guests that only partially came up.
+  DNS_FILTER="${HC_INFRA_ID}|${HOSTED_CLUSTER_NAME}"
+  if [[ -s "${SHARED_DIR}/cluster-manifests.json" ]]; then
+    # Capture before the loop: a process substitution would hide jq's exit status, so a
+    # malformed manifest would silently drop the guest names and leak their DNS records.
+    # The shape check matters too: a bare '.clusters[]?.name' exits 0 with no output when
+    # .clusters is missing or not an array, or when an entry has no name, which would skip
+    # the guest names without tripping the failure branch below.
+    if ! guest_names=$(jq -r '
+      if (.clusters | type) != "array" then
+        error(".clusters must be an array")
+      elif any(.clusters[]; (.name? | if type != "string" then true else length == 0 end)) then
+        error("every cluster must have a non-empty string name")
+      else
+        .clusters[].name
+      end
+    ' "${SHARED_DIR}/cluster-manifests.json"); then
+      echo "ERROR: failed to parse ${SHARED_DIR}/cluster-manifests.json - guest DNS records may be left behind"
+      guest_names=""
+      # Guest names are missing from the filter, so their records survive this cleanup.
+      # Keep going with the rest of it, but report incomplete cleanup at the end.
+      DNS_CLEANUP_FAILED=true
+    fi
+    while IFS= read -r guest_name; do
+      if [[ -n "${guest_name}" ]]; then
+        DNS_FILTER+="|${guest_name}"
+      fi
+    done <<< "${guest_names}"
+  fi
+
+  echo "Cleaning up DNS records for ${DNS_FILTER}..."
   if ! DNS_RECORDS=$(gcloud dns record-sets list \
     --zone="${HYPERSHIFT_GCP_CI_DNS_ZONE}" \
     --project="${HYPERSHIFT_GCP_CI_PROJECT}" \
-    --filter="name ~ '${HC_INFRA_ID}|${HOSTED_CLUSTER_NAME}'" \
+    --filter="name ~ '${DNS_FILTER}'" \
     --format="csv[no-heading](name,type)"); then
     echo "ERROR: Failed to list DNS records - check service account permissions"
     DNS_CLEANUP_FAILED=true
@@ -213,7 +247,7 @@ if [[ "${DNS_CLEANUP_FAILED}" == "false" ]]; then
     done <<< "${DNS_RECORDS}"
   fi
   if [[ "${DNS_RECORDS_FOUND}" == "false" ]]; then
-    echo "No DNS records found for ${HC_INFRA_ID} or ${HOSTED_CLUSTER_NAME}"
+    echo "No DNS records found for ${DNS_FILTER}"
   fi
 else
   echo "Skipping DNS cleanup because the hosted cluster infrastructure ID is unavailable"

@@ -35,10 +35,16 @@ echo "Adding mirror registry CA to cluster trust"
 QE_ADDITIONAL_CA_FILE="/var/run/vault/mirror-registry/client_ca.crt"
 REGISTRY_HOST=$(echo "${MIRROR_PROXY_REGISTRY_QUAY}" | cut -d: -f1)
 
+# The ipi-aws-pre-disconnected chain already creates this configmap (via
+# mirror-images-trust-registry-ca) with the mirror registry host key, so a
+# plain `oc create` fails with "configmaps registry-config already exists".
+# Use a client-side dry-run piped to `oc apply` to merge our keys into the
+# existing configmap instead.
 oc create configmap registry-config \
   --from-file="${REGISTRY_HOST}..5000=${QE_ADDITIONAL_CA_FILE}" \
   --from-file="${REGISTRY_HOST}..6001=${QE_ADDITIONAL_CA_FILE}" \
-  -n openshift-config
+  -n openshift-config \
+  --dry-run=client -o yaml | oc apply -f -
 
 oc patch image.config.openshift.io/cluster \
   --patch '{"spec":{"additionalTrustedCA":{"name":"registry-config"}}}' \

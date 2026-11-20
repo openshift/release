@@ -98,6 +98,38 @@ tests:
     - ref: tls-13
     - ref: tls-scanner-run
     workflow: openshift-e2e-aws-csi-efs
+- as: periodic-tls-groups-scanner-aws-efs
+  cron: 0 6 1,15 * *
+  reporter_config:
+    channel: '#team-ocp-storage-triage'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |
+      ':red_jenkins_circle: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      CLUSTERCSIDRIVER: efs.csi.aws.com
+      EXPECTED_GROUPS: SecP384r1MLKEM1024
+      EXPECTED_GROUPS_MODE: exact
+      FEATURE_SET: TechPreviewNoUpgrade
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: aws-efs-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: openshift-cluster-csi-drivers
+      SCANNER_CPU: "1"
+      SCANNER_MEMORY: 1Gi
+      TLS_GROUPS: SecP384r1MLKEM1024
+      TRUECONDITIONS: AWSEFSDriverControllerServiceControllerAvailable AWSEFSDriverNodeServiceControllerAvailable
+    test:
+    - ref: tls-groups-configure
+    - ref: tls-scanner-run
+    workflow: openshift-e2e-aws-csi-efs
 zz_generated_metadata:
   branch: main
   org: openshift

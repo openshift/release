@@ -11,12 +11,42 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
+combined_ca=""
+# Clean owned CA/extension-auth files even on initialization failure; leave caller paths intact.
+function cleanup() {
+    if [[ -n "${combined_ca:-}" ]]; then
+        rm -f "${combined_ca}"
+    fi
+    if [[ "${REGISTRY_AUTH_FILE:-}" == "${SHARED_DIR}/openshift-tests-registry-auth" || -f "${SHARED_DIR}/mirrored_extension_image" ]]; then
+        rm -f "${SHARED_DIR}/openshift-tests-registry-auth"
+    fi
+    echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"
+}
+trap cleanup EXIT
+
 # Optional shared test-tool environment. Projects that install developer tools
 # in a preceding step can expose them to openshift-tests and its extensions by
 # writing this file into SHARED_DIR.
 if [[ -f "${SHARED_DIR}/cluster-debug-tools.env" ]]; then
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/cluster-debug-tools.env"
+fi
+
+if [[ -f "${SHARED_DIR}/mirrored_extension_image" ]]; then
+    test -s "${SHARED_DIR}/openshift-tests-registry-auth"
+    export REGISTRY_AUTH_FILE="${SHARED_DIR}/openshift-tests-registry-auth"
+fi
+if [[ -z "${SSL_CERT_FILE:-}" && -s "${SHARED_DIR}/additional_trust_bundle" ]]; then
+    # Explicit /tmp placement avoids serializing a CA file when TMPDIR is shared.
+    combined_ca=$(mktemp /tmp/openshift-tests-ca.XXXXXX)
+    if [[ -s /etc/pki/tls/certs/ca-bundle.crt ]]; then
+        cat /etc/pki/tls/certs/ca-bundle.crt "${SHARED_DIR}/additional_trust_bundle" > "${combined_ca}"
+    elif [[ -s /etc/ssl/certs/ca-certificates.crt ]]; then
+        cat /etc/ssl/certs/ca-certificates.crt "${SHARED_DIR}/additional_trust_bundle" > "${combined_ca}"
+    else
+        cp "${SHARED_DIR}/additional_trust_bundle" "${combined_ca}"
+    fi
+    export SSL_CERT_FILE="${combined_ca}"
 fi
 
 echo "Debug artifact generation" > ${ARTIFACT_DIR}/dummy.log
@@ -85,14 +115,6 @@ if [[ -n "${TEST_OCP_CSI_DRIVER_MANIFEST}" ]] && [[ -e "${SHARED_DIR}/${TEST_OCP
 fi
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
-function cleanup() {
-    #echo "Requesting risk analysis for test failures in this job run from sippy:"
-    #openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
-
-    echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"
-}
-trap cleanup EXIT
 
 mkdir -p "${HOME}"
 
@@ -316,6 +338,64 @@ function upgrade() {
         --junit-dir "${ARTIFACT_DIR}/junit" &
     wait "$!" &&
     set +x
+}
+
+# mco_upgrade runs MCO upgrade TCs as explicit pre-upgrade and post-upgrade
+# phases around the standard cluster upgrade driver. The phase labels only
+# select tests; this function owns the ordering and verifies the upgrade
+# completed to a different release image before starting post-upgrade tests.
+function mco_upgrade() {
+    local target_release initial_image upgrade_state upgraded_image desired_image
+    local mco_upgrade_suite="openshift/machine-config-operator/upgrade"
+
+    target_release="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
+    if [[ -f "${SHARED_DIR}/override-upgrade" ]]; then
+        target_release="$(<"${SHARED_DIR}/override-upgrade")"
+        echo "Overriding upgrade target to ${target_release}"
+    fi
+    if [[ -z "${target_release}" ]]; then
+        echo >&2 "No upgrade target was provided"
+        return 1
+    fi
+
+    initial_image="$(oc get clusterversion/version -o jsonpath='{.status.history[0].image}')"
+    if [[ -z "${initial_image}" ]]; then
+        echo >&2 "Could not determine the installed release image before the MCO pre-upgrade phase"
+        return 1
+    fi
+
+    echo "MCO upgrade phase 1/3: run pre-upgrade tests on ${initial_image}"
+    openshift-tests run "${mco_upgrade_suite}" ${TEST_ARGS:-} \
+        --run "MCOUpgrade:Pre" \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/mco-upgrade-pre.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit"
+
+    echo "MCO upgrade phase 2/3: upgrade to ${target_release}"
+    openshift-tests run-upgrade all ${TEST_ARGS:-} \
+        --run "Cluster should remain functional during upgrade" \
+        --to-image "${target_release}" \
+        --options "${TEST_UPGRADE_OPTIONS-}" \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/mco-upgrade-driver.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit"
+
+    upgrade_state="$(oc get clusterversion/version -o jsonpath='{.status.history[0].state}')"
+    upgraded_image="$(oc get clusterversion/version -o jsonpath='{.status.history[0].image}')"
+    desired_image="$(oc get clusterversion/version -o jsonpath='{.status.desired.image}')"
+    if [[ "${upgrade_state}" != "Completed" || -z "${upgraded_image}" || \
+        "${upgraded_image}" == "${initial_image}" || "${upgraded_image}" != "${desired_image}" ]]; then
+        echo >&2 "MCO post-upgrade tests will not run: ClusterVersion did not complete an upgrade from ${initial_image}"
+        oc get clusterversion/version -o yaml
+        return 1
+    fi
+
+    echo "MCO upgrade phase 3/3: run post-upgrade tests on ${upgraded_image}"
+    openshift-tests run "${mco_upgrade_suite}" ${TEST_ARGS:-} \
+        --run "MCOUpgrade:Post" \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/mco-upgrade-post.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit"
 }
 
 # upgrade_conformance runs the upgrade and the parallel tests, and exits with an error if either fails.
@@ -629,6 +709,9 @@ done
 echo "[$(date)] All imagestreams are imported."
 
 case "${TEST_TYPE}" in
+mco-upgrade)
+    mco_upgrade
+    ;;
 upgrade-conformance)
     upgrade_conformance
     ;;

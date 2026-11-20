@@ -9,10 +9,6 @@ ref:
       memory: 8Gi
   timeout: 2h0m0s
   grace_period: 15m0s
-  credentials:
-  - collection: quay-tests
-    group: quay
-    mount_path: /var/run/quay-qe-quay-secret
   env:
   - name: PLAYWRIGHT_USE_IMAGE_TESTS
     default: "false"
@@ -20,6 +16,13 @@ ref:
       When "true", skip cloning PLAYWRIGHT_GIT_REPO and run the Playwright
       suite baked into the quay-playwright-runner image at /app. When
       "false" (default) the suite is cloned at runtime as before.
+  - name: PLAYWRIGHT_BRANDING_E2E
+    default: "0"
+    documentation: |-
+      The seed phase runs only the @upgrade-seed specs (PLAYWRIGHT_GREP), not
+      the suite that carries the @redhat-branding tests, and the n-1 server is
+      a pre-upgrade version. Keep the branding specs off here; the full-suite
+      functional phase runs them after the upgrade.
   - name: PLAYWRIGHT_GIT_REPO
     default: ""
     documentation: |-

@@ -20,16 +20,14 @@ images:
       # ARO-HCP
       COPY /src /opt/app-root/src/github.com/Azure
       WORKDIR /opt/app-root/src/github.com/Azure/ARO-HCP
-      ENV GOFLAGS='-mod=readonly'
+      ENV GOFLAGS='-mod=vendor'
       ENV GOPATH=/opt/app-root
       ENV GOCACHE=/opt/app-root/.cache
       RUN mkdir -p $GOPATH/bin && \
           make install-tools && \
           make -C tooling/image-updater build && \
           make -C tooling/templatize templatize && \
-          make -C tooling/yamlwrap && \
-          make all-tidy && \
-          go work vendor
+          make -C tooling/yamlwrap
       # Ensure all tools are in PATH
       ENV PATH="/usr/local/bin:$GOPATH/bin:$PATH"
       # Ensure all files are writable

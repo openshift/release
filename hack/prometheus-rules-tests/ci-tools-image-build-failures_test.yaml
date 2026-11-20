@@ -1,0 +1,71 @@
+# promtool unit tests for ci-tools-image-build-failures.
+# Only the POSTSUBMIT (branch-ci) ci-tools image builds are alerted, and the rule
+# now fires on SUSTAINED breakage: a failure/error in the last 6h with NO successful
+# build in the last 6h. The branch-ci image builds are flaky from transient infra
+# (CentOS mirror/dnf blips, build-pod scheduling), so a single failure that a later
+# merge clears must NOT page (case 2). Presubmit (pull-ci) builds never fire.
+rule_files:
+  - .rendered-rules.yaml
+
+tests:
+  # 1. Sustained breakage: a failure at t=10m and NO success in 6h -> fires.
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="branch-ci-openshift-ci-tools-main-images", job="prow-controller-manager", state="failure"}'
+        values: '0+0x9 1+0x140'
+    alert_rule_test:
+      - eval_time: 120m
+        alertname: ci-tools-image-build-failures
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job_name: branch-ci-openshift-ci-tools-main-images
+            exp_annotations:
+              ops_color: orange
+              ops_category: ci_platform
+              message: 'No successful ci-tools image postsubmit branch-ci-openshift-ci-tools-main-images build in the last 6h while builds are failing, so the ci-tools images on main are stale. Check <https://prow.ci.openshift.org/?job=branch-ci-openshift-ci-tools-main-images|Deck>.'
+
+  # 2. Transient failure cleared by a later success: fail at t=10m, success at t=70m
+  #    -> a success is within the 6h window -> does NOT fire (the key de-noise).
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="branch-ci-openshift-ci-tools-main-images", job="prow-controller-manager", state="failure"}'
+        values: '0+0x9 1+0x140'
+      - series: 'prowjob_state_transitions{job_name="branch-ci-openshift-ci-tools-main-images", job="prow-controller-manager", state="success"}'
+        values: '0+0x69 1+0x80'
+    alert_rule_test:
+      - eval_time: 120m
+        alertname: ci-tools-image-build-failures
+        exp_alerts: []
+
+  # 3. Resolve: broken (failing, no success) fires; a success at t=200m resolves it.
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="branch-ci-openshift-ci-tools-standalone-main-images", job="prow-controller-manager", state="failure"}'
+        values: '0+0x9 1+0x280'
+      - series: 'prowjob_state_transitions{job_name="branch-ci-openshift-ci-tools-standalone-main-images", job="prow-controller-manager", state="success"}'
+        values: '0+0x199 1+0x90'
+    alert_rule_test:
+      - eval_time: 120m
+        alertname: ci-tools-image-build-failures
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job_name: branch-ci-openshift-ci-tools-standalone-main-images
+            exp_annotations:
+              ops_color: orange
+              ops_category: ci_platform
+              message: 'No successful ci-tools image postsubmit branch-ci-openshift-ci-tools-standalone-main-images build in the last 6h while builds are failing, so the ci-tools images on main are stale. Check <https://prow.ci.openshift.org/?job=branch-ci-openshift-ci-tools-standalone-main-images|Deck>.'
+      - eval_time: 260m
+        alertname: ci-tools-image-build-failures
+        exp_alerts: []
+
+  # 4. Negative: a PRESUBMIT (pull-ci) image build failing must NOT fire this alert.
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="pull-ci-openshift-ci-tools-main-images", job="prow-controller-manager", state="failure"}'
+        values: '0+0x9 1+0x140'
+    alert_rule_test:
+      - eval_time: 120m
+        alertname: ci-tools-image-build-failures
+        exp_alerts: []

@@ -18,6 +18,7 @@ declare -A instance_types=(
 	[arm64]=t4g.large
 )
 
+# Keep versions in ascending order; the last entry is the fallback OS.
 allowed_os=(
 	"rhel-9.2"
 	"rhel-9.3"
@@ -26,6 +27,22 @@ allowed_os=(
 	"rhel-9.8"
 	"rhel-10.2"
 )
+
+: Getting OCP version from release image
+oc registry login -a /tmp/registry.json
+OCP_VERSION=$(oc adm release info -o=jsonpath='{.metadata.version}' -a /tmp/registry.json "${RELEASE_IMAGE_LATEST}" | cut -d. -f1-2)
+rm -f /tmp/registry.json
+
+if [[ -z "${MICROSHIFT_OS:-}" ]]; then
+	case "${OCP_VERSION}" in
+		4.14|4.15) MICROSHIFT_OS="rhel-9.2" ;;
+		4.16|4.17|4.18) MICROSHIFT_OS="rhel-9.4" ;;
+		4.19|4.20|4.21) MICROSHIFT_OS="rhel-9.6" ;;
+		4.22|5.0) MICROSHIFT_OS="rhel-9.8" ;;
+		5.1) MICROSHIFT_OS="rhel-10.2" ;;
+		*) MICROSHIFT_OS="${allowed_os[${#allowed_os[@]}-1]}" ;;
+	esac
+fi
 
 # shellcheck disable=SC2153  # possible misspelling
 if [[ " ${allowed_os[*]} " =~ [[:space:]]${MICROSHIFT_OS}[[:space:]] ]]; then
@@ -39,11 +56,6 @@ if [[ "${MICROSHIFT_ARCH}" != "x86_64" ]] && [[ "${MICROSHIFT_ARCH}" != "arm64" 
 	echo "MICROSHIFT_ARCH must have value: x86_64 or arm64"
 	exit 1
 fi
-
-: Getting OCP version from release image
-oc registry login -a /tmp/registry.json
-OCP_VERSION=$(oc adm release info -o=jsonpath='{.metadata.version}' -a /tmp/registry.json "${RELEASE_IMAGE_LATEST}" | cut -d. -f1-2)
-rm -f /tmp/registry.json
 
 if [[ -z "${EC2_INSTANCE_TYPE+x}" ]] || [[ "${EC2_INSTANCE_TYPE}" == "" ]]; then
 	: EC2_INSTANCE_TYPE is empty, determining from ARCH

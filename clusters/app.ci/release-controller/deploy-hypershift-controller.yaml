@@ -11,6 +11,8 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: release-controller-hypershift
   namespace: ci
 spec:
@@ -29,6 +31,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: release-controller-hypershift
   namespace: ci
 spec:
@@ -45,6 +49,8 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: release-controller-api-hypershift
   namespace: ci
 spec:
@@ -66,6 +72,8 @@ metadata:
     keel.sh/policy: force
     keel.sh/pollSchedule: '@every 5m'
     keel.sh/trigger: poll
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: release-controller-hypershift
   namespace: ci
 spec:
@@ -85,6 +93,7 @@ spec:
         - --period=30s
         - --root=/tmp/git-sync
         - --max-failures=3
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         command:
         - /git-sync
         env:
@@ -94,11 +103,14 @@ spec:
         name: git-sync
         resources:
           requests:
-            cpu: '0.5'
-            memory: 1Gi
+            cpu: 50m
+            memory: 50Mi
         volumeMounts:
         - mountPath: /tmp/git-sync
           name: release
+        - mountPath: /etc/git-sync
+          name: sparse-checkout
+          readOnly: true
       - command:
         - /usr/bin/release-controller
         - --release-namespace=hypershift
@@ -111,6 +123,11 @@ spec:
         - --release-architecture=amd64
         - -v=4
         - --manifest-list-mode
+        env:
+        - name: GOMEMLIMIT
+          value: 3584MiB
+        - name: GOMAXPROCS
+          value: '2'
         image: quay-proxy.ci.openshift.org/openshift/ci:ci_release-controller_latest
         imagePullPolicy: Always
         livenessProbe:
@@ -129,7 +146,8 @@ spec:
           timeoutSeconds: 600
         resources:
           requests:
-            memory: 13Gi
+            cpu: 300m
+            memory: 4Gi
         volumeMounts:
         - mountPath: /etc/config
           name: config
@@ -161,6 +179,7 @@ spec:
         - --root=/tmp/git-sync
         - --one-time=true
         - --depth=1
+        - --sparse-checkout-file=/etc/git-sync/sparse-checkout
         command:
         - /git-sync
         env:
@@ -171,6 +190,9 @@ spec:
         volumeMounts:
         - mountPath: /tmp/git-sync
           name: release
+        - mountPath: /etc/git-sync
+          name: sparse-checkout
+          readOnly: true
       serviceAccountName: release-controller
       volumes:
       - configMap:
@@ -179,6 +201,9 @@ spec:
         name: config
       - emptyDir: {}
         name: release
+      - configMap:
+          name: release-controller-sparse-checkout
+        name: sparse-checkout
       - name: oauth
         secret:
           defaultMode: 420
@@ -219,6 +244,8 @@ metadata:
     keel.sh/policy: force
     keel.sh/pollSchedule: '@every 5m'
     keel.sh/trigger: poll
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: release-controller-api-hypershift
   namespace: ci
 spec:

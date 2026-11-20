@@ -35,7 +35,7 @@ images:
       RUN mkdir -p /home/vscode/.claude/plugins
       COPY --from=ai-helpers /home/claude/.claude/plugins/known_marketplaces.json /home/vscode/.claude/plugins/known_marketplaces.json
       RUN chgrp -R 0 /opt/ai-helpers /home/vscode/.claude && chmod -R g=u /opt/ai-helpers /home/vscode/.claude
-      RUN python3 -m pip install --no-cache-dir agentic-ci==0.3.48
+      RUN python3 -m pip install --no-cache-dir agentic-ci==0.5.15
       ENV BUILDAH_ISOLATION=chroot
       USER vscode
       WORKDIR /workspace
@@ -59,6 +59,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: periodic-ship-status-dash-devcontainer-dependency-report
+  cron: 3 10 * * 1
+  steps:
+    env:
+      DEVCONTAINER_DEPENDENCY_REPOSITORY: openshift-eng/ship-status-dash
+    workflow: openshift-devcontainer-dependency-report
 - as: periodic-ship-status-dash-jira-agent
   capabilities:
   - nested-podman

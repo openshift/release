@@ -107,6 +107,7 @@ fi
 apiserver_patch=$(jq -nc --argjson groups "${groups_json}" --arg minver "${TLS_GROUPS_MIN_VERSION}" '
   {
     spec: {
+      tlsAdherence: "StrictAllComponents",	    
       tlsSecurityProfile: {
         type: "Custom",
         custom: {

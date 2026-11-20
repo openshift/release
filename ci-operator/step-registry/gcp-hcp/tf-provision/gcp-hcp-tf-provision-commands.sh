@@ -53,7 +53,9 @@ tfc_api_call() {
 
 # --- Install Terraform ---
 
-# The 'src' image already contains the gcp-hcp-infra repo at the working directory.
+# gcp-hcp-infra-src contains the gcp-hcp-infra repo at the working directory: the
+# code under test in gcp-hcp-infra jobs, or the latest promoted main in component
+# repository jobs (e.g. gecko).
 # Read terraform version from .tool-versions to ensure consistency with local dev.
 REPO_ROOT="$(pwd)"
 TERRAFORM_VERSION="$(awk '$1 == "terraform" { print $2; exit }' "${REPO_ROOT}/.tool-versions")"
@@ -119,10 +121,26 @@ log "  JOB_NAME:    ${JOB_NAME:-unknown}"
 
 # --- Render Template ---
 
-cd "${REPO_ROOT}"  # gcp-hcp-infra repo root (from: src)
+cd "${REPO_ROOT}"  # gcp-hcp-infra repo root (from: gcp-hcp-infra-src)
+
+# Components to deploy from a pull request build (gcp-hcp-component-refs)
+COMPONENT_REF_ARGS=()
+COMPONENT_REFS_PATH="${SHARED_DIR}/gcp-hcp-component-refs"
+if [[ -s "${COMPONENT_REFS_PATH}" ]]; then
+  if ! grep -q -- '--component-ref' scripts/e2e-render.sh; then
+    log "ERROR: this gcp-hcp-infra checkout predates e2e-render.sh --component-ref"
+    log "  (openshift-online/gcp-hcp-infra#2588); rebase it to deploy component pull request builds"
+    exit 1
+  fi
+  while read -r component_ref; do
+    [[ -n "${component_ref}" ]] || continue
+    COMPONENT_REF_ARGS+=(--component-ref "${component_ref}")
+    log "  Component:   ${component_ref} (pull request build)"
+  done <"${COMPONENT_REFS_PATH}"
+fi
 
 log "Rendering e2e template..."
-RENDERED_DIR="$(./scripts/e2e-render.sh "${RUN_ID}" "${REGION}" "${GIT_REVISION}")"
+RENDERED_DIR="$(./scripts/e2e-render.sh ${COMPONENT_REF_ARGS[@]+"${COMPONENT_REF_ARGS[@]}"} "${RUN_ID}" "${REGION}" "${GIT_REVISION}")"
 
 if [[ ! -d "${RENDERED_DIR}" ]]; then
   log "ERROR: Render script failed - directory not created"

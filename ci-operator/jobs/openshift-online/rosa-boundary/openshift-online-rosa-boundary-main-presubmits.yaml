@@ -1,7 +1,7 @@
 presubmits:
   openshift-online/rosa-boundary:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -16,6 +16,7 @@ presubmits:
     name: pull-ci-openshift-online-rosa-boundary-main-coverage
     optional: true
     rerun_command: /test coverage
+    skip_if_only_changed: ^(components/trusted-actions/|hcp-terraform/rosa-trusted-actions/|\.tekton/rosa-trusted-actions-)
     spec:
       containers:
       - args:
@@ -91,7 +92,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )coverage,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -105,6 +106,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-online-rosa-boundary-main-images
     rerun_command: /test images
+    skip_if_only_changed: ^(components/trusted-actions/|hcp-terraform/rosa-trusted-actions/|\.tekton/rosa-trusted-actions-)
     spec:
       containers:
       - args:
@@ -153,7 +155,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -167,6 +169,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-online-rosa-boundary-main-lambda-unit-tests
     rerun_command: /test lambda-unit-tests
+    skip_if_only_changed: ^(components/trusted-actions/|hcp-terraform/rosa-trusted-actions/|\.tekton/rosa-trusted-actions-)
     spec:
       containers:
       - args:
@@ -238,7 +241,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-online-rosa-boundary-main-localstack-integration-tests
     rerun_command: /test localstack-integration-tests
-    run_if_changed: ^(lambda/|deploy/regional/|tests/localstack/)
+    run_if_changed: ^(lambda/|deploy/regional/|tests/localstack/|cmd/|pkg/|internal/|go\.(mod|sum)$|Makefile$)
     spec:
       containers:
       - args:
@@ -313,3 +316,69 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )localstack-integration-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build04
+    context: ci/prow/trusted-actions-make-test
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: trusted-actions
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-online-rosa-boundary-main-trusted-actions-make-test
+    rerun_command: /test trusted-actions-make-test
+    run_if_changed: ^(components/trusted-actions/|hcp-terraform/rosa-trusted-actions/|\.tekton/rosa-trusted-actions-)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=make-test
+        - --variant=trusted-actions
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )trusted-actions-make-test,?($|\s.*)

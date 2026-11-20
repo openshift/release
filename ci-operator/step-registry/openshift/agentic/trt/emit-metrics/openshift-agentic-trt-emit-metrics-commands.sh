@@ -30,6 +30,7 @@ for metadata_file in "${METADATA_FILES[@]}"; do
     PHASE=$(echo "${METADATA}" | jq -r '.phase')
     ISSUE_KEY=$(echo "${METADATA}" | jq -r '.issue_key')
     RESULT=$(echo "${METADATA}" | jq -r '.result')
+    SESSION_ID=$(echo "${METADATA}" | jq -r '.session_id // ""')
     PR_URL=$(echo "${METADATA}" | jq -r '.pr_url // ""')
     UPSTREAM_REPO=$(echo "${METADATA}" | jq -r '.upstream_repo')
     NUM_REVIEW_ROUNDS=$(echo "${METADATA}" | jq -r '.num_review_rounds // 0')
@@ -41,6 +42,7 @@ for metadata_file in "${METADATA_FILES[@]}"; do
 
     ROW=$(jq -n \
         --arg agent "${AGENT}" \
+        --arg session_id "${SESSION_ID}" \
         --arg phase "${PHASE}" \
         --arg issue_key "${ISSUE_KEY}" \
         --arg pr_url "${PR_URL}" \
@@ -53,7 +55,7 @@ for metadata_file in "${METADATA_FILES[@]}"; do
         --arg job_name "${JOB_NAME:-}" \
         --arg build_id "${BUILD_ID:-}" \
         '{
-          session_id: "",
+          session_id: $session_id,
           agent: $agent,
           phase: $phase,
           issue_key: $issue_key,
@@ -68,9 +70,10 @@ for metadata_file in "${METADATA_FILES[@]}"; do
           build_id: $build_id
         }')
 
-    # Add num_review_rounds for review-responder
+    # The autodl loader decodes every row value as a string. A JSON number
+    # here makes it reject the whole file, so the jira_agent row never loads.
     if [[ "${AGENT}" == "trt-review-responder" ]]; then
-        ROW=$(echo "${ROW}" | jq --argjson num_review_rounds "${NUM_REVIEW_ROUNDS}" '. + {num_review_rounds: $num_review_rounds}')
+        ROW=$(echo "${ROW}" | jq --arg num_review_rounds "${NUM_REVIEW_ROUNDS}" '. + {num_review_rounds: $num_review_rounds}')
     fi
 
     ROWS=$(echo "${ROWS}" | jq --argjson row "${ROW}" '. + [$row]')
@@ -102,7 +105,7 @@ jq -n \
       expiration_days: 0,
       partition_column: ""
     }' > "${ARTIFACT_DIR}/jira-agent-trt-autodl.json"
-echo "Domain autodl written to ${ARTIFACT_DIR}/jira-agent-trt-autodl.json (${ROWS} rows)"
+echo "Domain autodl written to ${ARTIFACT_DIR}/jira-agent-trt-autodl.json (${#METADATA_FILES[@]} rows)"
 
 # --- JUnit XML for phase duration tracking ---
 echo "Generating JUnit XML..."

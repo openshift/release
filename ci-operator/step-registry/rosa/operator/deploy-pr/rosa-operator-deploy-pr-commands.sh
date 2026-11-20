@@ -4,9 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Overrides the MC's HyperShift operator deployment with PR-built images: the operator
-# container image (OPERATOR_IMAGE) and --control-plane-operator-image (CPO_OPERATOR_IMAGE),
-# so the operator and control plane are tested together from the same build.
+# Overrides the MC's HyperShift operator Deployment with the PR-built operator image.
+# The PR-built control-plane-operator is applied per HostedCluster by separate steps.
 HO_DEPLOY="operator"
 HO_NS="hypershift"
 
@@ -27,12 +26,20 @@ cleanup() {
   if [[ -n "${children}" ]]; then
     kill ${children} && wait
   fi
-  local lname
+  local lname psname
   lname=$(lock_name)
+  psname=$(pull_secret_name)
   if [[ -n "${LOCK_ACQUIRED}" && -n "${MC_KUBECONFIG}" && -f "${MC_KUBECONFIG}" ]]; then
     LOCK_OWNER=$(KUBECONFIG="${MC_KUBECONFIG}" oc get configmap "${lname}" -n "${HO_NS}" \
       -o jsonpath='{.data.job}' 2>/dev/null || true)
     if [[ "${LOCK_OWNER}" == "${JOB_ID}" ]]; then
+      # Remove the CI registry pull secret and its SA link while we still hold the lock, so an
+      # interrupted partial deploy does not leak the CI-token secret on the shared management
+      # cluster. Order matters: clean the secret BEFORE releasing the lock, otherwise another job
+      # could acquire the lock and create its own same-named secret in the gap and we'd delete it.
+      echo "Removing CI registry pull secret during cleanup..."
+      KUBECONFIG="${MC_KUBECONFIG}" oc secrets unlink "${HO_DEPLOY}" "${psname}" -n "${HO_NS}" 2>/dev/null || true
+      KUBECONFIG="${MC_KUBECONFIG}" oc delete secret "${psname}" -n "${HO_NS}" --ignore-not-found 2>/dev/null || true
       echo "Releasing lock during cleanup..."
       KUBECONFIG="${MC_KUBECONFIG}" oc delete configmap "${lname}" -n "${HO_NS}" --ignore-not-found 2>/dev/null || true
     fi
@@ -47,14 +54,21 @@ read_profile_file() {
   fi
 }
 
+# Only override the operator when an openshift/hypershift PR is under test. Periodics,
+# manual runs, and release-repo rehearsals must leave the shared management cluster alone.
+if [[ -z "${JOB_SPEC:-}" ]]; then
+  echo "JOB_SPEC is unset; leaving the management cluster operator unchanged"
+  exit 0
+fi
+PULLS=$(echo "${JOB_SPEC}" | jq -r '[.refs] + (.extra_refs // []) | map(select(.org=="openshift" and .repo=="hypershift") | (.pulls // []) | length) | add // 0')
+if (( PULLS == 0 )); then
+  echo "No openshift/hypershift PR under test; leaving the management cluster operator unchanged"
+  exit 0
+fi
+
 # Validate inputs
 if [[ -z "${OPERATOR_IMAGE:-}" ]]; then
   echo "OPERATOR_IMAGE is required (the PR-built HyperShift operator image, injected via dependencies)"
-  exit 1
-fi
-
-if [[ -z "${CPO_OPERATOR_IMAGE:-}" ]]; then
-  echo "CPO_OPERATOR_IMAGE is required (the PR-built control plane operator image, injected via dependencies)"
   exit 1
 fi
 
@@ -64,7 +78,6 @@ if [[ -z "${CLUSTER_SECTOR:-}" ]]; then
 fi
 
 echo "PR-built HyperShift operator image: ${OPERATOR_IMAGE}"
-echo "PR-built control plane operator image: ${CPO_OPERATOR_IMAGE}"
 
 # Log in to OCM
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
@@ -164,17 +177,12 @@ echo "Created CI registry pull secret '${PULL_SECRET}' on MC"
 
 KUBECONFIG="${MC_KUBECONFIG}" oc secrets link "${HO_DEPLOY}" "${PULL_SECRET}" --for=pull -n "${HO_NS}" 2>/dev/null || true
 
-# Snapshot the original image and args before mutating anything, so restore can always roll
-# back even if a later patch fails partway through. (-o json|jq, not jsonpath, so a missing
-# args field still yields a valid JSON array.)
+# Snapshot the original image before mutating anything, so restore can always roll back even
+# if a later patch fails partway through.
 ORIGINAL_IMAGE=$(KUBECONFIG="${MC_KUBECONFIG}" oc get deployment "${HO_DEPLOY}" -n "${HO_NS}" \
   -o jsonpath='{.spec.template.spec.containers[?(@.name=="operator")].image}')
 echo "${ORIGINAL_IMAGE}" > "${SHARED_DIR}/operator-original-image"
-ORIGINAL_ARGS=$(KUBECONFIG="${MC_KUBECONFIG}" oc get deployment "${HO_DEPLOY}" -n "${HO_NS}" -o json \
-  | jq -c 'first(.spec.template.spec.containers[] | select(.name == "operator") | (.args // [])) // []')
-echo "${ORIGINAL_ARGS}" > "${SHARED_DIR}/operator-original-args"
 echo "Original operator image: ${ORIGINAL_IMAGE}"
-echo "Original operator args: ${ORIGINAL_ARGS}"
 
 # Override the operator container image with the PR-built HyperShift operator.
 KUBECONFIG="${MC_KUBECONFIG}" oc set image "deployment/${HO_DEPLOY}" -n "${HO_NS}" \
@@ -193,13 +201,6 @@ if ! echo " ${EXISTING_PULL_SECRETS} " | grep -q " ${PULL_SECRET} "; then
   fi
 fi
 
-# Override --control-plane-operator-image so new HCPs use the PR-built control plane operator.
-# --type=strategic patches only this container's args, leaving the rest of the pod spec intact.
-UPDATED_ARGS=$(echo "${ORIGINAL_ARGS}" | \
-  jq -c '[.[] | select(startswith("--control-plane-operator-image=") | not)] + ["--control-plane-operator-image='"${CPO_OPERATOR_IMAGE}"'"]')
-KUBECONFIG="${MC_KUBECONFIG}" oc patch deployment "${HO_DEPLOY}" -n "${HO_NS}" --type=strategic \
-  -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"${HO_DEPLOY}\",\"args\":${UPDATED_ARGS}}]}}}}"
-
 # Wait for the HyperShift operator deployment to finish rolling out with the new configuration.
 echo "Waiting for HyperShift operator deployment rollout..."
 KUBECONFIG="${MC_KUBECONFIG}" oc rollout status "deployment/${HO_DEPLOY}" -n "${HO_NS}" --timeout=300s
@@ -213,4 +214,4 @@ if [[ "${READY_REPLICAS}" -lt 1 ]]; then
   exit 1
 fi
 
-echo "PR-built HyperShift operator and control plane operator active on ${MC_NAME}"
+echo "PR-built HyperShift operator active on ${MC_NAME}"

@@ -19,6 +19,13 @@ cp "${SHARED_DIR}/bastion" /eco-ci-cd/inventories/ocp-deployment/host_vars/basti
 
 cd /eco-ci-cd/
 
+# Publish OADP credentials when an IBU target hub is available.
+HUB_KUBECONFIG=""
+if [ -f "${SHARED_DIR}/cluster_name" ]; then
+  HUB_KUBECONFIG="/home/telcov10n/project/generated/$(cat "${SHARED_DIR}/cluster_name")/auth/kubeconfig"
+fi
+
 echo "Deploying MinIO on target bastion"
 ansible-playbook playbooks/ran/ibu-deploy-minio.yml \
-  -i inventories/ocp-deployment/build-inventory.py -vv
+  -i inventories/ocp-deployment/build-inventory.py \
+  --extra-vars "minio_oadp_hub_kubeconfig=${HUB_KUBECONFIG}" -vv

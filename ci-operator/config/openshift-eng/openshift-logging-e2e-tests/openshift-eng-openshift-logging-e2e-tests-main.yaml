@@ -7,9 +7,9 @@ images:
   items:
   - dockerfile_literal: |
       FROM pipeline:src
-      RUN GONOSUMDB="*" GOFLAGS="" go install github.com/go-bindata/go-bindata/v3/go-bindata@latest && \
-          make build && \
+      RUN make build && \
           install -m 0755 bin/openshift-logging-e2e-tests-tests-ext /usr/local/bin/openshift-logging-e2e-tests-tests-ext
+      RUN dnf install -y jq && dnf clean all && jq --version
       RUN curl -fsSL https://claude.ai/install.sh | bash \
           && install -m 0755 "$HOME/.local/bin/claude" /usr/local/bin/claude \
           && claude --version
@@ -24,6 +24,29 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: lint
+  steps:
+    test:
+    - as: lint
+      commands: make lint GOLANGCI_LINT_TIMEOUT=20m
+      from: src
+      resources:
+        requests:
+          cpu: "4"
+          memory: 2Gi
+  timeout: 45m0s
+- as: unit
+  steps:
+    test:
+    - as: unit
+      commands: make test
+      from: src
+      resources:
+        requests:
+          cpu: "1"
+          memory: 1Gi
+  timeout: 20m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng

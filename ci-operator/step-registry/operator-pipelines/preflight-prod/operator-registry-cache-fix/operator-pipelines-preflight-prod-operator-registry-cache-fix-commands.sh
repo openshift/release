@@ -5,7 +5,7 @@ export KUBECONFIG
 echo "Check if catalog sources are healthy"
 
 echo "Writing pods and statuses to disk"
-oc get pods -n openshift-marketplace -o "jsonpath={range .items[*]}{.metadata.name}{' '}{.status.phase}{'\n'}{end}" > /tmp/catalog-sources-status
+oc get pods -n openshift-marketplace -o "jsonpath={range .items[*]}{.metadata.name}{' '}{.status.containerStatuses[*].state.waiting.reason}{'\n'}{end}" > /tmp/catalog-sources-status
 
 cat /tmp/catalog-sources-status
 

@@ -38,11 +38,11 @@ group membership and the proxy-generated identity before activation. No anonymou
 access or bearer-token delegation is configured. Browser OAuth evaluates the SAR
 using the user's identity; the ServiceAccount needs no cluster-wide tokenreview or subjectaccessreview grant.
 
-The proxy session expires after one hour, requiring a new login and Service SAR.
-Service access is checked at login, not on every request, so revoking that
-permission can leave an existing session usable for up to one hour. Cookie refresh
-stays disabled to keep that limit fixed. Group and Service-permission changes
-govern operator access. Verify revocation with a new login after the existing
+The proxy session expires after twelve hours, covering an operator shift before
+requiring a new login and Service SAR. Service access is checked at login, not on
+every request, so revoking that permission can leave an existing session usable
+for up to twelve hours. Cookie refresh stays disabled to keep that limit fixed.
+Group and Service-permission changes govern operator access. Verify revocation with a new login after the existing
 session expires.
 
 The backend listens on port 8080 for pod health probes. `/healthz` is process
@@ -136,7 +136,7 @@ application directory. Catalog/config changes require a process restart.
    reaches 8443, peer pods cannot reach backend 8080, and kubelet probes succeed.
    Check effective policies together because NetworkPolicy allow rules are
    additive; another policy must not reopen backend ingress. Verify revoking
-   Service access denies a new login after the one-hour session expires.
+   Service access denies a new login after the twelve-hour session expires.
    Check known Alertmanager/Prow/SHIP classifications, Chai report behavior,
    SOP preview, and the optional core-ci metrics source.
 6. With an operator-approved occurrence, verify one acknowledge/undo cycle and

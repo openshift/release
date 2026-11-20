@@ -33,18 +33,21 @@ LOCK_NAME=$(lock_name)
 PULL_SECRET=$(pull_secret_name)
 
 IMAGE_FILE="${SHARED_DIR}/operator-original-image"
-ARGS_FILE="${SHARED_DIR}/operator-original-args"
 
-# If the state files the deploy step should have written are missing, the deploy likely did
-# not complete. Clean up the pull secret, release any orphaned lock owned by this job, and exit.
-if [[ ! -f "${IMAGE_FILE}" || ! -f "${ARGS_FILE}" ]]; then
-  echo "Expected deploy state files missing; deploy may not have completed."
-  cleanup_pull_secret "${PULL_SECRET}"
+# If the state file the deploy step should have written is missing, either this job skipped
+# the deployment (no openshift/hypershift PR) or it died before completing. Only touch the
+# shared MC state when this job owns the lock, otherwise a skipped run could delete the pull
+# secret an overlapping PR run is actively using on the same management cluster.
+if [[ ! -f "${IMAGE_FILE}" ]]; then
   LOCK_OWNER=$(KUBECONFIG="${MC_KUBECONFIG}" oc get configmap "${LOCK_NAME}" -n "${HO_NS}" \
     -o jsonpath='{.data.job}' 2>/dev/null || true)
   if [[ "${LOCK_OWNER}" == "${JOB_ID}" ]]; then
+    echo "Deploy state file missing but this job owns the lock; cleaning up partial deploy."
+    cleanup_pull_secret "${PULL_SECRET}"
     echo "Releasing orphaned lock owned by this job"
     KUBECONFIG="${MC_KUBECONFIG}" oc delete configmap "${LOCK_NAME}" -n "${HO_NS}" --ignore-not-found
+  else
+    echo "Deploy was skipped or not owned by this job (lock owner: ${LOCK_OWNER:-none}); nothing to restore."
   fi
   exit 0
 fi
@@ -60,15 +63,6 @@ UPDATED_SECRETS=$(KUBECONFIG="${MC_KUBECONFIG}" oc get deployment "${HO_DEPLOY}"
   | jq -c '[.spec.template.spec.imagePullSecrets // [] | .[] | select(.name != "'"${PULL_SECRET}"'")]')
 KUBECONFIG="${MC_KUBECONFIG}" oc patch deployment "${HO_DEPLOY}" -n "${HO_NS}" --type=merge \
   -p "{\"spec\":{\"template\":{\"spec\":{\"imagePullSecrets\":${UPDATED_SECRETS}}}}}" 2>/dev/null || true
-
-# Restore the original HyperShift operator deployment args, which removes the injected
-# --control-plane-operator-image override so new HCPs use the default control plane again.
-ORIGINAL_ARGS=$(cat "${ARGS_FILE}")
-echo "Restoring HyperShift operator deployment args: ${ORIGINAL_ARGS}"
-# Use --type=strategic so that only the named container's args are updated and
-# other containers or fields in the pod spec are not replaced.
-KUBECONFIG="${MC_KUBECONFIG}" oc patch deployment "${HO_DEPLOY}" -n "${HO_NS}" --type=strategic \
-  -p "{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"${HO_DEPLOY}\",\"args\":${ORIGINAL_ARGS}}]}}}}"
 
 # Unlink and remove the CI registry pull secret.
 cleanup_pull_secret "${PULL_SECRET}"
@@ -91,4 +85,4 @@ else
   echo "Lock (${LOCK_NAME}) not owned by this job (owner: ${LOCK_OWNER}), skipping delete"
 fi
 
-echo "HyperShift operator and control plane operator restored successfully"
+echo "HyperShift operator restored successfully"

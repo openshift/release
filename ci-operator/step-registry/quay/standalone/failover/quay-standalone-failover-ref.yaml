@@ -1,0 +1,42 @@
+ref:
+  as: quay-standalone-failover
+  from: upi-installer
+  cli: latest
+  commands: quay-standalone-failover-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 30m0s
+  grace_period: 2m0s
+  documentation: |-
+    Stop Quay node 3 (ec2 stop-instances) while reading through the NLB, and
+    check that Quay keeps serving from the other two nodes. Each operation is
+    an authenticated API GET of the smoke repository, a registry bearer
+    token, and a manifest GET of quay_standalone_smoke_image over TLS
+    verified against the job CA; it may take up to 5 attempts. Reads run
+    until 2 minutes after the stopped node's target leaves healthy (at most 5
+    minutes). Testcases in ${ARTIFACT_DIR}/junit_quay_standalone_failover.xml:
+    reads before the stop, the target leaving healthy, no operation failing
+    all attempts, an unchanged manifest digest, and 2 healthy targets after.
+    Failed attempts and the recovery time (last failed attempt after the
+    stop) are in the JUnit output and ${ARTIFACT_DIR}/failover-operations.log.
+
+    Then it stops the Clair container on node 1, checks that node 1's Clair
+    NLB target leaves healthy within 5 minutes, and makes 10 security report
+    GETs (vulnerabilities=true, up to 5 attempts each) of
+    quay_standalone_scan_target through the NLB, all of which must return
+    status "scanned"; a missing scan target is a failure. Clair on node 1 is
+    started again, best effort.
+
+    Quay node 3 stays stopped. This covers losing one Quay node and one
+    Clair instance, not database or availability-zone failover. Run it
+    before long steps: the OAuth token from quay-standalone-deploy expires
+    9000s after the deploy.
+
+    Reads from SHARED_DIR: quay_standalone_region, quay_standalone_hostname,
+    quay_standalone_target_group_arn, quay_standalone_clair_target_group_arn,
+    quay_standalone_nodes, quay_standalone_ssh_user, quay_standalone_ca.crt,
+    quay_oauth2_token, quay_standalone_smoke_image,
+    quay_standalone_scan_target.
+    Writes nothing to SHARED_DIR.

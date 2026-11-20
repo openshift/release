@@ -1,0 +1,66 @@
+base_images:
+  commenter:
+    name: commenter
+    namespace: ci
+    tag: latest
+prowgen:
+  enable_secrets_store_csi_driver: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-lifecycle-stale
+  cron: 30 1,9 * * *
+  reporter_config:
+    channel: '#aro-hcp-failures-dev'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      LIFECYCLE_MODE: stale
+      VERBOSITY: "1"
+    test:
+    - ref: aro-hcp-automation-pr-lifecycle
+  timeout: 15m0s
+- as: pr-lifecycle-rotten
+  cron: 0 2,10 * * *
+  reporter_config:
+    channel: '#aro-hcp-failures-dev'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      LIFECYCLE_MODE: rotten
+      VERBOSITY: "1"
+    test:
+    - ref: aro-hcp-automation-pr-lifecycle
+  timeout: 15m0s
+- as: pr-lifecycle-close
+  cron: 30 2,10 * * *
+  reporter_config:
+    channel: '#aro-hcp-failures-dev'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      LIFECYCLE_MODE: close
+      VERBOSITY: "1"
+    test:
+    - ref: aro-hcp-automation-pr-lifecycle
+  timeout: 15m0s
+zz_generated_metadata:
+  branch: main
+  org: Azure
+  repo: ARO-HCP
+  variant: pr-lifecycle

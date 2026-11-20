@@ -220,8 +220,36 @@ EOF
 
   cp "${dir}/bootstrap.ign" "${config_dir}/bootstrap_initial.ign"
   # We're using ancient fcct as glibc in installer container is 1.28
-  curl -sL https://github.com/coreos/butane/releases/download/v0.7.0/fcct-x86_64-unknown-linux-gnu >/tmp/fcct && chmod ug+x /tmp/fcct
-  /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
+  local -r fcct_url="https://github.com/coreos/butane/releases/download/v0.7.0/fcct-x86_64-unknown-linux-gnu"
+  local -r fcct_download=/tmp/fcct.download
+  local -r max_attempts=3
+  local attempt
+  local delay
+  # Never run, or leave behind, a stale, partial, or error-page download.
+  rm -f /tmp/fcct "${fcct_download}"
+  for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+    if curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 -o "${fcct_download}" "${fcct_url}" &&
+      [[ -s "${fcct_download}" ]]; then
+      break
+    fi
+    rm -f "${fcct_download}"
+    if (( attempt == max_attempts )); then
+      echo "ERROR: failed to download fcct from ${fcct_url} after ${max_attempts} attempts; cannot inject promtail into bootstrap.ign" >&2
+      exit 1
+    fi
+    delay=$((2 ** attempt))
+    echo "WARNING: fcct download failed (attempt ${attempt}/${max_attempts}); retrying in ${delay}s" >&2
+    sleep "${delay}"
+  done
+  if ! chmod ug+x "${fcct_download}" || ! mv "${fcct_download}" /tmp/fcct; then
+    rm -f "${fcct_download}" /tmp/fcct
+    echo "ERROR: failed to install the downloaded fcct binary" >&2
+    exit 1
+  fi
+  if ! /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"; then
+    echo "ERROR: fcct failed to render bootstrap.ign with promtail" >&2
+    exit 1
+  fi
 }
 
 function install_required_tools() {
@@ -361,6 +389,129 @@ function init_ibmcloud() {
     exit 1
   fi
   export CLOUD_INSTANCE_ID
+}
+
+# update_subnet_nameservers is a temporary mitigation to address DNS misconfiguration in CI
+# As a workaround, the function updates subnet nameserver entries with a predefined set of nameservers whenever a subnet is created.
+function update_subnet_nameservers() {
+  local install_pid=$1
+  local nameservers=${2:-"1.1.1.1,161.26.0.10"}
+  local timeout_seconds=900  # 15 min timeout
+  local elapsed=0
+  local interval=5
+
+  echo "Starting PowerVS subnet watcher..."
+
+  # Resolve Infra ID from generated manifests using install-config
+  local infra_id=""
+  if [ -f "${SHARED_DIR}/install-config.yaml" ]; then
+    infra_id=$(yq-v4 eval '.metadata.name' "${SHARED_DIR}/install-config.yaml")
+  fi
+  if [ -z "${infra_id}" ] || [ "${infra_id}" == "null" ]; then
+    infra_id="${CLUSTER_NAME}"
+  fi
+  echo "Target cluster identifier: ${infra_id}"
+
+  # Poll until workspace is created and targeted correctly
+  local workspace_crn=""
+  while [ ${elapsed} -lt ${timeout_seconds} ]; do
+    if ! kill -0 "${install_pid}" 2>/dev/null; then
+      echo "Installer process exited. Stopping subnet watcher."
+      return 0
+    fi
+
+    echo "Checking for PowerVS workspace (${elapsed}s elapsed)..."
+
+    # Fetch dynamically created by CAPI (${infra_id}-power-iaas or ${infra_id}-workspace) from infra_id
+    workspace_crn="$(ibmcloud resource search "name:*${infra_id}*" --output json 2>/dev/null | jq -r '.items[] | select((.type | contains("resource-instance")) and (.crn | contains("power-iaas"))) | .crn' | head -n 1)"
+
+    if [ -n "${workspace_crn}" ] && [ "${workspace_crn}" != "null" ]; then
+      echo "Found PowerVS workspace CRN: ${workspace_crn}"
+      if ! ibmcloud pi workspace target "${workspace_crn}" >/dev/null 2>&1; then
+        echo "Workspace targeting failed. Retrying in 5 seconds." >&2
+        sleep ${interval}
+        elapsed=$((elapsed + interval))
+        continue
+      fi
+      TARGET_WS_NAME=$(ibmcloud pi workspace ls --json 2>/dev/null | jq -r --arg crn "${workspace_crn}" '.Payload.workspaces[] | select((.details.crn == $crn) or (.crn == $crn)) | .name')
+      if [ -z "${TARGET_WS_NAME}" ]; then
+        echo "Error: Could not find workspace with CRN ${workspace_crn}"
+      fi
+
+      if [[ "${TARGET_WS_NAME}" == *"${infra_id}"* ]]; then
+        echo "Verified targeted workspace matches infra ID: ${infra_id} and Workspace Name: ${TARGET_WS_NAME}"
+        break
+      fi
+    fi
+
+    sleep ${interval}
+    elapsed=$((elapsed + interval))
+  done
+
+  # Poll until subnet/network is created in the workspace
+  local subnet_id=""
+  while [ ${elapsed} -lt ${timeout_seconds} ]; do
+    if ! kill -0 "${install_pid}" 2>/dev/null; then
+      echo "Installer process exited. Stopping subnet watcher."
+      return 0
+    fi
+
+    echo "Checking for PowerVS subnet in workspace (${elapsed}s elapsed)..."
+    # Check if any subnet is created at all
+    local subnets_json
+    subnets_json=$(ibmcloud pi subnet ls --json 2>/dev/null || true)
+    local subnet_count
+    subnet_count=$(echo "${subnets_json}" | jq '(.networks // .) | length' 2>/dev/null || echo 0)
+
+    if [ -z "${subnet_count}" ] || [ "${subnet_count}" -eq 0 ]; then
+      echo "No subnets found in workspace. Waiting..."
+      sleep ${interval}
+      elapsed=$((elapsed + interval))
+      continue
+    fi
+
+    echo "Subnets exist in workspace (count: ${subnet_count}). Searching for DHCP subnet..."
+
+    # Fetch PowerVS DHCP private subnet
+    subnet_id=$(echo "${subnets_json}" | jq -r '(.networks // .)[] | select(.name | test("DHCP"; "i")) | .networkID' | head -n 1)
+
+    if [ -n "${subnet_id}" ] && [ "${subnet_id}" != "null" ]; then
+      echo "Found PowerVS subnet ID: ${subnet_id}"
+      break
+    else
+      echo "Subnets exist, but matching DHCP subnet is not ready yet."
+    fi
+
+    sleep ${interval}
+    elapsed=$((elapsed + interval))
+  done
+
+  if [ -z "${subnet_id}" ] || [ "${subnet_id}" == "null" ]; then
+    echo "Subnet was not detected before timeout or installer completion."
+    return 1
+  fi
+
+  # Update the subnet with nameservers
+  echo "Updating subnet ${subnet_id} with nameservers: ${nameservers}..."
+
+  while [ ${elapsed} -lt ${timeout_seconds} ]; do
+    if ! kill -0 "${install_pid}" 2>/dev/null; then
+      echo "Installer process exited before the subnet nameserver update succeeded."
+      return 0
+    fi
+
+    if ibmcloud pi subnet update "${subnet_id}" --dns-servers "${nameservers}" >/dev/null 2>&1; then
+      echo "Subnet nameservers successfully updated."
+      return 0
+    fi
+    echo "Subnet nameserver update failed. Retrying..." >&2
+
+    sleep ${interval}
+    elapsed=$((elapsed + interval))
+  done
+
+  echo "Subnet nameserver update did not succeed before timeout." >&2
+  return 1
 }
 
 function check_resources() {
@@ -965,8 +1116,17 @@ echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
 # Note: Redirect order matters - stdout first, then stderr to stdout, so both go through grep
 openshift-install --dir="${dir}" create cluster > >(grep --line-buffered -v 'password\|X-Auth-Token\|UserData:') 2>&1 &
 INSTALL_PID=$!
+
+# Launch the subnet watcher in background to update Nameserver entries
+update_subnet_nameservers "${INSTALL_PID}" &
+WATCHER_PID=$!
+
 wait $INSTALL_PID
 ret=$?
+
+# Clean up watcher process if still running
+kill ${WATCHER_PID} 2>/dev/null || true
+
 echo "ret=${ret}"
 if [ ${ret} -gt 0 ]; then
   SKIP_WAIT_FOR=false

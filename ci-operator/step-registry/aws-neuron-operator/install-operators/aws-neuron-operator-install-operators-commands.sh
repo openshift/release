@@ -7,14 +7,19 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 
 DEVICECONFIG_SAMPLE="/tmp/deviceconfig-sample.yaml"
 REPO="awslabs/operator-for-ai-chips-on-aws"
+DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/deviceconfig-sample.yaml"
 
 echo "Fetching deviceconfig-sample.yaml from latest ${REPO} release..."
-DOWNLOAD_URL=$(curl -sfL --connect-timeout 10 --max-time 30 --retry 3 --retry-connrefused --retry-delay 5 \
-    "https://api.github.com/repos/${REPO}/releases/latest" \
-    | python3 -c "import json,sys; assets=json.load(sys.stdin).get('assets',[]); print(next(a['browser_download_url'] for a in assets if a['name']=='deviceconfig-sample.yaml'))")
-
-curl -sfL --connect-timeout 10 --max-time 30 --retry 3 --retry-connrefused --retry-delay 5 \
-    "${DOWNLOAD_URL}" -o "${DEVICECONFIG_SAMPLE}"
+if ! DOWNLOAD_STATUS=$(curl -sS -L --connect-timeout 10 --max-time 30 --retry 3 \
+    --retry-connrefused --retry-delay 5 -o "${DEVICECONFIG_SAMPLE}" -w '%{http_code}' \
+    "${DOWNLOAD_URL}"); then
+    echo "ERROR: failed to download ${DOWNLOAD_URL}" >&2
+    exit 1
+fi
+if [[ "${DOWNLOAD_STATUS}" != "200" || ! -s "${DEVICECONFIG_SAMPLE}" ]]; then
+    echo "ERROR: deviceconfig-sample.yaml download returned HTTP ${DOWNLOAD_STATUS} or an empty file" >&2
+    exit 1
+fi
 echo "Downloaded deviceconfig-sample.yaml"
 
 python3 -c "

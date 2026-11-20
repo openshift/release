@@ -277,6 +277,67 @@ else
   export INSTALLER_BINARY="openshift-install"
 fi
 
+# Ensure the installer binary matches the release payload being installed.
+# Opt-in via ALIGN_INSTALLER_TO_PAYLOAD: only jobs that redirect the install
+# payload away from the installer image's stream (e.g. upgrade jobs installing
+# the previous minor) want this. The image's upi-installer binary may be newer
+# than the payload, and a newer installer can render bootstrap assets
+# incompatible with the payload's CVO (observed:
+# "unknown flag: --cluster-version-manifest-path" from cvo-render). When the
+# X.Y versions differ, extract the payload's own installer so the bootimage
+# matches. If the payload version cannot be determined or extraction fails,
+# warn and keep the image's installer.
+if [[ "${ALIGN_INSTALLER_TO_PAYLOAD:-false}" == "true" && -n "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  # Build-farm release images (registry.build*.ci.openshift.org) need CI
+  # registry credentials on top of the cluster-profile pull secret. Fail fast
+  # on credential setup: this script runs with errexit disabled here, and an
+  # opted-in job that cannot resolve its payload should stop now rather than
+  # keep a mismatched installer and time out at bootstrap.
+  ALIGN_PULL_SECRET="${SHARED_DIR}/pull-secret-with-ci"
+  if [[ ! -s "${ALIGN_PULL_SECRET}" ]]; then
+    ALIGN_PULL_SECRET="/tmp/pull-secret-with-ci"
+    if ! cp -f "${CLUSTER_PROFILE_DIR}/pull-secret" "${ALIGN_PULL_SECRET}"; then
+      echo "ERROR: failed to copy the cluster-profile pull secret for installer alignment" 1>&2
+      exit 1
+    fi
+    if [[ "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%%/*}" != "quay.io" ]]; then
+      if ! KUBECONFIG="" oc registry login --to "${ALIGN_PULL_SECRET}"; then
+        echo "ERROR: failed to log in to the CI registry for installer alignment of ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" 1>&2
+        exit 1
+      fi
+    fi
+  fi
+  # Match the executable basename: the version output prints the binary as
+  # invoked ("openshift-install" from PATH, "/tmp/openshift-install" when
+  # extracted from a custom payload).
+  INSTALLER_VERSION="$(${INSTALLER_BINARY} version | awk '{sub(/^.*\//, "", $1); if (!found && $1 == "openshift-install") {print $2; found=1}}')"
+  # The image's upi-installer reports "v1.4.22-ec5..." (installer repo EC
+  # build); a payload-extracted installer reports the payload version
+  # "4.21.40...". Normalize both to X.Y.
+  if [[ "${INSTALLER_VERSION}" == v1.* ]]; then
+    INSTALLER_XY="$(echo "${INSTALLER_VERSION}" | cut -d. -f2,3 | cut -d- -f1)"
+  else
+    INSTALLER_XY="$(echo "${INSTALLER_VERSION}" | cut -d. -f1,2 | cut -d- -f1)"
+  fi
+  PAYLOAD_XY="$(oc adm release info -a "${ALIGN_PULL_SECRET}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}' 2>/dev/null || echo '')"
+  PAYLOAD_XY="$(echo "${PAYLOAD_XY}" | cut -d. -f1,2)"
+  if [[ -z "${PAYLOAD_XY}" ]]; then
+    echo "WARNING: unable to determine payload version from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}; keeping the image's installer (${INSTALLER_XY})" 1>&2
+  elif [[ "${INSTALLER_XY}" != "${PAYLOAD_XY}" ]]; then
+    echo "Installer is ${INSTALLER_XY} but the install payload is ${PAYLOAD_XY}; extracting the payload's installer so the bootimage matches"
+    # Extract to a fresh directory so a failed extraction cannot leave a
+    # truncated binary at the path the custom-payload flow may already be
+    # using; only switch INSTALLER_BINARY after a successful extraction.
+    if ! oc adm release extract -a "${ALIGN_PULL_SECRET}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+      --command=openshift-install --to="/tmp/align-installer"; then
+      echo "WARNING: failed to extract installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}; keeping the image's installer (${INSTALLER_XY})" 1>&2
+    else
+      chmod +x /tmp/align-installer/openshift-install
+      export INSTALLER_BINARY="/tmp/align-installer/openshift-install"
+    fi
+  fi
+fi
+
 echo "=============== openshift-install version =============="
 ${INSTALLER_BINARY} version
 
@@ -749,6 +810,140 @@ if test -f "${SHARED_DIR}/manifest_cluster-network-03-config.yml"; then
   cp "${SHARED_DIR}/manifest_cluster-network-03-config.yml" manifests/cluster-network-03-config.yml
 fi
 
+# Simulate a cluster installed without vSphere failure domain information (e.g.
+# pre-4.13 or UPI installs that never populate it). vcenters/failureDomains are
+# only present under spec.platformSpec.vsphere (VSpherePlatformStatus carries
+# neither field), and the installer never backfills this on upgrade, so deleting
+# it here from the pre-bootstrap manifest reproduces that persistent state
+# without fighting any later immutability/admission checks on a live cluster.
+#
+# Before deleting it, compute the legacy-INI form of
+# openshift-config/cloud-provider-config from the installer-rendered YAML,
+# using the exact server/datacenter/datastore/folder values the installer
+# resolved for this install's sole failure domain. No installer version in
+# active use renders cloud-provider-config as INI anymore -- a fresh install
+# always emits YAML there, regardless of install-config schema -- so
+# stripping alone produces a config-format/Infra-CR combination (new-format
+# config + legacy-shaped Infra) that cannot occur on a real cluster, and
+# leaves vmware-vsphere-csi-driver-operator with no source of
+# datastore/topology data at all: a storage ClusterOperator that never
+# leaves Degraded, which keeps the install itself from ever completing
+# (SPLAT-3028). Real UPI/pre-4.13 clusters have always carried this data in
+# the INI [Workspace] section instead; a real 4.12-origin cluster upgraded
+# through day-2 multi-vCenter GA confirms cloud-provider-config stays INI,
+# untouched since original install, and that storage stays Available in
+# that exact state.
+#
+# The computed INI is staged to a file outside manifests/, not written
+# straight into cloud-provider-config.yaml, because cluster-config-operator's
+# bootstrap-time render (invoked from bootkube.sh's "config-bootstrap" stage)
+# has no vSphere-specific transformer and just copies that ConfigMap
+# byte-for-byte into ControllerConfig.Spec.CloudProviderConfig, and from
+# there into /etc/kubernetes/cloud.conf on every node. The in-cluster
+# machine-config-controller regenerates that same field moments later from
+# cluster-cloud-controller-manager-operator's CCCMO-normalized (YAML) copy of
+# the same ConfigMap, so if the file were already legacy INI at render time,
+# the two renders would disagree byte-for-byte and trip MCD's one-time
+# "bootstrap generated MC vs in-cluster generated MC" mismatch check,
+# permanently degrading the machine-config ClusterOperator. The staged
+# content is applied later, after `create ignition-configs` and
+# cluster-config-operator's render have both consumed the installer's
+# native (modern) YAML -- see the injection below, right before this
+# script hands the ignition files off to the VM-provisioning step.
+if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - staging legacy-INI cloud-provider-config for later injection (SPLAT-3028)"
+  infra_manifest="manifests/cluster-infrastructure-02-config.yml"
+  ccm_manifest="manifests/cloud-provider-config.yaml"
+  staged_ccm_manifest="vsphere-legacy-cloud-provider-config.yaml"
+
+  # infraID comes from the Infrastructure manifest's own
+  # status.infrastructureName rather than metadata.json: metadata.json is not
+  # written to disk until `create ignition-configs` runs, so reading it here
+  # (right after `create manifests`) would either read a stale file or,
+  # under `set -o errexit`, silently kill the whole script when it doesn't
+  # exist yet.
+  vsphere_fd_server=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.vcenters[0].server")
+  vsphere_fd_datacenter=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.datacenter")
+  vsphere_fd_datastore_path=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.datastore")
+  vsphere_fd_folder=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.folder")
+  vsphere_fd_resource_pool=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.resourcePool")
+  vsphere_fd_port=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.vcenters[0].port")
+  vsphere_infra_id=$(yq-go r "${infra_manifest}" "status.infrastructureName")
+  for v in vsphere_fd_server vsphere_fd_datacenter vsphere_fd_datastore_path vsphere_fd_folder vsphere_fd_resource_pool vsphere_fd_port vsphere_infra_id; do
+    [[ "${!v}" == "null" ]] && eval "${v}=\"\""
+  done
+  # The legacy in-tree vSphere provider takes a datastore name, or
+  # "<datastore-cluster>/<datastore>" when the datastore lives in a datastore
+  # cluster, relative to the datacenter's datastore folder -- not a full
+  # inventory path. Strip only the "/<datacenter>/datastore/" prefix so a
+  # nested datastore keeps its cluster segment; a bare name or an
+  # already-relative value passes through unchanged. Taking the basename
+  # instead would silently drop that segment and point the provider at the
+  # wrong datastore.
+  vsphere_fd_datastore="${vsphere_fd_datastore_path#*/datastore/}"
+  [[ "${vsphere_fd_port}" == "0" ]] && vsphere_fd_port=""
+
+  if [[ -z "${vsphere_fd_server}" || -z "${vsphere_fd_datacenter}" || -z "${vsphere_fd_datastore}" ]]; then
+    echo "ERROR: could not read vCenter server/datacenter/datastore from ${infra_manifest}; cannot build a legacy cloud-provider-config" >&2
+    exit 1
+  fi
+
+  if [[ -z "${vsphere_fd_folder}" ]]; then
+    if [[ -n "${vsphere_infra_id}" ]]; then
+      vsphere_fd_folder="/${vsphere_fd_datacenter}/vm/${vsphere_infra_id}"
+    else
+      echo "WARNING: no topology.folder resolved and no status.infrastructureName available; omitting 'folder' from the legacy [Workspace] section" >&2
+    fi
+  fi
+
+  vsphere_cm_name=$(yq-go r "${ccm_manifest}" "metadata.name")
+  vsphere_cm_namespace=$(yq-go r "${ccm_manifest}" "metadata.namespace")
+
+  vsphere_port_line="" vsphere_folder_line="" vsphere_resource_pool_line=""
+  [[ -n "${vsphere_fd_port}" ]] && vsphere_port_line="    port = \"${vsphere_fd_port}\""$'\n'
+  [[ -n "${vsphere_fd_folder}" ]] && vsphere_folder_line="    folder = \"${vsphere_fd_folder}\""
+  [[ -n "${vsphere_fd_resource_pool}" ]] && vsphere_resource_pool_line="    resourcepool-path = \"${vsphere_fd_resource_pool}\""
+
+  # Mirrors openshift-installer's own CloudProviderConfigIni() in
+  # pkg/asset/manifests/vsphere/cloudproviderconfig.go -- dead code there
+  # (no caller in the installer outside its own tests, since no installer
+  # version in active use ever selects this format for a fresh install) but
+  # still the product's canonical legacy-INI shape, including its
+  # infraID-based default folder, so what this job manufactures matches as
+  # closely as possible what a real pre-4.13/UPI install would have produced.
+  #
+  # Written to staged_ccm_manifest, not ccm_manifest: see the comment above
+  # for why this must not land in manifests/ until after the bootstrap-time
+  # swap below.
+  cat > "${staged_ccm_manifest}" <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${vsphere_cm_name}
+  namespace: ${vsphere_cm_namespace}
+data:
+  config: |
+    [Global]
+    secret-name = "vsphere-creds"
+    secret-namespace = "kube-system"
+    insecure-flag = "1"
+
+    [VirtualCenter "${vsphere_fd_server}"]
+${vsphere_port_line}    datacenters = "${vsphere_fd_datacenter}"
+
+    [Workspace]
+    server = "${vsphere_fd_server}"
+    datacenter = "${vsphere_fd_datacenter}"
+    default-datastore = "${vsphere_fd_datastore}"
+${vsphere_folder_line}
+${vsphere_resource_pool_line}
+EOF
+
+  echo "$(date -u --rfc-3339=seconds) - stripping vcenters/failureDomains from the Infrastructure manifest"
+  yq-go d -i "manifests/cluster-infrastructure-02-config.yml" "spec.platformSpec.vsphere.vcenters"
+  yq-go d -i "manifests/cluster-infrastructure-02-config.yml" "spec.platformSpec.vsphere.failureDomains"
+fi
+
 ### Create Ignition configs
 echo "Creating Ignition configs..."
 ${INSTALLER_BINARY} --dir="${dir}" create ignition-configs &
@@ -764,6 +959,170 @@ cp "${dir}/.openshift_install.log" "${ARTIFACT_DIR}/.openshift_install.log"
 
 if [ $ret -ne 0 ]; then
   exit "$ret"
+fi
+
+# Swap cloud-provider-config to the legacy INI form inside bootstrap.ign. That
+# file is what bootkube's "config-bootstrap" stage (cluster-config-operator's
+# bootstrap-time render) turns into ControllerConfig.Spec.CloudProviderConfig,
+# and what "cb-bootstrap" later applies to the API server as the live
+# openshift-config/cloud-provider-config.
+#
+# Two independent renders consume it and must agree byte-for-byte, or MCD's
+# one-time bootstrap-vs-in-cluster MachineConfig check degrades the master pool
+# permanently: the bootstrap one reads manifests/cloud-provider-config.yaml,
+# while MCO's syncCloudConfig() reads
+# openshift-config-managed/kube-cloud-config, key cloud.conf.
+#
+# The in-cluster format is decided by whoever writes that managed copy, and
+# that flips on the VSphereMultiVCenterDay2 feature gate:
+#
+#   gate disabled (4.19/4.20/4.21 defaults): cluster-config-operator copies
+#     openshift-config/<Infrastructure.spec.cloudConfig.name> VERBATIM, so the
+#     in-cluster format equals the live ConfigMap's. The manifest must be INI
+#     at render time too, so the unit is ordered Before=bootkube.service
+#     (VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER=pre-bootstrap).
+#
+#   gate enabled (GA from 4.22 / 5.x): CCMO owns that copy and rewrites it
+#     through its vSphere transformer, which emits normalized YAML from either
+#     input. The in-cluster render is YAML regardless, so the manifest must stay
+#     the installer's modern YAML at render time and the swap must wait for
+#     config-bootstrap.done (post-bootstrap, the default).
+#
+# VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER selects which; gate-off releases set
+# it per-test in the release config. Either way the live ConfigMap ends up INI
+# (pre: from the start; post: cb-bootstrap applies manifests/ after
+# config-bootstrap.done, observed on 5.x). Getting it wrong costs a full job.
+if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - injecting the legacy cloud-provider-config swap into bootstrap.ign (SPLAT-3028)"
+
+  if [[ ! -s "${staged_ccm_manifest}" ]]; then
+    echo "ERROR: ${staged_ccm_manifest} is missing or empty; the legacy cloud-provider-config staging step above must have failed silently" >&2
+    exit 1
+  fi
+
+  vsphere_legacy_swap_order="${VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER:-post-bootstrap}"
+  case "${vsphere_legacy_swap_order}" in
+    pre-bootstrap)
+      vsphere_legacy_unit_description="Swap cloud-provider-config to the legacy INI form before bootkube derives the bootstrap cloud config (SPLAT-3028)"
+      vsphere_legacy_before_line="        Before=bootkube.service"$'\n'
+      ;;
+    post-bootstrap)
+      vsphere_legacy_unit_description="Swap cloud-provider-config to the legacy INI form once cluster-config-operator's bootstrap render has consumed the modern YAML (SPLAT-3028)"
+      vsphere_legacy_before_line=""
+      ;;
+    *)
+      echo "ERROR: VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER must be 'pre-bootstrap' or 'post-bootstrap', got '${vsphere_legacy_swap_order}'" >&2
+      exit 1
+      ;;
+  esac
+
+  if [[ "${vsphere_legacy_swap_order}" == "pre-bootstrap" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - legacy cloud-provider-config swap order: vsphere_legacy_swap_order=${vsphere_legacy_swap_order} (assumes VSphereMultiVCenterDay2 is DISABLED on this payload: cluster-config-operator copies openshift-config-managed/kube-cloud-config verbatim, so the bootstrap render must see INI)"
+  else
+    echo "$(date -u --rfc-3339=seconds) - legacy cloud-provider-config swap order: vsphere_legacy_swap_order=${vsphere_legacy_swap_order} (assumes VSphereMultiVCenterDay2 is ENABLED on this payload: CCMO normalizes openshift-config-managed/kube-cloud-config to YAML, so the bootstrap render must see the installer YAML)"
+  fi
+  vsphere_legacy_cc_dir=/tmp/vsphere-legacy-cloud-config
+  mkdir -p "${vsphere_legacy_cc_dir}"
+  cp "${staged_ccm_manifest}" "${vsphere_legacy_cc_dir}/cloud-provider-config-legacy.yaml"
+
+  cat > "${vsphere_legacy_cc_dir}/swap-cloud-provider-config.sh" << 'SCRIPT_EOF'
+#!/bin/bash
+set -o nounset
+set -o pipefail
+
+mode="${1:-post-bootstrap}"
+target=/opt/openshift/manifests/cloud-provider-config.yaml
+source_file=/opt/openshift/cloud-provider-config-legacy.yaml
+
+# pre-bootstrap: the unit is ordered Before=bootkube.service, so bootkube
+#   cannot read the manifest until this finishes; wait only for the
+#   ignition-written layout to appear.
+# post-bootstrap: wait for the marker of the very stage whose render must
+#   consume the installer's YAML first; the swap then still lands before
+#   cb-bootstrap reads manifests/, several bootkube stages later.
+if [[ "${mode}" == "pre-bootstrap" ]]; then
+  marker="${target}"
+  timeout_seconds=120
+  poll_seconds=2
+else
+  marker=/opt/openshift/config-bootstrap.done
+  timeout_seconds=900
+  poll_seconds=5
+fi
+elapsed=0
+
+if [[ ! -s "${source_file}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - ERROR: ${source_file} is missing or empty; the legacy INI staging in the install step must have failed" >&2
+  exit 1
+fi
+
+echo "$(date -u --rfc-3339=seconds) - [${mode}] waiting for ${marker} before swapping cloud-provider-config to legacy INI (SPLAT-3028)"
+until [[ -f "${marker}" ]]; do
+  if (( elapsed >= timeout_seconds )); then
+    echo "$(date -u --rfc-3339=seconds) - ERROR: ${marker} did not appear within ${timeout_seconds}s; leaving cloud-provider-config.yaml in its modern (non-legacy) form. The legacy vSphere infra simulation did NOT take effect for cloud-provider-config (SPLAT-3028)." >&2
+    exit 1
+  fi
+  sleep "${poll_seconds}"
+  elapsed=$((elapsed + poll_seconds))
+done
+
+if ! cp "${source_file}" "${target}"; then
+  echo "$(date -u --rfc-3339=seconds) - ERROR: failed to overwrite ${target} with ${source_file}" >&2
+  exit 1
+fi
+echo "$(date -u --rfc-3339=seconds) - [${mode}] overwrote ${target} with the legacy INI ConfigMap after a ${elapsed}s wait for ${marker} (SPLAT-3028)"
+SCRIPT_EOF
+
+  cat > "${vsphere_legacy_cc_dir}/fcct.yml" << EOF
+variant: fcos
+version: 1.1.0
+ignition:
+  config:
+    merge:
+      - local: bootstrap_initial.ign
+storage:
+  files:
+    - path: /opt/openshift/cloud-provider-config-legacy.yaml
+      mode: 0644
+      overwrite: true
+      contents:
+        local: cloud-provider-config-legacy.yaml
+    - path: /usr/local/bin/swap-vsphere-cloud-provider-config.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        local: swap-cloud-provider-config.sh
+systemd:
+  units:
+    - name: swap-vsphere-cloud-provider-config.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=${vsphere_legacy_unit_description}
+        After=network-online.target
+        Wants=network-online.target
+${vsphere_legacy_before_line}
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/local/bin/swap-vsphere-cloud-provider-config.sh ${vsphere_legacy_swap_order}
+
+        [Install]
+        WantedBy=multi-user.target
+EOF
+
+  cp "${dir}/bootstrap.ign" "${vsphere_legacy_cc_dir}/bootstrap_initial.ign"
+  # SSL_CERT_FILE may be set to a vCenter-only CA bundle in this environment
+  # (the other vsphere step scripts in this repo unset it for the same
+  # reason), which breaks TLS verification of this public mirror's normal
+  # certificate. Use the system trust store for this call instead.
+  if ! env -u SSL_CERT_FILE curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 \
+    "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/butane/latest/butane-amd64" -o /tmp/fcct; then
+    echo "ERROR: failed to download butane/fcct for the vsphere legacy cloud-provider-config swap" >&2
+    exit 1
+  fi
+  chmod ug+x /tmp/fcct
+  /tmp/fcct --pretty --strict -d "${vsphere_legacy_cc_dir}" "${vsphere_legacy_cc_dir}/fcct.yml" > "${dir}/bootstrap.ign"
 fi
 
 cp -t "${SHARED_DIR}" \

@@ -38,7 +38,7 @@ gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
   --allow tcp:22,icmp
 
 gcloud compute instances create "${INSTANCE_PREFIX}" \
-  --image-family rhel-9-arm64 \
+  --image-family "${INSTANCE_IMAGE}" \
   --image-project rhel-cloud \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --machine-type c4a-standard-8 \

@@ -132,6 +132,13 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=16G
+        NUM_EXTRA_WORKERS=1
+        APPLY_EXTRA_WORKERS=true
       TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/machine-config-operator/disruptive
     test:
@@ -154,6 +161,13 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=16G
+        NUM_EXTRA_WORKERS=1
+        APPLY_EXTRA_WORKERS=true
       TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/machine-config-operator/disruptive
     test:
@@ -176,6 +190,13 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=16G
+        NUM_EXTRA_WORKERS=1
+        APPLY_EXTRA_WORKERS=true
       TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/machine-config-operator/disruptive
     test:
@@ -297,6 +318,11 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         FEATURE_SET=TechPreviewNoUpgrade
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=16G
+        NUM_EXTRA_WORKERS=1
+        APPLY_EXTRA_WORKERS=true
       TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/machine-config-operator/disruptive
     test:
@@ -322,6 +348,11 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
         FEATURE_SET=TechPreviewNoUpgrade
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=16G
+        NUM_EXTRA_WORKERS=1
+        APPLY_EXTRA_WORKERS=true
       TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/machine-config-operator/disruptive
     test:
@@ -347,6 +378,11 @@ tests:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4v6
         FEATURE_SET=TechPreviewNoUpgrade
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=16G
+        NUM_EXTRA_WORKERS=1
+        APPLY_EXTRA_WORKERS=true
       TEST_ARGS: --disable-monitor=audit-log-analyzer
       TEST_SUITE: openshift/machine-config-operator/disruptive
     test:
@@ -454,11 +490,27 @@ tests:
     - ref: mco-check-day1-enable-ocl
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-mco-disconnected-longduration
+  cron: 17 6 * * 6
+  shard_count: 3
+  steps:
+    cluster_profile: aws-mco-qe
+    env:
+      BASE_DOMAIN: ocp-mco-qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "2"
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_ARGS: --disable-monitor=audit-log-analyzer
+      TEST_SKIPS: \[Skipped:Disconnected\]
+      TEST_SUITE: openshift/machine-config-operator/longduration
+    test:
+    - chain: mco-e2e-test
+    workflow: ocp-mco-e2e-aws-disconnected
 - as: update-amis
   cron: 0 0 1 * *
   steps:
     env:
-      CHERRY_PICK_BRANCHES: release-4.22 release-4.21 release-4.20 release-4.19
+      CHERRY_PICK_BRANCHES: release-5.0 release-4.22 release-4.21 release-4.20 release-4.19
       EXPECTED_RELEASE_VERSION: "5.1"
     test:
     - ref: mco-automation-update-amis

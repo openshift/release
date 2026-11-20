@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euxo pipefail; shopt -s inherit_errexit
 #
 # ACM Spoke Cluster Installation Script
 #
@@ -33,13 +34,19 @@
 #   - ClusterImageSet available for target OCP version
 #   - Sufficient leases acquired for the number of clusters
 #
+# A failed wget or curl must abort the step. The fetch is a command
+# substitution, so errexit does not stop the script: a failure becomes an
+# empty string, eval of that returns 0, and the step then dies at EnsureReqs
+# with "command not found". The || exit 1 keeps the download error as the cause.
+#
 
-set -euxo pipefail; shopt -s inherit_errexit
-eval "$(
+typeset _lib=""
+_lib="$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/f63f1f606b1d76f6ef2a3e78b4ec1ad7362d4fac/libs/bash/common/EnsureReqs.sh
-)"; EnsureReqs jq yq
+)" || exit 1
+eval "${_lib}"; EnsureReqs jq yq
 
 #=====================
 # Parse leased resources into array
@@ -73,6 +80,18 @@ fi
 # Ensure cluster count is a valid positive integer
 if [[ ! "${ACM_SPOKE_CLUSTER_COUNT}" =~ ^[1-9][0-9]*$ ]]; then
     : "ACM_SPOKE_CLUSTER_COUNT must be a positive integer, got: '${ACM_SPOKE_CLUSTER_COUNT}'"
+    exit 1
+fi
+
+# Hive ClusterDeployment.spec.installAttemptsLimit is *int32: a positive integer
+# no greater than 2147483647. Reject oversized values before jq --argjson.
+if [[ ! "${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT}" =~ ^[1-9][0-9]*$ ]]; then
+    : "ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT must be a positive integer, got: '${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT}'"
+    exit 1
+fi
+if (( ${#ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT} > 10 )) \
+    || [[ "${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT}" -gt 2147483647 ]]; then
+    : "ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT exceeds Hive int32 maximum 2147483647, got: '${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT}'"
     exit 1
 fi
 
@@ -496,7 +515,14 @@ ocEOF
     # Create ClusterDeployment - this is the main Hive resource
     # that triggers the actual cluster installation
     # Note: Uses the cluster-specific region from the lease
-    : "Creating ClusterDeployment '${clusterName}' in region '${clusterRegion}'"
+    # installAttemptsLimit: maximum number of install attempts. A limit of 3
+    # permits three total attempts (one initial attempt and two retries) before
+    # Hive sets ProvisionStopped=True (InstallAttemptsLimitReached). Default 3
+    # matches Hive's own default and allows transient AWS errors
+    # (e.g. LoadBalancerLimitExceeded) to self-heal.
+    # The heredoc value is a placeholder. jq always overwrites
+    # spec.installAttemptsLimit from ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT.
+    : "Creating ClusterDeployment '${clusterName}' in region '${clusterRegion}' (installAttemptsLimit=${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT})"
     {
         oc create -f - --dry-run=client -o json --save-config |
         jq -c \
@@ -505,6 +531,7 @@ ocEOF
             --arg domain     "${BASE_DOMAIN}" \
             --arg clusterSet "${clusterName}-set" \
             --arg imageSet   "${clusterImagesetName}" \
+            --argjson attempts "${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT}" \
             '
             .metadata.name                                         = $name      |
             .metadata.namespace                                    = $name      |
@@ -513,6 +540,7 @@ ocEOF
             .spec.baseDomain                                       = $domain    |
             .spec.clusterName                                      = $name      |
             .spec.platform.aws.region                              = $region    |
+            .spec.installAttemptsLimit                             = $attempts  |
             .spec.provisioning.imageSetRef.name                    = $imageSet
             ' |
         yq -p json -o yaml eval .
@@ -539,7 +567,8 @@ spec:
         name: acm-aws-secret
   pullSecretRef:
     name: pull-secret
-  installAttemptsLimit: 1
+  # Placeholder. jq sets this from ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT before apply.
+  installAttemptsLimit: 0
   provisioning:
     installConfigSecretRef:
       name: install-config
@@ -649,9 +678,29 @@ WaitForManagedClusterAvailable() {
         : "ManagedCluster ${clusterIdx} (${clusterName}) - Available=True"
     else
         : "Timed out waiting for ManagedCluster '${clusterName}' Available=True — current conditions:"
+        # Condition text (type/status/reason) stays in the CI log. oc's stderr
+        # can contain API hostnames and auth details. Capture it outside the
+        # published artifact directory and move only the redacted file in, so a
+        # slow or killed oc does not leave raw stderr where CI publishes it.
+        typeset mcErr
+        mcErr="$(mktemp -t managedcluster-conditions.XXXXXX)"
         oc get managedcluster "${clusterName}" \
             -o jsonpath='{range .status.conditions[*]}{.type}={.status} ({.reason}){"\n"}{end}' \
-            2>/dev/null || true
+            2>"${mcErr}" \
+            || true
+        if [[ -s "${mcErr}" ]]; then
+            sed -E \
+                -e 's#https?://[^[:space:]"]+#<redacted-url>#g' \
+                -e 's#[Bb]earer[[:space:]]+[^[:space:]]+#Bearer <redacted>#g' \
+                -e 's#([Tt]oken|[Pp]assword)[=:][[:space:]]*[^[:space:]]+#\1=<redacted>#g' \
+                -e 's#([A-Za-z0-9-]+\.)+[A-Za-z]{2,}(:[0-9]+)?#<redacted-host>#g' \
+                -e 's#[0-9]{1,3}(\.[0-9]{1,3}){3}(:[0-9]+)?#<redacted-ip>#g' \
+                "${mcErr}" > "${mcErr}.redacted"
+            mv "${mcErr}.redacted" "${mcErr}"
+            mv "${mcErr}" "${ARTIFACT_DIR}/managedcluster-${clusterName}-conditions.err"
+        else
+            rm -f "${mcErr}"
+        fi
         return 1
     fi
 }
@@ -730,6 +779,63 @@ WaitForClusterProvisioned() {
             <<< "${cdJson}" >&2
         exit 3
     )
+}
+
+#=====================
+# Function: DumpCancelledSpokeConditions
+#=====================
+# Best-effort ClusterDeployment conditions for a spoke whose wait was cancelled
+# because another spoke already failed. The cancelled wait never reaches its
+# own timeout or ProvisionStopped branch, so this is the post-mortem it would
+# have written. type/status/reason go to the CI log and to an artifact.
+#
+# Arguments:
+#   $1 - clusterName
+#
+DumpCancelledSpokeConditions() {
+    typeset clusterName="$1"
+    typeset cancelDiag="${ARTIFACT_DIR}/spoke-${clusterName}-cancelled-conditions.txt"
+
+    if oc -n "${clusterName}" get clusterdeployment "${clusterName}" -o json \
+        | jq -r '.status.conditions[]? | "  \(.type)=\(.status) reason=\(.reason // "N/A")"' \
+        > "${cancelDiag}"; then
+        if [[ -s "${cancelDiag}" ]]; then
+            : "ClusterDeployment conditions for cancelled spoke '${clusterName}':"
+            cat "${cancelDiag}" >&2
+        else
+            : "ClusterDeployment '${clusterName}' has no conditions yet"
+        fi
+    else
+        rm -f "${cancelDiag}"
+        : "Could not read ClusterDeployment conditions for cancelled spoke '${clusterName}'"
+    fi
+    true
+}
+
+#=====================
+# Function: ReapedProvisionPid
+#=====================
+# wait -n returns the exit status of the next spoke but not its pid.
+# wait -n -p would record the pid, and that form needs bash 5.1.
+# With monitor mode on, jobs -p still lists the waits that have not been
+# reaped, on bash 5.0 and 5.1. The missing pid is the one wait -n just collected.
+# Sets finishedPid. Returns 1 when no pending pid is missing.
+#
+ReapedProvisionPid() {
+    typeset -A alivePid=()
+    typeset jobPid=""
+    typeset pid=""
+    finishedPid=""
+    while IFS= read -r jobPid; do
+        [[ -n "${jobPid}" ]] && alivePid["${jobPid}"]=1
+    done < <(jobs -p)
+    for pid in "${provisionPendingArr[@]}"; do
+        if [[ -z "${alivePid[${pid}]+x}" ]]; then
+            finishedPid="${pid}"
+            return 0
+        fi
+    done
+    return 1
 }
 
 #=====================
@@ -995,12 +1101,79 @@ done
 
 : "All cluster resources created. Waiting for provisioning..."
 
-# Phase 2: Wait for all clusters to complete provisioning
-# Each cluster typically takes 30-45 minutes to provision
+# Phase 2: Wait for all clusters concurrently. Each wait keeps its own
+# ACM_SPOKE_INSTALL_TIMEOUT_MINUTES budget, and the budgets overlap.
+# Each cluster typically takes 30-45 minutes to provision.
+# Job control stays on until these waits are collected. Each wait gets its own
+# process group, so the first failure can signal that group, including the poll
+# subshell. jobs -p then shows which spoke wait -n reaped, without wait -n -p.
+typeset -a provisionPendingArr=()
+typeset -A provisionNameByPid=()
+set -m
 for ((i = 0; i < ${#clusterNamesArr[@]}; i++)); do
     idx=$((i + 1))
-    WaitForClusterProvisioned "${clusterNamesArr[i]}" "${idx}"
+    # PS4 tags this wait's xtrace lines with the spoke name. The three waits
+    # share stdout, so the default trace prefix cannot tell them apart.
+    ( PS4="+[${clusterNamesArr[i]}] "; WaitForClusterProvisioned "${clusterNamesArr[i]}" "${idx}" ) &
+    provisionPendingArr+=("$!")
+    provisionNameByPid[$!]="${clusterNamesArr[i]}"
 done
+
+typeset -i provisionFailedCount=0
+typeset -i waitRc=0
+typeset finishedPid=""
+typeset -a stillPendingArr=()
+while (( ${#provisionPendingArr[@]} > 0 )); do
+    finishedPid=""
+    stillPendingArr=()
+    if wait -n; then
+        waitRc=0
+    else
+        waitRc=$?
+    fi
+    ReapedProvisionPid || true
+    if [[ -z "${finishedPid}" ]]; then
+        : "wait -n finished a spoke, but jobs -p could not identify which one"
+        exit 3
+    fi
+    if (( waitRc == 0 )); then
+        for pid in "${provisionPendingArr[@]}"; do
+            if [[ "${pid}" != "${finishedPid}" ]]; then
+                stillPendingArr+=("${pid}")
+            fi
+        done
+        provisionPendingArr=("${stillPendingArr[@]}")
+        continue
+    fi
+    : "Provisioning failed for cluster '${provisionNameByPid[${finishedPid}]}'"
+    (( provisionFailedCount++ )) || true
+    # Monitor mode has already identified the failed pid. Turn it off before
+    # the kill so the shell does not print a job-control "Terminated" line.
+    set +m
+    for pid in "${provisionPendingArr[@]}"; do
+        if [[ "${pid}" == "${finishedPid}" ]]; then
+            continue
+        fi
+        # Record conditions before the kill. The cancelled wait will not reach
+        # its own timeout or ProvisionStopped diagnostics.
+        DumpCancelledSpokeConditions "${provisionNameByPid[${pid}]}"
+        # The wait may already have exited. A missing process is not another failure.
+        kill -- "-${pid}" || true
+    done
+    for pid in "${provisionPendingArr[@]}"; do
+        if [[ "${pid}" == "${finishedPid}" ]]; then
+            continue
+        fi
+        # Reap the cancelled wait. Its status must not add to provisionFailedCount.
+        wait "${pid}" || true
+    done
+    break
+done
+set +m
+if (( provisionFailedCount > 0 )); then
+    : "${provisionFailedCount} cluster(s) failed to provision"
+    exit 3
+fi
 
 : "All clusters provisioned. Extracting credentials..."
 

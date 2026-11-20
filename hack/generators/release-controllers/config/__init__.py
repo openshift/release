@@ -38,9 +38,10 @@ class RCPaths:
 
         # The updated configuration and deployment files, to app.ci, are located here:
         self.path_rc_deployments = self.path_base.joinpath('clusters/app.ci/release-controller')
+        # RPM mirror resources are applied from the shared build-cluster path.
+        # The legacy vsphere02 path is no longer covered by an ApplicationSet.
         self.path_rc_rpms = [
             self.path_base.joinpath('clusters/build-clusters/build-shared/release-controller'),
-            self.path_base.joinpath('clusters/build-clusters/vsphere02/release-controller'),
         ]
 
         # CRT Resources
@@ -74,7 +75,9 @@ class Config:
         self.products = [self.ocp, self.okd]
 
     def _get_releases(self):
-        releases = set()
+        # Retain existing legacy release resources after their periodic jobs retire.
+        # ImageStreams and their access permissions have an independent lifecycle.
+        releases = {'4.6', '4.7', '4.8', '4.9', '4.10', '4.11'}
 
         # Collect the 4.x and 5.x releases...
         for major in ('4', '5'):

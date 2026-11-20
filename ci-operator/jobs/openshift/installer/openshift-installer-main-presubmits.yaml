@@ -3846,6 +3846,115 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
+    context: ci/prow/e2e-aws-ovn-nested-virtualization-techpreview
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/baremetal/Dockerfile.ci
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-main-e2e-aws-ovn-nested-virtualization-techpreview
+    optional: true
+    rerun_command: /test e2e-aws-ovn-nested-virtualization-techpreview
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-nested-virtualization-techpreview
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-nested-virtualization-techpreview,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-pki-default-techpreview
     decorate: true
     decoration_config:
@@ -5047,6 +5156,115 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-techpreview,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/e2e-aws-ovn-tls-modern
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/baremetal/Dockerfile.ci
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-main-e2e-aws-ovn-tls-modern
+    optional: true
+    rerun_command: /test e2e-aws-ovn-tls-modern
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-aws-ovn-tls-modern
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-tls-modern,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -6368,7 +6586,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/e2e-azure-ovn-multidisk-techpreview
+    context: ci/prow/e2e-azure-ovn-multidisk
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -6384,9 +6602,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-main-e2e-azure-ovn-multidisk-techpreview
+    name: pull-ci-openshift-installer-main-e2e-azure-ovn-multidisk
     optional: true
-    rerun_command: /test e2e-azure-ovn-multidisk-techpreview
+    rerun_command: /test e2e-azure-ovn-multidisk
     spec:
       containers:
       - args:
@@ -6399,7 +6617,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-azure-ovn-multidisk-techpreview
+        - --target=e2e-azure-ovn-multidisk
         command:
         - ci-operator
         env:
@@ -6470,7 +6688,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-azure-ovn-multidisk-techpreview,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-azure-ovn-multidisk,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -7468,7 +7686,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/e2e-gcd-ovn-private-techpreview
+    context: ci/prow/e2e-gcd-ovn-private
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -7484,9 +7702,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: gcd
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-main-e2e-gcd-ovn-private-techpreview
+    name: pull-ci-openshift-installer-main-e2e-gcd-ovn-private
     optional: true
-    rerun_command: /test e2e-gcd-ovn-private-techpreview
+    rerun_command: /test e2e-gcd-ovn-private
     spec:
       containers:
       - args:
@@ -7499,7 +7717,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-gcd-ovn-private-techpreview
+        - --target=e2e-gcd-ovn-private
         command:
         - ci-operator
         env:
@@ -7570,7 +7788,116 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcd-ovn-private-techpreview,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcd-ovn-private,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/e2e-gcd-ovn-private-manual-oidc
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - images/baremetal/Dockerfile.ci
+      - images/installer/Dockerfile.ci
+      - images/installer/Dockerfile.upi.ci
+      - images/libvirt/Dockerfile.ci
+      - images/openstack/Dockerfile.ci
+    labels:
+      capability/intranet: intranet
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcd
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-main-e2e-gcd-ovn-private-manual-oidc
+    optional: true
+    rerun_command: /test e2e-gcd-ovn-private-manual-oidc
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-gcd-ovn-private-manual-oidc
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-gcd-ovn-private-manual-oidc,?($|\s.*)
   - agent: kubernetes
     always_run: false
     annotations:
@@ -9563,7 +9890,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/e2e-metal-ipi-bgp-vip
+    context: ci/prow/e2e-metal-ipi-bgp-vip-metallb-techpreview
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -9579,9 +9906,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-main-e2e-metal-ipi-bgp-vip
+    name: pull-ci-openshift-installer-main-e2e-metal-ipi-bgp-vip-metallb-techpreview
     optional: true
-    rerun_command: /test e2e-metal-ipi-bgp-vip
+    rerun_command: /test e2e-metal-ipi-bgp-vip-metallb-techpreview
     spec:
       containers:
       - args:
@@ -9594,7 +9921,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-ipi-bgp-vip
+        - --target=e2e-metal-ipi-bgp-vip-metallb-techpreview
         command:
         - ci-operator
         env:
@@ -9665,14 +9992,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-bgp-vip,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-bgp-vip-metallb-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/e2e-metal-ipi-bgp-vip-metallb
+    context: ci/prow/e2e-metal-ipi-bgp-vip-ovn-bgp-evpn-techpreview
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -9688,9 +10015,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-main-e2e-metal-ipi-bgp-vip-metallb
+    name: pull-ci-openshift-installer-main-e2e-metal-ipi-bgp-vip-ovn-bgp-evpn-techpreview
     optional: true
-    rerun_command: /test e2e-metal-ipi-bgp-vip-metallb
+    rerun_command: /test e2e-metal-ipi-bgp-vip-ovn-bgp-evpn-techpreview
     spec:
       containers:
       - args:
@@ -9703,7 +10030,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-ipi-bgp-vip-metallb
+        - --target=e2e-metal-ipi-bgp-vip-ovn-bgp-evpn-techpreview
         command:
         - ci-operator
         env:
@@ -9774,14 +10101,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-bgp-vip-metallb,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-bgp-vip-ovn-bgp-evpn-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/e2e-metal-ipi-bgp-vip-ovn-bgp
+    context: ci/prow/e2e-metal-ipi-bgp-vip-ovn-bgp-metallb-techpreview
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -9797,9 +10124,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-main-e2e-metal-ipi-bgp-vip-ovn-bgp
+    name: pull-ci-openshift-installer-main-e2e-metal-ipi-bgp-vip-ovn-bgp-metallb-techpreview
     optional: true
-    rerun_command: /test e2e-metal-ipi-bgp-vip-ovn-bgp
+    rerun_command: /test e2e-metal-ipi-bgp-vip-ovn-bgp-metallb-techpreview
     spec:
       containers:
       - args:
@@ -9812,7 +10139,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-ipi-bgp-vip-ovn-bgp
+        - --target=e2e-metal-ipi-bgp-vip-ovn-bgp-metallb-techpreview
         command:
         - ci-operator
         env:
@@ -9883,14 +10210,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-bgp-vip-ovn-bgp,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-bgp-vip-ovn-bgp-metallb-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/e2e-metal-ipi-bgp-vip-ovn-bgp-evpn
+    context: ci/prow/e2e-metal-ipi-bgp-vip-ovn-bgp-techpreview
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -9906,9 +10233,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-main-e2e-metal-ipi-bgp-vip-ovn-bgp-evpn
+    name: pull-ci-openshift-installer-main-e2e-metal-ipi-bgp-vip-ovn-bgp-techpreview
     optional: true
-    rerun_command: /test e2e-metal-ipi-bgp-vip-ovn-bgp-evpn
+    rerun_command: /test e2e-metal-ipi-bgp-vip-ovn-bgp-techpreview
     spec:
       containers:
       - args:
@@ -9921,7 +10248,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-ipi-bgp-vip-ovn-bgp-evpn
+        - --target=e2e-metal-ipi-bgp-vip-ovn-bgp-techpreview
         command:
         - ci-operator
         env:
@@ -9992,14 +10319,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-bgp-vip-ovn-bgp-evpn,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-bgp-vip-ovn-bgp-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/e2e-metal-ipi-bgp-vip-ovn-bgp-metallb
+    context: ci/prow/e2e-metal-ipi-bgp-vip-techpreview
     decorate: true
     decoration_config:
       sparse_checkout_files:
@@ -10015,9 +10342,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-main-e2e-metal-ipi-bgp-vip-ovn-bgp-metallb
+    name: pull-ci-openshift-installer-main-e2e-metal-ipi-bgp-vip-techpreview
     optional: true
-    rerun_command: /test e2e-metal-ipi-bgp-vip-ovn-bgp-metallb
+    rerun_command: /test e2e-metal-ipi-bgp-vip-techpreview
     spec:
       containers:
       - args:
@@ -10030,7 +10357,7 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-metal-ipi-bgp-vip-ovn-bgp-metallb
+        - --target=e2e-metal-ipi-bgp-vip-techpreview
         command:
         - ci-operator
         env:
@@ -10101,7 +10428,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-ipi-bgp-vip-ovn-bgp-metallb,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-ipi-bgp-vip-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: false
     annotations:

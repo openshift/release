@@ -1,12 +1,31 @@
 ref:
   as: baremetalds-e2e-bgp-vip-verify
-  from: dev-scripts
+  from: tests
   commands: baremetalds-e2e-bgp-vip-verify-commands.sh
+  timeout: 2h30m0s
+  grace_period: 10m
   resources:
     requests:
-      cpu: 100m
-      memory: 100Mi
-  grace_period: 10m
+      cpu: "1"
+      memory: 600Mi
+    limits:
+      memory: 4Gi
+  env:
+  - name: BGP_VIP_ORIGIN_SUITES
+    default: "openshift/bgp-vip openshift/bgp-vip/disruptive"
+    documentation: |-
+      Space-separated openshift-tests suites to run after the checks, in
+      order. A suite the payload's openshift-tests does not ship yet is
+      skipped with a notice. Set to "" to run the checks only.
+  - name: BGP_VIP_ORIGIN_DISABLED_MONITORS
+    default: "required-scc-annotation-checker,termination-message-policy"
+    documentation: |-
+      Comma-separated monitor tests to disable (--disable-monitor). The
+      default covers the two monitors that fail on every BGP VIP cluster
+      today because the kube-vip and frr-k8s static pods rendered for BGP
+      VIP management lack the openshift.io/required-scc annotation and
+      terminationMessagePolicy=FallbackToLogsOnError; drop them once those
+      manifests are fixed. Set to "" to run every monitor.
   documentation: |-
     Verifies BGP-based VIP management (enhancement 1982) on a dev-scripts
     cluster deployed with BGP_VIP_MANAGEMENT=true and ENABLE_BGP_TOR=true:
@@ -17,4 +36,12 @@ ref:
     BFD state matching the configured optional peer fields, the ToR has
     BGP paths for the API VIP from every master and for the ingress VIP
     from the workers, and the console route answers over the BGP-routed
-    VIP.
+    VIP. It then runs the openshift/origin [OCPFeatureGate:BGPBasedVIPManagement]
+    e2e suites: first the non-disruptive openshift/bgp-vip suite, then
+    openshift/bgp-vip/disruptive (a control plane node loses its BGP
+    peering; a day-2 peer timer change). The tests reach the hypervisor,
+    which hosts the bgp-tor FRR container, over SSH, so the step passes
+    --with-hypervisor-json built from the leased host's IP and the cluster
+    profile's SSH key. Payloads whose openshift-tests predates the suites
+    skip them. A failed check does not stop the suites; the step fails if
+    either part fails.

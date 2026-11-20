@@ -5,7 +5,7 @@ or more independent test suites after the main `test:` phase of the OSC
 (sandboxed-containers-operator) e2e workflows. Each suite is a step in the chain,
 gated by an enable variable and marked `best_effort: true` so that a
 failing / skipped / erroring suite **never blocks** the other suites or the
-remaining post steps (`cucushift-installer-wait`, must-gather, deprovision).
+remaining post steps (must-gather, `sandboxed-containers-operator-post-wait`, deprovision).
 
 ## Background & design intent (KATA-5727)
 
@@ -113,7 +113,8 @@ workflow:
     ...
     post:
     - chain: sandboxed-containers-operator-testsuites   # runs first in post
-    - ref: cucushift-installer-wait
+    - ref: sandboxed-containers-operator-gather-must-gather
+    - ref: sandboxed-containers-operator-post-wait
       ...
     test:
     - chain: sandboxed-containers-operator-test         # testsuites-gate

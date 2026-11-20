@@ -5,9 +5,37 @@ chain:
     cli: latest
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-self-managed-azure
-      group: ops/hypershift-ci-jobs-self-managed-azure
       collection: hypershift-team
+      group: ops/clusters/sm-azure-root-ci
+      field: azure-credentials
+      as: credentials.json
+    - mount_path: /etc/hypershift-ci-jobs-self-managed-azure-e2e
+      collection: hypershift-team
+      group: ops/clusters/sm-azure-root-ci
+      field: e2e-workload-identities
+      as: workload-identities.json
+    - mount_path: /etc/hypershift-ci-jobs-self-managed-azure-signer
+      collection: hypershift-team
+      group: ops/clusters/sm-azure-root-ci
+      field: serviceaccount-signer-private
+      as: serviceaccount-signer.private
+    - mount_path: /etc/hypershift-ci-jobs-self-managed-azure-oidc
+      collection: hypershift-team
+      group: ops/clusters/sm-azure-root-ci
+      field: oidc-issuer-url
+      as: oidc-issuer-url
+    - mount_path: /etc/hypershift-ci-jobs-self-managed-azure-kms
+      collection: hypershift-team
+      group: ops/clusters/sm-azure-root-ci
+      field: azure-encryption-key-id
+      as: azure-encryption-key-id
     env:
+    - name: AZURE_SA_TOKEN_ISSUER_KEY_PATH
+      default: /etc/hypershift-ci-jobs-self-managed-azure-signer/serviceaccount-signer.private
+      documentation: Path to the hosted cluster service-account signing key.
+    - name: HYPERSHIFT_AZURE_LOCATION
+      default: "uksouth"
+      documentation: "Azure region for the test HostedClusters."
     - name: AZURE_CREDS
       default: /etc/hypershift-ci-jobs-self-managed-azure/credentials.json
       documentation: "Azure identity used to collect worker boot diagnostics. Requires VM read and retrieveBootDiagnosticsData/action on worker resource groups."
@@ -17,6 +45,9 @@ chain:
     commands: |-
       set -xuo pipefail
       export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
+      AZURE_OIDC_ISSUER_URL="$(cat /etc/hypershift-ci-jobs-self-managed-azure-oidc/oidc-issuer-url)" || exit 1
+      AZURE_ENCRYPTION_KEY_ID="$(cat /etc/hypershift-ci-jobs-self-managed-azure-kms/azure-encryption-key-id)" || exit 1
+      export AZURE_OIDC_ISSUER_URL AZURE_ENCRYPTION_KEY_ID
       /hypershift/bin/run-tests
     timeout: 150m
     grace_period: 5m

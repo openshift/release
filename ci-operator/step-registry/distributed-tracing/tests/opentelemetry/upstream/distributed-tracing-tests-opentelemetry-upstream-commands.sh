@@ -34,6 +34,7 @@ function notify_qe_agent() {
     "INSTRUMENTATION_PYTHON_IMG": "${INSTRUMENTATION_PYTHON_IMG:-}",
     "INSTRUMENTATION_DOTNET_IMG": "${INSTRUMENTATION_DOTNET_IMG:-}",
     "INSTRUMENTATION_APACHE_HTTPD_IMG": "${INSTRUMENTATION_APACHE_HTTPD_IMG:-}",
+    "OTLPSINK_IMG": "${OTLPSINK_IMG:-}",
     "RUN_TESTS": "${RUN_TESTS:-}",
     "SKIP_TESTS": "${SKIP_TESTS:-}"
   }
@@ -46,20 +47,28 @@ trap notify_qe_agent EXIT
 OPERATOR_NAMESPACE="opentelemetry-operator-system"
 OPERATOR_DEPLOYMENT="opentelemetry-operator-controller-manager"
 WEBHOOK_DEPLOYMENT="opentelemetry-operator-webhook"
-# The full suite. Two directories run on their own, after everything else: tests/e2e-metadata-filters needs the
-# metadata filter variables set on the operator first, and tests/e2e-openshift-tls-profile changes the cluster-wide
-# TLS profile, which rolls out a MachineConfig update that disrupts any test running next to it, so it runs last.
+# The full suite. Three directories run on their own: tests/e2e-instrumentation-go is a Go test suite, not chainsaw
+# tests (see below), tests/e2e-metadata-filters needs the metadata filter variables set on the operator first, and
+# tests/e2e-openshift-tls-profile changes the cluster-wide TLS profile, which rolls out a MachineConfig update that
+# disrupts any test running next to it, so it runs last.
 FULL_SUITE="tests/e2e tests/e2e-autoscale tests/e2e-crd-validations tests/e2e-openshift tests/e2e-instrumentation
-tests/e2e-pdb tests/e2e-opampbridge tests/e2e-otel tests/e2e-multi-instrumentation tests/e2e-targetallocator-cr
-tests/e2e-targetallocator tests/e2e-prometheuscr tests/e2e-sidecar tests/e2e-metadata-filters tests/e2e-openshift-tls-profile"
+tests/e2e-instrumentation-go tests/e2e-pdb tests/e2e-opampbridge tests/e2e-otel tests/e2e-multi-instrumentation
+tests/e2e-targetallocator-cr tests/e2e-targetallocator tests/e2e-prometheuscr tests/e2e-sidecar tests/e2e-metadata-filters
+tests/e2e-openshift-tls-profile"
 METADATA_FILTERS_DIR="tests/e2e-metadata-filters"
 # The instrumentation tests run twice in the full suite: first with the default auto-instrumentation images of the
 # operator, then with the images built in this CI run (see below).
 INSTRUMENTATION_DIRS=("tests/e2e-instrumentation" "tests/e2e-multi-instrumentation")
+# The Go auto-instrumentation suite: each test deploys an OTLP sink (OTLPSINK_IMG), a collector and an instrumented app
+# into a namespace of its own, and asserts on the telemetry the sink received. It runs through the make targets of the
+# repository, which write a JUnit report: e2e-instrumentation-go-default with the default auto-instrumentation images
+# of the operator, e2e-instrumentation-go with the images built in this CI run.
+GO_INSTRUMENTATION_DIR="tests/e2e-instrumentation-go"
 TLS_PROFILE_DIR="tests/e2e-openshift-tls-profile"
 
 for required in OPERATOR_IMG TARGETALLOCATOR_IMG OPERATOROPAMPBRIDGE_IMG OPAMP_BRIDGE_SERVER INSTRUMENTATION_JAVA_IMG \
-  INSTRUMENTATION_NODEJS_IMG INSTRUMENTATION_PYTHON_IMG INSTRUMENTATION_DOTNET_IMG INSTRUMENTATION_APACHE_HTTPD_IMG; do
+  INSTRUMENTATION_NODEJS_IMG INSTRUMENTATION_PYTHON_IMG INSTRUMENTATION_DOTNET_IMG INSTRUMENTATION_APACHE_HTTPD_IMG \
+  OTLPSINK_IMG; do
   if [[ -z "${!required:-}" ]]; then
     echo "ERROR: ${required} must be set. The image variables are filled from the pipeline images that the ci-operator config builds."
     exit 1
@@ -86,14 +95,19 @@ git clone --depth 1 --branch main https://github.com/openshift/distributed-traci
 rm -rf tests/e2e-otel
 mv /tmp/distributed-tracing-qe/tests/e2e-otel tests/
 
-# Set the OpAMP bridge server image of the tests to the image built in this CI run.
-find . -path ./.git -prune -o -type f -exec sed -i "s|ghcr.io/open-telemetry/opentelemetry-operator/e2e-test-app-bridge-server:ve2e|${OPAMP_BRIDGE_SERVER}|g" {} +
+# Set the OpAMP bridge server image of the tests to the image built in this CI run. Any tag is replaced: the tests used
+# the ve2e tag, and use main since the e2e test apps were moved to tests/test-e2e-apps.
+find . -path ./.git -prune -o -type f -exec sed -i -E "s|ghcr.io/open-telemetry/opentelemetry-operator/e2e-test-app-bridge-server:[A-Za-z0-9._-]+|${OPAMP_BRIDGE_SERVER}|g" {} +
 
 # The tests to run: exactly RUN_TESTS, or the full suite minus SKIP_TESTS.
 if [[ -n "${RUN_TESTS:-}" ]]; then
   echo "Running the tests of RUN_TESTS: ${RUN_TESTS}"
   # shellcheck disable=SC2206 # RUN_TESTS is a space separated list
   selected=(${RUN_TESTS})
+  # A trailing slash is removed: the directories that run on their own are told apart by their exact names.
+  for i in "${!selected[@]}"; do
+    selected[i]="${selected[i]%/}"
+  done
   for dir in "${selected[@]}"; do
     if [[ ! -d "${dir}" ]]; then
       echo "ERROR: the test directory ${dir} of RUN_TESTS does not exist in the repository."
@@ -141,12 +155,15 @@ else
   done
 fi
 
-# The metadata filters and the TLS profile tests run on their own after the rest, in that order (see FULL_SUITE).
+# The Go instrumentation suite, the metadata filters and the TLS profile tests run on their own after the rest, in that
+# order (see FULL_SUITE).
 main_dirs=()
+run_go_instrumentation=false
 run_metadata_filters=false
 run_tls_profile=false
 for dir in "${selected[@]}"; do
   case "${dir}" in
+    "${GO_INSTRUMENTATION_DIR}") run_go_instrumentation=true ;;
     "${METADATA_FILTERS_DIR}") run_metadata_filters=true ;;
     "${TLS_PROFILE_DIR}") run_tls_profile=true ;;
     *) main_dirs+=("${dir}") ;;
@@ -183,14 +200,17 @@ done
 # Returns once OLM rolled out the patched deployments: each must carry exactly one entry of every variable with
 # the requested value, and must be Available.
 function set_operator_env() {
-  local names='[]' entries='[]' pair csv_name patch deployment patched
+  local names='[]' entries='[]' pair csv_list csv_name patch deployment patched
   for pair in "$@"; do
     names=$(jq -c --arg n "${pair%%=*}" '. + [$n]' <<< "${names}")
     entries=$(jq -c --arg n "${pair%%=*}" --arg v "${pair#*=}" '. + [{"name": $n, "value": $v}]' <<< "${entries}")
   done
   echo "Setting the operator environment variables: $(jq -r 'map(.name) | join(" ")' <<< "${entries}")"
 
-  if ! csv_name=$(oc get csv -n "${OPERATOR_NAMESPACE}" -o name | grep -m1 "opentelemetry-operator" | cut -d/ -f2); then
+  # List the CSVs first: with pipefail, "grep -m1" closing the pipe early can fail "oc get" with SIGPIPE while the CSV exists.
+  csv_list=$(oc get csv -n "${OPERATOR_NAMESPACE}" -o name)
+  csv_name=$(grep -m1 "opentelemetry-operator" <<< "${csv_list}" | cut -d/ -f2 || true)
+  if [[ -z "${csv_name}" ]]; then
     echo "ERROR: no opentelemetry-operator CSV found in namespace ${OPERATOR_NAMESPACE}."
     exit 1
   fi
@@ -240,6 +260,31 @@ instrumentation_env=(
   "RELATED_IMAGE_AUTO_INSTRUMENTATION_APACHE_HTTPD=${INSTRUMENTATION_APACHE_HTTPD_IMG}"
 )
 
+# Runs the Go instrumentation suite through the make target $1 and copies its JUnit report to ARTIFACT_DIR as $2.xml,
+# also when tests failed. Returns non-zero when the tests failed or no report was written.
+# e2e-instrumentation-go sets the images built in this CI run in the Instrumentation CRs. The suite sets every
+# INSTRUMENTATION_*_IMG variable of its environment in the CRs, so e2e-instrumentation-go-default runs without them, and
+# the agents come from the operator.
+function go_instrumentation_suite() {
+  local target=$1 report=$2 rc=0
+  local junit=".testresults/e2e/${target}.xml"
+  local make_env=(env)
+  if [[ "${target}" == "e2e-instrumentation-go-default" ]]; then
+    make_env+=(-u INSTRUMENTATION_JAVA_IMG -u INSTRUMENTATION_NODEJS_IMG -u INSTRUMENTATION_PYTHON_IMG
+      -u INSTRUMENTATION_DOTNET_IMG -u INSTRUMENTATION_APACHE_HTTPD_IMG)
+  fi
+  echo "=== Running: ${GO_INSTRUMENTATION_DIR} (make ${target})"
+  rm -f "${junit}"
+  "${make_env[@]}" make "${target}" OTLPSINK_IMG="${OTLPSINK_IMG}" || rc=$?
+  if [[ -s "${junit}" ]]; then
+    cp "${junit}" "${ARTIFACT_DIR}/${report}.xml" || rc=1
+  else
+    echo "ERROR: make ${target} did not write the JUnit report ${junit}."
+    rc=1
+  fi
+  return "${rc}"
+}
+
 # Point the operator at the target allocator and OpAMP bridge images built in this CI run. The collector image is the
 # default of the operator. PHP and Ruby auto-instrumentation are not enabled in the OpenShift bundle and the PHP and Ruby
 # tests of tests/e2e-instrumentation fail without it, so enable them. A job that names its tests (RUN_TESTS) runs them
@@ -280,6 +325,17 @@ if [[ ${#main_dirs[@]} -gt 0 ]]; then
     "${main_dirs[@]}" || any_errors=true
 fi
 
+# The Go instrumentation suite runs once for a job with RUN_TESTS, with the auto-instrumentation images built in this CI
+# run, which are also the defaults of its operator. The full suite runs it here with the default images of the operator,
+# and a second time with the images built in this CI run (see below).
+if [[ "${run_go_instrumentation}" == "true" ]]; then
+  if [[ -n "${RUN_TESTS:-}" ]]; then
+    go_instrumentation_suite e2e-instrumentation-go junit_otel_e2e_instrumentation_go_pipeline_images || any_errors=true
+  else
+    go_instrumentation_suite e2e-instrumentation-go-default junit_otel_e2e_instrumentation_go_default || any_errors=true
+  fi
+fi
+
 if [[ "${run_metadata_filters}" == "true" ]]; then
   set_operator_env "ANNOTATIONS_FILTER=.*filter.out,config.*.gke.io.*" "LABELS_FILTER=.*filter.out"
   echo "=== Running: ${METADATA_FILTERS_DIR} (selector ${selector})"
@@ -293,8 +349,8 @@ if [[ "${run_metadata_filters}" == "true" ]]; then
     "${METADATA_FILTERS_DIR}" || any_errors=true
 fi
 
-# The instrumentation tests of the full suite run a second time with the auto-instrumentation images built in this CI
-# run. The directories that SKIP_TESTS removed as a whole are left out.
+# The instrumentation tests of the full suite, chainsaw and Go, run a second time with the auto-instrumentation images
+# built in this CI run. The directories that SKIP_TESTS removed as a whole are left out.
 if [[ -z "${RUN_TESTS:-}" ]]; then
   instrumentation_dirs=()
   for dir in "${INSTRUMENTATION_DIRS[@]}"; do
@@ -311,6 +367,9 @@ if [[ -z "${RUN_TESTS:-}" ]]; then
       --selector "${selector}" \
       --test-dir \
       "${instrumentation_dirs[@]}" || any_errors=true
+  fi
+  if [[ "${run_go_instrumentation}" == "true" ]]; then
+    go_instrumentation_suite e2e-instrumentation-go junit_otel_e2e_instrumentation_go_pipeline_images || any_errors=true
   fi
 fi
 

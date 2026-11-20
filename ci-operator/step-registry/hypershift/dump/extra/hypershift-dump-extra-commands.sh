@@ -1,4 +1,12 @@
 #!/bin/bash
+if [[ -n "${HYPERSHIFT_CLUSTER_ROLE:-}" ]]; then
+  if [[ ! "${HYPERSHIFT_CLUSTER_ROLE}" =~ ^[a-z0-9-]+$ ]]; then
+    echo "HYPERSHIFT_CLUSTER_ROLE must contain only lowercase letters, digits, or hyphens" >&2
+    exit 1
+  fi
+  export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig_${HYPERSHIFT_CLUSTER_ROLE}"
+fi
+
 function queue() {
   local TARGET="${1}"
   shift

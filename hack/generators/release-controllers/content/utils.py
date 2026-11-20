@@ -1,8 +1,62 @@
+import yaml
+
+from job_definition_paths import PLUGIN_CONFIG_DIR, cone_sparse_checkout_patterns, read_job_definition_paths
+
+GIT_SYNC_SPARSE_CHECKOUT_CONFIGMAP = 'release-controller-sparse-checkout'
+GIT_SYNC_SPARSE_CHECKOUT_ARG = '--sparse-checkout-file=/etc/git-sync/sparse-checkout'
+
+# Go runtime settings for the release-controller containers. The soft memory limit is kept
+# below the memory request so the garbage collector runs more aggressively before the pod
+# grows into its request, and GOMAXPROCS is pinned so parallelism does not depend on the
+# number of CPUs on the node.
+RC_MEMORY_REQUEST = '4Gi'
+RC_CPU_REQUEST = '300m'
+RC_GOMEMLIMIT = '3584MiB'  # 3.5GiB
+RC_GOMAXPROCS = '2'
+
+# Requests for the git-sync sidecar, sized to its observed usage (~36Mi memory, ~0.055 CPU peak).
+GIT_SYNC_MEMORY_REQUEST = '50Mi'
+GIT_SYNC_CPU_REQUEST = '50m'
+
+
+def get_rc_runtime_env_vars():
+    return [
+        {
+            'name': 'GOMEMLIMIT',
+            'value': RC_GOMEMLIMIT,
+        },
+        {
+            'name': 'GOMAXPROCS',
+            'value': RC_GOMAXPROCS,
+        },
+    ]
+
+
+class _LiteralString(str):
+    pass
+
+
+def _literal_string_representer(dumper, data):
+    return dumper.represent_scalar('tag:yaml.org,2002:str', data, style='|')
+
+
+yaml.add_representer(_LiteralString, _literal_string_representer, Dumper=yaml.SafeDumper)
+
+
 def get_kubeconfig_volume_mounts():
     return [
         {
             'mountPath': '/etc/kubeconfigs',
             'name': 'release-controller-kubeconfigs',
+            'readOnly': True
+        }]
+
+
+def get_git_sync_sparse_checkout_volume_mounts():
+    return [
+        {
+            'name': 'sparse-checkout',
+            'mountPath': '/etc/git-sync',
             'readOnly': True
         }]
 
@@ -128,6 +182,22 @@ def get_rcapi_volumes(context, secret_name=None):
     ] + get_kubeconfig_volumes(context, secret_name) + get_oc_volumes()
 
 
+def add_release_controller_sparse_checkout_configmap(gendoc, config):
+    job_definition_paths = read_job_definition_paths(config.paths.path_base)
+    patterns = cone_sparse_checkout_patterns(job_definition_paths + [PLUGIN_CONFIG_DIR])
+    gendoc.append({
+        'apiVersion': 'v1',
+        'kind': 'ConfigMap',
+        'metadata': {
+            'name': GIT_SYNC_SPARSE_CHECKOUT_CONFIGMAP,
+            'namespace': config.rc_deployment_namespace,
+        },
+        'data': {
+            'sparse-checkout': _LiteralString('\n'.join(patterns) + '\n'),
+        },
+    }, comment='Generated from core-services/release-controller/job-definition-paths.txt plus\nthe plugin config tree, in git\'s cone format so that git-sync\'s\n"git sparse-checkout init" (which defaults to cone mode) uses it as-is.')
+
+
 def get_rc_volumes(context):
     return [
         {
@@ -140,6 +210,12 @@ def get_rc_volumes(context):
         {
             'name': 'release',
             'emptyDir': {}
+        },
+        {
+            'configMap': {
+                'name': GIT_SYNC_SPARSE_CHECKOUT_CONFIGMAP
+            },
+            'name': 'sparse-checkout'
         },
         {
             'name': 'oauth',

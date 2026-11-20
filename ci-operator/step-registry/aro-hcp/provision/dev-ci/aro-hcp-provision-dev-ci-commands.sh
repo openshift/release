@@ -11,6 +11,7 @@ export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/cl
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
 unset GOFLAGS
+export TEMPLATIZE_USE_PREBUILT=1
 
 #-# DEV CI UNPRIVILEGED ENTRYPOINT #-#
 
@@ -23,4 +24,4 @@ unset GOFLAGS
 # subscription-scoped RBAC grants) is NOT run here; it is applied on demand by
 # an OWNERS member because this job's service principal is not a subscription
 # Owner.
-make -o tooling/templatize/templatize dev-ci-local-run
+make dev-ci-local-run

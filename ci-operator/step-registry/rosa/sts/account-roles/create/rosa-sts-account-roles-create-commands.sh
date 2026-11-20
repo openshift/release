@@ -85,9 +85,23 @@ if [[ -z "$OPENSHIFT_VERSION" ]]; then
   fi
 fi
 
+set_version_switch() {
+  if [[ -n "$OPENSHIFT_VERSION" ]]; then
+    OPENSHIFT_VERSION=$(echo "${OPENSHIFT_VERSION}" | cut -d '.' -f 1,2)
+  fi
+
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    # Hosted control plane managed policies are not versioned by the
+    # OpenShift release. Passing --version makes older ROSA CLIs query the
+    # classic version list and reject HCP-only releases such as 5.0.
+    VERSION_SWITCH="--channel-group ${CHANNEL_GROUP}"
+  elif [[ -n "$OPENSHIFT_VERSION" ]]; then
+    VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
+  fi
+}
+
 if [[ -n "$OPENSHIFT_VERSION" ]]; then
-  OPENSHIFT_VERSION=$(echo "${OPENSHIFT_VERSION}" | cut -d '.' -f 1,2)
-  VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
+  set_version_switch
 fi
 
 ARN_PATH_SWITCH=""
@@ -119,28 +133,35 @@ if [[ "${create_ret}" -ne 0 && "${CHANNEL_GROUP}" == "stable" ]]; then
   exit "${create_ret}"
 elif [[ "${create_ret}" -ne 0 ]]; then
   echo "Account role creation failed (exit ${create_ret}). Falling back to latest available version in channel-group ${CHANNEL_GROUP}..."
-  if [[ "$HOSTED_CP" == "true" ]]; then
-    fallback_version=$(rosa list versions --channel-group "${CHANNEL_GROUP}" ${CLUSTER_SWITCH} -o json 2>/dev/null \
-      | jq -r '.[].raw_id' | cut -d'.' -f1,2 | sort -Vu | tail -1 || true)
+  if [[ "$HOSTED_CP" == "true" && -n "${OPENSHIFT_VERSION}" ]]; then
+    # HCP managed policies are not selected by version. Keep the resolved
+    # version for the cluster provisioning steps and retry the same role
+    # request instead of replacing it with a fallback version.
+    echo "Retrying hosted control-plane account-role creation for ${OPENSHIFT_VERSION}"
   else
-    fallback_version=$(rosa list versions --channel-group "${CHANNEL_GROUP}" -o json 2>/dev/null \
-      | jq -r '.[].raw_id' | cut -d'.' -f1,2 | sort -Vu | tail -1 || true)
+    if [[ "$HOSTED_CP" == "true" ]]; then
+      fallback_version=$(rosa list versions --channel-group "${CHANNEL_GROUP}" ${CLUSTER_SWITCH} -o json 2>/dev/null \
+        | jq -r '.[].raw_id' | cut -d'.' -f1,2 | sort -Vu | tail -1 || true)
+    else
+      fallback_version=$(rosa list versions --channel-group "${CHANNEL_GROUP}" -o json 2>/dev/null \
+        | jq -r '.[].raw_id' | cut -d'.' -f1,2 | sort -Vu | tail -1 || true)
+    fi
+    if [[ -n "${fallback_version}" && "${fallback_version}" != "${OPENSHIFT_VERSION}" ]]; then
+      echo "Retrying with version ${fallback_version} (was ${OPENSHIFT_VERSION})"
+      OPENSHIFT_VERSION="${fallback_version}"
+    else
+      echo "ERROR: No fallback version available in channel-group ${CHANNEL_GROUP}"
+      exit 1
+    fi
   fi
-  if [[ -n "${fallback_version}" && "${fallback_version}" != "${OPENSHIFT_VERSION}" ]]; then
-    echo "Retrying with version ${fallback_version} (was ${OPENSHIFT_VERSION})"
-    OPENSHIFT_VERSION="${fallback_version}"
-    VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
-    rosa create account-roles -y --mode auto \
-                              --prefix ${ACCOUNT_ROLES_PREFIX} \
-                              ${CLUSTER_SWITCH} \
-                              ${VERSION_SWITCH} \
-                              ${ARN_PATH_SWITCH} \
-                              ${PERMISSIONS_BOUNDARY_SWITCH} \
-                              | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
-  else
-    echo "ERROR: No fallback version available in channel-group ${CHANNEL_GROUP}"
-    exit 1
-  fi
+  set_version_switch
+  rosa create account-roles -y --mode auto \
+                            --prefix ${ACCOUNT_ROLES_PREFIX} \
+                            ${CLUSTER_SWITCH} \
+                            ${VERSION_SWITCH} \
+                            ${ARN_PATH_SWITCH} \
+                            ${PERMISSIONS_BOUNDARY_SWITCH} \
+                            | sed "s/$AWS_ACCOUNT_ID/$AWS_ACCOUNT_ID_MASK/g"
 fi
 
 # Share the resolved version (includes fallback if one was used)

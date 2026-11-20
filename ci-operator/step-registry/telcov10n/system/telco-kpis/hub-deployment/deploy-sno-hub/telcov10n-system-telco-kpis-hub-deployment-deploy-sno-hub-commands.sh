@@ -6,9 +6,11 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'deploy_sno_hub' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
 apply_gangway_overrides
-setup_debug_on_fail
 
 main() {
+    # Install unified exit handler (handles CONTINUE_ON_FAIL and DEBUG_ON_FAIL)
+    setup_telco_kpis_exit_handler
+
     echo "Deploying SNO hub cluster: ${HUB_CLUSTER}"
 
     # Hub IS the OCP cluster being deployed — pass as both spoke and hub args

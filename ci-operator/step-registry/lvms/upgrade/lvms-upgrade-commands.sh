@@ -201,12 +201,15 @@ EOF
 }
 
 function create_idms() {
-    local cluster_minor rhel_suffix mirror_api mirror_kind mirror_spec_field mirror_resource
-    cluster_minor=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d. -f2)
+    local cluster_version cluster_major cluster_minor rhel_suffix mirror_api mirror_kind mirror_spec_field mirror_resource
+    cluster_version=$(oc get clusterversion version -o jsonpath='{.status.desired.version}')
+    IFS=. read -r cluster_major cluster_minor _ <<< "${cluster_version}"
 
-    # LVMS product images track the cluster RHCOS base: rhel8 through 4.13, rhel9 from 4.14.
+    # LVMS product images track the cluster RHCOS base: rhel8 through 4.13, rhel9
+    # from 4.14 on. Guard on the major too: a bare "minor <= 13" check treats
+    # 5.0 (minor 0) as an old 4.x and wrongly selects the rhel8 + ICSP path.
     rhel_suffix="rhel9"
-    [[ "${cluster_minor}" -le 13 ]] && rhel_suffix="rhel8"
+    [[ "${cluster_major}" -eq 4 && "${cluster_minor}" -le 13 ]] && rhel_suffix="rhel8"
 
     # ImageDigestMirrorSet (config.openshift.io/v1) exists from 4.13 on; 4.12 only has
     # the older ImageContentSourcePolicy. Both express digest mirrors the same way.
@@ -214,7 +217,7 @@ function create_idms() {
     mirror_kind="ImageDigestMirrorSet"
     mirror_spec_field="imageDigestMirrors"
     mirror_resource="imagedigestmirrorset"
-    if [[ "${cluster_minor}" -le 12 ]]; then
+    if [[ "${cluster_major}" -eq 4 && "${cluster_minor}" -le 12 ]]; then
         mirror_api="operator.openshift.io/v1alpha1"
         mirror_kind="ImageContentSourcePolicy"
         mirror_spec_field="repositoryDigestMirrors"

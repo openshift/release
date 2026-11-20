@@ -11,16 +11,17 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 export_env_vars_from_json 'reboot' "${TEST_SETTINGS:-}" "${TEST_SETTINGS_DEFAULTS:-}"
 apply_gangway_overrides
 
+main() {
+    # Install unified exit handler (handles CONTINUE_ON_FAIL and DEBUG_ON_FAIL)
+    setup_telco_kpis_exit_handler
+
 # Validate REBOOT_COUNT is a non-negative integer
 if ! [[ "${REBOOT_COUNT}" =~ ^[0-9]+$ ]]; then
     echo "ERROR: REBOOT_COUNT must be a non-negative integer, got: '${REBOOT_COUNT}'"
     exit 1
 fi
 
-setup_continue_on_fail
-setup_debug_on_fail
 
-main() {
     echo "Running reboot test for spoke: ${SPOKE_CLUSTER}"
 
     setup_ansible_inventory "${SPOKE_CLUSTER}" "${HUB_CLUSTER}"

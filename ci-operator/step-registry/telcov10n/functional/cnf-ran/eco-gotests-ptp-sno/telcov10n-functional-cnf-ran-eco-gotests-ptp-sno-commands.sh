@@ -91,8 +91,8 @@ echo "Gather artifacts from bastion to ARTIFACT_DIR (for GCS)"
 # SCP all XML files to ARTIFACT_DIR so Prow uploads them to GCS for debugging.
 # This is the only transfer from bastion to CI pod — processing happens on the bastion.
 # Cycle-to-scenario mapping matches deploy-run-eco-gotests-ptp.yaml's ptp_cycles.
-declare -A PTP_CYCLE_NAMES=( [0]="BC-OC" [1]="OC-2-PORT" [2]="T-TSC" [3]="T-BC" )
-for i in 0 1 2 3; do
+declare -A PTP_CYCLE_NAMES=( [0]="BC-OC" [1]="OC-2-PORT" [2]="T-TSC" [3]="T-BC" [4]="DUAL-TR-TBC" )
+for i in 0 1 2 3 4; do
   local_dir="${ARTIFACT_DIR}/junit_eco_gotests_ptp_${i}-${PTP_CYCLE_NAMES[$i]}"
   mkdir -p "${local_dir}"
   if ! xml_output=$(scp -r "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \

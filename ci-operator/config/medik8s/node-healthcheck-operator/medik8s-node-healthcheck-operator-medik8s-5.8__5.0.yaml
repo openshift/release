@@ -43,7 +43,7 @@ images:
       system-tests-builder:
         as:
         - system-tests-builder
-    to: nhc-daily-test-runner
+    to: nhc-weekly-test-runner
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -61,25 +61,28 @@ resources:
       cpu: 100m
       memory: 500Mi
 tests:
-- as: e2e-system-tests-nhc-daily-aws
+- as: e2e-system-tests-nhc-weekly-aws
   capabilities:
   - nested-podman
   - intranet
-  cron: 0 4 * * *
+  cron: 0 4 * * 1
   steps:
     cluster_profile: openshift-org-aws
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
+      ECO_DUMP_FAILED_TESTS: "true"
       ECO_IS_DOWNSTREAM: "false"
       ECO_TEST_FEATURES: nhc-operator
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
+      EXTRA_MG_ARGS: --image=quay.io/medik8s/must-gather:latest
       MEDIK8S_BUNDLE_IMAGES: self-node-remediation
-      TEST_NAME: e2e-system-tests-nhc-daily-aws
+      TEST_NAME: e2e-system-tests-nhc-weekly-aws
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - ref: medik8s-upstream-bundle-install
     - as: build-and-install-nhc
@@ -145,7 +148,7 @@ tests:
           cd /tmp/nhc-source
           # VERSION / PREVIOUS_VERSION come from the branch Makefile
           # (DEFAULT_VERSION / PREVIOUS_VERSION). No registry lookup needed:
-          # this daily installs a fresh ttl.sh candidate, not an upgrade path.
+          # this weekly installs a fresh ttl.sh candidate, not an upgrade path.
           export CANDIDATE_VERSION
           CANDIDATE_VERSION="$(sed -n 's/^DEFAULT_VERSION := //p' Makefile)"
           test -n "$CANDIDATE_VERSION"
@@ -253,7 +256,7 @@ tests:
         build_candidate
         verify_candidate
         install_candidate
-      from: nhc-daily-test-runner
+      from: nhc-weekly-test-runner
       nested_podman: true
       resources:
         requests:
@@ -292,6 +295,7 @@ tests:
         echo '==> Run system-tests (nhc-operator)'
         make -C /tmp/system-tests run-tests
       env:
+      - name: ECO_DUMP_FAILED_TESTS
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
       - name: ECO_TEST_VERBOSE

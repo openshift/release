@@ -45,6 +45,7 @@ test/sandboxed-containers-operator-test-chain.yaml         # shared test-phase c
 test/sanity/                                                # test-phase step; one workload must run before anything else is tested
 testsuites-gate/                                            # test-phase step; creates ${SHARED_DIR}/testsuites_gate
 testsuites/                                                 # POST-phase test suites (see testsuites/AGENTS.md)
+post/wait/                                                  # hold cluster for manual debugging before cleanup
 ```
 
 ## OWNERS Files — Kept in Sync with Config OWNERS via sync-owners.sh
@@ -112,7 +113,8 @@ job with `TESTS_SANITY_ENABLE: "false"` — the disconnected job does that, as
 its mirror does not carry the workload image.
 
 The **first** post entry is the `sandboxed-containers-operator-testsuites` chain,
-followed by must-gather and deprovision. The workflows set
+followed by must-gather, `sandboxed-containers-operator-post-wait` and deprovision.
+The workflows set
 `steps.allow_best_effort_post_steps: true`, which is **required** for the
 non-blocking suite behavior documented in `testsuites/AGENTS.md`.
 
@@ -166,12 +168,13 @@ image must be either:
 
 ```bash
 make registry-metadata    # regenerate step metadata after adding/renaming steps
-make jobs                 # runs checkconfig, which loads & validates the registry
+make validate-step-registry  # validate ci-operator configs and the registry
 ```
-`checkconfig` (run by `make jobs`) is the authoritative validation — it resolves
-refs/chains/workflows and the image graph. Note: `make validate-step-registry`
-may fail in some environments with `flag provided but not defined: -prow-config`
-(a tooling/container mismatch, not your change); rely on `checkconfig`.
+`make validate-step-registry` runs `ci-operator-checkconfig` against the full
+ci-operator config directory and registry, including cluster-profile and
+cluster-claim-owner configuration. `make jobs` runs this same validation first,
+then regenerates and sanitizes Prow jobs. The separate `make checkconfig` target
+validates Prow configuration.
 
 ## Keeping This File Current
 

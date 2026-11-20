@@ -144,6 +144,11 @@ CLOUDCONTROLLER_SA=$(awk -F'"' '/"cloud-controller"/{print $4}' "${IAM_OUTPUT}")
 STORAGE_SA=$(awk -F'"' '/"gcp-pd-csi"/{print $4}' "${IAM_OUTPUT}")
 IMAGEREGISTRY_SA=$(awk -F'"' '/"image-registry"/{print $4}' "${IAM_OUTPUT}")
 NETWORK_SA=$(awk -F'"' '/"cloud-network"/{print $4}' "${IAM_OUTPUT}")
+# ingress-op is only emitted by hypershift versions that support the
+# Ingress-enabled variant (openshift/hypershift#9958), so it stays optional:
+# the multi-cluster platform config requires SHARED_DIR/ingress-sa only when
+# the image also creates that variant.
+INGRESS_SA=$(awk -F'"' '/"ingress-op"/{print $4}' "${IAM_OUTPUT}")
 
 if [[ -z "${PROJECT_NUMBER}" || -z "${POOL_ID}" || -z "${PROVIDER_ID}" || -z "${CONTROLPLANE_SA}" || -z "${NODEPOOL_SA}" || -z "${CLOUDCONTROLLER_SA}" || -z "${STORAGE_SA}" || -z "${IMAGEREGISTRY_SA}" || -z "${NETWORK_SA}" ]]; then
     echo "ERROR: Failed to parse WIF configuration from IAM output"
@@ -161,6 +166,9 @@ echo "${CLOUDCONTROLLER_SA}" > "${SHARED_DIR}/cloudcontroller-sa"
 echo "${STORAGE_SA}" > "${SHARED_DIR}/storage-sa"
 echo "${IMAGEREGISTRY_SA}" > "${SHARED_DIR}/imageregistry-sa"
 echo "${NETWORK_SA}" > "${SHARED_DIR}/network-sa"
+if [[ -n "${INGRESS_SA}" ]]; then
+    echo "${INGRESS_SA}" > "${SHARED_DIR}/ingress-sa"
+fi
 
 echo "WIF configuration saved to SHARED_DIR"
 
@@ -212,6 +220,9 @@ echo "  Control Plane SA: ${CONTROLPLANE_SA}"
 echo "  NodePool SA: ${NODEPOOL_SA}"
 echo "  Cloud Controller SA: ${CLOUDCONTROLLER_SA}"
 echo "  Network SA: ${NETWORK_SA}"
+if [[ -n "${INGRESS_SA}" ]]; then
+    echo "  Ingress SA: ${INGRESS_SA}"
+fi
 echo ""
 echo "Network Configuration:"
 echo "  VPC: ${HC_VPC_NAME}"

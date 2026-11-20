@@ -197,7 +197,7 @@ oc wait --for=condition=Established --timeout=2m "crd/${MIGRATION_CRD}"
 jq -n \
   --arg name "${MIGRATION_NAME}" \
   --arg namespace "${MIGRATION_NAMESPACE}" \
-  --argfile failureDomains "${rendered_fds}" \
+  --argjson failureDomains "$(<"${rendered_fds}")" \
   '{
     apiVersion: "migration.openshift.io/v1alpha1",
     kind: "VmwareCloudFoundationMigration",

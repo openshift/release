@@ -4,6 +4,9 @@ chain:
   - as: tests
     cli: latest
     env:
+    - name: AWS_MULTI_ARCH
+      default: "false"
+      documentation: "Enable multi-architecture testing. When true, the e2e suite runs against multi-arch payloads and arm64 NodePools."
     - name: HYPERSHIFT_PLATFORM
       default: ""
       documentation: "The cloud platform for the clusters (e.g. aws). Set in the workflow env block."
@@ -13,6 +16,11 @@ chain:
       export AWS_SHARED_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       export AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       export PULL_SECRET_FILE="/etc/ci-pull-credentials/.dockerconfigjson"
+      if [[ -f "${SHARED_DIR}/eip.env" ]]; then
+          set +x
+          source "${SHARED_DIR}/eip.env"
+          set -x
+      fi
       if [[ -f "${SHARED_DIR}/test-plan.yaml" ]]; then
           export TEST_PLAN="${SHARED_DIR}/test-plan.yaml"
       fi

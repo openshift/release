@@ -1,6 +1,7 @@
 ref:
   as: deploy-konflux-operator
   from: tests
+  cli: latest
   timeout: 30m
   grace_period: 1m
   commands: deploy-konflux-operator-commands.sh
@@ -9,6 +10,16 @@ ref:
       cpu: 100m
       memory: 100Mi
   env:
+  - name: ART_IMAGES_SOURCE
+    default: registry.stage.redhat.io
+    documentation: |-
+      Registry root mirroring registry.redhat.io related images, preserving repository paths and digests.
+      Authentication uses registry_stage.json from the existing mirror-registry credential mount.
+  - name: KONFLUX_CATALOG_REGISTRY_PROXY
+    default: ""
+    documentation: |-
+      Quay catalog proxy host:port for registry-proxy mode. Defaults to the ART proxy host on port 6001;
+      the ART proxy (port 6003 by default) must proxy registry.stage.redhat.io.
   - name: KONFLUX_DEPLOY_OPERATORS
     documentation: |-
       If set to "false", the operators will not be deployed. Default is "true".
@@ -42,15 +53,18 @@ ref:
     default: ""
   - name: KONFLUX_REGISTRY_PROXY_PORT
     documentation: |-
-      The port of the registry proxy. Must be set if KONFLUX_REGISTRY_PROXY_HOST is set.
+      The stage registry proxy port. Must be set if KONFLUX_REGISTRY_PROXY_HOST is set.
+      The legacy Quay ART-share port 6004 is migrated to the existing stage proxy port 6003.
+      Catalogs use the separate Quay proxy on port 6001 unless KONFLUX_CATALOG_REGISTRY_PROXY is set.
     default: ""
   credentials:
-  - collection: deploy-konflux-operator
-    group: art-image-share
-    mount_path: /var/run/vault/deploy-konflux-operator-art-image-share
   - collection: openshift-qe
     group: mirror-registry
     mount_path: /var/run/vault/mirror-registry
   documentation: |-
-     Deploy Konflux-built operators for connected environments using
-     https://github.com/ajaggapa/deploy-konflux-operator
+     Deploy Konflux-built operators using deployment logic owned by this step.
+     Uses CI-injected oc and opm extracted from a digest-pinned OpenShift
+     operator-registry image. Catalogs remain on Quay;
+     registry.redhat.io related images are pulled from the stage registry using the
+     existing opt-in mirror-registry credentials. Disconnected copies and stage
+     registry proxies preserve repository paths and image digests.

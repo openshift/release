@@ -1,5 +1,5 @@
 from content.osd_rc_deployments import get_oc_env_vars, get_oc_prepare_container
-from content.utils import get_rc_volumes, get_rc_volume_mounts, get_rcapi_volumes, get_rcapi_volume_mounts
+from content.utils import GIT_SYNC_SPARSE_CHECKOUT_ARG, get_git_sync_sparse_checkout_volume_mounts, get_rc_volumes, get_rc_volume_mounts, get_rcapi_volumes, get_rcapi_volume_mounts, get_rc_runtime_env_vars, RC_MEMORY_REQUEST, RC_CPU_REQUEST, GIT_SYNC_MEMORY_REQUEST, GIT_SYNC_CPU_REQUEST
 
 
 def add_legacy_origin_deployments_scaled_down(gendoc):
@@ -179,7 +179,8 @@ def add_okd_deployments(gendoc):
                                                       "--ref=main",
                                                       "--root=/tmp/git-sync",
                                                       "--one-time=true",
-                                                      "--depth=1"
+                                                      "--depth=1",
+                                                      GIT_SYNC_SPARSE_CHECKOUT_ARG
                                                   ],
                                                   "env": [
                                                       {
@@ -193,19 +194,21 @@ def add_okd_deployments(gendoc):
                                                           "name": "release",
                                                           "mountPath": "/tmp/git-sync"
                                                       }
-                                                  ]
+                                                  ] + get_git_sync_sparse_checkout_volume_mounts()
                                               }
                                           ] + get_oc_prepare_container(context),
                         "containers": [
                             {
                                 "name": "git-sync",
+                                "resources": {"requests": {"memory": GIT_SYNC_MEMORY_REQUEST, "cpu": GIT_SYNC_CPU_REQUEST}},
                                 "command": ["/git-sync"],
                                 "args": [
                                     "--repo=https://github.com/openshift/release.git",
                                     "--ref=main",
                                     "--period=30s",
                                     "--root=/tmp/git-sync",
-                                    "--max-failures=3"
+                                    "--max-failures=3",
+                                    GIT_SYNC_SPARSE_CHECKOUT_ARG
                                 ],
                                 "env": [
                                     {
@@ -219,18 +222,13 @@ def add_okd_deployments(gendoc):
                                         "name": "release",
                                         "mountPath": "/tmp/git-sync"
                                     }
-                                ],
-                                "resources": {
-                                    "requests": {
-                                        "memory": "1Gi",
-                                        "cpu": "0.5",
-                                    }
-                                }
+                                ] + get_git_sync_sparse_checkout_volume_mounts(),
                             },
                             {
                                 "resources": {
                                     "requests": {
-                                        "memory": "11Gi"
+                                        "memory": RC_MEMORY_REQUEST,
+                                        "cpu": RC_CPU_REQUEST
                                     },
                                 },
                                 "command": [
@@ -250,7 +248,7 @@ def add_okd_deployments(gendoc):
                                 'imagePullPolicy': 'Always',
                                 "name": "controller",
                                 "volumeMounts": get_rc_volume_mounts(),
-                                "env": get_oc_env_vars(),
+                                "env": get_oc_env_vars() + get_rc_runtime_env_vars(),
                                 'livenessProbe': {
                                     'httpGet': {
                                         'path': '/healthz',

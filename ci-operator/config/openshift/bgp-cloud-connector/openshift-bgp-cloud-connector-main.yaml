@@ -84,11 +84,13 @@ images:
         as:
         - upi-installer
     to: e2e-runner
+  skip_if_only_changed: ^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|^renovate\.json$
 operator:
   bundles:
   - as: bgp-cloud-connector-bundle
     dockerfile_path: bundle.Dockerfile
     skip_building_index: true
+    skip_if_only_changed: ^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|^renovate\.json$
   substitutions:
   - pullspec: controller:latest
     with: pipeline:bgp-cloud-connector
@@ -114,17 +116,17 @@ tests:
     make lint
   container:
     from: src
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
 - as: unit
   commands: make test test-aws
   container:
     from: src
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
 - as: verify
   commands: make verify
   container:
     from: src
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
 - as: e2e-runner-image
   commands: |
     # Proves the image the e2e jobs run in actually carries the tools
@@ -220,16 +222,16 @@ tests:
     check --peer-asn           network routeserver peering create
   container:
     from: e2e-runner
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
 - as: fips-image-scan
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
     dependencies:
       SCAN_IMAGE: bgp-cloud-connector
     test:
     - ref: fips-check-image-scan
 - as: e2e-aws-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -318,7 +320,7 @@ tests:
           memory: 200Mi
     workflow: ipi-aws
 - as: e2e-aws-fips-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -409,7 +411,7 @@ tests:
           memory: 200Mi
     workflow: ipi-aws
 - as: e2e-azure-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
     cluster_profile: openshift-org-azure
     test:
@@ -456,7 +458,7 @@ tests:
           memory: 200Mi
     workflow: ipi-azure
 - as: e2e-azure-workload-identity-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
     cluster_profile: openshift-org-azure
     test:
@@ -608,10 +610,8 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-azure-manual-oidc-workload-identity
-- always_run: false
-  as: e2e-gcp-operator
-  optional: true
-  pipeline_skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: e2e-gcp-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
     cluster_profile: openshift-org-gcp
     env:
@@ -659,8 +659,120 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- as: e2e-gcp-workload-identity-operator
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: openshift-org-gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    post:
+    - as: operator-identity-cleanup
+      best_effort: true
+      cli: latest
+      commands: |
+        set -euo pipefail
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        # operator-identity-record writes these before operator-identity
+        # creates anything, so the identity can go even when the cluster
+        # API has. With no record nothing was created, and the script
+        # asks the cluster.
+        if [[ -f "${SHARED_DIR}/operator-identity-infra" ]]; then
+          INFRA="$(<"${SHARED_DIR}/operator-identity-infra")"
+          GCP_PROJECT="$(<"${SHARED_DIR}/operator-identity-project")"
+          export INFRA GCP_PROJECT
+        fi
+        hack/gcp/delete-operator-identity.sh
+      from: e2e-runner
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    - chain: ipi-gcp-post-manual-oidc-workload-identity
+    test:
+    - as: enable-frr
+      cli: latest
+      commands: hack/enable-frr.sh
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        oc create namespace openshift-bgp-cloud-connector --dry-run=client -o yaml | oc apply -f -
+
+        # The CSV supports OwnNamespace and SingleNamespace only. The
+        # manager scopes no caches, so it watches cluster-wide either
+        # way.
+        operator-sdk run bundle -n openshift-bgp-cloud-connector --timeout=10m \
+          --security-context-config restricted --install-mode OwnNamespace "${OO_BUNDLE}"
+
+        oc -n openshift-bgp-cloud-connector wait --for=condition=Available \
+          deployment/openshift-bgp-cloud-connector-controller-manager --timeout=5m
+        oc -n openshift-bgp-cloud-connector get csv
+      dependencies:
+      - env: OO_BUNDLE
+        name: bgp-cloud-connector-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity-record
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # For operator-identity-cleanup, which may run after the cluster
+        # API has gone. A step of its own, so the record is in SHARED_DIR
+        # before operator-identity creates anything, however that step
+        # ends. The project id stays out of the log.
+        source hack/gcp/ci.sh
+        ci_use_shared_kubeconfig
+        gcp_cluster_facts
+        printf '%s' "${infra}" > "${SHARED_DIR}/operator-identity-infra"
+        printf '%s' "${project}" > "${SHARED_DIR}/operator-identity-project"
+      from: e2e-runner
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: operator-identity
+      cli: latest
+      commands: |
+        set -euo pipefail
+        source hack/gcp/ci.sh
+        ci_bootstrap
+        trap ci_remove_workdir EXIT
+        # ipi-conf-gcp-oidc-creds-provision runs ccoctl gcp create-all
+        # with --name=${NAMESPACE}-${UNIQUE_HASH}, which names both the
+        # pool and its provider.
+        POOL_ID="${NAMESPACE}-${UNIQUE_HASH}" hack/gcp/create-operator-identity.sh
+      from: e2e-runner
+      grace_period: 10m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: hack/ci-e2e-gcp.sh
+      from: e2e-runner
+      grace_period: 30m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-manual-oidc-workload-identity
 - as: e2e-rosa-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
     cluster_profile: rosa-e2e-01
     env:
@@ -912,7 +1024,7 @@ tests:
     workflow: rosa-aws-sts-hcp
 - always_run: false
   as: e2e-aro-classic-operator
-  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.tekton/|^hack/konflux/|^Containerfile\.|^catalog/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE|renovate\.json)$
   steps:
     allow_best_effort_post_steps: true
     cluster_profile: azure-qe
@@ -1161,8 +1273,11 @@ tests:
           create+=(--version "${version}")
         fi
 
-        echo "Running: ${create[*]} --client-secret <redacted>"
-        "${create[@]}" --client-secret "${client_secret}" >"${SHARED_DIR}/clusterinfo"
+        # --client-secret=VALUE, not --client-secret VALUE: the secret is
+        # generated per run, and one beginning with a hyphen is otherwise
+        # read as another flag.
+        echo "Running: ${create[*]} --client-secret=<redacted>"
+        "${create[@]}" --client-secret="${client_secret}" >"${SHARED_DIR}/clusterinfo"
 
         echo "Cluster created, sleeping 600 seconds"
         sleep 600

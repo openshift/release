@@ -9,7 +9,9 @@
 # Environment Variables:
 #   OSC_INSTALL                   - "true" to install, "false" to skip (default: false)
 #   OSC_NAMESPACE                 - Namespace for operator (default: openshift-sandboxed-containers-operator)
-#   CATALOG_SOURCE_IMAGE      - Custom catalog image (optional)
+#   CATALOG_SOURCE_IMAGE      - Custom catalog image (optional). A quay.io image
+#                               tagged :latest is resolved at runtime to the
+#                               newest <X.Y.Z>-<unix_epoch> build tag.
 #   OSC_CHARTS_REPO               - Charts repo URL
 #   OSC_CHARTS_REF                - Charts git ref (default: main)
 #   CREDENTIALS_MODE                 - Credentials mode when peer-pods enabled (default: cco)
@@ -51,6 +53,10 @@ ENABLEPEERPODS=${ENABLEPEERPODS:-false}
 WORKLOAD_TO_TEST=${WORKLOAD_TO_TEST:-kata}
 USE_OLMV1=${USE_OLMV1:-false}
 OSC_DEV_CATALOG_NAME="osc-operator-dev-catalog"
+# Marker telling later steps that mirror_konflux already applied the mirror sets
+# published by the operator and trustee-fbc repositories. Those are the
+# authoritative ones, so a chart carrying its own copy must not recreate it.
+KONFLUX_MIRRORS_MARKER="${SHARED_DIR}/konflux-mirrors-applied"
 
 OC_RETRY_COUNT=${OC_RETRY_COUNT:-3}
 OC_RETRY_INTERVAL=${OC_RETRY_INTERVAL:-20}
@@ -154,6 +160,28 @@ function wait_until() {
   return 1
 }
 
+# Dump the cluster state needed to diagnose an OLM resolution stall, where a
+# CatalogSource reports READY and its gRPC endpoint then refuses connections.
+# Catalog pod age and restart counts show whether the pod was replaced; node and
+# MachineConfigPool state shows whether a rollout drained it; the catalog-operator
+# log shows what the resolver itself hit.
+function dump_olm_diagnostics() {
+  echo ">>> CatalogSources in openshift-marketplace:" >&2
+  oc get catalogsource -n openshift-marketplace -o wide || true
+  oc get catalogsource -n openshift-marketplace -o yaml || true
+  echo ">>> Catalog pods in openshift-marketplace:" >&2
+  oc get pods -n openshift-marketplace -o wide || true
+  oc describe pods -n openshift-marketplace -l olm.catalogSource | tail -120 || true
+  echo ">>> Recent events in openshift-marketplace:" >&2
+  oc get events -n openshift-marketplace --sort-by=.lastTimestamp | tail -50 || true
+  echo ">>> MachineConfigPools:" >&2
+  oc get mcp || true
+  echo ">>> Nodes:" >&2
+  oc get nodes || true
+  echo ">>> OLM catalog-operator log:" >&2
+  oc logs -n openshift-operator-lifecycle-manager deploy/catalog-operator --tail=200 || true
+}
+
 
 # Usage: oc_with_retry [--retries N] [--interval S] command [args...]
 function oc_with_retry() {
@@ -208,10 +236,18 @@ function mirror_konflux() {
     oc get mcp || true
     return 1
   fi
+
+  touch "${KONFLUX_MIRRORS_MARKER}"
 }
 
+# Resolve the newest immutable "<X.Y.Z>-<unix_epoch>" release tag of a Quay
+# repository. The Quay tag API lists tags newest-first, so the first regex
+# match in page order is the newest release build.
+# Args: $1 - repository path on quay.io (e.g. redhat-user-workloads/ose-osc-tenant/osc-test-fbc-v1-14)
+# Echoes: the newest matching tag, or "latest" as a fallback when none is found.
 function latest_catsrc_image_tag() {
-    local api_url="https://quay.io/api/v1/repository/redhat-user-workloads/ose-osc-tenant/osc-test-fbc/tag/"
+    local quay_repo="$1"
+    local api_url="https://quay.io/api/v1/repository/${quay_repo}/tag/"
     local page=1
     local max_pages=20
 
@@ -253,11 +289,16 @@ function setup_catalog_source() {
 
   mirror_konflux
 
-  local default_catsrc_image="quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc"
-  if [[ "${CATALOG_SOURCE_IMAGE}" = "${default_catsrc_image}:latest" ]]; then
+  # Resolve a floating :latest tag to the newest immutable <X.Y.Z>-<unix_epoch>
+  # build tag of whatever quay.io repository is configured, so the exact catalog
+  # tested is recorded (catalog-source-image.env) and reproducible. Works for
+  # any quay.io repository (e.g. the per-release osc-test-fbc-vN-M catalogs).
+  # Digest references, specific tags and non-quay.io images are used as-is.
+  if [[ "${CATALOG_SOURCE_IMAGE}" =~ ^quay\.io/([^@]+):latest$ ]]; then
+    local catsrc_repo_path="${BASH_REMATCH[1]}"
     local catsrc_image_tag
-    catsrc_image_tag=$(latest_catsrc_image_tag)
-    CATALOG_SOURCE_IMAGE="${default_catsrc_image}:${catsrc_image_tag}"
+    catsrc_image_tag=$(latest_catsrc_image_tag "${catsrc_repo_path}")
+    CATALOG_SOURCE_IMAGE="quay.io/${catsrc_repo_path}:${catsrc_image_tag}"
     echo ">>> Resolved :latest to tag: ${catsrc_image_tag}"
   else
     echo ">>> Using provided catalog image: ${CATALOG_SOURCE_IMAGE}"
@@ -331,6 +372,17 @@ function render_osc_operator_chart() {
     "--namespace" "${OSC_NAMESPACE}"
     "--set" "namespaceOverride=${OSC_NAMESPACE}"
   )
+
+  # The chart ships an ImageTagMirrorSet/ImageDigestMirrorSet of its own, named
+  # "osc-registry" just like the one mirror_konflux applied from the operator
+  # repository. Letting the chart create it would overwrite the authoritative
+  # set with a narrower copy that covers neither the per-release osc-*-vN-M
+  # repositories nor every component, breaking digest pulls for the bundle and
+  # operands. Keep the mirrors already on the cluster.
+  if [[ -f "${KONFLUX_MIRRORS_MARKER}" ]]; then
+    helm_args+=("--set" "dev.createMirrorSets=false")
+    echo ">>> Helm: dev.createMirrorSets=false (konflux mirror sets already applied)" >&2
+  fi
 
   if [[ "${CATALOG_SOURCE_NAME}" == "redhat-operators" ]]; then
     helm_args+=("--set" "dev.enabled=false")
@@ -560,9 +612,7 @@ function install_osc_operator() {
   oc_with_retry oc apply -f "${operator_yaml}"
 
   # The helm chart creates osc-operator-dev-catalog unconditionally regardless of dev.enabled
-  # (helm chart bug).  When using the GA redhat-operators catalog the dev catalog has no valid
-  # image and will never become READY, blocking Stage 0 of wait_for_operator().  Delete it so
-  # the wait only covers catalogs that are actually needed.
+  # (helm chart bug). Delete the invalid dev catalog when using a GA or mirrored catalog.
   if [[ "${CATALOG_SOURCE_NAME}" == "redhat-operators" || -n "${MIRROR_CATALOG_SOURCE}" ]]; then
     echo ">>> redhat-operators catalog in use; deleting spurious ${OSC_DEV_CATALOG_NAME} CatalogSource (helm chart bug)"
     oc delete catalogsource "${OSC_DEV_CATALOG_NAME}" -n openshift-marketplace --ignore-not-found=true || true
@@ -570,48 +620,13 @@ function install_osc_operator() {
 }
 
 function wait_for_operator_olmv0() {
-  # Stage 0: Wait for ALL CatalogSources to be READY (600s)
-  echo ">>> Waiting for all CatalogSources to be READY..."
-  local all_catalogs_ready=false
-  for i in {1..120}; do
-    local catalog_states
-    catalog_states=$(oc get catalogsource -n openshift-marketplace -o jsonpath='{range .items[*]}{.metadata.name}={.status.connectionState.lastObservedState}{"\n"}{end}' 2>/dev/null || echo "")
-
-    if [[ -z "${catalog_states}" ]]; then
-      [[ ${i} -lt 120 ]] && sleep 5
-      continue
-    fi
-
-    local total_catalogs ready_catalogs
-    total_catalogs=$(echo "${catalog_states}" | wc -l)
-    ready_catalogs=$(echo "${catalog_states}" | grep -c "=READY" || true)
-    ready_catalogs=${ready_catalogs:-0}
-
-    if [[ ${ready_catalogs} -eq ${total_catalogs} && ${ready_catalogs} -gt 0 ]]; then
-      echo ">>> All CatalogSources are READY (${ready_catalogs}/${total_catalogs})"
-      all_catalogs_ready=true
-      break
-    fi
-
-    if [[ $((i % 6)) -eq 0 ]]; then
-      echo ">>> CatalogSources ready: ${ready_catalogs}/${total_catalogs} ($((i*5))s elapsed)..."
-    fi
-
-    [[ ${i} -lt 120 ]] && sleep 5
-  done
-
-  if [[ "${all_catalogs_ready}" != "true" ]]; then
-    echo ">>> ERROR: Not all CatalogSources are READY after 600s"
-    oc get catalogsource -n openshift-marketplace -o custom-columns=NAME:.metadata.name,STATE:.status.connectionState.lastObservedState || true
-    return 1
-  fi
-
-  # Stage 1: Wait for the dev CatalogSource created by the helm chart
-  if [[ -n "${CATALOG_SOURCE_IMAGE}" ]]; then
-    if ! wait_until "CatalogSource ${OSC_DEV_CATALOG_NAME} READY" 300 5 \
+  # Wait only for the dev CatalogSource created by this step. GA and disconnected
+  # installs use existing catalogs; the mirror step waits for its own catalog.
+  if [[ -n "${CATALOG_SOURCE_IMAGE}" && "${CATALOG_SOURCE_NAME}" != "redhat-operators" && -z "${MIRROR_CATALOG_SOURCE}" ]]; then
+    if ! wait_until "CatalogSource ${OSC_DEV_CATALOG_NAME} READY" 600 5 \
       "[[ \"\$(oc get catalogsource -n openshift-marketplace '${OSC_DEV_CATALOG_NAME}' -o jsonpath='{.status.connectionState.lastObservedState}' 2>/dev/null)\" == \"READY\" ]]"; then
-      oc get catalogsource -n openshift-marketplace || true
       oc describe catalogsource -n openshift-marketplace "${OSC_DEV_CATALOG_NAME}" || true
+      dump_olm_diagnostics
       return 1
     fi
   fi
@@ -621,6 +636,7 @@ function wait_for_operator_olmv0() {
     "oc get subscription -n '${OSC_NAMESPACE}' sandboxed-containers-operator -o jsonpath='{.status.installplan.name}' 2>/dev/null | grep -q '^install-'"; then
     echo ">>> ERROR: Subscription has no InstallPlan reference" >&2
     oc get subscription -n "${OSC_NAMESPACE}" sandboxed-containers-operator -o yaml || true
+    dump_olm_diagnostics
     return 1
   fi
 

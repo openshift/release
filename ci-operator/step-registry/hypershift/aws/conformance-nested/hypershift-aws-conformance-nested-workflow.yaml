@@ -1,0 +1,47 @@
+workflow:
+  as: hypershift-aws-conformance-nested
+  documentation: |-
+    The HyperShift aws conformance nested workflow executes tests against a new
+    ephemeral HyperShift cluster whose management cluster is itself a fresh
+    HostedCluster on the root CI management cluster, with the HyperShift operator
+    installed from the pipeline image. Administrative access to the control plane
+    is provided via the `KUBECONFIG` environment variable.
+
+    Unlike `hypershift-aws-conformance`, which schedules the hosted control plane
+    on the long-lived shared management cluster, this workflow owns the HyperShift
+    operator install. Use it when the test needs an operator feature set that the
+    shared management cluster does not run, for example `TECH_PREVIEW_NO_UPGRADE`,
+    or an operator build that has not reached the shared cluster yet.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - chain: hypershift-aws-create
+    test:
+    - chain: hypershift-conformance
+    post:
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy
+    - chain: hypershift-destroy-nested-management-cluster
+    env:
+      # Same baseline skips as hypershift-aws-conformance. Each test skip must be anchored to an issue:
+      # CCM-AWS (upstream): https://issues.redhat.com/browse/OCPBUGS-74537 for upstream CCM tests not supported by Hypershift
+      # FIPS: Remove when https://github.com/openshift/origin/pull/31288 is merged and propagated to older branches.
+      # readyz test lists KAS pods across all namespaces: https://redhat.atlassian.net/browse/OCPBUGS-91633
+      IGNORE_EMPTY_TEST_SKIPS: true
+      TEST_SKIPS: loadbalancer NLB should be reachable with target-node-labels\|
+        loadbalancer NLB internal should be reachable with hairpinning traffic\|
+        FIPS TestFIPS\|
+        API LBs follow /readyz of kube-apiserver and stop sending requests before server shutdowns for external clients

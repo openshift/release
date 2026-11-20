@@ -6,6 +6,7 @@ CI_FOLDER_ID="$(<"${CLUSTER_PROFILE_DIR}/ci-folder-id")"
 BILLING_ACCOUNT_ID="$(<"${CLUSTER_PROFILE_DIR}/billing-account-id")"
 GCP_REGION="${GKE_REGION:-northamerica-northeast2}"
 RELEASE_CHANNEL="${GKE_RELEASE_CHANNEL:-stable}"
+PSC_SUBNET_COUNT="${PSC_SUBNET_COUNT:-10}"
 
 retry_with_backoff() {
     local max_attempts="$1"
@@ -116,7 +117,7 @@ gcloud config set project "${CP_PROJECT_ID}"
 # ============================================================================
 VPC_NAME="${INFRA_ID}-vpc"
 GKE_SUBNET_NAME="${INFRA_ID}-gke-subnet"
-PSC_SUBNET_NAME="${INFRA_ID}-psc"
+PSC_SUBNET_PREFIX="${INFRA_ID}-psc"
 
 echo "Creating VPC in Control Plane project"
 gcloud compute networks create "${VPC_NAME}" \
@@ -150,16 +151,22 @@ gcloud compute routers nats create "${INFRA_ID}-nat" \
     --quiet
 
 # ============================================================================
-# Step 3: Add PSC Subnet to VPC (for Service Attachments)
+# Step 3: Add PSC Subnets to VPC (one per hosted cluster Service Attachment)
+# GCP forbids sharing a PRIVATE_SERVICE_CONNECT subnet between Service
+# Attachments, so each hosted cluster needs its own subnet. Ranges
+# 10.3.0.0/24..10.3.9.0/24 do not overlap the GKE subnet (10.0.0.0/20), pods
+# (10.4.0.0/14) or services (10.8.0.0/20).
 # ============================================================================
-echo "Creating PSC subnet: ${PSC_SUBNET_NAME}"
-gcloud compute networks subnets create "${PSC_SUBNET_NAME}" \
-    --project="${CP_PROJECT_ID}" \
-    --region="${GCP_REGION}" \
-    --network="${VPC_NAME}" \
-    --range="10.3.0.0/24" \
-    --purpose=PRIVATE_SERVICE_CONNECT \
-    --quiet
+for ((i = 0; i < PSC_SUBNET_COUNT; i++)); do
+    echo "Creating PSC subnet: ${PSC_SUBNET_PREFIX}-${i}"
+    gcloud compute networks subnets create "${PSC_SUBNET_PREFIX}-${i}" \
+        --project="${CP_PROJECT_ID}" \
+        --region="${GCP_REGION}" \
+        --network="${VPC_NAME}" \
+        --range="10.3.${i}.0/24" \
+        --purpose=PRIVATE_SERVICE_CONNECT \
+        --quiet
+done
 
 # ============================================================================
 # Step 4: Create GKE Autopilot Cluster
@@ -305,7 +312,6 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 # Save remaining cluster info for downstream steps
 echo "${INFRA_ID}" > "${SHARED_DIR}/infra-id"
 echo "${VPC_NAME}" > "${SHARED_DIR}/vpc-name"
-echo "${PSC_SUBNET_NAME}" > "${SHARED_DIR}/psc-subnet"
 
 # CI DNS config for hypershift-install (shared step, can't use workflow env vars)
 echo "${HYPERSHIFT_GCP_CI_PROJECT}" > "${SHARED_DIR}/hypershift-ci-project"

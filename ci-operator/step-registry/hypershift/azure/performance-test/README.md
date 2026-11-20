@@ -44,20 +44,23 @@ The performance test suite measures the following key operations:
 ```text
 Pre Steps:
   1. ipi-install-rbac → Set up RBAC for root cluster
-  2. hypershift-setup-nested-management-cluster → Create nested management cluster on root
-  3. hypershift-azure-setup-private-link → Configure Azure Private Link
-  4. hypershift-install → Deploy HyperShift operator
+  2. hypershift-setup-nested-management-cluster-azure-v2 → Create nested management cluster on root
+  3. hypershift-azure-setup-private-link-v2 → Configure Azure Private Link
+  4. hypershift-install-azure-v2 → Deploy HyperShift operator
 
 Test Step:
   5. hypershift-azure-performance-test → Execute performance benchmarks
 
 Post Steps:
-  6. hypershift-destroy-nested-management-cluster → Clean up management cluster
+  6. hypershift-dump-management-cluster-azure-v2 → Collect management cluster artifacts
+  7. hypershift-dump-extra → Collect extra CI artifacts
+  8. hypershift-destroy-nested-management-cluster-azure-v2 → Clean up management cluster
 ```
 
 ### Infrastructure
-- **Management Cluster**: Nested OpenShift cluster on Azure (Standard_D16s_v5)
-- **Region**: centralus (configurable via `HYPERSHIFT_AZURE_LOCATION`)
+- **Root Cluster**: `sm-azure-root-ci` ARO HCP cluster
+- **Management Cluster**: Nested OpenShift cluster on Azure, one Standard_D16s_v5 node per zone
+- **Region**: uksouth (configurable via `HYPERSHIFT_AZURE_LOCATION`)
 - **Storage**: managed-csi-premium-v2 for etcd
 - **Base Domain**: hcp-sm-azure.azure.devcluster.openshift.com
 - **Authentication**: Azure Service Principal with Workload Identity
@@ -68,19 +71,21 @@ Post Steps:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `HYPERSHIFT_AZURE_LOCATION` | centralus | Azure region for testing |
+| `HYPERSHIFT_AZURE_LOCATION` | uksouth | Azure region for testing |
 | `HYPERSHIFT_BASE_DOMAIN` | hcp-sm-azure.azure.devcluster.openshift.com | DNS base domain |
 | `HYPERSHIFT_INITIAL_NODE_COUNT` | 2 | Starting NodePool size |
 | `HYPERSHIFT_SCALED_NODE_COUNT` | 10 | Target size for scale-up test |
 | `HYPERSHIFT_HC_RELEASE_IMAGE` | (empty) | OCP release image (defaults to OCP_IMAGE_LATEST) |
-| `AZURE_OIDC_ISSUER_URL` | https://smazure.blob.core.windows.net/smazure | OIDC issuer for WIF |
 
 ### Credentials Required
 
-The test requires these credentials mounted from test-credentials namespace:
-- `/etc/hypershift-ci-jobs-self-managed-azure/credentials.json` - Azure service principal
-- `/etc/hypershift-ci-jobs-self-managed-azure-e2e/` - Workload identities and SA signing key
-- `/etc/ci-pull-credentials/.dockerconfigjson` - Container image pull secret
+The test step mounts these fields from the `ops/clusters/sm-azure-root-ci` group in the `hypershift-team` collection:
+- `azure-credentials` → `/etc/hypershift-ci-jobs-self-managed-azure/credentials.json` - Azure service principal
+- `e2e-workload-identities` → `/etc/hypershift-ci-jobs-self-managed-azure-e2e/workload-identities.json` - Hosted cluster workload identities
+- `serviceaccount-signer-private` → `/etc/hypershift-ci-jobs-self-managed-azure-signer/serviceaccount-signer.private` - SA token signing key
+- `oidc-issuer-url` → `/etc/hypershift-ci-jobs-self-managed-azure-oidc/oidc-issuer-url` - OIDC issuer URL for workload identity
+
+The container image pull secret is mounted from the `test-credentials` namespace at `/etc/ci-pull-credentials/.dockerconfigjson`.
 
 ## Running the Tests
 
@@ -90,7 +95,9 @@ The performance test runs automatically every Monday at 8:00 AM UTC via the peri
 azure-self-managed-performance
 ```
 
-Configured in: `ci-operator/config/openshift/hypershift/openshift-hypershift-release-5.0__periodics-azure-perf.yaml`
+Configured in:
+- `ci-operator/config/openshift/hypershift/openshift-hypershift-release-5.0__periodics-azure-perf.yaml`
+- `ci-operator/config/openshift/hypershift/openshift-hypershift-release-5.1__periodics-azure-perf.yaml`
 
 ### Manual Execution
 To run the performance test manually in a development environment:
@@ -119,7 +126,7 @@ Human-readable performance metrics:
 ```text
 # Azure Self-Managed HCP Performance Metrics
 # Cluster: perf-abc123def456
-# Region: centralus
+# Region: uksouth
 # Release: registry.ci.openshift.org/ocp/release:4.18
 # Date: 2026-06-11 14:30:00 UTC
 
@@ -174,7 +181,7 @@ If metrics exceed targets:
 
 1. **Check Azure region health**:
    ```bash
-   az vm list-skus --location centralus --output table
+   az vm list-skus --location uksouth --output table
    ```
 
 2. **Verify management cluster health**:

@@ -35,7 +35,7 @@ images:
       system-tests-builder:
         as:
         - system-tests-builder
-    to: sbr-daily-test-runner
+    to: sbr-weekly-test-runner
 prowgen:
   enable_secrets_store_csi_driver: true
 releases:
@@ -53,27 +53,30 @@ resources:
       cpu: 100m
       memory: 500Mi
 tests:
-- as: e2e-system-tests-sbr-daily-aws-odf
+- as: e2e-system-tests-sbr-weekly-aws-odf
   capabilities:
   - nested-podman
   - intranet
-  cron: 0 4 * * *
+  cron: 0 4 * * 1
   steps:
     cluster_profile: openshift-org-aws
     env:
       BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
+      ECO_DUMP_FAILED_TESTS: "true"
       ECO_IS_DOWNSTREAM: "false"
       ECO_TEST_FEATURES: sbr-operator
       ECO_TEST_LABELS: '!tier:upgrade && !tier:upgrade-operator && !tier:fresh-install
         && !tier:upgrade-cluster && !tier:interop'
       ECO_TEST_VERBOSE: "true"
+      EXTRA_MG_ARGS: --image=quay.io/medik8s/must-gather:latest
       ODF_OPERATOR_CHANNEL: stable-5.0
       ODF_VERSION_MAJOR_MINOR: "5.0"
-      TEST_NAME: e2e-system-tests-sbr-daily-aws-odf
+      TEST_NAME: e2e-system-tests-sbr-weekly-aws-odf
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - as: build-and-install-sbr
       cli: latest
@@ -138,7 +141,7 @@ tests:
           cd /tmp/sbr-source
           # VERSION / PREVIOUS_VERSION come from the branch Makefile
           # (DEFAULT_VERSION / PREVIOUS_VERSION). No registry lookup needed:
-          # this daily installs a fresh ttl.sh candidate, not an upgrade path.
+          # this weekly installs a fresh ttl.sh candidate, not an upgrade path.
           export SBR_VERSION
           SBR_VERSION="$(sed -n 's/^DEFAULT_VERSION := //p' Makefile)"
           test -n "$SBR_VERSION"
@@ -231,7 +234,7 @@ tests:
         build_candidate
         verify_candidate
         install_candidate
-      from: sbr-daily-test-runner
+      from: sbr-weekly-test-runner
       nested_podman: true
       resources:
         requests:
@@ -271,6 +274,7 @@ tests:
         echo '==> Run system-tests (sbr-operator)'
         make -C /tmp/system-tests run-tests
       env:
+      - name: ECO_DUMP_FAILED_TESTS
       - name: ECO_TEST_FEATURES
       - name: ECO_TEST_LABELS
       - name: ECO_TEST_VERBOSE
