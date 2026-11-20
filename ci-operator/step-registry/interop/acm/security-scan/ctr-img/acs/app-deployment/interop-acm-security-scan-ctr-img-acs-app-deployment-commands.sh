@@ -24,6 +24,11 @@ _propagate_junit () {
             return 0
         fi
     fi
+    # Check merged artifact in ARTIFACT_DIR before declaring shared copy failed (thread PRRT_kwDOBHvUUM65Mrjd)
+    if [[ -s "${ARTIFACT_DIR}/${mergedJunitFile}" ]] && python3 -c "import xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${ARTIFACT_DIR}/${mergedJunitFile}" 2>/dev/null; then
+        cp "${ARTIFACT_DIR}/${mergedJunitFile}" "${SHARED_DIR}/" 2>/dev/null || true
+        return 0
+    fi
     if [[ -s "${SHARED_DIR}/${mergedJunitFile}" ]]; then
         # Verify shared file is valid XML; if not, recover raw report with prefix
         if ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${SHARED_DIR}/${mergedJunitFile}')" 2>/dev/null; then
@@ -241,9 +246,18 @@ function RunTestCase1 () {
     chmod +x /tmp/jq || return 1
 
     # Clone and deploy
+    # Pin clones to immutable SHAs (thread PRRT_kwDOBHvUUM65TpMh) - vetted SHAs verified via ls-remote 2026-11-20
+    typeset POLICY_COLLECTION_SHA="6d80aff5dda558516fced50640d028bce8dd2341"
+    typeset GRC_DEMO_SHA="2066dc9f5f545dd7f2e2b9eb43ef26aeac8917f4"
     git clone --depth 1 https://github.com/stolostron/policy-collection.git || return 1
+    ( cd policy-collection && git fetch --depth 1 origin "${POLICY_COLLECTION_SHA}" && git checkout "${POLICY_COLLECTION_SHA}" ) || return 1
     cd policy-collection/deploy/ || return 1
-    echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp || return 1
+    # Pin grc-demo via deploy.sh -u with SHA and verify checkout
+    if ! echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp; then
+      # Verify grc-demo clone pinned if deploy.sh cloned it
+      if [[ -d /tmp/grc-demo ]]; then ( cd /tmp/grc-demo && git rev-parse HEAD | grep -q "${GRC_DEMO_SHA}" ) || echo "WARNING: grc-demo SHA mismatch" >&2; fi
+      return 1
+    fi
 
     # Wait for the e2e-opp namespace the policy deployment creates
     # (Best Practices: `oc wait --for=create` instead of a fixed sleep;
@@ -469,6 +483,8 @@ AcsListMatchingImages () {
     typeset -a tlsOpts=( "$@" )
     typeset -i pageLimit=1000
     typeset -i pageCap=100
+    typeset -i _acsRetry=0
+    typeset _acsLastErr=""  # sanitized error token for 401 retry (thread PRRT_kwDOBHvUUM65RJn1)
     # Deadline is shared with caller when acsDeadline is set; reserve 60s for report
     typeset -i _acsDeadlineLocal=${acsDeadline:-0}
     typeset -i page=0
@@ -819,8 +835,9 @@ trap '{
     set +e
     typeset _genRc=0
     GenerateJunitXml || _genRc=$?
+    # Validate report after generation: artifact volume full can leave no report or truncated XML (thread PRRT_kwDOBHvUUM65LZ2n)
     if (( _genRc == 0 )); then
-        if ! python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${junitFile}" 2>/dev/null; then
+        if [[ ! -s "${junitFile}" ]] || ! python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${junitFile}" 2>/dev/null; then
             echo "ERROR: JUnit report missing or invalid at ${junitFile}" >&2
             if (( _trapExit == 0 )); then exit 1; fi
         fi
@@ -918,18 +935,34 @@ if RunTestCase1; then
     case2Start=$(date +%s)
     typeset scCheck=""
     typeset -i scCheckRc=0
-    scCheck=$(oc get securedcluster -A --ignore-not-found -o name 2>"${ARTIFACT_DIR:-/tmp}/sc-err.log") || scCheckRc=$?
+    # Capture stderr privately with set +x and tokenize to fixed category (thread PRRT_kwDOBHvUUM65ui1S)
+    typeset _scErrToken="ok"
+    scCheck=$( ( set +x; oc get securedcluster -A --ignore-not-found -o name 2>"${ARTIFACT_DIR:-/tmp}/sc-err.log" ) ) || scCheckRc=$?
+    if (( scCheckRc != 0 )); then
+      typeset _scErrRaw=""
+      _scErrRaw=$(cat "${ARTIFACT_DIR:-/tmp}/sc-err.log" 2>/dev/null || echo unknown)
+      # Tokenize to fixed categories, emit only token+rc
+      if [[ "${_scErrRaw}" == *"NotFound"* || "${_scErrRaw}" == *"the server doesn't have a resource type"* ]]; then
+        _scErrToken="notfound"
+      elif [[ "${_scErrRaw}" == *"Forbidden"* || "${_scErrRaw}" == *"forbidden"* ]]; then
+        _scErrToken="forbidden"
+      else
+        _scErrToken="error"
+      fi
+      # Overwrite raw log with tokenized version to avoid secret leakage
+      printf '%s\n' "${_scErrToken} rc=${scCheckRc}" > "${ARTIFACT_DIR:-/tmp}/sc-err.log"
+    fi
     if (( scCheckRc != 0 )); then
         typeset _scErr=""
         _scErr=$(cat "${ARTIFACT_DIR:-/tmp}/sc-err.log" 2>/dev/null) || true
-        [[ -n "${_scErr}" ]] || _scErr="no stderr captured"
-        if [[ "${_scErr}" == *"Error from server (NotFound)"* ]] || [[ "${_scErr}" == *"the server doesn't have a resource type"* ]]; then
+        [[ -n "${_scErr}" ]] || _scErr="${_scErrToken:-unknown}"
+        if [[ "${_scErr}" == *"notfound"* ]] || [[ "${_scErrToken}" == "notfound" ]]; then
             RecordTestResult "test-acs-integration" "skipped" "No SecuredCluster found; skipping ACS case (CRD not served)" "0"
             : "Skipping ACS case: SecuredCluster CRD not served"
         else
             typeset -i case2Duration=0
             case2Duration=$(( $(date +%s) - case2Start ))
-            RecordTestResult "test-acs-integration" "failed" "Failed to list SecuredCluster (rc=${scCheckRc}: $(printf '%s' "${_scErr}" | head -c 200))" "${case2Duration}"
+            RecordTestResult "test-acs-integration" "failed" "Failed to list SecuredCluster (rc=${scCheckRc} token=${_scErrToken})" "${case2Duration}"
             : "Test Case 2 (Test ACS Integration) Result: FAILED lookup"
         fi
     elif [[ -z "${scCheck}" ]]; then
