@@ -1,6 +1,7 @@
 # Supplemental CI images
 
 These resources provide some supplemental images to be used in CI builds.
+- `agentic-validation.yaml`: Prebuilds the runner used by the agentic PR validation registry steps.
 - `azure`: Used by [openshift/openshift-azure](../../../ci-operator/config/openshift/openshift-azure)
 - `cincinnati-ci`: Used by [openshift/cincinnati](../../../ci-operator/config/openshift/cincinnati)
 - `cli-jq.yaml`: Used by [openshift/kubernetes](../../ci-operator/config/openshift/kubernetes)
