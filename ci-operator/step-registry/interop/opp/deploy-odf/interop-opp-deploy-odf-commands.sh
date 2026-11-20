@@ -773,7 +773,7 @@ fi
 #     noobaa-* resource requests/limits. ---
 _crd_want=$(( $(date +%s) + 60 ))
 _poll_deadline=$(_clamp_deadline "${_crd_want}")
-if _poll_jsonpath customresourcedefinitions storageclusters.ocs.openshift.io "" '{.metadata.name}' storageclusters.ocs.openshift.io '' "storagecluster CRD"; then
+if _poll_jsonpath customresourcedefinitions storageclusters.ocs.openshift.io "" '{range .status.conditions[*]}{.type}={.status}{"\n"}{end}' '@contains:Established=True' '' "storagecluster CRD"; then
   :
 else
   _prc=$?

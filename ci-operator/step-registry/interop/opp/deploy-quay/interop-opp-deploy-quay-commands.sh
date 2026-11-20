@@ -576,7 +576,9 @@ _quay_admin_job_fail() {
 # token travels in a curl config on a file descriptor so it never appears in the
 # process arguments. A Basic credential cannot replace it: Quay applies its
 # OAuth decorator to every v1 resource, so a Basic header is ignored and the read
-# runs anonymous.
+# runs anonymous. Callers bracket the call with set +x / set -x: the token is an
+# argument, so the trace records the expanded value, and the cleanup scrub below
+# matches 'token=' and 'Bearer <value>' shapes but never a bare token.
 _quay_auth_curl() {
   local _cred=$1
   shift
@@ -612,8 +614,10 @@ _quay_token_rejected() {
 _quay_devel_repo_role() {
   local _kind="${1:-direct}" _suffix="" _body _code
   [[ "${_kind}" == "transitive" ]] && _suffix="/transitive"
+  set +x
   _body=$(_quay_auth_curl "${_token}" --connect-timeout "$(_left_budget 10)" --max-time "$(_left_budget 20)" -w '\n%{http_code}' \
     "https://${_host}/api/v1/repository/devel/example/permissions/user/quaydevel${_suffix}") || _body=""
+  set -x
   _code=${_body##*$'\n'}
   _body=${_body%$'\n'*}
   case "${_code}" in
@@ -656,7 +660,12 @@ _quay_org_repo_check() {
     _dump_diagnostics
     exit 1
   fi
+  # The token read is bracketed for the same reason as the _quay_auth_curl
+  # callers: xtrace prints the expanded value of an assignment whose right-hand
+  # side is a command substitution.
+  set +x
   _token=$(oc get secret quayadmin -n "${QUAY_NAMESPACE}" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d 2>/dev/null) || _token=""
+  set -x
   _host=$(oc get route -n "${QUAY_NAMESPACE}" registry-quay -o jsonpath='{.spec.host}' 2>/dev/null) || _host=""
   if [[ -z "${_token}" ]]; then
     _classify "quay-admin-secrets-query-failed" "the quayadmin token is empty or unreadable, so the registry reads cannot be authenticated"
@@ -671,8 +680,10 @@ _quay_org_repo_check() {
     exit 1
   fi
   for _path in /api/v1/organization/devel /api/v1/repository/devel/example; do
+    set +x
     _code=$(_quay_auth_curl "${_token}" -o /dev/null -w '%{http_code}' --connect-timeout "$(_left_budget 10)" --max-time "$(_left_budget 30)" \
       "https://${_host}${_path}") || _code=""
+    set -x
     case "${_code}" in
       200) ;;
       401 | 403)
