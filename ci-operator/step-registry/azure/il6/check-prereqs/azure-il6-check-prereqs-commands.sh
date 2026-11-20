@@ -1,0 +1,136 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+# save the exit code for junit xml file generated in step gather-must-gather
+# pre configuration steps before running installation, exit code 100 if failed,
+# save to install-pre-config-status.txt
+EXIT_CODE=100
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"' EXIT TERM
+
+# This step talks to the COMMERCIAL Azure plane only (management.azure.com), using the azure-qe
+# service principal. The emulated IL6 plane is not reachable from a CI pod at all -- see the
+# ipi-conf-azureil6 and ipi-install-install-in-bastion steps for that half.
+AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+AZURE_AUTH_CLIENT_ID="$(jq -r .clientId "${AZURE_AUTH_LOCATION}")"
+AZURE_AUTH_CLIENT_SECRET="$(jq -r .clientSecret "${AZURE_AUTH_LOCATION}")"
+AZURE_AUTH_TENANT_ID="$(jq -r .tenantId "${AZURE_AUTH_LOCATION}")"
+AZURE_AUTH_SUBSCRIPTION_ID="$(jq -r .subscriptionId "${AZURE_AUTH_LOCATION}")"
+
+az cloud set --name AzureCloud
+az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
+az account set --subscription "${AZURE_AUTH_SUBSCRIPTION_ID}"
+
+errors=0
+fail() { echo "ERROR: $*"; errors=$((errors + 1)); }
+
+echo "=================================================================="
+echo " Azure IL6 preflight"
+echo "   subscription   : ${AZURE_AUTH_SUBSCRIPTION_ID}"
+echo "   resource group : ${AZURE_IL6_RESOURCE_GROUP}"
+echo "   vnet           : ${AZURE_IL6_VNET_NAME}"
+echo "=================================================================="
+
+# ---------------------------------------------------------------- resource group
+# One call, not 'az group exists' followed by 'az group show' for the same resource: the show
+# fails on its own if the group is absent, which is what every other Azure preflight here does.
+if ! rg_region="$(az group show -n "${AZURE_IL6_RESOURCE_GROUP}" --query location -o tsv 2>/dev/null)"; then
+    fail "resource group '${AZURE_IL6_RESOURCE_GROUP}' does not exist in subscription ${AZURE_AUTH_SUBSCRIPTION_ID}."
+    echo "This group is a shared, pre-provisioned fixture. CI never creates it."
+    echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"
+    exit 1
+fi
+echo "OK   resource group exists, region '${rg_region}'"
+if [[ "${rg_region}" != "${AZURE_IL6_REGION}" ]]; then
+    fail "resource group is in '${rg_region}' but AZURE_IL6_REGION is '${AZURE_IL6_REGION}'. The cluster's commercial-plane resources must be co-located with the VNet."
+fi
+
+# ---------------------------------------------------------------- vnet
+if ! az network vnet show -g "${AZURE_IL6_RESOURCE_GROUP}" -n "${AZURE_IL6_VNET_NAME}" -o none 2>/dev/null; then
+    fail "VNet '${AZURE_IL6_VNET_NAME}' not found in '${AZURE_IL6_RESOURCE_GROUP}'."
+    echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"
+    exit 1
+fi
+
+vnet_json="$(az network vnet show -g "${AZURE_IL6_RESOURCE_GROUP}" -n "${AZURE_IL6_VNET_NAME}" -o json)"
+vnet_prefix="$(jq -r '.addressSpace.addressPrefixes[0] // empty' <<<"${vnet_json}")"
+[[ -n "${vnet_prefix}" ]] || fail "VNet has no address space."
+echo "OK   vnet address space: ${vnet_prefix}"
+
+# The VNet's DNS servers are the emulator's resolvers, reached across the tunnels. They are the
+# only way *.microsoft.scloud resolves for anything in this VNet, bastion included.
+#
+# This is also self-healing, and needs to be. azure-il6-bastion-setup repoints dnsServers at the
+# bastion so that cluster nodes inherit its split-horizon resolver, and the teardown puts them
+# back. A run that dies in between leaves the VNet pointing at a bastion that no longer exists --
+# after which NOTHING in the VNet resolves, the next bastion cannot pull its own boot images, and
+# the failure looks nothing like its cause. Rather than detect that and stop, restore the
+# expected value and carry on.
+read -r -a expected_dns <<<"${AZURE_IL6_EMULATOR_DNS}"
+mapfile -t dns_servers < <(jq -r '.dhcpOptions.dnsServers[]? // empty' <<<"${vnet_json}")
+
+if [[ "${dns_servers[*]}" == "${expected_dns[*]}" ]]; then
+    echo "OK   vnet DNS servers: ${dns_servers[*]}"
+else
+    echo "WARN vnet DNS servers are '${dns_servers[*]:-<none>}', expected '${expected_dns[*]}'."
+    echo "     A previous run almost certainly died before its teardown restored them."
+    echo "     Resetting so this run starts from a known state."
+    if az network vnet update -g "${AZURE_IL6_RESOURCE_GROUP}" -n "${AZURE_IL6_VNET_NAME}" \
+        --dns-servers ${AZURE_IL6_EMULATOR_DNS} -o none; then
+        echo "OK   vnet DNS servers reset to ${expected_dns[*]}"
+    else
+        fail "could not reset the VNet's DNS servers. Nothing in this VNet will resolve the IL6 plane."
+    fi
+fi
+
+# ---------------------------------------------------------------- free subnet space
+# Both spellings: az creates subnets with --address-prefix or --address-prefixes depending on
+# CLI version, and azure-provision-bastionhost uses the plural form when it is available.
+# Reading only the singular field drops those subnets and overstates the free space.
+used_prefixes="$(jq -r '[.subnets[] | (.addressPrefix // empty), (.addressPrefixes[]? // empty)] | join(" ")' <<<"${vnet_json}")"
+echo "     existing subnets: ${used_prefixes}"
+
+free_count="$(python3 - "${vnet_prefix}" ${used_prefixes} <<'PY'
+import ipaddress, sys
+vnet = ipaddress.ip_network(sys.argv[1])
+used = [ipaddress.ip_network(p) for p in sys.argv[2:]]
+free = sum(1 for c in vnet.subnets(new_prefix=24)
+           if not any(c.overlaps(u) for u in used))
+print(free)
+PY
+)"
+echo "OK   free /24s available: ${free_count}"
+if (( free_count < AZURE_IL6_REQUIRED_FREE_SUBNETS )); then
+    fail "need ${AZURE_IL6_REQUIRED_FREE_SUBNETS} free /24s, found ${free_count}. Stale subnets from a previous run may need cleaning up."
+fi
+
+# ---------------------------------------------------------------- tunnels
+# NB: 'az network vpn-connection list' does NOT populate connectionStatus -- it comes back null for
+# every entry. The status is only returned by a per-connection 'show'. Listing and filtering on the
+# list output silently passes even when every tunnel is down.
+mapfile -t connections < <(az network vpn-connection list -g "${AZURE_IL6_RESOURCE_GROUP}" --query '[].name' -o tsv)
+if [[ "${#connections[@]}" -eq 0 ]]; then
+    fail "no IPsec connections found in '${AZURE_IL6_RESOURCE_GROUP}'. The emulated IL6 plane is unreachable without them."
+fi
+
+for conn in "${connections[@]}"; do
+    status="$(az network vpn-connection show -g "${AZURE_IL6_RESOURCE_GROUP}" -n "${conn}" --query connectionStatus -o tsv)"
+    if [[ "${status}" == "Connected" ]]; then
+        echo "OK   tunnel '${conn}': ${status}"
+    else
+        fail "tunnel '${conn}' is '${status}', expected 'Connected'."
+    fi
+done
+
+echo "=================================================================="
+if (( errors > 0 )); then
+    echo "Preflight FAILED with ${errors} error(s). Not provisioning anything."
+    echo
+    echo "This job depends on a shared emulator environment that CI does not own."
+    echo "If the tunnels are down or the fixture has drifted, contact the SHIFT"
+    echo "emulator team rather than re-running the job."
+    exit 1
+fi
+echo "Preflight passed."

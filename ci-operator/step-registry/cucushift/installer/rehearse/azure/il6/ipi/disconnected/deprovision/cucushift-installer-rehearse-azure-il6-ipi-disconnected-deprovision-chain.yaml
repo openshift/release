@@ -1,0 +1,53 @@
+chain:
+  as: cucushift-installer-rehearse-azure-il6-ipi-disconnected-deprovision
+  steps:
+  - ref: gather-installer-boostrap-logs-in-bastion
+  - ref: gather-mirror-registry
+  - chain: gather-network
+  - chain: gather-core-dump
+  - chain: gather
+  # Destroys the cluster on the emulated IL6 plane. Must run on the bastion for the same reason
+  # the install does: *.microsoft.scloud has no route from a CI pod, and a destroy that cannot
+  # reach ARM silently leaks every resource it was meant to remove.
+  - ref: ipi-deprovision-deprovision-in-bastion
+  # Hand the shared VNet's dnsServers back to the emulator. Must be after the destroy, so cluster
+  # nodes keep resolving through the bastion for as long as they exist, and before the bastion is
+  # deleted, so the VNet is never left pointing at an address that answers nothing.
+  - ref: azure-il6-restore-vnet-dns
+  # Deletes the per-run group, and with it the bastion VM, NIC, public IP, disks, image, NSGs,
+  # storage account and private DNS zone. Also sources ${SHARED_DIR}/remove_resources_by_cli.sh,
+  # which carries the mirror registry's public DNS A record in os4-common.
+  - ref: azure-deprovision-resourcegroup
+  # What is left: the two subnets inside the shared VNet, matched on this run's name prefix. They
+  # can only be deleted once the group delete above has taken the bastion's NIC off them.
+  - ref: azure-il6-deprovision-resources
+  env:
+  - name: AZURE_IL6_RESOURCE_GROUP
+    default: "CI-Azure-IL6-DoNotDelete"
+  - name: AZURE_IL6_VNET_NAME
+    default: "RHOCP-CI-AzureIL6-virtual-network"
+  documentation: |-
+    Tears down the Azure IL6 cluster and the commercial-plane resources this job created.
+
+    Three separate paths in this registry delete a whole resource group, and each is either used
+    deliberately or kept out:
+
+      openshift-install destroy             deletes platform.azure.resourceGroupName. That is
+                                            ${infraID}-rg, which the installer created for the
+                                            cluster. ipi-conf-azureil6 asserts it is never the
+                                            shared group.
+
+      azure-deprovision-resourcegroup       deletes every group named in
+                                            ${SHARED_DIR}/resourcegroup*. In this chain that file
+                                            holds exactly one name: the per-run group from
+                                            azure-provision-resourcegroup. Nothing else in the
+                                            chain writes those files, and
+                                            azure-il6-provision-subnets refuses to run if the one
+                                            that exists names the shared group.
+
+      ipi-deprovision-azure-resourcegroup   deletes platform.azure.resourceGroupName. Redundant
+                                            with the destroy above, so not in this chain.
+
+    The shared group, CI-Azure-IL6-DoNotDelete, is permanent: it holds the VNet, a VPN gateway and
+    two IPsec tunnels to the emulator that CI cannot rebuild. It is never deleted, and the only
+    thing removed from inside it is this run's two subnets.
