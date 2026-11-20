@@ -44,7 +44,8 @@ cleanup() {
     fi
     if [[ "${kiali_suite}" == true ]]; then
         make clean-kiali-openshift KUBERNETES_CLI=oc \
-            BOOKINFO_CP_NAMESPACE="${kiali_cp_namespace:-istio-system}" || true
+            BOOKINFO_CP_NAMESPACE="${kiali_cp_namespace:-istio-system}" \
+            BOOKINFO_NAMESPACE="${bookinfo_namespace:-bookinfo}" || true
     fi
 }
 trap cleanup EXIT
@@ -121,15 +122,19 @@ case "${EVAL_SUITE:-}" in
         ;;
     kiali)
         kiali_cp_namespace="${KIALI_CP_NAMESPACE:-istio-system}"
+        bookinfo_namespace="${BOOKINFO_NAMESPACE:-bookinfo}"
         # Make targets use BOOKINFO_CP_NAMESPACE (default istio-system). Keep
         # setup/cleanup/port-forward on the same control-plane namespace.
-        if ! oc -n "${kiali_cp_namespace}" get deployment/kiali >/dev/null 2>&1; then
+        # Kiali evals assume Bookinfo workloads (e.g. productpage); require both.
+        if ! oc -n "${kiali_cp_namespace}" get deployment/kiali >/dev/null 2>&1 \
+            || ! oc -n "${bookinfo_namespace}" get deployment/productpage-v1 >/dev/null 2>&1; then
             # Mark before setup so partial failures still run clean-kiali-openshift.
-            # Leave unset when reusing an existing deployment so cleanup does not
-            # tear down preinstalled OSSM/Kiali.
+            # Leave unset when reusing a complete install so cleanup does not
+            # tear down preinstalled OSSM/Kiali/Bookinfo.
             kiali_suite=true
             make setup-kiali-openshift KUBERNETES_CLI=oc \
-                BOOKINFO_CP_NAMESPACE="${kiali_cp_namespace}"
+                BOOKINFO_CP_NAMESPACE="${kiali_cp_namespace}" \
+                BOOKINFO_NAMESPACE="${bookinfo_namespace}"
         fi
         if ! ( : > /dev/tcp/127.0.0.1/20001 ) 2>/dev/null; then
             oc -n "${kiali_cp_namespace}" port-forward svc/kiali 20001:20001 >/dev/null 2>&1 &
