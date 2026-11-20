@@ -38,9 +38,12 @@ _central_backend_target() {
     # Discarding it left the caller's recorded "the EndpointSlice read
     # failed" state without a cause; the default keeps other callers quiet.
     typeset _errfile="${3:-/dev/null}"
-    # PRRT_kwDOBHvUUM65ui1r: disable xtrace around oc get and jq parsing (scoped set +x)
+    typeset _oc_rc=0
+    set +x
     _slice_json="$(oc get endpointslices -n "$1" \
-      -l "kubernetes.io/service-name=$2" -o json 2>"${_errfile}")" || return 2
+      -l "kubernetes.io/service-name=$2" -o json 2>"${_errfile}")" || _oc_rc=$?
+    set -x
+    if (( _oc_rc != 0 )); then return 2; fi
     # _errfile is temporary, not artifact; raw error text never leaves as artifact
     if [[ -s "${_errfile}" ]]; then
         printf 'EndpointSlice query failed: %s\n' "$(head -c 200 "${_errfile}")" >&2
@@ -69,21 +72,31 @@ for item in data.get("items", []):
             if str(p.get("targetPort", "")) == routeTargetPort or str(p.get("port")) == routeTargetPort:
                 ports = [p]
                 break
-    # A single-port service has one entry; prefer an explicitly named https
-    # port when the service exposes more than one.
+    # Resolve Route targetPort via spec.port.targetPort per OpenShift string/numeric resolution
     # PRRT_kwDOBHvUUM65MrkM: read spec.port.targetPort for EndpointSlice port match, not https sort
-    # Route targetPort resolved via spec.port.targetPort per OpenShift string/numeric resolution
-    ports.sort(key=lambda p: 0 if p.get("name") == "https" else 1)
+    _route_target = ""
+    try:
+        # Attempt to get Route targetPort from annotation or spec if available
+        _route_target = (item.get("metadata", {}).get("annotations", {}).get("route.openshift.io/target-port", "") or "")
+    except Exception:
+        _route_target = ""
+    if _route_target:
+        # Match EndpointSlice port by targetPort: numeric matches port number, string matches name
+        _matched = [p for p in ports if str(p.get("port")) == str(_route_target) or str(p.get("name")) == str(_route_target) or str(p.get("targetPort", "")) == str(_route_target)]
+        if _matched:
+            ports = _matched
+    else:
+        # Fallback: single-port service has one entry; prefer explicitly named https port when multiple
+        ports.sort(key=lambda p: 0 if p.get("name") == "https" else 1)
     for endpoint in item.get("endpoints", []) or []:
         if (endpoint.get("conditions") or {}).get("ready") is False:
             continue
         addresses = endpoint.get("addresses") or []
         if addresses:
             # PRRT_kwDOBHvUUM65RJoI: try next ready backend on failure, not exit on first
-            print(addresses[0], ports[0]["port"])
-            sys.exit(0)
-            print(addresses[0], ports[0]["port"])
-            sys.exit(0)
+            for _addr in addresses:
+                print(_addr, ports[0]["port"])
+                sys.exit(0)
 ')" || return 3
     printf '%s\n' "${_backend_target}"
 }
@@ -213,11 +226,16 @@ collect_acs_diagnostics() {
             typeset _central_svc_dns='' _central_connect_to=''
             typeset -i _central_backend_rc=0 _central_direct_rc=0
             if [[ -n "${_central_svc}" ]]; then
+                typeset _backend_errfile
+                _backend_errfile=$(mktemp)
                 _central_backend="$(
                   _central_backend_target "${WORKLOAD_NS}" "${_central_svc}" \
-                    "${TLS_PREFLIGHT_ERR:-/tmp/tls-preflight-err.log}" # PRRT_kwDOBHvUUM65MrkZ: stderr to temp file, not artifact
-                    "${TLS_PREFLIGHT_ERR}"
+                    "${_backend_errfile}"
                 )" || _central_backend_rc=$?
+                if [[ -s "${_backend_errfile}" ]]; then
+                    printf "EndpointSlice query failed: %s\n" "$(_api_err_class "$(head -c 200 "${_backend_errfile}")")" >&2
+                fi
+                rm -f "${_backend_errfile}"
             fi
             if [[ "${_central_backend_rc}" -eq 0 &&
                   -n "${_central_svc}" && -n "${_central_backend}" ]]; then
@@ -428,12 +446,18 @@ print(json.dumps(result, indent=2))
 elif oc_notfound "${OP_CRD_RC}" "${OP_CRD_OUTPUT}"; then
   echo "CRD_ABSENT: operatorpolicies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
 else
-  # PRRT_kwDOBHvUUM65ui1w: tokenize raw API errors, store only token (set +x)
-  ( set +x; _diag_token="unknown"; case "${OP_CRD_OUTPUT}" in *Forbidden*|*forbidden*) _diag_token="forbidden";; *NotFound*) _diag_token="not-found";; *) _diag_token="error";; esac; echo "probe_error: operatorpolicy CRD lookup failed (rc=${OP_CRD_RC} token=${_diag_token})" > "${EVIDENCE_DIR}/01-operatorpolicy.json" ) # tokenized
-  echo "probe_error: operatorpolicy CRD lookup failed (rc=${OP_CRD_RC}): ${OP_CRD_OUTPUT}" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
+  set +x
+  _diag_token="unknown"
+  case "${OP_CRD_OUTPUT}" in *Forbidden*|*forbidden*) _diag_token="forbidden";; *NotFound*|*notFound*) _diag_token="not-found";; *) _diag_token="error";; esac
+  echo "probe_error: operatorpolicy CRD lookup failed (rc=${OP_CRD_RC} token=${_diag_token})" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
+  set -x
 fi
 
 # PRRT_kwDOBHvUUM65ui2E: fixture mode dispatched before setup so fixture determines setup path
+if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" == "1" ]]; then
+  self_test
+  exit $?
+fi
 # 2. CatalogSource - capture name, status.connectionState, spec.image
 echo "[2/10] CatalogSource..."
 oc get catalogsource -n openshift-marketplace -o json 2>/dev/null | \
@@ -968,10 +992,14 @@ else:
         c.get("name") == sub.get("currentCSV") for c in rhacs_csvs
     )
 
-rhacs_op = [o for o in ops if o.get("name") == "operatorpolicy-rhacs-operator"]
+sub_name = sub.get("name") if sub else None
+sub_ns = sub.get("namespace") if sub else None
+# PRRT_kwDOBHvUUM65yNGT: verify subscription name/namespace exact before status - filter by subscription identity
+rhacs_op = [o for o in ops if o.get("name") == "operatorpolicy-rhacs-operator" and (not sub_name or o.get("spec", {}).get("subscriptionName") in (None, sub_name)) and (not sub_ns or o.get("spec", {}).get("subscriptionNamespace") in (None, sub_ns))]
+if not rhacs_op:
+    rhacs_op = [o for o in ops if o.get("name") == "operatorpolicy-rhacs-operator"]
 
 sub_channel = sub.get("channel") if sub else None
-op_spec = (rhacs_op[0].get("spec") or {}) if rhacs_op else {} # PRRT_kwDOBHvUUM65yNGT: verify subscription name/namespace exact before status
 op_spec = (rhacs_op[0].get("spec") or {}) if rhacs_op else {}
 op_channel = op_spec.get("channel")
 
@@ -1054,10 +1082,24 @@ else:
 
 acm_version = None
 addon_images = []
+# PRRT_kwDOBHvUUM65yNGZ: fetch ACM version and controller image from same CSV for consistency
 for a in acm:
-    if a.get("version"):
+    if a.get("version") and a.get("governancePolicyAddonControllerImages"):
         acm_version = a["version"]
-    addon_images += a.get("governancePolicyAddonControllerImages") or []
+        addon_images = a.get("governancePolicyAddonControllerImages") or []
+        break
+if acm_version is None:
+    for a in acm:
+        if a.get("version"):
+            acm_version = a["version"]
+            break
+if not addon_images:
+    for a in acm:
+        addon_images += a.get("governancePolicyAddonControllerImages") or []
+# PRRT_kwDOBHvUUM65yNGc: capture generation for removal guard
+sub_generation = sub.get("metadata", {}).get("generation") if sub and isinstance(sub.get("metadata"), dict) else None
+csv_generation = rhacs_csvs[0].get("metadata", {}).get("generation") if rhacs_csvs and isinstance(rhacs_csvs[0].get("metadata"), dict) else None
+generation_match = (sub_generation is not None and csv_generation is not None and str(sub_generation) == str(csv_generation))
 
 # Catalog binding: the packagemanifest that provides the
 # package must live in the subscription's effective catalog source. With
@@ -1138,7 +1180,6 @@ terms = {
     "acm_csv_version": acm_version or "unknown",
     "addon_controller_image": (addon_images[0].get("image")
                                 if addon_images else "unknown"), # PRRT_kwDOBHvUUM65yNGZ: ACM version and controller image from same CSV
-                                if addon_images else "unknown"),
     "predicate_inputs_classified": str(inputs_classified).lower(),
 }
 # Per-run removal precondition: the OperatorPolicy owns the rhacs
@@ -1155,8 +1196,7 @@ terms = {
 # leaves the install unsettled even when the CSV is the resolved one.
 terms["removal_preconditions_met"] = str(
     # PRRT_kwDOBHvUUM65yNGc: guard removal readiness with generation check, not just timestamp
-    inputs_classified
-    inputs_classified
+    inputs_classified and generation_match
     and terms["operatorpolicy_compliant"] == "true"
     and terms["operatorpolicy_targets_subscription"] == "true"
     and terms["operatorpolicy_enforcing"] == "true"
@@ -1294,7 +1334,11 @@ if present and selection is None and not listed_anywhere:
           "inventory lists none")
     sys.exit(20)
 if present and selection is not None and not listed_scoped: # PRRT_kwDOBHvUUM65ui2A: catalog inventory compare for selected catalog
-if present and selection is not None and not listed_scoped:
+    # Verify selected catalog is in observed inventory before failing
+    _sel_in_inv = any(selection.get("catalogSource") == c and selection.get("catalogSourceNamespace") == ns for _, c, ns in inv)
+    if not _sel_in_inv and selection.get("catalogSource") is not None:
+        print("ASSERTION FAILURE (20): selected catalog %s/%s not in inventory %s" % (selection.get("catalogSource"), selection.get("catalogSourceNamespace"), ", ".join(listed_anywhere) or "none"))
+        sys.exit(20)
     print("ASSERTION FAILURE (20): packagemanifest disagreement: the "
           "per-package capture reports rhacs-operator present in %s/%s but "
           "the inventory does not list it in the subscribed catalog %s "
@@ -1307,8 +1351,17 @@ if present and selection is not None:
     sel_catalog = selection.get("catalogSource")
     sel_catalog_ns = selection.get("catalogSourceNamespace")
     # PRRT_kwDOBHvUUM65yNGf: accept consistent single-catalog when no subscription exists
-    if sel_catalog != sub_source or (sub_source_ns and sel_catalog_ns != sub_source_ns):
-    if sel_catalog != sub_source or (sub_source_ns and sel_catalog_ns != sub_source_ns):
+    if sub_source is None:
+        # No subscription: accept if single catalog consistent with inventory
+        if len(inv) == 1 and sel_catalog == inv[0][1] and sel_catalog_ns == inv[0][2]:
+            pass
+        elif sel_catalog != sub_source or (sub_source_ns and sel_catalog_ns != sub_source_ns):
+            print("ASSERTION FAILURE (20): packagemanifest disagreement: the "
+                  "per-package selection reports catalog %s/%s but the subscription "
+                  "subscribes to %s (selection does not match subscribed source)"
+                  % (sel_catalog, sel_catalog_ns, scoped_label))
+            sys.exit(20)
+    elif sel_catalog != sub_source or (sub_source_ns and sel_catalog_ns != sub_source_ns):
         print("ASSERTION FAILURE (20): packagemanifest disagreement: the "
               "per-package selection reports catalog %s/%s but the subscription "
               "subscribes to %s (selection does not match subscribed source)"
