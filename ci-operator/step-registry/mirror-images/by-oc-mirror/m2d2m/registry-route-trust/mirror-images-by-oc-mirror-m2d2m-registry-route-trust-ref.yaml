@@ -1,0 +1,29 @@
+ref:
+  as: mirror-images-by-oc-mirror-m2d2m-registry-route-trust
+  from: tools
+  commands: mirror-images-by-oc-mirror-m2d2m-registry-route-trust-commands.sh
+  dependencies:
+  - name: cli
+    env: ROUTE_TRUST_CLI_IMAGE
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  timeout: 30m0s
+  grace_period: 1m0s
+  documentation: |-
+    Runs in the payload tools image for jq and certificate/network utilities;
+    the separate cli dependency supplies only the temporary probe image.
+    Checks required commands before sourcing credentials or accessing the API.
+
+    Verifies the live integrated registry default route's serving chain and
+    hostname using only CA certificates from the managed default-ingress-cert
+    bundle, then merges those CAs into the existing image additionalTrustedCA
+    ConfigMap, preserving other registry trust and the existing reference.
+    Requires the default route and mirror-images-trust-registry-ca configuration.
+    Seeds a temporary integrated-registry image from the payload CLI dependency
+    with verified TLS, then gates on real authenticated pulls on every Linux
+    worker. This bounded propagation check does not require a new rendered
+    MachineConfig. Temporary workloads and namespace-local credentials are
+    deleted; the merged CA remains available to subsequent e2e build/test cases.
+    Does not change disconnected egress policy or disable TLS verification.

@@ -13,9 +13,13 @@ ref:
     (configs.imageregistry.operator.openshift.io cluster spec.defaultRoute=true)
     and waits until 'oc registry info --public' resolves successfully.
 
-    Required before any step that pushes images to the cluster's integrated
-    registry from outside the cluster (e.g. mirror-images-community-e2e-images),
-    because the internal registry Service is not reachable from CI pods.
+    Required for external integrated-registry access, including e2e build/test
+    cases that use public registry references, because the internal registry
+    Service is not reachable from CI pods.
+
+    Hostname readiness alone does not configure node trust for the route's
+    certificate. Use mirror-images-by-oc-mirror-m2d2m-registry-route-trust as a
+    separate trust and authenticated worker-pull gate.
 
     This step does not restore or weaken any air-gap or disconnected-egress
     configuration: it only exposes an inbound OpenShift Route so the CI pod

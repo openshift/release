@@ -10,6 +10,7 @@ workflow:
     - ref: mirror-images-community-e2e-images
     - ref: mirror-images-qe-test-images
     - ref: mirror-images-trust-registry-ca
+    - ref: mirror-images-by-oc-mirror-m2d2m-registry-route-trust
     - ref: openshift-e2e-test
     post:
     - chain: gather-core-dump
@@ -33,6 +34,10 @@ workflow:
 
     Before the e2e test phase, mirror-images-by-oc-mirror-m2d2m-enable-registry-route patches the
     cluster image-registry operator to expose the integrated registry via a public
-    Route, allowing the CI pod to push community e2e test images into the cluster.
+    Route for public integrated-registry references used by e2e build/test cases.
+    Community e2e images are mirrored to the bastion registry, not this route.
+    After configuring bastion mirror trust, mirror-images-by-oc-mirror-m2d2m-registry-route-trust
+    adds the ingress CA to the same trust ConfigMap without replacing mirror trust.
+    It gates conformance on authenticated default-route pulls on all Linux workers.
     This does not weaken the air-gap assertion: it exposes only an inbound Route,
     not outbound cluster or bastion egress.
