@@ -1,0 +1,52 @@
+ref:
+  as: medik8s-fbc-fresh-install
+  from: fbc-fresh-install-test-runner
+  cli: latest
+  commands: medik8s-fbc-fresh-install-commands.sh
+  env:
+  - name: ECO_DUMP_FAILED_TESTS
+    default: ""
+    documentation: When "true", eco-gotests dumps cluster state on test failure via k8reporter.
+  - name: FBC_OPERATOR
+    default: nhc
+    documentation: Operator suite to run (nhc or sbr). NHC is the supported s390x fresh-install path.
+  - name: SYSTEM_TESTS_REF
+    default: main
+    documentation: rhwa-system-tests branch, tag, or commit SHA; main continuously validates current tests.
+  - name: FBC_CATALOG_MODE
+    default: latest-build
+    documentation: latest-build (default) discovers the newest complete public main build; provided uses configured images; latest-stage reads the current stage index.
+  - name: FBC_BUILD_REPOSITORY
+    default: quay.io/redhat-user-workloads/rhwa-tenant/rhwa-fbc/rhwa-fbc-500
+    documentation: Public Quay repository to discover builds from in latest-build mode.
+  - name: FBC_STAGE_IMAGE
+    default: registry.stage.redhat.io/redhat/redhat-operator-index:v5.0
+    documentation: Stage index tag for latest-stage mode; its registry credentials must already be in the cluster pull secret.
+  - name: FBC_CATALOG_IMAGE
+    default: quay.io/redhat-user-workloads/rhwa-tenant/rhwa-fbc/rhwa-fbc-500@sha256:e999cbe4fb3604d66ee71c9927827c2a88852b1456cb274ff1d673f1db9ce8fd
+    documentation: Used only in provided mode (digest-pinned FBC catalog).
+  - name: FBC_CANDIDATE_VERSION
+    default: "5.8.0"
+    documentation: Exact candidate CSV version in provided mode; discovery modes read the selected channel head's version.
+  - name: FBC_CANDIDATE_IMAGE
+    default: ""
+    documentation: Digest-pinned controller pullspec in provided mode; discovery modes read it from the selected bundle.
+  - name: FBC_CANDIDATE_BUNDLE
+    default: ""
+    documentation: Digest-pinned bundle pullspec in provided mode; discovery modes read it from the selected olm.bundle image.
+  - name: FBC_CANDIDATE_MIRROR
+    default: ""
+    documentation: Public Quay controller mirror in provided mode; discovery modes select a pullable mirror from the selected release's IDMS.
+  - name: FBC_CHANNEL
+    default: stable
+    documentation: Catalog channel used to select the candidate head bundle.
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  documentation: |-
+    Runs tier:fresh-install against a candidate discovered from (or provided via) an RHWA FBC.
+    Discovers the channel-head bundle/controller, exports NHC_UPGRADE_CANDIDATE_* (and
+    operator-sdk path), applies release IDMS, then runs make run-tests. Does not build
+    source images. SNR peer for NHC may be discovered from GA when not set. Use a
+    disposable cluster.

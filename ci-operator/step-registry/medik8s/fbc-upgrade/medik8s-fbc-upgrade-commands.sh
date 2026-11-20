@@ -483,8 +483,10 @@ run_upgrade_test() {
   export WORKLOAD_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
 
   # Match the proven source jobs' operator-specific safety settings.
+  # On s390x OZ, FBC chains do not install the GA run-tests SSH ProxyCommand
+  # jump; use oc-debug kubelet-stop for operators that may remediate nodes.
   case "$FBC_OPERATOR" in
-    nhc) export MEDIK8S_KUBELET_STOP_OCDEBUG=true ;;
+    nhc|snr) export MEDIK8S_KUBELET_STOP_OCDEBUG=true ;;
     # Keep upgrade/config checks; skip the optional RWX-backed reboot test.
     sbr) export SBR_FBC_REMEDIATION=false; unset SBR_STORAGE_CLASS ;;
     # Keep upgrade/config checks; skip optional real fencing and its credentials.

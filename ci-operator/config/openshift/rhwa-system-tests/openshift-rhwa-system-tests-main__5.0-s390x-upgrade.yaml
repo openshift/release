@@ -1,0 +1,148 @@
+base_images:
+  claude-ai-helpers:
+    name: claude-ai-helpers
+    namespace: ci
+    tag: latest
+  cli:
+    name: "5.0"
+    namespace: ocp
+    tag: cli
+  libvirt-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: libvirt-installer
+  nested-podman:
+    name: nested-podman
+    namespace: ci
+    tag: latest
+  system-tests-builder:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.27
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: konveyor
+    tag: ubi9-v1.27
+images:
+  items:
+  - dockerfile_literal: |
+      FROM system-tests-builder AS go-builder
+      FROM docker.io/mikefarah/yq:4.53.2 AS yq
+      FROM nested-podman
+      USER 0
+      RUN dnf install -y git make skopeo jq findutils tar gzip && dnf clean all
+      COPY --from=go-builder /opt/app-root/src/go /opt/app-root/src/go
+      COPY --from=yq /usr/bin/yq /usr/local/bin/yq
+      ENV GOROOT=/opt/app-root/src/go
+      ENV PATH=/opt/app-root/src/go/bin:$PATH
+    from: nested-podman
+    inputs:
+      system-tests-builder:
+        as:
+        - system-tests-builder
+    to: fbc-upgrade-test-runner
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+  s390x-latest:
+    candidate:
+      architecture: s390x
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- always_run: false
+  as: e2e-nhc-fbc-upgrade-s390x
+  capabilities:
+  - intranet
+  cluster: build12
+  optional: true
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "5.0"
+      COMPUTE_COUNT: "2"
+      CONTROL_COUNT: "3"
+      ECO_DUMP_FAILED_TESTS: "true"
+      ETCD_DISK_SPEED: slow
+      FBC_BUILD_REPOSITORY: quay.io/redhat-user-workloads/rhwa-tenant/rhwa-fbc/rhwa-fbc-500
+      FBC_CATALOG_MODE: latest-build
+      FBC_OPERATOR: nhc
+      NODE_TUNING: "true"
+      TEST_NAME: e2e-nhc-fbc-upgrade-s390x
+      TEST_STEPS: medik8s-fbc-upgrade
+      USE_EXTERNAL_DNS: "true"
+    workflow: rhwa-system-tests-s390x-fbc-upgrade
+- always_run: false
+  as: e2e-nmo-fbc-upgrade-s390x
+  capabilities:
+  - intranet
+  cluster: build12
+  optional: true
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "5.0"
+      COMPUTE_COUNT: "2"
+      CONTROL_COUNT: "3"
+      ECO_DUMP_FAILED_TESTS: "true"
+      ETCD_DISK_SPEED: slow
+      FBC_BUILD_REPOSITORY: quay.io/redhat-user-workloads/rhwa-tenant/rhwa-fbc/rhwa-fbc-500
+      FBC_CATALOG_MODE: latest-build
+      FBC_OPERATOR: nmo
+      NODE_TUNING: "true"
+      TEST_NAME: e2e-nmo-fbc-upgrade-s390x
+      TEST_STEPS: medik8s-fbc-upgrade
+      USE_EXTERNAL_DNS: "true"
+    workflow: rhwa-system-tests-s390x-fbc-upgrade
+- always_run: false
+  as: e2e-snr-fbc-upgrade-s390x
+  capabilities:
+  - intranet
+  cluster: build12
+  optional: true
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARCH: s390x
+      BRANCH: "5.0"
+      COMPUTE_COUNT: "2"
+      CONTROL_COUNT: "3"
+      ECO_DUMP_FAILED_TESTS: "true"
+      ETCD_DISK_SPEED: slow
+      FBC_BUILD_REPOSITORY: quay.io/redhat-user-workloads/rhwa-tenant/rhwa-fbc/rhwa-fbc-500
+      FBC_CATALOG_MODE: latest-build
+      FBC_OPERATOR: snr
+      NODE_TUNING: "true"
+      TEST_NAME: e2e-snr-fbc-upgrade-s390x
+      TEST_STEPS: medik8s-fbc-upgrade
+      USE_EXTERNAL_DNS: "true"
+    workflow: rhwa-system-tests-s390x-fbc-upgrade
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: rhwa-system-tests
+  variant: 5.0-s390x-upgrade
