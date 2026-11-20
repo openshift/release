@@ -596,6 +596,9 @@ class Model:  # pylint: disable=too-few-public-methods
         self.phase = phase
         self.url = required("VALIDATION_MODEL_URL")
         self.model = required(f"VALIDATION_{phase.upper()}_MODEL")
+        self.reasoning_effort = os.environ.get(f"VALIDATION_{phase.upper()}_REASONING_EFFORT", "").strip()
+        if self.reasoning_effort not in ("", "low", "medium", "high", "xhigh"):
+            raise ValidationError(f"VALIDATION_{phase.upper()}_REASONING_EFFORT must be empty, low, medium, high or xhigh")
         self.token = token_file("VALIDATION_MODEL_TOKEN_FILE", "/var/run/validation-model/token")
         self.ca_file = os.environ.get("VALIDATION_MODEL_CA_FILE") or None
         self.usage = {"requests": 0, "prompt_tokens": 0, "completion_tokens": 0}
@@ -608,6 +611,8 @@ class Model:  # pylint: disable=too-few-public-methods
             "max_tokens": MODEL_OUTPUT_TOKENS,
             "temperature": 0,
         }
+        if self.reasoning_effort:
+            payload["reasoning_effort"] = self.reasoning_effort
         if tools:
             payload["tools"] = tools
             payload["tool_choice"] = "required"
@@ -954,6 +959,7 @@ def model_metrics(started, model):
     return {
         "seconds": time.monotonic() - started,
         "model": model.model if model else None,
+        "reasoning_effort": (model.reasoning_effort or None) if model else None,
         "usage": model.usage if model else {},
     }
 

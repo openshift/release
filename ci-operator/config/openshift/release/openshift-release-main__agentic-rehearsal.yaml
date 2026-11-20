@@ -1,59 +1,65 @@
 base_images:
   agentic-validation:
-    namespace: ci
     name: agentic-validation
+    namespace: ci
     tag: latest
 build_root:
   image_stream_tag:
+    name: "4.21"
     namespace: ocp
-    name: '4.21'
     tag: cli
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: '5.1'
+      version: "5.1"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi
-  always_run: false
-  optional: true
+- always_run: false
+  as: aws-ipi
   capabilities:
   - intranet
   - nested-podman
   cluster: build03
+  optional: true
   steps:
     cluster_profile: openshift-org-aws
     env:
       EXTENSION_BINARY_PATH: /usr/bin/router-tests-ext.gz
       EXTENSION_SOURCE: openshift:payload:router
-      VALIDATION_INCLUDE_DIFF: "false"
       VALIDATION_COMPONENT: haproxy-router
-      VALIDATION_SCOPE: 'NE-2126 / openshift/router#867: validate raw-gzip packaging and executable test discovery for the router extension in the installed release. Other deliverables of the automation epic are outside this run.'
+      VALIDATION_EXECUTE_MODEL: Qwen3.8-27B-FP8
+      VALIDATION_EXECUTE_REASONING_EFFORT: low
+      VALIDATION_INCLUDE_DIFF: "false"
+      VALIDATION_SCOPE: 'NE-2126 / openshift/router#867: validate raw-gzip packaging
+        and executable test discovery for the router extension in the installed release.
+        Other deliverables of the automation epic are outside this run.'
     test:
     - ref: openshift-agentic-test-extension
     - ref: openshift-agentic-prepare-validation
     - ref: openshift-agentic-validate
     workflow: ipi-aws
-- as: prepare
-  always_run: false
-  optional: true
+- always_run: false
+  as: prepare
   capabilities:
   - intranet
   cluster: build03
+  optional: true
   steps:
     env:
       VALIDATION_INCLUDE_DIFF: "false"
-      VALIDATION_SCOPE: 'NE-2126 / openshift/router#867: validate raw-gzip packaging and executable test discovery for the router extension in the installed release. Other deliverables of the automation epic are outside this run.'
+      VALIDATION_SCOPE: 'NE-2126 / openshift/router#867: validate raw-gzip packaging
+        and executable test discovery for the router extension in the installed release.
+        Other deliverables of the automation epic are outside this run.'
     test:
     - ref: openshift-agentic-prepare-validation
 zz_generated_metadata:
+  branch: main
   org: openshift
   repo: release
-  branch: main
   variant: agentic-rehearsal
