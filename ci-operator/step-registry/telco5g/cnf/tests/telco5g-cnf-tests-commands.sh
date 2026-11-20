@@ -636,6 +636,17 @@ elif [[ "$T5CI_JOB_TYPE" == "hcp-cnftests" ]]; then
 else
     export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni knmstate}"
 fi
+# CNF-29223: the ocp/5.0 kubernetes-nmstate-{operator,handler} CI images are not imported
+# (manifest unknown), so the NMState operator never becomes ready and feature-wait times out.
+# Skip knmstate on 5.0 until the images are available again.
+if [[ "$T5CI_VERSION" == "5.0" ]]; then
+    filtered_features=()
+    for feature in $FEATURES; do
+        [[ "$feature" == "knmstate" ]] || filtered_features+=("$feature")
+    done
+    export FEATURES="${filtered_features[*]}"
+    echo "Skipping knmstate feature for $T5CI_VERSION (CNF-29223), FEATURES=$FEATURES"
+fi
 export VALIDATIONS_FEATURES="${VALIDATIONS_FEATURES:-$FEATURES}"
 export TEST_RUN_FEATURES="${TEST_RUN_FEATURES:-$FEATURES}"
 
