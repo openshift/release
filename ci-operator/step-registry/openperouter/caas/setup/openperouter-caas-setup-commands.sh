@@ -84,6 +84,9 @@ echo "ERROR: OpenShift cluster did not become ready within ${VERIFY_TIMEOUT_MIN:
 exit 1
 REMOTE_SETUP
 
+echo "DEBUG for script content"
+cat "${remote_script}"
+
 echo "### Copying remote setup script to remote host"
 scp "${SSHOPTS[@]}" "${remote_script}" "root@${IP}:/tmp/openperouter-caas-setup.sh"
 
