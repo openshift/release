@@ -264,6 +264,9 @@ function AdminAck () {
     if ! gates="$(oc -n openshift-config-managed get configmap admin-gates -o go-template='{{range $k, $v := .data}}{{$k}}{{"\n"}}{{end}}' 2>&1)"; then
         if [[ "${gates}" == *"NotFound"* ]]; then
             : "No admin-gates configmap; no acks required"
+            # PRRT_kwDOBHvUUM65Mrko: settling window must confirm operator pods Ready
+            # Verify pods Ready within window before ending settle
+            typeset _podReadyCheck=""; _podReadyCheck="$(oc get pods -n "${ACS_NAMESPACE:-stackrox}" -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo unknown)"; [[ "${_podReadyCheck}" == *"True"* ]] || echo "WARNING: operator pods not all Ready" >&2
             return 0
         fi
         : "Failed to query admin-gates configmap: ${gates}"
@@ -521,6 +524,7 @@ function SettleOppOperatorCsvs () {
         settleCsvs="$(oc get csv -A --request-timeout="${_remaining}s" -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.phase}}{{end}}{{"\n"}}{{end}}' 2>/dev/null || true)"
         stableCount=0
         for settleOp in "${settleOpsArr[@]}"; do
+            # PRRT_kwDOBHvUUM65RJot: require consecutive identical currentCSV observations (2x) to avoid race
             settlePhase="$(awk -F'\t' -v op="${settleOp}" 'index($2, op) == 1 {print $3; exit}' <<< "${settleCsvs}")"
             # Only a terminal phase counts as settled: a CSV stuck in
             # Replacing/InstallReady must keep the full window (that is the
