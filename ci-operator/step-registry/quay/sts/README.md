@@ -14,21 +14,22 @@ The `e2e-sts` job in the Quay Operator `master__ocp-latest` configuration runs:
    including a per-cluster OIDC provider and platform roles. The chain records
    the provider ARN in `${SHARED_DIR}/aws_oidc_provider_arn`.
 2. `quay-sts-provision` validates the cluster, OIDC provider and AWS caller,
-   then creates a unique test namespace, S3 bucket, and workload role in the
-   leased cluster account. The role trusts only
+   then creates a unique test namespace, S3 bucket, and two workload roles in
+   the leased cluster account. Both roles trust only
    `system:serviceaccount:<run-namespace>:sts-cco-quay-app` with audience
-   `openshift` and grants access only to the run-owned bucket.
+   `openshift` and grant access only to the run-owned bucket.
 3. `quay-sts-install` installs the PR-built Quay Operator bundle in
    `openshift-operators` with AllNamespaces mode, adds the workload role as the
    operator's `ROLEARN`, and waits for the updated deployment.
 4. `quay-test-chainsaw` with `CHAINSAW_SUITE=sts` invokes `make test-e2e-sts`
-   from the operator PR source. The Chainsaw test validates
-   the CredentialRequest and projected-token configuration and exercises Quay
-   image push, pull, and repository mirroring.
+   from the operator PR source. The Chainsaw test validates the
+   CredentialRequest and projected-token configuration, exercises Quay image
+   push, pull, and repository mirroring, rotates `ROLEARN` to the second
+   workload role, and repeats real S3 operations.
 5. `ipi-aws-post-manual-oidc-sts` destroys the cluster and removes the OIDC and
    platform IAM infrastructure created by `ccoctl`.
 6. `quay-sts-cleanup` verifies AWS account and resource ownership tags, then
-   deletes the run-owned role, bucket contents, and bucket.
+   deletes the run-owned roles, bucket contents, and bucket.
 
 All cleanup actions run in the job's post phase. The existing Quay `e2e` and
 `e2e-upgrade` jobs are unchanged.
@@ -48,6 +49,7 @@ Provisioning state and non-secret identifiers are stored in
 - `STS_S3_BUCKET`
 - `STS_S3_REGION`
 - `STS_ROLE_ARN`
+- `STS_SECOND_ROLE_ARN`
 
 The scripts do not print account IDs, role/provider ARNs, issuer URLs,
 kubeconfigs, or credential values.
@@ -83,7 +85,7 @@ the IPI and ccoctl lifecycle. The Quay-specific provision and cleanup steps use:
   `DeleteObject`, `DeleteObjectVersion`, and `DeleteBucket` for run buckets.
 
 Set `QUAY_STS_PERMISSIONS_BOUNDARY` if the account requires a boundary for the
-workload role. The boundary must be a policy in the same AWS account.
+workload roles. The boundary must be a policy in the same AWS account.
 
 ## Validation and failure handling
 
@@ -92,9 +94,9 @@ account, role tag, and bucket owner/tag checks prevent adopted-resource
 cleanup. S3 versions, delete markers, and incomplete multipart uploads are
 removed. If cleanup fails, any remaining resources stay in the leased AWS
 account after `SHARED_DIR` is discarded. Resources are named
-`quay-sts-<run-id>` and, once initialization completes, tagged
-`quay-sts-run=<run-id>`; administrators must locate and delete leftovers
-manually.
+`quay-sts-<run-id>` and `quay-sts-<run-id>-b` and, once initialization
+completes, tagged `quay-sts-run=<run-id>`; administrators must locate and
+delete leftovers manually.
 
 After this registration merges, a successful live `e2e-sts` Prow run against
 the Quay Operator feature PR is required before that feature merges. The live
