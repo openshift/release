@@ -1,0 +1,77 @@
+base_images:
+  ocp_builder_rhel-9-openshift-nodejs-base-5.0.art:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-openshift-nodejs-base-5.0.art
+  origin_scos-5.0_base-stream9:
+    name: scos-5.0
+    namespace: origin
+    tag: base-stream9
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder-v29
+images:
+  items:
+  - dockerfile_literal: |
+      FROM origin_scos-5.0_base-stream9
+      # Branch Dockerfiles install packages before selecting their non-root runtime user.
+      USER 0
+      RUN INSTALL_PKGS="nginx" && \
+          dnf install -y --setopt=tsflags=nodocs $INSTALL_PKGS && \
+          rpm -V $INSTALL_PKGS && \
+          dnf -y clean all --enablerepo='*' && rm -rf /var/cache/dnf/* && \
+          chown -R 1001:0 /var/lib/nginx /var/log/nginx /run && \
+          chmod -R ug+rwX /var/lib/nginx /var/log/nginx /run
+      RUN printf '%s\n' \
+          'error_log /dev/stderr warn;' \
+          'pid /tmp/nginx.pid;' \
+          'events { worker_connections 1024; }' \
+          'http {' \
+          '    include /etc/nginx/mime.types;' \
+          '    default_type application/octet-stream;' \
+          '    access_log /dev/stdout;' \
+          '    server {' \
+          '        listen 8080 default_server;' \
+          '        root /opt/app-root/src;' \
+          '        index index.html;' \
+          '    }' \
+          '}' > /etc/nginx/nginx.conf
+      EXPOSE 8080
+      ENTRYPOINT []
+      STOPSIGNAL SIGQUIT
+    from: origin_scos-5.0_base-stream9
+    to: nmstate-console-plugin-runtime
+  - dockerfile_path: Dockerfile
+    from: nmstate-console-plugin-runtime
+    inputs:
+      ocp_builder_rhel-9-openshift-nodejs-base-5.0.art:
+        as:
+        - build
+        - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-4.22
+    to: nmstate-console-plugin
+promotion:
+  to:
+  - excluded_images:
+    - nmstate-console-plugin-runtime
+    name: scos-5.0
+    namespace: origin
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: scos-5.0
+      namespace: origin
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 1000m
+      memory: 6Gi
+zz_generated_metadata:
+  branch: release-5.0
+  org: openshift
+  repo: nmstate-console-plugin
+  variant: okd-scos
