@@ -300,8 +300,11 @@ function CheckOppCompatibility () {
         # PRRT_kwDOBHvUUM65TpMz: re-enforce compatibility floor after product upgrades (post-upgrade check tracked INTEROP-9553)
         # Pre-flight is informational; post-upgrade floor enforcement must happen in product-upgrade/smoke steps
         AppendCheck "opp_compatibility_matrix" "warn" "${details}"
-        # Mark for post-upgrade re-enforcement
-        echo "WARN: operator below target floor ${ocpKey} will be re-checked post-upgrade" > "${ARTIFACT_DIR}/compat-floor-preflight-warn.txt" 2>/dev/null || true
+        # PRRT_kwDOBHvUUM65TpMz: re-enforce compatibility floor after product upgrades
+        if [[ -n "${belowFloor}" ]]; then
+            echo "${belowFloor}" > "${SHARED_DIR}/compat-floor-below.txt" 2>/dev/null || true
+            echo "WARN: operator below target floor ${ocpKey} will be re-checked post-upgrade" > "${ARTIFACT_DIR}/compat-floor-preflight-warn.txt" 2>/dev/null || true
+        fi
     else
         : "All OPP operators are compatible with OCP ${ocpKey}"
         AppendCheck "opp_compatibility_matrix" "pass" "${details}"
