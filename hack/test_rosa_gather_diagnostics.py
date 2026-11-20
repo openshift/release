@@ -70,6 +70,8 @@ def fixture_shared_ids(base, ids, case):
         (shared / "ocm-fvt-cluster-ids").write_text("b" * 32 if case == "alias-conflict" else CLUSTER, encoding="utf-8")
         if case == "alias-only":
             (shared / "cluster-id").unlink()
+    if case == "dangling-manifest":
+        (shared / "ocm-fvt-diagnostic-identity.json").symlink_to(shared / "absent-handoff")
 
 
 def mock_oc(arguments):
@@ -373,6 +375,9 @@ class CollectorTests(unittest.TestCase):
             artifacts, calls = self.run_fixture(case, manifest=True)
             self.assertEqual(artifacts["collection-outcome.json"]["collector"], "incomplete")
             self.assertNotIn("/resources/live", calls)
+        artifacts, calls = self.run_fixture("dangling-manifest")
+        self.assertEqual(artifacts["collection-outcome.json"]["reason"], "invalid_identity_file")
+        self.assertNotIn("ocm get ", calls)
 
     def test_fractional_creation_in_final_run_second_is_accepted(self):
         artifacts, _ = self.run_fixture("fractional-finish", ids=None, manifest=True)

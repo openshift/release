@@ -116,7 +116,8 @@ def identity():
                 identifiers.add(value)
     if len(identifiers) > 1:
         raise ValueError("ambiguous_identity")
-    if not (SHARED / "ocm-fvt-diagnostic-identity.json").exists():
+    manifest_path = SHARED / "ocm-fvt-diagnostic-identity.json"
+    if not (manifest_path.exists() or manifest_path.is_symlink()):
         if identifiers:
             OUTCOME["identity"] = "shared_id"
             return identifiers.pop()
