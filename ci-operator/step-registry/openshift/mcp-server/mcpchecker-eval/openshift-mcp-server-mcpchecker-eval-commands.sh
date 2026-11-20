@@ -43,7 +43,8 @@ cleanup() {
         kill "$(cat .kiali-pf.pid)" 2>/dev/null || true
     fi
     if [[ "${kiali_suite}" == true ]]; then
-        make clean-kiali-openshift KUBERNETES_CLI=oc || true
+        make clean-kiali-openshift KUBERNETES_CLI=oc \
+            BOOKINFO_CP_NAMESPACE="${kiali_cp_namespace:-istio-system}" || true
     fi
 }
 trap cleanup EXIT
@@ -119,10 +120,16 @@ case "${EVAL_SUITE:-}" in
         fi
         ;;
     kiali)
-        kiali_suite=true
         kiali_cp_namespace="${KIALI_CP_NAMESPACE:-istio-system}"
+        # Make targets use BOOKINFO_CP_NAMESPACE (default istio-system). Keep
+        # setup/cleanup/port-forward on the same control-plane namespace.
         if ! oc -n "${kiali_cp_namespace}" get deployment/kiali >/dev/null 2>&1; then
-            make setup-kiali-openshift KUBERNETES_CLI=oc
+            # Mark before setup so partial failures still run clean-kiali-openshift.
+            # Leave unset when reusing an existing deployment so cleanup does not
+            # tear down preinstalled OSSM/Kiali.
+            kiali_suite=true
+            make setup-kiali-openshift KUBERNETES_CLI=oc \
+                BOOKINFO_CP_NAMESPACE="${kiali_cp_namespace}"
         fi
         if ! ( : > /dev/tcp/127.0.0.1/20001 ) 2>/dev/null; then
             oc -n "${kiali_cp_namespace}" port-forward svc/kiali 20001:20001 >/dev/null 2>&1 &
