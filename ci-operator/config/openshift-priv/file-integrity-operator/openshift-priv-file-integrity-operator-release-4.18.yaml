@@ -82,32 +82,6 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - always_run: false
-  as: e2e-rosa
-  optional: true
-  steps:
-    cluster_profile: quay-aws
-    env:
-      BYO_OIDC: "true"
-      CHANNEL_GROUP: stable
-      ENABLE_BILLING_ACCOUNT: "yes"
-      OCM_LOGIN_ENV: integration
-      OPENSHIFT_VERSION: "4.15"
-      REGION: us-east-2
-    test:
-    - ref: ipi-install-rbac
-    - as: test-rosa
-      cli: latest
-      commands: oc adm wait-for-stable-cluster --minimum-stable-period 5m --timeout
-        30m; make e2e-rosa
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: file-integrity-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: rosa-aws-sts-hcp
-- always_run: false
   as: e2e-bundle-aws
   optional: true
   pipeline_run_if_changed: ^(config|bundle)

@@ -42,7 +42,7 @@ base_images:
   ocp_os:
     name: "5.1"
     namespace: ocp-priv
-    tag: rhel-coreos
+    tag: rhel-coreos-10
   tls-scanner-tool:
     name: "5.1"
     namespace: ocp-priv
@@ -138,12 +138,16 @@ tests:
     workflow: agent-e2e-compact-ipv4-iso-no-registry
 - always_run: false
   as: e2e-metal-ovn-two-node-arbiter
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-edge-enablement
     workflow: baremetalds-two-node-arbiter
 - always_run: false
   as: e2e-metal-ovn-two-node-fencing
+  capabilities:
+  - intranet
   optional: true
   steps:
     cluster_profile: equinix-edge-enablement
@@ -234,6 +238,14 @@ tests:
   optional: true
   steps:
     cluster_profile: openshift-org-gcp
+    workflow: openshift-upgrade-gcp
+- always_run: true
+  as: e2e-gcp-mco-upgrade
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      TEST_TYPE: mco-upgrade
     workflow: openshift-upgrade-gcp
 - always_run: false
   as: e2e-gcp-rt-op

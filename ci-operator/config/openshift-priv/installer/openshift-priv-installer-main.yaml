@@ -284,6 +284,15 @@ tests:
         keyC valueC
     workflow: openshift-e2e-aws
 - always_run: false
+  as: e2e-aws-ovn-tls-modern
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      TLS_PROFILE_TYPE: Modern
+    workflow: tls-install-aws-ovn-modern
+- always_run: false
   as: e2e-aws-ovn-devpreview
   optional: true
   steps:
@@ -608,7 +617,7 @@ tests:
       OS_IMAGE_STREAM: rhel-10
     workflow: openshift-e2e-aws
 - always_run: false
-  as: e2e-gcd-ovn-private-techpreview
+  as: e2e-gcd-ovn-private
   optional: true
   steps:
     cluster_profile: gcd
@@ -623,7 +632,6 @@ tests:
       CONTROL_PLANE_DISK_TYPE: hyperdisk-balanced
       CONTROL_PLANE_NODE_TYPE: c3-standard-8
       DEFAULT_MACHINE_OSIMAGE: projects/eu0:openshift/images/rhcos10
-      FEATURE_SET: TechPreviewNoUpgrade
       PUBLISH: Internal
       TEST_SKIPS: Ensure HTTPRoute object is created\|The HAProxy router should pass
         the http2 tests\|The HAProxy router should pass the h2spec conformance tests\|should
@@ -632,6 +640,24 @@ tests:
         custom network, cluster-networked pods, NodePort service\|cluster-config-operator
         should report complete ClusterOperator status
     workflow: openshift-e2e-gcd
+- always_run: false
+  as: e2e-gcd-ovn-private-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: gcd
+    env:
+      BASE_DOMAIN: ci.gcd.devcluster.openshift.com
+      BASTION_IMAGE_NAME: fedora-coreos-41-20241122-3-0-gcp-x86-64
+      BASTION_IMAGE_PROJECT: eu0:openshift
+      BASTION_MACHINE_TYPE: c3-standard-4
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: c3-standard-4
+      CONTROL_PLANE_DISK_SIZEGB: "512"
+      CONTROL_PLANE_DISK_TYPE: hyperdisk-balanced
+      CONTROL_PLANE_NODE_TYPE: c3-standard-8
+      DEFAULT_MACHINE_OSIMAGE: projects/eu0:openshift/images/rhcos10
+      PUBLISH: Internal
+    workflow: openshift-e2e-gcd-manual-oidc-workload-identity
 - always_run: false
   as: e2e-gcp-ovn
   pipeline_run_if_changed: (gcp|google)
@@ -722,6 +748,7 @@ tests:
   steps:
     cluster_profile: openshift-org-azure
     env:
+      AZURE_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
       USER_TAGS: |
         keyA valueA
         keyB valueB
@@ -1261,6 +1288,8 @@ tests:
     workflow: openshift-e2e-aws-single-node
 - always_run: false
   as: e2e-metal-single-node-live-iso
+  capabilities:
+  - intranet
   optional: true
   pipeline_run_if_changed: (baremetal|metal3|ironic)
   steps:
@@ -1755,6 +1784,29 @@ tests:
       CONTROL_PLANE_AMI: ami-0b78302f83217d149
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
+- always_run: false
+  as: e2e-aws-ovn-nested-virtualization-techpreview
+  optional: true
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    cluster_profile: openshift-org-aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      COMPUTE_MACHINE_MANAGEMENT: ClusterAPI
+      COMPUTE_NESTED_VIRTUALIZATION: Enabled
+      COMPUTE_NODE_TYPE: m8i.2xlarge
+      FEATURE_SET: TechPreviewNoUpgrade
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-conf-aws
+    - chain: aws-provision-iam-user-minimal-permission
+    - chain: ipi-install
+    - ref: ipi-aws-describe
+    test:
+    - ref: aws-verify-nested-virtualization
+    - ref: openshift-e2e-test
 zz_generated_metadata:
   branch: main
   org: openshift-priv
