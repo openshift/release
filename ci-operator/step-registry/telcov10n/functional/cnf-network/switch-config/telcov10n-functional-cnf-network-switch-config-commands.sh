@@ -2,6 +2,8 @@
 set -e
 set -o pipefail
 
+sleep 3600
+
 ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
 MOUNTED_HOST_INVENTORY="/var/host_variables/"
 

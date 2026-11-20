@@ -1,0 +1,37 @@
+build_root:
+  image_stream_tag:
+    name: eco-ci-cd
+    namespace: telcov10n-ci
+    tag: eco-ci-cd
+prowgen:
+  enable_secrets_store_csi_driver: false
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.22"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 200m
+      memory: 300Mi
+tests:
+- as: cnf-ran-ptp-tests
+  capabilities:
+  - intranet
+  cron: 0 18 * * 6
+  steps:
+    env:
+      CLUSTER_NAME: kni-qe-69
+      DISABLE_INSIGHTS: "true"
+      VERSION: "4.22"
+    pre:
+    - ref: telcov10n-functional-system-hub-deploy
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: system-rdscore-schedulable-4.22
