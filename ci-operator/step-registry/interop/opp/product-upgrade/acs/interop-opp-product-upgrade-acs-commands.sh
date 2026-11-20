@@ -554,6 +554,10 @@ function Main () {
         # PRRT_kwDOBHvUUM65RJoY: re-read generation/uid before patch to avoid race
         _sub_gen_before="$(oc get subscription rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.generation}' 2>/dev/null || echo 0)"
         _sub_uid_before="$(oc get subscription rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.uid}' 2>/dev/null || echo unknown)"
+        # PRRT_kwDOBHvUUM65RJoY: re-read subscription generation before patch to avoid stale baseline
+        typeset _sub_gen_before="" _sub_uid_before=""
+        _sub_gen_before="$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.generation}' 2>/dev/null || echo "")"
+        _sub_uid_before="$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.uid}' 2>/dev/null || echo "")"
         versionCmp="$(VersionCompare "${targetHeadVersion}" "${currentVersion}")"
         if (( versionCmp < 0 )); then
             _junit_reason="acs-upgrade rejected: downgrade (target channel ${targetChannel} head ${targetHeadVersion} < installed ${currentVersion})"
