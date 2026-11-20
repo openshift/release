@@ -27,6 +27,10 @@ base_images:
     name: hypershift-operator
     namespace: hypershift
     tag: "4.22"
+  postgresql-13-c9s:
+    name: postgresql
+    namespace: ci
+    tag: postgresql-13-c9s
   postgresql-15-c9s:
     name: postgresql
     namespace: ci
@@ -101,6 +105,8 @@ operator:
     with: assisted-installer-controller
   - pullspec: quay.io/edge-infrastructure/assisted-image-service:ocm-2.17
     with: assisted-image-service
+  - pullspec: quay.io/sclorg/postgresql-13-c9s:latest
+    with: postgresql-13-c9s
   - pullspec: quay.io/sclorg/postgresql-15-c9s:latest
     with: postgresql-15-c9s
 promotion:
@@ -460,6 +466,12 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=1
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-ofcir-baremetal-operator-ztp
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-ocm-2.17
   org: openshift-priv
