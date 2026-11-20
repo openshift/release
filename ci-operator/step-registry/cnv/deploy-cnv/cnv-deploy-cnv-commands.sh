@@ -14,6 +14,7 @@ CNV_HYPERCONVERGED_NAME=kubevirt-hyperconverged
 CNV_INSTALL_NAMESPACE=openshift-cnv
 CNV_OPERATOR_CHANNEL="${CNV_OPERATOR_CHANNEL:-stable}"
 CNV_VERSION=${CNV_VERSION:?CNV_VERSION environment variable is required}
+CNV_FAIL_FAST=${CNV_FAIL_FAST:-false}
 # readonly CNV_MAJOR_MINOR=${CNV_VERSION%.*}
 # CNV_STARTING_CSV="kubevirt-hyperconverged-operator.v${CNV_VERSION}"
 
@@ -22,7 +23,11 @@ wait_for_manual_debug() {
   echo "😵 Something went wrong, pause here to give yourself time to debug and investigate the issue"
   sleep 7200
 }
-trap wait_for_manual_debug ERR
+case ${CNV_FAIL_FAST} in
+  true) ;;
+  false) trap wait_for_manual_debug ERR ;;
+  *) echo "CNV_FAIL_FAST must be true or false" >&2; exit 1 ;;
+esac
 
 
 create_cnv_catalog_source() {
@@ -175,16 +180,25 @@ spec:
 EOF
 )
 
+csv_ready=false
 for _ in {1..60}; do
     CSV=$(oc -n "${CNV_INSTALL_NAMESPACE}" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
     if [[ -n "$CSV" ]]; then
         if [[ "$(oc -n "${CNV_INSTALL_NAMESPACE}" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
             echo "ClusterServiceVersion \"$CSV\" ready"
+            csv_ready=true
             break
         fi
     fi
     sleep 10
 done
+
+if [[ ${CNV_FAIL_FAST} == true && ${csv_ready} == false ]]; then
+    echo "CNV operator did not reach Succeeded within 10 minutes" >&2
+    oc --request-timeout=15s -n "${CNV_INSTALL_NAMESPACE}" get subscription "$SUB" \
+        -o jsonpath='{range .status.conditions[*]}{.type}{" "}{.status}{" "}{.reason}{"\n"}{end}' >&2 || true
+    exit 1
+fi
 
 echo_debug "Creating HyperConverged resource"
 oc create -f - <<EOF
