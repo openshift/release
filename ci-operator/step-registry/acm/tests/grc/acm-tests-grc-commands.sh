@@ -158,13 +158,18 @@ typeset -i _OPP_BASELINE_OK=0
 # for 00-placement-query-error.log with both scrub passes. Takes the
 # placement query rc and the stderr temp file path. On scrub failure the
 # raw stderr is withheld and only the command, rc, and a note are written.
+# Additional args (rc, src, label) append further query failures with their
+# own command label and return code, each scrubbed with both passes.
 _opp_write_query_error_log() {
     local _oqe_rc="$1"
     local _oqe_src="$2"
     local _oqe_tmp
     local _oqe_scrub_rc=0
+    local _oqe_agg
     _oqe_tmp="$(mktemp)" || true
+    _oqe_agg="$(mktemp)" || true
     mkdir -p "${_OPP_EVIDENCE_DIR}"
+    : > "${_oqe_agg}" 2>/dev/null || true
     if [[ -n "${_secrets_pattern}" ]]; then
         sed -E "s/${_secrets_pattern}/[REDACTED]/g" "${_oqe_src}" > "${_oqe_tmp}" 2>/dev/null || _oqe_scrub_rc=$?
     else
@@ -180,8 +185,58 @@ _opp_write_query_error_log() {
         else
             echo "stderr withheld: scrubbing failed"
         fi
-    } > "${_OPP_EVIDENCE_DIR}/00-placement-query-error.log" 2>&1 || true
+    } >> "${_oqe_agg}" 2>&1 || true
     rm -f "${_oqe_tmp}" 2>/dev/null || true
+    if [[ $# -ge 5 ]]; then
+        local _oqe2_rc="$3"
+        local _oqe2_src="$4"
+        local _oqe2_label="$5"
+        _oqe_tmp="$(mktemp)" || true
+        _oqe_scrub_rc=0
+        if [[ -n "${_secrets_pattern}" ]]; then
+            sed -E "s/${_secrets_pattern}/[REDACTED]/g" "${_oqe2_src}" > "${_oqe_tmp}" 2>/dev/null || _oqe_scrub_rc=$?
+        else
+            cp "${_oqe2_src}" "${_oqe_tmp}" 2>/dev/null || _oqe_scrub_rc=$?
+        fi
+        if (( _oqe_scrub_rc == 0 )); then
+            _scrub_leaktk_patterns -i "${_oqe_tmp}" 2>/dev/null || _oqe_scrub_rc=$?
+        fi
+        {
+            echo "${_oqe2_label} failed with rc=${_oqe2_rc}"
+            if (( _oqe_scrub_rc == 0 )); then
+                sed 's/^/  /' "${_oqe_tmp}"
+            else
+                echo "stderr withheld: scrubbing failed"
+            fi
+        } >> "${_oqe_agg}" 2>&1 || true
+        rm -f "${_oqe_tmp}" 2>/dev/null || true
+    fi
+    if [[ $# -ge 8 ]]; then
+        local _oqe3_rc="$6"
+        local _oqe3_src="$7"
+        local _oqe3_label="$8"
+        _oqe_tmp="$(mktemp)" || true
+        _oqe_scrub_rc=0
+        if [[ -n "${_secrets_pattern}" ]]; then
+            sed -E "s/${_secrets_pattern}/[REDACTED]/g" "${_oqe3_src}" > "${_oqe_tmp}" 2>/dev/null || _oqe_scrub_rc=$?
+        else
+            cp "${_oqe3_src}" "${_oqe_tmp}" 2>/dev/null || _oqe_scrub_rc=$?
+        fi
+        if (( _oqe_scrub_rc == 0 )); then
+            _scrub_leaktk_patterns -i "${_oqe_tmp}" 2>/dev/null || _oqe_scrub_rc=$?
+        fi
+        {
+            echo "${_oqe3_label} failed with rc=${_oqe3_rc}"
+            if (( _oqe_scrub_rc == 0 )); then
+                sed 's/^/  /' "${_oqe_tmp}"
+            else
+                echo "stderr withheld: scrubbing failed"
+            fi
+        } >> "${_oqe_agg}" 2>&1 || true
+        rm -f "${_oqe_tmp}" 2>/dev/null || true
+    fi
+    cat "${_oqe_agg}" > "${_OPP_EVIDENCE_DIR}/00-placement-query-error.log" 2>&1 || true
+    rm -f "${_oqe_agg}" 2>/dev/null || true
 }
 # Three-way placement probe. The previous form classified absence by grepping
 # the probe stderr for "not found" strings, so a Forbidden response that
@@ -196,6 +251,8 @@ _opp_write_query_error_log() {
 # _OPP_QUERY_FAILED.
 _OPP_QUERY_LOG="$(mktemp)"
 _OPP_QUERY_OUT="$(mktemp)"
+_OPP_NS_LOG="$(mktemp)"
+_OPP_API_LOG="$(mktemp)"
 typeset -i _OPP_QUERY_RC=0
 oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" --ignore-not-found --request-timeout=30s -o name >"${_OPP_QUERY_OUT}" 2>"${_OPP_QUERY_LOG}" || _OPP_QUERY_RC=$?
 if (( _OPP_QUERY_RC == 0 )); then
@@ -299,37 +356,37 @@ else
     # takes the query-failure path.
     _OPP_NS_OUT="$(mktemp)"
     typeset -i _OPP_NS_RC=0
-    oc get namespace "${_OPP_PLACEMENT_NS}" --ignore-not-found --request-timeout=30s -o name >"${_OPP_NS_OUT}" 2>"${_OPP_QUERY_LOG}" || _OPP_NS_RC=$?
+    oc get namespace "${_OPP_PLACEMENT_NS}" --ignore-not-found --request-timeout=30s -o name >"${_OPP_NS_OUT}" 2>"${_OPP_NS_LOG}" || _OPP_NS_RC=$?
     if (( _OPP_NS_RC == 0 )) && [[ ! -s "${_OPP_NS_OUT}" ]]; then
         echo "No OPP placement in ${_OPP_PLACEMENT_NS} (namespace ${_OPP_PLACEMENT_NS} not found); OPP checks inactive for this lane"
         rm -f "${_OPP_NS_OUT}"
     elif (( _OPP_NS_RC != 0 )); then
         _OPP_QUERY_FAILED=1
-        _opp_write_query_error_log "${_OPP_QUERY_RC}" "${_OPP_QUERY_LOG}"
+        _opp_write_query_error_log "${_OPP_QUERY_RC}" "${_OPP_QUERY_LOG}" "${_OPP_NS_RC}" "${_OPP_NS_LOG}" "oc get namespace ${_OPP_PLACEMENT_NS}"
         echo "ERROR: OPP placement query failed (rc=${_OPP_QUERY_RC}); a failed query is not a lane without OPP, so the OPP checks will run and report this as a failure. See co-located 00-placement-query-error.log" >&2
         rm -f "${_OPP_NS_OUT}"
     else
         rm -f "${_OPP_NS_OUT}"
         _OPP_API_OUT="$(mktemp)"
         typeset -i _OPP_API_RC=0
-        oc api-resources --api-group=cluster.open-cluster-management.io --request-timeout=30s -o name >"${_OPP_API_OUT}" 2>"${_OPP_QUERY_LOG}" || _OPP_API_RC=$?
+        oc api-resources --api-group=cluster.open-cluster-management.io --request-timeout=30s -o name >"${_OPP_API_OUT}" 2>"${_OPP_API_LOG}" || _OPP_API_RC=$?
         if (( _OPP_API_RC == 0 )); then
             if ! grep -q "placements" "${_OPP_API_OUT}"; then
                 echo "No OPP placement in ${_OPP_PLACEMENT_NS} (placements API not found); OPP checks inactive for this lane"
             else
                 _OPP_QUERY_FAILED=1
-                _opp_write_query_error_log "${_OPP_QUERY_RC}" "${_OPP_QUERY_LOG}"
+                _opp_write_query_error_log "${_OPP_QUERY_RC}" "${_OPP_QUERY_LOG}" "${_OPP_API_RC}" "${_OPP_API_LOG}" "oc api-resources --api-group=cluster.open-cluster-management.io"
                 echo "ERROR: OPP placement query failed (rc=${_OPP_QUERY_RC}); a failed query is not a lane without OPP, so the OPP checks will run and report this as a failure. See co-located 00-placement-query-error.log" >&2
             fi
         else
             _OPP_QUERY_FAILED=1
-            _opp_write_query_error_log "${_OPP_QUERY_RC}" "${_OPP_QUERY_LOG}"
+            _opp_write_query_error_log "${_OPP_QUERY_RC}" "${_OPP_QUERY_LOG}" "${_OPP_API_RC}" "${_OPP_API_LOG}" "oc api-resources --api-group=cluster.open-cluster-management.io"
             echo "ERROR: OPP placement query failed (rc=${_OPP_QUERY_RC}); a failed query is not a lane without OPP, so the OPP checks will run and report this as a failure. See co-located 00-placement-query-error.log" >&2
         fi
         rm -f "${_OPP_API_OUT}"
     fi
 fi
-rm -f "${_OPP_QUERY_OUT}" "${_OPP_QUERY_LOG}"
+rm -f "${_OPP_QUERY_OUT}" "${_OPP_QUERY_LOG}" "${_OPP_NS_LOG}" "${_OPP_API_LOG}"
 
 # Run the test suite with all output captured to a temp file.
 _grc_raw_log="$(mktemp)"
@@ -469,7 +526,12 @@ except Exception:
     _opp_deadline="$((_opp_start_epoch + 300))"
     while (( $(date +%s) < _opp_deadline )); do
         _opp_dec="no"
-        if [[ "$(oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" --request-timeout=30s -o json 2>/dev/null | python3 -c '
+        _opp_remain=$((_opp_deadline - $(date +%s)))
+        if (( _opp_remain <= 0 )); then
+            break
+        fi
+        _opp_timeout=$(( _opp_remain < 30 ? _opp_remain : 30 ))
+        if [[ "$(oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" --request-timeout=${_opp_timeout}s -o json 2>/dev/null | python3 -c '
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -484,7 +546,15 @@ except Exception:
 ')" == "yes" ]]; then
             _opp_dec="yes"
         else
-            _opp_dec="$(oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" --request-timeout=30s -o json 2>/dev/null | python3 -c '
+            if (( $(date +%s) >= _opp_deadline )); then
+                break
+            fi
+            _opp_remain=$((_opp_deadline - $(date +%s)))
+            if (( _opp_remain <= 0 )); then
+                break
+            fi
+            _opp_timeout=$(( _opp_remain < 30 ? _opp_remain : 30 ))
+            _opp_dec="$(oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" --request-timeout=${_opp_timeout}s -o json 2>/dev/null | python3 -c '
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -497,11 +567,19 @@ except Exception:
     print("no")
 ')"
         fi
+        if (( $(date +%s) >= _opp_deadline )); then
+            break
+        fi
         if [[ "${_opp_dec}" == "yes" ]]; then
             _opp_sel=1
             break
         fi
-        sleep 10
+        _opp_remain=$((_opp_deadline - $(date +%s)))
+        if (( _opp_remain <= 0 )); then
+            break
+        fi
+        _opp_sleep=$(( _opp_remain < 10 ? _opp_remain : 10 ))
+        sleep "${_opp_sleep}"
     done
 
     # Post-suite placement state and decisions as evidence.
