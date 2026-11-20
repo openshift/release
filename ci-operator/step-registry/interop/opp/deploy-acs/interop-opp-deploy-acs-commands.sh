@@ -851,7 +851,9 @@ else
     _prop "acs_namespace" "race-tolerated"
     rm -f "${_ns_err}"
   else
-    _classify "acs-namespace-error" "failed to create namespace ${ACS_NAMESPACE} ($(_api_err_class "$(cat "${_ns_err}")"))"
+    ( set +x
+      _classify "acs-namespace-error" "failed to create namespace ${ACS_NAMESPACE} ($(_api_err_class "$(cat "${_ns_err}")"))"
+    )
     echo "ERROR: ${_class_detail}" >&2
     rm -f "${_ns_err}"
     _dump_diagnostics
