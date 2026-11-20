@@ -251,11 +251,12 @@ function RunTestCase1 () {
     typeset GRC_DEMO_SHA="2066dc9f5f545dd7f2e2b9eb43ef26aeac8917f4"
     git clone --depth 1 https://github.com/stolostron/policy-collection.git || return 1
     ( cd policy-collection && git fetch --depth 1 origin "${POLICY_COLLECTION_SHA}" && git checkout "${POLICY_COLLECTION_SHA}" ) || return 1
+    # Pre-clone grc-demo at pinned SHA and use local checkout for deploy.sh
+    if ! git clone https://github.com/gparvin/grc-demo.git /tmp/grc-demo; then return 1; fi
+    ( cd /tmp/grc-demo && git fetch --depth 1 origin "${GRC_DEMO_SHA}" && git checkout "${GRC_DEMO_SHA}" ) || return 1
+    if [[ "$(cd /tmp/grc-demo && git rev-parse HEAD)" != "${GRC_DEMO_SHA}" ]]; then echo "ERROR: grc-demo SHA mismatch" >&2; return 1; fi
     cd policy-collection/deploy/ || return 1
-    # Pin grc-demo via deploy.sh -u with SHA and verify checkout
-    if ! echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp; then
-      # Verify grc-demo clone pinned if deploy.sh cloned it
-      if [[ -d /tmp/grc-demo ]]; then ( cd /tmp/grc-demo && git rev-parse HEAD | grep -q "${GRC_DEMO_SHA}" ) || echo "WARNING: grc-demo SHA mismatch" >&2; fi
+    if ! echo 'y' | ./deploy.sh -p httpd-example -n policies -u file:///tmp/grc-demo -a e2e-opp; then
       return 1
     fi
 
@@ -732,10 +733,25 @@ def lastn($d): split("/") | .[-$d:] | join("/");
         # The listing is paged inside the helper: one request answers at most
         # 1000 records, so a single unpaginated query misses the image in a
         # large registry.  A failed listing is retried like an empty answer.
+        typeset -i _acsTry=0
         httpdImageJson='[]'
-        httpdImageJson="$(AcsListMatchingImages "${acsHost}" "${acsPassFile}" "${jqFilter}" \
-            "${deployedRepo}" "${deployedRepoDepth}" "${deployedDigest}" "${acsTlsOpts[@]}")" \
-            || httpdImageJson='[]'
+        for _acsTry in 1 2 3; do
+            if httpdImageJson="$(AcsListMatchingImages "${acsHost}" "${acsPassFile}" "${jqFilter}" \
+                "${deployedRepo}" "${deployedRepoDepth}" "${deployedDigest}" "${acsTlsOpts[@]}")"; then
+                break
+            else
+                typeset _acsErr=""
+                _acsErr=$(cat "${ARTIFACT_DIR:-/tmp}/acs-err.log" 2>/dev/null || echo unknown)
+                if [[ "${_acsErr}" == *"401"* || "${_acsErr}" == *"403"* || "${_acsErr}" == *"Forbidden"* ]]; then
+                    echo "ACS query failed with ${_acsErr}, retry ${_acsTry}/3" >&2
+                    sleep $(( _acsTry * 2 ))
+                    continue
+                else
+                    httpdImageJson='[]'
+                    break
+                fi
+            fi
+        done
         # Read the record only out of a single-element answer.  Two or more
         # matching records are named and retried instead of being read: jq
         # would otherwise concatenate their fields, and a record whose cves is
