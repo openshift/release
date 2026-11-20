@@ -18,11 +18,11 @@ import unittest
 from unittest.mock import Mock, patch
 
 sys.dont_write_bytecode = True
-PRODUCER_PATH = Path(__file__).resolve().parents[2] / "ocm-fvt/tests/rosa-e2e-ocm-fvt-tests-commands.py"
+PRODUCER_PATH = Path(__file__).resolve().parents[1] / "ocm-fvt/rosa-e2e-ocm-fvt-commands.py"
 SPEC = importlib.util.spec_from_file_location("rosa_artifact_tests", PRODUCER_PATH)
 PRODUCER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PRODUCER)
-SCRIPT = Path(__file__).resolve().parents[1] / "rosa-e2e-gather-cluster-diagnostics-commands.sh"
+SCRIPT = Path(__file__).resolve().with_suffix(".sh")
 CLUSTER = "a" * 32
 SECRET = "FIXTURE_SECRET_MUST_NOT_APPEAR"
 CONTAINER_OUTPUT = "/ocm-backend-tests/output"
@@ -281,7 +281,7 @@ class CollectorTests(unittest.TestCase):
                 (base / "shared/cluster-id").unlink()
                 (base / "shared/cluster-id").symlink_to(base / "credentials/ocm_token")
             delivered = base / "delivered.sh"
-            delivered.write_text(SCRIPT.read_text().replace("/usr/local/cs-qe-credentials", str(base / "credentials")))
+            delivered.write_text(SCRIPT.read_text(encoding="utf-8").replace("/usr/local/cs-qe-credentials", str(base / "credentials")))
             environment = {"PATH": str(base / "bin"),
                            "PYTHONPATH": fixture_python_path(base, case),
                            "ARTIFACT_DIR": str(base / "artifacts"), "SHARED_DIR": str(base / "shared"),

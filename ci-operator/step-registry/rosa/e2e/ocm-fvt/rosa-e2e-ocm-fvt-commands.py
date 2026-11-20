@@ -11,8 +11,8 @@ import unittest
 
 
 sys.dont_write_bytecode = True
-REPOSITORY = Path(__file__).resolve().parents[6]
-STEP = Path(__file__).resolve().parents[1]
+REPOSITORY = Path(__file__).resolve().parents[5]
+STEP = Path(__file__).resolve().parent
 SPEC = importlib.util.spec_from_file_location("upstream_rosa_artifacts", REPOSITORY / "hack/test_rosa_ocm_fvt_artifacts.py")
 UPSTREAM = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(UPSTREAM)

@@ -5,7 +5,7 @@ not adjacent repository files. The Python collector is embedded in the Bash step
 Run offline regression tests from the repository root:
 
 ```sh
-python3 ci-operator/step-registry/rosa/e2e/gather-cluster-diagnostics/tests/rosa-e2e-gather-cluster-diagnostics-tests-commands.py -v
+python3 -B ci-operator/step-registry/rosa/e2e/gather-cluster-diagnostics/rosa-e2e-gather-cluster-diagnostics-commands.py -v
 shellcheck -e SC1091 ci-operator/step-registry/rosa/e2e/gather-cluster-diagnostics/*commands.sh
 ```
 
@@ -17,15 +17,19 @@ bind mount only while the mock populates it; the producer sees its original
 private path when the mock returns. Failure injection and cleanup follow that
 same private output. No shared test targets or upstream fixtures are changed.
 The entry point runs all 54 collector, handoff and upstream artifact cases.
-Test script names follow the registry's component-prefixed `-commands.py`
-convention without adding step references. Tests disable bytecode writes so
-imports do not leave files the registry loader would reject.
+The Python test entry points sit directly in the existing owned step directories
+and share their real step's `-commands` stem. Registry change discovery therefore
+maps either extension to the existing step, without inventing test-only refs or
+unowned directories. The step refs still explicitly deliver only their `.sh`
+scripts; these `.py` companions are offline tests, not delivered commands.
+Tests disable bytecode writes so imports do not leave files the registry loader
+would reject.
 
 Lint these component tests explicitly; the repository's `hack`-only pylint
 discovery does not include them:
 
 ```sh
-pylint --rcfile=hack/.pylintrc --persistent=n ci-operator/step-registry/rosa/e2e/{gather-cluster-diagnostics,ocm-fvt}/tests/*commands.py
+pylint --rcfile=hack/.pylintrc --persistent=n ci-operator/step-registry/rosa/e2e/{gather-cluster-diagnostics,ocm-fvt}/*commands.py
 ```
 
 ## Identity and ordering
