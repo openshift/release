@@ -2,11 +2,13 @@
 
 import json
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,12 +20,12 @@ import os
 from pathlib import Path
 import sys
 
-command = Path(sys.argv[0]).name
+command = Path(sys.argv[0]).stem
 args = sys.argv[1:]
 if command == "oc":
     request_timeouts = [arg for arg in args if arg.startswith("--request-timeout=")]
-    if request_timeouts and ("rollout" in args or "wait" in args):
-        assert request_timeouts[-1] == "--request-timeout=" + os.environ["VERIFY_TIMEOUT"]
+    if "rollout" in args or "wait" in args:
+        assert request_timeouts == ["--request-timeout=" + os.environ["VERIFY_TIMEOUT"]]
     args = [arg for arg in args if not arg.startswith("--request-timeout=")]
 scenario = os.environ.get("SCENARIO", "normal")
 directory = Path(os.environ["SHARED_DIR"])
@@ -50,7 +52,7 @@ elif command == "oc":
     if args[0] == "apply":
         sys.stdin.read()
     elif args[:2] == ["get", "subscription"]:
-        if scenario == "csv-transient" and count("subscriptions") < 2:
+        if scenario == "csv-transient" and args[2] == "cloudnative-pg" and count("cnpg-subscriptions") < 2:
             sys.exit(17)
         print("installed.v1" if scenario != "csv-unset" else "")
     elif args[:2] == ["get", "csv"]:
@@ -65,7 +67,20 @@ elif command == "oc":
             print("synthetic deployment lookup failure", file=sys.stderr)
             sys.exit(17)
         namespace = args[args.index("-n") + 1]
-        print("maas-api praxis" if namespace == "enmaas" else "prometheus grafana")
+        if namespace != "enmaas":
+            print("prometheus\t\t\ngrafana\t\t")
+        elif scenario == "api-absent":
+            print("praxis\t\t")
+        elif scenario == "api-empty":
+            pass
+        elif scenario == "api-legacy":
+            print("enmaas-api\t\t\npraxis\t\t")
+        elif scenario.startswith("api-label-"):
+            print("synthetic-api\t" + scenario[len("api-label-"):] + "\t\npraxis\t\t")
+        elif scenario.startswith("api-template-"):
+            print("synthetic-api\t\t" + scenario[len("api-template-"):] + "\npraxis\t\t")
+        else:
+            print("maas-api\t\t\npraxis\t\t")
     elif "rollout" in args or "wait" in args:
         if "rollout" in args and scenario == "rollout-failures" and args[2] in (
                 "deployment/maas-api", "deployment/grafana"):
@@ -158,16 +173,20 @@ else:
 '''
 
 
-class EnmaasShellTests(unittest.TestCase):
+def write_stub(path, source):
+    path.with_name(path.name + ".py").write_text(source, encoding="utf-8")
+    path.write_text('#!/bin/sh\nexec ' + shlex.quote(sys.executable) + ' "${0}.py" "$@"\n', encoding="utf-8")
+    path.chmod(0o755)
+
+
+class EnmaasShellFixture(unittest.TestCase):
     def setUp(self):
         self.directory = Path(tempfile.mkdtemp(prefix="enmaas shell "))
         self.addCleanup(shutil.rmtree, self.directory)
         self.bin = self.directory / "bin"
         self.bin.mkdir()
         for command in ("aws", "oc", "openssl", "jq"):
-            path = self.bin / command
-            path.write_text(f"#!{sys.executable}\n" + STUB, encoding="utf-8")
-            path.chmod(0o755)
+            write_stub(self.bin / command, STUB)
         self.environment = {
             "PATH": str(self.bin) + ":/usr/local/bin:/usr/bin:/bin", "HOME": str(self.directory),
             "SHARED_DIR": str(self.directory), "CLUSTER_PROFILE_DIR": str(self.directory),
@@ -192,6 +211,8 @@ class EnmaasShellTests(unittest.TestCase):
         path = self.directory / "calls"
         return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()] if path.exists() else []
 
+
+class EnmaasShellTests(EnmaasShellFixture):
     def test_clone_credentials_scoped_and_never_persisted_or_traced(self):
         token = self.directory / "token"
         token.write_text("synthetic-credential-placeholder", encoding="utf-8")
@@ -221,9 +242,7 @@ assert result.returncode == 0
 assert token in result.stdout
 assert token not in result.stderr
 '''
-        executable = self.bin / "git"
-        executable.write_text(f"#!{sys.executable}\n" + stub, encoding="utf-8")
-        executable.chmod(0o755)
+        write_stub(self.bin / "git", stub)
         source = (STEPS / "deploy/enmaas-deploy-commands.sh").read_text(encoding="utf-8")
         source = source.split('cd "${WORK_DIR}/EnMaaS-opps"', 1)[0]
         source = source.replace('WORK_DIR=$(mktemp -d)', 'WORK_DIR="$SHARED_DIR"')
@@ -234,6 +253,21 @@ assert token not in result.stderr
         self.assertEqual(result.returncode, 0, "scoped Git credential checks failed")
         self.assertNotIn(token.read_text(encoding="utf-8"), result.stdout + result.stderr)
         self.assertEqual(global_config.read_text(encoding="utf-8"), "[user]\n\tname = unchanged\n")
+
+    def test_stub_interpreter_path_with_spaces_preserves_arguments_and_stdin(self):
+        interpreter = self.directory / "python runner's path"
+        interpreter.symlink_to(sys.executable)
+        source = 'import json, sys; print(json.dumps([sys.executable, sys.argv[1:], sys.stdin.read()]))'
+        for command in ("oc", "git"):
+            with self.subTest(command=command):
+                with mock.patch.object(sys, "executable", str(interpreter)):
+                    write_stub(self.bin / command, source)
+                arguments = ["two words", "$(not-executed)", "quote'argument"]
+                result = subprocess.run([str(self.bin / command), *arguments], env=self.environment,
+                                        input="synthetic stdin", capture_output=True, text=True,
+                                        check=False, timeout=15)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout), [str(interpreter), arguments, "synthetic stdin"])
 
     def test_cleanup_ownership_mismatch_never_deletes(self):
         self.recorded_resources()
@@ -325,6 +359,7 @@ assert token not in result.stderr
         for action in ("ec2 create-tags", "ec2 authorize-security-group-ingress", "rds create-db-instance"):
             self.assertNotIn(action, actions)
 
+class EnmaasVerificationTests(EnmaasShellFixture):
     def test_installed_csv_not_grep_and_bounded_unset_status(self):
         result = self.run_step("install-operators")
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -336,7 +371,22 @@ assert token not in result.stderr
     def test_installed_csv_transient_query_recovers(self):
         result = self.run_step("install-operators", "csv-transient")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertGreaterEqual(int((self.directory / "subscriptions").read_text(encoding="utf-8")), 2)
+        self.assert_cnpg_retried()
+
+    def assert_cnpg_retried(self):
+        target = ["oc", "get subscription cloudnative-pg -n openshift-operators -o jsonpath={.status.installedCSV}"]
+        self.assertGreaterEqual(self.calls().count(target), 2)
+
+    def test_transient_csv_assertion_rejects_false_ready_mutation(self):
+        source = (STEPS / "install-operators/enmaas-install-operators-commands.sh").read_text(encoding="utf-8")
+        source = source.replace("if operator_ready openshift-operators cloudnative-pg; then",
+                                "if ! operator_ready openshift-operators cloudnative-pg; then")
+        result = self.run_step("install-operators", "csv-transient", source)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(any("get subscription openshift-cert-manager-operator " in action
+                            for command, action in self.calls()))
+        with self.assertRaises(AssertionError):
+            self.assert_cnpg_retried()
 
     def test_pvc_error_not_empty_success(self):
         for scenario, expected in (("normal", 0), ("pvc-error", 17)):
@@ -376,6 +426,42 @@ assert token not in result.stderr
                     self.assertIn("Failed to list deployments in namespace enmaas-monitoring", result.stdout)
                     self.assertNotIn("No deployments found", result.stdout)
 
+    def test_verify_requires_known_api_identity_and_still_checks_other_workloads(self):
+        for scenario in ("api-absent", "api-empty", "normal", "api-legacy",
+                         "api-label-maas-api", "api-label-enmaas-api",
+                         "api-template-maas-api", "api-template-enmaas-api"):
+            with self.subTest(scenario=scenario):
+                (self.directory / "calls").unlink(missing_ok=True)
+                result = self.run_step("verify", scenario)
+                missing = scenario in ("api-absent", "api-empty")
+                self.assertEqual(result.returncode, 1 if missing else 0, result.stdout + result.stderr)
+                calls = [action for command, action in self.calls() if command == "oc"]
+                expected_rollouts = 2 if scenario == "api-empty" else 3 if missing else 4
+                self.assertEqual(sum(action.startswith("rollout status ") for action in calls), expected_rollouts)
+                self.assertTrue(any(action.startswith("rollout status deployment/grafana ") for action in calls))
+                self.assertTrue(any("get route gateway-enmaas" in action for action in calls))
+                if scenario == "api-absent":
+                    self.assertIn("No API deployment found", result.stdout)
+                    self.assertTrue(any(action.startswith("rollout status deployment/praxis ") for action in calls))
+                elif not missing:
+                    self.assertNotIn("No API deployment found", result.stdout)
+
+    def test_stub_rejects_missing_duplicate_or_wrong_watch_request_timeout(self):
+        for command in (["rollout", "status", "deployment/maas-api"],
+                        ["-n", "enmaas", "wait", "cluster.postgresql.cnpg.io/aigateway-pg"]):
+            for flags in ([], ["--request-timeout="], ["--request-timeout=2s"],
+                          ["--request-timeout=1s", "--request-timeout=1s"]):
+                with self.subTest(command=command, flags=flags):
+                    result = subprocess.run([str(self.bin / "oc"), *flags, *command],
+                                            env=self.environment, capture_output=True, text=True,
+                                            check=False, timeout=15)
+                    self.assertNotEqual(result.returncode, 0)
+        source = (STEPS / "verify/enmaas-verify-commands.sh").read_text(encoding="utf-8")
+        mutant = source.replace(' oc --request-timeout="${request_timeout}" "$@"', ' oc "$@"')
+        self.assertNotEqual(mutant, source)
+        result = self.run_step("verify", source=mutant)
+        self.assertNotEqual(result.returncode, 0)
+
     def test_verify_deadline_fails_without_unbounded_requests(self):
         source = (STEPS / "verify/enmaas-verify-commands.sh").read_text(encoding="utf-8")
         self.assertIn('request_timeout=30s', source)
@@ -383,6 +469,20 @@ assert token not in result.stderr
         result = self.run_step("verify", source=source.replace("SECONDS + 1800", "SECONDS - 1"))
         self.assertEqual(result.returncode, 1)
         self.assertIn("deadline", result.stderr)
+        self.assertIn("skipped deployment inventory in enmaas.", result.stderr)
+        self.assertIn("skipped deployment inventory in enmaas-monitoring.", result.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_deadline_diagnostic_does_not_include_command_arguments(self):
+        source = (STEPS / "verify/enmaas-verify-commands.sh").read_text(encoding="utf-8")
+        source = source.split("declare -A DEPLOYMENTS", 1)[0] + '''
+DEADLINE=$((SECONDS - 1))
+verify_oc "synthetic metadata check" get "synthetic-argument-not-for-logs"
+'''
+        result = self.run_step("verify", source=source)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("skipped synthetic metadata check", result.stderr)
+        self.assertNotIn("synthetic-argument-not-for-logs", result.stdout + result.stderr)
         self.assertEqual(self.calls(), [])
 
 

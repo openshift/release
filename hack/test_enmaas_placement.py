@@ -19,6 +19,8 @@ INFRA_TOLERATION = {"key": INFRA, "operator": "Equal", "value": "", "effect": "N
 API = "example.invalid/api:manifest-default"
 EXPORTER = "example.invalid/exporter:manifest-default"
 DECODER = shutil.which("oc") or shutil.which("kubectl")
+if DECODER is not None:
+    DECODER = str(Path(DECODER).resolve())
 
 
 class EnmaasPlacementFixture(unittest.TestCase):
@@ -359,6 +361,18 @@ class EnmaasPlacementConstraintTests(EnmaasPlacementFixture):
                         source.index("oc apply -f /tmp/enmaas.yaml"))
         self.assertIn('for project in enmaas enmaas-monitoring;', source)
         self.assertIn('--server-side --field-manager=enmaas-opps --force-conflicts', source)
+
+    def test_relative_path_decoder_survives_consumer_workdir(self):
+        tools = self.directory / "tools/bin"
+        tools.mkdir(parents=True)
+        (tools / "oc").symlink_to(DECODER)
+        result = subprocess.run(
+            [sys.executable, str(ROOT / "hack/test_enmaas_placement.py"),
+             f"{type(self).__name__}.test_render_consumer_fail_fast"],
+            cwd=self.directory, env={"PATH": "tools/bin:/usr/local/bin:/usr/bin:/bin"},
+            capture_output=True, text=True, check=False, timeout=60,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_render_consumer_fail_fast(self):
         source = DEPLOY.read_text(encoding="utf-8")
