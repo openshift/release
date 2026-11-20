@@ -1,0 +1,67 @@
+ref:
+  as: azure-il6-bastion-setup
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-il6-bastion-setup-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: AZURE_CLI_IMAGE
+    default: mcr.microsoft.com/azure-cli:latest
+    documentation: |-
+      Container image providing the az CLI on the bastion. RHCOS has no package manager, so the
+      SHIFT article's apt-based install does not apply.
+  - name: AZURE_IL6_ARM_ENDPOINT
+    default: https://management.azure.microsoft.scloud
+    documentation: The emulated IL6 Azure Resource Manager endpoint.
+  - name: AZURE_IL6_ARM_HOST
+    default: management.azure.microsoft.scloud
+    documentation: Hostname of AZURE_IL6_ARM_ENDPOINT, used for resolver checks.
+  - name: AZURE_IL6_CA_FILE
+    default: shift-rhocp-ci-azure-il6.pem
+    documentation: |-
+      The emulator's CA chain. Delivered as a key/value entry in the azure-qe cluster profile, so
+      it needs no separate credential mount.
+  - name: AZURE_IL6_DNS_DOMAIN
+    default: microsoft.scloud
+    documentation: |-
+      Domain routed to the VNet's own DNS servers. Everything else goes to AZURE_IL6_PUBLIC_DNS.
+  - name: AZURE_IL6_PUBLIC_DNS
+    default: 168.63.129.16
+    documentation: |-
+      Azure's platform resolver. Reachable from any VNet over a platform route regardless of the
+      VNet's custom dnsServers setting, which is what makes the split possible without an
+      emulator-side change.
+  documentation: |-
+    Prepares the bastion for the emulated Azure IL6 environment: split-horizon DNS, the emulator's
+    CA, and a usable az CLI.
+
+    Setting dnsServers on a VNet REPLACES Azure's resolver for every NIC in it, and the emulator's
+    servers answer for the IL6 namespace only. So the bastion boots able to route to the internet
+    but unable to resolve any public name -- which also means squid and the mirror registries
+    cannot complete their boot-time image pulls.
+
+    A second 'nameserver' line does not fix it: glibc falls through on timeout, not on NXDOMAIN, so
+    whichever resolver is asked first decides the answer. This installs dnsmasq with no-resolv,
+    pins *.microsoft.scloud to the VNet's own servers and sends everything else to Azure's platform
+    resolver, then hands the bastion's own resolution to it through nmcli -- NetworkManager owns
+    resolv.conf on RHCOS and would otherwise revert it on the next DHCP renew. Both halves of the
+    split are verified before the step exits, and the boot-time units are restarted once public
+    names resolve.
+
+    The CA is installed into the RHCOS anchors and 'update-ca-trust extract' is run, per Appendix C
+    of the IL6 CI plan -- the SHIFT article's /usr/local/share/ca-certificates is Debian. ARM is
+    then re-curled WITHOUT -k to prove the certificate validates.
+
+    az runs under podman because RHCOS has no package manager. The step proves the container can
+    resolve the IL6 namespace before anything depends on it: the resolver lives on the bastion's
+    loopback, and a bridged container cannot reach it.
+
+    Outputs:
+      ${SHARED_DIR}/azure_il6_ca_bundle        the CA chain, for later in-cluster use
+      ${SHARED_DIR}/azure_il6_remote_ca_path   where the CA lives on the bastion

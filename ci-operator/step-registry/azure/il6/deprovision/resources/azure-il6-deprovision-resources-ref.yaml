@@ -1,0 +1,47 @@
+ref:
+  as: azure-il6-deprovision-resources
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-il6-deprovision-resources-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: AZURE_IL6_RESOURCE_GROUP
+    default: "CI-Azure-IL6-DoNotDelete"
+    documentation: |-
+      The shared, permanent resource group. This step deletes resources INSIDE it and must never
+      delete the group itself.
+  - name: AZURE_IL6_VNET_NAME
+    default: "RHOCP-CI-AzureIL6-virtual-network"
+    documentation: |-
+      The shared, permanent VNet. This step deletes subnets inside it and must never delete the
+      VNet itself.
+  documentation: |-
+    Removes the only resources this job leaves inside the shared, permanent emulator resource
+    group: the control-plane and compute subnets that azure-il6-provision-subnets added to the
+    shared VNet, matched on the ${NAMESPACE}-${UNIQUE_HASH} prefix recorded in
+    ${SHARED_DIR}/azure_il6_subnet_prefix.
+
+    Everything else the job creates on the commercial plane -- the bastion VM, NIC, public IP,
+    OS disk, image, NSGs, storage account and private DNS zone -- is provisioned into a per-run
+    resource group created by azure-provision-resourcegroup, and is reclaimed by
+    azure-deprovision-resourcegroup. Subnets are the exception only because a subnet is a child
+    resource of the VNet, so it cannot be created outside the VNet's group.
+
+    Ordering: azure-deprovision-resourcegroup must run BEFORE this step. Deleting the per-run
+    group is what removes the bastion NIC, and a subnet with a NIC still attached fails to delete
+    with InUseSubnetCannotBeDeleted. That step also sources
+    ${SHARED_DIR}/remove_resources_by_cli.sh, so the mirror registry's public DNS A record in
+    BASE_RESOURCE_GROUP is already gone by the time this one runs.
+
+    This step is deliberately incapable of deleting a resource group, a VNet, or anything whose
+    name does not carry this run's prefix. The shared group is permanent: it holds the VPN gateway
+    and the two IPsec tunnels to the emulator, which cannot be recreated by CI.
+
+    Best-effort: every deletion is non-fatal, so a partial cleanup cannot mask the real failure
+    that a job is being torn down for.
