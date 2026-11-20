@@ -29,8 +29,8 @@ export USE_CEPV2
 
 # --- Source repos and branches ---
 # Test code: repo and branch for the conformance test suite
-export TEST_REPO="${TEST_REPO:-https://github.com/k8snetworkplumbingwg/ptp-operator.git}"
-export TEST_BRANCH="${TEST_BRANCH:-main}"
+export TEST_REPO="${TEST_REPO:-https://github.com/edcdavid/ptp-operator-upstream.git}"
+export TEST_BRANCH="${TEST_BRANCH:-tbc-software-gm}"
 
 # Product under test: repo and branch for the operator being deployed
 if [[ "${T5CI_DEPLOY_UPSTREAM:-false}" == "true" ]]; then
