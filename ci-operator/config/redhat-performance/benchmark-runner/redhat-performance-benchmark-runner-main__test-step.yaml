@@ -25,7 +25,7 @@ tests:
   - intranet
   steps:
     env:
-      WORKLOAD: uperf_vm
+      WORKLOAD: uperf_pod
     test:
     - ref: redhat-performance-benchmark-runner
 - always_run: false
@@ -301,6 +301,54 @@ tests:
     test:
     - ref: redhat-performance-benchmark-runner
   timeout: 24h0m0s
+- always_run: false
+  as: install-m8i-xlarge
+  steps:
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m8i.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m8i.xlarge
+      CONTROL_PLANE_REPLICAS: "3"
+    workflow: ipi-aws
+- always_run: false
+  as: install-cnv-m8i-xlarge
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      CNV_VERSION: "4.22"
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m8i.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m8i.xlarge
+      CONTROL_PLANE_REPLICAS: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: cnv-deploy-cnv
+- always_run: false
+  as: deploy-cluster-cnv
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-rhdh-performance
+    env:
+      BASE_DOMAIN: rhdh-perfscale.devcluster.openshift.com
+      CNV_VERSION: "4.22"
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m8i.2xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m8i.xlarge
+      CONTROL_PLANE_REPLICAS: "3"
+      WORKLOAD: uperf_pod
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: cnv-deploy-cnv
+    test:
+    - ref: redhat-performance-benchmark-runner
 zz_generated_metadata:
   branch: main
   org: redhat-performance
