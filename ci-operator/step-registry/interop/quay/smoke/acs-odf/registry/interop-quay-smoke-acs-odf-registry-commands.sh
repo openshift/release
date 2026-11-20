@@ -211,7 +211,7 @@ PostProcessJunit () {
     [[ -f "${junitFile}" ]] && _junitPreSize=$(wc -c < "${junitFile}" 2>/dev/null || echo 0)
     if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
         # PRRT_kwDOBHvUUM65Mrls: pin jq helper alongside ExitTrap
-        curl -fsSL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq 2>/dev/null && chmod +x /tmp/jq
+        curl -fsSL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq 2>/dev/null && chmod +x /tmp/jq && /tmp/jq --version | grep -q "jq-1.6"
         ExitTrap--PostProcessPrep junit--interop-quay-smoke-acs-odf-registry.xml
         typeset -i _junitRc=$?
         if (( _junitRc != 0 )); then
@@ -330,12 +330,20 @@ function GetQuayAuth () {
         typeset initResult=''
         # The payload is built by json.dumps and piped in via stdin, so the
         # generated password is safely escaped and never part of any argv.
-        initResult="$(printf '%s' "${initPassword}" | python3 -c "
+        # PRRT_kwDOBHvUUM65TpNF: single init request with bounded retry
+        typeset -i _initTry=0
+        for _initTry in 1 2 3; do
+            initResult="$(printf '%s' "${initPassword}" | python3 -c "
 import json, sys
 print(json.dumps({'username': 'quayadmin', 'password': sys.stdin.read().strip(), 'email': 'quayadmin@example.com', 'access_token': True}))
 " | curl -fsS "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" \
-                -H "Content-Type: application/json" \
-                -d @-)" || initResult=""
+                    -H "Content-Type: application/json" \
+                    -d @-)" || initResult=""
+            if [[ -n "${initResult}" ]]; then
+                break
+            fi
+            sleep $(( _initTry * 2 ))
+        done
 
         QUAY_TOKEN="$(printf '%s' "${initResult}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")" || QUAY_TOKEN=""
         if [[ -n "${QUAY_TOKEN}" ]]; then
@@ -426,7 +434,7 @@ for s in items:
     owned = any((r.get('name') or '') == owner for r in refs)
     data = s.get('data') or {}
     if not owned:
-        if data.get('ssl.cert'):
+        if data.get('ssl.cert') and s.get('metadata',{}).get('labels',{}).get('app') == 'quay':
             # PRRT_kwDOBHvUUM65MrmC: trust candidates restrict to label selector and ns allowlist
             write('25-ssl', base64.b64decode(data['ssl.cert']))
         continue
@@ -694,8 +702,16 @@ function RunPushPull () {
     # `skopeo inspect` stops at the manifest, so a registry that serves
     # manifests but cannot return a layer blob from object storage would
     # still pass.  Copy the image into a local dir transport instead.
+    # PRRT_kwDOBHvUUM65TpNJ: pull by digest not tag to avoid TOCTOU; digest from inspect
     typeset pullDir='/tmp/quay-pull-verify'
     rm -rf "${pullDir}"
+    typeset imageDigest=""
+    imageDigest=$(SSL_CERT_FILE="${quayCaFile}" skopeo inspect --authfile="${authFile}" "docker://${pushTarget}" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('Digest',''))") || imageDigest=""
+    if [[ -z "${imageDigest}" ]]; then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "Could not determine image digest after push" "${elapsed}"
+        return 1
+    fi
     typeset pushTargetDigest="${pushTarget%%:*}@${imageDigest}"
     if [[ "${pushTarget}" == *":"* && "${pushTarget}" != *":/"* ]]; then
         pushTargetDigest="${pushTarget%%:*}@${imageDigest}"
@@ -704,7 +720,6 @@ function RunPushPull () {
     fi
     if ! SSL_CERT_FILE="${quayCaFile}" skopeo copy --src-tls-verify=true \
         --src-authfile="${authFile}" \
-        # PRRT_kwDOBHvUUM65TpNJ: pull digest not tag to avoid TOCTOU
         "docker://${pushTargetDigest}" \
         "dir:${pullDir}"; then
         elapsed=$(( $(date +%s) - start ))
@@ -823,10 +838,9 @@ sys.exit(1)
                 typeset -i _obcRetryRc=0
                 typeset -i _claimRemain=$(( _claimDeadline - $(date +%s) ))
                 (( _claimRemain > 0 )) || _claimRemain=1
-                # PRRT_kwDOBHvUUM65ui2G: refreshed OBC list bounded by remaining claim budget
-                if ! obcJson=$(timeout "${_claimRemain}s" oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>"${ARTIFACT_DIR:-/tmp}/obc-err.log"); then
-                    _obcRetryRc=$?
-                fi
+                # PRRT_kwDOBHvUUM65ui2G: refreshed OBC list bounded by remaining claim budget; capture real rc not negated
+                obcJson=$(timeout "${_claimRemain}s" oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>"${ARTIFACT_DIR:-/tmp}/obc-err.log")
+                _obcRetryRc=$?
                 if (( _obcRetryRc != 0 )); then
                     # obc list query produced an error, do not treat as no-match
                     quayObc=""
@@ -907,7 +921,7 @@ sys.exit(1)
 
     typeset unboundPvcs=''
     unboundPvcs=$(printf '%s' "${pvcJson}" | python3 -c "
-import sys, json
+import sys, json, os
 data = json.load(sys.stdin)
 quay_uid = os.environ.get('QUAY_UID', '')
 items = [i for i in data.get('items', []) if any(o.get('uid')==quay_uid for o in i.get('metadata',{}).get('ownerReferences',[]))] # PRRT_kwDOBHvUUM65Mrmi: PVC via ownerReference with QUAY_UID
