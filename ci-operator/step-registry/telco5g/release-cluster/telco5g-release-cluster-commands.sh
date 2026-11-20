@@ -30,4 +30,4 @@ ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/release-cluster.ym
 if [[ "$T5CI_JOB_TYPE"  == "sriov" ]]; then
     exit 0
 fi
-ansible-playbook -i $SHARED_DIR/inventory $SHARED_DIR/destroy-cluster.yml -vv
+#ansible-playbook -i $SHARED_DIR/inventory $SHARED_DIR/destroy-cluster.yml -vv
