@@ -217,6 +217,8 @@ function GetQuayAuth () {
     # Check existing credential before waiting for quayadmin (avoid 600s wait when quaydevel already present)
     if oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.token}' 2>/dev/null | grep -q .; then
         : "existing quayadmin token present, skipping wait"
+    elif oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.password}' 2>/dev/null | grep -q .; then
+        : "existing quayadmin password present, skipping wait"
     elif oc get secret quaydevel -n "${QUAY_NS}" -o jsonpath='{.data.password}' 2>/dev/null | grep -q .; then
         : "existing quaydevel credential present, skipping quayadmin wait"
     else
@@ -227,8 +229,13 @@ function GetQuayAuth () {
     else
         authWait=$(( authDeadline - $(date +%s) ))
         if (( authWait > 0 )) && ! oc wait secret/quayadmin -n "${QUAY_NS}" \
-            --for=jsonpath='{.data.token}' --timeout="${authWait}s"; then
-            echo "WARN: quayadmin token was not written within $(( authBudgetSeconds / 60 ))m; falling back to the other credential sources" >&2
+            --for=jsonpath='{.data.token}' --timeout="${authWait}s" 2>/dev/null; then
+            # Token wait failed; password may already be usable (GetQuayAuthOnce accepts either).
+            if oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.password}' 2>/dev/null | grep -q .; then
+                : "quayadmin password present despite token wait failure; proceeding"
+            else
+                echo "WARN: quayadmin token was not written within $(( authBudgetSeconds / 60 ))m; falling back to the other credential sources" >&2
+            fi
         fi
     fi
     fi
