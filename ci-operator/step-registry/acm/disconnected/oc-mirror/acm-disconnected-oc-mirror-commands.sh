@@ -95,6 +95,9 @@ create_imageset_config() {
 apiVersion: mirror.openshift.io/v2alpha1
 kind: ImageSetConfiguration
 mirror:
+  platform:
+    architectures:
+    - amd64
   operators:
   - catalog: ${ACM_IIB_IMAGE}
     packages:
@@ -125,6 +128,7 @@ mirror_operators() {
         --src-tls-verify=false \
         --dest-tls-verify=false \
         --retry-times=5 \
+        --image-timeout=30m \
         --log-level=debug 2>&1 | tee "${ARTIFACT_DIR}/acm_mce_mirror.log" || {
         log "ERROR: oc-mirror failed"
         return 1
