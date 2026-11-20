@@ -353,13 +353,14 @@ cd ${BASTION_SCRIPT_DIR}
 EOF
 }
 
-# Deploy and configure external FRR for UDN-BGP with static and connected redistribution.
+# Deploy and configure external FRR for UDN-BGP workload route redistribution.
 setup_external_frr_udn_bgp() {
   echo "=== Setup external FRR on bastion (UDN-BGP) ==="
   bastion_ssh "mkdir -p ${BASTION_WORK_DIR}"
 
   bastion_ssh env "${BASTION_EXTRA_ENV[@]}" "${AWS_SETUP_ENV[@]}" \
     BASTION_WORK_DIR="${BASTION_WORK_DIR}" \
+    UDN_BGP_IMPORT_CIDR="${UDN_BGP_IMPORT_CIDR}" \
     bash -s <<'EOF'
 set -o errexit
 set -o pipefail
@@ -427,7 +428,17 @@ done
 
 oc apply -n openshift-frr-k8s -f frr-k8s/hack/demo/configs/receive_all.yaml
 sleep 5
-podman exec -u root frr vtysh -c "conf t" -c "router bgp 64512" -c "redistribute static" -c "redistribute connected" -c "end" -c "write" 2>/dev/null
+# The workload adds 20.<dummy-interface>.<address>.1/24 to dummy interfaces.
+# Only redistribute those test routes; the bastion's underlay routes must stay local.
+podman exec -u root frr vtysh \
+  -c "conf t" \
+  -c "ip prefix-list UDN-BGP-IMPORT seq 10 permit ${UDN_BGP_IMPORT_CIDR} ge 24 le 24" \
+  -c "route-map UDN-BGP-IMPORT permit 10" \
+  -c "match ip address prefix-list UDN-BGP-IMPORT" -c "exit" \
+  -c "router bgp 64512" -c "address-family ipv4 unicast" \
+  -c "no redistribute static" -c "no redistribute connected" \
+  -c "redistribute connected route-map UDN-BGP-IMPORT" \
+  -c "end" -c "write"
 rm -rf frr-k8s
 EOF
 }
