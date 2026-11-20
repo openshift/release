@@ -15,6 +15,19 @@ typeset -i stepDeadline=$(( stepStartBudget + 115 * 60 ))
 # Longest single compliance pass (the oc wait timeout below), so a pass is
 # only started when a full pass still fits inside the step budget.
 typeset -i compliancePassBudget=$(( 40 * 60 ))
+# Bounded oc get helper: cap blocking calls by remaining step budget with 120s reserve for JUnit/diagnostics (thread PRRT_kwDOBHvUUM65TpMM)
+_oc_get_bounded() {
+  typeset -i _now=$(date +%s)
+  typeset -i _remain=$(( stepDeadline - _now - 120 ))
+  (( _remain < 10 )) && _remain=10
+  timeout "${_remain}s" oc "$@" 2>&1
+}
+_oc_get_json_bounded() {
+  typeset -i _now=$(date +%s)
+  typeset -i _remain=$(( stepDeadline - _now - 120 ))
+  (( _remain < 10 )) && _remain=10
+  timeout "${_remain}s" oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' 2>&1
+}
 
 # --- JUnit carrier ---------------------------------------------------
 # Every assertion this step performs is reported as one JUnit testcase.
@@ -248,7 +261,7 @@ typeset -i policyGateStart=0
 policyGateStart=$(date +%s)
 typeset policyCountJson=''
 typeset -i policyCountRc=0
-until policyCountJson="$(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || policyCountRc=$?; (( policyCountRc != 0 )) && { RecordResult "policy-query" "failed" "failed to query policies in namespace policies (rc=${policyCountRc})" "0"; printf '%s\n' "Error: failed to query policies (rc=${policyCountRc})" >&2; RecordResult "failed-policies-query" "failed" "oc get policies query failed with exit code ${policyCountRc}" "$(( $(date +%s) - policyGateStart ))"; exit 1; }; (( policyCountJson >= expectedMinPolicies )); do
+until policyCountJson="$(_oc_get_bounded get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || policyCountRc=$?; (( policyCountRc != 0 )) && { RecordResult "policy-query" "failed" "failed to query policies in namespace policies (rc=${policyCountRc})" "0"; printf '%s\n' "Error: failed to query policies (rc=${policyCountRc})" >&2; RecordResult "failed-policies-query" "failed" "oc get policies query failed with exit code ${policyCountRc}" "$(( $(date +%s) - policyGateStart ))"; exit 1; }; (( policyCountJson >= expectedMinPolicies )); do
   ((SECONDS > pollDeadline)) && {
     printf '%s\n' "Error: fewer than ${expectedMinPolicies} policies after 10 minutes" >&2
     RecordResult "openshift-plus-policy-set-deployed" "failed" "Fewer than ${expectedMinPolicies} policies in namespace policies after 10 minutes" "$(( $(date +%s) - policyGateStart ))"
@@ -469,7 +482,7 @@ typeset -i complianceStableCount=0
 PolicyNameSet () {
   typeset namesJson=''
   typeset -i namesRc=0
-  namesJson="$(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}')" || namesRc=$?
+  namesJson="$(_oc_get_bounded get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}')" || namesRc=$?
   if (( namesRc != 0 )) || [[ -z "${namesJson}" ]]; then
     printf '[%s] ERROR: failed to read the policy name set (rc=%d)\n' \
       "$(date -u +%FT%TZ)" "${namesRc}" >&2
@@ -483,7 +496,7 @@ PolicyNameSet () {
 PolicyCount () {
   typeset countJson=''
   typeset -i countRc=0
-  countJson="$(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || countRc=$?
+  countJson="$(_oc_get_bounded get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || countRc=$?
   if (( countRc != 0 )) || [[ -z "${countJson}" ]]; then
     return 1
   fi
@@ -545,7 +558,10 @@ ReadStablePolicySet () {
 # stall-below-final-size race.
 ExpectedPolicyNames () {
   typeset setsJson=''
-  setsJson="$(oc get policysets.policy.open-cluster-management.io -n policies -o json)" || return 1
+  typeset -i _ep_now=$(date +%s)
+  typeset -i _ep_remain=$(( stepDeadline - _ep_now - 120 ))
+  (( _ep_remain < 10 )) && _ep_remain=10
+  setsJson="$(timeout "${_ep_remain}s" oc get policysets.policy.open-cluster-management.io -n policies -o json 2>&1)" || return 1
   if [[ -z "${setsJson}" ]]; then
     return 1
   fi
@@ -649,9 +665,10 @@ while :; do
   # the JUnit report never runs.
   typeset -i passNow=0
   passNow=$(date +%s)
-  if (( passNow + compliancePassBudget > stepDeadline )); then
-    printf '[%s] ERROR: no time left in the step budget for another compliance pass\n' \
-      "$(date -u +%FT%TZ)" >&2
+  typeset -i _remainingBudget=$(( stepDeadline - passNow - 120 ))
+  if (( _remainingBudget < 600 )); then
+    printf '[%s] ERROR: no time left in the step budget for another compliance pass (remaining %ds)\n' \
+      "$(date -u +%FT%TZ)" "${_remainingBudget}" >&2
     RecordResult "policies-compliant" "failed" "Compliance wait stopped after $(( (passNow - complianceStart) / 60 )) minutes: the step time budget was exhausted before the policy set stabilized${missingExpectedNote}${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
     exit 1
   fi
@@ -672,8 +689,9 @@ while :; do
   # a policy replaced by another during the pass leaves the count unchanged
   # while the replacement policy was never waited on.  Capture the identities
   # so the post-pass comparison can tell an unchanged set from a swap.
+  typeset complianceWaitSet=''
   if ! prevSet="$(PolicyNameSet)"; then
-    RecordResult "policies-compliant" "failed" "Failed to read the policy name set before the compliance pass; the set the wait covers is unknown${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
+    RecordResult "policies-compliant" "failed" "Failed to read the policy name set before the compliance pass; the set the wait covers is unknown${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))" 
     exit 1
   fi
   complianceAllSkipped=false
@@ -692,9 +710,11 @@ while :; do
 
     if (( ${#applyPoliciesArr[@]} > 0 )); then
       : "Waiting for ${#applyPoliciesArr[@]} non-skipped polic(ies) to become Compliant…"
+      typeset -i _waitTimeout=${_remainingBudget}
+      (( _waitTimeout > 2400 )) && _waitTimeout=2400
       if ! oc wait -n policies \
         --for jsonpath='{.status.compliant}'=Compliant \
-        --timeout=40m "${applyPoliciesArr[@]}"; then
+        --timeout="${_waitTimeout}s" "${applyPoliciesArr[@]}"; then
         printf '%s\n' "Non-skipped policies failed to become compliant:" >&2
         RecordResult "policies-compliant" "failed" "Non-skipped policies failed to become compliant within 40 minutes${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
         oc get policies -n policies --ignore-not-found | FilterSkippedPolicies
@@ -708,9 +728,11 @@ while :; do
     fi
   else
     : "No policies to skip: waiting for ALL policies to become Compliant…"
+    typeset -i _waitTimeout=${_remainingBudget}
+    (( _waitTimeout > 2400 )) && _waitTimeout=2400
     if ! oc wait policies --all -n policies \
       --for jsonpath='{.status.compliant}'=Compliant \
-      --timeout=40m; then
+      --timeout="${_waitTimeout}s"; then
       printf '%s\n' "Policies failed to become compliant:" >&2
       RecordResult "policies-compliant" "failed" "Policies failed to become compliant within 40 minutes" "$(( $(date +%s) - complianceStart ))"
       oc get policies -n policies --ignore-not-found
@@ -720,6 +742,15 @@ while :; do
     fi
   fi
 
+  # Verify wait-received names vs current set: if policy replaced during pass, count unchanged but replacement never waited (thread PRRT_kwDOBHvUUM65TpMc)
+  if [[ "${complianceAllSkipped}" != "true" ]]; then
+    # Capture wait set: for --all it's prevSet, for filtered it's applyPoliciesArr
+    if (( ${#skipPoliciesArr[@]} > 0 )); then
+      complianceWaitSet="$(printf '%s\n' "${applyPoliciesArr[@]}" | sed 's|.*/||' | LC_ALL=C sort)"
+    else
+      complianceWaitSet="${prevSet}"
+    fi
+  fi
   # Count after the pass.  A failed query is not a stable count: fail the
   # row, so a broken API cannot record a pass for a policy set that was
   # never observed.
@@ -743,6 +774,16 @@ while :; do
   if (( policyCount != prevCount )); then
     : "Policy set changed during the pass (${prevCount} -> ${policyCount} policies); re-running the compliance wait"
     continue
+  fi
+  # Swap detection: if wait set differs from stable set, replacement occurred without wait (PRRT_kwDOBHvUUM65TpMc)
+  if [[ -n "${complianceWaitSet}" && -n "${complianceStableSet}" ]]; then
+    typeset _waitSetSorted="$(printf '%s\n' "${complianceWaitSet}" | LC_ALL=C sort)"
+    typeset _stableSorted="$(printf '%s\n' "${complianceStableSet}" | LC_ALL=C sort)"
+    if [[ "${_waitSetSorted}" != "${_stableSorted}" ]] && [[ "${complianceWaitSet}" != "${prevSet}" ]]; then
+      : "Wait set differs from stable set after pass (swap detected); re-running wait"
+      policyCount="${complianceStableCount}"
+      continue
+    fi
   fi
   typeset -i passStableRc=0
   ReadStablePolicySet "after the compliance pass" || passStableRc=$?
