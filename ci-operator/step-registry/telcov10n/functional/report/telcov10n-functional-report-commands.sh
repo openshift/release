@@ -46,8 +46,11 @@ mkdir -pv /tmp/junit
 if ! compgen -G "${SHARED_DIR}/*polarion*.xml" > /dev/null 2>&1; then
   echo "No Reports found in ${SHARED_DIR}, Using Bastion"
   BASTION_REPORT_DIR="/tmp/test_reports"
-  POLARION_REPORT_DIR="${BASTION_REPORT_DIR}/polarion"
-  JUNIT_REPORT_DIR="${BASTION_REPORT_DIR}/junit"
+  # The lane's plays stage a single suite JUnit set on the bastion. Lanes whose
+  # reports live elsewhere (e.g. O-RAN) set JUNIT_REPORT_DIR in their job config,
+  # so honour that value when it is present.
+  JUNIT_REPORT_DIR="${JUNIT_REPORT_DIR:-${BASTION_REPORT_DIR}/junit}"
+  processed_report_dir=${JUNIT_REPORT_DIR}
   UPLOAD_SHARED_DIR=""
 else
   echo "Reports found in SHARED_DIR"
@@ -73,6 +76,7 @@ else
   done
   POLARION_REPORT_DIR=/tmp/reports
   JUNIT_REPORT_DIR=/tmp/junit
+  processed_report_dir=${POLARION_REPORT_DIR}
   UPLOAD_SHARED_DIR="${SHARED_DIR}"
 fi
 
@@ -94,13 +98,12 @@ if [[ -f "${METRICS_FILE}" ]]; then
   echo "REPORTS_PORTAL_ATTRIBUTES: ${REPORTS_PORTAL_ATTRIBUTES}"
 fi
 
-echo "Uploading reports to Polarion and Report Portal"
+echo "Uploading reports to Report Portal"
 SHARED_DIR="${UPLOAD_SHARED_DIR}" ansible-playbook ./playbooks/upload-report.yaml \
   -i ./inventories/cnf/switch-config.yaml \
   --extra-vars "kubeconfig=${KUBECONFIG} \
     reporter_template_name='${REPORTER_TEMPLATE_NAME}' \
-    processed_report_dir=${POLARION_REPORT_DIR} \
-    junit_report_dir=${JUNIT_REPORT_DIR} \
+    processed_report_dir=${processed_report_dir} \
     reports_directory=/tmp/upload \
     reporter_launch_name='${REPORTER_LAUNCH_NAME}' \
     upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} \

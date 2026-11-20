@@ -35,7 +35,14 @@ chmod 600 "/tmp/temp_ssh_key"
 
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
-scp -r ${SSH_OPTS} -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}":/tmp/.polarion_url "${SHARED_DIR}/polarion_url"
+# Polarion reporting is retired, so report steps no longer write this file.
+# Keep the copy best-effort and fall back to N/A, like the cnf-ran/IBU steps.
+POLARION_URL="N/A"
+if scp -r ${SSH_OPTS} -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}":/tmp/.polarion_url "${SHARED_DIR}/polarion_url" 2>/dev/null; then
+  if [[ -f "${SHARED_DIR}/polarion_url" ]] && [[ -s "${SHARED_DIR}/polarion_url" ]]; then
+    POLARION_URL="$(cat "${SHARED_DIR}/polarion_url")"
+  fi
+fi
 scp ${SSH_OPTS} -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}:/tmp/${REPORTPORTAL_FILES:-}" "${SHARED_DIR}/reportportal_url" 2>/dev/null || true
 
 
@@ -64,14 +71,7 @@ if [[ -z "$SECONDARY_NIC_FILE" ]]; then
   exit 1
 fi
 
-# Read polarion URL if available
-POLARION_URL=""
-if [[ -f "${SHARED_DIR}/polarion_url" ]] && [[ -s "${SHARED_DIR}/polarion_url" ]]; then
-  POLARION_URL="$(cat ${SHARED_DIR}/polarion_url)"
-  echo "Polarion URL: ${POLARION_URL}"
-else
-  echo "No polarion URL file found or file is empty"
-fi
+echo "Polarion URL: ${POLARION_URL}"
 
 # Read ReportPortal URL if available
 REPORTPORTAL_URL=""
