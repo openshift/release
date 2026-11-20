@@ -733,11 +733,12 @@ def lastn($d): split("/") | .[-$d:] | join("/");
         # The listing is paged inside the helper: one request answers at most
         # 1000 records, so a single unpaginated query misses the image in a
         # large registry.  A failed listing is retried like an empty answer.
-        typeset -i _acsTry=0
+        typeset -i _acsTry=0 _acsQueryOk=0
         httpdImageJson='[]'
         for _acsTry in 1 2 3; do
             if httpdImageJson="$(AcsListMatchingImages "${acsHost}" "${acsPassFile}" "${jqFilter}" \
                 "${deployedRepo}" "${deployedRepoDepth}" "${deployedDigest}" "${acsTlsOpts[@]}")"; then
+                _acsQueryOk=1
                 break
             else
                 typeset _acsErr=""
@@ -747,11 +748,21 @@ def lastn($d): split("/") | .[-$d:] | join("/");
                     sleep $(( _acsTry * 2 ))
                     continue
                 else
-                    httpdImageJson='[]'
+                    # PRRT_kwDOBHvUUM65RJn1: distinguish request failure from empty results; keep failure marker
+                    httpdImageJson='__QUERY_FAILED__'
                     break
                 fi
             fi
         done
+        # If all retries exhausted without success, mark as query failure not empty
+        if (( _acsQueryOk == 0 )) && [[ "${httpdImageJson}" == '[]' ]]; then
+            httpdImageJson='__QUERY_FAILED__'
+        fi
+        if [[ "${httpdImageJson}" == '__QUERY_FAILED__' ]]; then
+            echo "ACS query failed after ${_acsTry} attempts, treating as transient not empty" >&2
+            sleep "${retryInterval}"
+            continue
+        fi
         # Read the record only out of a single-element answer.  Two or more
         # matching records are named and retried instead of being read: jq
         # would otherwise concatenate their fields, and a record whose cves is
