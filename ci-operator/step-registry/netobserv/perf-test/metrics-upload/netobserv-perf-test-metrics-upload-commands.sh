@@ -11,6 +11,7 @@ export ES_METADATA_INDEX
 
 set -x
 
+# Query metadata for one workload in this build.
 function get_es_data(){
     workload=$1
     # do a term query for exact matching
@@ -47,13 +48,19 @@ function get_es_data(){
 export ES_PASSWORD
 export ES_USERNAME
 
-# strip quotes
-
+# Keep authenticated metadata queries and workload identity out of shell traces.
+set +x
 workload_index_results=$(get_es_data "$WORKLOAD") 
 ingress_perf_index_results=$(get_es_data "ingress-perf")
 
 UUID=$(jq '.hits.hits[0]._source.uuid' "$workload_index_results")
 export UUID=${UUID//\"/}
+# Identify this build's workload sample for the Orion Spyglass report. Do not
+# infer the current run from the newest sample in Orion's lookback window.
+jq -n --arg uuid "$UUID" --arg build_id "$BUILD_ID" --arg workload "$WORKLOAD" \
+    '{uuid: $uuid, build_id: $build_id, workload: $workload}' \
+    > "${SHARED_DIR}/orion-current-run.json"
+set -x
 NOO_BUNDLE_VERSION=$(jq '.hits.hits[0]._source.noo_bundle_info' "$workload_index_results")
 export NOO_BUNDLE_VERSION=${NOO_BUNDLE_VERSION//\"/}
 
@@ -67,15 +74,19 @@ if [[ $WORKLOAD == "node-density-heavy" ]]; then
     END_TIME=$INGRESS_PERF_END_TIME
 fi
 
+# Install the dependencies declared by the metrics uploader.
 function install_requirements(){
     python -m pip install -r "$1"
 }
 
+# Upload this workload's metrics and preserve the uploader's exit status.
 function upload_metrics(){
     install_requirements scripts/requirements.txt
     export THANOS_VERIFY_CERTS="false"
+    set +x
     python scripts/nope.py --starttime "$START_TIME" --endtime "$END_TIME" --uuid "$UUID" --noo-bundle-version "$NOO_BUNDLE_VERSION"
     upload_metrics_rc=$?
+    set -x
     cp -r /tmp/data "$ARTIFACT_DIR"
 }
 
