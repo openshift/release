@@ -6,9 +6,11 @@ source "${SHARED_DIR}/telco-kpis-common-functions.sh"
 
 export_env_vars_from_json 'mirror_ran_test_images' "${INFRA_SETTINGS:-}" "${INFRA_SETTINGS_DEFAULTS:-}"
 apply_gangway_overrides
-setup_debug_on_fail
 
 main() {
+    # Install unified exit handler (handles CONTINUE_ON_FAIL and DEBUG_ON_FAIL)
+    setup_telco_kpis_exit_handler
+
     echo "Mirroring RAN test images for spoke: ${SPOKE_CLUSTER}, hub: ${HUB_CLUSTER}"
 
     setup_ansible_inventory "${SPOKE_CLUSTER:-dummy-spoke}" "${HUB_CLUSTER}"

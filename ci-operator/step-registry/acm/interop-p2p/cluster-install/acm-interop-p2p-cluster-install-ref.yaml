@@ -2,7 +2,7 @@ ref:
   as: acm-interop-p2p-cluster-install
   from: cli
   commands: acm-interop-p2p-cluster-install-commands.sh
-  timeout: 3h0m0s
+  timeout: 11h0m0s
   grace_period: 30m0s
   resources:
     requests:
@@ -43,12 +43,24 @@ ref:
     documentation: |-
       OCP network plugin: OVNKubernetes or OpenShiftSDN.
   - name: ACM_SPOKE_INSTALL_TIMEOUT_MINUTES
-    default: "150"
+    default: "450"
     documentation: |-
       Minutes to wait per cluster for ClusterDeployment.Provisioned=True.
-      All ClusterDeployments are submitted before waiting begins, so all clusters
-      provision in parallel. The effective wall-clock wait is approximately
-      max(cluster_install_times) rather than their sum.
+      Hive runs every install attempt inside this one wait. The previous
+      single-attempt ceiling was 150 minutes; the default is 3 × 150 so three
+      attempts can each use that ceiling. All ClusterDeployments are submitted
+      before waiting begins, so clusters provision in parallel. The effective
+      wall-clock wait is approximately max(cluster_install_times) rather than
+      their sum.
+  - name: ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT
+    default: "3"
+    documentation: |-
+      Hive ClusterDeployment.spec.installAttemptsLimit: the maximum number of
+      install attempts. A limit of 3 permits three total attempts (one initial
+      attempt and two retries). Hive sets ProvisionStopped=True
+      (InstallAttemptsLimitReached) once the limit is reached. Default 3 matches
+      Hive's default and allows transient AWS failures (e.g. LoadBalancerLimitExceeded)
+      to self-heal. Set to 1 only when fail-fast after a single attempt is desired.
   - name: ACM_SPOKE_CLUSTER_INITIAL_VERSION
     default: ""
     documentation: |-
@@ -108,6 +120,15 @@ ref:
     derived from its 1-based index so multi-spoke Submariner setups do not conflict
     with the hub or with each other.
 
+    Spokes install in parallel. The step timeout (11h) covers one 450m
+    provisioning budget for the slowest spoke, and every install attempt for
+    that spoke shares it. It also covers credential extraction, up to 30m per
+    spoke for ManagedCluster Available, and, when image-policy cleanup runs,
+    up to 25m per spoke for MachineConfigPool rollout. Phase 2 waits run at
+    the same time, so provisioning time is the slowest spoke, not the sum.
+    The extra time lets the script hit its own timeout and write diagnostics
+    before CI kills the step.
+
     Env vars consumed:
       ACM_SPOKE_ARCH_TYPE               - node architecture (default: amd64)
       BASE_DOMAIN                       - cluster base domain
@@ -117,7 +138,8 @@ ref:
       ACM_SPOKE_CP_REPLICAS             - control-plane node count (default: 3)
       ACM_SPOKE_CLUSTER_NAME_PREFIX     - spoke name prefix (default: acm-spoke)
       ACM_SPOKE_NETWORK_TYPE            - OCP network plugin (default: OVNKubernetes)
-      ACM_SPOKE_INSTALL_TIMEOUT_MINUTES - per-cluster provisioning timeout (default: 150)
+      ACM_SPOKE_INSTALL_TIMEOUT_MINUTES - per-cluster provisioning timeout for all install attempts (default: 450)
+      ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT  - maximum Hive install attempts (default: 3; one initial attempt and two retries)
       ACM_SPOKE_CLUSTER_INITIAL_VERSION - OCP minor version for ClusterImageSet
       ACM_SPOKE_CLUSTER_COUNT           - number of spoke clusters (default: 1, max: 3)
       OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY - when true, spoke uses hub

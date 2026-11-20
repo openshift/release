@@ -5,6 +5,7 @@ import dataclasses
 import json
 from pathlib import Path
 import sys
+import tarfile
 from unittest import mock
 
 import yaml
@@ -22,7 +23,7 @@ load_sibling = support.load_sibling
 class LifecycleTests(support.Fixture):
     def test_interruption_during_harness_preparation_finishes_reports(self):
         self.change_skill()
-        entries, files = runner.select_manifest_entries(self.repo, self.env)
+        entries, files = self.select_entries()
         with mock.patch.object(runner, "command",
                                side_effect=runner.Interrupted("interrupted by signal 15")):
             self.assertEqual(runner.run_evals(self.repo, entries, files,
@@ -37,7 +38,7 @@ class LifecycleTests(support.Fixture):
 
     def test_initial_report_failure_during_preparation_is_non_success(self):
         self.change_skill()
-        entries, files = runner.select_manifest_entries(self.repo, self.env)
+        entries, files = self.select_entries()
         original = runner.write_summary
         failed = False
 
@@ -61,7 +62,7 @@ class LifecycleTests(support.Fixture):
         self.write_manifest([self.entry, other])
         self.change_skill()
         self.artifacts.mkdir()
-        entries, files = runner.select_manifest_entries(self.repo, self.env)
+        entries, files = self.select_entries()
         original = getattr(runner, action)
         injected = False
 
@@ -110,7 +111,7 @@ class LifecycleTests(support.Fixture):
                     fixture.write_manifest([fixture.entry, other])
                     fixture.change_skill()
                     fixture.artifacts.mkdir()
-                    entries, files = runner.select_manifest_entries(fixture.repo, fixture.env)
+                    entries, files = fixture.select_entries()
                     with mock.patch.object(runner, action, side_effect=error):
                         if isinstance(error, runner.Interrupted):
                             self.assertEqual(runner.run_evals(fixture.repo, entries, files,
@@ -129,7 +130,7 @@ class LifecycleTests(support.Fixture):
     def test_unexpected_metrics_failure_is_nonfatal(self):
         self.change_skill()
         self.artifacts.mkdir()
-        entries, files = runner.select_manifest_entries(self.repo, self.env)
+        entries, files = self.select_entries()
         original = runner.command
 
         def fail_metrics(args, *rest, **kwargs):
@@ -190,7 +191,7 @@ class LifecycleTests(support.Fixture):
     def test_deadline_reached_after_verification_is_reported_as_the_step_limit(self):
         self.artifacts.mkdir()
         self.change_skill()
-        entries, files = runner.select_manifest_entries(self.repo, self.env)
+        entries, files = self.select_entries()
         verified = False
         verify, clock = runner.verify_result, runner.remaining
 
@@ -207,6 +208,60 @@ class LifecycleTests(support.Fixture):
         failure = self.junit().find("testcase/failure").attrib["message"]
         self.assertIn("step time limit reached before regression scoring", failure)
         self.assertNotIn("0.01 seconds", failure)
+
+
+class SessionArchiveTests(support.Fixture):
+    def setUp(self):
+        super().setUp()
+        self.shared = self.root / "shared"
+        self.shared.mkdir()
+        self.env["SHARED_DIR"] = str(self.shared)
+        self.change_skill()
+
+    def run_selected(self):
+        entries, files = self.select_entries()
+        return runner.run_evals(self.repo, entries, files, self.artifacts, self.env)
+
+    def test_missing_or_empty_sessions_write_nothing(self):
+        self.assertEqual(self.run_selected(), 0)
+        (Path(self.env["CLAUDE_CONFIG_DIR"]) / "projects").mkdir(parents=True)
+        self.assertEqual(self.run_selected(), 0)
+        self.assertFalse((self.artifacts / "claude-sessions.tar").exists())
+        self.assertFalse((self.shared / "claude-session-available").exists())
+
+    def test_home_is_used_without_claude_config_dir(self):
+        del self.env["CLAUDE_CONFIG_DIR"]
+        (self.root / ".claude/projects/-repo").mkdir(parents=True)
+        (self.root / ".claude/projects/-repo/session.jsonl").write_text("home session")
+        self.assertEqual(self.run_selected(), 0)
+        with tarfile.open(self.artifacts / "claude-sessions.tar", "r:") as archive:
+            self.assertIn("projects/-repo/session.jsonl", archive.getnames())
+        self.assertTrue((self.shared / "claude-session-available").is_file())
+
+    def test_claude_config_dir_wins_over_home(self):
+        for root, name in ((self.root / ".claude", "home"), (Path(self.env["CLAUDE_CONFIG_DIR"]), "config")):
+            (root / "projects").mkdir(parents=True)
+            (root / "projects" / f"{name}.jsonl").write_text(name)
+        self.assertEqual(self.run_selected(), 0)
+        with tarfile.open(self.artifacts / "claude-sessions.tar", "r:") as archive:
+            self.assertEqual(sorted(archive.getnames()), ["projects", "projects/config.jsonl"])
+
+    def test_archive_failure_does_not_change_the_result(self):
+        (Path(self.env["CLAUDE_CONFIG_DIR"]) / "projects").mkdir(parents=True)
+        (Path(self.env["CLAUDE_CONFIG_DIR"]) / "projects/session.jsonl").write_text("session")
+        original = tarfile.open
+
+        def fail_sessions(name, *args, **kwargs):
+            if Path(name).name.startswith("claude-sessions"):
+                raise OSError("disk full")
+            return original(name, *args, **kwargs)
+
+        with mock.patch.object(runner.tarfile, "open", side_effect=fail_sessions):
+            self.assertEqual(self.run_selected(), 0)
+            self.assertEqual(list(self.artifacts.glob("claude-sessions.*")), [])
+            self.assertFalse((self.shared / "claude-session-available").exists())
+            self.env["BEHAVIORS"] = json.dumps({self.entry["config"]: "case_failure"})
+            self.assertEqual(self.run_selected(), 1)
 
 
 class HarnessPreparationTests(support.Fixture):
@@ -339,7 +394,7 @@ class EvalConfig:
         self.entry["setup_script"] = "setup.sh"
         self.write_manifest([self.entry])
         self.change_skill()
-        entries, files = runner.select_manifest_entries(self.repo, self.env)
+        entries, files = self.select_entries()
         env = {**self.env, "RESOLVER_SLEEP": "60"}
         self.artifacts.mkdir()
         with mock.patch.object(runner, "CONFIG_RESOLUTION_TIMEOUT", 0.05):
@@ -469,6 +524,34 @@ class RunIdentityTests(support.Fixture):
         self.assert_identity_failure(
             "substituted_config", "harness evaluated config chain ['tmp/eval-foo-fixed.yaml'], "
             "but the runner planned ['evals/eval-foo.yaml']", "not a copied or edited file")
+
+    def test_config_chain_mismatch_is_reported_before_a_missing_thresholded_judge(self):
+        config = yaml.safe_load((self.repo / self.entry["config"]).read_text())
+        self.put(self.entry["config"], yaml.safe_dump(
+            {**config, "thresholds": {**config["thresholds"], "missing": {"min_pass_rate": 1.0}}}))
+        self.change_skill()  # Both checks fail; the run identity is verified first.
+        failure = self.assert_identity_failure(
+            "substituted_config", "harness evaluated config chain ['tmp/eval-foo-fixed.yaml'], "
+            "but the runner planned ['evals/eval-foo.yaml']",
+            "run_result.json recorded eval_params.config_chain ['tmp/eval-foo-fixed.yaml']")
+        self.assertNotIn("missing thresholded judge", failure)
+
+    def test_config_chain_mismatch_reports_the_raw_recorded_chain(self):
+        run = self.root / "run"
+        run.mkdir()
+        raw = [str(self.repo / "tmp/../tmp/eval-foo-fixed.yaml")]  # Normalizes to tmp/eval-foo-fixed.yaml.
+        (run / "run_result.json").write_text(json.dumps({
+            "execution_mode": "case", "model": "m",
+            "eval_params": {"execution_mode": "case", "config_chain": raw}}))
+        (run / "summary.yaml").write_text("judges: {}\n")
+        plan = runner.EvalPlan("evals/eval-foo.yaml", {}, "m", 1, 1,
+                               config_chain=("evals/eval-foo.yaml",))
+        with self.assertRaises(runner.EvalError) as raised:
+            runner.verify_run_identity(run, plan, frozenset({"case-001"}), self.repo)
+        message = str(raised.exception)
+        self.assertIn("harness evaluated config chain ['tmp/eval-foo-fixed.yaml'], but the runner "
+                      "planned ['evals/eval-foo.yaml']", message)
+        self.assertIn(f"run_result.json recorded eval_params.config_chain {raw}", message)
 
     def test_extra_extends_chain_file_fails(self):
         self.change_skill()

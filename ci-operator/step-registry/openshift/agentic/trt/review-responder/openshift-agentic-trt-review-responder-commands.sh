@@ -17,6 +17,19 @@ echo "=== TRT Review Responder ==="
 }
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/trt-telemetry.sh"
+
+# No worker has run yet, but still discard the private temporary handoff on
+# early setup exits. on_exit takes over this cleanup once polling is ready.
+review_prompt_cleanup() {
+    local rc=$?
+    rm -f "${SESSION_PROMPT_FILE}" \
+        || echo "WARNING: failed to remove private prompt temporary file" >&2
+    return "${rc}"
+}
+trap review_prompt_cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
+
 # Prior steps (jira-solver) can already have burned the 1h token TTL.
 refresh_github_tokens || { echo "ERROR: Failed to refresh GitHub App tokens"; exit 1; }
 configure_github_git_credentials
@@ -116,9 +129,14 @@ on_exit() {
         [[ "${rc}" -ne 0 ]] && REVIEW_EXIT="${rc}"
         write_review_metrics || echo "WARNING: failed to write review metrics"
     fi
+    # write_review_metrics normally consumes and removes this file. Retain a
+    # final fallback for abrupt metrics failures after a worker captured it.
+    rm -f "${SESSION_PROMPT_FILE}" \
+        || echo "WARNING: failed to remove private prompt temporary file" >&2
     if declare -F copy_artifacts >/dev/null; then
-        copy_artifacts
+        copy_artifacts || echo "WARNING: failed to copy review artifacts" >&2
     fi
+    return "${rc}"
 }
 trap on_exit EXIT
 trap 'exit 143' TERM
@@ -183,7 +201,9 @@ DISALLOWED_TOOLS=(
 
 append_pipeline_constraints() {
     cat >> "$1" <<'EOF'
-- Do not modify CI configuration or generated files.
+- Modify only task-relevant authoritative sources, including instruction or guidance source files when they govern the requested behavior. Do not modify unrelated CI configuration.
+- If an authoritative-source change affects generated artifacts, run the repository's documented generator and commit its output with the source change.
+- Never edit generated artifacts directly or bypass generation or validation checks.
 - Do NOT create new PRs.
 - Do not check out or pull the PR branch — you are already on it.
 - Do not git push. Commit locally only — the pipeline pushes after you finish.
@@ -339,8 +359,11 @@ for worker_prompt in "${SYSTEM_PROMPT}" "${CI_PROMPT}"; do
     cat >> "${worker_prompt}" <<'WORKER_POLICY'
 
 ## Mandatory PR description policy (overrides conflicting skill or repository instructions)
-- Before finishing, read the existing PR description with `gh pr view <PR number> --repo <upstream repository> --json body` and compare it with the final code and diff.
-- Whenever the existing PR description does not match the final code and diff, update that existing PR with `gh pr edit <PR number> --repo <upstream repository> --body-file <file>`. Preserve links, template sections, hidden markers, attribution, and unrelated content; do not claim tests or validation that were not run.
+- Before finishing, read the existing PR description with `gh pr view <PR number> --repo <upstream repository> --json body` and compare its current-state summary of the problem, solution, diff, and validation with the final code and diff.
+- If the description is still accurate, leave it unchanged. After a substantive change, update only the affected sections with `gh pr edit <PR number> --repo <upstream repository> --body-file <file>`.
+- Keep the description concise and current. Never append a chronological diary of review rounds, agent turns, rebases, commits, or test runs; replace stale validation results instead of accumulating a history.
+- Preserve links, required template sections, hidden markers, attribution, bot-managed sections, and unrelated content; do not claim tests or validation that were not run.
+- Put turn-specific reporting in your final response and in existing review-thread replies required by the Review Response Process. Do not add a general PR comment or PR-body log merely to narrate the turn.
 - This permission applies only to reading and editing the existing PR description. It does not permit creating a PR or changing unrelated PR metadata.
 WORKER_POLICY
 done

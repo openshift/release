@@ -1,0 +1,1 @@
+../deploy-spoke-sno-seed/telcov10n-functional-cnf-ran-arm-ibx-deploy-spoke-sno-seed-commands.sh

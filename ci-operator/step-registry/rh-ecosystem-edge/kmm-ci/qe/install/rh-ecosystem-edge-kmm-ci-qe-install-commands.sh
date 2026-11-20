@@ -107,6 +107,11 @@ collect_cluster_diagnostics() {
   echo "Comprehensive KMM diagnostics saved under ${diagnostics_dir}" >&2
 }
 
+if [[ -n "${KMM_QE_DEBUG_SLEEP:-}" ]]; then
+  echo "KMM QE debug pause: sleeping ${KMM_QE_DEBUG_SLEEP} before KMM installation"
+  sleep "${KMM_QE_DEBUG_SLEEP}"
+fi
+
 if ! KMM_CHANNEL="${KMM_CHANNEL:-release-2.7}" \
   KMM_CATALOG_PULL_SECRET_PATH="${KMM_CATALOG_PULL_SECRET_PATH:-}" \
   make cluster-operators; then

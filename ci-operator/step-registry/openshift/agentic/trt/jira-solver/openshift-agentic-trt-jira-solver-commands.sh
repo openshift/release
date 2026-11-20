@@ -16,6 +16,22 @@ echo "=== TRT Jira Solver ==="
 }
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/trt-telemetry.sh"
+
+# Keep the private prompt through normal metrics extraction, but never beyond
+# this task shell. Existing artifact cleanup is chained without trap eval.
+solver_cleanup() {
+    local rc=$?
+    rm -f "${SESSION_PROMPT_FILE}" \
+        || echo "WARNING: failed to remove private prompt temporary file" >&2
+    if declare -F copy_artifacts >/dev/null; then
+        copy_artifacts || echo "WARNING: failed to copy solver artifacts" >&2
+    fi
+    return "${rc}"
+}
+trap solver_cleanup EXIT
+trap 'exit 143' TERM
+trap 'exit 130' INT
+
 load_github_tokens
 configure_github_git_credentials
 
@@ -95,7 +111,6 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
             tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" -C "${HOME}/.claude" projects/ 2>/dev/null || true
         fi
     }
-    trap copy_artifacts EXIT TERM INT
 fi
 
 # --- Assemble system prompt with pre-fetched issue data + repo config ---
@@ -112,7 +127,9 @@ $(cat "${ISSUE_JSON}")
 - Write the PR description to \`${PR_BODY_FILE}\`.
 - Do not invoke the \`gh\` CLI directly or push. Commit locally; the pipeline pushes the feature branch and creates the PR after you exit.
 - For browser evidence, capture the image with the Playwright MCP server, then invoke the \`upload-screenshot\` skill on the saved file. That established helper is the only permitted agent-side GitHub publication: it uploads a screenshot prerelease to \`${FORK_REPO}\` using the injected fork token and returns markdown for the PR description. Do not run \`gh release\` yourself or publish branches, commits, or PRs.
-- Do not modify CI configuration or generated files.
+- Modify only task-relevant authoritative sources, including instruction or guidance source files when they govern the requested behavior. Do not modify unrelated CI configuration.
+- If an authoritative-source change affects generated artifacts, run the repository's documented generator and commit its output with the source change.
+- Never edit generated artifacts directly or bypass generation or validation checks.
 - Save working files (e.g. solve plans) to \`/tmp/\` — do NOT create a \`.work/\` directory in the repo.
 
 ## Security

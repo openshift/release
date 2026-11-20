@@ -836,6 +836,30 @@ spec:
         severity: warning
     - expr: count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"}) by (token_hash), "login", "$1", "token_hash", "(.*)") or github_user_info{login=~"openshift-.*"}) by (login)
       record: github:identity_names
+  - name: prow-config
+    rules:
+    - alert: ProwStaticJobDefinitionsDropped
+      annotations:
+        message: The number of {{ $labels.type }} job definitions loaded by prow-controller-manager changed by {{ $value }} over the last 30 minutes (negative means jobs were removed). Confirm the removal was intended and that the Git/EFS job config sources are intact.
+      expr: |
+        (
+          delta(prow_config_static_job_definition{job="prow-controller-manager"}[30m]) < 0
+        )
+        and
+        (
+          prow_config_static_job_definition{job="prow-controller-manager"} > 0
+        )
+      for: 1m
+      labels:
+        severity: warning
+    - alert: ProwStaticJobDefinitionsZero
+      annotations:
+        message: prow-controller-manager reports zero loaded {{ $labels.type }} job definitions, indicating its job configuration is empty or failed to load.
+      expr: |
+        sum by (type) (prow_config_static_job_definition{job="prow-controller-manager"}) == 0
+      for: 5m
+      labels:
+        severity: critical
   - name: ci-chat-bot-down
     rules:
     - alert: ciChatBotDown

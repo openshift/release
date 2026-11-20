@@ -197,7 +197,11 @@ if [[ "${DPF_SKIP_CI_PAYLOAD:-false}" == "true" ]]; then
 else
   PAYLOAD_URL="${RELEASE_IMAGE_LATEST:-}"
 fi
-echo "PAYLOAD_URL is ${PAYLOAD_URL:+set}${PAYLOAD_URL:-unset}"
+if [[ -n "${PAYLOAD_URL}" ]]; then
+  echo "PAYLOAD_URL is set"
+else
+  echo "PAYLOAD_URL is unset"
+fi
 
 # Merge CI registry credentials into the pull secret so the cluster can
 # access the Prow-internal registry (registry.buildXX.ci.openshift.org).
@@ -276,7 +280,17 @@ fi
 
 echo "Copying .env from hypervisor to artifacts..."
 if scp ${SSH_OPTS} root@${REMOTE_HOST}:${REMOTE_WORK_DIR}/openshift-dpf/.env /tmp/.env.full 2>/dev/null; then
-  sed -E '/^WORKER_[0-9]+_NAME=/!{ /^WORKER_[0-9]+_/d }' /tmp/.env.full > "${ARTIFACT_DIR}/.env"
+  if grep -q '^DPF_DEPLOYMENT_MODE=zero-trust$' /tmp/.env.full; then
+    sed -E '
+      /^WORKER_[0-9]+_NAME=/! { /^WORKER_[0-9]+_/d; }
+      /^ZT_/d
+      /^DPU[0-9]+_SERIAL=/d
+      /(^|_)(IP|IPS|VIP|PASSWORDS?|PASSWDS?|PASS)(_|=)/d
+      /=[^=]*([0-9]{1,3}\.){3}[0-9]{1,3}([^0-9]|$)/d
+    ' /tmp/.env.full > "${ARTIFACT_DIR}/.env"
+  else
+    sed -E '/^WORKER_[0-9]+_NAME=/!{ /^WORKER_[0-9]+_/d }' /tmp/.env.full > "${ARTIFACT_DIR}/.env"
+  fi
   rm -f /tmp/.env.full
 else
   echo "WARNING: Failed to copy .env to artifacts"

@@ -293,7 +293,13 @@ def test_kind_settings_presubmit_leaves_unset_trigger_fields_absent() -> None:
         _phase0_cell(test="api-test", kind="presubmit", cron=None, as_name=None),
     )
     test = presubmit["tests"][0]
-    for field_name in ("always_run", "optional", "run_if_changed", "skip_if_only_changed"):
+    for field_name in (
+        "always_run",
+        "optional",
+        "run_if_changed",
+        "skip_if_only_changed",
+        "pipeline_run_if_changed",
+    ):
         assert field_name not in test
 
 
@@ -501,7 +507,6 @@ def test_upgrade_edge_is_derived_from_versions() -> None:
     env = config["tests"][0]["steps"]["env"]
     assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == "stable-3.16"
     assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == "stable-3.18"
-    assert env["PLAYWRIGHT_N_GIT_BRANCH"] == "redhat-3.18"
     assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == "redhat-3.16"
 
 
@@ -588,8 +593,13 @@ def test_redhat_318_aws_upgrade_cell() -> None:
     assert "QUAY_OPERATOR_CHANNEL" not in env
     assert env["QUAY_UPGRADE_SOURCE_CHANNEL"] == "stable-3.17"
     assert env["QUAY_UPGRADE_TARGET_CHANNEL"] == "stable-3.18"
-    assert env["PLAYWRIGHT_N_GIT_BRANCH"] == "redhat-3.18"
+    # Seed and verify run branch tips; functional runs the n image's commit label.
     assert env["PLAYWRIGHT_N_MINUS_ONE_GIT_BRANCH"] == "redhat-3.17"
+    assert env["PLAYWRIGHT_N_VERIFY_GIT_BRANCH"] == "redhat-3.18"
+    assert "PLAYWRIGHT_N_GIT_BRANCH" not in env
+    assert env["PLAYWRIGHT_REF_MODE"] == "strict"
+    # The chains default the guard to "true", which fails any phase without a branch.
+    assert env["PLAYWRIGHT_REQUIRE_EXPLICIT_REF"] == "false"
     assert env["PLAYWRIGHT_WORKERS"] == "4"
     assert env["QUAYNAMESPACE"] == "quay"
     # ART FBC env still comes from the nightly source layer.
@@ -1287,6 +1297,21 @@ def test_presubmit_rejects_always_run_true_with_filter() -> None:
         expand_cells(matrix)
 
 
+def test_kind_settings_presubmit_copies_pipeline_run_if_changed() -> None:
+    presubmit = apply_kind_settings(
+        {"tests": [{"steps": {}}]},
+        _phase0_cell(
+            test="api-test",
+            kind="presubmit",
+            cron=None,
+            as_name=None,
+            always_run=False,
+            pipeline_run_if_changed="^requirements\\.txt$",
+        ),
+    )
+    assert presubmit["tests"][0]["pipeline_run_if_changed"] == "^requirements\\.txt$"
+
+
 def test_layout_must_be_variant_or_base() -> None:
     matrix = _matrix_with_job(
         {"cron": "daily", "clouds": ["aws"], "ocp": ["4.22"], "test": "e2e-install"},
@@ -1689,6 +1714,52 @@ def test_sts_rejected_without_aws() -> None:
     )
     with pytest.raises(ValueError, match="sts is only valid when clouds include aws"):
         expand_cells(matrix)
+
+
+def test_redhat_318_aws_ocp50_dualstack_shares_aws_file() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    tests = {
+        test["as"]: test
+        for test in by_name["quay-quay-redhat-3.18__aws-ocp50-e2e-install.yaml"]["tests"]
+    }
+
+    dualstack = tests["aws-s3-nightly-dualstack"]
+    assert dualstack["cron"] == "@weekly"
+    assert dualstack["steps"]["env"]["IP_FAMILY"] == "DualStackIPv6Primary"
+    extra = dualstack["steps"]["env"]["QUAY_EXTRA_CONFIG"].splitlines()
+    assert "FEATURE_LISTEN_IP_VERSION: dual-stack" in extra
+    steps = dualstack["steps"]["test"]
+    deploy = steps.index({"ref": "quay-deploy-aws-s3"})
+    assert steps[deploy + 1] == {"ref": "quay-check-dualstack"}
+    assert steps[:deploy + 1] + steps[deploy + 2:] == tests["aws-s3-nightly"]["steps"]["test"]
+
+    plain = tests["aws-s3-nightly"]["steps"]
+    assert "IP_FAMILY" not in plain["env"]
+    assert "FEATURE_LISTEN_IP_VERSION" not in plain["env"]["QUAY_EXTRA_CONFIG"]
+
+
+def test_dualstack_only_on_aws_periodic() -> None:
+    job = {
+        "cron": "daily",
+        "source": "nightly",
+        "clouds": ["gcp"],
+        "ocp": ["5.0"],
+        "test": "e2e-install",
+        "dualstack": True,
+    }
+    with pytest.raises(ValueError, match="dualstack is only valid for clouds"):
+        expand_cells(_matrix_with_job(job))
+    presubmit = {"kind": "presubmit", "clouds": ["aws"], "ocp": ["4.22"], "test": "e2e-install"}
+    matrix = _matrix_with_job(
+        {**presubmit, "dualstack": True},
+        release_overrides={"branch": "master", "layout": "base"},
+    )
+    with pytest.raises(ValueError, match="dualstack is only valid for kind: periodic"):
+        expand_cells(matrix)
+    upgrade = {**job, "clouds": ["aws"], "test": "upgrade", "upgrade_from": "3.17"}
+    with pytest.raises(ValueError, match="dualstack is not supported for test: upgrade"):
+        expand_cells(_matrix_with_job(upgrade))
 
 
 def test_storage_odf_allowed_only_on_aws() -> None:

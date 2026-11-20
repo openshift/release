@@ -207,6 +207,13 @@ applicationsets:
           name: '{{.name}}'
           namespace: openshift-gitops
         project: build-clusters
+        ignoreDifferences:
+        - group: machine.openshift.io
+          kind: MachineSet
+          namespace: openshift-machine-api
+          jqPathExpressions:
+          - .spec.template.spec.providerSpec.value.ami
+          - .spec.template.spec.providerSpec.value.disks[]? | select(.boot == true) | .image
         sources:
         - directory:
             exclude: '{OWNERS,*.md}'
@@ -225,6 +232,7 @@ applicationsets:
           - CreateNamespace=true
           - PruneLast=true
           - ServerSideApply=true
+          - RespectIgnoreDifferences=true
 - filename: appset-cluster-core-ci.yaml
   name: appset-cluster-core-ci
   spec:
@@ -285,6 +293,13 @@ applicationsets:
           name: hosted-mgmt
           namespace: openshift-gitops
         project: hosted-mgmt
+        ignoreDifferences:
+        - group: machine.openshift.io
+          kind: MachineSet
+          namespace: openshift-machine-api
+          jqPathExpressions:
+          - .spec.template.spec.providerSpec.value.ami
+          - .spec.template.spec.providerSpec.value.disks[]? | select(.boot == true) | .image
         source:
           directory:
             exclude: '{OWNERS,*.md}'
@@ -302,6 +317,7 @@ applicationsets:
           - ApplyOutOfSyncOnly=true
           - CreateNamespace=true
           - PruneLast=true
+          - RespectIgnoreDifferences=true
 - filename: appset-cluster-hosted-mgmt2.yaml
   name: appset-cluster-hosted-mgmt2
   spec:

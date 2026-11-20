@@ -60,6 +60,22 @@ load_secrets() {
     else
         echo "WARNING: GitHub App credentials not found at ${GITHUB_APP_ID_PATH} and ${GITHUB_KEY_PATH}. GitHub operations will not be available."
     fi
+
+    if [ -f "${JIRA_API_TOKEN_PATH}" ]; then
+        JIRA_API_TOKEN=$(cat "${JIRA_API_TOKEN_PATH}")
+        export JIRA_API_TOKEN
+        echo "Jira API token loaded."
+    else
+        echo "WARNING: Jira API token not found at ${JIRA_API_TOKEN_PATH}. Jira operations will not be available."
+    fi
+
+    if [ -f "${JIRA_USERNAME_PATH}" ]; then
+        JIRA_USERNAME=$(cat "${JIRA_USERNAME_PATH}")
+        export JIRA_USERNAME
+        echo "Jira username loaded."
+    else
+        echo "WARNING: Jira username not found at ${JIRA_USERNAME_PATH}. Jira operations will not be available."
+    fi
 }
 
 # The procedure to copy reports and session logs to artifacts, executed at exit

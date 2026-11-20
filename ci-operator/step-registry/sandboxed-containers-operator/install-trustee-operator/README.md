@@ -43,27 +43,36 @@ charts/
 ## What the Step Does
 
 1. Clones helm charts from `TRUSTEE_CHARTS_REPO` at ref `TRUSTEE_CHARTS_REF`.
-2. Renders `trustee-operator` chart with `helm template` and applies it.
-3. Waits for OLM installation stages: CatalogSources READY, Subscription,
+2. When `TRUSTEE_CATALOG_SOURCE_IMAGE` is set, renders and applies only the
+   chart's `ImageDigestMirrorSet`/`ImageTagMirrorSet` first, then waits for all
+   MachineConfigPools to report `Updated`. Mirrors are a `registries.conf`
+   change that the MCO rolls out by rebooting every node, so applying them
+   together with the Subscription lets OLM pull the pre-GA bundle from
+   `registry.redhat.io` (where it does not exist) before the mirror is live.
+   Skipped for GA and disconnected jobs, which render no mirror sets, and when
+   `install-osc-operator` already applied the authoritative sets.
+3. Renders `trustee-operator` chart with `helm template` and applies it. The
+   mirror sets are re-rendered here identically, so re-applying them is a no-op.
+4. Waits for OLM installation stages: CatalogSources READY, Subscription,
    InstallPlan, CSV Succeeded, Deployment Available, pods Ready.
-4. Renders `trustee-operands` chart (parameterized with the cluster domain)
+5. Renders `trustee-operands` chart (parameterized with the cluster domain)
    and applies it.
-5. Creates the `kbsres1` secret (cosign public key) required by the KbsConfig
+6. Creates the `kbsres1` secret (cosign public key) required by the KbsConfig
    controller and patches it into the KbsConfig CR's `kbsSecretResources`.
-6. Waits for operand deployments to become available.
-7. Discovers the KBS service URL (route, LoadBalancer, or ClusterIP).
-8. Creates INITDATA (aa.toml, cdh.toml, policy.rego) with TLS certificate
+7. Waits for operand deployments to become available.
+8. Discovers the KBS service URL (route, LoadBalancer, or ClusterIP).
+9. Creates INITDATA (aa.toml, cdh.toml, policy.rego) with TLS certificate
    and image security policy. The `image_security_policy` is read from the
    `containers-policy` secret if available; otherwise defaults to rejecting
    all images except `ghcr.io/confidential-containers/test-container-image-rs`,
    which is allowed via `sigstoreSigned` verification (with `matchRepository`
    identity) or `insecureAcceptAnything` as a fallback. KBS URLs in
    `aa.toml` and `cdh.toml` use `https` for TLS-secured communication.
-9. Updates the `osc-config` ConfigMap in the `default` namespace.
-10. Verifies KBS connectivity with a kbs-client test pod (RCA protocol) by
+10. Updates the `osc-config` ConfigMap in the `default` namespace.
+11. Verifies KBS connectivity with a kbs-client test pod (RCA protocol) by
     retrieving `default/kbsres1/key1` via in-cluster HTTP and validating the
     returned value matches the configured secret.
-11. Saves KBS attestation logs to `${ARTIFACT_DIR}/kbs-attestation-logs.txt`.
+12. Saves KBS attestation logs to `${ARTIFACT_DIR}/kbs-attestation-logs.txt`.
 
 ## Outputs
 

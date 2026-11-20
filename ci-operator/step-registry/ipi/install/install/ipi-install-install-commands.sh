@@ -685,7 +685,11 @@ function get_yq() {
     echo "WARNING: Failed to remove stale yq download ${yq_download}" >&2
     return 1
   fi
-  if ! retry-ipi-install-command "yq download" curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 \
+  # SSL_CERT_FILE may be set to a platform-specific, narrowed CA bundle
+  # earlier in this script (vsphere sets it to a vCenter-only bundle), which
+  # breaks TLS verification of this public download. Use the system trust
+  # store for this call instead, same as the butane download above.
+  if ! retry-ipi-install-command "yq download" env -u SSL_CERT_FILE curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 \
     "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$(get_arch)" -o "${yq_download}"; then
     rm -f "${yq_download}" || echo "WARNING: Failed to clean up ${yq_download}" >&2
     return 1
@@ -702,6 +706,29 @@ function get_yq() {
   fi
 
   return 0
+}
+
+# strip_vsphere_failure_domains deletes vcenters/failureDomains from the
+# generated Infrastructure manifest, simulating a cluster installed without
+# vSphere failure domain information (SPLAT-3028). Per the openshift/api
+# VSpherePlatformSpec/VSpherePlatformStatus types, both fields only exist
+# under spec.platformSpec.vsphere; status carries neither, so nothing else
+# needs touching. Unlike the other optional yq-based tweaks below, failing to
+# apply this is fatal: the whole point of a job setting
+# STRIP_VSPHERE_FAILURE_DOMAINS is to produce a legacy-shaped cluster, so
+# silently continuing without it would validate the wrong state instead.
+function strip_vsphere_failure_domains() {
+  local dir=${1}
+
+  if ! get_yq; then
+    echo "ERROR: yq is unavailable; cannot strip vcenters/failureDomains from the Infrastructure manifest" >&2
+    exit 1
+  fi
+
+  local infra_manifest="${dir}/manifests/cluster-infrastructure-02-config.yml"
+  echo "$(date -u --rfc-3339=seconds) - stripping vcenters/failureDomains from the Infrastructure manifest"
+  /tmp/yq d -i "${infra_manifest}" "spec.platformSpec.vsphere.vcenters"
+  /tmp/yq d -i "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains"
 }
 
 # inject_boot_diagnostics is an azure specific function for enabling boot diagnostics on Azure workers.
@@ -1104,6 +1131,10 @@ spec:
   skippedImagestreams:
   - openliberty
 EOF
+    fi
+
+    if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
+      strip_vsphere_failure_domains "${dir}"
     fi
     ;;
 esac

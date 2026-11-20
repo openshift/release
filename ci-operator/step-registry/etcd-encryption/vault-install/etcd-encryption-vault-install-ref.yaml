@@ -58,6 +58,17 @@ ref:
     default: "/var/run/vault/tests-private-account/kms-vault-license"
     documentation: |-
       Path to the Vault Enterprise license file on the CI test pod filesystem.
+  - name: VAULT_HA_REPLICAS
+    default: "1"
+    documentation: |-
+      Number of replicas for the primary Vault StatefulSet. 1 (default) is the
+      single-replica standalone layout. Set to 2 or more to deploy the primary
+      as an HA cluster with integrated raft storage, so the Service backing the
+      apiserver etcd encryption survives the loss of any single node; upgrade
+      jobs that reboot nodes while the KMS backend must stay available set 3.
+      Only the primary instance in VAULT_NAMESPACE is scaled; the secondary
+      stays single-replica, and bare metal is always single-replica (no
+      per-ordinal local PV provisioning).
   documentation: |-
     Installs HashiCorp Vault Enterprise via Helm.
 
@@ -68,14 +79,14 @@ ref:
     - Creates vault-license secret from mounted credential (if available)
     - Mirrors Vault Enterprise and vault-kube-kms plugin images to the dev-scripts local registry on baremetalds jobs (skopeo copy --all with oc image mirror fallback, purge under the discovered dev-scripts registry repository root, per-image retry, and platform-specific pull verification for the host architecture)
     - Applies ImageContentSourcePolicy/vault-mirror so cluster nodes pull both images from the local mirror
-    - Installs Vault Enterprise using Helm chart in standalone mode with file storage
+    - Installs Vault Enterprise using Helm chart: standalone with file storage by default; when VAULT_HA_REPLICAS >= 2 the primary runs as an HA cluster with integrated raft storage (api_addr set to the Service ClusterIP so standby redirects stay routable for the host-network KMS plugin)
     - Provisions vault-local-storage (hostPath PV with pre-created node directory, SELinux context, recursive ownership for Vault uid 100:gid 1000) on baremetal when no StorageClass exists
     - Configures server.statefulSet.securityContext.pod (runAsUser/fsGroup 100/1000; required because vault-helm 0.28 skips pod securityContext when global.openshift is true and the enterprise license secret is mounted mode 0440)
     - Pre-creates hostPath directory ownership and SELinux context on the worker node via oc debug node (no root initContainer; conflicts with runAsNonRoot)
     - Requests an OpenShift service-CA serving certificate for the client Service, then restarts the Vault StatefulSet so TLS and WaitForFirstConsumer PVC binding proceed on cloud platforms
-    - Initializes and unseals Vault, storing the root token and unseal key in Secrets
+    - Initializes and unseals Vault, storing the root token and unseal key in Secrets; in HA mode (VAULT_HA_REPLICAS >= 2) replicas 1..N-1 are joined to the raft cluster initialized on vault-0
     - Deploys an auto-unseal sidecar so Vault comes back unsealed after pod restarts
-    - Waits for Vault pod to be ready
+    - Waits for Vault pods to be ready and (HA) verifies the raft peer count
     - Installs a second instance in VAULT_SECONDARY_NAMESPACE
 
     Prerequisites:
@@ -85,8 +96,8 @@ ref:
 
     Outputs:
     - Vault service available at: vault.${VAULT_NAMESPACE}.svc:8200
-    - Vault pod: vault-0 (Ready state)
-    - Persistent volume: data-vault-0 (file storage for transit keys)
+    - Vault pods: vault-0..vault-N (Ready state, raft HA) when VAULT_HA_REPLICAS >= 2; vault-0 (standalone) otherwise
+    - Persistent volumes: data-vault-0..N (raft storage incl. transit keys) when HA; data-vault-0 (file storage) otherwise
     - Secrets: vault-root-token, vault-unseal-key (namespace: ${VAULT_NAMESPACE})
     - CA ConfigMap: vault-ca-bundle (openshift-config namespace)
     - Second Vault service at: vault-secondary.${VAULT_SECONDARY_NAMESPACE}.svc:8200

@@ -31,6 +31,19 @@ The [sandboxed-containers-operator-env-cm](./env-cm/) step creates the osc-confi
 
 Currently not all parameters are enabled. In particular, only GA release type is supported, meaning it doesn't install development builds of OSC.
 
+### sandboxed-containers-operator-gather-must-gather
+
+The [gather-must-gather](./gather-must-gather/) step defaults to the Konflux
+`quay.io/redhat-user-workloads/ose-osc-tenant/osc-must-gather:latest` image.
+It resolves that specific `:latest` to the active version-epoch tag with the
+newest source commit timestamp and logs the selected image. Explicit image
+tags and digests are used unchanged. If no build tag can be resolved, the step
+fails rather than silently using an unrelated image.
+
+In the restricted-network workflow, the mirror step resolves and copies the
+same image before tests, then shares the mirror reference with must-gather.
+Local resolver tests: `make -C ci-operator/config/openshift/sandboxed-containers-operator test-must-gather`.
+
 ### sandboxed-containers-operator-install-trustee-operator
 
 The [sandboxed-containers-operator-install-trustee-operator](./install-trustee-operator/) step installs the Trustee operator for Confidential Containers (CoCo) workloads. This step is only needed for CoCo tests.
@@ -50,10 +63,15 @@ Controlled by environment variables in job configurations:
 - **`CATALOG_SOURCE_IMAGE`** - Custom FBC (File-Based Catalog) image
   - Default: `""` (empty, uses existing catalog specified by `CATALOG_SOURCE_NAME`)
   - For testing: `"quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest"`
+    (tracks the FBC main branch; per-release repos `osc-test-fbc-vN-M` track the
+    `release-N.M` branches, e.g. `osc-test-fbc-v1-14` while a release is under test)
 
 **Behavior:**
 - If `CATALOG_SOURCE_IMAGE` is empty: uses existing catalog specified by `CATALOG_SOURCE_NAME`
 - If `CATALOG_SOURCE_IMAGE` is set: creates a new CatalogSource with that image
+- If it is a quay.io image tagged `:latest`: the `install-osc-operator` step
+  resolves it at runtime to the newest `<X.Y.Z>-<unix_epoch>` build tag of that
+  repository, so the exact catalog tested is recorded and reproducible
 
 ### Trustee Catalog Source
 
@@ -110,6 +128,10 @@ Catalog images can be referenced using different tag strategies with distinct tr
 ```yaml
 CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
 ```
+
+Note: when the `install-osc-operator` step sees a quay.io image tagged `:latest`,
+it queries the Quay API and pins the job to the newest immutable
+`<X.Y.Z>-<unix_epoch>` tag of that repository instead of using the floating tag.
 
 **How it resolves:**
 1. At job execution time, container runtime queries Quay.io registry

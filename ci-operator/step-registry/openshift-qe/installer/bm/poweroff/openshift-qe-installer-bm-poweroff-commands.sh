@@ -4,6 +4,11 @@ set -o nounset
 set -o pipefail
 set -x
 
+if [[ "${BM_POWEROFF_ENABLED:-true}" == "false" ]]; then
+  echo "BM_POWEROFF_ENABLED is false, skipping poweroff step"
+  exit 0
+fi
+
 SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -oUserKnownHostsFile=/dev/null"
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/address)
 target_bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion)

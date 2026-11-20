@@ -810,6 +810,18 @@ if test -f "${SHARED_DIR}/manifest_cluster-network-03-config.yml"; then
   cp "${SHARED_DIR}/manifest_cluster-network-03-config.yml" manifests/cluster-network-03-config.yml
 fi
 
+# Simulate a cluster installed without vSphere failure domain information (e.g.
+# pre-4.13 or UPI installs that never populate it). vcenters/failureDomains are
+# only present under spec.platformSpec.vsphere (VSpherePlatformStatus carries
+# neither field), and the installer never backfills this on upgrade, so deleting
+# it here from the pre-bootstrap manifest reproduces that persistent state
+# without fighting any later immutability/admission checks on a live cluster.
+if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - stripping vcenters/failureDomains from the Infrastructure manifest"
+  yq-go d -i "manifests/cluster-infrastructure-02-config.yml" "spec.platformSpec.vsphere.vcenters"
+  yq-go d -i "manifests/cluster-infrastructure-02-config.yml" "spec.platformSpec.vsphere.failureDomains"
+fi
+
 ### Create Ignition configs
 echo "Creating Ignition configs..."
 ${INSTALLER_BINARY} --dir="${dir}" create ignition-configs &

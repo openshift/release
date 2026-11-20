@@ -51,13 +51,30 @@ tests:
       EC2_AMI: ami-0da467f007dfebd6b
       EC2_INSTANCE_TYPE: m6i.xlarge
       EC2_REGION: us-west-2
+      EGA_ENTRYPOINT: entrypoint_e2e.sh
       REGION: us-west-2
     post:
     - ref: aws-deprovision-stacks
     pre:
     - chain: openshift-image-based-infra-aws-ec2
     test:
-    - ref: openshift-evpn-gateway-appliance-e2e
+    - ref: openshift-evpn-gateway-appliance-test
+- as: molecule
+  skip_if_only_changed: ^plans/|\.md$|^LICENSE$|(^|/)OWNERS$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      EC2_AMI: ami-0da467f007dfebd6b
+      EC2_INSTANCE_TYPE: m6i.xlarge
+      EC2_REGION: us-west-2
+      EGA_ENTRYPOINT: entrypoint_molecule.sh
+      REGION: us-west-2
+    post:
+    - ref: aws-deprovision-stacks
+    pre:
+    - chain: openshift-image-based-infra-aws-ec2
+    test:
+    - ref: openshift-evpn-gateway-appliance-test
 zz_generated_metadata:
   branch: release-5.2
   org: openshift

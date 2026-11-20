@@ -183,7 +183,7 @@ CONFIG = {
         'eu-west-1': 10
     },
     'aws-pipelines-performance-quota-slice': {
-        'eu-west-1': 10
+        'eu-west-1': 20
     },
     'aws-rhdh-performance-quota-slice': {
         'eu-west-1': 10
@@ -709,7 +709,8 @@ CONFIG = {
         'us-west-2': 25,
     },
     'odf-ibmcloud-quota-slice': {
-        'us-east': 25,
+        'us-east': 12,
+        'us-south': 12,
     },
     'aws-ip-pools-us-east-1': {
         'default': 256,

@@ -1,0 +1,29 @@
+ref:
+  as: aws-verify-nested-virtualization
+  from: upi-installer
+  grace_period: 5m
+  commands: aws-verify-nested-virtualization-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Validates that AWS compute and control plane nodes have nested virtualization configured correctly.
+
+    This step queries AWS EC2 directly using the cluster infrastructure ID to retrieve instance
+    information, then verifies that all compute nodes have CpuOptions.NestedVirtualization set to
+    the value specified in install-config.yaml (compute[0].platform.aws.cpuOptions.nestedVirtualization).
+
+    Control plane nodes are also checked if controlPlane.platform.aws.cpuOptions.nestedVirtualization
+    is specified in install-config.yaml. If not specified, control plane validation is skipped.
+
+    Fails the test if:
+    - Cannot determine AWS region or cluster infrastructure ID
+    - AWS API calls fail
+    - Any compute node does not have nested virtualization set to the expected value
+    - Any control plane node does not match the expected value (when specified in install-config)
+    - Expected compute replicas > 0 but no compute nodes are found
+
+    Exits successfully if:
+    - All compute nodes match the expected nested virtualization setting
+    - Compute replicas = 0 and no compute nodes exist (valid configuration)
