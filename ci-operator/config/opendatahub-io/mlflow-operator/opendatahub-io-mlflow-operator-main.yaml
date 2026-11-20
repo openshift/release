@@ -78,10 +78,12 @@ tests:
 
         # Minimal tracking server: sqlite + local PVC, no separate artifact server.
         # The MLflow CR is cluster-scoped; operands land in the operator namespace.
-        # The sample leaves workers unset, and the operator then starts 8
-        # uvicorn workers. Those do not fit in the sample's 512Mi limit.
-        grep -q '^  replicas: 1$' config/samples/mlflow_v1_mlflow_minimal.yaml
-        sed -i '/^  replicas: 1$/a\  workers: 1' config/samples/mlflow_v1_mlflow_minimal.yaml
+        # The operator starts 8 uvicorn workers when workers is unset. Those do
+        # not fit the sample's 512Mi limit. Skip this once the sample sets workers.
+        if ! grep -q '^  workers:' config/samples/mlflow_v1_mlflow_minimal.yaml; then
+          grep -q '^  replicas: 1$' config/samples/mlflow_v1_mlflow_minimal.yaml
+          sed -i '/^  replicas: 1$/a\  workers: 1' config/samples/mlflow_v1_mlflow_minimal.yaml
+        fi
         oc apply -f config/samples/mlflow_v1_mlflow_minimal.yaml
         # The controller creates this Deployment at 0 replicas while the
         # database migration Job runs. Available is true at zero replicas, so
