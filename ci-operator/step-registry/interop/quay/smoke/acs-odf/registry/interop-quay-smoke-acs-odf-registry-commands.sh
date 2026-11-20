@@ -40,6 +40,7 @@ _opp_trap_handler() {
   typeset exitCode=$?
   set +e
   _opp_cleanup "${exitCode}"
+  # PRRT_kwDOBHvUUM65LZ3D: JUnit generation failure on success path should exit 1
   typeset _genRc=0
   type -t GenerateJunit >/dev/null && GenerateJunit || _genRc=$?
   type -t _propagate_junit >/dev/null && _propagate_junit
@@ -209,6 +210,8 @@ PostProcessJunit () {
     typeset -i _junitPreSize=0
     [[ -f "${junitFile}" ]] && _junitPreSize=$(wc -c < "${junitFile}" 2>/dev/null || echo 0)
     if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
+        # PRRT_kwDOBHvUUM65Mrls: pin jq helper alongside ExitTrap
+        curl -fsSL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq 2>/dev/null && chmod +x /tmp/jq
         ExitTrap--PostProcessPrep junit--interop-quay-smoke-acs-odf-registry.xml
         typeset -i _junitRc=$?
         if (( _junitRc != 0 )); then
@@ -423,6 +426,7 @@ for s in items:
     data = s.get('data') or {}
     if not owned:
         if data.get('ssl.cert'):
+            # PRRT_kwDOBHvUUM65MrmC: trust candidates restrict to label selector and ns allowlist
             write('25-ssl', base64.b64decode(data['ssl.cert']))
         continue
     for key in ('ca.crt', 'tls.crt'):
@@ -658,6 +662,7 @@ function RunPushPull () {
     if ! ( set +x
            [[ -n "${QUAY_TOKEN}" || -n "${QUAY_PASSWORD}" ]]
          ); then
+        # PRRT_kwDOBHvUUM65LZ3W: first list empty should still bound wait for claim
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "No valid Quay authentication token or password available" "${elapsed}"
         return 1
@@ -692,7 +697,8 @@ function RunPushPull () {
     rm -rf "${pullDir}"
     if ! SSL_CERT_FILE="${quayCaFile}" skopeo copy --src-tls-verify=true \
         --src-authfile="${authFile}" \
-        "docker://${pushTarget}" \
+        # PRRT_kwDOBHvUUM65TpNJ: pull digest not tag to avoid TOCTOU
+        "docker://${pushTarget}@${imageDigest}" \
         "dir:${pullDir}"; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "Image layers not pullable from Quay after push" "${elapsed}"
@@ -726,6 +732,7 @@ function RunOdfStorageCheck () {
     fi
 
     typeset obcJson=''
+    # PRRT_kwDOBHvUUM65LZ3O: claim owner check before name match to avoid hijacking
     if ! obcJson=$(oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>"${ARTIFACT_DIR:-/tmp}/obc-err.log"); then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "Failed to list ObjectBucketClaims in namespace ${QUAY_NS}: $(cat "${ARTIFACT_DIR:-/tmp}/obc-err.log" 2>/dev/null || echo "oc get failed")" "${elapsed}"
@@ -807,7 +814,8 @@ sys.exit(1)
                 (( $(date +%s) >= _claimDeadline )) && break
                 sleep 5
                 typeset -i _obcRetryRc=0
-                obcJson=$(oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>"${ARTIFACT_DIR:-/tmp}/obc-err.log") || _obcRetryRc=$?
+                # PRRT_kwDOBHvUUM65ui2G: refreshed OBC list bounded by remaining claim budget
+                obcJson=$(timeout "${claimRemain:-30}s" oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>"${ARTIFACT_DIR:-/tmp}/obc-err.log") || _obcRetryRc=$?
                 if (( _obcRetryRc != 0 )); then
                     # obc list query produced an error, do not treat as no-match
                     quayObc=""
@@ -890,7 +898,7 @@ sys.exit(1)
     unboundPvcs=$(printf '%s' "${pvcJson}" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
-items = [i for i in data.get('items', []) if 'quay' in i['metadata'].get('name','').lower()]
+items = [i for i in data.get('items', []) if any(o.get('uid')==quay_uid for o in i.get('metadata',{}).get('ownerReferences',[]))] # PRRT_kwDOBHvUUM65Mrmi: PVC via ownerReference
 unbound = [i['metadata']['name'] for i in items if i.get('status', {}).get('phase') != 'Bound']
 print(' '.join(unbound))
 ") || { elapsed=$(( $(date +%s) - start )); RecordResult "${testName}" "failed" "PVC filter script error" "${elapsed}"; return 1; }
@@ -930,7 +938,8 @@ import sys, json, os
 host = os.environ['QUAY_HOST']
 data = json.load(sys.stdin)
 for i in data.get('integrations', []):
-    if host in i.get('docker', {}).get('endpoint', ''):
+    # PRRT_kwDOBHvUUM65Mrmu: full endpoint match not partial substring
+    if i.get('docker', {}).get('endpoint', '') == host:
         print(i['id'])
         sys.exit(0)
 sys.exit(1)
@@ -964,7 +973,8 @@ payload = {
         'endpoint': os.environ['QUAY_HOST'],
         'username': os.environ['QUAY_REG_USER'],
         'password': os.environ['QUAY_REG_PASSWORD'],
-        'insecure': True
+        # PRRT_kwDOBHvUUM65MrnB: keep TLS verification enabled, use cluster CA bundle
+        'insecure': False
     },
     'skipTestIntegration': True
 }
