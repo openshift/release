@@ -5,7 +5,7 @@ set -o pipefail
 
 # Fetch packet basic configuration
 source "${SHARED_DIR}/packet-conf.sh"
-ssh "${SSHOPTS[@]}" "root@${IP}" "FRR_IMAGE='$FRR_IMAGE' ADVERTISE_DEFAULT_NETWORK='${ADVERTISE_DEFAULT_NETWORK:-true}'" bash -x - << 'EOFTOP'
+ssh "${SSHOPTS[@]}" "root@${IP}" "FRR_IMAGE='$FRR_IMAGE' ADVERTISE_DEFAULT_NETWORK='${ADVERTISE_DEFAULT_NETWORK:-true}' NO_OVERLAY_ROUTING='${NO_OVERLAY_ROUTING:-}'" bash -x - << 'EOFTOP'
 #!/bin/bash
 set -o nounset
 set -o errexit
@@ -238,6 +238,14 @@ if [ "$local_gateway_mode" = "true" ]; then
     fi
 fi
 
+# On a no-overlay cluster with managed routing, OVN-Kubernetes peers the nodes with each other
+# and owns the FRRConfiguration and RouteAdvertisements of the default network. There is no
+# external router to deploy, and the ones below would compete with what it creates.
+if [ "${NO_OVERLAY_ROUTING:-}" = "Managed" ]; then
+  echo "Managed routing: skipping the external FRR router and route advertisements setup"
+  exit 0
+fi
+
 # we will potentially deploy multiple networks, each on its own VRF
 declare -A vrf_neighbors
 
@@ -424,6 +432,14 @@ done
 
 # Host routes for the advertised default pod network via the external FRR container.
 if [ "$ADVERTISE_DEFAULT_NETWORK" = "true" ]; then
+  # A no-overlay cluster is installed peering with a route reflector running on this host, so
+  # that it has pod to pod connectivity while it installs. That reflector has just been replaced
+  # by the external FRR container above, but the per node pod routes its zebra left in the host
+  # kernel are still there and are more specific than the route added below.
+  echo "Cleaning up host kernel routes left behind by the install time route reflector, if any"
+  $IP route show proto bgp | awk '{print $1}' | xargs -r -I {} $IP route delete {} || true
+  $IP -6 route show proto bgp | awk '{print $1}' | xargs -r -I {} $IP -6 route delete {} || true
+
   CLUSTER_NETWORK_V4="10.128.0.0/14"
   $IP route add $CLUSTER_NETWORK_V4 via 192.168.111.3 dev ostestbm || true
   $IPTABLES -t filter -I FORWARD -s ${CLUSTER_NETWORK_V4} -i ostestbm -j ACCEPT
