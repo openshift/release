@@ -134,6 +134,8 @@ _propagate_junit () {
     cp "${junitFile}" "${SHARED_DIR}/" || true
 }
 
+# Install minimal JUnit trap before helper download: truncated download would exit via set -e before full EXIT trap, leaving no report
+trap '{( set +e; GenerateJunit; _propagate_junit; true )}' EXIT
 # Load ExitTrap library for JUnit XML post-processing at script level
 # (must be loaded before trap can fire to avoid secondary errors).
 eval "$(
@@ -142,6 +144,10 @@ eval "$(
     "${_fURL[@]}" \
         https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
 )"
+# Validate helper download completeness: truncated download exits via set -e but minimal trap already installed
+if ! type -t ExitTrap--PostProcessPrep 1>/dev/null; then
+    echo "WARNING: ExitTrap helper download incomplete; JUnit will be raw only" >&2
+fi
 
 # Post-process the JUnit XML for Component Readiness routing.  This runs from
 # the EXIT trap, which clears errexit first, so the helper is called
@@ -297,7 +303,7 @@ placementStart=$(date +%s)
 if oc wait "placement/placement-openshift-plus-clusters" -n policies \
     --for=create --timeout=300s 1>/dev/null; then
   if oc patch placement placement-openshift-plus-clusters -n policies --type json \
-    -p '[{"op":"test","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1/key","value":"local-cluster"},{"op":"remove","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1"}]'; then
+    -p '[{"op":"test","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1/key","value":"local-cluster"},{"op":"test","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1/operator","value":"NotIn"},{"op":"remove","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1"}]'; then
     RecordResult "local-cluster-placement-predicate-removed" "passed" "" "$(( $(date +%s) - placementStart ))"
   else
     printf '%s\n' "Warning: could not remove local-cluster NotIn predicate from placement (continuing with upstream default)" >&2
@@ -309,11 +315,15 @@ else
 fi
 
 # Wait for Quay registry to be ready (checks operator-deployed Quay)
-typeset -a quayNamespacesArr=(quay openshift-quay quay-enterprise local-quay)
+typeset -a quayNamespacesArr=(local-quay quay openshift-quay quay-enterprise)
 typeset quayFound=false
 typeset -i quayStart=0
 quayStart=$(date +%s)
+typeset -i quayDeadline=$(( quayStart + 600 ))
 typeset ns=''
+# Poll for QuayRegistry with bounded deadline: policy-install-quay depends on odf-status, so registry may appear after initial scan
+typeset _quayPollInterval=10
+while (( $(date +%s) < quayDeadline )) && [[ "${quayFound}" == "false" ]]; do
 for ns in "${quayNamespacesArr[@]}"; do
   # Branch on the query's exit status: an API or RBAC failure must not read
   # as "no QuayRegistry in this namespace".  Only the CRD-absent and
@@ -342,11 +352,17 @@ for ns in "${quayNamespacesArr[@]}"; do
       --timeout=10m; then
       RecordResult "quay-registry-available" "failed" "QuayRegistry in namespace ${ns} did not become Available within 10 minutes" "$(( $(date +%s) - quayStart ))"
       oc get quayregistry -n "${ns}" --ignore-not-found -o yaml || true
+      oc describe quayregistry -n "${ns}" || true
       exit 1
     fi
     RecordResult "quay-registry-available" "passed" "" "$(( $(date +%s) - quayStart ))"
     quayFound=true
     break
+  fi
+  done
+  # Poll interval if no registry found in this pass and deadline not yet reached
+  if [[ "${quayFound}" == "false" ]] && (( $(date +%s) < quayDeadline )); then
+    sleep "${_quayPollInterval}"
   fi
 done
 if [[ "${quayFound}" == "false" ]]; then
