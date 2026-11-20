@@ -131,21 +131,22 @@ setting. Model requests have fixed implementation limits of 512 KiB input and
 planning is unaffected. The selected effort is recorded in metrics, and the
 fixed response limit is unchanged.
 
-Both steps default to `granite-3.3-8b-instruct`. On 2026-11-11 the production
-client passed a live completion, native function call and function-result round
-trip against the corporate endpoint with that model. The earlier Granite 3.1
-default rejects a 4096-token response allowance because its entire context is
-4096 tokens. The credential is provisioned as
-`test-platform-infra/agent-validation-model/token`.
+Both steps default to `NVIDIA-Nemotron-3-Super-120B-A12B-BF16`.
+The corporate endpoint passed native tool calling, a unique tool-result round
+trip and schema-constrained output checks with the CI credential. The client
+uses standard `tool_choice=auto`: execution still requires native calls while
+checks remain, complete responses and observations for every result. A prose-only
+response cannot pass. Forced tool selection exhausted the output limit on this
+endpoint; automatic selection returned complete native calls within that limit.
 
-The release-repo AWS consumer selects `Qwen3.8-27B-FP8` for execution with
-`VALIDATION_EXECUTE_REASONING_EFFORT=low`, while preparation retains Granite.
-The corporate endpoint passed Qwen native-tool and function-result round-trip
-probes. A command-generation review at default effort exhausted 4096 output
-tokens before producing a call; low effort produced a complete archive retrieval
-command within the same limit. These protocol checks do not establish a cluster
-validation pass. Qwen's supported effort settings are documented in its
-[model card](https://huggingface.co/Qwen/Qwen3.8-27B).
+`VALIDATION_PREPARE_TEMPERATURE` and `VALIDATION_EXECUTE_TEMPERATURE` default to
+`1`; the corresponding `VALIDATION_PREPARE_TOP_P` and `VALIDATION_EXECUTE_TOP_P`
+default to `0.95`, following the selected model's
+[model card](https://huggingface.co/nvidia/NVIDIA-Nemotron-3-Super-120B-A12B-BF16).
+Each field can be empty to use provider defaults. Temperature accepts 0 through 2;
+top_p accepts values greater than 0 through 1. Metrics retain the selected fields,
+and logs identify the model and each request without printing reasoning traces.
+The credential is provisioned as `test-platform-infra/agent-validation-model/token`.
 
 The same credential group must contain `ca-bundle`, obtained from Red Hat's
 official corporate CA distribution. `VALIDATION_MODEL_CA_FILE` defaults to that

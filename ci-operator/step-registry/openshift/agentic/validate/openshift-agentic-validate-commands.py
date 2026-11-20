@@ -589,13 +589,31 @@ def redact_json(value, secrets):
     return value
 
 
-class Model:  # pylint: disable=too-few-public-methods
+def model_sampling(phase):
+    """Validate optional standard sampling fields without echoing invalid values."""
+    sampling = {}
+    for name, default in (("TEMPERATURE", "1"), ("TOP_P", "0.95")):
+        value = os.environ.get(f"VALIDATION_{phase.upper()}_{name}", default).strip()
+        if not value:
+            continue
+        try:
+            number = float(value)
+        except ValueError as error:
+            raise ValidationError(f"VALIDATION_{phase.upper()}_{name} must be a number") from error
+        if (name == "TEMPERATURE" and not 0 <= number <= 2) or (name == "TOP_P" and not 0 < number <= 1):
+            raise ValidationError(f"VALIDATION_{phase.upper()}_{name} is outside its supported range")
+        sampling[name.lower()] = number
+    return sampling
+
+
+class Model:  # pylint: disable=too-few-public-methods,too-many-instance-attributes
     """Bounded Chat Completions client; execution requires native tool support."""
 
     def __init__(self, phase):
         self.phase = phase
         self.url = required("VALIDATION_MODEL_URL")
         self.model = required(f"VALIDATION_{phase.upper()}_MODEL")
+        self.sampling = model_sampling(phase)
         self.reasoning_effort = os.environ.get(f"VALIDATION_{phase.upper()}_REASONING_EFFORT", "").strip()
         if self.reasoning_effort not in ("", "low", "medium", "high", "xhigh"):
             raise ValidationError(f"VALIDATION_{phase.upper()}_REASONING_EFFORT must be empty, low, medium, high or xhigh")
@@ -609,13 +627,13 @@ class Model:  # pylint: disable=too-few-public-methods
             "model": self.model,
             "messages": messages,
             "max_tokens": MODEL_OUTPUT_TOKENS,
-            "temperature": 0,
         }
+        payload.update(self.sampling)
         if self.reasoning_effort:
             payload["reasoning_effort"] = self.reasoning_effort
         if tools:
             payload["tools"] = tools
-            payload["tool_choice"] = "required"
+            payload["tool_choice"] = "auto"
             payload["parallel_tool_calls"] = False
         elif self.phase == "prepare":
             payload["response_format"] = response_format or PLAN_RESPONSE_FORMAT
@@ -632,6 +650,7 @@ class Model:  # pylint: disable=too-few-public-methods
 
     def complete(self, messages, tools=None, response_format=None):
         payload = self.request_payload(messages, tools, response_format)
+        print(f"Requesting {self.phase} model {self.model} (request {self.usage['requests'] + 1}).", flush=True)
         headers = {"Authorization": f"Bearer {self.token}"}
         response = request_json(self.url, headers, payload, ca_file=self.ca_file)
         self.record_usage(response)
@@ -960,6 +979,7 @@ def model_metrics(started, model):
         "seconds": time.monotonic() - started,
         "model": model.model if model else None,
         "reasoning_effort": (model.reasoning_effort or None) if model else None,
+        "sampling": model.sampling if model else {},
         "usage": model.usage if model else {},
     }
 
@@ -1277,6 +1297,8 @@ def report_markdown(report):
         lines += [f'Validation scope: {report["scope"]}', ""]
     if "diff_included" in report:
         lines += [f'Implementation diff included: {str(report["diff_included"]).lower()}', ""]
+    if report.get("metrics", {}).get("model"):
+        lines += [f'Model: {report["metrics"]["model"]}', ""]
     if report["runner_error"]:
         lines += [f'Runner error: {report["runner_error"]}', ""]
     for result in report["checks"]:
