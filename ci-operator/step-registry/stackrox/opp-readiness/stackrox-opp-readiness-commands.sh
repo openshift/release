@@ -344,17 +344,20 @@ function DiscoverScNs () {
 
 function PeriodicSecuredClusterDiagnostics () {
     echo "[readiness] --- SecuredCluster CRs so far (all namespaces) ---"
-    oc get securedclusters.platform.stackrox.io --all-namespaces 2>/dev/null || true
+    # PRRT_kwDOBHvUUM65Uiu_: sanitize discovery callbacks; PRRT_kwDOBHvUUM65on2S: bound by timeout
+    timeout 10 bash -c 'oc get securedclusters.platform.stackrox.io --all-namespaces -o json 2>/tmp/sc-periodic-err.log | head -c 1024' 2>/dev/null || echo "[readiness]   SecuredCluster periodic query failed or timed out" >&2
     echo "[readiness] --- OPP policy status (the policy set creates the SecuredCluster) ---"
-    oc get policies -n policies 2>/dev/null || true
+    timeout 10 oc get policies -n policies 2>/dev/null || echo "[readiness]   policy query failed or timed out" >&2
 }
 
 function SecuredClusterDiscoveryFailureDiagnostics () {
     echo "[readiness] === SecuredCluster discovery failure diagnostics ==="
     echo "[readiness] --- SecuredCluster CRs in any state, all namespaces ---"
+    # PRRT_kwDOBHvUUM65on2Z: capture real rc not negated status
     typeset -i _scListRc=0
-    if ! oc get securedclusters.platform.stackrox.io --all-namespaces -o json > /tmp/sc-list.json 2> /tmp/sc-list-err.log; then
-        _scListRc=$?
+    oc get securedclusters.platform.stackrox.io --all-namespaces -o json > /tmp/sc-list.json 2> /tmp/sc-list-err.log
+    _scListRc=$?
+    if (( _scListRc != 0 )); then
         echo "[readiness]   SecuredCluster query failed rc=${_scListRc}" >&2
     else
         if [[ ! -s /tmp/sc-list.json ]]; then
