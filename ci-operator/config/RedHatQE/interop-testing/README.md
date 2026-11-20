@@ -47,7 +47,7 @@ Refer to [`gs-baremetal-localnet-test`](../../../step-registry/gs-baremetal/loca
 
 ACM+Virt jobs exercise Advanced Cluster Management with OpenShift Virtualization. Cross-cluster live migration (CCLM) covers spoke-to-spoke and hub-to-spoke migration. The product-to-product and upgrade jobs install a spoke, ODF, and CNV, then upgrade and run ACM tests.
 
-Step layout and ref names are in the [ACM CCLM step README](../../../step-registry/interop/acm/policy-set/acm-virt-bundle/README.md).
+Step layout and ref names are in the [ACM CCLM step README](../../../step-registry/interop/acm/acm-virt-bundle/README.md).
 
 ## Process
 
@@ -67,19 +67,19 @@ Following cluster provisioning, the following steps are executed in order:
 
 CCLM spoke-to-spoke (`cr--2spoke-mig--aws`) runs these steps after the hub is installed:
 
-1. [`interop-acm-policy-set-acm-virt-bundle-mtv-integration`](../../../step-registry/interop/acm/policy-set/acm-virt-bundle/mtv/integration/interop-acm-policy-set-acm-virt-bundle-mtv-integration-ref.yaml) — hand MTV to ACM
-2. [`interop-acm-policy-set-acm-virt-bundle-spoke-cluster-install`](../../../step-registry/interop/acm/policy-set/acm-virt-bundle/spoke/cluster-install/README.md) — provision spokes
-3. [`interop-acm-policy-set-acm-virt-bundle-cnv-addon-install`](../../../step-registry/interop/acm/policy-set/acm-virt-bundle/cnv/addon-install/interop-acm-policy-set-acm-virt-bundle-cnv-addon-install-ref.yaml) — CNV on spokes
-4. [`interop-acm-policy-set-acm-virt-bundle-odf-spoke-install`](../../../step-registry/interop/acm/policy-set/acm-virt-bundle/odf/spoke-install/interop-acm-policy-set-acm-virt-bundle-odf-spoke-install-ref.yaml) — ODF on spokes
-5. [`interop-acm-policy-set-acm-virt-bundle-submariner-install`](../../../step-registry/interop/acm/policy-set/acm-virt-bundle/submariner/install/interop-acm-policy-set-acm-virt-bundle-submariner-install-chain.yaml) — Submariner
-6. [`interop-acm-policy-set-acm-virt-bundle-cnv-exchange-ca`](../../../step-registry/interop/acm/policy-set/acm-virt-bundle/cnv/exchange-ca/interop-acm-policy-set-acm-virt-bundle-cnv-exchange-ca-ref.yaml) — KubeVirt CA exchange
-7. [`interop-acm-policy-set-acm-virt-bundle-mtv-wait-providers`](../../../step-registry/interop/acm/policy-set/acm-virt-bundle/mtv/wait-providers/interop-acm-policy-set-acm-virt-bundle-mtv-wait-providers-ref.yaml) — ACM MTV providers
-8. [`interop-acm-policy-set-acm-virt-bundle-mtv-cclm-migration-maps`](../../../step-registry/interop/acm/policy-set/acm-virt-bundle/mtv/cclm/migration-maps/interop-acm-policy-set-acm-virt-bundle-mtv-cclm-migration-maps-ref.yaml) and [`interop-acm-policy-set-acm-virt-bundle-mtv-cclm-return-maps`](../../../step-registry/interop/acm/policy-set/acm-virt-bundle/mtv/cclm/return-maps/interop-acm-policy-set-acm-virt-bundle-mtv-cclm-return-maps-ref.yaml)
-9. [`interop-acm-policy-set-acm-virt-bundle-mtv-cclm-bidir`](../../../step-registry/interop/acm/policy-set/acm-virt-bundle/mtv/cclm/bidir/interop-acm-policy-set-acm-virt-bundle-mtv-cclm-bidir-chain.yaml) — bidirectional live migration
+1. [`p2p-acm-mtv-integration`](../../../step-registry/p2p/acm-mtv-integration/p2p-acm-mtv-integration-ref.yaml) — hand MTV to ACM
+2. [`acm-interop-p2p-cluster-install`](../../../step-registry/acm/interop-p2p/cluster-install/README.md) — provision spokes
+3. [`p2p-acm-cnv-addon-install`](../../../step-registry/p2p/acm-cnv-addon-install/p2p-acm-cnv-addon-install-ref.yaml) — CNV on spokes
+4. [`p2p-install-odf-spokes`](../../../step-registry/p2p/install-odf-spokes/p2p-install-odf-spokes-ref.yaml) — ODF on spokes
+5. [`acm-interop-p2p-submariner-install`](../../../step-registry/acm/interop-p2p/submariner-install/acm-interop-p2p-submariner-install-chain.yaml) — Submariner
+6. [`p2p-cnv-exchange-kubevirt-ca`](../../../step-registry/p2p/cnv-exchange-kubevirt-ca/p2p-cnv-exchange-kubevirt-ca-ref.yaml) — KubeVirt CA exchange
+7. [`p2p-mtv-wait-acm-providers`](../../../step-registry/p2p/mtv-wait-acm-providers/p2p-mtv-wait-acm-providers-ref.yaml) — ACM MTV providers
+8. [`p2p-mtv-create-migration-maps`](../../../step-registry/p2p/mtv-create-migration-maps/p2p-mtv-create-migration-maps-ref.yaml) and [`p2p-mtv-create-return-migration-maps`](../../../step-registry/p2p/mtv-create-return-migration-maps/p2p-mtv-create-return-migration-maps-ref.yaml)
+9. [`p2p-cclm-bidir-migration-test`](../../../step-registry/p2p/cclm-bidir-migration-test/p2p-cclm-bidir-migration-test-chain.yaml) — bidirectional live migration. The execute and verify steps in that chain are the JUnit steps under [`acm-virt-bundle`](../../../step-registry/interop/acm/acm-virt-bundle/README.md).
 
-Hub-spoke CCLM (`cr--hub-spoke-mig--aws`) uses the [`interop-acm-policy-set-acm-virt-bundle-mtv-cclm-hub-spoke`](../../../step-registry/interop/acm/policy-set/acm-virt-bundle/mtv/cclm/hub-spoke/interop-acm-policy-set-acm-virt-bundle-mtv-cclm-hub-spoke-workflow.yaml) workflow. Post steps call [`interop-acm-policy-set-acm-virt-bundle-spoke-cluster-uninstall`](../../../step-registry/interop/acm/policy-set/acm-virt-bundle/spoke/cluster-uninstall/README.md).
+Hub-spoke CCLM (`cr--hub-spoke-mig--aws`) uses the [`p2p-cclm-hub-spoke`](../../../step-registry/p2p/cclm-hub-spoke/p2p-cclm-hub-spoke-workflow.yaml) workflow. Its migration chain calls the hub-spoke JUnit steps in the same bundle. Post steps call [`acm-interop-p2p-cluster-uninstall`](../../../step-registry/acm/interop-p2p/cluster-uninstall/README.md).
 
-The p2p and EUS jobs use `interop-acm-policy-set-acm-virt-bundle-odf-hub-install`, spoke install, ODF spoke install, `interop-acm-policy-set-acm-virt-bundle-cnv-install-policy`, and spoke uninstall. Spoke OCP upgrade is `interop-acm-product-upgrade-spoke-prehealthcheck`, `interop-acm-product-upgrade-spoke-upgrade`, then `interop-acm-product-upgrade-spoke-healthcheck`, followed by the ACM test steps.
+The p2p and EUS jobs use `p2p-install-odf-hub`, spoke install, ODF spoke install, `p2p-acm-cnv-install-policy`, and spoke uninstall. Spoke OCP upgrade is `acm-interop-p2p-spoke-upgrade-prehealthcheck`, `acm-interop-p2p-spoke-upgrade`, then `acm-interop-p2p-spoke-upgrade-healthcheck`, followed by the ACM test steps.
 
 ## Prerequisites
 
@@ -118,7 +118,7 @@ For detailed documentation on individual steps and configuration options, see th
 
 - **OCP 4.22 CCLM**: `RedHatQE-interop-testing-master__ocp-4.22-lpMainline-lp-interop--acm-virt--cclm.yaml`
     - `cr--2spoke-mig--aws` — spoke-to-spoke bidirectional CCLM
-    - `cr--hub-spoke-mig--aws` — hub-spoke CCLM via `interop-acm-policy-set-acm-virt-bundle-mtv-cclm-hub-spoke`
+    - `cr--hub-spoke-mig--aws` — hub-spoke CCLM via `p2p-cclm-hub-spoke`
 - **OCP 4.22 p2p**: `RedHatQE-interop-testing-master__ocp-4.22-lpMainline-lp-interop--acm-virt--p2p.yaml`
 - **OCP 4.22 EUS upgrade from 4.20**: `RedHatQE-interop-testing-master__ocp-4.22-lpMainline-lp-interop--acm-virt--eus-upgrade-from-4.20.yaml`
 - **OCP 5.0 p2p**: `RedHatQE-interop-testing-master__ocp-5.0-lpMainline-lp-interop--acm-virt--p2p.yaml`

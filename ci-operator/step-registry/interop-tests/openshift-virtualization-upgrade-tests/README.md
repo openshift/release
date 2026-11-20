@@ -4,13 +4,13 @@ CNV **upgrade-only** tests on the ACM **spoke** cluster. Follows
 [INSTALL_AND_UPGRADE.md](https://github.com/RedHatQE/openshift-virtualization-tests/blob/main/docs/INSTALL_AND_UPGRADE.md)
 (`--upgrade cnv`).
 
-Spoke **OCP** upgrade is **not** performed here — use `interop-acm-product-upgrade-spoke-upgrade` before this step.
+Spoke **OCP** upgrade is **not** performed here — use `acm-interop-p2p-spoke-upgrade` before this step.
 
 ## Default upgrade path
 
 | From | To | Catalog |
 |------|-----|---------|
-| CNV 4.20 (installed by interop-acm-policy-set-acm-virt-bundle-cnv-install-policy on stable) | CNV 4.21.0 GA | `CNV_SOURCE=production`, `CNV_CHANNEL=stable` |
+| CNV 4.20 (installed by p2p-acm-cnv-install-policy on stable) | CNV 4.21.0 GA | `CNV_SOURCE=production`, `CNV_CHANNEL=stable` |
 
 All pytest invocations pass `--ignore=tests/network/` (interop clusters are not multi-NIC).
 When the installed (source) CNV is below 4.22, pytest also passes `--ignore=tests/infrastructure/vm_template/`.
@@ -27,7 +27,7 @@ One `pytest --upgrade cnv` run with pre/post upgrade validation (full upgrade su
 ```yaml
 test:
 - ref: acm-interop-p2p-cluster-upgrade      # hub OCP
-- ref: interop-acm-product-upgrade-spoke-upgrade        # spoke OCP via ACM ManifestWork
+- ref: acm-interop-p2p-spoke-upgrade        # spoke OCP via ACM ManifestWork
 - ref: interop-tests-openshift-virtualization-upgrade-tests  # CNV 4.20 -> 4.21 GA
 env:
   CNV_TARGET_VERSION: "4.21.0"
