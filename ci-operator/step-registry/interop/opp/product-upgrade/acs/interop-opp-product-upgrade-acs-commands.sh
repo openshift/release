@@ -551,9 +551,6 @@ function Main () {
             echo >&2 "ERROR: ${_junit_reason}"
             exit 3
         fi
-        # PRRT_kwDOBHvUUM65RJoY: re-read generation/uid before patch to avoid race
-        _sub_gen_before="$(oc get subscription rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.generation}' 2>/dev/null || echo 0)"
-        _sub_uid_before="$(oc get subscription rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.uid}' 2>/dev/null || echo unknown)"
         # PRRT_kwDOBHvUUM65RJoY: re-read subscription generation before patch to avoid stale baseline
         typeset _sub_gen_before="" _sub_uid_before=""
         _sub_gen_before="$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.generation}' 2>/dev/null || echo "")"
@@ -568,6 +565,15 @@ function Main () {
             _junit_reason="acs-upgrade rejected: no forward path (target channel ${targetChannel} head ${targetHeadVersion} equals installed ${currentVersion})"
             echo >&2 "ERROR: ${_junit_reason}"
             exit 3
+        fi
+
+        # Guard patch against concurrent Subscription change
+        typeset _sub_gen_now="" _sub_uid_now=""
+        _sub_gen_now="$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.generation}' 2>/dev/null || echo "")"
+        _sub_uid_now="$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.uid}' 2>/dev/null || echo "")"
+        if [[ "${_sub_gen_now}" != "${_sub_gen_before}" || "${_sub_uid_now}" != "${_sub_uid_before}" ]]; then
+            echo "ERROR: Subscription changed during upgrade check (generation ${_sub_gen_before}->${_sub_gen_now}, uid ${_sub_uid_before}->${_sub_uid_now}); aborting patch" >&2
+            exit 1
         fi
 
         oc patch subscription "${ACS_SUBSCRIPTION_NAME}" \
