@@ -31,6 +31,11 @@ releases:
       include_built_images: true
       name: "5.0"
       namespace: ocp
+  latest-421:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.21"
 resources:
   '*':
     limits:
@@ -80,6 +85,28 @@ tests:
       TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_SUITE: openshift/conformance/parallel/minimal
     workflow: hypershift-aws-e2e-backuprestore
+- as: e2e-aks-standalone-velero
+  capabilities:
+  - arm64
+  cron: 29 3 * * 2
+  steps:
+    cluster_profile: hypershift-aks
+    dependency_overrides:
+      OADP_HYPERSHIFT_PLUGIN_IMAGE: pipeline:hypershift-oadp-plugin-oadp-1.5
+    workflow: hypershift-azure-aks-standalone-velero
+- as: e2e-aro-oadp-backuprestore
+  capabilities:
+  - arm64
+  cron: 53 4 * * 2
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest-421
+    dependency_overrides:
+      OADP_HYPERSHIFT_PLUGIN_IMAGE: pipeline:hypershift-oadp-plugin-oadp-1.5
+    env:
+      ARO_CLUSTER_VERSION: "4.21"
+    workflow: hypershift-azure-aro-oadp-backuprestore
 zz_generated_metadata:
   branch: oadp-1.5
   org: openshift

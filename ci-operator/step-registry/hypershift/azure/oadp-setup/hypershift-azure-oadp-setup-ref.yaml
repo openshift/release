@@ -1,0 +1,35 @@
+ref:
+  as: hypershift-azure-oadp-setup
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  commands: hypershift-azure-oadp-setup-commands.sh
+  credentials:
+  - mount_path: /etc/ci-pull-credentials
+    bundle: ci-pull-credentials
+    namespace: test-credentials
+  env:
+  - name: KUBECONFIG
+    default: ${SHARED_DIR}/management_cluster_kubeconfig
+    documentation: Management cluster kubeconfig. ARO jobs override this with the ARO kubeconfig.
+  - name: HYPERSHIFT_AZURE_LOCATION
+    default: eastus
+    documentation: Azure region of the management cluster and backup storage account.
+  - name: OADP_HYPERSHIFT_PLUGIN_IMAGE
+    default: quay.io/konveyor/hypershift-oadp-plugin:latest
+    documentation: HyperShift plugin image to add to the DataProtectionApplication.
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+  timeout: 30m
+  grace_period: 5m
+  documentation: |-
+    Sets up Azure-specific OADP prerequisites for HyperShift backup/restore
+    tests on an OpenShift (ARO) management cluster where the OADP operator is
+    already subscribed: creates an Azure Blob storage account and container,
+    the cloud credentials secret, a DataProtectionApplication with the
+    Azure, CSI and HyperShift plugins, and a BackupStorageLocation named after
+    the hosted cluster. Volumes are snapshotted through CSI. The workflow
+    deletes the resource group after use.
