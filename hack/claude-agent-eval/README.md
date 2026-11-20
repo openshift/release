@@ -227,6 +227,7 @@ ARTIFACT_DIR/
   evals-summary.html
   evals-summary.json
   runner/harness-install.log
+  claude-sessions.tar               # when Claude sessions exist
   evals/<artifact_name>/
     config-resolution.log
     report-summary.html
@@ -279,9 +280,11 @@ runs are not archived.
 Files for stages that never ran are absent; the index only links existing files.
 JUnit contains one testcase per attempted eval, not per dataset case.
 
-This workflow does not provide session continuation or archive the global
-Claude session directory. Eval reports, execution logs, and harness run
-artifacts remain available for diagnosis.
+After all evals, the runner archives the Claude projects directory
+(`$CLAUDE_CONFIG_DIR/projects`, else `~/.claude/projects`) to
+`claude-sessions.tar` at the job root, best effort, and the
+`openshift-claude-post` step then writes `continue-session-summary.html`
+so a session can be resumed locally with `/ci:continue-session <prow-url>`.
 
 Setup/process failures, incomplete results, and failed deterministic harness
 regression checks fail the eval; subsequent evals still run. Any failure
