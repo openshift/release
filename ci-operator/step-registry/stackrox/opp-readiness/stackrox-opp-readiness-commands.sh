@@ -352,9 +352,17 @@ function PeriodicSecuredClusterDiagnostics () {
 function SecuredClusterDiscoveryFailureDiagnostics () {
     echo "[readiness] === SecuredCluster discovery failure diagnostics ==="
     echo "[readiness] --- SecuredCluster CRs in any state, all namespaces ---"
-    oc get securedclusters.platform.stackrox.io --all-namespaces || \
-        # PRRT_kwDOBHvUUM65on2Z: distinguish rc !=0 (failed list) from empty
-        if (( _scListRc !=0 )); then echo "[readiness]   SecuredCluster query failed rc=${_scListRc}" >&2; else echo "[readiness]   No SecuredCluster CRs found at all"; fi
+    typeset -i _scListRc=0
+    if ! oc get securedclusters.platform.stackrox.io --all-namespaces -o json > /tmp/sc-list.json 2> /tmp/sc-list-err.log; then
+        _scListRc=$?
+        echo "[readiness]   SecuredCluster query failed rc=${_scListRc}" >&2
+    else
+        if [[ ! -s /tmp/sc-list.json ]]; then
+            echo "[readiness]   No SecuredCluster CRs found at all"
+        else
+            cat /tmp/sc-list.json
+        fi
+    fi
     echo "[readiness] --- OPP policy status (the policy set creates the SecuredCluster) ---"
     oc get policies -n policies || true
     echo "[readiness] --- Sensor pods in ${centralNs} ---"
