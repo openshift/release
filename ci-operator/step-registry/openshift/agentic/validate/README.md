@@ -92,8 +92,12 @@ planner's own source code or prompt examples as product validation actions.
 2. `prepare_cluster` flattens the target kubeconfig and verifies that a ready
    container runs the tested payload component digest. Execution receives those
    verified namespace, Pod and container identities as discovery context.
-3. `Execution.run_command` runs a bounded command in the sandbox and records its
-   sanitized output. Command text is retained before execution; command timeouts
+3. `Execution.run_command` first checks generated shell with `bash -n` inside the
+   sandbox. Syntax errors are retained in `command-rejections.json` and returned
+   for repair; they are not product observations or pass/fail evidence. A check
+   with rejected shell needs a new observation before recording a product result.
+   Valid commands run with a bound and publish sanitized output.
+   Command text is retained before execution; command timeouts
    preserve partial output and an unable-to-verify result. The execution prompt
    states the 90-second command deadline and requires shorter individual waits.
    `Execution.record_result` accepts one immutable outcome per

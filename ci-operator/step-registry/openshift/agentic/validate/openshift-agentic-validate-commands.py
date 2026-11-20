@@ -154,6 +154,11 @@ run_command to collect observations, then read its response before recording a
 result. Evidence paths must be the evidence/*.txt paths returned by run_command;
 files created inside /work are not report evidence. Issue one function call per
 turn. Do not call record_result before observing the command output.
+Malformed shell is rejected before execution and is not product evidence.
+Repair the reported syntax and retry run_command; do not record a result for it.
+Use the supervisor's verified_deployment entries for known namespace, Pod,
+container and image identities. Prefer simple oc commands with JSON output over
+deeply nested JSONPath quoting; inspect only fields needed for the check.
 Discover the component's actual namespaces, Pods, containers and configuration
 locations before testing. Never guess that a configuration ConfigMap exists.
 A NotFound response for a guessed resource is a discovery failure, not evidence
@@ -420,6 +425,18 @@ class Sandbox:
                 process.kill()
                 process.wait(timeout=10)
                 raise
+
+    def syntax_error(self, text):
+        """Parse generated shell inside the sandbox without executing it."""
+        result = subprocess.run(
+            ["podman", "exec", self.name, "bash", "-n", "-c", text],
+            capture_output=True, text=True, timeout=10, check=False,
+        )
+        if result.returncode == 2:
+            return result.stderr or result.stdout or "invalid shell syntax"
+        if result.returncode:
+            raise SandboxError(f"sandbox syntax check failed (status {result.returncode})")
+        return ""
 
     def stop(self):
         with contextlib.suppress(OSError, subprocess.SubprocessError, SandboxError):
@@ -1047,7 +1064,7 @@ TOOLS = [
 ]
 
 
-class Execution:
+class Execution:  # pylint: disable=too-many-instance-attributes
     """Owns evidence and result checkpoints outside the agent sandbox."""
 
     def __init__(self, plan, artifacts, sandbox, secrets):
@@ -1058,6 +1075,8 @@ class Execution:
         self.results = {}
         self.evidence = {}
         self.command_number = 0
+        self.command_rejections = []
+        self.rejected_checks = set()
 
     def invoke(self, name, args):
         """Allow tools only for a planned check without a recorded result."""
@@ -1081,6 +1100,17 @@ class Execution:
         text = args["command"]
         if not isinstance(text, str) or not text.strip() or len(text) > 16384:
             raise ValidationError("invalid command arguments")
+        syntax_error = self.sandbox.syntax_error(text)
+        if syntax_error:
+            self.rejected_checks.add(args["check_id"])
+            details = redact(syntax_error, self.secrets)[-4000:]
+            self.command_rejections.append({
+                "check_id": args["check_id"], "command": redact(text, self.secrets),
+                "error": "invalid shell syntax", "details": details,
+            })
+            write_json(self.artifacts / "command-rejections.json", self.command_rejections)
+            return {"error": "invalid shell syntax; repair the command and retry run_command",
+                    "details": details, "product_observation": False}
         self.command_number += 1
         check_id = args["check_id"]
         path = f"evidence/{self.command_number:04d}-{check_id}.txt"
@@ -1099,6 +1129,7 @@ class Execution:
                                 "observed": reason, "evidence": [path]})
             raise
         output = redact(output, self.secrets)
+        self.rejected_checks.discard(check_id)
         evidence = redact(f"$ {text}\n\n{output}\n\nExit status: {status}\n", self.secrets)
         atomic_write(self.artifacts / path, evidence)
         self.evidence[path] = check_id
@@ -1130,6 +1161,8 @@ class Execution:
         self.validate_evidence(check_id, evidence)
         if outcome in ("pass", "fail") and not evidence:
             raise ValidationError("pass/fail requires command evidence")
+        if outcome in ("pass", "fail") and check_id in self.rejected_checks:
+            raise ValidationError("repair rejected shell before recording a product result")
         self.results[check_id] = {
             "check_id": check_id,
             "outcome": outcome,
@@ -1160,7 +1193,8 @@ class Execution:
         command_tool = copy.deepcopy(TOOLS[0])
         command_tool["function"]["parameters"]["properties"]["check_id"]["enum"] = remaining
         tools = [command_tool]
-        observed = [check_id for check_id in remaining if check_id in self.evidence.values()]
+        observed = [check_id for check_id in remaining
+                    if check_id in self.evidence.values() and check_id not in self.rejected_checks]
         if observed:
             result_tool = copy.deepcopy(TOOLS[1])
             result_tool["function"]["parameters"]["properties"]["check_id"]["enum"] = observed
