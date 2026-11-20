@@ -30,8 +30,6 @@ shopt -s inherit_errexit
 #     the TERM lands late enough that the child self-terminates)
 #   self-terminating path: settle 90 + max wait 5400 + collection <= 120
 #     + health gate <= 60  =>  <= 5670s
-# PRRT_kwDOBHvUUM65Uiuf: diagnostics reserve from deadline vs pollDeadline (reserve diagnostics time from actual deadline)
-typeset -i _diag_reserve_actual=$(( $(date +%s) + 120 )); if (( _diag_reserve_actual > 5940 )); then _diag_reserve_actual=5940; fi # reserve from actual deadline
 #   both added: <= 5940s, leaving >= 360s headroom (>= the 300s grace)
 #   step-timeout path: only 300s remain between SIGTERM and SIGKILL, so the
 #     failure-path collector is watchdog-bounded (timeout 120) and the xtrace
@@ -279,8 +277,8 @@ function IsMcpProgressing () {
         # evidence pinned.
         if (( degradedHistory[i] )); then
             # PRRT_kwDOBHvUUM65TpM1: reset clean-poll streak on JSON parse failure
-        _cleanPollStreak=0
-        continue
+            consecutivePasses=0
+            continue
         fi
         if (( updatedHistory[i] != machineCountHistory[i] )); then
             break
@@ -309,7 +307,11 @@ function IsMcpProgressing () {
     if (( last > first )); then
         for (( i = windowStart + 1; i < len; ++i )); do
             (( updatedHistory[i] < updatedHistory[i-1] )) && return 1
-        # PRRT_kwDOBHvUUM65Mrk3: verify ready counts recover after updated dip
+            # PRRT_kwDOBHvUUM65Mrk3: verify ready counts recover after updated dip
+            if (( updatedHistory[i] < updatedHistory[i-1] )); then
+                (( readyHistory[i] < readyHistory[i-1] )) && return 1
+                (( readyHistory[i] < machineCountHistory[i] )) && return 1
+            fi
         done
         (( _vetoStreakHit )) && return 1
         return 0
@@ -698,6 +700,11 @@ REDACTEOF
     ' || true
     if [[ -n "${_redact}" ]]; then rm -f "${_redact}"; fi
     # PRRT_kwDOBHvUUM65on13: report which of 5 evidence queries failed with tokenized error
+    for _q in machines machinesets policies kubeletconfigs mcps nodes; do
+        if [[ ! -s "${ARTIFACT_DIR}/${_q}.yaml" && ! -s "${ARTIFACT_DIR}/${_q}.json" ]]; then
+            echo ">>> evidence query ${_q} produced no output (check ${ARTIFACT_DIR}/${_q}.* for tokenized error)" >&2
+        fi
+    done
     echo ">>> failure bundle collected to ${ARTIFACT_DIR} (machines, machinesets, policies [secret-redacted], kubeletconfigs, mcps, nodes)"
     set -x 2>/dev/null || true
     return 0
@@ -933,7 +940,7 @@ PY
     # genPrint is the sorted per-pool name=gen fingerprint: a replaced pool
     # changes it even when a numeric sum would not (preflight review).
     # PRRT_kwDOBHvUUM65yNGt: eligibility change should reset streak
-    if [[ -n "${_lastGenPrint}" && -n "${genPrint}" && "${genPrint}" != "${_lastGenPrint}" ]]; then _cleanPollStreak=0; fi
+    if [[ -n "${_lastGenPrint}" && -n "${genPrint}" && "${genPrint}" != "${_lastGenPrint}" ]]; then consecutivePasses=0; fi
     if [[ -n "${_lastGenPrint}" && -n "${genPrint}" && "${genPrint}" != "${_lastGenPrint}" ]]; then
         (( ++_renderChurnCount )) || true
         echo "Render churn detected (generations ${_lastGenPrint} -> ${genPrint}, churn #${_renderChurnCount}); resetting trend window"
