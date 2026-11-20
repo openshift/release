@@ -6,10 +6,22 @@ ref:
 
     Prerequisites:
     - A working kubeconfig and .env in ${SHARED_DIR}
+    - The deployment's SSH_KEY is an absolute path to a worker public key readable on the hypervisor
     - dpf-hypervisor-sanity-existing is recommended to run before to verify cluster health
 
-    Required Vault secrets:
+    Required cluster profile secrets:
     - remote-host: IP address of the hypervisor bastion host
+    - private-key: Base64-encoded SSH private key for the hypervisor
+    - aicli-offlinetoken: Offline token for an account with access to the Assisted Installer cluster
+    - openshift-pull-secret: Docker auth JSON, raw or base64-encoded, for Assisted Installer worker provisioning
+
+    Configure SSH at runtime for libvirt and the VM management helpers.
+    Host-key verification is deferred for live validation.
+
+    Configure remote libvirt in the E2E container and verify access with a
+    read-only virsh list command, limited to 120 seconds, before running tests.
+    Load the worker public key into the E2E container for Assisted Installer.
+    Worker provisioning and cleanup use the management kubeconfig in ${SHARED_DIR}.
 
     Timeout budget: 7 hours; complete full-suite runtime is not yet established.
   env:
