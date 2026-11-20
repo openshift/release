@@ -1,0 +1,31 @@
+ref:
+  as: openshift-qe-cudn-density-midterm-b-setup
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  cli: latest
+  env:
+  - name: EXTERNAL_INSTANCE_TYPE
+    default: "m5.4xlarge"
+    documentation: Instance type for external target host (must support 25+ secondary IPs)
+  - name: MAX_TARGETS
+    default: "25"
+    documentation: Number of external ipvlan target IPs to create
+  - name: AWS_REGION
+    default: "us-east-2"
+    documentation: AWS region matching cluster deployment
+  commands: openshift-qe-cudn-density-midterm-b-setup-commands.sh
+  timeout: 30m
+  credentials:
+  - collection: ocp-perfscale-cpt
+    group: ocp-qe-perfscale-es-creds
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    Pre-step for Scenario B: creates external EC2 instance in same VPC/subnet/SG
+    as cluster workers, assigns secondary IPs, configures ipvlan targets via AWS SSM.
+    Saves instance ID, external IP, and target IP range to SHARED_DIR.
