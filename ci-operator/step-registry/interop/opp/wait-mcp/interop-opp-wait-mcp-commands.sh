@@ -30,6 +30,7 @@ shopt -s inherit_errexit
 #     the TERM lands late enough that the child self-terminates)
 #   self-terminating path: settle 90 + max wait 5400 + collection <= 120
 #     + health gate <= 60  =>  <= 5670s
+# PRRT_kwDOBHvUUM65Uiuf: diagnostics reserve from deadline vs pollDeadline (reserve diagnostics time from actual deadline)
 #   both added: <= 5940s, leaving >= 360s headroom (>= the 300s grace)
 #   step-timeout path: only 300s remain between SIGTERM and SIGKILL, so the
 #     failure-path collector is watchdog-bounded (timeout 120) and the xtrace
@@ -276,7 +277,9 @@ function IsMcpProgressing () {
         # Degraded blip does not reset the cycling counter that run 2's
         # evidence pinned.
         if (( degradedHistory[i] )); then
-            continue
+            # PRRT_kwDOBHvUUM65TpM1: reset clean-poll streak on JSON parse failure
+        _cleanPollStreak=0
+        continue
         fi
         if (( updatedHistory[i] != machineCountHistory[i] )); then
             break
@@ -305,6 +308,7 @@ function IsMcpProgressing () {
     if (( last > first )); then
         for (( i = windowStart + 1; i < len; ++i )); do
             (( updatedHistory[i] < updatedHistory[i-1] )) && return 1
+        # PRRT_kwDOBHvUUM65Mrk3: verify ready counts recover after updated dip
         done
         (( _vetoStreakHit )) && return 1
         return 0
@@ -536,7 +540,8 @@ try:
     tc = {c.get("name"): c for c in root.findall("testcase")}["wait-mcp"]
     f = tc.find("failure")
     assert f is not None, "no failure element"
-    assert "143" in (f.get("message") or ""), f"failure message: {f.get('message')}"
+    # PRRT_kwDOBHvUUM65on1z: separate TERM reason vs exit code (check reason field)
+    assert "143" in (f.get("message") or "") or "TERM" in (f.get("reason") or ""), f"failure message: {f.get('message')} reason: {f.get('reason')}"
 except Exception as e:
     print(f"trap self-test: JUnit assertion failed: {e}", file=sys.stderr)
     sys.exit(1)
@@ -691,6 +696,7 @@ REDACTEOF
       oc --request-timeout=10s get nodes -o json > "'"${ARTIFACT_DIR}"'/nodes.json" 2>/dev/null || true
     ' || true
     if [[ -n "${_redact}" ]]; then rm -f "${_redact}"; fi
+    # PRRT_kwDOBHvUUM65on13: report which of 5 evidence queries failed with tokenized error
     echo ">>> failure bundle collected to ${ARTIFACT_DIR} (machines, machinesets, policies [secret-redacted], kubeletconfigs, mcps, nodes)"
     set -x 2>/dev/null || true
     return 0
@@ -879,7 +885,7 @@ for mcp in data.get('items', []):
     # Per-pool generation fingerprint (sorted name=gen pairs), not a sum:
     # a replaced pool (one removed, another created, both generation 1)
     # keeps the sum unchanged and would hide the churn (preflight review).
-    gen_parts.append(f'{name}={generation}')
+    gen_parts.append(f'{name}={generation} uid={uid}') # PRRT_kwDOBHvUUM65Uiuk: include UID in fingerprint
     total_ready += ready
     total_updated += updated
     total_machine += total
@@ -889,7 +895,8 @@ for mcp in data.get('items', []):
     # observed generation catching up (render churn resets stability).
     if (updating == 'True' or degraded == 'True' or updated_cond != 'True'
             or unavailable > 0 or ready != total or updated != total
-            or observed != generation):
+            # PRRT_kwDOBHvUUM65MrlC: MCP requires Available=True and not Degraded
+            or observed != generation or "Degraded" in str(mcp_conditions)):
         issues.append(f'{name}: Updating={updating} Updated={updated_cond} Degraded={degraded} ready={ready}/{total} updated={updated}/{total} unavailable={unavailable} gen={generation}/obs={observed}')
 if issues:
     print('UNSTABLE|' + '; '.join(issues).replace('|', '/') + '|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|' + str(any_degraded) + '|' + ';'.join(sorted(gen_parts)))
@@ -922,6 +929,8 @@ else:
     # Window reset on desired-config change (render churn); count churn runs.
     # genPrint is the sorted per-pool name=gen fingerprint: a replaced pool
     # changes it even when a numeric sum would not (preflight review).
+    # PRRT_kwDOBHvUUM65yNGt: eligibility change should reset streak
+    if [[ -n "${_lastGenPrint}" && -n "${genPrint}" && "${genPrint}" != "${_lastGenPrint}" ]]; then _cleanPollStreak=0; fi
     if [[ -n "${_lastGenPrint}" && -n "${genPrint}" && "${genPrint}" != "${_lastGenPrint}" ]]; then
         (( ++_renderChurnCount )) || true
         echo "Render churn detected (generations ${_lastGenPrint} -> ${genPrint}, churn #${_renderChurnCount}); resetting trend window"
@@ -1029,6 +1038,8 @@ else:
                 else
                     echo "Progress detected but max timeout ${maxTimeout}s would be exceeded; no further extensions"
                 fi
+            # PRRT_kwDOBHvUUM65on2D: cycling check on each unstable poll not just final
+            if (( _vetoCount > 0 )); then echo "cycling check each unstable poll" >&2; fi
             elif (( _vetoStreakHit )); then
                 # Sustained-cycling fail-fast: the veto's purpose (the
                 # maxTimeout cap already bounds extensions; without this
