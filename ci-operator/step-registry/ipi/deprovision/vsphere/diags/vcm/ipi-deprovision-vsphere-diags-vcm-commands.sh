@@ -186,12 +186,17 @@ function collect_diagnostic_data {
 
 
   while [[ $v_idx -lt $VCENTER_COUNT ]]; do
+    # Disable tracing due to credential extraction from platform.json
+    [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+    set +x
     VCENTER=$(jq -c -r '.vcenters['${v_idx}']' "$SHARED_DIR"/platform.json)
     GOVC_URL=$(echo $VCENTER | jq -r '.server')
     # shellcheck disable=SC2034
     GOVC_USERNAME=$(echo $VCENTER | jq -r '.user')
     # shellcheck disable=SC2034
     GOVC_PASSWORD=$(echo $VCENTER | jq -r '.password')
+    # Restore previous tracing state
+    $WAS_TRACING && set -x
 
     echo "Processing vcenter $GOVC_URL"
 
