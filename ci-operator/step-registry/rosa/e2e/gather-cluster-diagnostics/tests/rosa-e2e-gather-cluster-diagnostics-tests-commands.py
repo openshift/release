@@ -2,6 +2,7 @@
 """Offline execution of the delivered collector, with no network or credentials."""
 
 import datetime
+import importlib.util
 import io
 import json
 import os
@@ -16,12 +17,12 @@ import time
 import unittest
 from unittest.mock import Mock, patch
 
-import test_rosa_ocm_fvt_artifacts as producer
-
-
-ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / ("ci-operator/step-registry/rosa/e2e/gather-cluster-diagnostics/"
-                 "rosa-e2e-gather-cluster-diagnostics-commands.sh")
+sys.dont_write_bytecode = True
+PRODUCER_PATH = Path(__file__).resolve().parents[2] / "ocm-fvt/tests/rosa-e2e-ocm-fvt-tests-commands.py"
+SPEC = importlib.util.spec_from_file_location("rosa_artifact_tests", PRODUCER_PATH)
+PRODUCER = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(PRODUCER)
+SCRIPT = Path(__file__).resolve().parents[1] / "rosa-e2e-gather-cluster-diagnostics-commands.sh"
 CLUSTER = "a" * 32
 SECRET = "FIXTURE_SECRET_MUST_NOT_APPEAR"
 CONTAINER_OUTPUT = "/ocm-backend-tests/output"
@@ -183,7 +184,7 @@ def mock_podman(base, case, arguments):
     if arguments[0] == "pull":
         return 0
     if arguments[0] == "inspect":
-        print("fixture@" + producer.DIGEST)
+        print("fixture@" + PRODUCER.DIGEST)
         return 0
     if arguments[0] != "run":
         raise AssertionError("Unexpected podman operation")
@@ -195,7 +196,7 @@ def mock_podman(base, case, arguments):
     profile.mkdir(mode=0o755)
     (profile / "report.xml").write_text("<testsuites/>\n", encoding="utf-8")
     # An unreadable secret-bearing report keeps the leak assertions meaningful.
-    (profile / "pre-cluster-creation_123456.json").write_text(producer.SECRET, encoding="utf-8")
+    (profile / "pre-cluster-creation_123456.json").write_text(PRODUCER.SECRET, encoding="utf-8")
     (profile / "pre-cluster-creation_123456.json").chmod(0)
     (profile / "cluster.ini").write_text("[Cluster]\nName=fixture-run-name\nID=" + CLUSTER +
                                          "\nState=pending\n[OtherResource]\nID=not-a-cluster\n",
@@ -244,9 +245,9 @@ class CollectorTests(unittest.TestCase):
             fixture_system_tools(base / "bin")
             for command in ("curl", "ocm", "ocm-backplane", "oc", "tar"):
                 executable = base / "bin" / command
-                executable.write_text(f'#!{sys.executable}\nimport sys\nsys.path.insert(0, {str(ROOT / "hack")!r})\n'
-                                      f'import test_rosa_gather_diagnostics as fixtures\n'
-                                      f'sys.exit(fixtures.mock({command!r}, sys.argv[1:]))\n')
+                executable.write_text(f'#!{sys.executable}\nimport runpy, sys\n'
+                                      f'sys.argv = [{str(Path(__file__).resolve())!r}, "--mock", {command!r}, *sys.argv[1:]]\n'
+                                      f'runpy.run_path({str(Path(__file__).resolve())!r}, run_name="__main__")\n')
                 executable.chmod(0o700)
             fixture_shared_ids(base, ids, case)
             if manifest:
@@ -527,7 +528,7 @@ class CollectorTests(unittest.TestCase):
                 self.assertEqual(outcome["reason"], reason)
 
 
-class ProducerHandoffTests(producer.ArtifactFixture):
+class ProducerHandoffTests(PRODUCER.ArtifactFixture):
     def run_handoff(self, recordings, setup=""):
         snippet = self.script.read_text(encoding="utf-8").split(
             'python3 - "${ocm_fvt_output}" "${SHARED_DIR}" "${ocm_fvt_started}" <<\'PY\' 2>/dev/null || true\n',
@@ -680,6 +681,11 @@ os.scandir = lambda unused: LimitedScan()
                 artifacts, calls = CollectorTests().run_fixture(manifest={**manifest, **change})
                 self.assertEqual(artifacts["collection-outcome.json"]["reason"], "invalid_run_window")
                 self.assertNotIn("ocm get ", calls)
+
+
+def load_tests(loader, tests, _pattern):
+    tests.addTests(loader.loadTestsFromModule(PRODUCER))
+    return tests
 
 
 if __name__ == "__main__":

@@ -5,9 +5,27 @@ not adjacent repository files. The Python collector is embedded in the Bash step
 Run offline regression tests from the repository root:
 
 ```sh
-make test-rosa-gather-diagnostics
-python3 -m unittest discover -s hack -p 'test_rosa_ocm_fvt_artifacts.py' -v
+python3 ci-operator/step-registry/rosa/e2e/gather-cluster-diagnostics/tests/rosa-e2e-gather-cluster-diagnostics-tests-commands.py -v
 shellcheck -e SC1091 ci-operator/step-registry/rosa/e2e/gather-cluster-diagnostics/*commands.sh
+```
+
+Component tests stay alongside their source. The artifact suite imports the
+existing upstream assertions from `hack/test_rosa_ocm_fvt_artifacts.py` rather
+than duplicating them. Its local adapter delivers the prepared helper and
+maps the nested-container mock's historical output path to the actual private
+bind mount only while the mock populates it; the producer sees its original
+private path when the mock returns. Failure injection and cleanup follow that
+same private output. No shared test targets or upstream fixtures are changed.
+The entry point runs all 54 collector, handoff and upstream artifact cases.
+Test script names follow the registry's component-prefixed `-commands.py`
+convention without adding step references. Tests disable bytecode writes so
+imports do not leave files the registry loader would reject.
+
+Lint these component tests explicitly; the repository's `hack`-only pylint
+discovery does not include them:
+
+```sh
+pylint --rcfile=hack/.pylintrc --persistent=n ci-operator/step-registry/rosa/e2e/{gather-cluster-diagnostics,ocm-fvt}/tests/*commands.py
 ```
 
 ## Identity and ordering

@@ -177,10 +177,6 @@ new-repo:
 test-tls-scanner:
 	python3 hack/test_tls_scanner.py
 
-.PHONY: test-rosa-gather-diagnostics
-test-rosa-gather-diagnostics:
-	python3 -m unittest discover -s hack -p 'test_rosa_gather_diagnostics.py' -v
-
 # Use the same local config and registry validation as make jobs.
 validate-step-registry: ci-operator-checkconfig
 
