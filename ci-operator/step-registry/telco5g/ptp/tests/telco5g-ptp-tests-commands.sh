@@ -602,7 +602,7 @@ build_operator_script() {
   cat <<'OPERATOR'
 export IMG=PTP_IMAGE
 echo "Cloning ptp-operator branch OPERATOR_VERSION"
-git clone --single-branch --branch OPERATOR_VERSION PTP_REPO_URL
+git clone --single-branch --branch OPERATOR_VERSION PTP_REPO_URL ptp-operator
 cd ptp-operator
 sed -i "s/\(CGO_ENABLED=\${CGO_ENABLED}\) \(GOOS=\${GOOS}\)/\1 CC=\"gcc -fuse-ld=gold\" \2/" hack/build.sh
 if [[ "$T5CI_VERSION" =~ 4.1[2-8]+ || "${USE_UPSTREAM:-false}" == "true" ]]; then
@@ -626,7 +626,7 @@ if [[ "${USE_UPSTREAM:-false}" == "false" ]]; then
   exit 0
 fi
 echo "Running on branch ${DAEMON_BRANCH:-main} of linuxptp-daemon"
-git clone --single-branch --branch "${DAEMON_BRANCH:-main}" DAEMON_REPO_URL
+git clone --single-branch --branch "${DAEMON_BRANCH:-main}" DAEMON_REPO_URL linuxptp-daemon
 cd linuxptp-daemon
 IMAGE_TAG_BASE="${DAEMON_IMG%:*}" VERSION="${DAEMON_IMG##*:}" make image
 podman push "${DAEMON_IMG}" --tls-verify=false
@@ -643,13 +643,13 @@ if [[ "${USE_UPSTREAM:-false}" == "false" ]]; then
 fi
 if [[ "${USE_CEPV2:-false}" == "true" ]]; then
   echo "Building cloud-event-proxy (CEPv2) from linuxptp-daemon/Dockerfile.cep on branch ${DAEMON_BRANCH:-main}"
-  git clone --single-branch --branch "${DAEMON_BRANCH:-main}" DAEMON_REPO_URL
+  git clone --single-branch --branch "${DAEMON_BRANCH:-main}" DAEMON_REPO_URL linuxptp-daemon
   cd linuxptp-daemon
   podman build -t "${SIDECAR_IMG}" -f Dockerfile.cep .
   podman push "${SIDECAR_IMG}" --tls-verify=false
 else
   echo "Running on branch ${CEP_BRANCH:-main} of cloud-event-proxy"
-  git clone --single-branch --branch "${CEP_BRANCH:-main}" CEP_REPO_URL
+  git clone --single-branch --branch "${CEP_BRANCH:-main}" CEP_REPO_URL cloud-event-proxy
   cd cloud-event-proxy
   IMG=${SIDECAR_IMG} make podman-build
   podman push "${SIDECAR_IMG}" --tls-verify=false
