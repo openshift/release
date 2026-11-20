@@ -94,13 +94,44 @@ if [[ -z "${expirationDate:-}" ]]; then
     echo "WARNING: failed to compute expirationDate, skipping VPC tagging" >&2
 elif [[ ! -f "${AWS_SHARED_CREDENTIALS_FILE:-}" ]]; then
     echo "WARNING: AWS credentials not found at ${AWS_SHARED_CREDENTIALS_FILE}, skipping VPC tagging" >&2
-elif ! command -v aws >/dev/null 2>&1; then
-    echo "WARNING: aws CLI not found, skipping VPC tagging" >&2
-elif ! command -v oc >/dev/null 2>&1; then
-    echo "WARNING: oc not found, skipping ClusterDeployment discovery" >&2
-elif ! command -v jq >/dev/null 2>&1; then
-    echo "WARNING: jq not found, skipping ClusterDeployment discovery" >&2
 else
+    # Bootstrap aws CLI if missing — clc-ui-e2e image lacks it (round-2 finding: every rehearsal
+    # logged "WARNING: aws CLI not found, skipping VPC tagging"). Precedent: INTEROP-9517
+    # (fcc1c63a77786:ci-operator/step-registry/interop/aws-cspi-qe-cleanup/interop-aws-cspi-qe-cleanup-commands.sh)
+    # bootstrapped AWS CLI v2 in a golang image via curl+unzip to /tmp:
+    #   curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+    #   cd /tmp && unzip -q awscliv2.zip && ./aws/install --bin-dir /tmp/aws-bin --install-dir /tmp/aws-cli
+    #   export PATH="/tmp/aws-bin:${PATH}"; aws --version
+    # Layered, guarded, fail-soft: try v2 bundle if curl+unzip exist, else pip3, else loud-skip.
+    if ! command -v aws >/dev/null 2>&1; then
+        if command -v curl >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1; then
+            echo "aws CLI not found, bootstrapping AWS CLI v2 bundle (INTEROP-9517 precedent)..." >&2
+            if curl -sSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip 2>&1; then
+                if cd /tmp && unzip -q awscliv2.zip 2>&1 && ./aws/install --bin-dir /tmp/aws-bin --install-dir /tmp/aws-cli 2>/dev/null; then
+                    export PATH="/tmp/aws-bin:${PATH}"
+                    aws --version 2>&1 || true
+                else
+                    echo "WARNING: AWS CLI v2 bundle install failed" >&2 || true
+                fi
+                cd - >/dev/null 2>&1 || true
+            else
+                echo "WARNING: failed to download AWS CLI v2 bundle" >&2 || true
+            fi
+        fi
+        if ! command -v aws >/dev/null 2>&1 && command -v pip3 >/dev/null 2>&1; then
+            echo "aws CLI still not found, trying pip3 install..." >&2
+            pip3 install --user awscli 2>&1 || true
+            export PATH="${HOME}/.local/bin:${PATH}"
+            aws --version 2>&1 || true
+        fi
+    fi
+    if ! command -v aws >/dev/null 2>&1; then
+        echo "WARNING: aws CLI not found (bootstrap failed), skipping VPC tagging" >&2
+    elif ! command -v oc >/dev/null 2>&1; then
+        echo "WARNING: oc not found, skipping ClusterDeployment discovery" >&2
+    elif ! command -v jq >/dev/null 2>&1; then
+        echo "WARNING: jq not found, skipping ClusterDeployment discovery" >&2
+    else
     echo "Tagging VPCs with expirationDate=${expirationDate} (TTL 8h, --iso=minutes --utc)" 
     typeset clusterNames=""
     # Prefer live ClusterDeployments from the hub (has hub kubeconfig via SHARED_DIR).
@@ -148,6 +179,7 @@ else
             done
         done
         echo "VPC tagging complete: ${taggedCount} VPC(s) tagged with expirationDate=${expirationDate}" 
+    fi
     fi
 fi
 set -e
