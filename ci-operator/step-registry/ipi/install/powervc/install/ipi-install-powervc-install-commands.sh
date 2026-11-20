@@ -1415,8 +1415,12 @@ fi
 date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
-# Dump resources information
-dump_resources
+# Dump resources information (watch-create and GrabConsole) only on failure
+if [[ ${ret} -ne 0 ]]; then
+	dump_resources
+else
+	log_info "Cluster created successfully, skipping dump_resources"
+fi
 
 # Extract installation statistics
 log_info "Extracting installation statistics..."
