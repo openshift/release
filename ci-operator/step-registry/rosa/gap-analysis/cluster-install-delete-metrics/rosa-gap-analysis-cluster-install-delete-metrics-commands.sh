@@ -18,6 +18,15 @@ success(){
     echo -e "\033[1;32m$(date "+%d-%m-%YT%H:%M:%S") SUCCESS: " "${*}\033[0m" >&2
 }
 
+# Keep raw JSON payloads out of the published artifacts. Callers must check
+# this function's status before using the JSON as health evidence.
+get_resource_json(){
+  local resource="$1" dest="$2"
+  oc get "${resource}" -o json --request-timeout=60s > "${dest}" 2>/dev/null || return 1
+  jq -e 'has("items") and (.items | type == "array") and all(.items[]; type == "object")' \
+    "${dest}" >/dev/null 2>&1
+}
+
 # Configure cloud credentials. OSD GCP does not use AWS.
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ "${CLUSTER_TOPOLOGY:-}" == "osd-gcp" ]]; then
@@ -65,6 +74,10 @@ fi
 
 DIAG_DIR="${ARTIFACT_DIR}/diagnostics"
 mkdir -p "${DIAG_DIR}"
+
+# JSON payloads are temporary working data, never artifacts.
+VALIDATION_SCRATCH="$(mktemp -d)"
+trap 'rm -rf -- "${VALIDATION_SCRATCH}"' EXIT
 
 # Initialize validation report
 INSTALL_REPORT="${DIAG_DIR}/gap-analysis-cluster-install-report.txt"
@@ -122,19 +135,30 @@ echo "1. ClusterOperators Status" >> "${INSTALL_REPORT}"
 echo "--------------------------" >> "${INSTALL_REPORT}"
 
 CO_OUTPUT="${DIAG_DIR}/clusteroperators.txt"
-oc get co -o wide > "${CO_OUTPUT}" 2>&1 || {
+CO_JSON="${VALIDATION_SCRATCH}/clusteroperators.json"
+CO_WIDE_OK=0
+CO_JSON_OK=0
+if oc get co -o wide > "${CO_OUTPUT}" 2>/dev/null; then
+  CO_WIDE_OK=1
+  cat "${CO_OUTPUT}" >> "${INSTALL_REPORT}"
+  echo "" >> "${INSTALL_REPORT}"
+else
+  echo "(ClusterOperator listing unavailable)" > "${CO_OUTPUT}"
   error "Failed to get ClusterOperators"
   echo "Status: FAILED (unable to retrieve ClusterOperators)" >> "${INSTALL_REPORT}"
   VALIDATION_FAILED=1
-}
+fi
 
-if [[ -f "${CO_OUTPUT}" ]]; then
-  cat "${CO_OUTPUT}" >> "${INSTALL_REPORT}"
-  echo "" >> "${INSTALL_REPORT}"
-
+if ! get_resource_json co "${CO_JSON}"; then
+  error "Failed to query ClusterOperators as JSON; operator health is unverified"
+  echo "Status: FAILED (ClusterOperator JSON query failed or returned malformed data)" >> "${INSTALL_REPORT}"
+  VALIDATION_FAILED=1
+else
+  CO_JSON_OK=1
   # Check for degraded or unavailable operators
-  DEGRADED_CO=$(oc get co -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Degraded" and .status=="True")) | .metadata.name' 2>/dev/null || true)
-  UNAVAILABLE_CO=$(oc get co -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Available" and .status=="False")) | .metadata.name' 2>/dev/null || true)
+  CO_COUNT=$(jq -r '.items | length' "${CO_JSON}")
+  DEGRADED_CO=$(jq -r '.items[]? | select(any(.status.conditions[]?; .type=="Degraded" and .status=="True")) | .metadata.name' "${CO_JSON}")
+  UNAVAILABLE_CO=$(jq -r '.items[]? | select(any(.status.conditions[]?; .type=="Available" and .status=="False")) | .metadata.name' "${CO_JSON}")
 
   if [[ -n "${DEGRADED_CO}" ]]; then
     error "Degraded ClusterOperators found: ${DEGRADED_CO}"
@@ -148,7 +172,11 @@ if [[ -f "${CO_OUTPUT}" ]]; then
     VALIDATION_FAILED=1
   fi
 
-  if [[ -z "${DEGRADED_CO}" && -z "${UNAVAILABLE_CO}" ]]; then
+  if [[ "${CO_COUNT}" -eq 0 ]]; then
+    error "ClusterOperator query returned no operators; operator health is unverified"
+    echo "Status: FAILED (no ClusterOperators returned)" >> "${INSTALL_REPORT}"
+    VALIDATION_FAILED=1
+  elif [[ -z "${DEGRADED_CO}" && -z "${UNAVAILABLE_CO}" && "${CO_WIDE_OK}" -eq 1 ]]; then
     success "All ClusterOperators are healthy"
     echo "All operators: HEALTHY" >> "${INSTALL_REPORT}"
   fi
@@ -163,31 +191,44 @@ echo "2. Nodes Status" >> "${INSTALL_REPORT}"
 echo "---------------" >> "${INSTALL_REPORT}"
 
 NODES_OUTPUT="${DIAG_DIR}/nodes.txt"
-oc get nodes -o wide > "${NODES_OUTPUT}" 2>&1 || {
+NODES_JSON="${VALIDATION_SCRATCH}/nodes.json"
+NODES_WIDE_OK=0
+NODES_JSON_OK=0
+if oc get nodes -o wide > "${NODES_OUTPUT}" 2>/dev/null; then
+  NODES_WIDE_OK=1
+  cat "${NODES_OUTPUT}" >> "${INSTALL_REPORT}"
+  echo "" >> "${INSTALL_REPORT}"
+else
+  echo "(node listing unavailable)" > "${NODES_OUTPUT}"
   error "Failed to get nodes"
   echo "Status: FAILED (unable to retrieve nodes)" >> "${INSTALL_REPORT}"
   VALIDATION_FAILED=1
-}
+fi
 
-if [[ -f "${NODES_OUTPUT}" ]]; then
-  cat "${NODES_OUTPUT}" >> "${INSTALL_REPORT}"
-  echo "" >> "${INSTALL_REPORT}"
-
+if ! get_resource_json nodes "${NODES_JSON}"; then
+  error "Failed to query nodes as JSON; node health is unverified"
+  echo "Status: FAILED (node JSON query failed or returned malformed data)" >> "${INSTALL_REPORT}"
+  VALIDATION_FAILED=1
+else
+  NODES_JSON_OK=1
   # Check for NotReady nodes
-  NOTREADY_NODES=$(oc get nodes -o json | jq -r '.items[] | select(.status.conditions[] | select(.type=="Ready" and .status!="True")) | .metadata.name' 2>/dev/null || true)
+  NODE_COUNT=$(jq -r '.items | length' "${NODES_JSON}")
+  NOTREADY_NODES=$(jq -r '.items[]? | select(any(.status.conditions[]?; .type=="Ready" and .status!="True")) | .metadata.name' "${NODES_JSON}")
 
-  if [[ -n "${NOTREADY_NODES}" ]]; then
+  if [[ "${NODE_COUNT}" -eq 0 ]]; then
+    error "Node query returned no nodes; node health is unverified"
+    echo "Status: FAILED (no nodes returned)" >> "${INSTALL_REPORT}"
+    VALIDATION_FAILED=1
+  elif [[ -n "${NOTREADY_NODES}" ]]; then
     error "NotReady nodes found: ${NOTREADY_NODES}"
     echo "NotReady Nodes: ${NOTREADY_NODES}" >> "${INSTALL_REPORT}"
     VALIDATION_FAILED=1
-  else
+  elif [[ "${NODES_WIDE_OK}" -eq 1 ]]; then
     success "All nodes are Ready"
     echo "All nodes: READY" >> "${INSTALL_REPORT}"
   fi
 
   # Count nodes
-  NODE_COUNT="$(oc get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ' || true)"
-  NODE_COUNT="${NODE_COUNT:-0}"
   echo "Total nodes: ${NODE_COUNT}" >> "${INSTALL_REPORT}"
 fi
 
@@ -313,6 +354,37 @@ write_install_snapshot() {
   local overall_status="$3"
   mkdir -p "${snapshot_dir}"
 
+  local snapshot_co_json snapshot_nodes_json
+  local node_count degraded_raw unavailable_raw notready_raw
+  if [[ "${overall_status}" == "INFO" ]]; then
+    snapshot_co_json="${VALIDATION_SCRATCH}/${cluster_role}-clusteroperators.json"
+    snapshot_nodes_json="${VALIDATION_SCRATCH}/${cluster_role}-nodes.json"
+    if ! get_resource_json co "${snapshot_co_json}"; then
+      echo '{"items":[]}' > "${snapshot_co_json}"
+    fi
+    if ! get_resource_json nodes "${snapshot_nodes_json}"; then
+      echo '{"items":[]}' > "${snapshot_nodes_json}"
+    fi
+
+    node_count="$(oc get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ' || true)"
+    [[ "${node_count}" =~ ^[0-9]+$ ]] || node_count=0
+    degraded_raw="$(jq -r '.items[] | select(.status.conditions[]? | select(.type=="Degraded" and .status=="True")) | .metadata.name' "${snapshot_co_json}" 2>/dev/null || true)"
+    unavailable_raw="$(jq -r '.items[] | select(.status.conditions[]? | select(.type=="Available" and .status=="False")) | .metadata.name' "${snapshot_co_json}" 2>/dev/null || true)"
+    notready_raw="$(jq -r '.items[] | select(.status.conditions[]? | select(.type=="Ready" and .status!="True")) | .metadata.name' "${snapshot_nodes_json}" 2>/dev/null || true)"
+  else
+    if [[ "${CO_JSON_OK:-0}" -ne 1 || "${NODES_JSON_OK:-0}" -ne 1 ]]; then
+      error "Cannot write ${cluster_role} snapshot without validated ClusterOperator and node JSON"
+      VALIDATION_FAILED=1
+      return 1
+    fi
+    snapshot_co_json="${CO_JSON}"
+    snapshot_nodes_json="${NODES_JSON}"
+    node_count="${NODE_COUNT}"
+    degraded_raw="${DEGRADED_CO:-}"
+    unavailable_raw="${UNAVAILABLE_CO:-}"
+    notready_raw="${NOTREADY_NODES:-}"
+  fi
+
   local cluster_version=""
   cluster_version="$(oc get clusterversion version -o jsonpath='{.status.desired.version}' --request-timeout=30s 2>/dev/null || true)"
   local mgmt_name="" mgmt_id=""
@@ -322,10 +394,6 @@ write_install_snapshot() {
   if [[ -f "${SHARED_DIR}/mc-cluster-id" ]]; then
     mgmt_id="$(cat "${SHARED_DIR}/mc-cluster-id")"
   fi
-
-  local node_count
-  node_count="$(oc get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ' || true)"
-  [[ "${node_count}" =~ ^[0-9]+$ ]] || node_count=0
 
   local snapshot_cluster_id snapshot_openshift_version
   snapshot_cluster_id="${CLUSTER_ID}"
@@ -337,14 +405,11 @@ write_install_snapshot() {
     fi
   fi
 
-  local degraded_raw unavailable_raw notready_raw
-  degraded_raw="$(oc get co -o json --request-timeout=60s 2>/dev/null | jq -r '.items[] | select(.status.conditions[]? | select(.type=="Degraded" and .status=="True")) | .metadata.name' || true)"
-  unavailable_raw="$(oc get co -o json --request-timeout=60s 2>/dev/null | jq -r '.items[] | select(.status.conditions[]? | select(.type=="Available" and .status=="False")) | .metadata.name' || true)"
-  notready_raw="$(oc get nodes -o json --request-timeout=60s 2>/dev/null | jq -r '.items[] | select(.status.conditions[]? | select(.type=="Ready" and .status!="True")) | .metadata.name' || true)"
-
   log "Writing cluster install snapshot role=${cluster_role} topology=${topology} cluster_id=${snapshot_cluster_id} to ${snapshot_dir}"
 
-  oc get co -o json --request-timeout=60s 2>/dev/null | jq '{
+  local projected_co="${VALIDATION_SCRATCH}/${cluster_role}-snapshot-clusteroperators.json"
+  local projected_nodes="${VALIDATION_SCRATCH}/${cluster_role}-snapshot-nodes.json"
+  if ! jq '{
     items: [.items[] | {
       name: .metadata.name,
       available: (([.status.conditions[]? | select(.type=="Available") | .status] | first) // ""),
@@ -352,18 +417,44 @@ write_install_snapshot() {
       progressing: (([.status.conditions[]? | select(.type=="Progressing") | .status] | first) // ""),
       version: ((.status.versions[]? | select(.name=="operator") | .version) // "")
     }]
-  }' > "${snapshot_dir}/clusteroperators.json" || echo '{"items":[]}' > "${snapshot_dir}/clusteroperators.json"
+  }' "${snapshot_co_json}" > "${projected_co}" 2>/dev/null; then
+    if [[ "${overall_status}" == "INFO" ]]; then
+      echo '{"items":[]}' > "${projected_co}"
+    else
+      error "Failed to project ClusterOperator JSON for ${cluster_role} snapshot"
+      VALIDATION_FAILED=1
+      return 1
+    fi
+  fi
 
-  oc get nodes -o json --request-timeout=60s 2>/dev/null | jq '{
+  if ! jq '{
     items: [.items[] | {
       name: .metadata.name,
       ready: (([.status.conditions[]? | select(.type=="Ready") | .status] | first) // ""),
       schedulable: ((.spec.unschedulable // false) | not),
       roles: ([.metadata.labels | keys[] | select(startswith("node-role.kubernetes.io/"))] | map(sub("node-role.kubernetes.io/"; "")))
     }]
-  }' > "${snapshot_dir}/nodes.json" || echo '{"items":[]}' > "${snapshot_dir}/nodes.json"
+  }' "${snapshot_nodes_json}" > "${projected_nodes}" 2>/dev/null; then
+    if [[ "${overall_status}" == "INFO" ]]; then
+      echo '{"items":[]}' > "${projected_nodes}"
+    else
+      error "Failed to project node JSON for ${cluster_role} snapshot"
+      VALIDATION_FAILED=1
+      return 1
+    fi
+  fi
 
-  jq -n \
+  if ! mv -- "${projected_co}" "${snapshot_dir}/clusteroperators.json" || \
+     ! mv -- "${projected_nodes}" "${snapshot_dir}/nodes.json"; then
+    if [[ "${overall_status}" != "INFO" ]]; then
+      error "Failed to publish ${cluster_role} snapshot projections"
+      VALIDATION_FAILED=1
+    fi
+    return 1
+  fi
+
+  local metadata_tmp="${VALIDATION_SCRATCH}/${cluster_role}-metadata.json"
+  if ! jq -n \
     --arg topology "${topology}" \
     --arg cluster_role "${cluster_role}" \
     --arg openshift_version "${snapshot_openshift_version}" \
@@ -403,7 +494,21 @@ write_install_snapshot() {
       notready_nodes: ($notready_raw | split("\n") | map(select(length > 0))),
       clusteroperator_count: (($operators[0].items // []) | length),
       ready_node_count: (($nodes[0].items // []) | map(select(.ready=="True")) | length)
-    }' > "${snapshot_dir}/metadata.json" || log "WARNING: ${cluster_role}: failed to write metadata.json"
+    }' > "${metadata_tmp}" 2>/dev/null; then
+    if [[ "${overall_status}" != "INFO" ]]; then
+      error "Failed to write ${cluster_role} snapshot metadata"
+      VALIDATION_FAILED=1
+    fi
+    return 1
+  fi
+
+  if ! mv -- "${metadata_tmp}" "${snapshot_dir}/metadata.json"; then
+    if [[ "${overall_status}" != "INFO" ]]; then
+      error "Failed to publish ${cluster_role} snapshot metadata"
+      VALIDATION_FAILED=1
+    fi
+    return 1
+  fi
 
   log "Cluster install snapshot JSON written (${cluster_role}): ${snapshot_dir}/metadata.json"
 }
@@ -413,7 +518,10 @@ primary_role="${topology}"
 if [[ "${topology}" == "hcp" ]]; then
   primary_role="hosted"
 fi
-write_install_snapshot "${primary_role}" "${ARTIFACT_DIR}" "${HOSTED_OVERALL}"
+if ! write_install_snapshot "${primary_role}" "${ARTIFACT_DIR}" "${HOSTED_OVERALL}"; then
+  VALIDATION_FAILED=1
+  echo "Status: FAILED (unable to create a verified primary snapshot)" >> "${INSTALL_REPORT}"
+fi
 
 # Management-cluster capture is HCP-only. Classic and OSD GCP are
 # single-cluster topologies and must keep writing only root ARTIFACT_DIR files. PASS/FAIL stays on this cluster.
