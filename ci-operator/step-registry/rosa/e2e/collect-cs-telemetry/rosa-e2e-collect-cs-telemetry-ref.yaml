@@ -9,7 +9,9 @@ ref:
     requests:
       cpu: 100m
       memory: 200Mi
-  timeout: 5m0s
+  timeout: 10m0s
+  # Diagnostics only: a collection failure must never fail the job it is diagnosing.
+  best_effort: true
   grace_period: 30s
   credentials:
   - collection: rosa-e2e
@@ -34,3 +36,77 @@ ref:
     UCT*/UNT*, nodepool NT*) that help diagnose cluster provisioning
     and day-2 operation failures. Requires RHOBS OIDC credentials
     and a start timestamp from rosa-e2e-record-start-time pre-step.
+
+    Additionally collects Classic identity-provider resync events,
+    tagged "[ROSA CLASSIC IDP]", into
+    ARTIFACT_DIR/classic-idp-resync-events.json. These are handled on
+    a separate path from the lifecycle report above: the query response
+    is reduced to an allowlisted schema before anything is written, and
+    the raw response is never placed in ARTIFACT_DIR.
+
+
+    An event carrying any field outside that set is dropped whole rather
+    than filtered, and the counts of each rejection reason are reported
+    alongside the events.
+
+    Each collected event carries only an operation
+    (resync_attempt, source_secret_write, lease_delete,
+    sync_identity_provider_write, syncset_write), an outcome
+    (started, succeeded, deleted, not_found, forbidden, conflict,
+    failed), the resync flow that executed, the
+    flow toggle state, a UTC timestamp, the UTC timestamp the resync
+    call started at, the conflict-retry ordinal, an object generation
+    where one applies, and the service build the operation ran as.
+
+    The build is reported with a shape: a value that is lowercase
+    hexadecimal but entirely decimal digits is labelled
+    ambiguous_numeric_or_git_object_name, because an all-decimal value
+    cannot be told apart from a git object name whose digits happen to
+    all be decimal, and a hexadecimal shape alone does not establish git
+    provenance. An unrecognised build shape is counted and its value is
+    not written.
+
+    A resync reports resync_attempt/started before anything can fail,
+    so a resync that died before its first write is distinguishable
+    from no resync having been requested at all. That event is emitted
+    before a flow is chosen and reports not_yet_selected rather than
+    claiming one.
+
+    When events were collected from more than one query - one per
+    cluster identifier of the run - each event also carries
+    cluster_group, so writes against different clusters stay
+    distinguishable. It is a position in this report, numbered densely
+    over the queries that actually yielded events, not an identifier,
+    and it is omitted when they all came from one query.
+
+    The invocation stamp and the retry ordinal together keep two calls,
+    and the retries inside one call, from collapsing into each other:
+    every call restarts the ordinal at 1, and the event timestamp alone
+    cannot separate calls that overlap within a second.
+
+    The toggle state is reported as unavailable with a bounded reason
+    when the build carries no flow-selecting toggle. That is a statement
+    about what can be observed, not a claim that a toggle was disabled.
+
+    Events are tagged with the test phase they fall in, using bounded
+    phase windows the test step hands over in
+    SHARED_DIR/classic-idp-phase-windows (a phase name and two UTC
+    timestamps per line, nothing else). An event outside every window is
+    tagged outside_known_phase, and when no handoff is present the phase
+    is reported unavailable rather than guessed. This is what makes an
+    event attributable to the import under test rather than to any other
+    identity-provider write in the same job.
+
+    The run's cluster identifiers are read from SHARED_DIR/cluster-id or
+    SHARED_DIR/ocm-fvt-cluster-ids only to scope the query to this job's
+    events; they are matched against the log line's own context envelope,
+    which the parser then discards whole. No identifier is written to the
+    artifact, and the query response and selectors stay in a scratch
+    directory outside ARTIFACT_DIR that is removed on every exit path.
+
+    The collection status is always explicit, so absence is never read as
+    evidence that a resync did not run: collected, no_events_in_window,
+    truncated (a result set that filled the query limit, so the list may
+    be incomplete), partial (at least one selector query failed),
+    query_failed, parse_failed, token_unavailable, or
+    selector_unavailable.

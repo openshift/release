@@ -464,6 +464,30 @@ if [[ ! -s "${SHARED_DIR}/cluster-id" ]]; then
   fi
 fi
 
+# Publish the Classic IDP phase windows the suite recorded, for the post telemetry step.
+# Each line is "<phase> <start> <end>": an enum and two UTC timestamps, nothing else. Like
+# cluster-id above, the suite can only write under output/, so it is copied here.
+# ocmtest writes a per-phase output tree, so there can be more than one of these and find
+# order is not deterministic: take every one. Only well-formed lines are copied, so a damaged
+# file cannot put anything unexpected into SHARED_DIR for the post step to parse, and the
+# total is capped so a looping writer cannot fill the shared volume.
+classic_idp_windows="${SHARED_DIR}/classic-idp-phase-windows"
+classic_idp_raw="$(mktemp)" || classic_idp_raw=""
+if [[ -n "${classic_idp_raw}" ]]; then
+  # Keep anything an earlier invocation of this step already published, so a second pass
+  # merges with it instead of replacing it.
+  [[ -s "${classic_idp_windows}" ]] && cat "${classic_idp_windows}" >> "${classic_idp_raw}"
+  while IFS= read -r -d '' windows; do
+    grep -hE '^[a-z0-9_]{1,40} [0-9T:.Z-]{20,32} [0-9T:.Z-]{20,32}$' "${windows}" \
+      >> "${classic_idp_raw}" 2>/dev/null || true
+  done < <(find "${ocm_fvt_output}" -type f -name 'classic-idp-phase-windows' -print0 2>/dev/null)
+  if [[ -s "${classic_idp_raw}" ]]; then
+    sort -u "${classic_idp_raw}" | head -64 > "${classic_idp_windows}" || true
+    echo "Wrote SHARED_DIR/classic-idp-phase-windows ($(wc -l < "${classic_idp_windows}") window(s))"
+  fi
+  rm -f "${classic_idp_raw}"
+fi
+
 if [[ ! -s "${SHARED_DIR}/kubeconfig" ]]; then
   while IFS= read -r -d '' kc; do
     # Skip empty / scrubbed placeholders; real kubeconfigs are much larger.
