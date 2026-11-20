@@ -3,6 +3,7 @@ set -o nounset
 # set -o errexit
 set -o pipefail
 
+_junit_suite_remapped=false
 if [ "${MAP_TESTS}" = "true" ]; then
     eval "$(
         typeset -a _fURL=()
@@ -11,6 +12,7 @@ if [ "${MAP_TESTS}" = "true" ]; then
             https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
     )"
     if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
+        _junit_suite_remapped=true
         trap '
             LP_IO__ET_PPP__NEW_TS_NAME="${LP_QE__CR__TS_NAME__PFX__ACM:-lp-interop--ACM--OPP}--%s" \
                 ExitTrap--PostProcessPrep
@@ -133,11 +135,14 @@ if (( _junit_cases == 0 )); then
         _junit_condition="the runner wrote no JUnit report"
         mkdir -p "$(dirname "${_junit_report}")"
     fi
+    _junit_final_suite="${LP_QE__CR__TS_NAME__PFX__ACM:-lp-interop--ACM--OPP}--acm-tests-alc"
+    _junit_suite="${_junit_final_suite}"
+    if [[ "${_junit_suite_remapped}" == "true" ]]; then _junit_suite="acm-tests-alc"; fi
     cat > "${_junit_report}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
-  <testsuite name="lp-interop--ACM--OPP--acm-tests-alc" tests="1" failures="1" errors="0" skipped="0">
-    <testcase name="acm-tests-alc: runner asserted nothing" classname="lp-interop--ACM--OPP--acm-tests-alc">
+  <testsuite name="${_junit_suite}" tests="1" failures="1" errors="0" skipped="0">
+    <testcase name="acm-tests-alc: runner asserted nothing" classname="${_junit_final_suite}">
       <failure message="${_junit_condition}" type="empty-junit-carrier">${_junit_condition}, so this step asserted nothing. Look for the runner abort in the step build log; a known cause is the AAP operator preflight in the runner global setup (INTEROP-9598).</failure>
     </testcase>
   </testsuite>
