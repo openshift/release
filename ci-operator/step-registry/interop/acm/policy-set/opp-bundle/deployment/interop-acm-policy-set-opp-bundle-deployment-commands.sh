@@ -691,7 +691,7 @@ while :; do
   # so the post-pass comparison can tell an unchanged set from a swap.
   typeset complianceWaitSet=''
   if ! prevSet="$(PolicyNameSet)"; then
-    RecordResult "policies-compliant" "failed" "Failed to read the policy name set before the compliance pass; the set the wait covers is unknown${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))" 
+    RecordResult "policies-compliant" "failed" "Failed to read the policy name set before the compliance pass; the set the wait covers is unknown${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
     exit 1
   fi
   complianceAllSkipped=false

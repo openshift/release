@@ -1232,7 +1232,7 @@ typeset _wait2_err="" _wait2_rc=0
     elif [[ "${_phase}" == "query-failed" ]]; then
       _classify "acs-csv-query-failed" "CSV ${csvName} query failed (rc=${_phase_rc}: $(_api_err_class "${_phase_err}"))"
     elif [[ "${_phase}" == "unknown" ]] && (( _probe_notfound )); then
-      _classify "acs-csv-timeout" "CSV object ${csvName} never created within ${ACS_INSTALL_TIMEOUT}s (currentCSV published, object absent)" 
+      _classify "acs-csv-timeout" "CSV object ${csvName} never created within ${ACS_INSTALL_TIMEOUT}s (currentCSV published, object absent)"
     else
       _classify "acs-csv-timeout" "CSV ${csvName} not Succeeded after ${ACS_INSTALL_TIMEOUT}s (phase: ${_phase})"
     fi
