@@ -858,7 +858,7 @@ while (( SECONDS < deadline )); do
 
     (( _junit_polls += 1 )) || true
     typeset statusLine=""
-    statusLine="$(echo "${mcpJson}" | python3 -c "
+    statusLine="$(echo "${mcpJson}" | python3 /dev/fd/3 3<<'PY' 2>/dev/null
 import sys, json
 data = json.load(sys.stdin)
 issues = []
@@ -904,7 +904,8 @@ if issues:
     print('UNSTABLE|' + '; '.join(issues).replace('|', '/') + '|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|' + str(any_degraded) + '|' + ';'.join(sorted(gen_parts)))
 else:
     print('STABLE|all non-paused MCPs healthy|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|0|' + ';'.join(sorted(gen_parts)))
-" 2>/dev/null)" || statusLine="UNSTABLE|python parse error|0|0|0|0|"
+PY
+)" || statusLine="UNSTABLE|python parse error|0|0|0|0|"
 
     # statusLine = KEY|detail|ready|updated|machine|degraded|genPrint
     typeset statusKey="" statusDetail=""
