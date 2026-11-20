@@ -49,7 +49,7 @@ echo "" >> /tmp/id_rsa
 chmod 600 /tmp/id_rsa
 
 # Define SSH command with explicit options (don't rely on ~/.ssh/config)
-SSH_OPTS="-q -i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=QUIET -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
+SSH_OPTS="-i /tmp/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=30 -o ServerAliveInterval=10 -o ServerAliveCountMax=3 -o BatchMode=yes"
 
 # Test SSH connection
 echo "Testing SSH connection to DPF hypervisor..."
@@ -283,6 +283,55 @@ else
 fi
 
 
+# Deployment must survive a lost SSH session without starting make again.
+run_remote_deployment() {
+  local result_file="${DEPLOYMENT_LOG}.exit-status"
+  local result chunk offset=1 deadline=$((SECONDS + 10800))
+  chunk=$(mktemp) || return 1
+
+  if ssh ${SSH_OPTS} root@${REMOTE_HOST} bash -s -- "${REMOTE_WORK_DIR}/openshift-dpf" "${DPF_DEPLOY_MAKE_TARGET}" "${DEPLOYMENT_LOG}" "${result_file}" <<'REMOTE'
+nohup bash -c '
+  set -o pipefail
+  (cd "$1" && make "$2") > "$3" 2>&1
+  rc=$?
+  printf "%s\n" "$rc" > "$4.tmp"
+  mv "$4.tmp" "$4"
+' dpf-deploy "$1" "$2" "$3" "$4" </dev/null >/dev/null 2>&1 &
+REMOTE
+  then
+    echo "Deployment started on hypervisor"
+  else
+    echo "WARNING: Deployment launch SSH exited with status $?; checking the remote result without relaunching"
+  fi
+
+  while (( SECONDS < deadline )); do
+    if result=$(ssh ${SSH_OPTS} root@${REMOTE_HOST} "if test -f '${result_file}'; then cat '${result_file}'; else echo running; fi"); then
+      if ssh ${SSH_OPTS} root@${REMOTE_HOST} "tail -c +${offset} '${DEPLOYMENT_LOG}'" > "${chunk}"; then
+        cat "${chunk}"
+        offset=$((offset + $(wc -c < "${chunk}")))
+      else
+        echo "WARNING: Reading deployment log over SSH failed with status $?; will retry"
+      fi
+
+      if [[ "${result}" == "0" ]]; then
+        rm -f "${chunk}"
+        return 0
+      elif [[ "${result}" != "running" ]]; then
+        echo "ERROR: Remote deployment returned exit status '${result}'"
+        rm -f "${chunk}"
+        return 1
+      fi
+    else
+      echo "WARNING: Reading deployment status over SSH failed with status $?; will reconnect"
+    fi
+    sleep 30
+  done
+
+  echo "ERROR: No completed deployment result received within 3 hours; remote deployment may still be running"
+  rm -f "${chunk}"
+  return 1
+}
+
 # SSH session to hypervisor
 echo "Starting DPF deployment with 'make ${DPF_DEPLOY_MAKE_TARGET}'..."
 echo "Logs will be saved to: ${DEPLOYMENT_LOG}"
@@ -304,15 +353,9 @@ if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
   # Execute the configured make target on hypervisor with comprehensive logging
   echo "Execute make ${DPF_DEPLOY_MAKE_TARGET} on hypervisor with comprehensive logging"
 
-  if ssh ${SSH_OPTS} root@${REMOTE_HOST} "set -euo pipefail; \
-    cd ${REMOTE_WORK_DIR}/openshift-dpf ; \
-    mkdir -p ${REMOTE_LOGS_DIR} ; \
-    make ${DPF_DEPLOY_MAKE_TARGET} 2>&1 | tee ${DEPLOYMENT_LOG}"; then
+  if run_remote_deployment; then
 
     DEPLOYMENT_SUCCESS=true
-
-    # Note:  here we often get here but make failed, so we need to ssh again
-    # and run oc commands to confirm the deployment is success and we got the DPU workers ready
 
     echo "DPF deployment completed successfully, DEPLOYMENT_SUCCESS is set to: ${DEPLOYMENT_SUCCESS}"
 
