@@ -166,8 +166,8 @@ create_mirror_pull_secret() {
     mirror_registry_auth=$(head -n 1 /var/run/vault/mirror-registry/registry_creds | base64 -w 0)
 
     local secret_name="acm-mce-mirror-pull-secret"
-    log "Creating mirror pull secret ${secret_name} in openshift-marketplace..."
-    cat <<EOF | oc apply -f -
+    log "Creating mirror pull secret ${secret_name} in openshift-marketplace..." >&2
+    cat <<EOF | oc apply -f - >&2
 apiVersion: v1
 kind: Secret
 metadata:
