@@ -551,6 +551,9 @@ function Main () {
             echo >&2 "ERROR: ${_junit_reason}"
             exit 3
         fi
+        # PRRT_kwDOBHvUUM65RJoY: re-read generation/uid before patch to avoid race
+        _sub_gen_before="$(oc get subscription rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.generation}' 2>/dev/null || echo 0)"
+        _sub_uid_before="$(oc get subscription rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.uid}' 2>/dev/null || echo unknown)"
         versionCmp="$(VersionCompare "${targetHeadVersion}" "${currentVersion}")"
         if (( versionCmp < 0 )); then
             _junit_reason="acs-upgrade rejected: downgrade (target channel ${targetChannel} head ${targetHeadVersion} < installed ${currentVersion})"
