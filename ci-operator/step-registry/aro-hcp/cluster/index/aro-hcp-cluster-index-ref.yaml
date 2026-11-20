@@ -1,0 +1,33 @@
+ref:
+  as: aro-hcp-cluster-index
+  from: aro-hcp-e2e-tools
+  commands: aro-hcp-cluster-index-commands.sh
+  grace_period: 5m
+  timeout: 20m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  credentials:
+  - collection: ocp-perfscale
+    group: production-es
+    mount_path: /secret
+  env:
+  - name: INDEX_ENABLED
+    default: "false"
+    documentation: Upload ARO HCP timing metadata to Elasticsearch when true.
+  - name: ES_INDEX
+    default: rosa-metadata
+    documentation: Elasticsearch index where cluster timing metadata is stored. Override for a dedicated ARO HCP index.
+  - name: METADATA_FILE
+    default: cluster-config
+    documentation: JSON metadata file in SHARED_DIR to index.
+  - name: ES_SERVER_FILE
+    default: /secret/host
+    documentation: File containing the credentialed Elasticsearch endpoint.
+  documentation: |-
+    Index the ARO HCP readiness and installation timer document using the same
+    timers.install (including individual transition-state durations),
+    timers.install_ready, timers.cluster_ready, timers.nodes_ready, and
+    timers.total_install_time field names used by the ROSA index. The endpoint
+    is read from the mounted CI credential and is never printed in the build log.
