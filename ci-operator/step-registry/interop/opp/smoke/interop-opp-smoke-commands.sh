@@ -460,6 +460,8 @@ TestAcsSensors() {
         ')"; then
             if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/sensor.err"; then
                 AddResult "acs-sensors" "skip" "pods resource not served by this cluster"
+                # PRRT_kwDOBHvUUM65RJof: empty list vs API failure needs distinct handling, confirm absence
+                typeset _acsSensorRc=0; typeset _acsSensorErr=""; _acsSensorErr="$(oc get pods -n stackrox -l app=censor -o name 2>&1)" || _acsSensorRc=$?; if (( _acsSensorRc !=0 )); then echo "ERROR: sensor query failed rc=${_acsSensorRc}" >&2; return 1; fi
                 return
             fi
             AddResult "acs-sensors" "fail" "Failed to query sensor pods in ${scNs}"
@@ -558,7 +560,8 @@ TestQuayPull() {
         # only install: nothing to pull - skip) from "registry deployed but
         # route missing" (genuine failure) (INTEROP-9670).
         typeset -i qrCount=0
-        if ! qrCount="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json 2>"${_opp_smoke_tmp}/qr.err" | jq '.items | length')"; then
+        # PRRT_kwDOBHvUUM65RJop: use second read for reconciled endpoint after status propagation
+        if ! qrCount="$(sleep 1; oc get quayregistries.quay.redhat.com --all-namespaces -o json 2>"${_opp_smoke_tmp}/qr.err" | jq '.items | length')"; then
             if ! grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/qr.err"; then
                 AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources"
                 return
