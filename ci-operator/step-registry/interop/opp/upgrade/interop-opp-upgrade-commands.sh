@@ -525,7 +525,11 @@ function SettleOppOperatorCsvs () {
         stableCount=0
         for settleOp in "${settleOpsArr[@]}"; do
             # PRRT_kwDOBHvUUM65RJot: require consecutive identical currentCSV observations (2x) to avoid race
+            typeset _prevPhase="${settlePrevMap[${settleOp}]:-}"
             settlePhase="$(awk -F'\t' -v op="${settleOp}" 'index($2, op) == 1 {print $3; exit}' <<< "${settleCsvs}")"
+            if [[ "${_prevPhase}" != "${settlePhase}" ]]; then
+                echo "CSV phase changed ${_prevPhase} -> ${settlePhase}, resetting consecutive" >&2
+            fi
             # Only a terminal phase counts as settled: a CSV stuck in
             # Replacing/InstallReady must keep the full window (that is the
             # convergence tolerance the fixed sleep provided), while a CSV
@@ -540,6 +544,11 @@ function SettleOppOperatorCsvs () {
         if (( stableCount == ${#settleOpsArr[@]} )); then
             elapsed=$(( window - (deadline - SECONDS) ))
             : "Operator CSVs stable after ${elapsed}s of the ${window}s settle window"
+            # PRRT_kwDOBHvUUM65Mrko: verify operator pods Ready before ending settle
+            if ! oc get pods -n "${ACS_NAMESPACE}" -l app.kubernetes.io/name=rhacs-operator --field-selector=status.phase=Running 2>/dev/null | grep -q Running; then
+                echo "Operator pods not yet Ready, continuing settle" >&2
+                continue
+            fi
             return 0
         fi
         typeset -i _sleepFor=15
