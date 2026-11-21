@@ -8,11 +8,47 @@ SSO_AUTH_CONFIG_PATH="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-dex"
 IMAGE_CHECK_STAMP="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-image-check"
 CONTAINER_ENGINE="${CONTAINER_ENGINE:-podman}"
 IMAGE="${SECRET_MANAGER_IMAGE:-quay.io/openshift/ci-public:ci_secret-manager_latest}"
+HOST_OS="$(uname -s)"
+
+# On macOS the CLI runs natively instead of in a container. The container path
+# relies on virtiofs ownership emulation that podman cannot provide reliably:
+# mounts appear inside the VM as root, podman pins the credential directories
+# with a user.containers.override_stat xattr that later runs cannot write
+# through, and the SSO callback port and browser have to be tunnelled out of the
+# VM. Natively none of that applies, because the CLI binds loopback and opens
+# the browser itself.
+#
+# There is no published package for the CLI, so pin the source to a commit and
+# install its pinned requirements into a private virtualenv. When the image is
+# bumped, update NATIVE_COMMIT to the ci-tools-standalone commit it was built
+# from, otherwise macOS silently stays behind the container path.
+NATIVE_COMMIT="4daba691a18147afa424be4aa288e5d853323cc0"
+# Each commit gets its own immutable directory. A newer pin provisions a new
+# directory rather than moving or deleting the one an in-flight invocation may
+# already be running from, which publishing then reduces to a single rename.
+# Old caches are kept: their age cannot tell us whether an invocation is using
+# them. Remove unused caches manually only when no native invocation is running.
+NATIVE_ROOT="$SCRIPT_DIR/gcp-secret-manager/.secret-manager-native"
+NATIVE_DIR="$NATIVE_ROOT/$NATIVE_COMMIT"
+NATIVE_LOCK="$NATIVE_ROOT/.lock"
+NATIVE_STAGE=""
+NATIVE_SRC="$NATIVE_DIR/src"
+NATIVE_PYTHON="$NATIVE_DIR/venv/bin/python3"
+NATIVE_MAIN="$NATIVE_SRC/cmd/secret-manager/main.py"
+
+use_native() {
+    # SECRET_MANAGER_CONTAINER=1 forces the container path on macOS, for example
+    # to test a locally built image via SECRET_MANAGER_IMAGE.
+    [ "$HOST_OS" = Darwin ] && [ "${SECRET_MANAGER_CONTAINER:-}" != 1 ]
+}
 
 if [ "${1:-}" = "clean" ]; then
     echo "Removing cached credentials..."
     rm -rf "$GCLOUD_CONFIG_PATH" "$SSO_AUTH_CONFIG_PATH"
     echo "Done. Run the 'login' command to re-authenticate."
+    if use_native && [ -d "$NATIVE_ROOT" ]; then
+        echo "The native CLI cache in $NATIVE_ROOT is kept; remove it to reclaim disk space."
+    fi
     exit 0
 fi
 
@@ -46,6 +82,140 @@ update_image_if_stale() {
     fi
 }
 
+# native_cli_ready is true once a commit's directory exists and has an
+# interpreter. A directory only ever appears through the rename below, so its
+# presence implies a complete build.
+native_cli_ready() {
+    [ -x "$NATIVE_PYTHON" ]
+}
+
+# release_native_lock drops the lock if this process still owns it and disarms
+# the EXIT trap. Ownership is checked rather than releasing by path alone: after
+# publishing, this run goes on to execute the CLI (possibly an interactive
+# login) without retaining the provisioning lock.
+release_native_lock() {
+    if [ -n "$NATIVE_STAGE" ]; then
+        rm -rf "$NATIVE_STAGE"
+        NATIVE_STAGE=""
+    fi
+    if [ "$(cat "$NATIVE_LOCK/pid" 2>/dev/null || true)" = "$$" ]; then
+        rm -rf "$NATIVE_LOCK"
+    fi
+    trap - EXIT
+}
+
+# ensure_native_cli provisions the pinned CLI source and its virtualenv. The
+# build happens in a per-process staging directory that is published with a
+# rename, and a lock keeps concurrent runs from downloading and installing
+# twice. Neither step can destroy a cache another run is using, and a failed
+# attempt leaves any previously working cache in place.
+ensure_native_cli() {
+    native_cli_ready && return 0
+    if ! command -v uv &>/dev/null; then
+        echo "Error: 'uv' is not installed. Install it with: brew install uv" >&2
+        exit 1
+    fi
+    local waited=0 holder="" abandoned=""
+    mkdir -p "$NATIVE_ROOT"
+    NATIVE_STAGE="$NATIVE_ROOT/.stage.$$"
+    while ! mkdir "$NATIVE_LOCK" 2>/dev/null; do
+        native_cli_ready && return 0
+        # A killed run leaves the lock behind. A lock that names a live holder is
+        # never disturbed, however old it is: age alone would steal the lock from
+        # a slow but healthy run and make it provision twice.
+        holder="$(cat "$NATIVE_LOCK/pid" 2>/dev/null || true)"
+        abandoned=""
+        if [ -n "$holder" ]; then
+            kill -0 "$holder" 2>/dev/null || abandoned=yes
+        elif [ -n "$(find "$NATIVE_LOCK" -mmin +1 2>/dev/null)" ]; then
+            # No PID recorded. That is only legitimate for the microseconds
+            # between mkdir and writing the PID, so a lock still PID-less after a
+            # minute needs manual recovery. Note -mmin +1, not +0: on BSD/macOS
+            # find, +0 matches anything older than a second, which could report
+            # an abandoned lock while a run is still writing its PID.
+            abandoned=yes
+        fi
+        if [ -n "$abandoned" ]; then
+            # Checking a PID and renaming/removing its directory is not atomic:
+            # another waiter could have acquired it in between. Never reclaim
+            # by path while other invocations may be acquiring the same lock.
+            echo "Error: native CLI setup lock appears abandoned: $NATIVE_LOCK. Stop all native invocations before removing it, then retry." >&2
+            exit 1
+        fi
+        if [ "$waited" -ge 600 ]; then
+            echo "Error: timed out waiting for native CLI setup. Stop all native invocations before removing $NATIVE_LOCK, then retry." >&2
+            exit 1
+        fi
+        if [ "$waited" -eq 0 ]; then
+            echo "Waiting for another run to finish setting up the CLI..." >&2
+        fi
+        waited=$((waited + 1))
+        sleep 0.5
+    done
+    # NATIVE_STAGE is deliberately not "local": the trap runs at exit, after this
+    # function has returned and its locals are gone. Arm it before the PID write
+    # so a failed write cannot leave an ownerless lock behind; if one is left
+    # anyway, report it above for manual recovery once it has aged.
+    trap release_native_lock EXIT
+    printf '%s' "$$" >"$NATIVE_LOCK/pid"
+    # Another run may have finished provisioning while we waited for the lock.
+    if native_cli_ready; then
+        release_native_lock
+        return 0
+    fi
+    # mv would nest staging inside an existing directory rather than replace
+    # it. Do not remove an invalid cache that another invocation might be using.
+    if [ -e "$NATIVE_DIR" ] || [ -L "$NATIVE_DIR" ]; then
+        echo "Error: native CLI cache is incomplete: $NATIVE_DIR. Stop all native invocations before removing it, then retry." >&2
+        exit 1
+    fi
+    echo "Setting up the native secret-manager CLI at ${NATIVE_COMMIT:0:12} (first run only)..." >&2
+    mkdir -p "$NATIVE_STAGE/src"
+    if ! curl -fsSL --max-time 300 \
+        "https://codeload.github.com/openshift/ci-tools-standalone/tar.gz/$NATIVE_COMMIT" |
+        tar -xz -C "$NATIVE_STAGE/src" --strip-components=1; then
+        echo "Error: could not download ci-tools-standalone at $NATIVE_COMMIT." >&2
+        exit 1
+    fi
+    if [ ! -f "$NATIVE_STAGE/src/cmd/secret-manager/main.py" ] ||
+        [ ! -f "$NATIVE_STAGE/src/cmd/secret-manager/requirements.txt" ]; then
+        echo "Error: unexpected ci-tools-standalone layout at $NATIVE_COMMIT." >&2
+        exit 1
+    fi
+    uv venv -q -p 3.12 "$NATIVE_STAGE/venv"
+    uv pip install -q --python "$NATIVE_STAGE/venv/bin/python3" \
+        -r "$NATIVE_STAGE/src/cmd/secret-manager/requirements.txt"
+    printf '%s' "$NATIVE_COMMIT" >"$NATIVE_STAGE/commit"
+    # Publish with a single rename into this commit's own directory. Nothing is
+    # moved or removed, so a concurrent invocation running from another commit's
+    # directory is unaffected.
+    if ! mv "$NATIVE_STAGE" "$NATIVE_DIR" 2>/dev/null || ! native_cli_ready; then
+        echo "Error: could not publish the native CLI cache." >&2
+        exit 1
+    fi
+    release_native_lock
+}
+
+# run_native executes the CLI directly. SM_CALLBACK_HOST and SM_BROWSER_REQUEST
+# are removed from the environment so the CLI uses its own defaults - listen on
+# loopback, open the browser itself - even if the caller exported them. They
+# must be unset rather than set to an empty string, because an empty
+# SM_CALLBACK_HOST would make the CLI bind all interfaces. `env -u` scopes this
+# to the command and leaves the caller's environment alone.
+run_native() {
+    ensure_native_cli
+    mkdir -p "$SSO_AUTH_CONFIG_PATH" "$GCLOUD_CONFIG_PATH"
+    # Both directories hold credentials (an ADC refresh token and an SSO token).
+    # The container path needs them readable by its mapped UID; natively they are
+    # only ever read by this user, so keep them private.
+    chmod 700 "$SSO_AUTH_CONFIG_PATH" "$GCLOUD_CONFIG_PATH"
+    env -u SM_BROWSER_REQUEST -u SM_CALLBACK_HOST \
+        CLOUDSDK_CONFIG="$GCLOUD_CONFIG_PATH" \
+        SM_AUTH_DIR="$SSO_AUTH_CONFIG_PATH" \
+        GOOGLE_CLOUD_QUOTA_PROJECT=openshift-ci-secrets \
+        "$NATIVE_PYTHON" "$NATIVE_MAIN" "$@"
+}
+
 mkdir -p "$GCLOUD_CONFIG_PATH"
 
 if [ "${1:-}" = "login" ] && [ "$#" -eq 1 ]; then
@@ -54,15 +224,25 @@ if [ "${1:-}" = "login" ] && [ "$#" -eq 1 ]; then
         exit 1
     fi
     CLOUDSDK_CONFIG="$GCLOUD_CONFIG_PATH" gcloud auth application-default login --verbosity=error
-    chmod -R a+rX "$GCLOUD_CONFIG_PATH"
+    if ! use_native; then
+        # The container runs as a mapped, unprivileged UID and needs to read the
+        # credentials directory; natively the CLI runs as this user already.
+        chmod -R a+rX "$GCLOUD_CONFIG_PATH"
+        update_image_if_stale
+        touch "$IMAGE_CHECK_STAMP"
+    fi
+fi
+
+# Other commands check for a newer image at most once a day.
+if ! use_native && [ "${1:-}" != "login" ] &&
+    [ -z "$(find "$IMAGE_CHECK_STAMP" -mmin -1440 2>/dev/null)" ]; then
     update_image_if_stale
     touch "$IMAGE_CHECK_STAMP"
 fi
 
-# Other commands check for a newer image at most once a day.
-if [ "${1:-}" != "login" ] && [ -z "$(find "$IMAGE_CHECK_STAMP" -mmin -1440 2>/dev/null)" ]; then
-    update_image_if_stale
-    touch "$IMAGE_CHECK_STAMP"
+if use_native; then
+    run_native "$@"
+    exit 0
 fi
 
 tty_flags=()
@@ -156,7 +336,7 @@ if [[ "$needs_sso" = true ]]; then
                 case "$url" in
                     https://idp.ci.openshift.org/auth\?*)
                         opener=xdg-open
-                        if [[ "$(uname -s)" = Darwin ]]; then
+                        if [ "$HOST_OS" = Darwin ]; then
                             opener=open
                         fi
                         if ! "$opener" "$url" >/dev/null 2>&1; then
