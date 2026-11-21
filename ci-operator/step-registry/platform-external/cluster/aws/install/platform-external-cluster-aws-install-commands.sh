@@ -268,6 +268,58 @@ INGRESS_HTTP_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputK
 INGRESS_HTTPS_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "IngressHTTPSTargetGroupArn").OutputValue')"
 PRIVATE_HOSTED_ZONE="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "PrivateHostedZoneId").OutputValue')"
 
+if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
+  # In disconnected mode, the CF template's private-zone *.apps record points
+  # to the external NLB (public subnets).  Nodes on private subnets without
+  # NAT cannot reach public NLB IPs, so ingress health checks fail.  Fix by
+  # adding ingress listeners (80/443) to the internal NLB and updating the
+  # *.apps record in the private hosted zone to point to it.
+  INTERNAL_NLB_NAME="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "InternalApiLoadBalancerName").OutputValue')"
+  INTERNAL_NLB_ARN="$(aws elbv2 describe-load-balancers \
+    --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].LoadBalancerArn" \
+    --output text)"
+  INTERNAL_NLB_HZ="$(aws elbv2 describe-load-balancers \
+    --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].CanonicalHostedZoneId" \
+    --output text)"
+  INTERNAL_NLB_DNS="$(aws elbv2 describe-load-balancers \
+    --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].DNSName" \
+    --output text)"
+
+  if [[ -n "${INTERNAL_NLB_ARN}" ]]; then
+    log "Adding ingress listeners (80/443) to internal NLB ${INTERNAL_NLB_ARN}"
+    aws elbv2 create-listener \
+      --load-balancer-arn "${INTERNAL_NLB_ARN}" \
+      --protocol TCP --port 80 \
+      --default-actions "Type=forward,TargetGroupArn=${INGRESS_HTTP_TARGET_GROUP}" || true
+    aws elbv2 create-listener \
+      --load-balancer-arn "${INTERNAL_NLB_ARN}" \
+      --protocol TCP --port 443 \
+      --default-actions "Type=forward,TargetGroupArn=${INGRESS_HTTPS_TARGET_GROUP}" || true
+
+    log "Updating *.apps record in private hosted zone to point to internal NLB"
+    APPS_RECORD="\\052.apps.${CLUSTER_NAME}.${base_domain}"
+    aws route53 change-resource-record-sets \
+      --hosted-zone-id "${PRIVATE_HOSTED_ZONE}" \
+      --change-batch "{
+        \"Changes\": [{
+          \"Action\": \"UPSERT\",
+          \"ResourceRecordSet\": {
+            \"Name\": \"${APPS_RECORD}\",
+            \"Type\": \"A\",
+            \"AliasTarget\": {
+              \"HostedZoneId\": \"${INTERNAL_NLB_HZ}\",
+              \"DNSName\": \"${INTERNAL_NLB_DNS}\",
+              \"EvaluateTargetHealth\": false
+            }
+          }
+        }]
+      }" || true
+    log "Internal ingress routing configured for disconnected"
+  else
+    log "WARNING: Could not find internal NLB ARN; *.apps may be unreachable from private subnets"
+  fi
+fi
+
 echo "========================="
 echo "CREATING STACK: SECURITY"
 echo "========================="
