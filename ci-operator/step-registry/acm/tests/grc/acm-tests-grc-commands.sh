@@ -639,7 +639,7 @@ print(json.dumps(result, indent=2))
         fi
         echo "  </testcase>"
         echo "</testsuite>"
-    } > "${_opp_junit}" || _opp_junit_write_rc=$?
+    } > "${_opp_junit}" || _opp_junit_write_rc=1
     if (( _opp_junit_write_rc != 0 )) || [[ ! -s "${_opp_junit}" ]] || ! tail -n1 "${_opp_junit}" 2>/dev/null | grep -qF "</testsuite>"; then
         echo "ERROR: failed to write JUnit report ${_opp_junit} (write rc=${_opp_junit_write_rc})" >&2
         if [[ "${_test_rc}" -eq 0 ]]; then
