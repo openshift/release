@@ -72,20 +72,26 @@ ADDITIONAL_TEST_ENV_VARS="\
 cd "${ECO_CI_CD_DIR}"
 
 step_failed=0
+deployed_features=()
 
 echo "Deploy eco-gotests scripts for O-RAN features"
 for feature in ${ECO_GOTESTS_FEATURES}; do
-  ECO_GOTEST_DIR="/tmp/eco_gotests_${feature}"
-  # ECO_GOTESTS_FEATURES entries are "oran-<label>" (e.g. oran-pre-provision).
-  # eco-gotests expects a directory name ("oran") plus a Ginkgo label filter.
-  oran_dir="${feature%%-*}"     # "oran-pre-provision" → "oran"
-  oran_label="${feature#*-}"    # "oran-pre-provision" → "pre-provision"
-  echo "Generate eco-gotests script for feature: ${feature} (dir=${oran_dir}, label=${oran_label})"
+  if [[ ! ${feature} =~ ^oran/[A-Za-z0-9._-]+$ ]]; then
+    echo "ERROR: invalid O-RAN feature '${feature}': expected oran/<phase>"
+    step_failed=1
+    continue
+  fi
+
+  # The feature path becomes an artifact directory name, so replace its slash
+  # while leaving the value passed to eco-gotests unchanged.
+  artifact_suite="${feature//\//-}"
+  ECO_GOTEST_DIR="/tmp/eco_gotests_${artifact_suite}"
+  echo "Generate eco-gotests script for feature: ${feature}"
 
   playbook_rc=0
   ansible-playbook ./playbooks/ran/deploy-run-eco-gotests-oran.yaml \
     -i ./inventories/ocp-deployment/build-inventory.py \
-    --extra-vars "features=${oran_dir} labels=${oran_label} eco_gotest_dir=${ECO_GOTEST_DIR}" \
+    --extra-vars "features=${feature} labels='${ECO_GOTESTS_LABELS}' eco_gotest_dir=${ECO_GOTEST_DIR}" \
     --extra-vars "eco_gotests_tag=latest" \
     --extra-vars "hub_clusterconfigs_path=${HUB_CLUSTERCONFIGS_PATH}" \
     --extra-vars "mirror_registry=${MIRROR_REGISTRY}" \
@@ -94,12 +100,15 @@ for feature in ${ECO_GOTESTS_FEATURES}; do
   if [[ ${playbook_rc} -ne 0 ]]; then
     echo "ERROR: ansible-playbook failed for feature ${feature} (exit code ${playbook_rc})"
     step_failed=1
+  else
+    deployed_features+=("${feature}")
   fi
 done
 
 echo "Run eco-gotests O-RAN features via SSH (streaming output to CI pod)"
-for feature in ${ECO_GOTESTS_FEATURES}; do
-  ECO_GOTEST_DIR="/tmp/eco_gotests_${feature}"
+for feature in "${deployed_features[@]}"; do
+  artifact_suite="${feature//\//-}"
+  ECO_GOTEST_DIR="/tmp/eco_gotests_${artifact_suite}"
   echo "Run eco-gotests ${feature} tests via SSH"
   # Use || true so test assertion failures do not set step_failed — the step
   # exits 0 and report/slack/verify-junit steps run normally. The overall job
@@ -128,10 +137,11 @@ BASTION_ARTIFACTS_DIR="/tmp/eco_gotests_artifacts"
 echo "Using k8sreporter directory: ${K8S_REPORTER_DIR}"
 
 echo "Run artifact collection on bastion"
+deployed_suites="${deployed_features[*]//\//-}"
 collect_rc=0
 ssh "${SSH_OPTS_KEEPALIVE[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${WORKDIR}/temp_ssh_key" \
   "python3 /tmp/collect-eco-gotests-artifacts.py \
-     --suites '${ECO_GOTESTS_FEATURES}' \
+     --suites '${deployed_suites}' \
      --junit-dir '${JUNIT_REPORT_DIR}' \
      --k8s-reporter-dir '${K8S_REPORTER_DIR}' \
      --artifacts-dir '${BASTION_ARTIFACTS_DIR}'" || collect_rc=$?
