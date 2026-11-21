@@ -71,6 +71,14 @@ SUBNET="$(leaseLookup 'subnet')"
 leaseLookup 'httpd-ip' >/dev/null
 leaseLookup 'httpd-port' >/dev/null
 
+# Require VXLAN bridge from lease and publish for network/install/cleanup.
+ADDITIONAL_BRIDGE_NAME="$(leaseLookup 'vxlan."additional-bridge"')"
+if [[ "${ADDITIONAL_BRIDGE_NAME}" =~ [^a-zA-Z0-9_-] ]]; then
+  echo "ERROR: Invalid lease vxlan.additional-bridge value" >&2
+  exit 1
+fi
+printf '%s\n' "${ADDITIONAL_BRIDGE_NAME}" > "${SHARED_DIR}/additional-bridge-name"
+
 # Node count validation
 CP_COUNT=$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".\"control-plane\" | length" "${LEASE_CONF}")
 COMPUTE_COUNT_LEASE=$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".compute | length" "${LEASE_CONF}")
@@ -321,16 +329,11 @@ spec:
 EOF
 fi
 
-# Chrony configuration:
-# Point chrony at the s390x hypervisor gateway and VPN subnets for control-plane and workers.
+# Chrony: use only the gateway derived from the allocated lease subnet.
 s390x_gateway="192.168.${SUBNET}.1"
 echo "Saving chrony configuration for cluster..."
 chrony_s390x_b64="$(base64 -w0 <<EOF
 server ${s390x_gateway} iburst
-server 192.168.1.1 iburst
-server 192.168.2.1 iburst
-server 192.168.3.1 iburst
-server 192.168.126.1 iburst
 pool 2.rhel.pool.ntp.org iburst
 driftfile /var/lib/chrony/drift
 makestep 1.0 3
