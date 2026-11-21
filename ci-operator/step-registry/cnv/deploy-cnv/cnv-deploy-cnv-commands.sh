@@ -14,6 +14,7 @@ CNV_HYPERCONVERGED_NAME=kubevirt-hyperconverged
 CNV_INSTALL_NAMESPACE=openshift-cnv
 CNV_OPERATOR_CHANNEL="${CNV_OPERATOR_CHANNEL:-stable}"
 CNV_VERSION=${CNV_VERSION:?CNV_VERSION environment variable is required}
+CNV_FAIL_FAST=${CNV_FAIL_FAST:-false}
 # readonly CNV_MAJOR_MINOR=${CNV_VERSION%.*}
 # CNV_STARTING_CSV="kubevirt-hyperconverged-operator.v${CNV_VERSION}"
 
@@ -22,12 +23,22 @@ wait_for_manual_debug() {
   echo "😵 Something went wrong, pause here to give yourself time to debug and investigate the issue"
   sleep 7200
 }
-trap wait_for_manual_debug ERR
+case ${CNV_FAIL_FAST} in
+  true) ;;
+  false) trap wait_for_manual_debug ERR ;;
+  *) echo "CNV_FAIL_FAST must be true or false" >&2; exit 1 ;;
+esac
 
 
 create_cnv_catalog_source() {
   local catalog_source_name=${1}
   local catalog_image=${2}
+  # Invalid input must exit directly instead of entering the manual debug pause.
+  # In particular, the string "null" becomes an unset image in the YAML below.
+  if [[ -z ${catalog_image} || ${catalog_image} == "null" || ${catalog_image} =~ [[:space:]] ]]; then
+    echo "Error: CNV_CATALOG_IMAGE must be a non-empty image pullspec, not null or whitespace" >&2
+    exit 1
+  fi
   (tee "${ARTIFACT_DIR}/${catalog_source_name}.yaml" | oc apply -o yaml -f -) <<__EOF__
     apiVersion: operators.coreos.com/v1alpha1
     kind: CatalogSource
@@ -77,8 +88,11 @@ __EOF__
 resolve_iib_from_map () {
     local iib_map_file_url="https://raw.githubusercontent.com/openshift-cnv/cnv-ci/refs/heads/master/version-mapping.json"
     local result
-    result=$(curl -sL "${iib_map_file_url}" \
-      | jq --arg version "${CNV_VERSION}" -r '.[$version].index_image // empty') || true
+    result=$(curl -fsSL "${iib_map_file_url}" \
+      | jq --arg version "${CNV_VERSION}" -er '
+          .[$version].index_image | strings |
+          select(length > 0 and . != "null" and (test("\\s") | not))
+        ') || true
     echo "${result}"
 }
 
@@ -109,7 +123,7 @@ fi
 if [[ -z ${CNV_CATALOG_IMAGE} && -n ${CNV_CATALOG_SOURCE} && ${CNV_CATALOG_SOURCE} == "${CNV_IIB_CATALOG_NAME}" ]]; then
     CNV_CATALOG_IMAGE=$(resolve_iib_from_map)
     if [[ -z ${CNV_CATALOG_IMAGE} ]]; then
-        echo "Error: Failed to resolve IIB image for version ${CNV_VERSION}"
+        echo "Error: Failed to resolve a valid IIB image for version ${CNV_VERSION} from version-mapping.json; supply a valid CNV_CATALOG_IMAGE or repair the mapping" >&2
         exit 1
     fi
     echo "Resolved IIB image for version ${CNV_VERSION}: ${CNV_CATALOG_IMAGE}"
@@ -167,16 +181,25 @@ spec:
 EOF
 )
 
+csv_ready=false
 for _ in {1..60}; do
     CSV=$(oc -n "${CNV_INSTALL_NAMESPACE}" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
     if [[ -n "$CSV" ]]; then
         if [[ "$(oc -n "${CNV_INSTALL_NAMESPACE}" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
             echo "ClusterServiceVersion \"$CSV\" ready"
+            csv_ready=true
             break
         fi
     fi
     sleep 10
 done
+
+if [[ ${CNV_FAIL_FAST} == true && ${csv_ready} == false ]]; then
+    echo "CNV operator did not reach Succeeded within 10 minutes" >&2
+    oc --request-timeout=15s -n "${CNV_INSTALL_NAMESPACE}" get subscription "$SUB" \
+        -o jsonpath='{range .status.conditions[*]}{.type}{" "}{.status}{" "}{.reason}{"\n"}{end}' >&2 || true
+    exit 1
+fi
 
 echo_debug "Creating HyperConverged resource"
 oc create -f - <<EOF
