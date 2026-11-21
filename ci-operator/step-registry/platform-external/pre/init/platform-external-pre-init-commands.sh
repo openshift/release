@@ -133,13 +133,51 @@ function collect_bootstrap_handler() {
   BOOTSTRAP_IP=\$(<\${SHARED_DIR}/BOOTSTRAP_IP)
   SSH_PRIV_KEY_PATH=\${CLUSTER_PROFILE_DIR}/ssh-privatekey
 
-  # Try to collect bootstrap logs
+  # Try to collect bootstrap logs.
+  # When a bastion host is available (disconnected install), the bootstrap
+  # is on a private subnet unreachable from the CI runner.  Route the
+  # gather through the bastion: copy the installer binary and SSH key to
+  # the bastion, run "openshift-install gather bootstrap" there (the
+  # bastion can reach private IPs within the VPC), then copy the
+  # log-bundle back.  For the connected path (no bastion) the existing
+  # direct gather is preserved.
   log "[\${handler_name}]: Attempting to collect bootstrap logs..."
   {
     make_install_dir
     if ! command -v openshift-install &> /dev/null; then
       log "[\${handler_name}]: ERROR: openshift-install not found, cannot gather bootstrap logs"
+    elif [[ -s "\${SHARED_DIR}/bastion_public_address" ]] && [[ -s "\${SHARED_DIR}/bastion_ssh_user" ]]; then
+      # Bastion-routed gather for private bootstrap
+      local bastion_dns bastion_user gather_args installer_bin
+      bastion_dns=\$(<\${SHARED_DIR}/bastion_public_address)
+      bastion_user=\$(<\${SHARED_DIR}/bastion_ssh_user)
+      installer_bin=\$(which openshift-install)
+      gather_args=\$(<\${SHARED_DIR}/GATHER_BOOTSTRAP_ARGS 2>/dev/null || echo "--bootstrap \${BOOTSTRAP_IP}")
+      local ssh_opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+      log "[\${handler_name}]: Routing gather through bastion \${bastion_dns}"
+
+      # Ensure our UID is in /etc/passwd (required for SSH/SCP)
+      if ! whoami &> /dev/null; then
+        if [[ -w /etc/passwd ]]; then
+          echo "\${USER_NAME:-default}:x:\$(id -u):0:\${USER_NAME:-default} user:\${HOME}:/sbin/nologin" >> /etc/passwd
+        fi
+      fi
+
+      # Copy installer binary and SSH key to bastion
+      scp \${ssh_opts} -i "\${SSH_PRIV_KEY_PATH}" "\${installer_bin}" "\${bastion_user}@\${bastion_dns}:/tmp/" || true
+      scp \${ssh_opts} -i "\${SSH_PRIV_KEY_PATH}" "\${SSH_PRIV_KEY_PATH}" "\${bastion_user}@\${bastion_dns}:/tmp/ssh-gatherkey" || true
+
+      # Run gather on bastion (bastion can reach private bootstrap/masters)
+      # Disable tracing to avoid logging SSH key path in detail
+      ssh \${ssh_opts} -i "\${SSH_PRIV_KEY_PATH}" "\${bastion_user}@\${bastion_dns}" \
+        "/tmp/openshift-install gather bootstrap --key /tmp/ssh-gatherkey \${gather_args} --log-level debug 2>/tmp/gather-bootstrap.log; rm -f /tmp/ssh-gatherkey" || true
+
+      # Copy results back to artifact dir
+      scp \${ssh_opts} -i "\${SSH_PRIV_KEY_PATH}" "\${bastion_user}@\${bastion_dns}:/tmp/gather-bootstrap.log" "\${ARTIFACT_DIR}/" 2>/dev/null || true
+      scp \${ssh_opts} -i "\${SSH_PRIV_KEY_PATH}" "\${bastion_user}@\${bastion_dns}:/tmp/log-bundle-*.tar.gz" "\${ARTIFACT_DIR}/" 2>/dev/null || true
     else
+      # Direct gather for connected path (bootstrap has public IP)
       openshift-install gather bootstrap --key "\${SSH_PRIV_KEY_PATH}" --bootstrap "\${BOOTSTRAP_IP}" || true
       cp log-bundle-*.tar.gz "\${ARTIFACT_DIR}" || true
     fi
