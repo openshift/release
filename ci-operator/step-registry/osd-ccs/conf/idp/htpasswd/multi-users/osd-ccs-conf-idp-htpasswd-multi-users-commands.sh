@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set +x
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -13,6 +14,35 @@ read_profile_file() {
   fi
 }
 
+ocm_login_with_retry() {
+  local attempt output status failure_class delay started
+  for attempt in 1 2 3; do
+    started=${SECONDS}
+    if output=$(ocm login "$@" 2>&1); then
+      echo "OCM login attempt ${attempt}/3 succeeded after $((SECONDS - started))s"
+      return 0
+    else
+      status=$?
+    fi
+
+    case "${output,,}" in
+      *invalid_client*|*invalid_grant*|*invalid*credentials*|*unauthorized*|*forbidden*)
+        failure_class=authentication ;;
+      *"connection reset by peer"*|*"net/http: tls handshake timeout"*)
+        failure_class=transport ;;
+      *)
+        failure_class=unrecognized ;;
+    esac
+    echo "OCM login attempt ${attempt}/3 failed after $((SECONDS - started))s (${failure_class})" >&2
+    if [[ "${failure_class}" != transport || "${attempt}" == 3 ]]; then
+      return "${status}"
+    fi
+    delay=$((attempt * 2))
+    echo "Retrying OCM login in ${delay}s" >&2
+    sleep "${delay}"
+  done
+}
+
 # Log in
 OCM_VERSION=$(ocm version)
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
@@ -20,10 +50,10 @@ SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
 OCM_TOKEN=$(read_profile_file "ocm-token")
 if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
   echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
-  ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+  ocm_login_with_retry --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
 elif [[ -n "${OCM_TOKEN}" ]]; then
   echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
-  ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
+  ocm_login_with_retry --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 else
   echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
   exit 1
