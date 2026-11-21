@@ -55,7 +55,9 @@ if [[ "${BASH_SOURCE[0]:-$0}" != "$0" ]]; then
 fi
 
 LEASE_NAMESPACE="${LEASE_NAMESPACE:-rosa-cluster-lease}"
-LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
+# Overridable only so hack/tests can run this script; the step does not declare
+# it in its ref, so ci-operator always leaves the mounted credential path below.
+LEASE_HOST_KUBECONFIG="${LEASE_HOST_KUBECONFIG:-/etc/rosa-cluster-lease-manager/kubeconfig}"
 OCM_LOGIN_ENV="${OCM_LOGIN_ENV:-staging}"
 STALE_LEASE_HOURS="${STALE_LEASE_HOURS:-1}"
 ERROR_REPLACE_HOURS="${ERROR_REPLACE_HOURS:-1}"
@@ -639,7 +641,29 @@ log "Phase 4: Health checking existing clusters"
 ACTUAL_CMS=$(lease_oc get configmap -n "${LEASE_NAMESPACE}" -l "rosa-cluster-lease/managed=true" -o json 2>/dev/null || echo '{"items":[]}')
 ACTUAL_COUNT=$(echo "${ACTUAL_CMS}" | jq '.items | length')
 
+# Summary counters:
+#   HEALTHY       clusters the run leaves usable: available ones that passed
+#                 every check below, in-use ones OCM reports ready, clusters
+#                 that finished installing during the run, and clusters
+#                 restored from error. Also maintenance clusters (upgrading or
+#                 being refreshed), unconditionally: they are not leasable, but
+#                 folding them into HEALTHY is pre-existing behaviour this
+#                 change does not alter.
+#   PROVISIONING  clusters OCM is still building (pending/installing/waiting),
+#                 counted apart from HEALTHY so in-flight capacity is not
+#                 reported as usable.
+#   UNHEALTHY     clusters the run found or left unusable: the ones it marks
+#                 error, in-use ones with a bad OCM status (reported only, no
+#                 action while a job holds them), provisioning ones that are
+#                 gone from OCM, and clusters already in error whose restore
+#                 this run defers.
+#   RECOVERED     stale leases released back to the pool.
+# Clusters left for the next reconcile are counted in none of these -- OCM
+# unreachable, an unexpected OCM state, or a ready cluster whose data was
+# incomplete or whose patch failed -- so the totals may be lower than the
+# inventory.
 HEALTHY=0
+PROVISIONING=0
 UNHEALTHY=0
 RECOVERED=0
 
@@ -808,8 +832,9 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
             fi
             UNHEALTHY=$((UNHEALTHY + 1))
         elif [[ "${OCM_CHECK_STATUS}" == "pending" || "${OCM_CHECK_STATUS}" == "installing" || "${OCM_CHECK_STATUS}" == "waiting" ]]; then
+            # Still building in OCM: not an error, but not usable capacity either.
             echo "PROVISIONING: ${CM_NAME} (OCM: ${OCM_CHECK_STATUS})" >> "${REPORT}"
-            HEALTHY=$((HEALTHY + 1))
+            PROVISIONING=$((PROVISIONING + 1))
         else
             log "WARNING: ${CM_NAME} has unexpected OCM state ${OCM_CHECK_STATUS}, leaving provisioning for retry"
             echo "SKIPPED: ${CM_NAME} (unexpected OCM state: ${OCM_CHECK_STATUS})" >> "${REPORT}"
@@ -1315,7 +1340,7 @@ for i in $(seq 0 $((FINAL_COUNT - 1))); do
 done
 
 echo "" >> "${REPORT}"
-echo "Summary: ${HEALTHY} healthy, ${UNHEALTHY} unhealthy, ${RECOVERED} recovered" >> "${REPORT}"
+echo "Summary: ${HEALTHY} healthy, ${PROVISIONING} provisioning, ${UNHEALTHY} unhealthy, ${RECOVERED} recovered" >> "${REPORT}"
 
-log "Controller reconcile complete"
+log "Controller reconcile complete: ${HEALTHY} healthy, ${PROVISIONING} provisioning, ${UNHEALTHY} unhealthy, ${RECOVERED} recovered"
 cat "${REPORT}"
