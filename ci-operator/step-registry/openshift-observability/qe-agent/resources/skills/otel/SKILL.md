@@ -72,7 +72,7 @@ If `qe-agent-context.json` does not exist, infer the suite from the JUnit file n
 
 ## Step 1 — Parse JUnit XMLs and Identify Failures
 
-Mandatory. Read `/tmp/qe-agent-modules/junit-triage.md` and follow it. Typical shared root causes here: operator crash, missing CRD, install failure. Representative test: the one with the fewest steps in `chainsaw-test.yaml`. If missing: read `${SHARED_DIR}/qe-agent-junit-*.xml`, extract each suite name and failed `<testcase>` (`<failure>`/`<error>` message and full text), group by suite, and exit with a clear message if there are no files. If more than 5 tests fail, look for one shared root cause and diagnose the simplest failing test as the representative (Steps 2–5); with no pattern, diagnose individually, capped at 3. Write any pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.md`.
+Mandatory. Read `/tmp/qe-agent-modules/junit-triage.md` and follow it. Typical shared root causes here: operator crash, missing CRD, install failure. Representative test: the one with the fewest steps in `chainsaw-test.yaml`. If missing: read `${QE_JUNIT_DIR}/qe-agent-junit-*.xml`, extract each suite name and failed `<testcase>` (`<failure>`/`<error>` message and full text), group by suite, and exit with a clear message if there are no files. If more than 5 tests fail, look for one shared root cause and diagnose the simplest failing test as the representative (Steps 2–5); with no pattern, diagnose individually, capped at 3. Write any pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.md`.
 
 ---
 
@@ -335,6 +335,6 @@ Mandatory. Follow "Analysis summary" in `/tmp/qe-agent-modules/analysis-summary.
 - The cluster is already provisioned and the OpenTelemetry operator is already installed — do not reinstall the operator
 - The test repo is set up by Step 0b using commands from the fetched step script — the repo path is the destination shown in the script (e.g., `/tmp/opentelemetry-tests`). The qe-agent runs in a fresh pod so `/tmp/` is always empty at start; Step 0b populates it
 - `$KUBECONFIG` is set and points to the test cluster; `oc`, `kubectl`, and `chainsaw` are available in PATH
-- All output files must go to `$ARTIFACT_DIR` (uploaded to GCS by the sidecar) or `$SHARED_DIR` (accessible to other steps)
+- All output files must go to `$ARTIFACT_DIR` (uploaded to GCS by the sidecar). Never write into `$SHARED_DIR`: it is a 1 MiB Kubernetes Secret synced when this pod exits, and files written there can fail the step.
 - **Namespace restriction**: You MUST NOT access, read, list, or modify any resources in the `kube-system` namespace. This namespace contains cloud provider credentials and platform-critical components. Do not run `oc get`, `oc describe`, `oc logs`, `kubectl`, or any other command that targets `kube-system`. If a diagnostic command defaults to all namespaces (e.g., `oc get pods -A`), filter out `kube-system` from the output before analysis
 - This step runs `best_effort: true` — always exit 0 even if analysis is incomplete
