@@ -1,0 +1,31 @@
+ref:
+  as: openshift-topology-transition-scaling-check-scaling
+  from: upi-installer
+  commands: openshift-topology-transition-scaling-check-scaling-commands.sh
+  timeout: 70m
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 500Mi
+  documentation: 'Verify the inventory from add-nodes: expected names, requested roles,
+    Ready state, and uncordoned nodes. Infra taints are allowed. Optional compact-worker
+    and etcd checks support callers with control-plane targets. Does not change node
+    or cluster policy.'
+  env:
+  - name: NODE_INVENTORY
+    default: expected-nodes.json
+    documentation: Remote inventory file to check. Defaults to the latest add-nodes
+      batch.
+  - name: EXPECTED_NODES
+    default: ''
+    documentation: Optional exact total cluster node count; empty only checks inventory
+      entries.
+  - name: ETCD_VOTING_MEMBERS
+    default: ''
+    documentation: Optional exact count of healthy voting etcd members; empty skips
+      etcd checks.
+  - name: CONTROL_PLANE_AS_WORKERS
+    default: 'false'
+    documentation: Require inventoried control-plane nodes to have worker roles and
+      no scheduling-blocking taints.
