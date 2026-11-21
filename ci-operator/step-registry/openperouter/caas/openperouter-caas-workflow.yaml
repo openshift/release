@@ -1,0 +1,24 @@
+workflow:
+  as: openperouter-caas
+  steps:
+    pre:
+    - ref: ofcir-acquire
+    - ref: ipi-install-rbac
+    - ref: openperouter-caas-setup
+    test:
+    - ref: openperouter-e2e-day0
+    post:
+    - ref: ofcir-release
+    env:
+      DEPLOYMENT_MODE: day0
+      DATAPLANE: kernel
+  documentation: |-
+    OpenPERouter CaaS workflow. Acquires a single bare-metal host via OFCIR
+    (unlike baremetalds-e2e, no dev-scripts cluster is provisioned), checks
+    out the OpenPERouter day0 OpenShift repository on the host, and hands
+    over to custom steps that set up the virtual environment and deploy and
+    test OpenShift with OpenPERouter.
+
+    Variables (overridable per test in the ci-operator config):
+    - DEPLOYMENT_MODE: day0 or standard (default: standard)
+    - DATAPLANE: kernel or grout (default: kernel)
