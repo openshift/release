@@ -180,6 +180,12 @@ test-tls-scanner:
 # Use the same local config and registry validation as make jobs.
 validate-step-registry: ci-operator-checkconfig
 
+# Exercises the AWS failure diagnostics capture and its post step against
+# fixtures. Needs bash, python3 and jq; makes no cloud call.
+test-aws-failure-diagnostics:
+	hack/tests/aws-failure-diagnostics/run-tests.sh
+.PHONY: test-aws-failure-diagnostics
+
 python-validation: 
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) quay.io/openshift/ci-public:ci_python-validation_latest
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" quay.io/openshift/ci-public:ci_python-validation_latest cd /release && pylint --rcfile=hack/.pylintrc --ignore=lib,image-mirroring --persistent=n hack
