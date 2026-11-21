@@ -1,17 +1,17 @@
 chain:
   as: platform-external-cluster-aws-post-disconnected
   steps:
-  - ref: gather-installer-boostrap-logs-in-bastion
   - ref: platform-external-cluster-aws-destroy
   - ref: aws-deprovision-s3buckets
   - ref: aws-deprovision-stacks
   documentation: |-
-    Deprovisions a disconnected platform-external AWS cluster. Gathers
-    bootstrap logs via the bastion host (bootstrap is on a private subnet
-    and not directly reachable), then runs cleanup in order: (1) delete
-    the CloudFormation stacks created by the install step (compute,
-    control-plane, bootstrap, security, infra), (2) delete S3 buckets
-    used for bootstrap and bastion ignition, (3) delete the bastion host
-    and disconnected VPC CloudFormation stacks tracked in
-    to_be_removed_cf_stack_list. Cleanup continues on best-effort when
-    allow_best_effort_post_steps is set at the workflow level.
+    Deprovisions a disconnected platform-external AWS cluster. Runs
+    cleanup in order: (1) delete the CloudFormation stacks created by
+    the install step (compute, control-plane, bootstrap, security,
+    infra), (2) delete S3 buckets used for bootstrap and bastion
+    ignition, (3) delete the bastion host and disconnected VPC
+    CloudFormation stacks tracked in to_be_removed_cf_stack_list.
+    Bootstrap log gathering on install failure is handled by the
+    collect_bootstrap_error_handler in init-fn.sh (best-effort via
+    SSH to the bootstrap private IP). Cleanup continues on best-effort
+    when allow_best_effort_post_steps is set at the workflow level.

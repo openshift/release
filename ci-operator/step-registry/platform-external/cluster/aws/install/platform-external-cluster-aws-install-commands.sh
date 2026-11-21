@@ -166,14 +166,24 @@ if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
     exit 1
   fi
 
-  # Fall back to first subnet when only one AZ is available
+  # Fall back to first subnet when only one AZ is available.
+  # Per-node placement (Master2Subnet, worker Subnet) may reuse an AZ.
   PRIVATE_SUBNET_1="${PRIVATE_SUBNET_1:-${PRIVATE_SUBNET_0}}"
   PRIVATE_SUBNET_2="${PRIVATE_SUBNET_0}"
   PUBLIC_SUBNET_1="${PUBLIC_SUBNET_1:-${PUBLIC_SUBNET_0}}"
 
-  # Build the comma-separated formats expected by downstream CF parameters
-  PRIVATE_SUBNETS="\"${PRIVATE_SUBNET_0},${PRIVATE_SUBNET_1}\""
-  PUBLIC_SUBNETS="\"${PUBLIC_SUBNET_0},${PUBLIC_SUBNET_1}\""
+  # Build the comma-separated subnet lists for CF parameters (NLBs, etc.).
+  # NLBs require unique subnet IDs — deduplicate when a single AZ is used.
+  if [[ "${PRIVATE_SUBNET_0}" == "${PRIVATE_SUBNET_1}" ]]; then
+    PRIVATE_SUBNETS="\"${PRIVATE_SUBNET_0}\""
+  else
+    PRIVATE_SUBNETS="\"${PRIVATE_SUBNET_0},${PRIVATE_SUBNET_1}\""
+  fi
+  if [[ "${PUBLIC_SUBNET_0}" == "${PUBLIC_SUBNET_1}" ]]; then
+    PUBLIC_SUBNETS="\"${PUBLIC_SUBNET_0}\""
+  else
+    PUBLIC_SUBNETS="\"${PUBLIC_SUBNET_0},${PUBLIC_SUBNET_1}\""
+  fi
 
   log "VPC_ID=${VPC_ID}"
   log "PRIVATE_SUBNETS=${PRIVATE_SUBNETS}"
