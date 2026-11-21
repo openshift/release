@@ -268,56 +268,8 @@ INGRESS_HTTP_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputK
 INGRESS_HTTPS_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "IngressHTTPSTargetGroupArn").OutputValue')"
 PRIVATE_HOSTED_ZONE="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "PrivateHostedZoneId").OutputValue')"
 
-if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
-  # In disconnected mode, the CF template's private-zone *.apps record points
-  # to the external NLB (public subnets).  Nodes on private subnets without
-  # NAT cannot reach public NLB IPs, so ingress health checks fail.  Fix by
-  # adding ingress listeners (80/443) to the internal NLB and updating the
-  # *.apps record in the private hosted zone to point to it.
-  INTERNAL_NLB_ARN="$(aws elbv2 describe-load-balancers \
-    --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].LoadBalancerArn" \
-    --output text)"
-  INTERNAL_NLB_HZ="$(aws elbv2 describe-load-balancers \
-    --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].CanonicalHostedZoneId" \
-    --output text)"
-  INTERNAL_NLB_DNS="$(aws elbv2 describe-load-balancers \
-    --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].DNSName" \
-    --output text)"
-
-  if [[ -n "${INTERNAL_NLB_ARN}" ]]; then
-    log "Adding ingress listeners (80/443) to internal NLB ${INTERNAL_NLB_ARN}"
-    aws elbv2 create-listener \
-      --load-balancer-arn "${INTERNAL_NLB_ARN}" \
-      --protocol TCP --port 80 \
-      --default-actions "Type=forward,TargetGroupArn=${INGRESS_HTTP_TARGET_GROUP}" || true
-    aws elbv2 create-listener \
-      --load-balancer-arn "${INTERNAL_NLB_ARN}" \
-      --protocol TCP --port 443 \
-      --default-actions "Type=forward,TargetGroupArn=${INGRESS_HTTPS_TARGET_GROUP}" || true
-
-    log "Updating *.apps record in private hosted zone to point to internal NLB"
-    APPS_RECORD="*.apps.${CLUSTER_NAME}.${base_domain}"
-    aws route53 change-resource-record-sets \
-      --hosted-zone-id "${PRIVATE_HOSTED_ZONE}" \
-      --change-batch "{
-        \"Changes\": [{
-          \"Action\": \"UPSERT\",
-          \"ResourceRecordSet\": {
-            \"Name\": \"${APPS_RECORD}\",
-            \"Type\": \"A\",
-            \"AliasTarget\": {
-              \"HostedZoneId\": \"${INTERNAL_NLB_HZ}\",
-              \"DNSName\": \"${INTERNAL_NLB_DNS}\",
-              \"EvaluateTargetHealth\": false
-            }
-          }
-        }]
-      }" || true
-    log "Internal ingress routing configured for disconnected"
-  else
-    log "WARNING: Could not find internal NLB ARN; *.apps may be unreachable from private subnets"
-  fi
-fi
+# Ingress routing for disconnected is configured after workers are deployed
+# (see end of script) because target groups require worker IPs.
 
 echo "========================="
 echo "CREATING STACK: SECURITY"
@@ -509,3 +461,90 @@ echo -e "control-plane: ${CONTROL_PLANE_0_IP} ${CONTROL_PLANE_1_IP} ${CONTROL_PL
 echo -e "compute: ${COMPUTE_0_IP} ${COMPUTE_1_IP} ${COMPUTE_2_IP}"
 
 echo "${GATHER_BOOTSTRAP_ARGS}" > "${SHARED_DIR}"/GATHER_BOOTSTRAP_ARGS
+
+if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
+  # In disconnected mode, the CF template's private-zone *.apps record
+  # points to the external NLB (public subnets).  Nodes on private subnets
+  # without NAT cannot reach public NLB IPs, so ingress health checks fail.
+  # Fix: create new internal ingress target groups on the internal NLB,
+  # register worker IPs, add listeners, and update the *.apps DNS record
+  # in the private hosted zone. AWS NLB target groups can only belong to
+  # one load balancer, so we cannot reuse the external NLB's target groups.
+  INTERNAL_NLB_ARN="$(aws elbv2 describe-load-balancers \
+    --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].LoadBalancerArn" \
+    --output text)"
+  INTERNAL_NLB_HZ="$(aws elbv2 describe-load-balancers \
+    --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].CanonicalHostedZoneId" \
+    --output text)"
+  INTERNAL_NLB_DNS="$(aws elbv2 describe-load-balancers \
+    --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].DNSName" \
+    --output text)"
+
+  if [[ -n "${INTERNAL_NLB_ARN}" ]]; then
+    log "Creating internal ingress target groups and listeners"
+    INT_HTTP_TG_ARN="$(aws elbv2 create-target-group \
+      --name "${INFRA_ID:0:20}-int-http" \
+      --protocol TCP --port 80 \
+      --vpc-id "${VPC_ID}" \
+      --target-type ip \
+      --health-check-protocol TCP \
+      --health-check-port 80 \
+      --query 'TargetGroups[0].TargetGroupArn' --output text)" || true
+    INT_HTTPS_TG_ARN="$(aws elbv2 create-target-group \
+      --name "${INFRA_ID:0:20}-int-https" \
+      --protocol TCP --port 443 \
+      --vpc-id "${VPC_ID}" \
+      --target-type ip \
+      --health-check-protocol TCP \
+      --health-check-port 443 \
+      --query 'TargetGroups[0].TargetGroupArn' --output text)" || true
+
+    if [[ -n "${INT_HTTP_TG_ARN}" ]] && [[ -n "${INT_HTTPS_TG_ARN}" ]]; then
+      # Register worker IPs to internal target groups
+      # shellcheck disable=SC2153
+      for WORKER_IP in ${COMPUTE_0_IP} ${COMPUTE_1_IP} ${COMPUTE_2_IP}; do
+        aws elbv2 register-targets --target-group-arn "${INT_HTTP_TG_ARN}" \
+          --targets "Id=${WORKER_IP}" || true
+        aws elbv2 register-targets --target-group-arn "${INT_HTTPS_TG_ARN}" \
+          --targets "Id=${WORKER_IP}" || true
+      done
+
+      # Add listeners on internal NLB
+      aws elbv2 create-listener \
+        --load-balancer-arn "${INTERNAL_NLB_ARN}" \
+        --protocol TCP --port 80 \
+        --default-actions "Type=forward,TargetGroupArn=${INT_HTTP_TG_ARN}" || true
+      aws elbv2 create-listener \
+        --load-balancer-arn "${INTERNAL_NLB_ARN}" \
+        --protocol TCP --port 443 \
+        --default-actions "Type=forward,TargetGroupArn=${INT_HTTPS_TG_ARN}" || true
+
+      # Save for cleanup
+      echo "${INT_HTTP_TG_ARN}" >> "${SHARED_DIR}/disconnected_tg_arns"
+      echo "${INT_HTTPS_TG_ARN}" >> "${SHARED_DIR}/disconnected_tg_arns"
+
+      log "Updating *.apps in private hosted zone to internal NLB"
+      aws route53 change-resource-record-sets \
+        --hosted-zone-id "${PRIVATE_HOSTED_ZONE}" \
+        --change-batch "{
+          \"Changes\": [{
+            \"Action\": \"UPSERT\",
+            \"ResourceRecordSet\": {
+              \"Name\": \"*.apps.${CLUSTER_NAME}.${base_domain}\",
+              \"Type\": \"A\",
+              \"AliasTarget\": {
+                \"HostedZoneId\": \"${INTERNAL_NLB_HZ}\",
+                \"DNSName\": \"${INTERNAL_NLB_DNS}\",
+                \"EvaluateTargetHealth\": false
+              }
+            }
+          }]
+        }" || true
+      log "Internal ingress routing configured for disconnected"
+    else
+      log "WARNING: Failed to create internal ingress target groups"
+    fi
+  else
+    log "WARNING: Could not find internal NLB; *.apps may be unreachable from private subnets"
+  fi
+fi
