@@ -8,6 +8,16 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.24-openshift-4.22
+images:
+  items:
+  - dockerfile_literal: |
+      FROM src
+      WORKDIR /go/src/github.com/stolostron/policy-collection
+      RUN cd openshift-tests-ext && make build
+      RUN cp openshift-tests-ext/acm-policy-tests /usr/bin/openshift-tests-extension
+      RUN gzip -f -k /usr/bin/openshift-tests-extension
+    from: src
+    to: acm-policy-ote
 releases:
   initial:
     release:
