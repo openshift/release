@@ -63,6 +63,12 @@ fi
 log "openshift-install version used for bootimage discovery:"
 "${INSTALLER_BINARY}" version | grep -E "(openshift-install|build|release|architecture)"
 
+# Save installer binary to SHARED_DIR so downstream steps (e.g.
+# ready-control error handler) can use it even when running from a
+# different base image (from: cli).
+cp -f "${INSTALLER_BINARY}" "${SHARED_DIR}/openshift-install"
+chmod +x "${SHARED_DIR}/openshift-install"
+
 #
 # Discover RHCOS image to use for the cluster
 #
