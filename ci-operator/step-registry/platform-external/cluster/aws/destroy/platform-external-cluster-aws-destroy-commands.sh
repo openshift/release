@@ -78,27 +78,12 @@ if [[ ! -f "${stacks_file}" ]]; then
   exit 0
 fi
 
-# Clean up disconnected internal ingress listeners and target groups BEFORE
-# deleting CF stacks — the infra stack owns the internal NLB, and it cannot
-# be deleted while our manually-added listeners reference target groups.
+delete_stacks
+
+# Clean up disconnected internal ingress target groups (not managed by CF)
 if [[ -f "${SHARED_DIR}/disconnected_tg_arns" ]]; then
-  log "Cleaning up disconnected internal ingress listeners and target groups"
-  # Find and delete listeners we added to the internal NLB (ports 80/443)
-  INTERNAL_NLB_ARN="$(aws --region "${REGION}" elbv2 describe-load-balancers \
-    --query "LoadBalancers[?contains(LoadBalancerName, '-int')].LoadBalancerArn" \
-    --output text 2>/dev/null)" || true
-  if [[ -n "${INTERNAL_NLB_ARN}" ]]; then
-    for LISTENER_ARN in $(aws --region "${REGION}" elbv2 describe-listeners \
-      --load-balancer-arn "${INTERNAL_NLB_ARN}" \
-      --query "Listeners[?Port==\`80\` || Port==\`443\`].ListenerArn" \
-      --output text 2>/dev/null); do
-      aws --region "${REGION}" elbv2 delete-listener --listener-arn "${LISTENER_ARN}" 2>/dev/null || true
-    done
-  fi
-  # Delete target groups
+  log "Cleaning up disconnected internal ingress target groups"
   while IFS= read -r tg_arn; do
     aws --region "${REGION}" elbv2 delete-target-group --target-group-arn "${tg_arn}" 2>/dev/null || true
   done < "${SHARED_DIR}/disconnected_tg_arns"
 fi
-
-delete_stacks
