@@ -33,7 +33,9 @@ _propagate_junit () {
 # Test Reporting:
 #   - Results are recorded in JUnit XML format
 #   - JUnit XML is generated on exit (via trap) regardless of test results
-#   - Script always exits 0 to allow subsequent Prow test steps to run
+#   - Script exits nonzero when any test case is marked failed (the
+#     preflight failure paths and the end-of-script status check); a
+#     fully skipped report exits 0
 #   - Individual test failures are visible in Prow UI via JUnit reporting
 #
 ################################################################################
@@ -153,10 +155,29 @@ function RunTestCase1 () {
     cd policy-collection/deploy/ || return 1
     echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp || return 1
 
-    sleep 60
-
-    # Verify e2e-opp namespace was created
-    oc get namespace e2e-opp || return 1
+    # The e2e-opp namespace and the httpd-example buildconfig are created
+    # by policy remediation, which can lag well past a minute on loaded
+    # clusters (observed: policies still Pending after the previous fixed
+    # 60s sleep, so the build trigger hit a missing buildconfig). A
+    # rehearsal of this step then showed roughly 11 minutes from policy
+    # landing to the dependent ConfigurationPolicy creating the
+    # buildconfig, which arrived 60s after a 600s budget had expired even
+    # though the rest of the pipeline completed once it existed. Wait for
+    # both within one bounded budget instead of racing a fixed sleep; the
+    # 1200s budget covers that gate latency with margin and leaves the
+    # case well inside the step's 1h timeout next to the fixed 10m
+    # deployment wait that follows.
+    typeset -i remediationDeadline=$(( $(date +%s) + 1200 ))
+    # Best Practices: oc wait --for=create for a not-yet-created object
+    # (an existence poll with sleep is the fixed-sleep violation). Both
+    # waits below charge the one shared deadline.
+    typeset -i _waitBudget=$(( remediationDeadline - $(date +%s) ))
+    if ! oc wait namespace/e2e-opp --for=create --timeout="${_waitBudget}s"; then
+        : "ERROR: e2e-opp namespace was not created within 20m of deploy"
+        : "=== Policy Status ==="
+        oc get policies -n policies | sed -n '/example/p' || true
+        return 1
+    fi
 
     oc label managedcluster local-cluster oppapps=httpd-example --overwrite
 
@@ -165,6 +186,16 @@ function RunTestCase1 () {
     oc get build -n e2e-opp || true
     oc get po -n e2e-opp || true
     oc get deployment -n e2e-opp || true
+
+    # Wait for the buildconfig policy to remediate before triggering a
+    # build; oc start-build fails when the buildconfig does not exist yet.
+    _waitBudget=$(( remediationDeadline - $(date +%s) ))
+    if (( _waitBudget <= 0 )) || ! oc wait buildconfig/httpd-example -n e2e-opp --for=create --timeout="${_waitBudget}s"; then
+        : "ERROR: buildconfig httpd-example was not created within 20m of deploy"
+        : "=== Policy Status ==="
+        oc get policies -n policies | sed -n '/example/p' || true
+        return 1
+    fi
 
     # Trigger build if needed
     typeset latestBuildName=""
@@ -287,9 +318,10 @@ function RunTestCase2 () {
     if (( acsPasswordRc != 0 )) || (( acsHostRc != 0 )) || [[ -z "${acsPasswordB64}" ]] || [[ "${acsPasswordB64}" == "null" ]] || [[ -z "${acsHostB64}" ]] || [[ "${acsHostB64}" == "null" ]]; then
         acsCredsMissing=1
     else
-        acsPassword=$(printf '%s' "${acsPasswordB64}" | base64 -d)
-        acsHost=$(printf '%s' "${acsHostB64}" | base64 -d)
-        if [[ -z "${acsPassword}" ]] || [[ -z "${acsHost}" ]]; then
+        typeset -i _passRc=0 _hostRc=0
+        acsPassword=$(printf '%s' "${acsPasswordB64}" | base64 -d) || _passRc=$?
+        acsHost=$(printf '%s' "${acsHostB64}" | base64 -d) || _hostRc=$?
+        if (( _passRc != 0 )) || (( _hostRc != 0 )) || [[ -z "${acsPassword}" ]] || [[ -z "${acsHost}" ]]; then
             acsCredsMissing=1
         fi
     fi
@@ -378,9 +410,31 @@ fi
 # missing" (fail).  On OCP versions where the Quay Bridge Operator is not
 # available in the catalog the QuayIntegration CRD will be absent entirely;
 # that is an environment limitation, not a test failure.
+# Bounded retry for the read-only preflight queries below. The Quay check is
+# now a hard failure, so a single transient apiserver error would red a gating
+# lane on a hiccup; each attempt is also time-boxed so a hung apiserver fails
+# the step inside the pod timeout instead of stalling it.
+_oc_query_bounded() {
+    typeset -i _attempts="${1:-3}"
+    shift
+    typeset -i _i=1 _rc=0
+    while (( _i <= _attempts )); do
+        if "$@" "--request-timeout=30s" 2>/dev/null; then
+            return 0
+        else
+            _rc=$?
+        fi
+        if (( _i < _attempts )); then
+            sleep $(( _i * 5 ))
+        fi
+        (( _i += 1 ))
+    done
+    return "${_rc}"
+}
+
 typeset apiOutput=""
 typeset -i apiRc=0
-apiOutput=$(oc api-resources --api-group=quay.redhat.com) || apiRc=$?
+apiOutput=$(_oc_query_bounded 3 oc api-resources --api-group=quay.redhat.com) || apiRc=$?
 
 if ((apiRc != 0)); then
     : "WARNING: oc api-resources failed (rc=${apiRc}) - cannot determine CRD presence, falling through to CR check"
@@ -398,7 +452,7 @@ fi
 
 typeset getOutput=""
 typeset -i getRc=0
-getOutput=$(oc get quayintegration quay --ignore-not-found -o name) || getRc=$?
+getOutput=$(_oc_query_bounded 3 oc get quayintegration quay --ignore-not-found -o name) || getRc=$?
 
 if ((getRc != 0)); then
     : "WARNING: oc get quayintegration failed (rc=${getRc}) - cluster API error"
@@ -409,7 +463,8 @@ if ((getRc != 0)); then
         testFailureMsg["${test}"]="oc get quayintegration failed (rc=${getRc}) - cluster API error"
     done
 
-    exit 0
+    echo "ERROR: oc get quayintegration failed (rc=${getRc}) with all test cases marked failed; failing the step." >&2
+    exit 1
 elif [[ -z "${getOutput}" ]]; then
     : "ERROR: QuayIntegration CRD exists but CR 'quay' not found!"
     : "OPP bundle components are not properly configured."
@@ -420,11 +475,12 @@ elif [[ -z "${getOutput}" ]]; then
         testFailureMsg["${test}"]="QuayIntegration CR 'quay' not found - OPP bundle not configured"
     done
 
-    exit 0
+    echo "ERROR: QuayIntegration CR 'quay' not found with all test cases marked failed; failing the step." >&2
+    exit 1
 fi
 
 : "QuayIntegration quay found"
-oc get quayintegration quay -o yaml --ignore-not-found
+oc get quayintegration quay -o yaml --ignore-not-found || true
 
 ################################################################################
 # Execute Test Cases

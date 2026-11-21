@@ -40,9 +40,23 @@ _opp_trap_handler() {
   typeset exitCode=$?
   set +e
   _opp_cleanup "${exitCode}"
-  type -t GenerateJunit >/dev/null && GenerateJunit
+  # PRRT_kwDOBHvUUM65LZ3D: JUnit generation failure on success path should exit 1
+  typeset _genRc=0
+  type -t GenerateJunit >/dev/null && GenerateJunit || _genRc=$?
   type -t _propagate_junit >/dev/null && _propagate_junit
   type -t PostProcessJunit >/dev/null && PostProcessJunit
+  # If report generation failed and original exit was success, fail the step
+  if (( _genRc != 0 && exitCode == 0 )); then
+      echo "ERROR: JUnit report generation failed for otherwise successful run" >&2
+      exit 1
+  fi
+  # Verify at least one valid report reached SHARED_DIR or ARTIFACT_DIR
+  if (( exitCode == 0 )); then
+      if ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${junitFile}')" 2>/dev/null && ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${SHARED_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml')" 2>/dev/null; then
+          echo "ERROR: no valid JUnit report in ${junitFile} or SHARED_DIR for successful run" >&2
+          exit 1
+      fi
+  fi
   true
 }
 trap '_opp_trap_handler' EXIT
@@ -75,6 +89,10 @@ imageTag="${BUILD_ID:-$(date +%s)}"
 # subshell with xtrace disabled, read by the ACS helpers through
 # process-substitution curl configs, removed in Main.
 typeset acsPassFile='/tmp/acs-admin-password'
+
+EscapeForCurlUser() {
+    sed 's/\\/\\\\/g; s/"/\\"/g'
+}
 
 typeset -A testStatus=()
 typeset -A testDuration=()
@@ -123,7 +141,8 @@ function GenerateJunit () {
         [[ "${testStatus[${t}]}" == "skipped" ]] && skipped=$((skipped + 1))
     done
 
-    cat > "${junitFile}" <<EOF
+    typeset _junitTmp="${junitFile}.tmp"
+    cat > "${_junitTmp}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
   <testsuite name="interop-quay-smoke-acs-odf-registry" tests="${total}" failures="${failures}" errors="0" skipped="${skipped}" time="${elapsed}">
@@ -136,27 +155,38 @@ EOF
         escapedMsg="$(printf '%s' "${testFailureMsg[${t}]}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')"
 
         if [[ "${testStatus[${t}]}" == "failed" ]]; then
-            echo "    <testcase name=\"${escapedName}\" classname=\"interop-quay-smoke-acs-odf-registry\" time=\"${testDuration[${t}]}\"><failure message=\"${escapedMsg}\"><![CDATA[${testFailureMsg[${t}]}]]></failure></testcase>" >> "${junitFile}"
+            typeset safeFailure="${testFailureMsg[${t}]//]]>/]]]]><![CDATA[>}"
+            echo "    <testcase name=\"${escapedName}\" classname=\"interop-quay-smoke-acs-odf-registry\" time=\"${testDuration[${t}]}\"><failure message=\"${escapedMsg}\"><![CDATA[${safeFailure}]]></failure></testcase>" >> "${_junitTmp}"
         elif [[ "${testStatus[${t}]}" == "skipped" ]]; then
-            echo "    <testcase name=\"${escapedName}\" classname=\"interop-quay-smoke-acs-odf-registry\" time=\"${testDuration[${t}]}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
+            echo "    <testcase name=\"${escapedName}\" classname=\"interop-quay-smoke-acs-odf-registry\" time=\"${testDuration[${t}]}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${_junitTmp}"
         else
-            echo "    <testcase name=\"${escapedName}\" classname=\"interop-quay-smoke-acs-odf-registry\" time=\"${testDuration[${t}]}\"/>" >> "${junitFile}"
+            echo "    <testcase name=\"${escapedName}\" classname=\"interop-quay-smoke-acs-odf-registry\" time=\"${testDuration[${t}]}\"/>" >> "${_junitTmp}"
         fi
     done
 
-    cat >> "${junitFile}" <<'EOF'
+    cat >> "${_junitTmp}" <<'EOF'
   </testsuite>
 </testsuites>
 EOF
-    cat "${junitFile}"
+    if python3 -c "import xml.etree.ElementTree as ET; ET.parse('${_junitTmp}')" 2>/dev/null; then
+        mv -f "${_junitTmp}" "${junitFile}"
+        cat "${junitFile}"
+    else
+        echo "ERROR: JUnit report at ${_junitTmp} is invalid or incomplete" >&2
+        rm -f "${_junitTmp}"
+        if (( failures == 0 )); then
+            echo "ERROR: required JUnit artifact not produced for successful run" >&2
+            return 1
+        fi
+    fi
     true
 }
 
 # shellcheck disable=SC2317
 _propagate_junit () {
     [[ -n "${SHARED_DIR:-}" ]] || return 0
-    mkdir -p "${SHARED_DIR}/junit"
-    find "${ARTIFACT_DIR:-}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; || true
+    cp "${junitFile}" "${SHARED_DIR}/" 2>/dev/null || true
+    find "${ARTIFACT_DIR:-}" -name '*.xml' -exec cp {} "${SHARED_DIR}/" \; 2>/dev/null || true
 }
 
 # Load ExitTrap library for JUnit XML post-processing at script level
@@ -165,7 +195,7 @@ eval "$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
-        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
 )"
 
 # Post-process the JUnit XML for Component Readiness routing.  Guarded on
@@ -177,9 +207,19 @@ eval "$(
 # (lowercase junit prefix required) and collides with other steps in
 # shared storage.
 PostProcessJunit () {
+    typeset -i _junitPreSize=0
+    [[ -f "${junitFile}" ]] && _junitPreSize=$(wc -c < "${junitFile}" 2>/dev/null || echo 0)
     if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
-        ExitTrap--PostProcessPrep junit--interop-quay-smoke-acs-odf-registry.xml ||
-            echo "WARNING: junit post-processing failed" >&2
+        # PRRT_kwDOBHvUUM65Mrls: pin jq helper alongside ExitTrap
+        curl -fsSL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq 2>/dev/null && chmod +x /tmp/jq && /tmp/jq --version | grep -q "jq-1.6"
+        ExitTrap--PostProcessPrep junit--interop-quay-smoke-acs-odf-registry.xml
+        typeset -i _junitRc=$?
+        if (( _junitRc != 0 )); then
+            echo "WARNING: junit post-processing failed (rc=${_junitRc})" >&2
+            if (( _junitPreSize > 0 )) && [[ ! -s "${junitFile}" ]]; then
+                echo "WARNING: post-processing removed raw report, size was ${_junitPreSize}" >&2
+            fi
+        fi
     else
         echo "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping" >&2
     fi
@@ -203,8 +243,8 @@ function DiscoverQuay () {
     fi
 
     typeset registryJson="" discoverErr=""
-    if ! registryJson="$(oc get quayregistry --all-namespaces -o json 2>&1)"; then
-        discoverErr="${registryJson}"
+    if ! registryJson="$(oc get quayregistry --all-namespaces -o json 2>"${ARTIFACT_DIR:-/tmp}/quayregistry-err.log")"; then
+        discoverErr="$(cat "${ARTIFACT_DIR:-/tmp}/quayregistry-err.log" 2>/dev/null || echo "oc get failed")"
         echo "ERROR: Failed to query QuayRegistry: ${discoverErr}" >&2
         return 2
     fi
@@ -227,7 +267,9 @@ print(len(json.load(sys.stdin).get('items',[])))
     fi
 
     QUAY_NS="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['namespace'])")"
-    QUAY_REGISTRY="$(oc get quayregistry -n "${QUAY_NS}" -o jsonpath='{.items[0].metadata.name}')"
+    QUAY_REGISTRY="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['name'])")"
+    QUAY_UID="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['uid'])")"
+
     QUAY_HOST="$(oc get quayregistry -n "${QUAY_NS}" "${QUAY_REGISTRY}" -o jsonpath='{.status.registryEndpoint}')"
     QUAY_HOST="${QUAY_HOST#https://}"
     if [[ -z "${QUAY_HOST}" ]]; then
@@ -236,7 +278,7 @@ print(len(json.load(sys.stdin).get('items',[])))
         # not deployed), so the caller fails instead of reporting a skip.
         return 2
     fi
-    export QUAY_NS QUAY_REGISTRY QUAY_HOST
+    export QUAY_NS QUAY_REGISTRY QUAY_HOST QUAY_UID
     true
 }
 
@@ -288,12 +330,20 @@ function GetQuayAuth () {
         typeset initResult=''
         # The payload is built by json.dumps and piped in via stdin, so the
         # generated password is safely escaped and never part of any argv.
-        initResult="$(printf '%s' "${initPassword}" | python3 -c "
+        # PRRT_kwDOBHvUUM65TpNF: single init request with bounded retry
+        typeset -i _initTry=0
+        for _initTry in 1 2 3; do
+            initResult="$(printf '%s' "${initPassword}" | python3 -c "
 import json, sys
 print(json.dumps({'username': 'quayadmin', 'password': sys.stdin.read().strip(), 'email': 'quayadmin@example.com', 'access_token': True}))
-" | curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" \
-                -H "Content-Type: application/json" \
-                -d @-)" || initResult=""
+" | curl -fsS "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" \
+                    -H "Content-Type: application/json" \
+                    -d @-)" || initResult=""
+            if [[ -n "${initResult}" ]]; then
+                break
+            fi
+            sleep $(( _initTry * 2 ))
+        done
 
         QUAY_TOKEN="$(printf '%s' "${initResult}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")" || QUAY_TOKEN=""
         if [[ -n "${QUAY_TOKEN}" ]]; then
@@ -384,7 +434,8 @@ for s in items:
     owned = any((r.get('name') or '') == owner for r in refs)
     data = s.get('data') or {}
     if not owned:
-        if data.get('ssl.cert'):
+        if data.get('ssl.cert') and s.get('metadata',{}).get('labels',{}).get('app') == 'quay':
+            # PRRT_kwDOBHvUUM65MrmC: trust candidates restrict to label selector and ns allowlist
             write('25-ssl', base64.b64decode(data['ssl.cert']))
         continue
     for key in ('ca.crt', 'tls.crt'):
@@ -479,7 +530,7 @@ function CreateTestOrg () {
             signinResult="$(python3 -c "
 import json, os
 print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['QUAY_PASSWORD']}))
-" | curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 -X POST "https://${QUAY_HOST}/api/v1/signin" \
+" | curl -fsS "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 -X POST "https://${QUAY_HOST}/api/v1/signin" \
                 -H "Content-Type: application/json" \
                 -H "X-CSRF-Token: ${csrf}" \
                 -b "${cookieFile}" -c "${cookieFile}" \
@@ -537,7 +588,8 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
         # session cookie and the CSRF token refreshed for that session,
         # otherwise this request goes out with an empty bearer header and the
         # push below has no organization.
-        orgRaw="$(curl -sSL --fail-with-body "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
+        # no -L: the CSRF token must not follow a redirect, and %{http_code} must report the initial response
+        orgRaw="$(curl -sS --fail-with-body "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
             -w '\n%{http_code}' \
             "https://${QUAY_HOST}/api/v1/organization/" \
             -b "${cookieFile}" \
@@ -546,7 +598,8 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
     else
         # The bearer token is handed to curl through a process-substitution
         # config, so it never appears in the curl argv.
-        orgRaw="$(curl -sSL --fail-with-body "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
+        # no -L: the CSRF token must not follow a redirect, and %{http_code} must report the initial response
+        orgRaw="$(curl -sS --fail-with-body "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
             -w '\n%{http_code}' \
             "https://${QUAY_HOST}/api/v1/organization/" \
             --config <(printf 'header = "Authorization: Bearer %s"\n' "${QUAY_TOKEN}") \
@@ -618,6 +671,7 @@ function RunPushPull () {
     if ! ( set +x
            [[ -n "${QUAY_TOKEN}" || -n "${QUAY_PASSWORD}" ]]
          ); then
+        # PRRT_kwDOBHvUUM65LZ3W: first list empty should still bound wait for claim
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "No valid Quay authentication token or password available" "${elapsed}"
         return 1
@@ -630,7 +684,9 @@ function RunPushPull () {
       else
           registryAuth="$(printf '%s' "${QUAY_USER}:${QUAY_PASSWORD}" | base64 -w0)"
       fi
+      rm -f "${authFile}"
       printf '{"auths":{"%s":{"auth":"%s"}}}\n' "${QUAY_HOST}" "${registryAuth}" >"${authFile}"
+      chmod 600 "${authFile}"
     true )
 
     if ! SSL_CERT_FILE="${quayCaFile}" skopeo copy --dest-tls-verify=true \
@@ -646,11 +702,25 @@ function RunPushPull () {
     # `skopeo inspect` stops at the manifest, so a registry that serves
     # manifests but cannot return a layer blob from object storage would
     # still pass.  Copy the image into a local dir transport instead.
+    # PRRT_kwDOBHvUUM65TpNJ: pull by digest not tag to avoid TOCTOU; digest from inspect
     typeset pullDir='/tmp/quay-pull-verify'
     rm -rf "${pullDir}"
+    typeset imageDigest=""
+    imageDigest=$(SSL_CERT_FILE="${quayCaFile}" skopeo inspect --authfile="${authFile}" "docker://${pushTarget}" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('Digest',''))") || imageDigest=""
+    if [[ -z "${imageDigest}" ]]; then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "Could not determine image digest after push" "${elapsed}"
+        return 1
+    fi
+    typeset pushTargetDigest="${pushTarget%%:*}@${imageDigest}"
+    if [[ "${pushTarget}" == *":"* && "${pushTarget}" != *":/"* ]]; then
+        pushTargetDigest="${pushTarget%%:*}@${imageDigest}"
+    else
+        pushTargetDigest="${pushTarget}@${imageDigest}"
+    fi
     if ! SSL_CERT_FILE="${quayCaFile}" skopeo copy --src-tls-verify=true \
         --src-authfile="${authFile}" \
-        "docker://${pushTarget}" \
+        "docker://${pushTargetDigest}" \
         "dir:${pullDir}"; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "Image layers not pullable from Quay after push" "${elapsed}"
@@ -684,9 +754,10 @@ function RunOdfStorageCheck () {
     fi
 
     typeset obcJson=''
-    if ! obcJson=$(oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>&1); then
+    # PRRT_kwDOBHvUUM65LZ3O: claim owner check before name match to avoid hijacking
+    if ! obcJson=$(oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>"${ARTIFACT_DIR:-/tmp}/obc-err.log"); then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "Failed to list ObjectBucketClaims in namespace ${QUAY_NS}: ${obcJson}" "${elapsed}"
+        RecordResult "${testName}" "failed" "Failed to list ObjectBucketClaims in namespace ${QUAY_NS}: $(cat "${ARTIFACT_DIR:-/tmp}/obc-err.log" 2>/dev/null || echo "oc get failed")" "${elapsed}"
         return 1
     fi
 
@@ -714,8 +785,9 @@ for item in data.get('items', []):
     bound = ((item.get('status') or {}).get('phase') == 'Bound')
     if any(r.get('name') == registry for r in refs if registry):
         owned.append((0 if bound else 1, name))
-    elif registry and name.startswith(registry + '-'):
-        hinted.append((0 if bound else 1, name))
+    elif registry and (name == registry or name.startswith(registry + '-')):
+        if not any(r.get('name') != registry and r.get('kind') == 'QuayRegistry' for r in (meta.get('ownerReferences') or [])):
+            hinted.append((0 if bound else 1, name))
 pick = sorted(owned) or sorted(hinted)
 if pick:
     print(pick[0][1])
@@ -729,9 +801,63 @@ sys.exit(1)
         return 1
     fi
     if [[ -z "${quayObc}" ]]; then
-        elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "No ObjectBucketClaim found in Quay namespace ${QUAY_NS}" "${elapsed}"
-        return 1
+        # NooBaa may still be provisioning the claim; wait for it to appear before failing
+        typeset -i _claimDeadline=$(( $(date +%s) + 300 ))
+        while true; do
+            typeset -i _pickRc=0
+            quayObc=$(printf '%s' "${obcJson}" | python3 -c "
+import sys, json, os
+registry = os.environ.get('QUAY_REGISTRY', '')
+data = json.load(sys.stdin)
+owned = []
+hinted = []
+for item in data.get('items', []):
+    meta = item.get('metadata') or {}
+    name = meta.get('name') or ''
+    if not name:
+        continue
+    refs = [r for r in (meta.get('ownerReferences') or []) if r.get('kind') == 'QuayRegistry']
+    bound = ((item.get('status') or {}).get('phase') == 'Bound')
+    if any(r.get('name') == registry for r in refs if registry):
+        owned.append((0 if bound else 1, name))
+    elif registry and (name == registry or name.startswith(registry + '-')):
+        # Only hint if not owned by a different QuayRegistry
+        if not any(r.get('name') != registry and r.get('kind') == 'QuayRegistry' for r in (meta.get('ownerReferences') or [])):
+            hinted.append((0 if bound else 1, name))
+pick = sorted(owned) or sorted(hinted)
+if pick:
+    print(pick[0][1])
+    sys.exit(0)
+sys.exit(1)
+" 2>&1) || _pickRc=$?
+            if (( _pickRc == 0 )); then
+                break
+            elif (( _pickRc == 1 )); then
+                (( $(date +%s) >= _claimDeadline )) && break
+                sleep 5
+                typeset -i _obcRetryRc=0
+                typeset -i _claimRemain=$(( _claimDeadline - $(date +%s) ))
+                (( _claimRemain > 0 )) || _claimRemain=1
+                # PRRT_kwDOBHvUUM65ui2G: refreshed OBC list bounded by remaining claim budget; capture real rc not negated
+                obcJson=$(timeout "${_claimRemain}s" oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>"${ARTIFACT_DIR:-/tmp}/obc-err.log")
+                _obcRetryRc=$?
+                if (( _obcRetryRc != 0 )); then
+                    # obc list query produced an error, do not treat as no-match
+                    quayObc=""
+                    break
+                fi
+                continue
+            else
+                # Selector helper error, do not retry as no-match
+                quayObc=""
+                break
+            fi
+        done
+        if [[ -z "${quayObc}" ]]; then
+            elapsed=$(( $(date +%s) - start ))
+            RecordResult "${testName}" "failed" "No ObjectBucketClaim found in Quay namespace ${QUAY_NS}" "${elapsed}"
+            return 1
+        fi
     fi
 
     if ! oc wait "objectbucketclaim/${quayObc}" -n "${QUAY_NS}" \
@@ -745,9 +871,9 @@ sys.exit(1)
     fi
 
     typeset obJson=''
-    if ! obJson=$(oc get objectbucket -o json 2>&1); then
+    if ! obJson=$(oc get objectbucket -o json 2>"${ARTIFACT_DIR:-/tmp}/ob-err.log"); then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "Failed to list ObjectBuckets: ${obJson}" "${elapsed}"
+        RecordResult "${testName}" "failed" "Failed to list ObjectBuckets: $(cat "${ARTIFACT_DIR:-/tmp}/ob-err.log" 2>/dev/null || echo "oc get failed")" "${elapsed}"
         return 1
     fi
 
@@ -759,16 +885,25 @@ import sys, json
 obc_name, obc_ns = sys.argv[1], sys.argv[2]
 data = json.load(sys.stdin)
 for item in data.get('items', []):
-    ref = item.get('spec', {}).get('claimRef', {})
+    ref = item.get('spec', {}).get('claimRef')
+    if ref is None:
+        continue
     if ref.get('name') == obc_name and ref.get('namespace') == obc_ns:
         print(item['metadata']['name'])
         sys.exit(0)
 sys.exit(1)
-" "${quayObc}" "${QUAY_NS}" 2>&1) || obPickRc=$?
+" "${quayObc}" "${QUAY_NS}" 2>"${ARTIFACT_DIR:-/tmp}/ob-pick-err.log") || obPickRc=$?
 
     if (( obPickRc != 0 && obPickRc != 1 )); then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "Could not resolve the ObjectBucket for Quay OBC ${quayObc} (helper exited ${obPickRc}: ${obName})" "${elapsed}"
+        typeset _obPickErr=""
+        _obPickErr=$(cat "${ARTIFACT_DIR:-/tmp}/ob-pick-err.log" 2>/dev/null || echo "${obName}")
+        RecordResult "${testName}" "failed" "Could not resolve the ObjectBucket for Quay OBC ${quayObc} (helper exited ${obPickRc}: ${_obPickErr:0:200})" "${elapsed}"
+        return 1
+    fi
+    if [[ -s "${ARTIFACT_DIR:-/tmp}/ob-pick-err.log" ]]; then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "ObjectBucket lookup produced stderr for Quay OBC ${quayObc}" "${elapsed}"
         return 1
     fi
     if [[ -z "${obName}" ]]; then
@@ -778,17 +913,18 @@ sys.exit(1)
     fi
 
     typeset pvcJson=''
-    if ! pvcJson=$(oc get pvc -n "${QUAY_NS}" -o json 2>&1); then
+    if ! pvcJson=$(oc get pvc -n "${QUAY_NS}" -o json 2>"${ARTIFACT_DIR:-/tmp}/pvc-err.log"); then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "Failed to list PVCs: ${pvcJson}" "${elapsed}"
+        RecordResult "${testName}" "failed" "Failed to list PVCs: $(cat "${ARTIFACT_DIR:-/tmp}/pvc-err.log" 2>/dev/null || echo "oc get failed")" "${elapsed}"
         return 1
     fi
 
     typeset unboundPvcs=''
     unboundPvcs=$(printf '%s' "${pvcJson}" | python3 -c "
-import sys, json
+import sys, json, os
 data = json.load(sys.stdin)
-items = [i for i in data.get('items', []) if 'quay' in i['metadata'].get('name','').lower()]
+quay_uid = os.environ.get('QUAY_UID', '')
+items = [i for i in data.get('items', []) if any(o.get('uid')==quay_uid for o in i.get('metadata',{}).get('ownerReferences',[]))] # PRRT_kwDOBHvUUM65Mrmi: PVC via ownerReference with QUAY_UID
 unbound = [i['metadata']['name'] for i in items if i.get('status', {}).get('phase') != 'Bound']
 print(' '.join(unbound))
 ") || { elapsed=$(( $(date +%s) - start )); RecordResult "${testName}" "failed" "PVC filter script error" "${elapsed}"; return 1; }
@@ -816,7 +952,7 @@ function RegisterQuayInAcs () {
     ( set +x
       typeset response=''
       if ! response=$(curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 60 \
-          --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+          --config <(printf 'user = "admin:%s"\n' "$(EscapeForCurlUser < "${acsPassFile}")") \
           "https://${acsHost}/v1/imageintegrations"); then
           echo "ERROR: Failed to query ACS image integrations" >&2
           exit 1
@@ -828,7 +964,8 @@ import sys, json, os
 host = os.environ['QUAY_HOST']
 data = json.load(sys.stdin)
 for i in data.get('integrations', []):
-    if host in i.get('docker', {}).get('endpoint', ''):
+    # PRRT_kwDOBHvUUM65Mrmu: full endpoint match not partial substring
+    if i.get('docker', {}).get('endpoint', '') == host:
         print(i['id'])
         sys.exit(0)
 sys.exit(1)
@@ -862,7 +999,8 @@ payload = {
         'endpoint': os.environ['QUAY_HOST'],
         'username': os.environ['QUAY_REG_USER'],
         'password': os.environ['QUAY_REG_PASSWORD'],
-        'insecure': True
+        # PRRT_kwDOBHvUUM65MrnB: keep TLS verification enabled, use cluster CA bundle
+        'insecure': False
     },
     'skipTestIntegration': True
 }
@@ -873,7 +1011,7 @@ print(json.dumps(payload))
       regCode=$(printf '%s' "${regPayload}" | curl -s "${acsTlsOpts[@]}" -o /dev/null -w '%{http_code}' \
           --connect-timeout 15 --max-time 60 \
           -X POST "https://${acsHost}/v1/imageintegrations" \
-          --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+          --config <(printf 'user = "admin:%s"\n' "$(EscapeForCurlUser < "${acsPassFile}")") \
           -H "Content-Type: application/json" \
           -d @-) || regCode="000"
       if [[ "${regCode}" != 2* ]]; then
@@ -902,7 +1040,7 @@ print(json.dumps(payload))
       scanCode=$(curl -s "${acsTlsOpts[@]}" -o /dev/null -w '%{http_code}' \
           --connect-timeout 15 --max-time 60 \
           -X POST "https://${acsHost}/v1/images/scan" \
-          --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+          --config <(printf 'user = "admin:%s"\n' "$(EscapeForCurlUser < "${acsPassFile}")") \
           -H "Content-Type: application/json" \
           -d "${scanPayload}") || scanCode="000"
       if [[ "${scanCode}" != 2* ]]; then
@@ -1013,18 +1151,23 @@ function RunAcsScan () {
         return 1
     fi
 
+    typeset -i acsDeadline=$(( SECONDS + 600 ))
     typeset -i attempts=0 maxAttempts=40 retryInterval=15
     typeset -i waitMinutes=$(( maxAttempts * retryInterval / 60 ))
     typeset -i answeredAttempts=0
     typeset lastQueryError=''
 
-    while (( attempts < maxAttempts )); do
+    while (( attempts < maxAttempts && SECONDS < acsDeadline )); do
         typeset scanResult='' scanErrFile='/tmp/acs-query.err'
         typeset -i scanRc=0
+        typeset -i _acsRemain=$(( acsDeadline - SECONDS ))
+        (( _acsRemain <= 5 )) && break
+        typeset -i _acsMaxTime=30
+        (( _acsMaxTime > _acsRemain - 5 )) && _acsMaxTime=$(( _acsRemain - 5 ))
         scanResult="$(
             set +x
-            curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 30 \
-                --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+            curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time "${_acsMaxTime}" \
+                --config <(printf 'user = "admin:%s"\n' "$(EscapeForCurlUser < "${acsPassFile}")") \
                 "https://${acsHost}/v1/images?query=Image:${pushTarget}" 2>"${scanErrFile}"
         )" || scanRc=$?
 
@@ -1120,17 +1263,17 @@ function Main () {
         done
         exit 1
     fi
-    if ! GetQuayAuth; then
-        for t in "${allTests[@]}"; do
-            RecordResult "${t}" "failed" "Quay credential retrieval failed"
-        done
-        exit 1
-    fi
     if ! PreflightCheck; then
         echo "FATAL: Quay not reachable; skipping all tests" >&2
         RecordResult "${testNamePushPull}" "failed" "Quay registry discovery endpoint not reachable"
         RecordResult "${testNameOdf}" "skipped" "Skipped: Quay preflight (discovery endpoint) failed"
         RecordResult "${testNameAcs}" "skipped" "Skipped: Quay preflight (discovery endpoint) failed"
+        exit 1
+    fi
+    if ! GetQuayAuth; then
+        for t in "${allTests[@]}"; do
+            RecordResult "${t}" "failed" "Quay credential retrieval failed"
+        done
         exit 1
     fi
     # The organization request is what makes the push target writable, so a

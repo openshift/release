@@ -327,11 +327,50 @@ function DiscoverCentralNs () {
 }
 
 function DiscoverScNs () {
-    scNs="$(oc get securedclusters.platform.stackrox.io --all-namespaces \
+    # The OPP policy set co-locates the SecuredCluster with Central; query
+    # the central namespace first, then fall back to all namespaces for
+    # layouts that separate them.
+    scNs="$(oc get securedclusters.platform.stackrox.io -n "${centralNs}" \
         -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
-        || return 1
+        || true
+    if [[ -z "${scNs}" ]]; then
+        scNs="$(oc get securedclusters.platform.stackrox.io --all-namespaces \
+            -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
+            || return 1
+    fi
     [[ -n "${scNs}" ]] || return 1
     true
+}
+
+function PeriodicSecuredClusterDiagnostics () {
+    echo "[readiness] --- SecuredCluster CRs so far (all namespaces) ---"
+    # PRRT_kwDOBHvUUM65Uiu_: sanitize discovery callbacks; PRRT_kwDOBHvUUM65on2S: bound by timeout
+    timeout 10 bash -c 'oc get securedclusters.platform.stackrox.io --all-namespaces -o json 2>/tmp/sc-periodic-err.log | head -c 1024' 2>/dev/null || echo "[readiness]   SecuredCluster periodic query failed or timed out" >&2
+    echo "[readiness] --- OPP policy status (the policy set creates the SecuredCluster) ---"
+    timeout 10 oc get policies -n policies 2>/dev/null || echo "[readiness]   policy query failed or timed out" >&2
+}
+
+function SecuredClusterDiscoveryFailureDiagnostics () {
+    echo "[readiness] === SecuredCluster discovery failure diagnostics ==="
+    echo "[readiness] --- SecuredCluster CRs in any state, all namespaces ---"
+    # PRRT_kwDOBHvUUM65on2Z: capture real rc not negated status
+    typeset -i _scListRc=0
+    oc get securedclusters.platform.stackrox.io --all-namespaces -o json > /tmp/sc-list.json 2> /tmp/sc-list-err.log || _scListRc=$?
+    if (( _scListRc != 0 )); then
+        echo "[readiness]   SecuredCluster query failed rc=${_scListRc}" >&2
+    else
+        if [[ ! -s /tmp/sc-list.json ]]; then
+            echo "[readiness]   No SecuredCluster CRs found at all"
+        else
+            cat /tmp/sc-list.json
+        fi
+    fi
+    echo "[readiness] --- OPP policy status (the policy set creates the SecuredCluster) ---"
+    oc get policies -n policies || true
+    echo "[readiness] --- Sensor pods in ${centralNs} ---"
+    oc get pods -n "${centralNs}" -l app=sensor 2>/dev/null || \
+        echo "[readiness]   No sensor pods found in ${centralNs}"
+    echo "[readiness] === End failure diagnostics ==="
 }
 
 typeset centralNs=""
@@ -343,7 +382,10 @@ if ! WaitFor "Central CR namespace discovery" DiscoverCentralNs PeriodicOperator
 fi
 echo "[readiness] Central namespace: ${centralNs}"
 
-WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs
+if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs PeriodicSecuredClusterDiagnostics; then
+    SecuredClusterDiscoveryFailureDiagnostics
+    exit 1
+fi
 echo "[readiness] SecuredCluster namespace: ${scNs}"
 
 # ---------------------------------------------------------------------------
