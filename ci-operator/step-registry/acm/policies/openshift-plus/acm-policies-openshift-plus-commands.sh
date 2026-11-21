@@ -1,10 +1,44 @@
 #!/bin/bash
 set -euxo pipefail; shopt -s inherit_errexit
 
+# Pin policy-collection to immutable SHA (INTEROP-9691)
+# Verified via: git ls-remote https://github.com/stolostron/policy-collection.git HEAD => 6d80aff5dda558516fced50640d028bce8dd2341
+# and byte-check: policygenerator/policy-sets/stable/openshift-plus/ exists at this SHA
+if [[ -z "${POLICY_COLLECTION_REF:-}" ]]; then
+  echo "ERROR: POLICY_COLLECTION_REF is not set" >&2
+  exit 1
+fi
+if [[ ! "${POLICY_COLLECTION_REF}" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "ERROR: POLICY_COLLECTION_REF must be a 40-char SHA, got '${POLICY_COLLECTION_REF}'" >&2
+  exit 1
+fi
 cd /tmp/
 git clone https://github.com/stolostron/policy-collection.git
+cd policy-collection
+git fetch --depth 1 origin "${POLICY_COLLECTION_REF}"
+git checkout "${POLICY_COLLECTION_REF}"
+# Verify checkout matches pinned SHA
+typeset _pc_checked_sha
+_pc_checked_sha=$(git rev-parse HEAD)
+if [[ "${_pc_checked_sha}" != "${POLICY_COLLECTION_REF}" ]]; then
+  echo "ERROR: checked out SHA '${_pc_checked_sha}' != expected '${POLICY_COLLECTION_REF}'" >&2
+  exit 1
+fi
+# Byte-check: ensure expected policy set path exists at this SHA
+if [[ ! -f "policygenerator/policy-sets/stable/openshift-plus/policyGenerator.yaml" ]]; then
+  echo "ERROR: policygenerator/policy-sets/stable/openshift-plus/ not found at ${POLICY_COLLECTION_REF}" >&2
+  exit 1
+fi
+if [[ ! -f "policygenerator/policy-sets/stable/openshift-plus/input-quay/policy-install-quay.yaml" ]]; then
+  echo "ERROR: input-quay/policy-install-quay.yaml not found at ${POLICY_COLLECTION_REF}" >&2
+  exit 1
+fi
+if [[ ! -f "policygenerator/policy-sets/stable/openshift-plus/input-odf/policy-odf.yaml" ]]; then
+  echo "ERROR: input-odf/policy-odf.yaml not found at ${POLICY_COLLECTION_REF}" >&2
+  exit 1
+fi
 
-cd policy-collection/deploy/
+cd deploy/
 
 # If QUAY_OPERATOR_CHANNEL is set, patch the Quay operator subscription to pin the channel
 if [[ -n "${QUAY_OPERATOR_CHANNEL}" ]]; then
@@ -32,11 +66,53 @@ fi
 # SecuredCluster policies can target local-cluster.  In OPP single-
 # cluster test environments local-cluster is the only managed cluster,
 # and the default NotIn rule prevents the SecuredCluster CR from being
-# created — causing stackrox-opp-readiness to timeout.
+# created; causing stackrox-opp-readiness to timeout.
 sed -i '/local-cluster.*NotIn/d' \
   ../policygenerator/policy-sets/stable/openshift-plus/input/clusters-placement.yaml
 
-echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
+# Deploy with a real branch and pin the immutable commit via the Subscription annotation.
+# deploy.sh -b sets apps.open-cluster-management.io/git-branch (branch name only); ACM
+# fetches a commit via apps.open-cluster-management.io/git-desired-commit. Using the SHA
+# as git-branch would make ACM look for refs/heads/<SHA> which does not exist.
+# Generate manifests, patch in the desired commit and a clone depth that can reach it
+# even after the branch advances, then apply. See
+# https://github.com/stolostron/multicloud-operators-subscription/blob/main/docs/gitrepo_subscription.md#subscribing-to-a-specific-commit
+typeset _pc_branch="main"
+echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -b "${_pc_branch}" -a openshift-plus --dry-run >/dev/null
+python3 <<PY
+import os, pathlib, re, sys
+ref = os.environ.get("POLICY_COLLECTION_REF", "")
+if not ref:
+    print("ERROR: POLICY_COLLECTION_REF not set for manifest patch", file=sys.stderr)
+    sys.exit(1)
+p = pathlib.Path("manifests.yaml")
+if not p.is_file():
+    print("ERROR: manifests.yaml not found after deploy.sh --dry-run", file=sys.stderr)
+    sys.exit(1)
+txt = p.read_text()
+m = re.search(r"\n(\s+)apps.open-cluster-management.io/git-branch:", txt)
+if not m:
+    print("ERROR: git-branch annotation not found in manifests.yaml", file=sys.stderr)
+    sys.exit(1)
+indent = m.group(1)
+if "apps.open-cluster-management.io/git-desired-commit" not in txt:
+    txt = txt.replace(
+        f"\n{indent}apps.open-cluster-management.io/git-branch:",
+        f"\n{indent}apps.open-cluster-management.io/git-desired-commit: {ref}\n{indent}apps.open-cluster-management.io/git-clone-depth: \"100\"\n{indent}apps.open-cluster-management.io/git-branch:"
+    )
+else:
+    txt = re.sub(r"apps.open-cluster-management.io/git-desired-commit:.*", f"apps.open-cluster-management.io/git-desired-commit: {ref}", txt)
+    if "apps.open-cluster-management.io/git-clone-depth" not in txt:
+        txt = txt.replace(
+            f"\n{indent}apps.open-cluster-management.io/git-branch:",
+            f"\n{indent}apps.open-cluster-management.io/git-clone-depth: \"100\"\n{indent}apps.open-cluster-management.io/git-branch:"
+        )
+p.write_text(txt)
+PY
+# Ensure target namespace exists (deploy.sh skips this in --dry-run)
+kubectl get ns policies >/dev/null 2>&1 || kubectl create ns policies
+kubectl apply -f manifests.yaml
+rm -f manifests.yaml
 
 # openshift-plus generates ~25 policies; require 4+ before oc wait to avoid
 # racing the GitOps Subscription propagation (stolostron/policy-collection#174)
@@ -77,7 +153,7 @@ done
 typeset -a skipPoliciesArr=()
 if [[ -n "${SKIP_POLICIES:-}" ]]; then
   IFS=',' read -ra skipPoliciesArr <<< "${SKIP_POLICIES}"
-  printf '[%s] SKIP_POLICIES set — will skip %d polic(ies):\n' \
+  printf '[%s] SKIP_POLICIES set; will skip %d polic(ies):\n' \
     "$(date -u +%FT%TZ)" "${#skipPoliciesArr[@]}"
   for p in "${skipPoliciesArr[@]}"; do
     printf '  - %s\n' "${p}"
@@ -86,7 +162,7 @@ fi
 
 # Write the full skip manifest for auditing / artifact collection
 {
-  printf '# skip-policies manifest — generated %s\n' "$(date -u +%FT%TZ)"
+  printf '# skip-policies manifest; generated %s\n' "$(date -u +%FT%TZ)"
   printf '# SKIP_POLICIES=%s\n' "${SKIP_POLICIES:-}"
   printf '# Total policies to skip: %d\n' "${#skipPoliciesArr[@]}"
   for p in "${skipPoliciesArr[@]}"; do
@@ -108,7 +184,7 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
   # Build a regex to filter out skipped policies
   typeset skipRegex=""
   skipRegex="$(IFS='|'; echo "${skipPoliciesArr[*]}")"
-  # Fetch the full policy list first — fail hard if oc cannot reach the cluster
+  # Fetch the full policy list first; fail hard if oc cannot reach the cluster
   typeset policyList=""
   policyList="$(oc get policies -n policies -o name)" || {
     printf '[%s] ERROR: failed to list policies in namespace "policies"\n' \
@@ -133,11 +209,11 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
       exit 1
     fi
   else
-    printf '[%s] All policies are in the skip list — no policies to wait for\n' \
+    printf '[%s] All policies are in the skip list; no policies to wait for\n' \
       "$(date -u +%FT%TZ)"
   fi
 else
-  printf '[%s] No policies to skip — waiting for ALL policies to become Compliant…\n' \
+  printf '[%s] No policies to skip; waiting for ALL policies to become Compliant…\n' \
     "$(date -u +%FT%TZ)"
   if ! oc wait policies --all -n policies \
     --for jsonpath='{.status.compliant}'=Compliant \
