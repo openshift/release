@@ -45,7 +45,7 @@ releases:
     release:
       architecture: multi
       channel: stable
-      version: "4.16"
+      version: "4.22"
 resources:
   '*':
     limits:
@@ -555,6 +555,123 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
+- as: bundle-e2e-metal-ipv6
+  capabilities:
+  - intranet
+  cluster: build10
+  cron: 40 4 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      OO_BUNDLE: lightspeed-bundle-test
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        ENABLE_LOCAL_REGISTRY=true
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: openshift-lightspeed
+    post:
+    - chain: baremetalds-ofcir-post
+    pre:
+    - chain: baremetalds-ofcir-pre
+    test:
+    - ref: optional-operators-operator-sdk
+    - as: ols-ipv6-repro
+      cli: latest
+      commands: |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        NS=openshift-lightspeed
+
+        echo "== Assert the cluster is IPv6-only"
+        node_ips=$(oc get nodes -o jsonpath='{range .items[*].status.addresses[?(@.type=="InternalIP")]}{.address}{"\n"}{end}')
+        echo "Node internal IPs:"
+        echo "$node_ips"
+        if [[ -z "$node_ips" ]]; then
+          echo "FAIL: no node internal IPs found"
+          exit 1
+        fi
+        if echo "$node_ips" | grep -qv ':'; then
+          echo "FAIL: expected all node internal IPs to be IPv6"
+          exit 1
+        fi
+        svc_ip=$(oc get svc kubernetes -n default -o jsonpath='{.spec.clusterIP}')
+        echo "kubernetes service clusterIP: $svc_ip"
+        if [[ "$svc_ip" != *:* ]]; then
+          echo "FAIL: service network is not IPv6"
+          exit 1
+        fi
+        echo "Cluster is IPv6-only."
+
+        echo "== Wait for the OLS operator to be available"
+        oc wait --for condition=Available -n "$NS" deployment/lightspeed-operator-controller-manager --timeout=10m
+
+        echo "== Create a minimal OLSConfig (dummy LLM credentials; no LLM calls needed for this repro)"
+        oc label ns "$NS" openshift.io/cluster-monitoring=true --overwrite=true
+        if ! oc get secret llm-token-first -n "$NS" >/dev/null 2>&1; then
+          oc create secret generic llm-token-first -n "$NS" --from-literal=apitoken=dummy-token-for-ipv6-repro
+        fi
+        oc apply -f - <<'EOF'
+        apiVersion: ols.openshift.io/v1alpha1
+        kind: OLSConfig
+        metadata:
+          name: cluster
+        spec:
+          llm:
+            providers:
+            - name: openai
+              type: openai
+              credentialsSecretRef:
+                name: llm-token-first
+              models:
+              - name: gpt-4o
+          ols:
+            defaultModel: gpt-4o
+            defaultProvider: openai
+        EOF
+
+        echo "== Wait for the OLS app-server deployment to appear (up to 10 min)"
+        found=false
+        for _ in $(seq 1 60); do
+          if oc get deployment/lightspeed-app-server -n "$NS" >/dev/null 2>&1; then
+            found=true
+            break
+          fi
+          sleep 10
+        done
+        if [[ "$found" != true ]]; then
+          echo "FAIL: deployment/lightspeed-app-server was not created within 10 minutes"
+          oc get deploy,rs,pods -n "$NS" || true
+          exit 1
+        fi
+
+        echo "== Observe OLS-4834: pods binding 0.0.0.0 cannot pass probes on an IPv6-only cluster"
+        # Give the pods time to start and hit probe failures, then collect evidence.
+        sleep 300
+        oc get pods -n "$NS" -o wide | tee "${ARTIFACT_DIR}/ols-4834-pods.txt"
+        oc get events -n "$NS" --sort-by=.lastTimestamp > "${ARTIFACT_DIR}/ols-4834-events.txt" || true
+        for pod in $(oc get pods -n "$NS" -l app.kubernetes.io/component=application-server -o jsonpath='{.items[*].metadata.name}'); do
+          oc describe pod "$pod" -n "$NS" > "${ARTIFACT_DIR}/ols-4834-describe-${pod}.txt" || true
+        done
+        echo "== Pod status and recent probe failures:"
+        oc get pods -n "$NS"
+        oc get events -n "$NS" --sort-by=.lastTimestamp | grep -iE "unhealthy|probe|BackOff" | tail -30 || true
+
+        if oc wait --for=condition=Available deployment/lightspeed-app-server -n "$NS" --timeout=60s; then
+          echo "OLS-4834 NOT reproduced: app-server became Available on IPv6-only cluster."
+          echo "If the fix for OLS-4834 has landed, replace this repro step with the full make test-e2e block."
+          exit 0
+        fi
+        echo "OLS-4834 REPRODUCED: lightspeed-app-server is not Available on an IPv6-only cluster."
+        echo "See artifacts ols-4834-* in this job's artifact directory for probe failure evidence."
+        exit 1
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: security
   skip_if_only_changed: ^docs/|\.md$|lightspeed-catalog.*|^\.tekton/|^\.github/|^hack/|^(?:.*/)?(?:\.gitignore|\.snyk|\.dockerignore|OWNERS|PROJECT|LICENSE)$
   steps:
