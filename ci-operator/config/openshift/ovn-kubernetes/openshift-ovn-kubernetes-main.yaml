@@ -1405,6 +1405,60 @@ tests:
     - chain: workers-scale
     - ref: openshift-qe-node-density-cni
   timeout: 16h0m0s
+- always_run: false
+  as: e2e-bm-hypershift-agent-secondary-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      EGRESSIP_REMOTE_SUBNET: 192.168.223.0/24
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="egressnet"
+        EGRESSNET_NETWORK_SUBNET_V4='192.168.221.0/24'
+      IPECHO_HOST_IP: 192.168.221.1
+      IPECHO_REMOTE_CIDR: 192.168.223.1/32
+      LVM_OPERATOR_SUB_CHANNEL: ""
+      MCE_VERSION: "2.12"
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+      TIMEOUT: +24 hours
+    test:
+    - ref: hypershift-agent-ovn-ipecho-provision
+    - ref: hypershift-agent-ovn-egressip-multinic-verify
+    - ref: wait
+    - chain: hypershift-conformance
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+  timeout: 24h0m0s
+- always_run: false
+  as: e2e-bm-hypershift-agent-secondary-vlan-tagged-ote
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      EGRESSIP_REMOTE_SUBNET: 192.168.223.0/24
+      EGRESSIP_VLAN_ID: "3686"
+      EGRESSIP_VLAN_SUBNET: 192.168.222.0/24
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="egressnet"
+        EGRESSNET_NETWORK_SUBNET_V4='192.168.221.0/24'
+      IPECHO_HOST_IP: 192.168.221.1
+      IPECHO_REMOTE_CIDR: 192.168.223.1/32
+      IPECHO_VLAN_CIDR: 192.168.222.1/24
+      IPECHO_VLAN_ID: "3686"
+      LVM_OPERATOR_SUB_CHANNEL: ""
+      MCE_VERSION: "2.12"
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+      TIMEOUT: +24 hours
+    test:
+    - ref: hypershift-agent-ovn-ipecho-provision
+    - ref: hypershift-agent-ovn-egressip-multinic-verify
+    - ref: wait
+    - chain: hypershift-conformance
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce-guest
+  timeout: 24h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift
