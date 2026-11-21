@@ -102,21 +102,124 @@ if [[ -f /usr/local/rhobs-oidc/client_id ]]; then
         local output_file="$2"
         local limit="${3:-10000}"
         echo "    Loki query: ${query} (limit=${limit})"
-        curl -sf --max-time 120 \
-          -H "Authorization: Bearer $TOKEN" \
-          --data-urlencode "query=${query}" \
-          --data-urlencode "start=${START_NS}" \
-          --data-urlencode "end=${END_NS}" \
-          --data-urlencode "limit=${limit}" \
-          --data-urlencode "direction=forward" \
-          -G "$LOKI_BASE/query_range" | \
-          python3 -c "
-import sys, json
-d = json.load(sys.stdin)
-for stream in d.get('data',{}).get('result',[]):
-    for ts_ns, msg in stream.get('values',[]):
-        print(msg)
-" > "${output_file}" 2>/dev/null || true
+        TOKEN="${TOKEN}" python3 - "${query}" "${output_file}" "${limit}" "${START_NS}" "${END_NS}" "${LOKI_BASE}" <<'PY'
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+
+query, output, limit, start, end, base = sys.argv[1:]
+output = Path(output)
+status = {"outcome": "transport_error", "entries": 0, "curl_exit": None,
+          "http_status": None, "output_cleanup_failed": False}
+
+
+def atomic_write(path, contents):
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent,
+                                         prefix=".rhobs-", delete=False) as handle:
+            temporary = handle.name
+            handle.write(contents)
+        os.replace(temporary, path)
+    finally:
+        if temporary is not None and os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def messages_from_response(response):
+    if not isinstance(response, dict):
+        return "schema_error", []
+    if response.get("status") == "error":
+        return "api_error", []
+    data = response.get("data")
+    if (response.get("status") != "success" or not isinstance(data, dict)
+            or data.get("resultType") != "streams" or not isinstance(data.get("result"), list)):
+        return "schema_error", []
+    messages = []
+    for stream in data["result"]:
+        if not isinstance(stream, dict) or not isinstance(stream.get("values"), list):
+            return "schema_error", []
+        for entry in stream["values"]:
+            if (not isinstance(entry, list) or len(entry) != 2
+                    or not isinstance(entry[0], str) or not entry[0].isdigit()
+                    or not isinstance(entry[1], str)):
+                return "schema_error", []
+            messages.append(entry[1])
+    return ("success_nonempty" if messages else "success_empty"), messages
+
+
+messages = []
+try:
+    result = subprocess.run([
+        "curl", "-sf", "--max-time", "120",
+        "-H", "Authorization: Bearer " + os.environ.pop("TOKEN"),
+        "--data-urlencode", "query=" + query,
+        "--data-urlencode", "start=" + start,
+        "--data-urlencode", "end=" + end,
+        "--data-urlencode", "limit=" + limit,
+        "--data-urlencode", "direction=forward",
+        "-w", "\n%{http_code}", "-G", base + "/query_range",
+    ], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
+    status["curl_exit"] = result.returncode
+    body, separator, http_code = result.stdout.rpartition(b"\n")
+    if separator and len(http_code) == 3 and http_code.isdigit():
+        status["http_status"] = int(http_code)
+    if result.returncode == 28:
+        status["outcome"] = "timeout"
+    elif result.returncode == 22:
+        status["outcome"] = "http_error"
+    elif result.returncode != 0:
+        status["outcome"] = "transport_error"
+    elif status["http_status"] is None:
+        status["outcome"] = "transport_error"
+    elif not 200 <= status["http_status"] < 300:
+        status["outcome"] = "http_error"
+    else:
+        try:
+            response = json.loads(body)
+        except (ValueError, UnicodeError, RecursionError):
+            status["outcome"] = "malformed_json"
+        else:
+            status["outcome"], messages = messages_from_response(response)
+except OSError:
+    status["outcome"] = "transport_error"
+
+try:
+    if status["outcome"].startswith("success_"):
+        atomic_write(output, "".join(message + "\n" for message in messages))
+        status["entries"] = len(messages)
+except (OSError, UnicodeError):
+    status["outcome"] = "output_error"
+
+if not status["outcome"].startswith("success_"):
+    status["entries"] = 0
+    try:
+        output.unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        status["outcome"] = "output_error"
+        status["output_cleanup_failed"] = True
+
+sidecar = "written"
+sidecar_path = Path(str(output) + ".status.json")
+try:
+    atomic_write(sidecar_path, json.dumps(status) + "\n")
+except OSError:
+    sidecar = "write_error"
+    try:
+        sidecar_path.unlink()
+    except FileNotFoundError:
+        pass
+    except OSError:
+        sidecar = "write_error_cleanup_failed"
+print("    Loki outcome: {} outcome={} entries={} curl_exit={} http_status={} sidecar={} output_cleanup_failed={}".format(
+    output.name, status["outcome"], status["entries"], status["curl_exit"],
+    status["http_status"], sidecar, status["output_cleanup_failed"]), flush=True)
+PY
       }
 
       # --- MC-side log collection via Loki ---
