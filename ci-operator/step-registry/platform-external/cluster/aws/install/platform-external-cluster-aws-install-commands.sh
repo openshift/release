@@ -296,7 +296,7 @@ if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
       --default-actions "Type=forward,TargetGroupArn=${INGRESS_HTTPS_TARGET_GROUP}" || true
 
     log "Updating *.apps record in private hosted zone to point to internal NLB"
-    APPS_RECORD="\\052.apps.${CLUSTER_NAME}.${base_domain}"
+    APPS_RECORD="*.apps.${CLUSTER_NAME}.${base_domain}"
     aws route53 change-resource-record-sets \
       --hosted-zone-id "${PRIVATE_HOSTED_ZONE}" \
       --change-batch "{
