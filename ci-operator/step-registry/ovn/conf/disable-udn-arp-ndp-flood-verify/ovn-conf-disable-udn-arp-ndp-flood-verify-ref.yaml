@@ -1,0 +1,56 @@
+ref:
+  as: ovn-conf-disable-udn-arp-ndp-flood-verify
+  from: cli
+  commands: ovn-conf-disable-udn-arp-ndp-flood-verify-commands.sh
+  timeout: 20m0s
+  grace_period: 2m0s
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: DISABLE_UDN_ARP_NDP_FLOOD
+    default: ""
+    documentation: |-
+      Set to "true" by jobs that enable ARP/NDP flood suppression through the
+      ovn-conf-disable-udn-arp-ndp-flood-manifest step. When unset or empty the step is a no-op,
+      so it can be part of a shared workflow. Any value other than "true" or empty fails the step.
+  - name: OVN_NOFLOOD_VERIFY_TIMEOUT_SECONDS
+    default: "900"
+    documentation: |-
+      Overall seconds the step may wait for the feature to be in effect, from 1 to 1080. Each oc
+      call is limited to 60 seconds or the remaining wait, whichever is shorter, and is killed 10
+      seconds after a timeout, so oc calls end within the configured wait plus 10 seconds (at most
+      1090 seconds). That leaves headroom under the 20 minute ref timeout; local processing between
+      calls is not separately time-limited.
+  documentation: |-
+    Required feature-mode guard for OVN-Kubernetes ARP/NDP flood suppression on user-defined
+    networks. It runs after installation and before the tests, because the feature tests can skip
+    and are informing. It is read-only: it never creates, patches or deletes anything, and
+    `oc exec` only reads process arguments and /proc metadata. It is a no-op unless
+    DISABLE_UDN_ARP_NDP_FLOOD is "true".
+
+    Using ${SHARED_DIR}/kubeconfig and, when present, ${SHARED_DIR}/proxy-conf.sh, it requires, in
+    one pass:
+    - openshift-network-operator/ovn-kubernetes-config-overrides data disable-udn-arp-ndp-flood
+      set to a true value (CNO boolean parsing after trimming);
+    - for the openshift-ovn-kubernetes ovnkube-node DaemonSet, a UID and a positive desired pod
+      count, and exactly that many pods owned by that UID that are scheduled, Running and not
+      terminating, each on a different node (a coverage check only, not a rollout or readiness
+      check);
+    - in each of those pods, a static Bash check that passes only when exactly one process of
+      that container (matched by its cgroup, which excludes processes of other containers sharing
+      the host PID namespace) is ovnkube with --init-node and names
+      --disable-udn-arp-ndp-flood exactly once, as the bare flag or =true (any other value, a
+      repeated flag or a second such process fails);
+    - the pod census taken again after the checks and unchanged, so a pod replaced while its
+      neighbours were being checked cannot yield an unverified pass;
+    - the ConfigMap value again before reporting success.
+
+    A missing, false or invalid setting fails at once; other states are polled every 10 seconds
+    until the deadline. A pass counts only if every call and the final evaluation finish before
+    the deadline (whole-second resolution). A failed check in a pod is reported as "could not
+    verify" together with a fixed error category; raw error text is never logged, and the summary
+    in ${ARTIFACT_DIR}/ovn-noflood-verify.txt holds no credentials, URLs or addresses. The step
+    does not check rollout or readiness; general cluster readiness is left to the test step that
+    follows.
