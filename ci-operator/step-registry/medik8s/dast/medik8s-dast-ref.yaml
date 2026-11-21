@@ -1,0 +1,27 @@
+ref:
+  as: medik8s-dast
+  from: upi-installer
+  cli: latest
+  grace_period: 10m
+  commands: medik8s-dast-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: RHWA_NAMESPACE
+    default: "openshift-workload-availability"
+    documentation: Namespace where RHWA operators are installed and pods will be scanned.
+  - name: TRIVY_IMAGE
+    default: "docker.io/aquasec/trivy:0.76.1"
+    documentation: Trivy image to run inside the cluster for the DAST scan.
+  documentation: |-
+    Runs a DAST (Dynamic Application Security Testing) scan against RHWA operator
+    pods using the Trivy Kubernetes misconfiguration scanner.
+
+    Trivy runs as a Kubernetes Job inside the cluster (not nested in the test pod),
+    matching the eco-gotests implementation pattern.
+    Scans all pods in RHWA_NAMESPACE for HIGH and CRITICAL severity misconfigurations.
+    Results are reported per-pod so findings are attributable to individual operators.
+
+    Must run after the medik8s-setup chain (operators must be installed and running).
