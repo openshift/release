@@ -9,7 +9,10 @@ log(){
 }
 
 LEASE_NAMESPACE="${LEASE_NAMESPACE:-rosa-cluster-lease}"
-LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
+# The override is a test seam for exercising the authentication paths offline.
+# It is not declared in the step ref, so ci-operator never sets it and a CI run
+# always takes the credential bundle mount path below.
+LEASE_HOST_KUBECONFIG="${LEASE_HOST_KUBECONFIG:-/etc/rosa-cluster-lease-manager/kubeconfig}"
 OCM_LOGIN_ENV="${OCM_LOGIN_ENV:-staging}"
 STALE_LEASE_HOURS="${STALE_LEASE_HOURS:-4}"
 
@@ -26,14 +29,61 @@ SSO_CLIENT_ID=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-id" 2>/dev/null || true)
 SSO_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/sso-client-secret" 2>/dev/null || true)
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token" 2>/dev/null || true)
 
+# When `ocm login` fails the step exits before any artifact is written, so the
+# retained Prow artifacts only show the rejection from the OCM server. Record
+# which credential kind was selected and which OCM environment was targeted
+# before the login runs, so the failure can be triaged from the artifacts.
+#
+# Only fixed labels are published. Credential values, client identifiers,
+# command arguments and credential paths must never reach a publicly retained
+# log, and OCM_LOGIN_ENV is step configuration that may hold an arbitrary URL,
+# so it is reported through a strict allowlist and otherwise as "other".
 if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-    ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+    OCM_AUTH_MODE="sso-client-pair"
 elif [[ -n "${OCM_TOKEN}" ]]; then
+    OCM_AUTH_MODE="ocm-token"
+else
+    OCM_AUTH_MODE="none"
+fi
+
+# `ocm` also accepts a full URL here, OCM_LOGIN_ENV is step configuration and
+# the per-cluster environment comes from a ConfigMap, so a diagnostic names an
+# environment only when it matches a known one and reports anything else as a
+# fixed label.
+ocm_env_label() {
+    case "$1" in
+        production|staging|integration|local) printf '%s' "$1" ;;
+        *)                                    printf 'other' ;;
+    esac
+}
+
+# Overwrites the file so it always names the furthest stage reached: a run that
+# dies in an `ocm login` leaves that login's stage behind. Diagnostics are best
+# effort and never change the step's control flow or exit status.
+write_auth_diagnostics() {
+    local stage="$1" env_label
+    env_label=$(ocm_env_label "$2")
+    log "OCM auth: stage=${stage} auth-mode=${OCM_AUTH_MODE} ocm-env=${env_label}"
+    [[ -n "${ARTIFACT_DIR:-}" ]] || return 0
+    if ! printf 'stage: %s\nauth-mode: %s\nocm-env: %s\n' \
+        "${stage}" "${OCM_AUTH_MODE}" "${env_label}" \
+        > "${ARTIFACT_DIR}/lease-health-auth-diagnostics.txt"; then
+        log "WARNING: could not write the OCM auth diagnostics to the artifact directory"
+    fi
+}
+
+write_auth_diagnostics "ocm-login" "${OCM_LOGIN_ENV}"
+
+if [[ "${OCM_AUTH_MODE}" == "sso-client-pair" ]]; then
+    ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+elif [[ "${OCM_AUTH_MODE}" == "ocm-token" ]]; then
     ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 else
     log "ERROR: No OCM credentials found in cluster profile"
     exit 1
 fi
+
+write_auth_diagnostics "ocm-login-succeeded" "${OCM_LOGIN_ENV}"
 
 CURRENT_OCM_ENV="${OCM_LOGIN_ENV}"
 
@@ -42,12 +92,14 @@ ocm_ensure_env() {
     if [[ "${CURRENT_OCM_ENV}" == "${target_env}" ]]; then
         return 0
     fi
+    write_auth_diagnostics "ocm-reauth" "${target_env}"
     if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
         ocm login --url "${target_env}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
     elif [[ -n "${OCM_TOKEN}" ]]; then
         ocm login --url "${target_env}" --token "${OCM_TOKEN}"
     fi
     CURRENT_OCM_ENV="${target_env}"
+    write_auth_diagnostics "ocm-reauth-succeeded" "${target_env}"
 }
 
 ALL_CMS=$(lease_oc get configmap -n "${LEASE_NAMESPACE}" -l "rosa-cluster-lease/managed=true" -o json)
