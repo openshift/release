@@ -939,9 +939,14 @@ PY
     # Window reset on desired-config change (render churn); count churn runs.
     # genPrint is the sorted per-pool name=gen fingerprint: a replaced pool
     # changes it even when a numeric sum would not (preflight review).
-    # PRRT_kwDOBHvUUM65yNGt: eligibility change should reset streak
-    if [[ -n "${_lastGenPrint}" && -n "${genPrint}" && "${genPrint}" != "${_lastGenPrint}" ]]; then consecutivePasses=0; fi
-    if [[ -n "${_lastGenPrint}" && -n "${genPrint}" && "${genPrint}" != "${_lastGenPrint}" ]]; then
+    # PRRT_kwDOBHvUUM65yNGt: eligibility change should reset streak. The
+    # streak reset is unconditional (an eligibility change that empties the
+    # fingerprint still resets); the churn COUNTER keeps the previous-fingerprint
+    # guard so the baseline poll and paused-pool gaps are not counted as churn
+    # (preflight deep review: the first valid fingerprint is a baseline, not a
+    # change, and an empty fingerprint is not a re-render).
+    if [[ "${genPrint}" != "${_lastGenPrint}" ]]; then consecutivePasses=0; fi
+    if [[ -n "${_lastGenPrint}" && "${genPrint}" != "${_lastGenPrint}" ]]; then
         (( ++_renderChurnCount )) || true
         echo "Render churn detected (generations ${_lastGenPrint} -> ${genPrint}, churn #${_renderChurnCount}); resetting trend window"
         readyHistory=()
