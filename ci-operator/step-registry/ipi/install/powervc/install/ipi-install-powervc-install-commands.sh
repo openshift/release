@@ -22,9 +22,9 @@ set -o errtrace
 #   DEBUG - Enable debug logging (default: false)
 
 # Global constants
-readonly POWERVC_TOOL_VERSION="v2.4.12"
-readonly YQ_VERSION="v4.53.6"
-readonly IBMCLOUD_VERSION="2.47.1"
+readonly POWERVC_TOOL_VERSION="v2.4.14"
+readonly YQ_VERSION="v4.54.3"
+readonly IBMCLOUD_VERSION="2.49.0"
 
 # Color codes for output (only use if terminal supports it)
 if [[ -t 2 ]]; then
@@ -266,7 +266,7 @@ function download_tool_w_sha() {
 # the EXIT trap when the subshell returns.
 #
 # Arguments:
-#   $1 - yq release version tag (required, e.g. v4.53.6).
+#   $1 - yq release version tag (required, e.g. v4.54.3).
 #   $2 - (optional) release asset name. Defaults to yq_linux_amd64.
 #   $3 - (optional) destination path for the installed binary. Defaults to yq.
 # Returns:
@@ -456,12 +456,28 @@ function install_required_tools() {
 	if [[ ! -f "${ibmcloud_tarball}" ]]; then
 		log_info "Installing IBM Cloud CLI version ${IBMCLOUD_VERSION}"
 
-		local ibmcloud_url="https://download.clis.cloud.ibm.com/ibm-cloud-cli/${IBMCLOUD_VERSION}/IBM_Cloud_CLI_${IBMCLOUD_VERSION}_amd64.tar.gz"
+		# Newer versions are served from ibm-cloud-cli-dn; older versions
+		# (e.g. 2.47.1) are only available from the original ibm-cloud-cli path.
+		local ibmcloud_base_url="https://download.clis.cloud.ibm.com"
+		local ibmcloud_file="IBM_Cloud_CLI_${IBMCLOUD_VERSION}_amd64.tar.gz"
+		local ibmcloud_url=""
+		local ibmcloud_path
+		local ibmcloud_downloaded=false
 
-		if ! retry_command 3 5 "Download IBM Cloud CLI" \
-			curl --fail --connect-timeout 30 --max-time 120 \
-				--location --output "${ibmcloud_tarball}" "${ibmcloud_url}"; then
-			log_error "Could not download ${ibmcloud_url}"
+		for ibmcloud_path in ibm-cloud-cli-dn ibm-cloud-cli; do
+			ibmcloud_url="${ibmcloud_base_url}/${ibmcloud_path}/${IBMCLOUD_VERSION}/${ibmcloud_file}"
+			if retry_command 3 5 "Download IBM Cloud CLI" \
+				curl --fail --connect-timeout 30 --max-time 120 \
+					--location --output "${ibmcloud_tarball}" "${ibmcloud_url}"; then
+				ibmcloud_downloaded=true
+				break
+			fi
+			log_info "Could not download ${ibmcloud_url}"
+			rm -f "${ibmcloud_tarball}"
+		done
+
+		if ! ${ibmcloud_downloaded}; then
+			log_error "Could not download IBM Cloud CLI version ${IBMCLOUD_VERSION} from any known location"
 			popd > /dev/null || true
 			return 1
 		fi
