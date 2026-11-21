@@ -2,6 +2,8 @@
 
 Deprovisions a **Hive-managed ACM spoke** from the hub after test/post phase.
 
+Used by every ACM+Virt job. See the [JUnit step index](../../../interop/acm/acm-virt-bundle/README.md) and the [interop-testing job README](../../../../config/RedHatQE/interop-testing/README.md).
+
 ## Order of operations
 
 1. Delete `ManagedCluster`; wait up to `ACM_CLUSTER_MC_DETACH_TIMEOUT_MINUTES` for ACM to clear finalizers. If still stuck (spoke unreachable), finalizers are auto-stripped so deprovisioning can always proceed.
