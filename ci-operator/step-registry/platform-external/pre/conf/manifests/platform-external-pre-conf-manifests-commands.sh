@@ -66,7 +66,9 @@ log "openshift-install version used for bootimage discovery:"
 # Save installer binary to SHARED_DIR so downstream steps (e.g.
 # ready-control error handler) can use it even when running from a
 # different base image (from: cli).
-cp -f "${INSTALLER_BINARY}" "${SHARED_DIR}/openshift-install"
+# Resolve to absolute path (INSTALLER_BINARY may be a bare command name)
+INSTALLER_PATH="$(command -v "${INSTALLER_BINARY}")"
+cp -f "${INSTALLER_PATH}" "${SHARED_DIR}/openshift-install"
 chmod +x "${SHARED_DIR}/openshift-install"
 
 #

@@ -482,6 +482,8 @@ if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
 
   if [[ -n "${INTERNAL_NLB_ARN}" ]]; then
     log "Creating internal ingress target groups and listeners"
+    INGRESS_SETUP_FAILED=""
+
     INT_HTTP_TG_ARN="$(aws elbv2 create-target-group \
       --name "${INFRA_ID:0:20}-int-http" \
       --protocol TCP --port 80 \
@@ -489,7 +491,12 @@ if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
       --target-type ip \
       --health-check-protocol TCP \
       --health-check-port 80 \
-      --query 'TargetGroups[0].TargetGroupArn' --output text)" || true
+      --query 'TargetGroups[0].TargetGroupArn' --output text)" || INGRESS_SETUP_FAILED="http-tg"
+    # Track immediately so cleanup can delete on partial failure
+    if [[ -n "${INT_HTTP_TG_ARN}" ]] && [[ "${INT_HTTP_TG_ARN}" != "None" ]]; then
+      echo "${INT_HTTP_TG_ARN}" >> "${SHARED_DIR}/disconnected_tg_arns"
+    fi
+
     INT_HTTPS_TG_ARN="$(aws elbv2 create-target-group \
       --name "${INFRA_ID:0:20}-int-https" \
       --protocol TCP --port 443 \
@@ -497,31 +504,32 @@ if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
       --target-type ip \
       --health-check-protocol TCP \
       --health-check-port 443 \
-      --query 'TargetGroups[0].TargetGroupArn' --output text)" || true
+      --query 'TargetGroups[0].TargetGroupArn' --output text)" || INGRESS_SETUP_FAILED="https-tg"
+    if [[ -n "${INT_HTTPS_TG_ARN}" ]] && [[ "${INT_HTTPS_TG_ARN}" != "None" ]]; then
+      echo "${INT_HTTPS_TG_ARN}" >> "${SHARED_DIR}/disconnected_tg_arns"
+    fi
 
-    if [[ -n "${INT_HTTP_TG_ARN}" ]] && [[ -n "${INT_HTTPS_TG_ARN}" ]]; then
+    if [[ -n "${INGRESS_SETUP_FAILED}" ]]; then
+      log "ERROR: Failed to create internal ingress target group (${INGRESS_SETUP_FAILED}); disconnected ingress will not work"
+    else
       # Register worker IPs to internal target groups
       # shellcheck disable=SC2153
       for WORKER_IP in ${COMPUTE_0_IP} ${COMPUTE_1_IP} ${COMPUTE_2_IP}; do
         aws elbv2 register-targets --target-group-arn "${INT_HTTP_TG_ARN}" \
-          --targets "Id=${WORKER_IP}" || true
+          --targets "Id=${WORKER_IP}" || INGRESS_SETUP_FAILED="register"
         aws elbv2 register-targets --target-group-arn "${INT_HTTPS_TG_ARN}" \
-          --targets "Id=${WORKER_IP}" || true
+          --targets "Id=${WORKER_IP}" || INGRESS_SETUP_FAILED="register"
       done
 
       # Add listeners on internal NLB
       aws elbv2 create-listener \
         --load-balancer-arn "${INTERNAL_NLB_ARN}" \
         --protocol TCP --port 80 \
-        --default-actions "Type=forward,TargetGroupArn=${INT_HTTP_TG_ARN}" || true
+        --default-actions "Type=forward,TargetGroupArn=${INT_HTTP_TG_ARN}" || INGRESS_SETUP_FAILED="listener-80"
       aws elbv2 create-listener \
         --load-balancer-arn "${INTERNAL_NLB_ARN}" \
         --protocol TCP --port 443 \
-        --default-actions "Type=forward,TargetGroupArn=${INT_HTTPS_TG_ARN}" || true
-
-      # Save for cleanup
-      echo "${INT_HTTP_TG_ARN}" >> "${SHARED_DIR}/disconnected_tg_arns"
-      echo "${INT_HTTPS_TG_ARN}" >> "${SHARED_DIR}/disconnected_tg_arns"
+        --default-actions "Type=forward,TargetGroupArn=${INT_HTTPS_TG_ARN}" || INGRESS_SETUP_FAILED="listener-443"
 
       log "Updating *.apps in private hosted zone to internal NLB"
       aws route53 change-resource-record-sets \
@@ -539,11 +547,13 @@ if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
               }
             }
           }]
-        }" || true
-      log "Internal ingress routing configured for disconnected"
-    else
-      log "WARNING: Failed to create internal ingress target groups"
-    fi
+        }" || INGRESS_SETUP_FAILED="dns"
+      if [[ -n "${INGRESS_SETUP_FAILED}" ]]; then
+        log "ERROR: Disconnected ingress setup incomplete (failed at: ${INGRESS_SETUP_FAILED})"
+      else
+        log "Internal ingress routing configured for disconnected"
+      fi
+    fi  # end TG creation success
   else
     log "WARNING: Could not find internal NLB; *.apps may be unreachable from private subnets"
   fi
