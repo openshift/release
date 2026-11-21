@@ -21,7 +21,211 @@ set -o pipefail
 # MIN_VCENTERS - Requires the lease's pools to span at least this many distinct
 #      vCenters (min-vcenters lease support, SPLAT-2993).  Only valid with the
 #      POOL_COUNT single-lease path; must not exceed POOL_COUNT or MAX_VCENTERS.
+# MAX_VCENTERS - Caps the number of distinct vCenters a lease may span.  It is
+#      reduced to 1 when the release being installed predates multi-vCenter
+#      install-config support (see below).
 ################################################################################
+
+################################################################################
+# Installer release capabilities
+#
+# install-config.yaml only accepts more than one platform.vsphere.vcenters
+# entry from OCP 4.18 on, where VSphereMultiVCenters is enabled by default.
+# Installers for 4.13 - 4.16 cap the list at one item outright.  OCP 4.17
+# allows a longer list only when the job enables the VSphereMultiVCenters
+# feature gate (through TechPreviewNoUpgrade or CustomNoUpgrade), which the
+# zonal workflows do not do.  A lease spanning several vCenters therefore makes
+# the initial installation fail before an upgrade can even be exercised.
+#
+# Upgrade jobs install the release referenced by release:initial before
+# upgrading, so the bound must follow the *initial* release rather than the
+# release being upgraded to.  The image resolution below mirrors what
+# ipi-conf-vsphere-vcm and ipi-install-install-stableinitial do.
+################################################################################
+
+MULTI_VCENTER_MIN_OCP_VERSION=418
+# OCP 4.17 is the first release with the VSphereMultiVCenters feature gate.
+MULTI_VCENTER_FEATURE_GATE_VERSION=417
+
+# A single vCenter exposes three failure-domain pools in the VMC fleet, so a
+# lease capped to one vCenter can only satisfy three pools.  This matches the
+# MAX_VCENTERS=1/POOL_COUNT=3 combination that the older-release zonal jobs use.
+SINGLE_VCENTER_MAX_POOLS=3
+
+# Echo the release image that the initial installation will use.
+function determine_install_release_image() {
+  local release_image_initial="${RELEASE_IMAGE_INITIAL:-}"
+
+  if [[ -z "${release_image_initial}" ]]; then
+    release_image_initial=$(oc get istag "release:initial" -n "${NAMESPACE}" \
+      -o jsonpath='{.tag.from.name}' 2>/dev/null || true)
+  fi
+
+  if [[ -z "${release_image_initial}" ]]; then
+    release_image_initial="${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM:-}"
+  fi
+
+  printf '%s\n' "${release_image_initial}"
+}
+
+# Echo the payload version (.metadata.version) for a release image.  The
+# cluster profile pull secret is used directly; build-farm registry
+# credentials are merged in the same way ipi-conf-vsphere-vcm does it.
+function install_release_version() {
+  local release_image="${1:-}"
+  local work_dir=""
+  local version=""
+
+  if [[ -z "${release_image}" || ! -f "${CLUSTER_PROFILE_DIR:-}/pull-secret" ]]; then
+    return 0
+  fi
+
+  work_dir=$(mktemp -d)
+  cp "${CLUSTER_PROFILE_DIR}/pull-secret" "${work_dir}/pull-secret"
+  oc registry login --to "${work_dir}/pull-secret" &>/dev/null || true
+  # A failed lookup must not abort the step: the requested limits are kept when
+  # the version is unknown.
+  version=$(oc adm release info \
+    --registry-config "${work_dir}/pull-secret" \
+    "${release_image}" --output=json 2>/dev/null |
+    jq -r '.metadata.version // empty' 2>/dev/null || true)
+  rm -rf "${work_dir}"
+
+  printf '%s\n' "${version}"
+}
+
+# Echo the release version embedded in an image tag, e.g.
+# registry/repo:4.13.0-0.nightly -> 4.13.  Used when the payload metadata
+# cannot be read; digest references and non-version tags echo nothing.
+function release_version_from_image_reference() {
+  local release_image="${1:-}"
+  local tag=""
+
+  case "${release_image}" in
+    *@sha256:*)
+      return 0
+      ;;
+  esac
+
+  tag="${release_image##*:}"
+  if [[ "${tag}" =~ ^([0-9]+)\.([0-9]{1,2})(\.|-|$) ]]; then
+    printf '%s.%s\n' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
+  fi
+}
+
+# Echo <major>*100+<minor> for a payload version, e.g. 4.13.0-0.nightly -> 413.
+# Echoes nothing when the version cannot be parsed.
+function ocp_version_number() {
+  local version="${1:-}"
+  local major_version=""
+  local minor_version=""
+
+  major_version=$(echo "${version}" | cut -d. -f1)
+  minor_version=$(echo "${version}" | cut -d. -f2)
+  if [[ ! "${major_version}" =~ ^[0-9]+$ || ! "${minor_version}" =~ ^[0-9]+$ ]]; then
+    return 0
+  fi
+
+  echo $((10#${major_version} * 100 + 10#${minor_version}))
+}
+
+# Returns success when the job enables the VSphereMultiVCenters feature gate,
+# which is how pre-4.18 releases opt into multi-vCenter install-config.
+function multi_vcenter_feature_gate_enabled() {
+  case "${FEATURE_SET:-}" in
+    TechPreviewNoUpgrade)
+      return 0
+      ;;
+    CustomNoUpgrade)
+      [[ "${FEATURE_GATES:-}" == *VSphereMultiVCenters* && "${FEATURE_GATES:-}" != *VSphereMultiVCenters=false* ]]
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+# Returns success when the release accepts multiple platform.vsphere.vcenters
+# entries.  An unknown version is treated as supported so a registry outage
+# does not force newer jobs onto the single-vCenter path.
+function multi_vcenter_install_supported() {
+  local ocp_version="${1:-}"
+
+  if [[ ! "${ocp_version}" =~ ^[0-9]+$ ]]; then
+    return 0
+  fi
+
+  if (( 10#${ocp_version} >= MULTI_VCENTER_MIN_OCP_VERSION )); then
+    return 0
+  fi
+
+  if (( 10#${ocp_version} >= MULTI_VCENTER_FEATURE_GATE_VERSION )); then
+    multi_vcenter_feature_gate_enabled
+    return
+  fi
+
+  return 1
+}
+
+# Echo "<max_vcenters> <pool_count>" with the lease limits adjusted to the
+# release's multi-vCenter capability.
+function apply_release_lease_limits() {
+  local ocp_version="${1:-}"
+  local max_vcenters="$2"
+  local pool_count="$3"
+  local pools="$4"
+
+  if multi_vcenter_install_supported "${ocp_version}"; then
+    printf '%s %s\n' "${max_vcenters}" "${pool_count}"
+    return 0
+  fi
+
+  if (( 10#${max_vcenters} > 1 )); then
+    max_vcenters=1
+  fi
+
+  # When POOLS lists explicit pools, each pool gets its own lease, so there is
+  # no single-lease pool count to trim.
+  if [[ -z "${pools}" ]] && (( 10#${pool_count} > SINGLE_VCENTER_MAX_POOLS )); then
+    pool_count=${SINGLE_VCENTER_MAX_POOLS}
+  fi
+
+  printf '%s %s\n' "${max_vcenters}" "${pool_count}"
+}
+
+# Echo the reason MIN_VCENTERS cannot be satisfied by the requested lease
+# shape, or nothing when it is valid.  MIN_VCENTERS=0 disables the request.
+# The vCenter comparison runs against the post-cap MAX_VCENTERS, so a minimum
+# of 1 is valid on a single-vCenter lease while 2 is rejected.
+function min_vcenters_error() {
+  local min_vcenters="$1"
+  local pool_count="$2"
+  local max_vcenters="$3"
+  local pools="$4"
+
+  if [[ "${min_vcenters}" == "0" ]]; then
+    return 0
+  fi
+
+  if [[ -n "${pools}" ]]; then
+    echo "MIN_VCENTERS cannot be used with POOLS; it requires the single-lease POOL_COUNT path"
+    return 0
+  fi
+
+  if (( 10#${min_vcenters} > 10#${pool_count} )); then
+    echo "MIN_VCENTERS (${min_vcenters}) must not exceed POOL_COUNT (${pool_count})"
+    return 0
+  fi
+
+  if (( 10#${min_vcenters} > 10#${max_vcenters} )); then
+    echo "MIN_VCENTERS (${min_vcenters}) must not exceed MAX_VCENTERS (${max_vcenters})"
+  fi
+}
+
+# Keep this marker directly above the first statement that has side effects:
+# hack/tests/ipi-conf-vsphere-check-vcm-commands_test.sh sources this file up to
+# the marker to exercise the release-capability helpers on their own.
+# END_RELEASE_CAPABILITY_HELPERS
 
 if [[ "${CLUSTER_PROFILE_NAME:-}" != "vsphere-elastic" ]]; then
   echo "using legacy sibling of this step"
@@ -60,22 +264,35 @@ for NUMERIC_VAR in MIN_VCENTERS POOL_COUNT MAX_VCENTERS; do
   fi
 done
 
+# Apply the capability of the release that will actually be installed.  In an
+# upgrade job that is the initial release, not the release being upgraded to.
+install_release_image=$(determine_install_release_image)
+INSTALL_RELEASE_VERSION=$(install_release_version "${install_release_image}")
+if [[ -z "${INSTALL_RELEASE_VERSION}" ]]; then
+  INSTALL_RELEASE_VERSION=$(release_version_from_image_reference "${install_release_image}")
+fi
+INSTALL_RELEASE_OCP_VERSION=$(ocp_version_number "${INSTALL_RELEASE_VERSION}")
+
+requested_max_vcenters=${MAX_VCENTERS}
+requested_pool_count=${POOL_COUNT}
+read -r MAX_VCENTERS POOL_COUNT <<<"$(apply_release_lease_limits \
+  "${INSTALL_RELEASE_OCP_VERSION}" "${MAX_VCENTERS}" "${POOL_COUNT}" "${POOLS}")"
+
+if [[ -z "${INSTALL_RELEASE_OCP_VERSION}" ]]; then
+  log "WARNING: unable to determine the release being installed; keeping MAX_VCENTERS=${MAX_VCENTERS} and POOL_COUNT=${POOL_COUNT}"
+elif multi_vcenter_install_supported "${INSTALL_RELEASE_OCP_VERSION}"; then
+  log "release ${INSTALL_RELEASE_VERSION} supports multiple vCenters; keeping MAX_VCENTERS=${MAX_VCENTERS} and POOL_COUNT=${POOL_COUNT}"
+else
+  log "release ${INSTALL_RELEASE_VERSION} (OCP ${INSTALL_RELEASE_OCP_VERSION}) does not support multiple vCenters; using MAX_VCENTERS=${MAX_VCENTERS} and POOL_COUNT=${POOL_COUNT} (requested ${requested_max_vcenters} and ${requested_pool_count})"
+fi
+
 # MIN_VCENTERS requires the single-lease (POOL_COUNT) path and must respect the
 # same bounds VCM enforces on spec.min-vcenters: it cannot exceed the number of
-# pools requested or the vCenters cap.
-if [[ "${MIN_VCENTERS}" != "0" ]]; then
-  if [[ "${POOLS}" != "" ]]; then
-    echo "MIN_VCENTERS cannot be used with POOLS; it requires the single-lease POOL_COUNT path"
-    exit 1
-  fi
-  if (( 10#${MIN_VCENTERS} > 10#${POOL_COUNT} )); then
-    echo "MIN_VCENTERS (${MIN_VCENTERS}) must not exceed POOL_COUNT (${POOL_COUNT})"
-    exit 1
-  fi
-  if (( 10#${MIN_VCENTERS} > 10#${MAX_VCENTERS} )); then
-    echo "MIN_VCENTERS (${MIN_VCENTERS}) must not exceed MAX_VCENTERS (${MAX_VCENTERS})"
-    exit 1
-  fi
+# pools requested or the (possibly capped) vCenters limit.
+min_vcenters_error_message=$(min_vcenters_error "${MIN_VCENTERS}" "${POOL_COUNT}" "${MAX_VCENTERS}" "${POOLS}")
+if [[ -n "${min_vcenters_error_message}" ]]; then
+  echo "${min_vcenters_error_message}"
+  exit 1
 fi
 
 export GOVC_TLS_CA_CERTS=/var/run/vault/vsphere-ibmcloud-ci/vcenter-certificate
