@@ -7,23 +7,30 @@ set -o pipefail
 # gathers on both pass and fail. Best-effort throughout: every command tolerates
 # failure and the script always exits 0 so it never fails the run.
 
-QUAY_NS="${QUAYNAMESPACE:-quay-enterprise}"
 SHARED_DIR="${SHARED_DIR:-/tmp/shared}"
+JAEGER_NS="${JAEGER_NAMESPACE:-}"
+if [[ -z "${JAEGER_NS}" && -f "${SHARED_DIR}/jaeger_namespace" ]]; then
+  JAEGER_NS=$(cat "${SHARED_DIR}/jaeger_namespace")
+fi
+JAEGER_NS="${JAEGER_NS:-${QUAYNAMESPACE:-quay-enterprise}}"
+JAEGER_SERVICE="${JAEGER_SERVICE:-quay}"
 JAEGER_TRACE_LIMIT="${JAEGER_TRACE_LIMIT:-5000}"
 JAEGER_WINDOW="${JAEGER_WINDOW:-5m}"
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
 OUT="${ARTIFACT_DIR}/jaeger-traces"
 mkdir -p "${OUT}"
+UNAVAILABLE="${OUT}/trace-collection-unavailable.txt"
 
 if [[ ! -f "${SHARED_DIR}/jaeger_deployed" ]]; then
   echo "Jaeger was not deployed; nothing to gather"
+  echo "Jaeger was not deployed" > "${UNAVAILABLE}"
   exit 0
 fi
 
-oc get pods -n "${QUAY_NS}" -l app=jaeger -o wide > "${OUT}/jaeger-pods.txt" 2>&1 || true
-oc logs deploy/jaeger -n "${QUAY_NS}" > "${OUT}/jaeger.log" 2>&1 || true
+oc get pods -n "${JAEGER_NS}" -l app=jaeger -o wide > "${OUT}/jaeger-pods.txt" 2>&1 || true
+oc logs deploy/jaeger -n "${JAEGER_NS}" > "${OUT}/jaeger.log" 2>&1 || true
 
-oc port-forward -n "${QUAY_NS}" svc/jaeger 16686:16686 > "${OUT}/port-forward.log" 2>&1 &
+oc port-forward -n "${JAEGER_NS}" svc/jaeger 16686:16686 > "${OUT}/port-forward.log" 2>&1 &
 PF_PID=$!
 trap 'kill "${PF_PID}" 2>/dev/null || true' EXIT
 
@@ -38,6 +45,7 @@ done
 
 if [[ "${READY}" != "true" ]]; then
   echo "WARNING: Jaeger query API never became reachable; keeping logs for debugging" >&2
+  echo "Jaeger query API in ${JAEGER_NS} never became reachable" > "${UNAVAILABLE}"
   exit 0
 fi
 
@@ -74,6 +82,7 @@ fi
 TOTAL_TRACES=0
 TOTAL_SPANS=0
 IDX=0
+OK=0
 WS="${START}"
 while [[ "${WS}" -lt "${NOW}" ]]; do
   WE=$(( WS + WINDOW_SECS ))
@@ -81,7 +90,7 @@ while [[ "${WS}" -lt "${NOW}" ]]; do
   IDX=$(( IDX + 1 ))
   RESP="${OUT}/traces-${IDX}.response"
   HTTP_CODE=$(curl -s --connect-timeout 5 --max-time 120 \
-    "http://127.0.0.1:16686/api/traces?service=quay&limit=${JAEGER_TRACE_LIMIT}&start=$(( WS * 1000000 ))&end=$(( WE * 1000000 ))" \
+    "http://127.0.0.1:16686/api/traces?service=${JAEGER_SERVICE}&limit=${JAEGER_TRACE_LIMIT}&start=$(( WS * 1000000 ))&end=$(( WE * 1000000 ))" \
     -o "${RESP}" -w '%{http_code}' 2>/dev/null || echo "000")
   if [[ "${HTTP_CODE}" == 2* ]] && jq -e '.data' "${RESP}" >/dev/null 2>&1; then
     TC=$(jq '.data | length' "${RESP}" 2>/dev/null || echo 0)
@@ -89,6 +98,7 @@ while [[ "${WS}" -lt "${NOW}" ]]; do
     mv "${RESP}" "${OUT}/traces-${IDX}.json"
     TOTAL_TRACES=$(( TOTAL_TRACES + TC ))
     TOTAL_SPANS=$(( TOTAL_SPANS + SC ))
+    OK=$(( OK + 1 ))
     echo "window ${IDX}: HTTP ${HTTP_CODE}, ${TC} traces"
   else
     echo "WARNING: window ${IDX}: HTTP ${HTTP_CODE}; response kept at ${RESP} for debugging" >&2
@@ -96,7 +106,12 @@ while [[ "${WS}" -lt "${NOW}" ]]; do
   WS="${WE}"
 done
 
-echo "Collected ${TOTAL_TRACES} traces / ${TOTAL_SPANS} spans for service quay across ${IDX} windows"
+echo "Collected ${TOTAL_TRACES} traces / ${TOTAL_SPANS} spans for service ${JAEGER_SERVICE} across ${IDX} windows"
+if [[ "${IDX}" -gt 0 && "${OK}" -eq 0 ]]; then
+  echo "all ${IDX} window queries failed for service ${JAEGER_SERVICE}" > "${UNAVAILABLE}"
+elif [[ "${TOTAL_TRACES}" -eq 0 ]]; then
+  echo "0 traces for service ${JAEGER_SERVICE}" > "${UNAVAILABLE}"
+fi
 gzip -f "${OUT}"/traces-*.json 2>/dev/null || true
 
 exit 0

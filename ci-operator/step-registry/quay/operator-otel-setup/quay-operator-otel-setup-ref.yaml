@@ -1,0 +1,22 @@
+ref:
+  as: quay-operator-otel-setup
+  cli: latest
+  from_image:
+    name: quay-test-omr
+    namespace: ci
+    tag: latest
+  commands: quay-operator-otel-setup-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  grace_period: 10m0s
+  documentation: |-
+    Point the quay-operator installed by quay-install-operator-bundle at the
+    in-cluster Jaeger from quay-deploy-jaeger. Sets OTEL_EXPORTER_OTLP_ENDPOINT
+    to ${SHARED_DIR}/jaeger_otlp_endpoint through the OLM Subscription's
+    spec.config.env (a direct Deployment patch would be reverted by OLM) and
+    waits for deployment/quay-operator-tng to roll out with it. Then snapshots
+    the operator's controller-runtime metrics (pod port 8080) to
+    ${ARTIFACT_DIR}/operator-metrics/metrics-before.txt. If Jaeger was not
+    deployed, records that tracing is not configured and exits 0.
