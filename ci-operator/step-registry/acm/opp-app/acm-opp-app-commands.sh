@@ -33,7 +33,9 @@ _propagate_junit () {
 # Test Reporting:
 #   - Results are recorded in JUnit XML format
 #   - JUnit XML is generated on exit (via trap) regardless of test results
-#   - Script always exits 0 to allow subsequent Prow test steps to run
+#   - Script exits nonzero when any test case is marked failed (the
+#     preflight failure paths and the end-of-script status check); a
+#     fully skipped report exits 0
 #   - Individual test failures are visible in Prow UI via JUnit reporting
 #
 ################################################################################
@@ -378,9 +380,31 @@ fi
 # missing" (fail).  On OCP versions where the Quay Bridge Operator is not
 # available in the catalog the QuayIntegration CRD will be absent entirely;
 # that is an environment limitation, not a test failure.
+# Bounded retry for the read-only preflight queries below. The Quay check is
+# now a hard failure, so a single transient apiserver error would red a gating
+# lane on a hiccup; each attempt is also time-boxed so a hung apiserver fails
+# the step inside the pod timeout instead of stalling it.
+_oc_query_bounded() {
+    typeset -i _attempts="${1:-3}"
+    shift
+    typeset -i _i=1 _rc=0
+    while (( _i <= _attempts )); do
+        if "$@" "--request-timeout=30s" 2>/dev/null; then
+            return 0
+        else
+            _rc=$?
+        fi
+        if (( _i < _attempts )); then
+            sleep $(( _i * 5 ))
+        fi
+        (( _i += 1 ))
+    done
+    return "${_rc}"
+}
+
 typeset apiOutput=""
 typeset -i apiRc=0
-apiOutput=$(oc api-resources --api-group=quay.redhat.com) || apiRc=$?
+apiOutput=$(_oc_query_bounded 3 oc api-resources --api-group=quay.redhat.com) || apiRc=$?
 
 if ((apiRc != 0)); then
     : "WARNING: oc api-resources failed (rc=${apiRc}) - cannot determine CRD presence, falling through to CR check"
@@ -398,7 +422,7 @@ fi
 
 typeset getOutput=""
 typeset -i getRc=0
-getOutput=$(oc get quayintegration quay --ignore-not-found -o name) || getRc=$?
+getOutput=$(_oc_query_bounded 3 oc get quayintegration quay --ignore-not-found -o name) || getRc=$?
 
 if ((getRc != 0)); then
     : "WARNING: oc get quayintegration failed (rc=${getRc}) - cluster API error"
@@ -409,7 +433,8 @@ if ((getRc != 0)); then
         testFailureMsg["${test}"]="oc get quayintegration failed (rc=${getRc}) - cluster API error"
     done
 
-    exit 0
+    echo "ERROR: oc get quayintegration failed (rc=${getRc}) with all test cases marked failed; failing the step." >&2
+    exit 1
 elif [[ -z "${getOutput}" ]]; then
     : "ERROR: QuayIntegration CRD exists but CR 'quay' not found!"
     : "OPP bundle components are not properly configured."
@@ -420,7 +445,8 @@ elif [[ -z "${getOutput}" ]]; then
         testFailureMsg["${test}"]="QuayIntegration CR 'quay' not found - OPP bundle not configured"
     done
 
-    exit 0
+    echo "ERROR: QuayIntegration CR 'quay' not found with all test cases marked failed; failing the step." >&2
+    exit 1
 fi
 
 : "QuayIntegration quay found"
