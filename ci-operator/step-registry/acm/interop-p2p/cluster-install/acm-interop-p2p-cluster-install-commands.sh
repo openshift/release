@@ -464,6 +464,18 @@ ocEOF
     # the JSON form without any conversion step.
     # Process substitution <(...) feeds the generated config directly to oc create
     # without writing to /tmp; --rawfile keeps the SSH public key out of xtrace.
+    # INTEROP-9750: tag p2p spoke install-config with expirationDate so the periodic
+    # aws-deprovision-collector (aws-deprovision-collector-commands.sh:209) can select
+    # leaked spoke VPCs when the workflow aborts. Without userTags the collector has
+    # no signal — e.g. leaked acm-spoke-c694d-1-9vvcj from failed rehearse-88800 (cleaned
+    # in INTEROP-9746). TTL 12h (date -d '12 hours' --iso=minutes --utc) covers the
+    # 450m provision budget (ACM_SPOKE_INSTALL_TIMEOUT_MINUTES=450, 7.5h) + test window
+    # + buffer and exceeds the step's 11h timeout; collector adds 30m grace via
+    # CLUSTER_TTL="30 minutes ago". Format --iso=minutes --utc (e.g. 2026-11-20T16:00+00:00)
+    # matches the collector's lexical cutoff (date '+%Y-%m-%dT%H:%M+0000') and the
+    # ipi-conf-aws convention (ipi-conf-aws-commands.sh:33,272-274).
+    typeset expirationDate
+    expirationDate="$(date -d '12 hours' --iso=minutes --utc)"
     : "Creating install-config secret for region '${clusterRegion}'"
     oc -n "${clusterName}" create secret generic install-config \
         --type Opaque \
@@ -478,6 +490,7 @@ ocEOF
                 --argjson wkR  "${ACM_SPOKE_WORKER_REPLICAS}" \
                 --arg netType  "${ACM_SPOKE_NETWORK_TYPE}" \
                 --arg region   "${clusterRegion}" \
+                --arg expirationDate "${expirationDate}" \
                 --arg clusterNetCidr "${clusterNetworkCidr}" \
                 --arg machineNetCidr "${machineNetworkCidr}" \
                 --arg serviceNetCidr "${serviceNetworkCidr}" \
@@ -506,7 +519,7 @@ ocEOF
                         "machineNetwork": [{"cidr": $machineNetCidr}],
                         "serviceNetwork": [$serviceNetCidr]
                     },
-                    "platform": {"aws": {"region": $region}},
+                    "platform": {"aws": {"region": $region, "userTags": {"expirationDate": $expirationDate, "clusterName": $name}}},
                     "sshKey": ($sshKey | rtrimstr("\n"))
                 }'
         ) \
