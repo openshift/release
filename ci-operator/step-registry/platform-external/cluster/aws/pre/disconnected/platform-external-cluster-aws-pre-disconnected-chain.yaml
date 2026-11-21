@@ -30,6 +30,8 @@ chain:
         memory: 100Mi
     timeout: 5m0s
     grace_period: 5m0s
+  - ref: mirror-images-community-e2e-images
+  - ref: mirror-images-qe-test-images
   - ref: platform-external-cluster-task-image-registry-emptydir
   - ref: platform-external-cluster-aws-destroy-bootstrap
   env:
@@ -42,6 +44,9 @@ chain:
   - name: MIRROR_IN_BASTION
     default: "yes"
     documentation: "Mirror images from the bastion host rather than the build farm."
+  - name: QE_IMAGES
+    default: "false"
+    documentation: "Only mirror community e2e test images (from mirror-images-list.yaml), not QE-specific images."
   documentation: |-
     Provisions a disconnected OpenShift cluster on AWS with platform type
     external. Reuses the existing disconnected VPC, bastion host, and
@@ -61,4 +66,7 @@ chain:
       6. Waits for install completion
       7. Trusts the mirror registry CA for in-cluster consumers
       8. Disables default OperatorHub catalog sources
-      9. Destroys the bootstrap resources
+      9. Mirrors community e2e test images and applies IDMS/ITMS so
+         tag-based upstream image pulls (registry.k8s.io) are
+         redirected to the bastion mirror
+     10. Destroys the bootstrap resources
