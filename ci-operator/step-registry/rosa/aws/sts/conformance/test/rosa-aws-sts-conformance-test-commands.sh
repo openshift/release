@@ -34,6 +34,14 @@ if [[ -n "${TEST_SKIPS:-}" ]]; then
     done
 fi
 
+# Publish the test-phase markers consumed by the gather-extra step when it
+# builds job_metrics.json. The end marker is written from an EXIT trap so the
+# phase is still recorded when the suite fails or the step is terminated early.
+# Both writes tolerate failure, and the trap leaves the script's exit status
+# untouched, so existing exit behaviour is unchanged.
+trap 'date +%s > "${SHARED_DIR}/TEST_TIME_TEST_END" || :' EXIT
+date +%s > "${SHARED_DIR}/TEST_TIME_TEST_START" || :
+
 set +e
 set -x
 openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
