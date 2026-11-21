@@ -629,7 +629,8 @@ except Exception:
       typeset _ns_create_time=""
       _ns_create_time="$(oc get namespace "${ACS_NAMESPACE}" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || echo "")"
       if [[ -n "${_ns_create_time}" ]]; then
-        typeset -i _ns_epoch=$(date -d "${_ns_create_time}" +%s 2>/dev/null || echo 0)
+        typeset -i _ns_epoch
+        _ns_epoch=$(date -d "${_ns_create_time}" +%s 2>/dev/null || echo 0)
         # If namespace created within step window (last 2h) consider independent proof, else fresh installability not proven
         if (( _ns_epoch >= _junit_start )); then
           _ns_created_recent=true

@@ -820,7 +820,7 @@ for item in data.get('items', []):
     bound = ((item.get('status') or {}).get('phase') == 'Bound')
     if any(r.get('name') == registry for r in refs if registry):
         owned.append((0 if bound else 1, name))
-    elif registry and name.startswith(registry + '-'):
+    elif registry and (name == registry or name.startswith(registry + '-')):
         # Only hint if not owned by a different QuayRegistry
         if not any(r.get('name') != registry and r.get('kind') == 'QuayRegistry' for r in (meta.get('ownerReferences') or [])):
             hinted.append((0 if bound else 1, name))

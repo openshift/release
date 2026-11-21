@@ -856,11 +856,15 @@ PostProcessJunit () {
 # Integrates existing GenerateJunitXml function with ExitTrap library
 # errexit is off inside the trap so one failing report step cannot skip the
 # rest, and the credential file is removed here so it does not survive an
-# early return.
+# early return. Both status carriers are declared at file scope: a `typeset`
+# inside the quoted trap body is invisible to shellcheck (SC2154) and, with an
+# early `exit`, would meet an unset variable under `set -u`.
+typeset -i _trapExit=0
+typeset -i _genRc=0
 trap '{
-    typeset _trapExit=$?
+    _trapExit=$?
     set +e
-    typeset _genRc=0
+    _genRc=0
     GenerateJunitXml || _genRc=$?
     # Validate report after generation: artifact volume full can leave no report or truncated XML (thread PRRT_kwDOBHvUUM65LZ2n)
     if (( _genRc == 0 )); then

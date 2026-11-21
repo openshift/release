@@ -565,12 +565,6 @@ TestQuayPull() {
         sleep 1
         qrJson2="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json 2>"${_opp_smoke_tmp}/qr2.err" || echo '{"items":[]}')"
         qrCount="$(printf '%s' "${qrJson2}" | jq '.items | length' 2>/dev/null || echo 0)"
-        # Use second read endpoint if available for integration
-        typeset qrEndpoint2=""
-        qrEndpoint2="$(printf '%s' "${qrJson2}" | jq -r '.items[0].status.registryEndpoint // empty' 2>/dev/null || echo "")"
-        if [[ -n "${qrEndpoint2}" ]]; then
-            quayEndpoint="${qrEndpoint2}"
-        fi
         if ! qrCount="$(printf '%s' "${qrJson2}" | jq '.items | length')"; then
             # PRRT_kwDOBHvUUM65RJop: align error file with second read (qr2.err holds second query's stderr)
             if ! grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/qr2.err"; then

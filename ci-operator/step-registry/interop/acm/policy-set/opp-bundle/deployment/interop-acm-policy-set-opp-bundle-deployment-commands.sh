@@ -12,18 +12,17 @@ umask 077
 typeset -i stepStartBudget=0
 stepStartBudget=$(date +%s)
 typeset -i stepDeadline=$(( stepStartBudget + 115 * 60 ))
-# Longest single compliance pass (the oc wait timeout below), so a pass is
-# only started when a full pass still fits inside the step budget.
-typeset -i compliancePassBudget=$(( 40 * 60 ))
 # Bounded oc get helper: cap blocking calls by remaining step budget with 120s reserve for JUnit/diagnostics (thread PRRT_kwDOBHvUUM65TpMM)
 _oc_get_bounded() {
-  typeset -i _now=$(date +%s)
+  typeset -i _now
+  _now=$(date +%s)
   typeset -i _remain=$(( stepDeadline - _now - 120 ))
   (( _remain < 10 )) && _remain=10
   timeout "${_remain}s" oc "$@" 2>&1
 }
 _oc_get_json_bounded() {
-  typeset -i _now=$(date +%s)
+  typeset -i _now
+  _now=$(date +%s)
   typeset -i _remain=$(( stepDeadline - _now - 120 ))
   (( _remain < 10 )) && _remain=10
   timeout "${_remain}s" oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' 2>&1
@@ -558,7 +557,8 @@ ReadStablePolicySet () {
 # stall-below-final-size race.
 ExpectedPolicyNames () {
   typeset setsJson=''
-  typeset -i _ep_now=$(date +%s)
+  typeset -i _ep_now
+  _ep_now=$(date +%s)
   typeset -i _ep_remain=$(( stepDeadline - _ep_now - 120 ))
   (( _ep_remain < 10 )) && _ep_remain=10
   setsJson="$(timeout "${_ep_remain}s" oc get policysets.policy.open-cluster-management.io -n policies -o json 2>&1)" || return 1
@@ -777,8 +777,9 @@ while :; do
   fi
   # Swap detection: if wait set differs from stable set, replacement occurred without wait (PRRT_kwDOBHvUUM65TpMc)
   if [[ -n "${complianceWaitSet}" && -n "${complianceStableSet}" ]]; then
-    typeset _waitSetSorted="$(printf '%s\n' "${complianceWaitSet}" | LC_ALL=C sort)"
-    typeset _stableSorted="$(printf '%s\n' "${complianceStableSet}" | LC_ALL=C sort)"
+    typeset _waitSetSorted _stableSorted
+    _waitSetSorted="$(printf '%s\n' "${complianceWaitSet}" | LC_ALL=C sort)"
+    _stableSorted="$(printf '%s\n' "${complianceStableSet}" | LC_ALL=C sort)"
     if [[ "${_waitSetSorted}" != "${_stableSorted}" ]] && [[ "${complianceWaitSet}" != "${prevSet}" ]]; then
       : "Wait set differs from stable set after pass (swap detected); re-running wait"
       policyCount="${complianceStableCount}"

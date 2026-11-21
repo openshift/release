@@ -1053,8 +1053,6 @@ PY
                 else
                     echo "Progress detected but max timeout ${maxTimeout}s would be exceeded; no further extensions"
                 fi
-            # PRRT_kwDOBHvUUM65on2D: cycling check on each unstable poll not just final
-            if (( _vetoCount > 0 )); then echo "cycling check each unstable poll" >&2; fi
             elif (( _vetoStreakHit )); then
                 # Sustained-cycling fail-fast: the veto's purpose (the
                 # maxTimeout cap already bounds extensions; without this
@@ -1141,7 +1139,7 @@ case "${classification}" in
                 echo "All machines updated (updated==machineCount) but the pool never went ready; ready count oscillated without Degraded: cycling, not progressing"
                 _junit_class="mcp-rollout-not-converging"
             else
-                echo "FAILURE CLASS: Potential interop issue"
+                echo "FAILURE CLASS: UPDATING-oscillating"
                 echo "MCP is updating but neither updated nor ready counts are progressing: nodes may be cycling"
                 _junit_class="UPDATING-oscillating"
             fi
@@ -1154,7 +1152,8 @@ case "${classification}" in
         fi
         ;;
     *)
-        echo "FAILURE CLASS: Unknown timeout"
+        echo "FAILURE CLASS: UNKNOWN"
+        echo "Wait ended in a state the classifier does not name (see the MCP ready count trend below)"
         _junit_class="UNKNOWN"
         echo "Ready count trend: ${readyHistory[*]}"
         exit 1
