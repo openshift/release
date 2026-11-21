@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 
 function delete_kms_key()
 {

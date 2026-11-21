@@ -2,7 +2,7 @@
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-REGION=${REGION:-$LEASED_RESOURCE}
+REGION=${AWS_REGION_OVERWRITE:-${REGION:-$LEASED_RESOURCE}}
 
 # Special setting for C2S/SC2S
 if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then

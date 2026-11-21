@@ -36,7 +36,7 @@ fi
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
 
-REGION=${REGION:-$LEASED_RESOURCE}
+REGION=${AWS_REGION_OVERWRITE:-${REGION:-$LEASED_RESOURCE}}
 
 function save_stack_events_to_artifacts()
 {

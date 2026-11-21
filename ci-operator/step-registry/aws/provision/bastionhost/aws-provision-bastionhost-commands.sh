@@ -14,7 +14,7 @@ trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-REGION=${REGION:-$LEASED_RESOURCE}
+REGION=${AWS_REGION_OVERWRITE:-${REGION:-$LEASED_RESOURCE}}
 
 function save_stack_events_to_artifacts()
 {
@@ -150,6 +150,9 @@ BastionHostInstanceType="t2.medium"
 # there is no t2.medium instance type in us-gov-east-1 region
 if [[ "${REGION}" == "us-gov-east-1" ]]; then
     BastionHostInstanceType="t3a.medium"
+# me-west-1 has t3 but not t3a
+elif [[ "${REGION}" == "me-west-1" ]]; then
+    BastionHostInstanceType="t3.medium"
 # EUSC bastion AMI includes ephemeral0 instance store, requires instance-store-capable instance type
 elif [[ "${REGION}" == "eusc-de-east-1" ]]; then
     # EUSC supports m6id (6th gen) but not m5d (5th gen) instance types

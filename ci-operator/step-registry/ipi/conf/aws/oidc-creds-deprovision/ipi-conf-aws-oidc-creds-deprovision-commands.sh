@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 infra_name=${NAMESPACE}-${UNIQUE_HASH}
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 
 if [[ ${AWS_CCOCTL_USE_MINIMAL_PERMISSIONS} == "yes" ]]; then
   if [[ ! -f "${SHARED_DIR}/aws_minimal_permission_ccoctl" ]]; then

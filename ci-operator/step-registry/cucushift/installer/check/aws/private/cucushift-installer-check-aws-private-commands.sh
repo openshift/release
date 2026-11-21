@@ -12,7 +12,7 @@ set -o pipefail
 EXIT_CODE=101
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-post-check-status.txt"' EXIT TERM
 
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 INFRA_ID=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
