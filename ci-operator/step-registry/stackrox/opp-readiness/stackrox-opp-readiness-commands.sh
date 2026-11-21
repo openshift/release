@@ -327,11 +327,39 @@ function DiscoverCentralNs () {
 }
 
 function DiscoverScNs () {
-    scNs="$(oc get securedclusters.platform.stackrox.io --all-namespaces \
+    # The OPP policy set co-locates the SecuredCluster with Central; query
+    # the central namespace first, then fall back to all namespaces for
+    # layouts that separate them.
+    scNs="$(oc get securedclusters.platform.stackrox.io -n "${centralNs}" \
         -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
-        || return 1
+        || true
+    if [[ -z "${scNs}" ]]; then
+        scNs="$(oc get securedclusters.platform.stackrox.io --all-namespaces \
+            -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
+            || return 1
+    fi
     [[ -n "${scNs}" ]] || return 1
     true
+}
+
+function PeriodicSecuredClusterDiagnostics () {
+    echo "[readiness] --- SecuredCluster CRs so far (all namespaces) ---"
+    oc get securedclusters.platform.stackrox.io --all-namespaces 2>/dev/null || true
+    echo "[readiness] --- OPP policy status (the policy set creates the SecuredCluster) ---"
+    oc get policies -n policies 2>/dev/null || true
+}
+
+function SecuredClusterDiscoveryFailureDiagnostics () {
+    echo "[readiness] === SecuredCluster discovery failure diagnostics ==="
+    echo "[readiness] --- SecuredCluster CRs in any state, all namespaces ---"
+    oc get securedclusters.platform.stackrox.io --all-namespaces || \
+        echo "[readiness]   No SecuredCluster CRs found at all"
+    echo "[readiness] --- OPP policy status (the policy set creates the SecuredCluster) ---"
+    oc get policies -n policies || true
+    echo "[readiness] --- Sensor pods in ${centralNs} ---"
+    oc get pods -n "${centralNs}" -l app=sensor 2>/dev/null || \
+        echo "[readiness]   No sensor pods found in ${centralNs}"
+    echo "[readiness] === End failure diagnostics ==="
 }
 
 typeset centralNs=""
@@ -343,7 +371,10 @@ if ! WaitFor "Central CR namespace discovery" DiscoverCentralNs PeriodicOperator
 fi
 echo "[readiness] Central namespace: ${centralNs}"
 
-WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs
+if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs PeriodicSecuredClusterDiagnostics; then
+    SecuredClusterDiscoveryFailureDiagnostics
+    exit 1
+fi
 echo "[readiness] SecuredCluster namespace: ${scNs}"
 
 # ---------------------------------------------------------------------------
