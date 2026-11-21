@@ -70,40 +70,63 @@ fi
 
 find "${registry_dir}" -name "*.sh" -print0 | xargs -0 -n1 shellcheck -S warning
 
-# The downstream-sync behavioral tests intentionally live outside the step
+# Behavioral tests for step-registry scripts intentionally live outside the step
 # registry because registry validation only accepts registered step files.
-downstream_sync_test_path="hack/tests/github-downstream-sync-commands_test.sh"
-downstream_sync_test="${base_dir}/${downstream_sync_test_path}"
-downstream_sync_test_dir="${base_dir}/hack/tests"
-created_downstream_sync_test=false
-created_downstream_sync_test_dir=false
+tests_dir_rel="hack/tests"
+tests_dir="${base_dir}/${tests_dir_rel}"
+created_tests=()
+created_tests_dir=false
 
-cleanup_downstream_sync_test() {
-  if [[ "${created_downstream_sync_test}" == true ]]; then
-    rm -f "${downstream_sync_test}"
-  fi
-  if [[ "${created_downstream_sync_test_dir}" == true ]]; then
-    rmdir "${downstream_sync_test_dir}" 2>/dev/null || true
+cleanup_materialized_tests() {
+  local created_test
+  for created_test in ${created_tests+"${created_tests[@]}"}; do
+    rm -f "${created_test}"
+  done
+  if [[ "${created_tests_dir}" == true ]]; then
+    rmdir "${tests_dir}" 2>/dev/null || true
   fi
 }
-trap cleanup_downstream_sync_test EXIT
+trap cleanup_materialized_tests EXIT
 
-if ! git -C "${base_dir}" cat-file -e "HEAD:${downstream_sync_test_path}"; then
-  echo "ERROR: ${downstream_sync_test_path} does not exist in HEAD" >&2
+if ! git -C "${base_dir}" rev-parse --verify --quiet "HEAD:${tests_dir_rel}" > /dev/null; then
+  echo "ERROR: ${tests_dir_rel} does not exist in HEAD" >&2
   exit 1
 fi
 
-# Prow derives sparse-checkout paths from the base branch configuration, so a
-# test added by the PR can exist in HEAD while still being absent from disk.
-if [[ ! -e "${downstream_sync_test}" ]]; then
-  if [[ ! -d "${downstream_sync_test_dir}" ]]; then
-    mkdir -p "${downstream_sync_test_dir}"
-    created_downstream_sync_test_dir=true
-  fi
-  created_downstream_sync_test=true
-  git -C "${base_dir}" show "HEAD:${downstream_sync_test_path}" > "${downstream_sync_test}"
-  chmod 0755 "${downstream_sync_test}"
+test_names=()
+while IFS= read -r test_name; do
+  test_names+=("${test_name}")
+done < <(git -C "${base_dir}" ls-tree --name-only "HEAD:${tests_dir_rel}" | grep -E '_test\.sh$' | sort)
+
+if (( ${#test_names[@]} == 0 )); then
+  echo "ERROR: no ${tests_dir_rel}/*_test.sh files exist in HEAD" >&2
+  exit 1
 fi
 
-shellcheck -S warning "${downstream_sync_test}"
-"${downstream_sync_test}"
+# Run every test even when one fails, so a single failure does not hide the others.
+failed_tests=()
+for test_name in "${test_names[@]}"; do
+  test_path="${tests_dir}/${test_name}"
+  # Prow derives sparse-checkout paths from the base branch configuration, so a
+  # test added by the PR can exist in HEAD while still being absent from disk.
+  if [[ ! -e "${test_path}" ]]; then
+    if [[ ! -d "${tests_dir}" ]]; then
+      mkdir -p "${tests_dir}"
+      created_tests_dir=true
+    fi
+    created_tests+=("${test_path}")
+    git -C "${base_dir}" show "HEAD:${tests_dir_rel}/${test_name}" > "${test_path}"
+    chmod 0755 "${test_path}"
+  fi
+
+  shellcheck -S warning "${test_path}"
+  echo "Running ${tests_dir_rel}/${test_name}"
+  if ! "${test_path}"; then
+    failed_tests+=("${test_name}")
+  fi
+done
+
+if (( ${#failed_tests[@]} > 0 )); then
+  echo "ERROR: failing tests: ${failed_tests[*]}" >&2
+  exit 1
+fi
