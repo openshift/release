@@ -191,4 +191,56 @@ echo "  IAM role cleanup done: deleted=${iam_deleted}, skipped_recent=${iam_skip
 echo "=== Done: IAM operator roles ==="
 echo ""
 
+# Clean up stale OIDC providers (global resource).
+# Each HCP cluster creation creates one OIDC provider; they are not removed when
+# the cluster is deleted, causing the account to hit the hard limit of 100
+# (OpenIdConnectProvidersPerAccount). This is a dedicated OCP5 test account so
+# every provider older than HOURS_OLD hours is guaranteed stale.
+echo "=== OIDC provider cleanup (global) ==="
+echo "  Listing OIDC providers older than ${HOURS_OLD}h..."
+
+oidc_arns=""
+if ! oidc_arns=$(aws iam list-open-id-connect-providers \
+  --query 'OpenIDConnectProviderList[*].Arn' --output text 2>&1); then
+  echo "  WARNING: failed to list OIDC providers: ${oidc_arns}" >&2
+  overall_exit=1
+  oidc_arns=""
+fi
+
+oidc_deleted=0
+oidc_skipped=0
+for arn in ${oidc_arns}; do
+  [[ -z "${arn}" || "${arn}" == "None" ]] && continue
+
+  create_time=""
+  if ! create_time=$(aws iam get-open-id-connect-provider \
+    --open-id-connect-provider-arn "${arn}" \
+    --query 'CreateDate' --output text 2>/dev/null); then
+    echo "  WARNING: could not get CreateDate for ${arn}, skipping" >&2
+    continue
+  fi
+
+  create_epoch=$(date -u -d "${create_time}" '+%s' 2>/dev/null) || {
+    echo "  WARNING: could not parse timestamp '${create_time}' for ${arn}, skipping" >&2
+    continue
+  }
+
+  if [[ "${create_epoch}" -ge "${cutoff_epoch}" ]]; then
+    oidc_skipped=$((oidc_skipped + 1))
+    continue
+  fi
+
+  echo "  Deleting stale OIDC provider ${arn} (created ${create_time})"
+  if aws iam delete-open-id-connect-provider --open-id-connect-provider-arn "${arn}" 2>/dev/null; then
+    oidc_deleted=$((oidc_deleted + 1))
+  else
+    echo "  WARNING: failed to delete OIDC provider ${arn}" >&2
+    overall_exit=1
+  fi
+done
+
+echo "  OIDC provider cleanup done: deleted=${oidc_deleted}, skipped_recent=${oidc_skipped}"
+echo "=== Done: OIDC providers ==="
+echo ""
+
 exit ${overall_exit}
