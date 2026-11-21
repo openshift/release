@@ -33,24 +33,51 @@ _opp_cleanup() {
 }
 
 # --- Atomic JUnit Writer (INTEROP-9527) ---
+# Suite naming (INTEROP-9601): emit the canonical Component Readiness suite
+# name via the component-suffixed prefix variable (etirta's structured-naming
+# ruling on openshift/release#87932, 2026-11-03). The job env sets
+# LP_QE__CR__TS_NAME__PFX__ACM; the published name is
+# "<prefix>--interop-opp-product-upgrade-acm"
+# (docs/opp-suite-name-inventory.md, producer row for this step).
+# No default: consuming jobs must set the variable explicitly. When unset,
+# the step degrades to the raw suite name (pre-INTEROP-9601 behavior) with a
+# loud warning rather than crashing the lane.
+_JUNIT_RAW_TS_NAME="interop-opp-product-upgrade-acm"
+if [[ -n "${LP_QE__CR__TS_NAME__PFX__ACM:-}" ]]; then
+  _junit_ts_name="${LP_QE__CR__TS_NAME__PFX__ACM}--${_JUNIT_RAW_TS_NAME}"
+else
+  echo ">>> WARNING: LP_QE__CR__TS_NAME__PFX__ACM is unset; emitting the raw suite name, which is unrouted in ci-test-mapping" >&2
+  _junit_ts_name="${_JUNIT_RAW_TS_NAME}"
+fi
+# XML-escape the suite name for attribute use; the raw value stays untouched
+# for filename derivation. Each replacement writes \& so the entity's literal
+# ampersand survives bash >= 5.2 patsub_replacement (where a bare & in the
+# replacement expands to the matched text) and older bash alike.
+_junit_ts_name_xml=${_junit_ts_name//&/\&amp;}
+_junit_ts_name_xml=${_junit_ts_name_xml//</\&lt;}
+_junit_ts_name_xml=${_junit_ts_name_xml//>/\&gt;}
+_junit_ts_name_xml=${_junit_ts_name_xml//\"/\&quot;}
+# '/' cannot appear in an artifact filename; sanitize defensively.
+_junit_fn="junit_${_junit_ts_name//\//_}.xml"
+
 _junit_emit_safe() {
   local kind="$1" message="$2" rc="${3:-0}"
   local tmpf
-  tmpf="${ARTIFACT_DIR}/.junit_acm_upgrade.tmp.$$"
+  tmpf="${ARTIFACT_DIR}/.${_junit_fn}.tmp.$$"
   {
     cat <<XMLEOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="interop-opp-product-upgrade-acm" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
+<testsuite name="${_junit_ts_name_xml}" tests="1" failures="$( (( rc != 0 )) && echo 1 || echo 0)">
   <testcase name="${kind}">
     $( (( rc != 0 )) && printf '<failure message="%s">exit code %d</failure>' "${message}" "${rc}" )
   </testcase>
 </testsuite>
 XMLEOF
   } > "${tmpf}"
-  mv -f "${tmpf}" "${ARTIFACT_DIR}/junit_acm_upgrade.xml"
+  mv -f "${tmpf}" "${ARTIFACT_DIR}/${_junit_fn}"
   if [[ -n "${SHARED_DIR:-}" ]]; then
     mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
-    cp "${ARTIFACT_DIR}/junit_acm_upgrade.xml" "${SHARED_DIR}/junit/" 2>/dev/null || true
+    cp "${ARTIFACT_DIR}/${_junit_fn}" "${SHARED_DIR}/junit/" 2>/dev/null || true
   fi
 }
 
@@ -381,48 +408,93 @@ function ValidateHubHealth () {
     # Check MultiClusterHub phase, policy propagator readiness, and managed cluster availability.
     echo "Validating ACM hub health post-upgrade..."
 
-    typeset mchStatus
-    mchStatus="$(oc get multiclusterhub -A \
-        -o jsonpath='{.items[0].status.phase}' || true)"
-    echo "  MultiClusterHub phase: ${mchStatus}"
+    # Topology tolerance (INTEROP-9683 class): the stolostron policy-collection
+    # lanes install ACM 2.17.z via OLM subscription without a MultiClusterHub
+    # CR: the MCH is the hub resource of the MCH-managed topology, and the
+    # product deliberately does not create one under MCE/operator management.
+    # Failing the lane for its absence asks upstream to place a resource this
+    # topology never provisions. Classify the topology explicitly
+    # (not-provisioned) and skip only the MCH wait: the policy-propagator and
+    # managed-cluster checks below still run, so the hub is still validated.
+    # Never a silent skip: the classification is echoed and recorded in the
+    # upgrade summary artifact.
 
-    if [[ "${mchStatus}" != "Running" ]]; then
-        echo "  Waiting for MCH to reach Running phase (timeout: 5m)..."
-        typeset timeoutEnd
-        timeoutEnd="$(( $(date +%s) + 300 ))"
-        while (( $(date +%s) < timeoutEnd )); do
-            mchStatus="$(oc get multiclusterhub -A \
-                -o jsonpath='{.items[0].status.phase}' || true)"
-            if [[ "${mchStatus}" == "Running" ]]; then
+    # Capture oc stderr so a failed query cannot pass for an unprovisioned
+    # topology. Only the server's resource-type-missing message classifies as
+    # not provisioned; auth and reachability errors fail closed below.
+    typeset mchNames mchStderr
+    typeset -i mchRc=0
+    mchStderr="$(mktemp)"
+    mchNames="$(oc get multiclusterhub -A \
+        -o jsonpath='{.items[*].metadata.name}' 2>"${mchStderr}")" || mchRc=$?
+
+    if [[ ${mchRc} -ne 0 ]] \
+        && ! grep -qF "the server doesn't have a resource type" "${mchStderr}"; then
+        echo >&2 "ERROR: Failed to query multiclusterhub resources (oc exit ${mchRc}):"
+        sed 's/^/  /' "${mchStderr}" >&2
+        rm -f "${mchStderr}"
+        return 1
+    fi
+    rm -f "${mchStderr}"
+
+    if [[ -z "${mchNames}" ]]; then
+        MCH_TOPOLOGY="not-provisioned (MCE/operator-managed ACM topology)"
+        echo "  MultiClusterHub: ${MCH_TOPOLOGY} (skipping the MCH Running wait; the governance framework is not deployed in this topology)"
+    else
+        MCH_TOPOLOGY="MCH Running"
+        typeset mchStatus
+        mchStatus="$(oc get multiclusterhub -A \
+            -o jsonpath='{.items[0].status.phase}' || true)"
+        echo "  MultiClusterHub phase: ${mchStatus}"
+
+        if [[ "${mchStatus}" != "Running" ]]; then
+            echo "  Waiting for MCH to reach Running phase (timeout: 5m)..."
+            typeset timeoutEnd
+            timeoutEnd="$(( $(date +%s) + 300 ))"
+            while (( $(date +%s) < timeoutEnd )); do
+                mchStatus="$(oc get multiclusterhub -A \
+                    -o jsonpath='{.items[0].status.phase}' || true)"
+                if [[ "${mchStatus}" == "Running" ]]; then
+                    break
+                fi
+                sleep 15
+            done
+            if [[ "${mchStatus}" != "Running" ]]; then
+                echo >&2 "ERROR: MultiClusterHub did not reach Running phase"
+                return 1
+            fi
+        fi
+    fi
+
+    # The governance-policy-propagator is deployed by the ACM hub CRs
+    # (MultiClusterHub/MCE). On lanes that install ACM as a bare operator
+    # subscription (no hub CR), the propagator never exists, so the wait
+    # is scoped to the MCH topology; the operator-managed topology is
+    # validated by the CSV Succeeded check above and the managed-cluster
+    # report below.
+    if [[ -z "${mchNames}" ]]; then
+        echo "  Policy propagator: skipped (not deployed in the operator-managed topology)"
+    else
+        echo "  Checking policy propagator..."
+        typeset propagatorReady=""
+        typeset -i propTimeout=300
+        typeset -i propStart
+        propStart="$(date +%s)"
+        while (( $(date +%s) - propStart < propTimeout )); do
+            propagatorReady="$(oc get pods -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
+                -l name=governance-policy-propagator \
+                -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' \
+                || true)"
+            if [[ "${propagatorReady}" == "True" ]]; then
                 break
             fi
             sleep 15
         done
-        if [[ "${mchStatus}" != "Running" ]]; then
-            echo >&2 "ERROR: MultiClusterHub did not reach Running phase"
+        echo "  Policy propagator ready: ${propagatorReady}"
+        if [[ "${propagatorReady}" != "True" ]]; then
+            echo >&2 "ERROR: Policy propagator not ready after ${propTimeout}s"
             return 1
         fi
-    fi
-
-    echo "  Checking policy propagator..."
-    typeset propagatorReady=""
-    typeset -i propTimeout=300
-    typeset -i propStart
-    propStart="$(date +%s)"
-    while (( $(date +%s) - propStart < propTimeout )); do
-        propagatorReady="$(oc get pods -n "${ACM_SUBSCRIPTION_NAMESPACE}" \
-            -l name=governance-policy-propagator \
-            -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' \
-            || true)"
-        if [[ "${propagatorReady}" == "True" ]]; then
-            break
-        fi
-        sleep 15
-    done
-    echo "  Policy propagator ready: ${propagatorReady}"
-    if [[ "${propagatorReady}" != "True" ]]; then
-        echo >&2 "ERROR: Policy propagator not ready after ${propTimeout}s"
-        return 1
     fi
 
     echo "  Checking managed clusters..."
@@ -709,14 +781,19 @@ function Main () {
         echo "${_acm_upgrade_output}"
     fi
 
-    if ! _acm_upgrade_output="$(ValidateHubHealth 2>&1)"; then
-        echo "${_acm_upgrade_output}"
-        if echo "${_acm_upgrade_output}" | grep -q "cannot unmarshal string into Go struct"; then
+    # Run ValidateHubHealth with output redirection instead of command
+    # substitution: the function then runs in the current shell, so the
+    # MCH_TOPOLOGY assignment survives for the summary below, and the
+    # validation log is preserved as an artifact.
+    typeset _hub_health_log="${ARTIFACT_DIR}/hub-health-validation.log"
+    if ! ValidateHubHealth >"${_hub_health_log}" 2>&1; then
+        cat "${_hub_health_log}"
+        if grep -q "cannot unmarshal string into Go struct" "${_hub_health_log}"; then
             # Known-issue skip: ACM-45920
             # Added: 2026-09-21
             # Review-by: 2026-12-21 (or when ACM-45920 is resolved)
             # Owner: OPP-interop team
-            _detect_known_issue "${_acm_upgrade_output}" "ACM-45920" \
+            _detect_known_issue "$(cat "${_hub_health_log}")" "ACM-45920" \
                 "YAML unmarshal error on OCP 5.0 — ACM team fix in progress"
         else
             _JUNIT_KIND="hub-health-failure"
@@ -725,7 +802,7 @@ function Main () {
             return 1
         fi
     else
-        echo "${_acm_upgrade_output}"
+        cat "${_hub_health_log}"
     fi
 
     {
@@ -733,6 +810,7 @@ function Main () {
         printf 'Previous: %s (%s)\n' "${currentVersion}" "${currentChannel}"
         printf 'Current:  %s (%s)\n' "${newVersion}" "${targetChannel}"
         printf 'CSV:      %s\n' "${newCsv}"
+        printf 'Hub:      %s\n' "${MCH_TOPOLOGY:-MCH unchecked}"
         printf 'Status:   SUCCESS\n'
     } > "${ARTIFACT_DIR}/acm-upgrade-summary.txt"
 
