@@ -14,14 +14,6 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 source "${SHARED_DIR}/init-fn.sh" || true
 
-# Make the openshift-install binary available if the manifests step saved
-# it to SHARED_DIR (from: cli does not include it natively).
-if [[ -x "${SHARED_DIR}/openshift-install" ]] && ! command -v openshift-install &>/dev/null; then
-  cp -f "${SHARED_DIR}/openshift-install" /tmp/openshift-install
-  chmod +x /tmp/openshift-install
-  export PATH="/tmp:${PATH}"
-fi
-
 # Register bootstrap error handler so early control-plane failures collect
 # bootstrap logs (routed through bastion in disconnected mode).
 if type collect_bootstrap_error_handler &>/dev/null; then
