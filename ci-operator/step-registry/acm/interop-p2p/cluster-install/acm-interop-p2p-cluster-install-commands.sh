@@ -188,7 +188,8 @@ fi
 # (names like img4.14.0-x86_64). When OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
 # is true, install from the hub payload instead so the spoke is the same unsigned
 # nightly as the hub (catalog image sets are signed GA and fail rpm-ostree rebase
-# onto nightlies). Hive does not pass that installer env into the spoke install.
+# onto nightlies). The same env is also injected into ClusterDeployment
+# provisioning.installerEnv so openshift-install opts out during bootstrap.
 if [[ -z "${ACM_SPOKE_CLUSTER_INITIAL_VERSION}" ]]; then
     : "ACM_SPOKE_CLUSTER_INITIAL_VERSION must be set (e.g. 4.20)"
     exit 1
@@ -532,6 +533,7 @@ ocEOF
             --arg clusterSet "${clusterName}-set" \
             --arg imageSet   "${clusterImagesetName}" \
             --argjson attempts "${ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT}" \
+            --arg disableImagePolicy "${OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY:-}" \
             '
             .metadata.name                                         = $name      |
             .metadata.namespace                                    = $name      |
@@ -541,7 +543,21 @@ ocEOF
             .spec.clusterName                                      = $name      |
             .spec.platform.aws.region                              = $region    |
             .spec.installAttemptsLimit                             = $attempts  |
-            .spec.provisioning.imageSetRef.name                    = $imageSet
+            .spec.provisioning.imageSetRef.name                    = $imageSet  |
+            # Pass the job/step env into Hive so openshift-install on the spoke
+            # opts out of ClusterImagePolicy during bootstrap (unsigned nightlies).
+            # Append (do not replace) so any future installerEnv entries are preserved.
+            if $disableImagePolicy == "true" then
+              .spec.provisioning.installerEnv =
+                ((.spec.provisioning.installerEnv // [])
+                  | map(select(.name != "OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY"))
+                  + [{
+                      "name": "OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY",
+                      "value": "true"
+                    }])
+            else
+              .
+            end
             ' |
         yq -p json -o yaml eval .
     } 0<<'ocEOF' | oc apply -f -
@@ -574,7 +590,8 @@ spec:
       name: install-config
     imageSetRef:
       name: placeholder
-    sshPrivateKeyRef:
+    # installerEnv is injected by jq when OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true
+    sshPrivateKeySecretRef:
       name: ssh-private-key
 ocEOF
 
