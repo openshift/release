@@ -34,7 +34,8 @@ echo "Pinned ${REPOSITORY_URL}@${REPOSITORY_BRANCH} at ${PINNED_SHA}"
 
 # Write one override file per ROSA_REGIONAL_COMPONENTS entry that has a
 # target, with IMAGE_REPO/IMAGE_TAG replaced by the image the image-push step
-# pushed for that entry's repo (listed in SHARED_DIR/component-images).
+# pushed for that entry's repo (listed in SHARED_DIR/component-images), and
+# PR_SHA by the PR's head commit.
 # Prints one "<target>:<override-file>" line per override.
 write_overrides() {
   python3 <<'PYEOF'
@@ -59,6 +60,10 @@ for i, c in enumerate(components):
         text = text.replace("IMAGE_REPO", repo)
     if repo in pushed:
         text = text.replace("IMAGE_TAG", pushed[repo])
+    if "PR_SHA" in text:
+        if not os.environ.get("PULL_PULL_SHA"):
+            sys.exit(f"ERROR: PR_SHA in the override for {c['target']} needs a PR job")
+        text = text.replace("PR_SHA", os.environ["PULL_PULL_SHA"])
     path = os.path.join(shared, f"component-override-{i}.yaml")
     with open(path, "w") as f:
         f.write(text)
