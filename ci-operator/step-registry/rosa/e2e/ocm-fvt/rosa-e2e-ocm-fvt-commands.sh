@@ -416,7 +416,62 @@ podman run \
   quay.io/redhat-services-prod/rosa-tenant/rosa-backend-tests/rosa-backend-tests:latest \
   ocmtest "${ocmtest_args[@]}" || exit_code=$?
 trap 'cleanup_ocm_fvt || true; exit "${exit_code}"' EXIT
-(echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code") 2>/dev/null || true
+# Record the suite's status for later steps. The write is best effort, but a
+# value that is not this run's is worse than none: the OSDFM stage-promotion
+# post step promotes when it reads 0 and skips when the file is absent, so a
+# readable but unwritable file already holding 0 would promote a run that
+# failed. On a failed write the recorded value is by definition not this run's,
+# so it is removed and that step takes its existing "not found" path. rm never
+# follows a symlink and never removes a directory.
+if ! (echo "${exit_code}" > "${SHARED_DIR}/ocm-fvt-exit-code") 2>/dev/null; then
+  rm -f -- "${SHARED_DIR}/ocm-fvt-exit-code" 2>/dev/null || true
+  echo "WARNING: could not record the ocm-fvt exit status for later steps"
+fi
+
+# Publish the same status: SHARED_DIR is not uploaded to Prow GCS, so without
+# this the suite's own exit status survives only for the in-job post steps that
+# read SHARED_DIR. A run that ends before any test executes publishes no
+# report, and the step's finished.json cannot say whether the suite exited
+# non-zero or the step scaffolding around it did. Written before publication so
+# the audit manifest's handoff inventory lists it.
+#
+# The value comes from exit_code, not from the SHARED_DIR copy. Reading that
+# copy back would republish whatever it held when the write above failed, which
+# is the one case this artifact exists to describe.
+#
+# The name is cleared first and then created, never written through. rm -f
+# removes a regular file or a symlink without following it and without touching
+# a symlink's target, and refuses a directory, so it cannot delete a tree
+# something else owns. noclobber makes the redirection O_EXCL, so if rm could
+# not clear the name the write refuses rather than following a symlink left
+# behind or truncating what is there. That exclusivity only covers a regular
+# file or a symlink to one, so the write is additionally chained to an unlink
+# that succeeded: a FIFO at this name is not refused by noclobber, and opening
+# one for writing blocks until something opens it for reading, which would
+# hang the step. Attempting the write only once the name is known to be free
+# avoids that, and leaves a name this step cannot clear - a directory, or
+# anything at all in an ARTIFACT_DIR it cannot write to - exactly as it found
+# it. A FIFO it can unlink is replaced like any other entry.
+# noclobber then covers only the gap between that unlink and this open, which
+# nothing in the job is expected to race for.
+#
+# chmod is the only thing that decides the mode, rather than sharing that job
+# with a umask, so the collector can read the result whatever the step
+# inherited. It is chained to a successful write, so nothing the step did not
+# just create is ever re-moded.
+#
+# If the name can neither be cleared nor written - a regular file in an
+# ARTIFACT_DIR this step cannot write to - the step does not change it, but
+# what is already there is what the collector uploads under that name, so the
+# published object is then not this run's status. The SHARED_DIR copy and this
+# step's own log output are unaffected by that failure.
+artifact_exit_code="${ARTIFACT_DIR}/ocm-fvt-exit-code"
+(
+  set -o noclobber
+  rm -f -- "${artifact_exit_code}" &&
+    printf '%s\n' "${exit_code}" > "${artifact_exit_code}" &&
+    chmod 0644 -- "${artifact_exit_code}"
+) 2>/dev/null || true
 
 (
   umask 022
