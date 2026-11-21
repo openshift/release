@@ -754,6 +754,8 @@ function get_source_dir() {
     [bootc-c2cc]="scenarios-bootc/c2cc:scenarios-bootc"
     [releases]="scenarios/releases:scenarios"
     [presubmits]="scenarios/presubmits:scenarios"
+    [rpm-presubmits-el9]="scenarios-rpm/el9/presubmits:scenarios-rpm"
+    [rpm-presubmits-el10]="scenarios-rpm/el10/presubmits:scenarios-rpm"
     [periodics]="scenarios/periodics:scenarios-periodics"
   )
   local -r scenario_type=$1
