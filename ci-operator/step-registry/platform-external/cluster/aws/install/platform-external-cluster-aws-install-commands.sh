@@ -137,45 +137,87 @@ COMPUTE_STACK_NAME_PREFIX=${CLUSTER_NAME}-compute
 
 # Create s3 bucket for bootstrap and proxy ignition configs
 aws s3 mb s3://"${INFRA_STACK_NAME}"
+# Track for cleanup by aws-deprovision-s3buckets
+echo "s3://${INFRA_STACK_NAME}" >> "${SHARED_DIR}/to_be_removed_s3_bucket_list"
 
-echo "==================="
-echo "CREATING STACK: VPC"
-echo "==================="
+if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
+  echo "============================================="
+  echo "DISCONNECTED: consuming precreated VPC"
+  echo "============================================="
 
-log "Creating VPC Stack..."
+  log "Reading VPC info from SHARED_DIR (created by aws-provision-vpc-disconnected)..."
 
-# If we are using a proxy, create a 'black-hole' private subnet vpc TODO
-# For now this is just a placeholder...
-cf_params_vpc=${ARTIFACT_DIR}/cf_params_vpc.json
-add_param_to_json AvailabilityZoneCount 2 "${cf_params_vpc}"
-add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_vpc}"
+  if [[ -f "${SHARED_DIR}/vpc_info.json" ]]; then
+    VPC_ID="$(jq -r '.vpc_id' "${SHARED_DIR}/vpc_info.json")"
+    # Read private subnets from vpc_info.json (array of objects with .ids[].private)
+    PRIVATE_SUBNET_0="$(jq -r '.subnets[0].ids[0].private' "${SHARED_DIR}/vpc_info.json")"
+    PRIVATE_SUBNET_1="$(jq -r '.subnets[1].ids[0].private // empty' "${SHARED_DIR}/vpc_info.json")"
+    PUBLIC_SUBNET_0="$(jq -r '.subnets[0].ids[0].public' "${SHARED_DIR}/vpc_info.json")"
+    PUBLIC_SUBNET_1="$(jq -r '.subnets[1].ids[0].public // empty' "${SHARED_DIR}/vpc_info.json")"
+  elif [[ -f "${SHARED_DIR}/vpc_id" ]]; then
+    VPC_ID="$(<"${SHARED_DIR}/vpc_id")"
+    # Subnet files use single-quoted JSON arrays: ['subnet-1','subnet-2']
+    PRIVATE_SUBNET_0="$(sed "s/'/\"/g" "${SHARED_DIR}/private_subnet_ids" | jq -r '.[0]')"
+    PRIVATE_SUBNET_1="$(sed "s/'/\"/g" "${SHARED_DIR}/private_subnet_ids" | jq -r '.[1] // empty')"
+    PUBLIC_SUBNET_0="$(sed "s/'/\"/g" "${SHARED_DIR}/public_subnet_ids" | jq -r '.[0]')"
+    PUBLIC_SUBNET_1="$(sed "s/'/\"/g" "${SHARED_DIR}/public_subnet_ids" | jq -r '.[1] // empty')"
+  else
+    log "ERROR: No VPC info found in SHARED_DIR for disconnected mode"
+    exit 1
+  fi
 
-cat "${cf_params_vpc}"
+  # Fall back to first subnet when only one AZ is available
+  PRIVATE_SUBNET_1="${PRIVATE_SUBNET_1:-${PRIVATE_SUBNET_0}}"
+  PRIVATE_SUBNET_2="${PRIVATE_SUBNET_0}"
+  PUBLIC_SUBNET_1="${PUBLIC_SUBNET_1:-${PUBLIC_SUBNET_0}}"
 
-echo "${VPC_STACK_NAME}" >> "${NEW_STACKS}"
-aws cloudformation create-stack  --stack-name "${VPC_STACK_NAME}" \
-  --template-body "$(cat "${TEMPLTE_DEST}/01_vpc.yaml")" \
-  --tags "${TAGS}" \
-  --parameters "file://${cf_params_vpc}" &
-wait "$!"
+  # Build the comma-separated formats expected by downstream CF parameters
+  PRIVATE_SUBNETS="\"${PRIVATE_SUBNET_0},${PRIVATE_SUBNET_1}\""
+  PUBLIC_SUBNETS="\"${PUBLIC_SUBNET_0},${PUBLIC_SUBNET_1}\""
 
-aws cloudformation wait stack-create-complete --stack-name "${VPC_STACK_NAME}" &
-wait "$!"
+  log "VPC_ID=${VPC_ID}"
+  log "PRIVATE_SUBNETS=${PRIVATE_SUBNETS}"
+  log "PUBLIC_SUBNETS=${PUBLIC_SUBNETS}"
+else
+  echo "==================="
+  echo "CREATING STACK: VPC"
+  echo "==================="
 
-VPC_JSON="$(aws cloudformation describe-stacks --stack-name "${VPC_STACK_NAME}" \
-  --query 'Stacks[].Outputs[]' --output json)"
-VPC_ID="$(echo "${VPC_JSON}" | jq -r '.[] | select(.OutputKey == "VpcId").OutputValue')"
-PRIVATE_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PrivateSubnetIds").OutputValue')"  # explicitly keeping wrapping quotes
-PRIVATE_SUBNET_0="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f1)"
-PRIVATE_SUBNET_1="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f2)"
-# PRIVATE_SUBNET_2="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f3)"
-PRIVATE_SUBNET_2="$PRIVATE_SUBNET_0"
-PUBLIC_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PublicSubnetIds").OutputValue')"  # explicitly keeping wrapping quotes
+  log "Creating VPC Stack..."
 
-# Adapt step aws-provision-tags-for-byo-vpc, which is required by Ingress operator testing.
-echo ${VPC_ID} > "${SHARED_DIR}/vpc_id"
-echo ${VPC_JSON} | jq -c '[.[] | select(.OutputKey=="PrivateSubnetIds") | .OutputValue | split(",")[]]' | sed "s/\"/'/g" > "${SHARED_DIR}/private_subnet_ids"
-echo ${VPC_JSON} | jq -c '[.[] | select(.OutputKey=="PublicSubnetIds") | .OutputValue | split(",")[]]' | sed "s/\"/'/g" > "${SHARED_DIR}/public_subnet_ids"
+  # If we are using a proxy, create a 'black-hole' private subnet vpc TODO
+  # For now this is just a placeholder...
+  cf_params_vpc=${ARTIFACT_DIR}/cf_params_vpc.json
+  add_param_to_json AvailabilityZoneCount 2 "${cf_params_vpc}"
+  add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_vpc}"
+
+  cat "${cf_params_vpc}"
+
+  echo "${VPC_STACK_NAME}" >> "${NEW_STACKS}"
+  aws cloudformation create-stack  --stack-name "${VPC_STACK_NAME}" \
+    --template-body "$(cat "${TEMPLTE_DEST}/01_vpc.yaml")" \
+    --tags "${TAGS}" \
+    --parameters "file://${cf_params_vpc}" &
+  wait "$!"
+
+  aws cloudformation wait stack-create-complete --stack-name "${VPC_STACK_NAME}" &
+  wait "$!"
+
+  VPC_JSON="$(aws cloudformation describe-stacks --stack-name "${VPC_STACK_NAME}" \
+    --query 'Stacks[].Outputs[]' --output json)"
+  VPC_ID="$(echo "${VPC_JSON}" | jq -r '.[] | select(.OutputKey == "VpcId").OutputValue')"
+  PRIVATE_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PrivateSubnetIds").OutputValue')"  # explicitly keeping wrapping quotes
+  PRIVATE_SUBNET_0="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f1)"
+  PRIVATE_SUBNET_1="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f2)"
+  # PRIVATE_SUBNET_2="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f3)"
+  PRIVATE_SUBNET_2="$PRIVATE_SUBNET_0"
+  PUBLIC_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PublicSubnetIds").OutputValue')"  # explicitly keeping wrapping quotes
+
+  # Adapt step aws-provision-tags-for-byo-vpc, which is required by Ingress operator testing.
+  echo ${VPC_ID} > "${SHARED_DIR}/vpc_id"
+  echo ${VPC_JSON} | jq -c '[.[] | select(.OutputKey=="PrivateSubnetIds") | .OutputValue | split(",")[]]' | sed "s/\"/'/g" > "${SHARED_DIR}/private_subnet_ids"
+  echo ${VPC_JSON} | jq -c '[.[] | select(.OutputKey=="PublicSubnetIds") | .OutputValue | split(",")[]]' | sed "s/\"/'/g" > "${SHARED_DIR}/public_subnet_ids"
+fi
 
 echo "====================="
 echo "CREATING STACK: INFRA"

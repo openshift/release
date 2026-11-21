@@ -1,0 +1,44 @@
+chain:
+  as: platform-external-cluster-aws-pre-disconnected
+  steps:
+  - ref: aws-provision-vpc-disconnected
+  - chain: aws-provision-bastionhost
+  - chain: mirror-images-payload
+  - ref: platform-external-pre-init
+  - ref: ipi-conf
+  - ref: ipi-conf-telemetry
+  - ref: ipi-install-monitoringpvc
+  - ref: platform-external-pre-conf
+  - ref: ipi-conf-mirror
+  - ref: platform-external-pre-conf-manifests
+  - chain: platform-external-cluster-aws-install
+  - chain: platform-external-ccm-deploy-aws
+  - chain: platform-external-cluster-wait-for-install-complete
+  - ref: mirror-images-trust-registry-ca
+  - ref: platform-external-cluster-task-image-registry-emptydir
+  - ref: platform-external-cluster-aws-destroy-bootstrap
+  env:
+  - name: PLATFORM_EXTERNAL_DISCONNECTED
+    default: "yes"
+    documentation: "Signal the install step to consume a precreated disconnected VPC."
+  - name: ZONES_COUNT
+    default: "2"
+    documentation: "Number of availability zones. Default 2 to avoid regions with fewer than 3 AZs."
+  - name: MIRROR_IN_BASTION
+    default: "yes"
+    documentation: "Mirror images from the bastion host rather than the build farm."
+  documentation: |-
+    Provisions a disconnected OpenShift cluster on AWS with platform type
+    external. Reuses the existing disconnected VPC, bastion host, and
+    mirror-images steps from the IPI disconnected chain, then runs the
+    platform-external UPI install with CloudFormation templates against
+    the precreated VPC (private subnets without NAT gateway, VPC
+    endpoints for AWS services). The chain:
+      1. Creates a disconnected VPC (private subnets + VPC endpoints)
+      2. Provisions a bastion host with mirror registry and proxy
+      3. Mirrors the release payload to the bastion registry
+      4. Configures the install with mirror and external platform settings
+      5. Deploys cluster infrastructure via CloudFormation
+      6. Waits for install completion
+      7. Trusts the mirror registry CA for in-cluster consumers
+      8. Destroys the bootstrap resources
