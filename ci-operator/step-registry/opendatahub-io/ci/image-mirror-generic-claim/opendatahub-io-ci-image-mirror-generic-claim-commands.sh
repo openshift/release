@@ -95,6 +95,11 @@ if [[ "$IMAGE_TAG" == "YearIndex" ]]; then
     esac
 fi
 
+IMAGE_TAG="${IMAGE_TAG}${IMAGE_TAG_SUFFIX-}"
+if [[ -n "${IMAGE_FLOATING_TAG-}" ]]; then
+    IMAGE_FLOATING_TAG="${IMAGE_FLOATING_TAG}${IMAGE_TAG_SUFFIX-}"
+fi
+
 log "INFO Image tag is $IMAGE_TAG"
 
 # Setup registry credentials
