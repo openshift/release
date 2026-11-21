@@ -16,16 +16,22 @@ spec:
       name: quay.io/openshift/ci:ocp_cli-jq_latest
   source:
     dockerfile: |
-      FROM ocp/4.22:cli
+      FROM ocp/5.0:cli
       RUN yum install -y jq
     type: Dockerfile
   strategy:
     dockerStrategy:
       from:
         kind: ImageStreamTag
-        name: 4.22:cli
+        name: 5.0:cli
         namespace: ocp
       imageOptimizationPolicy: SkipLayers
     type: Docker
   triggers:
     - type: ConfigChange
+    - imageChange:
+        from:
+          kind: ImageStreamTag
+          name: 5.0:cli
+          namespace: ocp
+      type: ImageChange
