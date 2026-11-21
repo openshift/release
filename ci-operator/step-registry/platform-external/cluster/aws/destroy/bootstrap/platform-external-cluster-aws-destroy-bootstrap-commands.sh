@@ -42,8 +42,16 @@ function save_stack_events_to_artifacts() {
 
 function gather_bootstrap_and_fail() {
   if test -n "${GATHER_BOOTSTRAP_ARGS}"; then
-    openshift-install --dir=${INSTALL_DIR} gather bootstrap \
-        --key "${SSH_PRIV_KEY_PATH}" ${GATHER_BOOTSTRAP_ARGS}
+    if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]] && \
+       [[ -s "${SHARED_DIR}/bastion_public_address" ]] && \
+       [[ -s "${SHARED_DIR}/bastion_ssh_user" ]] && \
+       type gather_bootstrap_via_bastion &>/dev/null; then
+      gather_bootstrap_via_bastion "${SSH_PRIV_KEY_PATH}" \
+        "$(<"${SHARED_DIR}"/BOOTSTRAP_IP)" || true
+    else
+      openshift-install --dir=${INSTALL_DIR} gather bootstrap \
+          --key "${SSH_PRIV_KEY_PATH}" ${GATHER_BOOTSTRAP_ARGS} || true
+    fi
   fi
   return 1
 }

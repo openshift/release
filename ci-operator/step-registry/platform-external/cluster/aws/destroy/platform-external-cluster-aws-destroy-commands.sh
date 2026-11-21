@@ -18,6 +18,11 @@ export REGION="${LEASED_RESOURCE}"
 export stacks_file="${SHARED_DIR}/aws_cfn_stacks"
 
 source "${SHARED_DIR}/init-fn.sh" || true
+# Ensure log is available even when init-fn.sh was not created
+# (e.g. teardown after early abort before platform-external-pre-init ran).
+if ! type log &>/dev/null; then
+  log() { echo "$(date -u --rfc-3339=seconds) - $*"; }
+fi
 
 function delete_stack() {
   local stack_name
@@ -74,3 +79,11 @@ if [[ ! -f "${stacks_file}" ]]; then
 fi
 
 delete_stacks
+
+# Clean up disconnected internal ingress target groups (not managed by CF)
+if [[ -f "${SHARED_DIR}/disconnected_tg_arns" ]]; then
+  log "Cleaning up disconnected internal ingress target groups"
+  while IFS= read -r tg_arn; do
+    aws --region "${REGION}" elbv2 delete-target-group --target-group-arn "${tg_arn}" 2>/dev/null || true
+  done < "${SHARED_DIR}/disconnected_tg_arns"
+fi
