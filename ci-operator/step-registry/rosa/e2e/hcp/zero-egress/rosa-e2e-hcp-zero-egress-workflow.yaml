@@ -1,0 +1,79 @@
+workflow:
+  as: rosa-e2e-hcp-zero-egress
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "true"
+      REPLICAS: "3"
+      # Day-1-only feature: rosa create cluster --properties zero_egress:true
+      # (threaded through rosa-cluster-provision via ADDITIONAL_PROPERTIES,
+      # which requires CLUSTER_SECTOR so a provision shard is pinned).
+      ADDITIONAL_PROPERTIES: zero_egress:true
+      # Recorded as feature_flags.zero_egress in cluster-metadata.json so the
+      # validation specs self-select via FEATURE_ZERO_EGRESS.
+      ZERO_EGRESS: "true"
+    pre:
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+    # ECR mirror VPC endpoints + NAT route removal; must run after the VPC
+    # exists and before the cluster is provisioned (day-1-only feature).
+    - ref: rosa-e2e-hcp-zero-egress-vpc-prepare
+    - chain: rosa-sts-oidc-config-create
+    - chain: rosa-cluster-provision
+    # Publish the SHARED_DIR provisioner-to-validator contract (cluster-id,
+    # kubeconfig, cluster-metadata.json, ROSAENG-67580) after the rosa-CLI head
+    # has provisioned the cluster.
+    - ref: rosa-e2e-rosa-cli-publish-contract
+    - ref: aws-provision-tags-for-byo-vpc
+    - ref: rosa-cluster-wait-ready-hosted-cp
+    - ref: rosa-cluster-wait-ready-nodes
+    # Platform-plane access: bp-kubeconfig / mc-kubeconfig / sc-kubeconfig via
+    # backplane (ROSAENG-67580).
+    - ref: rosa-backplane-login
+    test:
+    # Scoped to the Feature:ZeroEgress specs: the generic customer tail
+    # (workloads pulling public images, external networking checks) is
+    # expected to fail on a cluster with no internet egress.
+    - ref: rosa-e2e-validate-customer
+      env:
+      - name: LABEL_FILTER
+        default: "Feature:ZeroEgress"
+    - ref: rosa-e2e-validate-platform
+      env:
+      - name: PLATFORM_LABEL_FILTER
+        default: "Feature:ZeroEgress"
+    post:
+    - chain: rosa-cluster-deprovision
+    # Delete the VPC endpoints before the VPC stack teardown: endpoints block
+    # VPC deletion.
+    - ref: rosa-e2e-hcp-zero-egress-vpc-cleanup
+      best_effort: true
+    - chain: rosa-sts-oidc-config-delete
+      best_effort: true
+    - ref: rosa-e2e-cleanup-vpc
+      best_effort: true
+    - ref: aws-deprovision-stacks
+      best_effort: true
+  documentation: |-
+    The zero-egress row of the ROSAENG-308 provision x validate matrix
+    (ROSAENG-66391): the rosa-CLI head provisions an HCP cluster with
+    properties zero_egress:true in a BYO VPC whose private subnets have no
+    route to the internet (rosa-e2e-hcp-zero-egress-vpc-prepare creates the
+    ecr.api/ecr.dkr/s3 VPC endpoints and removes the NAT routes). Payload
+    images are served from the provision shard's regional ECR mirror, and the
+    HCP worker account role carries AmazonEC2ContainerRegistryReadOnly (added
+    by the rosa CLI at account-role creation).
+
+    Validation is scoped to the Feature:ZeroEgress specs: the customer plane
+    pulls a digest-pinned payload image through the ECR mirror and asserts
+    non-mirrored public images cannot be pulled; the platform plane verifies
+    the HostedCluster imageContentSources point at the ECR mirror, the
+    api.openshift.com/ecr-worker-role-arn annotation, and the nodepool
+    ignition ECR credential provider. The generic customer tail is not run:
+    its workloads pull public images, which is impossible without egress by
+    design.
+
+    The platform plane requires corp-network reachability: run this workflow
+    only where backplane is reachable (capabilities: [intranet],
+    restrict_network_access: false, network-access-rehearsals-ok label for
+    rehearsals).
