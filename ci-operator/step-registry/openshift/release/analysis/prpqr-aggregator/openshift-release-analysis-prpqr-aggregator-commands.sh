@@ -13,4 +13,5 @@ job-run-aggregator analyze-job-runs \
   --job-start-time=${JOB_START_TIME} \
   --working-dir=${WORKING_DIR} \
   --timeout=${TIMEOUT} \
+  --google-storage-bucket="${GOOGLE_STORAGE_BUCKET:-test-platform-results-public}" \
   --query-source=cluster
