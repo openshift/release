@@ -1,0 +1,139 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+    app: prow
+    component: efs-cluster-writer
+  name: efs-cluster-writer
+  namespace: ci
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: efs-cluster-writer
+  namespace: ci
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+    app: prow
+    component: efs-cluster-writer
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: prow
+      component: efs-cluster-writer
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: efs-cluster-writer
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+    spec:
+      serviceAccountName: efs-cluster-writer
+      # The writer talks to EFS and to the dispatcher over HTTP; it never calls
+      # the Kubernetes API, so it needs no projected token.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: efs-cluster-writer
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_efs-cluster-writer_latest
+        imagePullPolicy: Always
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+        args:
+        - --efs-root=/mnt/job-configs
+        - --backup-dir=/mnt/job-configs/..cluster-writer/backups
+        - --interval=5m
+        - --max-moves=5
+        - --max-move-percent=25
+        - --assignments-url=http://prowjob-dispatcher.ci.svc.cluster.local:8080/assignments
+        - --rescan-url=http://prowjob-dispatcher.ci.svc.cluster.local:8080/control/v1/rescan
+        - --control-token-path=/etc/dispatcher-control/token
+        - --listen-address=:8080
+        ports:
+        - name: http
+          containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+        volumeMounts:
+        - name: job-configs
+          mountPath: /mnt/job-configs
+        - name: dispatcher-control
+          mountPath: /etc/dispatcher-control
+          readOnly: true
+      volumes:
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
+      - name: dispatcher-control
+        secret:
+          secretName: prowjob-dispatcher-control
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: efs-cluster-writer
+  namespace: ci
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+    app: prow
+    component: efs-cluster-writer
+spec:
+  selector:
+    app: prow
+    component: efs-cluster-writer
+  ports:
+  - name: http
+    port: 8080
+    targetPort: http
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: efs-cluster-writer
+  namespace: ci
+spec:
+  podSelector:
+    matchLabels:
+      app: prow
+      component: efs-cluster-writer
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector: {}
+    ports:
+    - port: 8080
+      protocol: TCP
