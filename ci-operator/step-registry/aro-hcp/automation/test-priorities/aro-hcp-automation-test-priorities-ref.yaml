@@ -1,0 +1,100 @@
+ref:
+  as: aro-hcp-automation-test-priorities
+  from: aro-hcp-e2e-tests
+  commands: aro-hcp-automation-test-priorities-commands.sh
+  timeout: 60m0s
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: "1"
+      memory: 4Gi
+  credentials:
+    - collection: hcm-aro
+      group: aro-hcp-dev
+      mount_path: /var/run/aro-hcp-dev
+  env:
+    - name: E2E_RUNNER
+      default: /opt/app-root/src/github.com/Azure/ARO-HCP/test/aro-hcp-tests
+      documentation: |-
+        Prebuilt E2E runner used for score collection, the before catalog and the
+        refresh. It is baked into the aro-hcp-e2e-tests image from this revision.
+    - name: E2E_BAKED_REPO
+      default: /opt/app-root/src/github.com/Azure/ARO-HCP
+      documentation: |-
+        Baked ARO-HCP checkout the private scratch copy is derived from. Its HEAD
+        is recorded and must be clean.
+    - name: PRIORITIES_PUBLISH
+      default: "false"
+      documentation: |-
+        Set to "true" to commit the reviewed priority changes and open the bot
+        pull request. Any other value is rejected before credentials are read.
+        Rehearsal jobs and every non-periodic job force read-only behaviour, so
+        the same script previews the plan without writing anywhere.
+    - name: AZURE_CREDENTIALS_DIR
+      default: /var/run/aro-hcp-dev
+      documentation: |-
+        Directory holding the Azure service principal files (client-id,
+        client-secret, tenant) used for the Kusto data-plane query. The Go SDK
+        reads them directly; no CLI login or token cache is created.
+    - name: KUSTO_CLUSTER
+      default: hcp-dev-us-2
+      documentation: |-
+        Kusto cluster holding the CI telemetry tables.
+    - name: KUSTO_REGION
+      default: eastus2
+      documentation: |-
+        Kusto cluster region, used to build the data-plane endpoint.
+    - name: KUSTO_DATABASE
+      default: ServiceLogs
+      documentation: |-
+        Kusto database with ciJobOutcomes, ciProcessedJobs, ciTestResults and
+        ciTestNames.
+    - name: PRIORITIES_LOOKBACK
+      default: 720h
+      documentation: |-
+        Fixed run-completion lookback window. The job never widens it on its own;
+        weak coverage fails the run instead of silently refreshing from less data.
+    - name: PRIORITIES_MIN_SAMPLES
+      default: "3"
+      documentation: |-
+        Minimum distinct eligible builds per spec and environment before a
+        priority proposal is made, and the minimum eligible builds per
+        environment that publication requires.
+    - name: GITHUB_REPO_OWNER
+      default: Azure
+      documentation: |-
+        Owner of the repository the refresh pull request targets.
+    - name: GITHUB_REPO_NAME
+      default: ARO-HCP
+      documentation: |-
+        Name of the repository the refresh pull request targets.
+    - name: GITHUB_BASE_BRANCH
+      default: main
+      documentation: |-
+        Base branch of the refresh pull request.
+    - name: GITHUB_BOT_LOGIN
+      default: aro-hcp-robot[bot]
+      documentation: |-
+        Login of the GitHub App bot that authors the pull request. Used to find
+        an already open generated pull request and to verify the created one.
+    - name: GITHUB_BOT_NAME
+      default: aro-hcp-robot[bot]
+      documentation: |-
+        Git author and committer name for the refresh commit.
+    - name: GITHUB_BOT_EMAIL
+      default: aro-hcp-robot[bot]@users.noreply.github.com
+      documentation: |-
+        Git author and committer email for the refresh commit.
+    - name: VERBOSITY
+      default: "0"
+      documentation: |-
+        The debug level. 0 for no debug, 1 for debug.
+  documentation: |-
+    Reviews environment-normalized E2E implementation scores and refreshes the
+    labels.StartPriority declarations that declare them. The prebuilt E2E runner
+    collects and scores the data; only with PRIORITIES_PUBLISH=true does the step
+    commit the reviewed diff and open one bot pull request, after rebuilding the
+    runner, verifying the catalog and running the label and suite checks. An open
+    generated pull request, an open Azure/ARO-HCP#8096, insufficient environment
+    coverage, a stale mapping or a failed check all stop the run without a pull
+    request.
