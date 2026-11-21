@@ -1,0 +1,44 @@
+ref:
+  as: telcov10n-functional-cnf-ran-ibi-target-preinstall
+  from_image:
+    namespace: telcov10n-ci
+    name: eco-ci-cd
+    tag: eco-ci-cd
+  commands: telcov10n-functional-cnf-ran-ibi-target-preinstall-commands.sh
+  timeout: 4h
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: TARGET_CLUSTER_NAME
+    default: ""
+    documentation: Target hub name used to locate its kubeconfig on the target bastion.
+  - name: VERSION
+    default: "4.20"
+    documentation: Release family used for Git paths and the seed image tag.
+  - name: MIRROR_REGISTRY
+    default: "disconnected.registry.local:5000"
+    documentation: Target registry containing the mirrored seed image.
+  - name: TARGET_SPOKE_CLUSTER
+    default: "['ibi-target']"
+    documentation: Single target spoke name in the existing list format.
+  - name: ZTP_GIT_REPO
+    default: "https://gitlab.cee.redhat.com/telcov10n/ztp-site-configs-ci.git"
+    documentation: GitLab repository containing the target ClusterInstance and preinstall template.
+  credentials:
+  - namespace: test-credentials
+    name: telcov10n-ansible-group-all
+    mount_path: /var/group_variables/common/all
+  documentation: |-
+    Restore target inventory and use ibi-preinstall-stage.yml with phase
+    prepare to check the installer and prepare the launcher. Select phase run
+    to execute it and collect console output and reports, including on test failure.
+    Preserve the launcher exit code and retained Report Portal paths.
+    Requires a mirrored seed image, installer, HTTP service, matching SSH key,
+    target-* inventory files from target hub preparation, and ibi-seed-version
+    written by seed preparation from the running seed cluster. The mirror step
+    supplies the pinned seed digest and Git commit used for preinstall inputs.
+    The installer must match that full version before setup. Console output
+    is printed after collection; Ansible reports progress while the test runs.
