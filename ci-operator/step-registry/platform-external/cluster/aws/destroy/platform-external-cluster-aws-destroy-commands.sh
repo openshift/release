@@ -18,6 +18,11 @@ export REGION="${LEASED_RESOURCE}"
 export stacks_file="${SHARED_DIR}/aws_cfn_stacks"
 
 source "${SHARED_DIR}/init-fn.sh" || true
+# Ensure log is available even when init-fn.sh was not created
+# (e.g. teardown after early abort before platform-external-pre-init ran).
+if ! type log &>/dev/null; then
+  log() { echo "$(date -u --rfc-3339=seconds) - $*"; }
+fi
 
 function delete_stack() {
   local stack_name
