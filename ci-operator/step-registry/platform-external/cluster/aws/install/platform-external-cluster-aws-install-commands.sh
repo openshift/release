@@ -274,7 +274,6 @@ if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
   # NAT cannot reach public NLB IPs, so ingress health checks fail.  Fix by
   # adding ingress listeners (80/443) to the internal NLB and updating the
   # *.apps record in the private hosted zone to point to it.
-  INTERNAL_NLB_NAME="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "InternalApiLoadBalancerName").OutputValue')"
   INTERNAL_NLB_ARN="$(aws elbv2 describe-load-balancers \
     --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].LoadBalancerArn" \
     --output text)"
