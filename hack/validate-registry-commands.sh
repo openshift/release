@@ -70,40 +70,95 @@ fi
 
 find "${registry_dir}" -name "*.sh" -print0 | xargs -0 -n1 shellcheck -S warning
 
-# The downstream-sync behavioral tests intentionally live outside the step
-# registry because registry validation only accepts registered step files.
-downstream_sync_test_path="hack/tests/github-downstream-sync-commands_test.sh"
-downstream_sync_test="${base_dir}/${downstream_sync_test_path}"
-downstream_sync_test_dir="${base_dir}/hack/tests"
-created_downstream_sync_test=false
-created_downstream_sync_test_dir=false
+# Behavioral tests that intentionally live outside the step registry, because
+# registry validation only accepts registered step files. Keep this list in
+# step with the suites under hack/tests; every entry must be tracked in HEAD.
+behavioral_tests=(
+  "hack/tests/github-downstream-sync-commands_test.sh"
+  "hack/tests/rosa-gap-analysis-cluster-install-delete-metrics_test.sh"
+  "hack/tests/validate-registry-commands_test.sh"
+)
 
-cleanup_downstream_sync_test() {
-  if [[ "${created_downstream_sync_test}" == true ]]; then
-    rm -f "${downstream_sync_test}"
-  fi
-  if [[ "${created_downstream_sync_test_dir}" == true ]]; then
-    rmdir "${downstream_sync_test_dir}" 2>/dev/null || true
-  fi
+# Paths this invocation restored or created, newest last. Only these are
+# removed on exit: anything already on disk is left exactly as it was found.
+restored_test_files=()
+created_test_dirs=()
+
+cleanup_restored_tests() {
+  local path index
+  # ${arr[@]+...} because bash before 4.4 treats an empty array's [@] as
+  # unbound under `set -u`, and `|| true` because a cleanup that fails must
+  # neither abort the rest of the cleanup nor overwrite the real exit status.
+  for path in ${restored_test_files[@]+"${restored_test_files[@]}"}; do
+    rm -f "${path}" || true
+  done
+  # Deepest first, so a directory is only removed once its children are gone.
+  # rmdir, never rm -r: a directory that is not empty was not ours alone.
+  for ((index = ${#created_test_dirs[@]} - 1; index >= 0; index--)); do
+    rmdir "${created_test_dirs[index]}" 2>/dev/null || true
+  done
 }
-trap cleanup_downstream_sync_test EXIT
-
-if ! git -C "${base_dir}" cat-file -e "HEAD:${downstream_sync_test_path}"; then
-  echo "ERROR: ${downstream_sync_test_path} does not exist in HEAD" >&2
-  exit 1
-fi
+# One handler for every suite: a second `trap ... EXIT` would silently replace
+# this one and leak whatever the first had registered.
+trap cleanup_restored_tests EXIT
 
 # Prow derives sparse-checkout paths from the base branch configuration, so a
 # test added by the PR can exist in HEAD while still being absent from disk.
-if [[ ! -e "${downstream_sync_test}" ]]; then
-  if [[ ! -d "${downstream_sync_test_dir}" ]]; then
-    mkdir -p "${downstream_sync_test_dir}"
-    created_downstream_sync_test_dir=true
-  fi
-  created_downstream_sync_test=true
-  git -C "${base_dir}" show "HEAD:${downstream_sync_test_path}" > "${downstream_sync_test}"
-  chmod 0755 "${downstream_sync_test}"
-fi
+# Restore it rather than skipping: a suite that never ran must not look like a
+# suite that passed. A test missing from HEAD is a repository error, not a
+# checkout artifact, and fails the run.
+restore_test_from_head() {
+  local relative_path="$1"
+  local test_path="${base_dir}/${relative_path}"
+  local test_dir probe level
+  local missing_dirs=()
 
-shellcheck -S warning "${downstream_sync_test}"
-"${downstream_sync_test}"
+  if ! git -C "${base_dir}" cat-file -e "HEAD:${relative_path}"; then
+    echo "ERROR: ${relative_path} does not exist in HEAD" >&2
+    exit 1
+  fi
+
+  # -L as well as -e: a dangling symlink is not -e, and writing through it
+  # would create a file outside the recorded set and then delete the link.
+  if [[ -e "${test_path}" || -L "${test_path}" ]]; then
+    return 0
+  fi
+
+  test_dir="$(dirname "${test_path}")"
+  if [[ ! -d "${test_dir}" ]]; then
+    # Record every level this invocation creates, shallowest first, so cleanup
+    # removes exactly those and no pre-existing parent.
+    # ${arr[@]+...} because bash before 4.4 treats an empty array's [@] as
+    # unbound under `set -u`, and this prepend runs with missing_dirs empty on
+    # its first iteration.
+    probe="${test_dir}"
+    while [[ ! -d "${probe}" ]]; do
+      missing_dirs=("${probe}" ${missing_dirs[@]+"${missing_dirs[@]}"})
+      probe="$(dirname "${probe}")"
+    done
+    # One level at a time, shallowest first, each recorded as soon as it
+    # exists: `mkdir -p` followed by a single registration would leave an
+    # already-created parent untracked if a deeper level then failed.
+    for level in ${missing_dirs[@]+"${missing_dirs[@]}"}; do
+      mkdir "${level}"
+      created_test_dirs+=("${level}")
+    done
+  fi
+
+  # Registered before the write, not after: `git show` creates the destination
+  # before it can fail, and a failed chmod leaves it behind too. Either way the
+  # EXIT handler must know the file is ours, or a partial restore survives and
+  # the existence check above would accept it on a later run.
+  restored_test_files+=("${test_path}")
+  git -C "${base_dir}" show "HEAD:${relative_path}" > "${test_path}"
+  chmod 0755 "${test_path}"
+}
+
+for behavioral_test in "${behavioral_tests[@]}"; do
+  restore_test_from_head "${behavioral_test}"
+  shellcheck -S warning "${base_dir}/${behavioral_test}"
+  # Through bash, not directly: the file mode is not a contract these suites
+  # are meant to assert, and a suite committed 0644 would otherwise fail with
+  # an opaque "Permission denied" instead of running.
+  bash "${base_dir}/${behavioral_test}"
+done
