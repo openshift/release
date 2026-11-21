@@ -304,7 +304,20 @@ cf_params_bootstrap=${ARTIFACT_DIR}/cf_params_bootstrap.json
 add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_bootstrap}"
 add_param_to_json RhcosAmi "${RHCOS_AMI}" "${cf_params_bootstrap}"
 add_param_to_json VpcId "${VPC_ID}" "${cf_params_bootstrap}"
-add_param_to_json PublicSubnet "$(echo ${PUBLIC_SUBNETS%%,*} | sed 's/"//g')" "${cf_params_bootstrap}"
+
+# In disconnected mode, place bootstrap on a private subnet so it cannot
+# reach the internet and must pull images exclusively from the mirror
+# registry.  The CF template's "PublicSubnet" parameter is just a subnet ID
+# regardless of the subnet's actual routing — placing the instance in a
+# private subnet with no NAT gateway enforces network isolation.  Bootstrap
+# accesses S3 for its ignition via the VPC S3 endpoint and communicates with
+# NLB targets over the VPC-internal network.
+if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
+  add_param_to_json PublicSubnet "${PRIVATE_SUBNET_0}" "${cf_params_bootstrap}"
+else
+  add_param_to_json PublicSubnet "$(echo ${PUBLIC_SUBNETS%%,*} | sed 's/"//g')" "${cf_params_bootstrap}"
+fi
+
 add_param_to_json MasterSecurityGroupId "${MASTER_SECURITY_GROUP}" "${cf_params_bootstrap}"
 add_param_to_json BootstrapIgnitionLocation "${S3_BOOTSTRAP_URI}" "${cf_params_bootstrap}"
 add_param_to_json RegisterNlbIpTargetsLambdaArn "${NLB_IP_TARGETS_LAMBDA}" "${cf_params_bootstrap}"
@@ -327,8 +340,15 @@ wait "$!"
 aws cloudformation wait stack-create-complete --stack-name "${BOOTSTRAP_STACK_NAME}" &
 wait "$!"
 
-BOOTSTRAP_IP="$(aws cloudformation describe-stacks --stack-name "${BOOTSTRAP_STACK_NAME}" \
-  --query 'Stacks[].Outputs[?OutputKey == `BootstrapPublicIp`].OutputValue' --output text)"
+# In disconnected mode the bootstrap is on a private subnet and has no
+# public IP.  Use the private IP for gather and SSH (via bastion proxy).
+if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
+  BOOTSTRAP_IP="$(aws cloudformation describe-stacks --stack-name "${BOOTSTRAP_STACK_NAME}" \
+    --query 'Stacks[].Outputs[?OutputKey == `BootstrapPrivateIp`].OutputValue' --output text)"
+else
+  BOOTSTRAP_IP="$(aws cloudformation describe-stacks --stack-name "${BOOTSTRAP_STACK_NAME}" \
+    --query 'Stacks[].Outputs[?OutputKey == `BootstrapPublicIp`].OutputValue' --output text)"
+fi
 GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
 
 echo "$BOOTSTRAP_STACK_NAME" > "${SHARED_DIR}"/STACK_NAME_BOOTSTRAP

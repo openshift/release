@@ -15,6 +15,21 @@ chain:
   - chain: platform-external-ccm-deploy-aws
   - chain: platform-external-cluster-wait-for-install-complete
   - ref: mirror-images-trust-registry-ca
+  - as: disable-default-sources
+    from: cli
+    commands: |-
+      set -euo pipefail
+      if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+        source "${SHARED_DIR}/proxy-conf.sh"
+      fi
+      oc patch OperatorHub cluster --type json \
+        -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 5m0s
+    grace_period: 5m0s
   - ref: platform-external-cluster-task-image-registry-emptydir
   - ref: platform-external-cluster-aws-destroy-bootstrap
   env:
@@ -33,12 +48,17 @@ chain:
     mirror-images steps from the IPI disconnected chain, then runs the
     platform-external UPI install with CloudFormation templates against
     the precreated VPC (private subnets without NAT gateway, VPC
-    endpoints for AWS services). The chain:
+    endpoints for AWS services). Bootstrap is placed on a private subnet
+    to enforce network isolation — it fetches ignition from S3 via the
+    VPC endpoint and pulls images exclusively from the mirror registry.
+    The chain:
       1. Creates a disconnected VPC (private subnets + VPC endpoints)
       2. Provisions a bastion host with mirror registry and proxy
       3. Mirrors the release payload to the bastion registry
       4. Configures the install with mirror and external platform settings
-      5. Deploys cluster infrastructure via CloudFormation
+      5. Deploys cluster infrastructure via CloudFormation (all nodes
+         on private subnets)
       6. Waits for install completion
       7. Trusts the mirror registry CA for in-cluster consumers
-      8. Destroys the bootstrap resources
+      8. Disables default OperatorHub catalog sources
+      9. Destroys the bootstrap resources
