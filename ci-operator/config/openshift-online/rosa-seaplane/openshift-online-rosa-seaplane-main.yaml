@@ -79,6 +79,19 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: nightly-sanity
+  cron: 0 4 * * *
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      ROSA_LABEL_FILTER: seaplane-sanity
+      ROSA_REGIONAL_TEARDOWN_FIRE_AND_FORGET: "false"
+    post:
+    - ref: rosa-seaplane-teardown
+    pre:
+    - ref: rosa-seaplane-provision
+    test:
+    - ref: rosa-seaplane-e2e
 - as: nightly-stage
   cron: 0 4 * * *
   steps:
