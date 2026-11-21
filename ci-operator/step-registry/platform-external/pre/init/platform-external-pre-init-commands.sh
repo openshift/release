@@ -146,14 +146,14 @@ function collect_bootstrap_handler() {
     make_install_dir
     if ! command -v openshift-install &> /dev/null; then
       log "[\${handler_name}]: ERROR: openshift-install not found, cannot gather bootstrap logs"
-    elif [[ -s "\${SHARED_DIR}/bastion_public_address" ]] && [[ -s "\${SHARED_DIR}/bastion_ssh_user" ]]; then
-      # Bastion-routed gather for private bootstrap
+    elif [[ "\${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]] && [[ -s "\${SHARED_DIR}/bastion_public_address" ]] && [[ -s "\${SHARED_DIR}/bastion_ssh_user" ]]; then
+      # Bastion-routed gather for private bootstrap (disconnected only)
       local bastion_dns bastion_user gather_args installer_bin
       bastion_dns=\$(<\${SHARED_DIR}/bastion_public_address)
       bastion_user=\$(<\${SHARED_DIR}/bastion_ssh_user)
       installer_bin=\$(which openshift-install)
       gather_args=\$(<\${SHARED_DIR}/GATHER_BOOTSTRAP_ARGS 2>/dev/null || echo "--bootstrap \${BOOTSTRAP_IP}")
-      local ssh_opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+      local ssh_opts="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=30 -o ServerAliveInterval=30 -o ServerAliveCountMax=3"
 
       log "[\${handler_name}]: Routing gather through bastion \${bastion_dns}"
 
