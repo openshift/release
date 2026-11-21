@@ -422,6 +422,15 @@ trap 'cleanup_ocm_fvt || true; exit "${exit_code}"' EXIT
   umask 022
   python3 "${ocm_fvt_helpers}" metadata "${ocm_fvt_output}" "${ARTIFACT_DIR}/ocm-fvt-artifact-metadata.json"
 ) 2>/dev/null || echo "WARNING: failed to collect ocm-fvt artifact metadata"
+
+# Safe failure summary, built from the private per-phase Ginkgo reports before
+# anything is published, so which cases failed survives the post-upload scanner
+# replacing a report with a notice. It reads only report metadata and emits
+# fixed categories and bounded numbers; best effort, never the step's status.
+(
+  umask 022
+  python3 "${ocm_fvt_helpers}" summary "${ocm_fvt_output}" "${ARTIFACT_DIR}/ocm-fvt-failure-summary.json"
+) 2>/dev/null || echo "WARNING: failed to summarize ocm-fvt failures"
 $WAS_TRACING_RUN && set -x
 
 # Copy merged report.xml (skip per-phase duplicates).
