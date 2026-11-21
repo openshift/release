@@ -148,8 +148,10 @@ passing run into a failing one or the reverse.
 
 import json
 import os
+import re
 import stat
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 
 SCHEMA = 1
@@ -163,6 +165,12 @@ MAX_CASES_PARSED = 5000
 MAX_CASES_RECORDED = 1000
 REPORT_PREFIX = "test-run"
 REPORT_SUFFIX = ".xml"
+# An XML declaration is only a declaration at the very start of the document,
+# so matching is anchored. The scan is bounded by the declaration's own ">"
+# rather than by a byte count: XML allows arbitrary whitespace inside the
+# declaration, so any fixed bound could simply be padded past.
+XML_DECLARED_ENCODING = re.compile(rb"""\A<\?xml[^>]*?encoding\s*=\s*["']([^"']{1,64})["']""")
+UTF8_NAMES = (b"utf-8", b"utf8")
 # JUnit child tag -> the outcome token published for the testcase, worst first:
 # this is also the precedence order, see case_outcome(). The token is singular
 # and is deliberately not the plural key the same outcome uses under "totals".
@@ -276,6 +284,23 @@ def summarise(data):
     # rather than handed to a parser this check cannot cover.
     if not data.startswith(b"<") or b"\x00" in data[:4]:
         raise Unavailable("unsupported-encoding")
+    # The prefix check only rules out encodings that are not ASCII compatible.
+    # A report declaring, say, ISO-8859-1 still looks like ASCII at the prolog,
+    # and ElementTree honours that declaration - so without this the step would
+    # summarise a report it cannot claim to have understood. Decode to prove
+    # the bytes really are UTF-8; the decoder's message is dropped rather than
+    # recorded, because it quotes the offending bytes, which are report content.
+    try:
+        data.decode("utf-8")
+    except UnicodeDecodeError:
+        raise Unavailable("unsupported-encoding")
+    # Bytes that decode as UTF-8 can still carry a declaration naming another
+    # encoding. That contradiction is exactly the ambiguity this step refuses:
+    # the parser would follow the declaration, not the validation above.
+    prolog_end = data.find(b">") + 1
+    declared = XML_DECLARED_ENCODING.match(data[:prolog_end]) if prolog_end else None
+    if declared and declared.group(1).lower() not in UTF8_NAMES:
+        raise Unavailable("unsupported-encoding")
     # ElementTree expands internally declared entities, which is an
     # amplification vector on input this step does not control. The runner's
     # output has no doctype, so a document carrying one is refused outright
@@ -299,20 +324,35 @@ def summarise(data):
     if not suites:
         raise Unavailable("no-testsuites")
 
-    totals = {"tests": 0, "passed": 0, "failed": 0, "errors": 0, "skipped": 0}
-    cases = []
+    # An ordinal is published as a position in the report, so it has to follow
+    # document order. Numbering suite by suite instead would place a nested
+    # suite's cases after cases that come later in the document, and at the
+    # record cap it would retain the wrong prefix - dropping a failure that
+    # belongs in it. Ownership is resolved first, in one pass over the direct
+    # children of each suite; the walk below then visits testcases in document
+    # order without recursing itself. A testcase with no owner is not the
+    # direct child of any suite and is not counted.
+    owners = {}
     for index, suite in enumerate(suites, start=1):
         suite_id = "suite-%04d" % index
         for case in suite.iterfind("testcase"):
-            totals["tests"] += 1
-            if totals["tests"] > MAX_CASES_PARSED:
-                raise Unavailable("report-too-large")
-            outcome = case_outcome(case)
-            totals[TOTALS_KEY[outcome]] += 1
-            if len(cases) < MAX_CASES_RECORDED:
-                cases.append({"id": "case-%04d" % totals["tests"],
-                              "suite": suite_id,
-                              "outcome": outcome})
+            owners[case] = suite_id
+
+    totals = {"tests": 0, "passed": 0, "failed": 0, "errors": 0, "skipped": 0}
+    cases = []
+    for case in root.iter("testcase"):
+        suite_id = owners.get(case)
+        if suite_id is None:
+            continue
+        totals["tests"] += 1
+        if totals["tests"] > MAX_CASES_PARSED:
+            raise Unavailable("report-too-large")
+        outcome = case_outcome(case)
+        totals[TOTALS_KEY[outcome]] += 1
+        if len(cases) < MAX_CASES_RECORDED:
+            cases.append({"id": "case-%04d" % totals["tests"],
+                          "suite": suite_id,
+                          "outcome": outcome})
     return {
         "schema": SCHEMA,
         "status": "summarized",
@@ -343,26 +383,42 @@ def build(results_root):
 
 
 def write_summary(summary_path, summary):
-    """Write the summary, refusing to follow a link at the destination.
+    """Publish the summary atomically, refusing to follow or replace a link.
 
-    A write that fails part way - the artifact directory filling up behind the
-    tee'd runner log is the realistic way - leaves bytes already flushed on
-    disk. Half a JSON document published as the summary is worse than none,
-    and it would also satisfy the caller's "is the artifact there" fallback
-    test, so the remains are removed before the failure is reported.
+    The document is written to a staging file beside the destination and only
+    linked into place once it is complete on disk. Two failure modes motivate
+    that. A write that fails part way - the artifact directory filling up
+    behind the tee'd runner log is the realistic way - leaves bytes already
+    flushed; and a kill that skips Python's handlers entirely, which is how
+    the step ends when the job times out, leaves them with no chance to clean
+    up. Either way the final name must be a complete summary or absent, never
+    half a JSON document that a reader would take for the real thing.
+
+    os.link is the publication step rather than os.replace: link refuses a
+    destination that already exists, of any kind including a symlink, so the
+    no-clobber and no-follow guarantees of the previous direct O_EXCL creation
+    are kept. Staging is handled through its descriptor, and linked with
+    follow_symlinks=False, so no step here dereferences a name: otherwise a
+    name replaced underneath us between creation and publication would decide
+    what gets published. The staging file is removed either way; a kill
+    between the write and the link can leave one behind, bounded by the
+    summary's own size and under a name no consumer reads.
     """
-    descriptor = os.open(summary_path,
-                         os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+    directory = os.path.dirname(summary_path) or "."
+    descriptor, staging = tempfile.mkstemp(prefix=".capa-summary-", dir=directory)
     try:
         with os.fdopen(descriptor, "w") as artifact:
             json.dump(summary, artifact, sort_keys=True)
             artifact.write("\n")
-    except Exception:
+            artifact.flush()
+            os.fchmod(artifact.fileno(), 0o644)
+            os.fsync(artifact.fileno())
+        os.link(staging, summary_path, follow_symlinks=False)
+    finally:
         try:
-            os.unlink(summary_path)
+            os.unlink(staging)
         except OSError:
             pass
-        raise
 
 
 def main(argv):
@@ -419,7 +475,11 @@ RUN_STATUS=${PIPE_STATUS[0]}
 if [[ "${PIPE_STATUS[1]:-0}" -ne 0 ]]; then
   # Not fatal - the runner's own status still decides the step - but the log
   # is the artifact everything else refers to, so say that it is unreliable.
-  echo "WARNING: tee exited ${PIPE_STATUS[1]}; ${ARTIFACT_DIR}/rosa-hcp-e2e-test.log may be incomplete" >&2
+  # Best effort, like the export below: under errexit a failed write to a
+  # closed or full stderr would otherwise end the step here, discarding the
+  # runner status this block exists to preserve. This covers ordinary write
+  # errors only; nothing here can promise the process survives a signal.
+  echo "WARNING: tee exited ${PIPE_STATUS[1]}; ${ARTIFACT_DIR}/rosa-hcp-e2e-test.log may be incomplete" >&2 || true
 fi
 
 # Best effort, and deliberately after RUN_STATUS has been captured: the step
@@ -434,10 +494,13 @@ fi
 # publishes no summary, which the step's documentation states.
 export_structured_results "${RESULTS_ROOT}" "${ARTIFACT_DIR}/${SUMMARY_NAME}" || true
 
+# Both messages are best effort for the same reason as the warning above: the
+# step's status is already decided, and a diagnostic that cannot be written
+# must not be what changes it.
 if [[ "${RUN_STATUS}" -eq 0 ]]; then
-  echo "Tests complete. Results at ${ARTIFACT_DIR}/rosa-hcp-e2e-test.log"
+  echo "Tests complete. Results at ${ARTIFACT_DIR}/rosa-hcp-e2e-test.log" || true
 else
-  echo "Tests failed with status ${RUN_STATUS}. Results at ${ARTIFACT_DIR}/rosa-hcp-e2e-test.log" >&2
+  echo "Tests failed with status ${RUN_STATUS}. Results at ${ARTIFACT_DIR}/rosa-hcp-e2e-test.log" >&2 || true
 fi
 
 exit "${RUN_STATUS}"
