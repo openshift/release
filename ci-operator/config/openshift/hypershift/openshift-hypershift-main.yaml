@@ -1,5 +1,5 @@
 base_images:
-  aro-hcp-e2e-tests:
+  aro-hcp-e2e-tests-base:
     name: aro-hcp-e2e-tests
     namespace: aro-hcp
     tag: latest
@@ -47,6 +47,18 @@ images:
     dockerfile_path: Dockerfile.e2e
     to: hypershift-tests
   - dockerfile_literal: |
+      FROM hypershift-tests AS upstream-tests
+      FROM aro-hcp-e2e-tests-base
+      COPY --from=upstream-tests /hypershift/bin/test-e2e-v2 /usr/local/bin/test-e2e-v2
+    inputs:
+      aro-hcp-e2e-tests-base:
+        as:
+        - aro-hcp-e2e-tests-base
+      hypershift-tests:
+        as:
+        - hypershift-tests
+    to: aro-hcp-e2e-tests
+  - dockerfile_literal: |
       FROM base
       RUN dnf install -y python3-pip
     from: src
@@ -61,6 +73,7 @@ images:
 promotion:
   to:
   - excluded_images:
+    - aro-hcp-e2e-tests
     - custom-verify-src
     - hypershift-cli
     - hypershift-operator
@@ -278,6 +291,8 @@ tests:
   optional: true
   steps:
     cluster_profile: aro-hcp-dev
+    dependencies:
+      HYPERSHIFT_V2_TEST_IMAGE: hypershift-tests
     env:
       ALLOWED_SUBSCRIPTIONS: Hypershift Managed Azure
       ARO_HCP_CLOUD: dev
@@ -286,6 +301,7 @@ tests:
       ARO_HCP_OPENSHIFT_CHANNEL_GROUP: nightly
       ARO_HCP_OPENSHIFT_NODEPOOL_CHANNEL_GROUP: nightly
       ARO_HCP_OPENSHIFT_VERSION_ID: "5.1"
+      HYPERSHIFT_V2_BINARY: /usr/local/bin/test-e2e-v2
       MULTISTAGE_PARAM_OVERRIDE_LOCATION: westus3
       PUSH_CPO_IMAGE: "true"
     workflow: aro-hcp-hypershift-e2e
