@@ -13,14 +13,36 @@ log() {
 
 # Always exit 0 so the step never blocks job completion.
 cleanup() {
-  log "CR status collection complete."
   if [[ -d "${CR_DIR:-}" ]]; then
+    if [[ "${MC_DUMP_SUCCESS_COUNT:-0}" -gt 0 ]]; then
+      log "CR status collection complete: ${DUMP_SUCCESS_COUNT:-0} successful dumps (${MC_DUMP_SUCCESS_COUNT} management-cluster)."
+      printf 'success: %s CR dumps collected (%s management-cluster)\n' \
+        "${DUMP_SUCCESS_COUNT:-0}" "${MC_DUMP_SUCCESS_COUNT}" \
+        > "${CR_DIR}/collection-status.txt"
+    else
+      # Never let a best-effort success mask an empty collection (ROSAENG-75227).
+      local reason="${COLLECTION_REASON}"
+      if [[ -z "${reason}" ]]; then
+        if [[ "${DUMP_SUCCESS_COUNT:-0}" -gt 0 ]]; then
+          reason="all management-cluster dumps failed (guest-only collection)"
+        else
+          reason="all CR dumps failed (see error output in artifact files)"
+        fi
+      fi
+      log "CR status collection INCOMPLETE: 0 management-cluster dumps (${reason})."
+      printf 'incomplete: 0 management-cluster CR dumps (%s)\n' "${reason}" \
+        > "${CR_DIR}/collection-status.txt"
+    fi
     log "Output files:"
     ls -lh "${CR_DIR}" 2>/dev/null || true
   fi
   exit 0
 }
 trap cleanup EXIT
+
+COLLECTION_REASON=""
+DUMP_SUCCESS_COUNT=0
+MC_DUMP_SUCCESS_COUNT=0
 
 CR_DIR="${ARTIFACT_DIR}/cr-status"
 mkdir -p "${CR_DIR}"
@@ -33,6 +55,7 @@ if [[ -f "${SHARED_DIR}/cluster-id" ]]; then
 fi
 if [[ -z "${CLUSTER_ID}" ]]; then
   log "WARNING: No cluster-id found in SHARED_DIR. Skipping CR collection."
+  COLLECTION_REASON="skipped: no cluster-id in SHARED_DIR"
   exit 0
 fi
 log "Gathering HyperShift CR statuses for cluster ${CLUSTER_ID}"
@@ -52,6 +75,7 @@ if ! curl -sSL --fail --connect-timeout 30 --max-time 300 -o "${bp_tar}" \
   "https://github.com/openshift/backplane-cli/releases/download/v${bp_ver}/ocm-backplane_${bp_ver}_Linux_x86_64.tar.gz"; then
   log "ERROR: Failed to download ocm-backplane CLI"
   rm -f "${bp_tar}"
+  COLLECTION_REASON="ocm-backplane CLI download failed"
   exit 0
 fi
 tar -xzf "${bp_tar}" -C "${bin_dir}" ocm-backplane 2>/dev/null || true
@@ -60,6 +84,7 @@ rm -f "${bp_tar}"
 
 if [[ ! -x "${bin_dir}/ocm-backplane" ]]; then
   log "ERROR: ocm-backplane binary not found after extraction"
+  COLLECTION_REASON="ocm-backplane binary missing after extraction"
   exit 0
 fi
 
@@ -83,14 +108,23 @@ export KUBECONFIG="${BP_KUBECONFIG}"
 set +x
 
 # Support both SSO client credentials and offline token patterns from
-# /usr/local/cs-qe-credentials (matching the backplane and gather-diagnostics
-# steps). Try SSO client credentials first, fall back to OCM token.
+# /usr/local/cs-qe-credentials. The secret actually contains
+# backplane_client_id/backplane_client_secret (the SREP SSO client, same one
+# rosa-e2e-ocm-fvt uses for backplane access) and ocm-tokens (which exports
+# ORG_MEMBER_TOKEN, the var ocmtest logs in with). Keep sso-client-id/secret
+# and ocm_token/ocm-token files as fallbacks for other credential shapes.
+# See ROSAENG-75227.
 CRED_DIR="/usr/local/cs-qe-credentials"
 SSO_CLIENT_ID=""
 SSO_CLIENT_SECRET=""
 OCM_TOKEN=""
 
-if [[ -f "${CRED_DIR}/sso-client-id" && -f "${CRED_DIR}/sso-client-secret" ]]; then
+# -s (exists and non-empty) so an empty primary file falls through to the
+# fallback instead of blocking it.
+if [[ -s "${CRED_DIR}/backplane_client_id" && -s "${CRED_DIR}/backplane_client_secret" ]]; then
+  SSO_CLIENT_ID="$(cat "${CRED_DIR}/backplane_client_id")"
+  SSO_CLIENT_SECRET="$(cat "${CRED_DIR}/backplane_client_secret")"
+elif [[ -s "${CRED_DIR}/sso-client-id" && -s "${CRED_DIR}/sso-client-secret" ]]; then
   SSO_CLIENT_ID="$(cat "${CRED_DIR}/sso-client-id")"
   SSO_CLIENT_SECRET="$(cat "${CRED_DIR}/sso-client-secret")"
 fi
@@ -98,6 +132,10 @@ fi
 if [[ -z "${OCM_TOKEN}" && -f "${CRED_DIR}/ocm-tokens" ]]; then
   # shellcheck disable=SC1091
   source "${CRED_DIR}/ocm-tokens" 2>/dev/null || true
+fi
+# ocm-tokens exports ORG_MEMBER_TOKEN (and other role tokens), not OCM_TOKEN.
+if [[ -z "${OCM_TOKEN:-}" && -n "${ORG_MEMBER_TOKEN:-}" ]]; then
+  OCM_TOKEN="${ORG_MEMBER_TOKEN}"
 fi
 if [[ -z "${OCM_TOKEN:-}" && -f "${CRED_DIR}/ocm_token" ]]; then
   OCM_TOKEN="$(cat "${CRED_DIR}/ocm_token")"
@@ -107,11 +145,12 @@ if [[ -z "${OCM_TOKEN:-}" && -f "${CRED_DIR}/ocm-token" ]]; then
 fi
 
 if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-  log "Logging into OCM (${OCM_LOGIN_ENV}) with SSO credentials"
+  log "Logging into OCM (${OCM_LOGIN_ENV}) with SSO client credentials"
   if ! ocm login --url "${OCM_LOGIN_ENV}" \
        --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}" 2>/dev/null; then
     log "ERROR: OCM login with SSO credentials failed"
     $WAS_TRACING && set -x
+    COLLECTION_REASON="OCM login with SSO credentials failed"
     exit 0
   fi
 elif [[ -n "${OCM_TOKEN:-}" ]]; then
@@ -119,11 +158,13 @@ elif [[ -n "${OCM_TOKEN:-}" ]]; then
   if ! ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}" 2>/dev/null; then
     log "ERROR: OCM login with token failed"
     $WAS_TRACING && set -x
+    COLLECTION_REASON="OCM login with offline token failed"
     exit 0
   fi
 else
-  log "ERROR: No OCM credentials found in ${CRED_DIR} (sso-client-id/secret or ocm-token)"
+  log "ERROR: No OCM credentials found in ${CRED_DIR} (backplane_client_id/secret, ocm-tokens/ORG_MEMBER_TOKEN, or ocm-token)"
   $WAS_TRACING && set -x
+  COLLECTION_REASON="no OCM credentials found in ${CRED_DIR}"
   exit 0
 fi
 $WAS_TRACING && set -x
@@ -132,19 +173,34 @@ log "OCM login successful (${OCM_LOGIN_ENV})"
 
 # ---- backplane login + elevate ----------------------------------------------
 
-log "Running ocm-backplane login for ${CLUSTER_ID}..."
-if ! ocm-backplane login "${CLUSTER_ID}" 2>&1; then
-  log "ERROR: Backplane login failed for cluster ${CLUSTER_ID}"
+# Log into the management cluster: every CR dumped below (HostedClusters,
+# HostedControlPlanes, NodePools, CAPI Machines, ...) exists only on the
+# management plane. A plain `ocm-backplane login <id>` yields the hosted
+# (guest) plane, where those resource types do not exist. Same pattern as
+# the rosa-backplane-login step (ROSAENG-67580).
+log "Running ocm-backplane login --manager for ${CLUSTER_ID}..."
+if ! ocm-backplane login "${CLUSTER_ID}" --manager 2>&1; then
+  log "ERROR: Backplane --manager login failed for cluster ${CLUSTER_ID}"
+  COLLECTION_REASON="backplane --manager login failed for ${CLUSTER_ID}"
   exit 0
 fi
 
 log "Elevating backplane access (reason: ${elevate_reason})..."
-if ! ocm-backplane elevate "${elevate_reason}" -- config view --raw --minify > "${BP_KUBECONFIG}" 2>&1; then
-  log "ERROR: Failed to get elevated backplane kubeconfig"
-  rm -f "${BP_KUBECONFIG}"
-  exit 0
+ELEVATE_KUBECONFIG="$(mktemp /tmp/bp-elevated.XXXXXX)"
+if ocm-backplane elevate "${elevate_reason}" -- config view --raw --minify \
+  > "${ELEVATE_KUBECONFIG}" 2> "${CR_DIR}/backplane-elevate-error.txt"; then
+  mv "${ELEVATE_KUBECONFIG}" "${BP_KUBECONFIG}"
+  chmod 0600 "${BP_KUBECONFIG}"
+else
+  # Read-only CR dumps do not require backplane-cluster-admin. Keep the
+  # session kubeconfig that ocm-backplane login already wrote to $KUBECONFIG
+  # instead of discarding it, and retain the elevate error for diagnosis:
+  # redirecting elevate's output into BP_KUBECONFIG both truncated the login
+  # kubeconfig and swallowed the failure reason.
+  log "WARNING: backplane elevate failed (see backplane-elevate-error.txt); continuing with the non-elevated session kubeconfig"
+  rm -f "${ELEVATE_KUBECONFIG}"
+  cat "${CR_DIR}/backplane-elevate-error.txt" 2>/dev/null || true
 fi
-chmod 0600 "${BP_KUBECONFIG}"
 
 # Verify access
 if ! oc whoami > "${CR_DIR}/whoami.txt" 2>&1; then
@@ -185,6 +241,10 @@ fi
 
 # ---- helper: dump a CR to a file -------------------------------------------
 
+# Count successful dumps, not output files: a failed oc get still writes its
+# error text to the artifact, which is useful diagnostics but not a collection.
+# dump_cr is used for management-cluster CRs only; those are the step's core
+# output, so they get their own counter that gates the success status.
 dump_cr() {
   local resource="$1"
   local filename="$2"
@@ -192,9 +252,13 @@ dump_cr() {
 
   log "  Dumping ${resource}..."
   if [[ -n "${namespace}" ]]; then
-    oc get "${resource}" -n "${namespace}" -o yaml > "${CR_DIR}/${filename}" 2>&1 || true
+    oc get "${resource}" -n "${namespace}" -o yaml > "${CR_DIR}/${filename}" 2>&1 \
+      && DUMP_SUCCESS_COUNT=$((DUMP_SUCCESS_COUNT + 1)) \
+      && MC_DUMP_SUCCESS_COUNT=$((MC_DUMP_SUCCESS_COUNT + 1)) || true
   else
-    oc get "${resource}" -A -o yaml > "${CR_DIR}/${filename}" 2>&1 || true
+    oc get "${resource}" -A -o yaml > "${CR_DIR}/${filename}" 2>&1 \
+      && DUMP_SUCCESS_COUNT=$((DUMP_SUCCESS_COUNT + 1)) \
+      && MC_DUMP_SUCCESS_COUNT=$((MC_DUMP_SUCCESS_COUNT + 1)) || true
   fi
 }
 
@@ -235,11 +299,13 @@ if [[ -f "${GUEST_KUBECONFIG}" ]]; then
 
   log "  Dumping nodes..."
   oc --kubeconfig="${GUEST_KUBECONFIG}" get nodes -o yaml \
-    > "${CR_DIR}/guest-nodes.yaml" 2>&1 || true
+    > "${CR_DIR}/guest-nodes.yaml" 2>&1 \
+    && DUMP_SUCCESS_COUNT=$((DUMP_SUCCESS_COUNT + 1)) || true
 
   log "  Dumping certificatesigningrequests..."
   oc --kubeconfig="${GUEST_KUBECONFIG}" get certificatesigningrequests -o yaml \
-    > "${CR_DIR}/guest-csrs.yaml" 2>&1 || true
+    > "${CR_DIR}/guest-csrs.yaml" 2>&1 \
+    && DUMP_SUCCESS_COUNT=$((DUMP_SUCCESS_COUNT + 1)) || true
 else
   log "No guest cluster kubeconfig found in SHARED_DIR -- skipping guest CR collection"
 fi
