@@ -82,14 +82,15 @@ ENDPOINT_IDS+=("${S3_ENDPOINT_ID}")
 
 printf '%s\n' "${ENDPOINT_IDS[@]}" > "${SHARED_DIR}/zero_egress_endpoint_ids"
 
-# Cut internet egress: remove every route whose target is a NAT gateway. The
-# routes are owned by the VPC CloudFormation stack, but out-of-band deletion
-# is a no-op at stack teardown (CloudFormation proceeds when a resource is
-# already gone), while the NAT gateways themselves stay intact for the stack's
-# own lifecycle.
+# Cut internet egress: remove every route whose target is a NAT gateway. NAT
+# routes carry NatGatewayId, not GatewayId (which is null there and would make
+# a starts_with(GatewayId, ...) filter error out). The routes are owned by the
+# VPC CloudFormation stack, but out-of-band deletion is a no-op at stack
+# teardown (CloudFormation proceeds when a resource is already gone), while
+# the NAT gateways themselves stay intact for the stack's own lifecycle.
 for route_table in "${ROUTE_TABLES[@]}"; do
   mapfile -t NAT_ROUTES < <(aws ec2 describe-route-tables --route-table-ids "${route_table}" \
-    --query 'RouteTables[0].Routes[?starts_with(GatewayId, `nat-`)].DestinationCidrBlock' \
+    --query 'RouteTables[0].Routes[?NatGatewayId != null].DestinationCidrBlock' \
     --output text || true)
   for cidr in "${NAT_ROUTES[@]:-}"; do
     [[ -z "${cidr}" ]] && continue
