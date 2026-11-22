@@ -1,0 +1,32 @@
+ref:
+  as: ovn-conf-disable-udn-arp-ndp-flood-manifest
+  from: cli
+  commands: ovn-conf-disable-udn-arp-ndp-flood-manifest-commands.sh
+  timeout: 2m0s
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: DISABLE_UDN_ARP_NDP_FLOOD
+    default: ""
+    documentation: |-
+      Set to "true" by jobs that enable ARP/NDP flood suppression. When unset or empty the step
+      is a no-op, so it can be part of a shared workflow. Any value other than "true" or empty
+      fails the step.
+  documentation: |-
+    Pre-install step that enables OVN-Kubernetes ARP/NDP flood suppression for user-defined networks
+    through the installation manifests.
+
+    It writes ${SHARED_DIR}/manifest_ovn-kubernetes-noflood-config-overrides.yaml, a single ConfigMap
+    openshift-network-operator/ovn-kubernetes-config-overrides with data
+    disable-udn-arp-ndp-flood: "true" ("true" means flooding is suppressed). Installation steps that
+    collect ${SHARED_DIR}/manifest_*.yaml pass it to the installer, and the cluster network operator
+    reads the override after installation.
+
+    The step makes no cluster, kubeconfig or SSH calls and creates no Namespace, and is a no-op unless DISABLE_UDN_ARP_NDP_FLOOD is "true". It is idempotent for
+    an identical existing file and fails if the target file has other content, or if another
+    ${SHARED_DIR}/manifest_*.yaml or manifest_*.yml file contains a "name: ovn-kubernetes-config-overrides"
+    line, because bootstrap creates an object once and does not merge producers; merge such keys
+    into one producer instead. Use ovn-conf-disable-udn-arp-ndp-flood-verify after installation to
+    gate tests on the effective setting.
