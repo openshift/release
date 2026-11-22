@@ -53,22 +53,6 @@ images:
     to: source-upgrade-test-runner
   - dockerfile_literal: |
       FROM system-tests-builder AS go-builder
-      FROM docker.io/mikefarah/yq:4.53.2 AS yq
-      FROM nested-podman
-      USER 0
-      RUN dnf install -y git make skopeo jq findutils tar gzip && dnf clean all
-      COPY --from=go-builder /opt/app-root/src/go /opt/app-root/src/go
-      COPY --from=yq /usr/bin/yq /usr/local/bin/yq
-      ENV GOROOT=/opt/app-root/src/go
-      ENV PATH=/opt/app-root/src/go/bin:$PATH
-    from: nested-podman
-    inputs:
-      system-tests-builder:
-        as:
-        - system-tests-builder
-    to: fbc-upgrade-test-runner
-  - dockerfile_literal: |
-      FROM system-tests-builder AS go-builder
       FROM quay.io/operator-framework/operator-sdk@sha256:1b37b208f424e5abec0dc2045b54d3942e2eb03e085f48baf19aff7e5a333d84 AS operator-sdk
       FROM nested-podman
       USER 0
@@ -130,29 +114,6 @@ tests:
     - ref: send-results-to-reportportal
     test:
     - ref: medik8s-source-upgrade
-    workflow: ipi-aws
-- always_run: false
-  as: e2e-system-tests-far-fbc-upgrade
-  cron: 30 9 * * *
-  optional: true
-  presubmit: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      BASE_DOMAIN: ocp-ci.medik8s-ci.devcluster.openshift.com
-      ECO_DUMP_FAILED_TESTS: "true"
-      FBC_CANDIDATE_IMAGE: registry.redhat.io/workload-availability/fence-agents-remediation-rhel9-operator@sha256:f707b866dbbef82352070f9fe5612ad718ee7c92dcaa3af2c108fd1044993ead
-      FBC_CANDIDATE_MIRROR: quay.io/redhat-user-workloads/rhwa-tenant/fence-agents-remediation/far-operator-5-8
-      FBC_OPERATOR: far
-      TEST_NAME: e2e-system-tests-far-fbc-upgrade
-      TEST_STEPS: medik8s-fbc-upgrade
-    post:
-    - ref: medik8s-analyze-e2e-failure
-    - chain: ipi-aws-post
-    - ref: send-results-to-reportportal
-    test:
-    - ref: medik8s-fbc-upgrade
     workflow: ipi-aws
 - always_run: false
   as: e2e-system-tests-far-pr-aws
