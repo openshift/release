@@ -472,18 +472,42 @@ fi
 # file cannot put anything unexpected into SHARED_DIR for the post step to parse, and the
 # total is capped so a looping writer cannot fill the shared volume.
 classic_idp_windows="${SHARED_DIR}/classic-idp-phase-windows"
+# The accepted stamp is exactly the one the post step parses (%Y-%m-%dT%H:%M:%S.%fZ with
+# six fractional digits). Holding the producer to it keeps a line the consumer will drop
+# from taking a slot of the cap below, and makes the stamps fixed-width, which is what
+# lets them be ordered as text further down.
+classic_idp_stamp='[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z'
+classic_idp_cap=64
 classic_idp_raw="$(mktemp)" || classic_idp_raw=""
-if [[ -n "${classic_idp_raw}" ]]; then
+if [[ -z "${classic_idp_raw}" ]]; then
+  echo "WARNING: no scratch file; not publishing Classic IDP phase windows"
+else
   # Keep anything an earlier invocation of this step already published, so a second pass
   # merges with it instead of replacing it.
   [[ -s "${classic_idp_windows}" ]] && cat "${classic_idp_windows}" >> "${classic_idp_raw}"
   while IFS= read -r -d '' windows; do
-    grep -hE '^[a-z0-9_]{1,40} [0-9T:.Z-]{20,32} [0-9T:.Z-]{20,32}$' "${windows}" \
+    grep -hE "^[a-z0-9_]{1,40} ${classic_idp_stamp} ${classic_idp_stamp}$" "${windows}" \
       >> "${classic_idp_raw}" 2>/dev/null || true
   done < <(find "${ocm_fvt_output}" -type f -name 'classic-idp-phase-windows' -print0 2>/dev/null)
   if [[ -s "${classic_idp_raw}" ]]; then
-    sort -u "${classic_idp_raw}" | head -64 > "${classic_idp_windows}" || true
-    echo "Wrote SHARED_DIR/classic-idp-phase-windows ($(wc -l < "${classic_idp_windows}") window(s))"
+    # The cap keeps the newest windows, not the alphabetically first ones: the lines start
+    # with the phase name, so ordering by the whole line would let one phase crowd out every
+    # window of a later-sorting one and leave its events tagged outside_known_phase. The
+    # stamps are fixed-width UTC, so ordering them as text orders them in time.
+    classic_idp_unique="$(mktemp)" || classic_idp_unique=""
+    if [[ -z "${classic_idp_unique}" ]]; then
+      echo "WARNING: no scratch file; not publishing Classic IDP phase windows"
+    else
+      LC_ALL=C sort -u "${classic_idp_raw}" > "${classic_idp_unique}" || true
+      classic_idp_seen=$(wc -l < "${classic_idp_unique}" 2>/dev/null || echo 0)
+      LC_ALL=C sort -k2,2 -k3,3 "${classic_idp_unique}" \
+        | tail -n "${classic_idp_cap}" > "${classic_idp_windows}" || true
+      if (( classic_idp_seen > classic_idp_cap )); then
+        echo "WARNING: ${classic_idp_seen} Classic IDP phase window(s) found, keeping the newest ${classic_idp_cap}"
+      fi
+      rm -f "${classic_idp_unique}"
+      echo "Wrote SHARED_DIR/classic-idp-phase-windows ($(wc -l < "${classic_idp_windows}") window(s))"
+    fi
   fi
   rm -f "${classic_idp_raw}"
 fi
