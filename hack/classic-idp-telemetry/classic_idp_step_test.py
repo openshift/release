@@ -121,6 +121,14 @@ printf '%s' "$RESPONSE_BODY" > "$out"
 exit 0
 """
 
+# Lets a test fail the nth and later mktemp calls of a block that makes several.
+MKTEMP_FAILS_AFTER = """#!/bin/bash
+seen=$(cat "$MKTEMP_COUNT_FILE" 2>/dev/null || echo 0)
+echo $((seen + 1)) > "$MKTEMP_COUNT_FILE"
+if (( seen >= MKTEMP_FAIL_AFTER )); then echo "mktemp: failed" >&2; exit 1; fi
+exec {real} "$@"
+"""
+
 CLUSTER_IDS = [f"abcdefghij012345678{n}" for n in range(10)]
 
 
@@ -368,8 +376,11 @@ class PhaseWindowCase(unittest.TestCase):
                          "the cap discarded the newest windows")
         self.assertIn("keeping the newest", result.stdout)
 
-    def publish(self, found=(), already_published=()):
-        """Run the block over a found file and an existing SHARED_DIR handoff."""
+    def publish(self, found=(), already_published=(), mktemp_fails_after=None):
+        """Run the block over a found file and an existing SHARED_DIR handoff.
+
+        mktemp_fails_after makes the nth and later `mktemp` calls fail, so a test can
+        drive a scratch failure part-way through the block."""
         work = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, work, True)
         shared, output = work / "shared", work / "output" / "phase"
@@ -381,9 +392,22 @@ class PhaseWindowCase(unittest.TestCase):
         (output / "classic-idp-phase-windows").write_text(
             "".join(line + "\n" for line in found))
         runner = work / "block.sh"
-        runner.write_text(f'ocm_fvt_output="{work / "output"}"\n' + self.block)
+        # errexit matches the shipped script, so a scratch failure that would end the FVT
+        # step shows up here rather than passing quietly.
+        runner.write_text("set -o nounset\nset -o errexit\nset -o pipefail\n"
+                          + f'ocm_fvt_output="{work / "output"}"\n' + self.block)
+        env = {**os.environ, "SHARED_DIR": str(shared)}
+        if mktemp_fails_after is not None:
+            stubs = work / "bin"
+            stubs.mkdir()
+            stub = stubs / "mktemp"
+            stub.write_text(MKTEMP_FAILS_AFTER.format(real=shutil.which("mktemp")))
+            stub.chmod(0o755)
+            env["PATH"] = f"{stubs}{os.pathsep}{os.environ['PATH']}"
+            env["MKTEMP_COUNT_FILE"] = str(work / "mktemp-count")
+            env["MKTEMP_FAIL_AFTER"] = str(mktemp_fails_after)
         result = subprocess.run(["bash", str(runner)], capture_output=True, text=True,
-                                env={**os.environ, "SHARED_DIR": str(shared)}, check=False)
+                                env=env, check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         handoff = shared / "classic-idp-phase-windows"
         published = handoff.read_text().splitlines() if handoff.is_file() else []
@@ -456,6 +480,23 @@ class PhaseWindowCase(unittest.TestCase):
         self.assertEqual(published, [])
         self.assertIn("no usable", stdout)
         self.assertNotIn("sentinel_phase", stdout)
+
+    def test_a_scratch_failure_does_not_discard_an_existing_handoff(self):
+        # Validation needs a scratch file. Losing it says nothing about the windows an
+        # earlier pass already published, so they must survive - and nothing new may be
+        # published unvalidated.
+        valid = "idp_delete 2026-11-11T06:00:00.000000Z 2026-11-11T06:00:01.000000Z"
+        found = ["idp_create 2026-11-11T07:00:00.000000Z 2026-11-11T07:00:01.000000Z"]
+        for after in (1, 2):
+            with self.subTest(mktemp_fails_after=after):
+                published, stdout = self.publish(found=found, already_published=[valid],
+                                                 mktemp_fails_after=after)
+                self.assertEqual(published, [valid],
+                                 "a transient scratch failure discarded good windows")
+                # Nothing was examined, so the report must not claim the records were
+                # looked at and found wanting.
+                self.assertNotIn("no usable", stdout)
+                self.assertIn("no scratch file", stdout)
 
     def test_chronological_order_of_valid_records_is_preserved(self):
         windows = [f"idp_create 2026-11-11T07:{m:02d}:00.000000Z "

@@ -480,6 +480,8 @@ classic_idp_windows="${SHARED_DIR}/classic-idp-phase-windows"
 # lets them be ordered as text further down.
 classic_idp_stamp='[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z'
 classic_idp_cap=64
+# Cleared when the records cannot be validated, so nothing is published unchecked.
+classic_idp_publish=true
 # The closed set the post step's parser accepts (its PHASES). A name outside it is dropped
 # there, so accepting it here only lets it take a slot of the cap; keep the two in step.
 classic_idp_phases='htpasswd_user_import idp_create idp_delete'
@@ -540,18 +542,20 @@ else
         mv -f "${classic_idp_valid}" "${classic_idp_raw}" || rm -f "${classic_idp_valid}"
       else
         # Without scratch the records cannot be validated. Publishing them unchecked is
-        # what this block exists to stop, so publish nothing and say why.
-        echo "WARNING: no scratch file; cannot validate Classic IDP phase windows, not publishing"
-        : > "${classic_idp_raw}"
+        # what this block exists to stop - and a handoff an earlier pass already published
+        # must not be discarded over a transient scratch failure either, because that
+        # would lose good windows for a reason that says nothing about them. Leave it be.
+        echo "WARNING: no scratch file; cannot validate Classic IDP phase windows, leaving the handoff unchanged"
+        classic_idp_publish=false
       fi
     fi
-    if [[ ! -s "${classic_idp_raw}" ]]; then
+    if [[ "${classic_idp_publish}" == "true" && ! -s "${classic_idp_raw}" ]]; then
       # Nothing survived validation. Clear any handoff an earlier pass left behind rather
       # than leaving records in SHARED_DIR that the post step would only reject again; an
       # empty handoff reads as absent there, so it reports phase_windows unavailable.
       echo "WARNING: no usable Classic IDP phase window records; not publishing"
       [[ -e "${classic_idp_windows}" ]] && : > "${classic_idp_windows}"
-    elif [[ -n "${classic_idp_unique}" ]]; then
+    elif [[ "${classic_idp_publish}" == "true" && -n "${classic_idp_unique}" ]]; then
       LC_ALL=C sort -u "${classic_idp_raw}" > "${classic_idp_unique}" || true
       classic_idp_seen=$(wc -l < "${classic_idp_unique}" 2>/dev/null || echo 0)
       LC_ALL=C sort -k2,2 -k3,3 "${classic_idp_unique}" \
