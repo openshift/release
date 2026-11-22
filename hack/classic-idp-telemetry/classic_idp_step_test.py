@@ -423,12 +423,34 @@ class PhaseWindowCase(unittest.TestCase):
         # Shape-legal but unusable: the end precedes the start, and the stamps are later.
         reversed_later = [f"idp_create 2026-11-11T09:{m:02d}:05.000000Z "
                           f"2026-11-11T09:{m:02d}:00.000000Z" for m in range(self.CAP)]
-        published, stdout = self.publish(found=[valid] + reversed_later)
-        self.assertIn(valid, published,
-                      "a valid window was capped away by records the consumer rejects")
-        self.assertEqual([line for line in published if line in reversed_later], [],
-                         "records whose end precedes their start were published")
-        self.assertIn("rejected", stdout)
+        # Shape-legal and chronologically ordered, but :60 - strptime's %S pattern matches
+        # a leap second while building the datetime from it raises, so the consumer drops
+        # these too. Spread over two hours to get CAP distinct records.
+        leap_second_later = [
+            f"idp_create 2026-11-11T{9 + n // 32:02d}:{n % 32:02d}:60.000000Z "
+            f"2026-11-11T{9 + n // 32:02d}:{n % 32:02d}:60.000000Z" for n in range(self.CAP)]
+        self.assertEqual(len(set(leap_second_later)), self.CAP)
+        for label, later in (("reversed", reversed_later),
+                             ("leap_second", leap_second_later)):
+            # Both as records found in the output tree and as records an earlier pass
+            # already shared through SHARED_DIR.
+            for seeded in (False, True):
+                with self.subTest(records=label, seeded=seeded):
+                    published, stdout = self.publish(
+                        found=[valid] if seeded else [valid] + later,
+                        already_published=later if seeded else ())
+                    self.assertIn(valid, published,
+                                  "a valid window was capped away by records the "
+                                  "consumer rejects")
+                    self.assertEqual([line for line in published if line in later], [],
+                                     "records the consumer rejects were published")
+                    self.assertIn("rejected", stdout)
+
+    def test_the_last_second_of_a_minute_is_a_calendar_instant(self):
+        # The guard above must not be over-tightened: :59 is what the consumer accepts.
+        last = "idp_create 2026-11-11T07:00:59.000000Z 2026-11-11T07:00:59.000000Z"
+        published, _ = self.publish(found=[last])
+        self.assertEqual(published, [last])
 
     def test_non_calendar_and_reversed_and_unknown_phase_records_are_rejected(self):
         valid = "idp_delete 2026-11-11T07:00:00.000000Z 2026-11-11T07:00:01.000000Z"
@@ -437,6 +459,8 @@ class PhaseWindowCase(unittest.TestCase):
             "idp_create 2026-13-45T99:99:99.000000Z 2026-13-45T99:99:99.000000Z",
             "idp_create 2026-02-30T07:00:00.000000Z 2026-02-30T07:00:01.000000Z",
             "idp_create 2026-11-31T07:00:00.000000Z 2026-11-31T07:00:01.000000Z",
+            # A leap second: %S matches it, but the consumer's datetime refuses it.
+            "idp_create 2026-11-11T07:00:60.000000Z 2026-11-11T07:00:60.000000Z",
             # End before start.
             "idp_create 2026-11-11T08:00:05.000000Z 2026-11-11T08:00:00.000000Z",
             # A phase name the consumer's closed set does not contain.

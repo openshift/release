@@ -523,7 +523,10 @@ else
             d = substr(stamp, 9, 2) + 0; hh = substr(stamp, 12, 2) + 0
             mm = substr(stamp, 15, 2) + 0; ss = substr(stamp, 18, 2) + 0
             if (y < 1 || m < 1 || m > 12 || d < 1) return 0
-            if (hh > 23 || mm > 59 || ss > 60) return 0
+            # Not 60. The %S pattern in strptime matches a leap second, but building the
+            # datetime from it raises, so the consumer drops the record. Accepting one
+            # here only lets it take a slot of the cap below.
+            if (hh > 23 || mm > 59 || ss > 59) return 0
             days = 31
             if (m == 4 || m == 6 || m == 9 || m == 11) days = 30
             else if (m == 2) days = (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)) ? 29 : 28
