@@ -373,6 +373,27 @@ else
       CLASSIC_QUERY_OK=false
       continue
     fi
+    # -s above tests size, not content. A body of blank space decodes to no document at
+    # all, so nothing would be counted and the report would read "no events" for an answer
+    # that never arrived; a body carrying two documents would be numbered as two cluster
+    # groups although one selector produced it. Require exactly one JSON value, with only
+    # whitespace after it, before this response joins the merged file. A valid document
+    # whose result is empty is untouched and still reports a clean empty collection.
+    if ! python3 -c '
+import json, sys
+with open(sys.argv[1]) as handle:
+    text = handle.read()
+start = len(text) - len(text.lstrip())
+try:
+    _, index = json.JSONDecoder().raw_decode(text, start)
+except ValueError:
+    sys.exit(1)
+sys.exit(0 if text[index:].strip() == "" else 1)
+' "${CLASSIC_WORK}/sel.json" 2>/dev/null; then
+      echo "WARNING: Classic query response is not exactly one JSON document, treating as a failed query"
+      CLASSIC_QUERY_OK=false
+      continue
+    fi
     cat "${CLASSIC_WORK}/sel.json" >> "${CLASSIC_WORK}/merged.json"
     printf '\n' >> "${CLASSIC_WORK}/merged.json"
     # A result set that exactly fills the limit may have been cut short; say so rather than
