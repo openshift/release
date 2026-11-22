@@ -3058,23 +3058,29 @@ tests:
         [[ "${version}" == "${MIN_VERSION}" || "${version}" > "${MIN_VERSION}" ]] || { echo "payload ${version} is older than ${MIN_VERSION}"; exit 1; }
         [[ "${feature_set}" == "CustomNoUpgrade" ]] || { echo "expected CustomNoUpgrade, got ${feature_set:-<empty>}"; exit 1; }
         enabled="$(oc get featuregate cluster -o jsonpath='{range .spec.customNoUpgrade.enabled[*]}{.}{"\n"}{end}')"
-        echo "${enabled}" | grep -qx "BareMetalHostV1Beta1"
-        echo "${enabled}" | grep -qx "MetalHostClaimsAPI"
+        echo "enabled gates:"
+        printf '%s\n' "${enabled}"
+        grep -qx "BareMetalHostV1Beta1" <<< "${enabled}" || { echo "FAIL BareMetalHostV1Beta1 is not enabled"; exit 1; }
+        grep -qx "MetalHostClaimsAPI" <<< "${enabled}" || { echo "FAIL MetalHostClaimsAPI is not enabled"; exit 1; }
         bmh="$(oc get crd baremetalhosts.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
         hd="$(oc get crd hardwaredata.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
-        echo "${bmh}" | tee "${ARTIFACT_DIR}/baremetalhosts.versions"
-        echo "${hd}" | tee "${ARTIFACT_DIR}/hardwaredata.versions"
-        echo "${bmh}" | grep -qx "v1alpha1:served=true:storage=true"
-        echo "${bmh}" | grep -qx "v1beta1:served=true:storage=false"
-        echo "${hd}" | grep -qx "v1alpha1:served=true:storage=true"
-        echo "${hd}" | grep -qx "v1beta1:served=true:storage=false"
+        echo "baremetalhosts:"
+        printf '%s\n' "${bmh}" | tee "${ARTIFACT_DIR}/baremetalhosts.versions"
+        echo "hardwaredata:"
+        printf '%s\n' "${hd}" | tee "${ARTIFACT_DIR}/hardwaredata.versions"
+        grep -qx "v1alpha1:served=true:storage=true" <<< "${bmh}" || { echo "FAIL BareMetalHost v1alpha1 storage"; exit 1; }
+        grep -qx "v1beta1:served=true:storage=false" <<< "${bmh}" || { echo "FAIL BareMetalHost v1beta1"; exit 1; }
+        grep -qx "v1alpha1:served=true:storage=true" <<< "${hd}" || { echo "FAIL HardwareData v1alpha1 storage"; exit 1; }
+        grep -qx "v1beta1:served=true:storage=false" <<< "${hd}" || { echo "FAIL HardwareData v1beta1"; exit 1; }
         oc get crd hostclaims.metal3.io hostdeploypolicies.metal3.io
         hc="$(oc get crd hostclaims.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
         hdp="$(oc get crd hostdeploypolicies.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
-        echo "${hc}" | tee "${ARTIFACT_DIR}/hostclaims.versions"
-        echo "${hdp}" | tee "${ARTIFACT_DIR}/hostdeploypolicies.versions"
-        echo "${hc}" | grep -qx "v1alpha1:served=true:storage=true"
-        echo "${hdp}" | grep -qx "v1alpha1:served=true:storage=true"
+        echo "hostclaims:"
+        printf '%s\n' "${hc}" | tee "${ARTIFACT_DIR}/hostclaims.versions"
+        echo "hostdeploypolicies:"
+        printf '%s\n' "${hdp}" | tee "${ARTIFACT_DIR}/hostdeploypolicies.versions"
+        grep -qx "v1alpha1:served=true:storage=true" <<< "${hc}" || { echo "FAIL HostClaim version"; exit 1; }
+        grep -qx "v1alpha1:served=true:storage=true" <<< "${hdp}" || { echo "FAIL HostDeployPolicy version"; exit 1; }
         for crd in hostfirmwaresettings.metal3.io hostfirmwarecomponents.metal3.io firmwareschemas.metal3.io preprovisioningimages.metal3.io bmceventsubscriptions.metal3.io dataimages.metal3.io hostupdatepolicies.metal3.io baremetalswitches.metal3.io hostnetworkattachments.metal3.io; do
           oc get "crd/${crd}" >/dev/null
         done
@@ -3112,16 +3118,18 @@ tests:
         [[ "${version}" == "${MIN_VERSION}" || "${version}" > "${MIN_VERSION}" ]] || { echo "payload ${version} is older than ${MIN_VERSION}"; exit 1; }
         [[ -z "${feature_set}" || "${feature_set}" == "Default" ]] || { echo "expected the default feature set, got ${feature_set}"; exit 1; }
         disabled="$(oc get featuregate cluster -o jsonpath='{range .status.featureGates[*].disabled[*]}{.name}{"\n"}{end}')"
-        echo "${disabled}" | grep -qx "BareMetalHostV1Beta1"
-        echo "${disabled}" | grep -qx "MetalHostClaimsAPI"
+        grep -qx "BareMetalHostV1Beta1" <<< "${disabled}" || { echo "FAIL BareMetalHostV1Beta1 is not disabled"; exit 1; }
+        grep -qx "MetalHostClaimsAPI" <<< "${disabled}" || { echo "FAIL MetalHostClaimsAPI is not disabled"; exit 1; }
         bmh="$(oc get crd baremetalhosts.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
         hd="$(oc get crd hardwaredata.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
-        echo "${bmh}" | tee "${ARTIFACT_DIR}/baremetalhosts.versions"
-        echo "${hd}" | tee "${ARTIFACT_DIR}/hardwaredata.versions"
-        echo "${bmh}" | grep -qx "v1alpha1:served=true:storage=true"
-        if echo "${bmh}" | grep -q "v1beta1"; then echo "BareMetalHost v1beta1 is served"; exit 1; fi
-        echo "${hd}" | grep -qx "v1alpha1:served=true:storage=true"
-        if echo "${hd}" | grep -q "v1beta1"; then echo "HardwareData v1beta1 is served"; exit 1; fi
+        echo "baremetalhosts:"
+        printf '%s\n' "${bmh}" | tee "${ARTIFACT_DIR}/baremetalhosts.versions"
+        echo "hardwaredata:"
+        printf '%s\n' "${hd}" | tee "${ARTIFACT_DIR}/hardwaredata.versions"
+        grep -qx "v1alpha1:served=true:storage=true" <<< "${bmh}" || { echo "FAIL BareMetalHost v1alpha1"; exit 1; }
+        if grep -q "v1beta1" <<< "${bmh}"; then echo "BareMetalHost v1beta1 is served"; exit 1; fi
+        grep -qx "v1alpha1:served=true:storage=true" <<< "${hd}" || { echo "FAIL HardwareData v1alpha1"; exit 1; }
+        if grep -q "v1beta1" <<< "${hd}"; then echo "HardwareData v1beta1 is served"; exit 1; fi
         if oc get crd hostclaims.metal3.io >/dev/null 2>&1; then echo "hostclaims.metal3.io is installed"; exit 1; fi
         if oc get crd hostdeploypolicies.metal3.io >/dev/null 2>&1; then echo "hostdeploypolicies.metal3.io is installed"; exit 1; fi
         for crd in hostfirmwaresettings.metal3.io hostfirmwarecomponents.metal3.io firmwareschemas.metal3.io preprovisioningimages.metal3.io bmceventsubscriptions.metal3.io dataimages.metal3.io hostupdatepolicies.metal3.io baremetalswitches.metal3.io hostnetworkattachments.metal3.io; do
