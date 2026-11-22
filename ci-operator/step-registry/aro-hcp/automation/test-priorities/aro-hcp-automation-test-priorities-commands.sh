@@ -24,9 +24,7 @@ readonly SCHEDULED_JOB='periodic-ci-Azure-ARO-HCP-main-e2e-test-priorities-refre
 RUNNER=${E2E_RUNNER:-/opt/app-root/src/github.com/Azure/ARO-HCP/test/aro-hcp-tests}
 BAKED_REPO=${E2E_BAKED_REPO:-/opt/app-root/src/github.com/Azure/ARO-HCP}
 readonly RUNNER BAKED_REPO
-readonly API='https://api.github.com'
 readonly LOOKBACK_DAYS=7
-readonly MAX_PR_PAGES=50
 
 VERBOSITY=${VERBOSITY:-0}
 PRIORITIES_PUBLISH=${PRIORITIES_PUBLISH:-false}
@@ -98,7 +96,7 @@ info "job ${job_name} (${job_type}), build ${build_id}, publication ${publish}"
 [[ "${PRIORITIES_MIN_SAMPLES}" =~ ^[0-9]+$ ]] ||
     error "PRIORITIES_MIN_SAMPLES must be a number, got '${PRIORITIES_MIN_SAMPLES}'"
 
-for tool in git curl jq go; do
+for tool in git jq go; do
     command -v "${tool}" >/dev/null 2>&1 || error "required tool '${tool}' is not installed"
 done
 
@@ -124,84 +122,28 @@ repo_git remote remove origin || error "cannot detach the private checkout from 
 info "working checkout ${REPO_DIR} at ${base_sha}"
 
 # ---------------------------------------------------------------------------
-# GitHub helpers
+# Publication gate that must run before any collection or commit
 # ---------------------------------------------------------------------------
-github_get() {
-    curl --silent --show-error --fail-with-body \
-        --header "Authorization: Bearer $(<"${GITHUB_TOKEN_PATH}")" \
-        --header 'Accept: application/vnd.github+json' \
-        "${API}/$1"
+readonly BOT_BRANCH_PREFIX='bot/test-priorities-'
+
+# publication_gate reports whether this run may publish, as one JSON object.
+publication_gate() {
+    "${RUNNER}" priorities-gate \
+        --repo "${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}" \
+        --base "${GITHUB_BASE_BRANCH}" \
+        --base-commit "${base_sha}" \
+        --actor "${GITHUB_BOT_LOGIN}" \
+        --marker "${MARKER}" \
+        --branch-prefix "${BOT_BRANCH_PREFIX}" \
+        --token-path "${GITHUB_TOKEN_PATH}"
 }
 
-# require_valid_token fails fast when the installation token has expired before
-# the expensive rebuild, instead of losing the whole run at the final push.
-require_valid_token() {
-    github_get "rate_limit" >/dev/null 2>&1 ||
-        error "the GitHub App token is no longer valid; publication needs a token minted for this run"
-}
-
-# require_base_is_ancestor fails when the baked commit is not part of the target
-# branch, so a stale or foreign image can never publish an unrelated diff.
-require_base_is_ancestor() {
-    local compare status
-    compare=$(github_get "repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/compare/${base_sha}...${GITHUB_BASE_BRANCH}") ||
-        return 1
-    status=$(jq -r '.status // empty' <<<"${compare}") || return 1
-    case "${status}" in
-    ahead | identical) return 0 ;;
-    *)
-        error "the baked commit ${base_sha} is not on ${GITHUB_BASE_BRANCH} (compare status ${status:-unknown})"
-        ;;
-    esac
-}
-
-# open_pull_requests prints "number<TAB>head<TAB>login" for every open pull
-# request, failing loudly instead of pretending the list is empty.
-open_pull_requests() {
-    local page=1 count response
-    while ((page <= MAX_PR_PAGES)); do
-        response=$(github_get "repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/pulls?state=open&per_page=100&page=${page}") ||
-            return 1
-        count=$(jq 'length' <<<"${response}") || return 1
-        jq -r '.[] | [.number, .head.ref, .user.login] | @tsv' <<<"${response}" || return 1
-        if ((count < 100)); then
-            return 0
-        fi
-        page=$((page + 1))
-    done
-    return 1
-}
-
-# publication_blocker prints the reason publication must be skipped, or nothing.
-publication_blocker() {
-    local listing number head login body
-    listing=$(open_pull_requests) || error "cannot list open pull requests; refusing to publish"
-    while IFS=$'\t' read -r number head login; do
-        [[ -n "${number:-}" ]] || continue
-        if [[ -n "${login:-}" && "${login}" == "${GITHUB_BOT_LOGIN}" ]]; then
-            body=$(github_get "repos/${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}/pulls/${number}") || return 1
-            if jq -r '.body // empty' <<<"${body}" | grep -Fq "${MARKER}"; then
-                printf 'an open generated pull request #%s already exists\n' "${number}"
-                return 0
-            fi
-            case "${head}" in
-            bot/test-priorities-*)
-                printf 'an open generated branch pull request #%s already exists\n' "${number}"
-                return 0
-                ;;
-            esac
-        fi
-    done <<<"${listing}"
-}
-
-# ---------------------------------------------------------------------------
-# Publication gates that must run before any collection or commit
-# ---------------------------------------------------------------------------
 if [[ "${publish}" == true ]]; then
     [[ -r "${GITHUB_TOKEN_PATH}" ]] ||
         error "publication requires the GitHub App token at ${GITHUB_TOKEN_PATH}"
-    blocker=$(publication_blocker) || error "cannot evaluate the open pull request gate"
-    if [[ -n "${blocker:-}" ]]; then
+    gate=$(publication_gate) || error "cannot evaluate the publication gate"
+    blocker=$(jq -r '.reason // empty' <<<"${gate}") || error "cannot read the gate result"
+    if [[ -n "${blocker}" ]]; then
         "${RUNNER}" priorities-summary --note "Publication skipped before collection: ${blocker}." \
             --output "${ARTIFACT_DIR}/priorities-summary.html" >/dev/null ||
             error "cannot write the run summary"
@@ -271,8 +213,14 @@ fi
 # ---------------------------------------------------------------------------
 # Verify the edited checkout before publishing anything
 # ---------------------------------------------------------------------------
-require_valid_token
-require_base_is_ancestor
+# Re-check the gate before the expensive rebuild: the token may have expired and
+# another run may have opened a proposal while this one was collecting.
+gate=$(publication_gate) || error "cannot re-evaluate the publication gate"
+blocker=$(jq -r '.reason // empty' <<<"${gate}") || error "cannot read the gate result"
+if [[ -n "${blocker}" ]]; then
+    log "[info] not publishing: ${blocker}"
+    exit 0
+fi
 info "rebuilding the runner from the edited checkout"
 (
     cd "${REPO_DIR}/test" &&
@@ -326,77 +274,27 @@ done
 # ---------------------------------------------------------------------------
 # Report body
 # ---------------------------------------------------------------------------
-mapfile -t env_rows < <(jq -r '.environments[]? | "| \(.environment) | \(.eligible_build_count) | \(.eligible_sample_count) | \(.median_minutes) | \(.latest_eligible_completion) |"' "${SCORES}")
-mapfile -t change_rows < <(jq -r '.changes[]? | "| \(.name | gsub("\\|"; "\\|")) | \(.old_priority) | \(.new_priority) | \(.score_minutes) | \(.eligible_build_count) | \(.environments | join(", ")) |"' "${CHANGES}")
-window_from=$(jq -r '.selection.from' "${SCORES}") || error "cannot read the score window start"
-window_to=$(jq -r '.selection.to' "${SCORES}") || error "cannot read the score window end"
-origin=$(jq -r '.selection.origin' "${SCORES}")
-algorithm=$(jq -r '.algorithm' "${SCORES}")
-global_median=$(jq -r '.global_median_minutes' "${SCORES}")
-
-cat >"${PRIVATE_DIR}/body.md" <<EOF
-## What
-
-Refresh the \`labels.StartPriority\` declarations of the E2E suite from measured implementation durations.
-This pull request was generated by ${SCHEDULED_JOB}; it changes no test logic, only start order.
-
-## Why
-
-Start priority only exists so the suite scheduler starts the long specs early. Deriving it by hand drifts
-from reality, so it is recomputed from CI telemetry on a fixed schedule instead.
-
-## Data
-
-- Kusto scope: \`${origin}\`
-- Completion window: \`${window_from}\` to \`${window_to}\` with job filter \`e2e-parallel\`
-- Algorithm: \`${algorithm}\` (minimum ${PRIORITIES_MIN_SAMPLES} distinct builds per spec and environment, global median ${global_median} minutes)
-- Only successful, processed runs and passed \`e2e\` results contribute; skipped, failed and unprocessed records never count as zero-duration samples.
-
-| Environment | Eligible builds | Eligible samples | Median (min) | Latest eligible completion |
-| --- | --- | --- | --- | --- |
-$(printf '%s\n' "${env_rows[@]}")
-
-## Changed specs
-
-| Test | Old priority | New priority | Score (min) | Builds | Environments |
-| --- | --- | --- | --- | --- | --- |
-$(printf '%s\n' "${change_rows[@]}")
-
-## Testing
-
-- \`refresh-priorities\` mapped every proposal to one exact source declaration; no regex rewrite.
-- The E2E runner was rebuilt from this commit, the catalog was regenerated and verified to keep every spec name, keep all labels other than \`StartPriority\` unchanged, and carry exactly the proposed priorities.
-- \`TestRegisteredSpecsDeclareValidStartPriority\`, \`TestStartPriorityDoesNotChangeSuiteMembership\` and the suite ordering and parsing tests pass.
-- Each regenerated suite fixture is a permutation of its original; no suite gained or lost a spec.
-- No live E2E run was executed for a label refresh.
-
-## Notes for the reviewer
-
-- The diff is limited to \`test/e2e/**/*.go\` and \`test/testdata/zz_fixture_TestMainListSuitesForEachSuite_*.txt\`.
-- Base commit: \`${base_sha}\`.
-- Job: ${job_url:-unknown}
-- Kindly review the priority deltas above; this pull request is never merged automatically.
-
----
-
-Generated by ${SCHEDULED_JOB} (build ${build_id}). Re-running the job while this pull request is open is a no-op.
-EOF
+"${RUNNER}" priorities-summary \
+    --report "${SCORES}" \
+    --changes "${CHANGES}" \
+    --note "Publication in progress." \
+    --output "${PRIVATE_DIR}/summary-before.html" \
+    --publication-body "${PRIVATE_DIR}/body.md" \
+    --job-name "${job_name}" \
+    --build-id "${build_id}" \
+    --job-url "${job_url}" \
+    --base-commit "${base_sha}" >/dev/null ||
+    error "cannot render the pull request body"
 
 # ---------------------------------------------------------------------------
 # Commit, push and publish through the test CLI
 # ---------------------------------------------------------------------------
-blocker=$(publication_blocker) || error "cannot re-evaluate the open pull request gate"
-if [[ -n "${blocker:-}" ]]; then
-    log "[info] not publishing: ${blocker}"
-    exit 0
-fi
-
 info "publishing the refresh"
 receipt=$("${RUNNER}" priorities-publish \
     --repo "${REPO_DIR}" \
     --base "${GITHUB_BASE_BRANCH}" \
     --head-repo "${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}" \
-    --branch "bot/test-priorities-${build_id}" \
+    --branch "${BOT_BRANCH_PREFIX}${build_id}" \
     --title "${TITLE}" \
     --body-file "${PRIVATE_DIR}/body.md" \
     --marker "${MARKER}" \
