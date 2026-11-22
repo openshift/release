@@ -480,6 +480,9 @@ classic_idp_windows="${SHARED_DIR}/classic-idp-phase-windows"
 # lets them be ordered as text further down.
 classic_idp_stamp='[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z'
 classic_idp_cap=64
+# The closed set the post step's parser accepts (its PHASES). A name outside it is dropped
+# there, so accepting it here only lets it take a slot of the cap; keep the two in step.
+classic_idp_phases='htpasswd_user_import idp_create idp_delete'
 classic_idp_raw="$(mktemp)" || classic_idp_raw=""
 if [[ -z "${classic_idp_raw}" ]]; then
   echo "WARNING: no scratch file; not publishing Classic IDP phase windows"
@@ -500,6 +503,55 @@ else
     if [[ -z "${classic_idp_unique}" ]]; then
       echo "WARNING: no scratch file; not publishing Classic IDP phase windows"
     else
+      # Validate before capping, not after. The shape filter fixes the form of a stamp,
+      # not its meaning, and the handoff seeded above never passed even that - so a record
+      # the consumer will throw away still takes a slot of the cap, and because the cap
+      # keeps the newest, enough of them evict the window that was usable. The consumer
+      # would then find nothing it can parse and tag every event phase_unavailable.
+      # Hold a record to what the consumer actually accepts: a known phase name, two real
+      # calendar instants, and an end not before the start.
+      classic_idp_valid="$(mktemp)" || classic_idp_valid=""
+      if [[ -n "${classic_idp_valid}" ]]; then
+        LC_ALL=C awk -v names="${classic_idp_phases}" '
+          BEGIN { split(names, allowed, " "); for (i in allowed) known[allowed[i]] = 1 }
+          function calendar(stamp,    y, m, d, hh, mm, ss, days) {
+            if (stamp !~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z$/)
+              return 0
+            y = substr(stamp, 1, 4) + 0; m = substr(stamp, 6, 2) + 0
+            d = substr(stamp, 9, 2) + 0; hh = substr(stamp, 12, 2) + 0
+            mm = substr(stamp, 15, 2) + 0; ss = substr(stamp, 18, 2) + 0
+            if (y < 1 || m < 1 || m > 12 || d < 1) return 0
+            if (hh > 23 || mm > 59 || ss > 60) return 0
+            days = 31
+            if (m == 4 || m == 6 || m == 9 || m == 11) days = 30
+            else if (m == 2) days = (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)) ? 29 : 28
+            return d <= days
+          }
+          NF != 3 || !($1 in known) || !calendar($2) || !calendar($3) { next }
+          # Both stamps are fixed-width now, so comparing them as text compares instants.
+          ($3 "") < ($2 "") { next }
+          { print }
+        ' "${classic_idp_raw}" > "${classic_idp_valid}" || true
+        classic_idp_before=$(wc -l < "${classic_idp_raw}" 2>/dev/null || echo 0)
+        classic_idp_after=$(wc -l < "${classic_idp_valid}" 2>/dev/null || echo 0)
+        if (( classic_idp_before > classic_idp_after )); then
+          echo "WARNING: rejected $(( classic_idp_before - classic_idp_after )) malformed Classic IDP phase window record(s)"
+        fi
+        mv -f "${classic_idp_valid}" "${classic_idp_raw}" || rm -f "${classic_idp_valid}"
+      else
+        # Without scratch the records cannot be validated. Publishing them unchecked is
+        # what this block exists to stop, so publish nothing and say why.
+        echo "WARNING: no scratch file; cannot validate Classic IDP phase windows, not publishing"
+        : > "${classic_idp_raw}"
+      fi
+    fi
+    if [[ ! -s "${classic_idp_raw}" ]]; then
+      # Nothing survived validation. Clear any handoff an earlier pass left behind rather
+      # than leaving records in SHARED_DIR that the post step would only reject again; an
+      # empty handoff reads as absent there, so it reports phase_windows unavailable.
+      echo "WARNING: no usable Classic IDP phase window records; not publishing"
+      [[ -e "${classic_idp_windows}" ]] && : > "${classic_idp_windows}"
+    elif [[ -n "${classic_idp_unique}" ]]; then
       LC_ALL=C sort -u "${classic_idp_raw}" > "${classic_idp_unique}" || true
       classic_idp_seen=$(wc -l < "${classic_idp_unique}" 2>/dev/null || echo 0)
       LC_ALL=C sort -k2,2 -k3,3 "${classic_idp_unique}" \
