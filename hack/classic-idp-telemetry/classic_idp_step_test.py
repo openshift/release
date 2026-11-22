@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -33,6 +34,21 @@ REPORT = "classic-idp-resync-events.json"
 
 # A Loki answer with no events, used wherever the response itself is not what is under test.
 EMPTY_RESPONSE = '{"status":"success","data":{"result":[]}}'
+
+
+def response_with_one_event(offset=0):
+    """A Loki answer carrying a single accepted resync event, so a test can see whether
+    the report attributes it to one cluster group or to several. The stamp is taken from
+    the clock because the step derives its own window from the job start time."""
+    stamp = (datetime.now(timezone.utc) - timedelta(seconds=60 - offset)).strftime(
+        "%Y-%m-%dT%H:%M:%S.%f") + "Z"
+    payload = {"schema": "rosa.classic.idp.resync/v1", "op": "lease_delete",
+               "outcome": "deleted", "flow": "secret_mapping", "toggle": "unavailable",
+               "toggle_reason": "not_present_in_build", "build": "0f1e2d3",
+               "invocation": stamp, "time": stamp, "attempt": 1}
+    line = "[ROSA CLASSIC IDP] " + json.dumps(payload)
+    return json.dumps({"status": "success",
+                       "data": {"result": [{"values": [["0", line]]}]}})
 
 # curl is called twice over: once without -o for the token, and once per query with -o. The
 # stub answers the token request on stdout and writes RESPONSE_BODY to the query's -o path,
@@ -75,6 +91,33 @@ case "$*" in
 esac
 if [[ -e "$MARKER_FILE" ]]; then printf '%s' "$RESPONSE_BODY" > "$out"; else : > "$out"; fi
 touch "$MARKER_FILE"
+exit 0
+"""
+
+# The first query answers with a body that is not exactly one JSON document.
+CURL_STUB_UNUSABLE_FIRST = r"""#!/bin/bash
+out=""; prev=""
+for arg in "$@"; do [[ "$prev" == "-o" ]] && out="$arg"; prev="$arg"; done
+if [[ -z "$out" ]]; then echo '{"access_token":"stub-token"}'; exit 0; fi
+case "$*" in
+  *"ROSA HCP"*) printf '%s' "$RESPONSE_BODY" > "$out"; exit 0 ;;
+esac
+if [[ -e "$MARKER_FILE" ]]; then printf '%s' "$RESPONSE_BODY" > "$out"
+else printf '%s' "   "; printf '%s' "   " > "$out"; fi
+touch "$MARKER_FILE"
+exit 0
+"""
+
+# Records every --max-time the step asks for, so a test can check the bound itself.
+CURL_STUB_RECORDING = r"""#!/bin/bash
+out=""; prev=""
+for arg in "$@"; do
+  [[ "$prev" == "-o" ]] && out="$arg"
+  [[ "$prev" == "--max-time" ]] && printf 'max-time\t%s\n' "$arg" >> "$ARGS_FILE"
+  prev="$arg"
+done
+if [[ -z "$out" ]]; then echo '{"access_token":"stub-token"}'; exit 0; fi
+printf '%s' "$RESPONSE_BODY" > "$out"
 exit 0
 """
 
@@ -217,6 +260,60 @@ class StepCase(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.report()["collection"]["status"], "partial")
 
+    def test_whitespace_only_response_body_is_treated_as_a_failed_query(self):
+        # `-s` tests size, not content. A body of blank space is merged, the parser skips
+        # the whitespace and yields no document, and nothing is counted - so the artifact
+        # reads no_events_in_window for an answer that never arrived.
+        self.selectors(CLUSTER_IDS[0])
+        result = self.run_step(response_body="  \n \t\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.report()["collection"]["status"], "query_failed")
+
+    def test_a_two_document_response_is_treated_as_a_failed_query(self):
+        # One selector, one cluster. A body carrying two complete documents is numbered as
+        # two cluster groups, so a single-cluster run is published as a two-cluster one.
+        self.selectors(CLUSTER_IDS[0])
+        body = response_with_one_event(0) + "\n" + response_with_one_event(2)
+        result = self.run_step(response_body=body)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = self.report()
+        self.assertEqual(report["collection"]["status"], "query_failed")
+        # The point of the guard: one selector must never be published as two clusters.
+        self.assertEqual(report["events"], [])
+        self.assertNotIn("cluster_group", json.dumps(report))
+
+    def test_one_unusable_response_among_several_is_partial_not_collected(self):
+        # A lost response must not discard the selectors that answered.
+        self.selectors(*CLUSTER_IDS[:2])
+        self.stub("curl", CURL_STUB_UNUSABLE_FIRST)
+        result = self.run_step()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.report()["collection"]["status"], "partial")
+
+    def test_a_valid_single_document_empty_response_stays_clean(self):
+        # The guard must not turn a genuine empty result into a failure.
+        self.selectors(CLUSTER_IDS[0])
+        result = self.run_step(response_body=EMPTY_RESPONSE + "\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        collection = self.report()["collection"]
+        self.assertEqual(collection["status"], "no_events_in_window")
+        self.assertEqual(collection["selector_coverage"], "complete")
+
+    def test_the_classic_query_is_bounded_by_the_per_query_timeout(self):
+        # Coverage for the existing bound: the budget test asserts the step reports
+        # exhaustion, but nothing looked at the argument actually handed to curl.
+        self.selectors(CLUSTER_IDS[0])
+        self.stub("curl", CURL_STUB_RECORDING)
+        result = self.run_step(ARGS_FILE=str(self.work / "curl-args"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        recorded = (self.work / "curl-args").read_text().splitlines()
+        bounds = [int(line.split("\t", 1)[1]) for line in recorded
+                  if line.startswith("max-time\t")]
+        self.assertTrue(bounds, recorded)
+        for seconds in bounds:
+            self.assertGreater(seconds, 0)
+            self.assertLessEqual(seconds, 120)
+
     def test_no_selector_still_reports_a_status(self):
         result = self.run_step()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -270,6 +367,101 @@ class PhaseWindowCase(unittest.TestCase):
         self.assertEqual([line for line in published if line in newest], newest,
                          "the cap discarded the newest windows")
         self.assertIn("keeping the newest", result.stdout)
+
+    def publish(self, found=(), already_published=()):
+        """Run the block over a found file and an existing SHARED_DIR handoff."""
+        work = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, work, True)
+        shared, output = work / "shared", work / "output" / "phase"
+        shared.mkdir()
+        output.mkdir(parents=True)
+        if already_published:
+            (shared / "classic-idp-phase-windows").write_text(
+                "".join(line + "\n" for line in already_published))
+        (output / "classic-idp-phase-windows").write_text(
+            "".join(line + "\n" for line in found))
+        runner = work / "block.sh"
+        runner.write_text(f'ocm_fvt_output="{work / "output"}"\n' + self.block)
+        result = subprocess.run(["bash", str(runner)], capture_output=True, text=True,
+                                env={**os.environ, "SHARED_DIR": str(shared)}, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        handoff = shared / "classic-idp-phase-windows"
+        published = handoff.read_text().splitlines() if handoff.is_file() else []
+        return published, result.stdout
+
+    def test_invalid_records_do_not_evict_valid_windows(self):
+        # The cap keeps the newest records, and a record is accepted on shape alone. So 64
+        # later-stamped records the consumer will throw away evict the one window it could
+        # have used, and every event ends up tagged phase_unavailable with nothing saying
+        # why. Validate before capping, not after.
+        valid = ("htpasswd_user_import 2026-11-11T07:00:00.000000Z "
+                 "2026-11-11T07:00:01.000000Z")
+        # Shape-legal but unusable: the end precedes the start, and the stamps are later.
+        reversed_later = [f"idp_create 2026-11-11T09:{m:02d}:05.000000Z "
+                          f"2026-11-11T09:{m:02d}:00.000000Z" for m in range(self.CAP)]
+        published, stdout = self.publish(found=[valid] + reversed_later)
+        self.assertIn(valid, published,
+                      "a valid window was capped away by records the consumer rejects")
+        self.assertEqual([line for line in published if line in reversed_later], [],
+                         "records whose end precedes their start were published")
+        self.assertIn("rejected", stdout)
+
+    def test_non_calendar_and_reversed_and_unknown_phase_records_are_rejected(self):
+        valid = "idp_delete 2026-11-11T07:00:00.000000Z 2026-11-11T07:00:01.000000Z"
+        bad = [
+            # Shape-legal, not a calendar instant.
+            "idp_create 2026-13-45T99:99:99.000000Z 2026-13-45T99:99:99.000000Z",
+            "idp_create 2026-02-30T07:00:00.000000Z 2026-02-30T07:00:01.000000Z",
+            "idp_create 2026-11-31T07:00:00.000000Z 2026-11-31T07:00:01.000000Z",
+            # End before start.
+            "idp_create 2026-11-11T08:00:05.000000Z 2026-11-11T08:00:00.000000Z",
+            # A phase name the consumer's closed set does not contain.
+            "sentinel_phase 2026-11-11T08:00:00.000000Z 2026-11-11T08:00:01.000000Z",
+        ]
+        published, stdout = self.publish(found=[valid] + bad)
+        self.assertEqual(published, [valid], published)
+        self.assertNotIn("sentinel_phase", "\n".join(published))
+        self.assertNotIn("sentinel_phase", stdout)
+        self.assertIn("rejected", stdout)
+
+    def test_a_zero_length_window_is_kept(self):
+        # load_phases keeps a window when hi >= lo, so an instantaneous phase is valid.
+        same = "idp_create 2026-11-11T07:00:00.000000Z 2026-11-11T07:00:00.000000Z"
+        published, _ = self.publish(found=[same])
+        self.assertEqual(published, [same])
+
+    def test_a_leap_day_is_a_calendar_date(self):
+        leap = "idp_create 2028-02-29T07:00:00.000000Z 2028-02-29T07:00:01.000000Z"
+        published, _ = self.publish(found=[leap])
+        self.assertEqual(published, [leap])
+
+    def test_previously_published_records_are_validated_too(self):
+        # SHARED_DIR is writable by every step in the job and the existing handoff is
+        # seeded straight into the merge without even the shape filter, so a record placed
+        # there reaches the cap unchecked.
+        valid = "idp_delete 2026-11-11T07:00:00.000000Z 2026-11-11T07:00:01.000000Z"
+        seeded_bad = [f"sentinel_phase 2026-11-11T09:{m:02d}:00.000000Z "
+                      f"2026-11-11T09:{m:02d}:01.000000Z" for m in range(self.CAP)]
+        published, stdout = self.publish(found=[valid], already_published=seeded_bad)
+        self.assertEqual(published, [valid], published)
+        self.assertNotIn("sentinel_phase", "\n".join(published))
+        self.assertNotIn("sentinel_phase", stdout)
+
+    def test_no_usable_record_clears_the_handoff_without_failing_the_step(self):
+        # Every record rejected. The step must not fail, and it must not leave records in
+        # SHARED_DIR that the post step would only reject again.
+        bad = ["sentinel_phase 2026-11-11T07:00:00.000000Z 2026-11-11T07:00:01.000000Z"]
+        stale = ["idp_create 2026-11-11T08:00:05.000000Z 2026-11-11T08:00:00.000000Z"]
+        published, stdout = self.publish(found=bad, already_published=stale)
+        self.assertEqual(published, [])
+        self.assertIn("no usable", stdout)
+        self.assertNotIn("sentinel_phase", stdout)
+
+    def test_chronological_order_of_valid_records_is_preserved(self):
+        windows = [f"idp_create 2026-11-11T07:{m:02d}:00.000000Z "
+                   f"2026-11-11T07:{m:02d}:01.000000Z" for m in (5, 1, 3)]
+        published, _ = self.publish(found=windows)
+        self.assertEqual(published, sorted(windows, key=lambda w: w.split()[1]))
 
 
 if __name__ == "__main__":
