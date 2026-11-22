@@ -277,13 +277,21 @@ fi
 # failing after budget wait (INTEROP-9723 fallback). Check before reading
 # SHARED_DIR so a readiness skip does not cause a missing-file exit without
 # a recorded failure.
-if ! oc get securedclusters.platform.stackrox.io --all-namespaces -o name 2>/dev/null | grep -q "securedclusters"; then
+# Capture first, then test for emptiness: `-o name` prints the lowercase
+# singular kind (`securedcluster.platform.stackrox.io/<name>`), so matching
+# the plural spelling skips every lane; the capture also keeps grep's SIGPIPE
+# out of the pipeline under pipefail and separates a failed read (recorded
+# failed row, fail-closed) from a 0-exit read that lists nothing (skip row).
+typeset _scList=""
+if ! _scList="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedclusters.platform.stackrox.io --all-namespaces -o name 2>/dev/null)"; then
+    _add_case "stackrox-opp-smoke" failed "Assertion" "SecuredCluster read failed after the terminal wait; absence not established"
+    exit 1
+fi
+if [[ -z "${_scList}" ]]; then
     _add_case "scanner-v4-ready" skipped "NoSecuredCluster" "no SecuredCluster in lane: scanner not evaluated"
     _add_case "stackrox-opp-smoke" skipped "NoSecuredCluster" "no SecuredCluster in lane: smoke not evaluated"
     exit 0
 fi
-
-
 # ---------------------------------------------------------------------------
 # Present: run the SMOKE suite (existing flow)
 # ---------------------------------------------------------------------------

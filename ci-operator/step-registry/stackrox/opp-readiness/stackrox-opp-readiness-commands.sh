@@ -674,13 +674,28 @@ if ! oc wait --for=create securedclusters.platform.stackrox.io --all --timeout=9
     echo "[readiness] SecuredCluster terminal wait: no SecuredCluster CR created within 900s" >&2
 fi
 if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs; then
-    _add_case "central-route" skipped "NoSecuredCluster" "no SecuredCluster in lane: central-route not evaluated (budget remaining $(_budget_remaining)s)"
-    _add_case "central-api-insecure-tls" skipped "NoSecuredCluster" "no SecuredCluster in lane: central-api not evaluated (budget remaining $(_budget_remaining)s)"
-    _add_case "clusters-connected" skipped "NoSecuredCluster" "no SecuredCluster in lane: clusters-connected not evaluated"
-    _add_case "policies-loaded" skipped "NoSecuredCluster" "no SecuredCluster in lane: policies-loaded not evaluated"
-    _add_case "sensor-ready" skipped "NoSecuredCluster" "no SecuredCluster in lane: sensor-ready not evaluated (budget remaining $(_budget_remaining)s)"
-    _add_case "stackrox-opp-readiness" skipped "NoSecuredCluster" "no SecuredCluster in lane: readiness assertions not evaluated (budget remaining $(_budget_remaining)s)"
-    exit 0
+    # DiscoverScNs fails both for a failed read and for a 0-exit read that
+    # yields no namespace: only the second is an absent workload. Re-read once
+    # to separate them, so an API error or an authorization denial stays a
+    # failure instead of a silent skip.
+    typeset _scList=""
+    if _scList="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedclusters.platform.stackrox.io --all-namespaces -o name 2>/dev/null)" \
+        && [[ -z "${_scList}" ]]; then
+        _add_case "central-route" skipped "NoSecuredCluster" "no SecuredCluster in lane: central-route not evaluated (budget remaining $(_budget_remaining)s)"
+        _add_case "central-api-insecure-tls" skipped "NoSecuredCluster" "no SecuredCluster in lane: central-api not evaluated (budget remaining $(_budget_remaining)s)"
+        _add_case "clusters-connected" skipped "NoSecuredCluster" "no SecuredCluster in lane: clusters-connected not evaluated"
+        _add_case "policies-loaded" skipped "NoSecuredCluster" "no SecuredCluster in lane: policies-loaded not evaluated"
+        _add_case "sensor-ready" skipped "NoSecuredCluster" "no SecuredCluster in lane: sensor-ready not evaluated (budget remaining $(_budget_remaining)s)"
+        _add_case "stackrox-opp-readiness" skipped "NoSecuredCluster" "no SecuredCluster in lane: readiness assertions not evaluated (budget remaining $(_budget_remaining)s)"
+        exit 0
+    fi
+    _add_case "central-route" skipped "StateAbsent" "securedcluster namespace discovery failed; route check not reached"
+    _add_case "central-api-insecure-tls" skipped "StateAbsent" "securedcluster namespace discovery failed"
+    _add_case "clusters-connected" skipped "StateAbsent" "securedcluster namespace discovery failed"
+    _add_case "policies-loaded" skipped "StateAbsent" "securedcluster namespace discovery failed"
+    _add_case "sensor-ready" failed "Assertion" "securedcluster namespace discovery failed (budget remaining $(_budget_remaining)s)"
+    _add_case "stackrox-opp-readiness" failed "Timeout" "SecuredCluster discovery timeout after 900s: securedcluster namespace discovery failed (budget remaining $(_budget_remaining)s)"
+    exit 1
 fi
 echo "[readiness] SecuredCluster namespace: ${scNs}"
 
