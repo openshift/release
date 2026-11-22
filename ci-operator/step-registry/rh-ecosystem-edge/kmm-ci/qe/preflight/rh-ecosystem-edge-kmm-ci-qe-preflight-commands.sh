@@ -8,38 +8,78 @@ mkdir -p "${preflight_dir}"
 timeout_seconds="${KMM_QE_PREFLIGHT_TIMEOUT_SECONDS:-900}"
 stable_period_seconds="${KMM_QE_PREFLIGHT_STABLE_PERIOD_SECONDS:-120}"
 poll_seconds="${KMM_QE_PREFLIGHT_POLL_SECONDS:-30}"
+diagnostic_budget_seconds="${KMM_QE_PREFLIGHT_DIAGNOSTIC_BUDGET_SECONDS:-120}"
+diagnostic_command_timeout_seconds="${KMM_QE_PREFLIGHT_DIAGNOSTIC_COMMAND_TIMEOUT_SECONDS:-30}"
+
+if ! command -v timeout >/dev/null 2>&1; then
+  echo "KMM preflight requires the timeout command for bounded diagnostics" >&2
+  exit 1
+fi
 
 collect_diagnostics() {
   local suffix="${1:-failure}"
+  local diagnostics_deadline=$(( $(date +%s) + diagnostic_budget_seconds ))
 
-  oc get clusteroperators -o yaml \
-    >"${preflight_dir}/clusteroperators-${suffix}.yaml" 2>&1 || true
-  oc get machineconfigpools -o yaml \
-    >"${preflight_dir}/machineconfigpools-${suffix}.yaml" 2>&1 || true
-  oc get nodes -o wide \
-    >"${preflight_dir}/nodes-${suffix}.txt" 2>&1 || true
-  oc get machineconfignodes -o yaml \
-    >"${preflight_dir}/machineconfignodes-${suffix}.yaml" 2>&1 || true
-  oc get events --all-namespaces --sort-by='.lastTimestamp' \
-    >"${preflight_dir}/events-${suffix}.txt" 2>&1 || true
+  run_diagnostic() {
+    local output="$1"
+    shift
+    local remaining=$(( diagnostics_deadline - $(date +%s) ))
+    local command_timeout="${diagnostic_command_timeout_seconds}"
 
-  oc get pods -n openshift-machine-config-operator -o wide \
-    >"${preflight_dir}/mco-pods-${suffix}.txt" 2>&1 || true
-  oc get pods -n openshift-machine-config-operator \
-    -l k8s-app=machine-config-daemon -o name 2>/dev/null |
-    while IFS= read -r pod; do
-      [[ -n "${pod}" ]] || continue
-      pod_name="${pod#pod/}"
-      oc describe "${pod}" -n openshift-machine-config-operator \
-        >"${preflight_dir}/${pod_name}-describe-${suffix}.txt" 2>&1 || true
+    if (( remaining <= 0 )); then
+      echo "Diagnostic budget exhausted before: $*" >"${output}"
+      return 0
+    fi
+    if (( command_timeout > remaining )); then
+      command_timeout="${remaining}"
+    fi
+
+    timeout --signal=TERM "${command_timeout}s" "$@" >"${output}" 2>&1 || true
+  }
+
+  run_diagnostic "${preflight_dir}/clusteroperators-${suffix}.yaml" \
+    oc get clusteroperators -o yaml
+  run_diagnostic "${preflight_dir}/machineconfigpools-${suffix}.yaml" \
+    oc get machineconfigpools -o yaml
+  run_diagnostic "${preflight_dir}/nodes-${suffix}.txt" \
+    oc get nodes -o wide
+  run_diagnostic "${preflight_dir}/machineconfignodes-${suffix}.yaml" \
+    oc get machineconfignodes -o yaml
+  run_diagnostic "${preflight_dir}/events-${suffix}.txt" \
+    oc get events --all-namespaces --sort-by='.lastTimestamp'
+
+  run_diagnostic "${preflight_dir}/mco-pods-${suffix}.txt" \
+    oc get pods -n openshift-machine-config-operator -o wide
+
+  local pod_names_file="${preflight_dir}/mco-pod-names-${suffix}.txt"
+  run_diagnostic "${pod_names_file}" \
+    oc get pods -n openshift-machine-config-operator \
+      -l k8s-app=machine-config-daemon -o name
+  while IFS= read -r pod; do
+    [[ -n "${pod}" ]] || continue
+    local pod_name
+    pod_name="${pod#pod/}"
+    run_diagnostic "${preflight_dir}/${pod_name}-describe-${suffix}.txt" \
+      oc describe "${pod}" -n openshift-machine-config-operator
+    run_diagnostic "${preflight_dir}/${pod_name}-logs-${suffix}.txt" \
       oc logs "${pod}" -n openshift-machine-config-operator \
-        --all-containers=true --tail=300 \
-        >"${preflight_dir}/${pod_name}-logs-${suffix}.txt" 2>&1 || true
-    done || true
+        --all-containers=true --tail=300
+  done <"${pod_names_file}"
+}
+
+remaining_seconds() {
+  local remaining=$(( deadline - $(date +%s) ))
+  if (( remaining < 1 )); then
+    echo 1
+  else
+    echo "${remaining}"
+  fi
 }
 
 cluster_operators_ready() {
-  oc get clusteroperators -o json | jq -e '
+  local request_timeout
+  request_timeout="$(remaining_seconds)"
+  oc --request-timeout="${request_timeout}s" get clusteroperators -o json | jq -e '
     (.items | length) > 0 and
     all(.items[];
       any(.status.conditions[]?; .type == "Available" and .status == "True") and
@@ -50,7 +90,9 @@ cluster_operators_ready() {
 }
 
 machine_config_pools_ready() {
-  oc get machineconfigpools -o json | jq -e '
+  local request_timeout
+  request_timeout="$(remaining_seconds)"
+  oc --request-timeout="${request_timeout}s" get machineconfigpools -o json | jq -e '
     (.items | length) > 0 and
     all(.items[];
       (.status.machineCount == .status.updatedMachineCount) and
@@ -64,7 +106,9 @@ machine_config_pools_ready() {
 }
 
 nodes_ready() {
-  oc get nodes -o json | jq -e '
+  local request_timeout
+  request_timeout="$(remaining_seconds)"
+  oc --request-timeout="${request_timeout}s" get nodes -o json | jq -e '
     (.items | length) > 0 and
     all(.items[];
       any(.status.conditions[]?; .type == "Ready" and .status == "True")
@@ -106,7 +150,12 @@ while (( $(date +%s) < deadline )); do
     fi
   fi
 
-  sleep "${poll_seconds}"
+  remaining="$(remaining_seconds)"
+  sleep_for="${poll_seconds}"
+  if (( sleep_for > remaining )); then
+    sleep_for="${remaining}"
+  fi
+  sleep "${sleep_for}"
 done
 
 echo "KMM preflight failed after ${timeout_seconds}s; cluster was not stable" >&2
