@@ -14,6 +14,13 @@ if [ "${MAP_TESTS}" = "true" ]; then
         trap '
             LP_IO__ET_PPP__NEW_TS_NAME="${LP_QE__CR__TS_NAME__PFX__ACM:+${LP_QE__CR__TS_NAME__PFX__ACM}--}%s" \
                 ExitTrap--PostProcessPrep
+            # Restore GRC canonical carriers after ExitTrap archives originals (INTEROP-9666)
+            if [[ -f "/tmp/junit_grc_backup.xml" ]]; then
+                cp "/tmp/junit_grc_backup.xml" "${ARTIFACT_DIR}/junit_grc.xml" 2>/dev/null || true
+            fi
+            if [[ -f "/tmp/junit_grc_placement_restore_backup.xml" ]]; then
+                cp "/tmp/junit_grc_placement_restore_backup.xml" "${ARTIFACT_DIR}/junit_grc_placement_restore.xml" 2>/dev/null || true
+            fi
         ' EXIT
     else
         echo "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping" >&2
@@ -242,18 +249,39 @@ except Exception:
     else
         echo "OPP label baseline unreadable; the post-suite restore will be skipped and reported as a failure"
     fi
+    # Preserve unscrubbed baseline for restore before scrubbing (keep private copy)
+    _opp_baseline_private="/tmp/opp_labels_baseline_private.json"
+    if [[ -f "${_OPP_EVIDENCE_DIR}/02-managedcluster-labels.json" ]]; then
+        cp "${_OPP_EVIDENCE_DIR}/02-managedcluster-labels.json" "${_opp_baseline_private}" 2>/dev/null || true
+    fi
     # Scrub the snapshot files (both passes) before they land in artifacts.
     # Tracing is already off in this section; keep it off for the suite run.
     for _opp_f in "${_OPP_EVIDENCE_DIR}"/*.json; do
         [[ -f "${_opp_f}" ]] || continue
         _opp_tmp="$(mktemp)"
+        typeset -i _opp_scrub_ok=1
         if [[ -n "${_secrets_pattern}" ]]; then
-            sed -E "s/${_secrets_pattern}/[REDACTED]/g" "${_opp_f}" > "${_opp_tmp}" || cp "${_opp_f}" "${_opp_tmp}"
+            if ! sed -E "s/${_secrets_pattern}/[REDACTED]/g" "${_opp_f}" > "${_opp_tmp}"; then
+                echo "ERROR: OPP evidence value scrub failed for ${_opp_f}" >&2
+                _opp_scrub_ok=0
+                rm -f "${_opp_tmp}"
+            fi
         else
             cp "${_opp_f}" "${_opp_tmp}"
         fi
-        _scrub_leaktk_patterns -i "${_opp_tmp}"
-        mv "${_opp_tmp}" "${_opp_f}"
+        if (( _opp_scrub_ok )); then
+            if ! _scrub_leaktk_patterns -i "${_opp_tmp}"; then
+                echo "ERROR: OPP evidence pattern scrub failed for ${_opp_f}" >&2
+                _opp_scrub_ok=0
+                rm -f "${_opp_tmp}"
+            fi
+        fi
+        if (( _opp_scrub_ok )); then
+            mv "${_opp_tmp}" "${_opp_f}"
+        else
+            rm -f "${_opp_tmp}"
+            echo "WARNING: scrub failed for ${_opp_f}; original retained" >&2
+        fi
     done
     echo "OPP snapshot taken: ${_OPP_POLICY_COUNT} OperatorPolicy objects; labels and placement state in ${_OPP_EVIDENCE_DIR}"
 else
@@ -312,43 +340,165 @@ cat "${_grc_scrubbed_log}"
 rm -f "${_grc_scrubbed_log}"
 set -x  # Re-enable tracing
 
-# Scrub cypress test results before copying to ARTIFACT_DIR
+# --- GRC JUnit carrier (INTEROP-9666) --------------------------------------
+# Flatten Cypress outputs into a single lowercase carrier with the canonical
+# suite name. Derive the canonical filename at write time (MPEX L24):
+# ${ARTIFACT_DIR}/junit_grc.xml with suite lp-interop--ACM--OPP--grc.
+# Collect every JUnit XML under test-output (both cypress/ and any
+# out-of-tree reporter), merge their <testcase> elements, and write once.
+# This removes the hash-shaped per-spec publish (junit_cypress-<hash>.xml)
+# and the capital-U jUnit.xml that the prow lens never discovers.
 set +x  # sed patterns reference escaped secret values
-find test-output/cypress -type f -print0 2>/dev/null | \
-    while IFS= read -r -d '' _cy; do
-        _cy_tmp="$(mktemp)"
-        # Pass 1: value-based scrub
-        if [[ -n "$_secrets_pattern" ]]; then
-            sed -E "s/${_secrets_pattern}/[REDACTED]/g" "$_cy" > "$_cy_tmp"
-        else
-            cp "$_cy" "$_cy_tmp"
+_grc_canonical_junit="${ARTIFACT_DIR}/junit_grc.xml"
+_grc_staging_unscrubbed="$(mktemp)"
+_grc_staging_scrubbed="$(mktemp)"
+typeset -i _grc_py_rc=0
+_GRC_STAGING_UNSCRUBBED="${_grc_staging_unscrubbed}" python3 <<'PYEOF_GRC' 2>&1 | sed 's/^/[grc-junit] /' || _grc_py_rc=$?
+import os, sys, pathlib, xml.etree.ElementTree as ET
+staging = os.environ.get("_GRC_STAGING_UNSCRUBBED", "/tmp/grc_staging_unscrubbed.xml")
+test_output_root = pathlib.Path("test-output")
+xml_files = []
+if test_output_root.is_dir():
+    for p in test_output_root.rglob("*.xml"):
+        if p.is_file():
+            xml_files.append(str(p))
+testcases = []
+suite_time = 0.0
+for xf in xml_files:
+    try:
+        tree = ET.parse(xf)
+        root = tree.getroot()
+        for tc in root.iter("testcase"):
+            if "classname" not in tc.attrib or not tc.attrib["classname"]:
+                tc.set("classname", "acm-tests-grc")
+            try:
+                suite_time += float(tc.get("time", "0") or 0)
+            except Exception:
+                pass
+            testcases.append(tc)
+        if root.tag == "testcase":
+            if "classname" not in root.attrib or not root.attrib["classname"]:
+                root.set("classname", "acm-tests-grc")
+            testcases.append(root)
+    except ET.ParseError:
+        continue
+    except Exception:
+        continue
+synthetic = False
+if not testcases:
+    synthetic = True
+    tc = ET.Element("testcase", {"classname": "acm-tests-grc", "name": "GRC Cypress JUnit not found", "time": "0"})
+    fail = ET.SubElement(tc, "failure", {"message": "no Cypress JUnit XML found under test-output"})
+    fail.text = "no JUnit XML discovered under test-output; expected Cypress reporter output"
+    testcases.append(tc)
+tests = len(testcases)
+failures = sum(1 for tc in testcases if tc.find("failure") is not None)
+errors = sum(1 for tc in testcases if tc.find("error") is not None)
+skipped = sum(1 for tc in testcases if tc.find("skipped") is not None)
+suite = ET.Element("testsuite", {
+    "name": "lp-interop--ACM--OPP--grc",
+    "tests": str(tests),
+    "failures": str(failures),
+    "errors": str(errors),
+    "skipped": str(skipped),
+    "time": str(suite_time)
+})
+for tc in testcases:
+    suite.append(tc)
+tree_out = ET.ElementTree(suite)
+try:
+    tree_out.write(staging, encoding="utf-8", xml_declaration=True)
+    print(f"wrote {staging} with {tests} testcases (failures={failures}) from {len(xml_files)} source files synthetic={synthetic}")
+    if synthetic:
+        pathlib.Path("/tmp/grc_synthetic_needed").touch()
+except Exception as e:
+    print(f"failed to write {staging}: {e}", file=sys.stderr)
+    sys.exit(1)
+PYEOF_GRC
+if (( _grc_py_rc != 0 )); then
+    echo "ERROR: GRC JUnit generator failed rc=${_grc_py_rc}" >&2
+    if [[ "${_test_rc}" -eq 0 ]]; then
+        _test_rc=1
+    fi
+fi
+# Stage outside ARTIFACT_DIR, publish only after scrub succeeds
+typeset -i _grc_scrub_ok=1
+if [[ -f "${_grc_staging_unscrubbed}" ]]; then
+    if [[ -n "${_secrets_pattern}" ]]; then
+        # XML-aware value scrub: redact only text and attribute values, not tag names
+        if ! _GRC_SECRETS_PATTERN="${_secrets_pattern}" _GRC_STAGING_UNSCRUBBED="${_grc_staging_unscrubbed}" _GRC_STAGING_SCRUBBED="${_grc_staging_scrubbed}" python3 <<'PYEOF_SCRUB' 2>&1 | sed 's/^/[grc-scrub] /'; then
+import os, re, pathlib, xml.etree.ElementTree as ET
+pat = os.environ.get("_GRC_SECRETS_PATTERN", "")
+src = os.environ.get("_GRC_STAGING_UNSCRUBBED", "")
+dst = os.environ.get("_GRC_STAGING_SCRUBBED", "")
+if not pat:
+    raise SystemExit(0)
+try:
+    rx = re.compile(pat)
+except re.error as e:
+    print(f"secret pattern compile failed: {e}", file=sys.stderr)
+    raise SystemExit(1)
+try:
+    tree = ET.parse(src)
+    root = tree.getroot()
+    for el in root.iter():
+        for k in list(el.attrib.keys()):
+            v = el.attrib[k]
+            nv = rx.sub("[REDACTED]", v)
+            if nv != v:
+                el.set(k, nv)
+        if el.text:
+            el.text = rx.sub("[REDACTED]", el.text)
+        if el.tail:
+            el.tail = rx.sub("[REDACTED]", el.tail)
+    tree.write(dst, encoding="utf-8", xml_declaration=True)
+except Exception as e:
+    print(f"value scrub failed: {e}", file=sys.stderr)
+    raise SystemExit(1)
+PYEOF_SCRUB
+            echo "ERROR: GRC value-based scrub failed for ${_grc_staging_unscrubbed}" >&2
+            _grc_scrub_ok=0
+            if [[ "${_test_rc}" -eq 0 ]]; then
+                _test_rc=1
+            fi
         fi
-        # Pass 2: pattern-based scrub
-        _scrub_leaktk_patterns -i "$_cy_tmp"
-        _cy_rel="${_cy#test-output/}"
-        mkdir -p "$ARTIFACT_DIR/$(dirname "$_cy_rel")"
-        cp "$_cy_tmp" "$ARTIFACT_DIR/$_cy_rel"
-        rm -f "$_cy_tmp"
-    done
-set -x
-
-# Broaden JUnit/XML collection: search for any XML result files that may live
-# outside the cypress/ subtree (e.g. mocha, jest, or custom reporters).
-set +x  # sed patterns reference escaped secret values
-find test-output -name '*.xml' -not -path 'test-output/cypress/*' -print0 2>/dev/null | \
-    while IFS= read -r -d '' _xml; do
-        _xml_tmp="$(mktemp)"
-        # Pass 1: value-based scrub
-        if [[ -n "$_secrets_pattern" ]]; then
-            sed -E "s/${_secrets_pattern}/[REDACTED]/g" "$_xml" > "$_xml_tmp"
-        else
-            cp "$_xml" "$_xml_tmp"
+    else
+        cp "${_grc_staging_unscrubbed}" "${_grc_staging_scrubbed}"
+    fi
+    if (( _grc_scrub_ok )); then
+        if ! _scrub_leaktk_patterns -i "${_grc_staging_scrubbed}"; then
+            echo "ERROR: GRC pattern scrub failed for ${_grc_staging_scrubbed}" >&2
+            _grc_scrub_ok=0
+            if [[ "${_test_rc}" -eq 0 ]]; then
+                _test_rc=1
+            fi
         fi
-        # Pass 2: pattern-based scrub
-        _scrub_leaktk_patterns -i "$_xml_tmp"
-        cp --backup=numbered "$_xml_tmp" "$ARTIFACT_DIR/$(basename "$_xml")"
-        rm -f "$_xml_tmp"
-    done
+    fi
+    if (( _grc_scrub_ok )); then
+        mv "${_grc_staging_scrubbed}" "${_grc_canonical_junit}"
+        cp "${_grc_canonical_junit}" "/tmp/junit_grc_backup.xml" 2>/dev/null || true
+        if [[ -f "/tmp/grc_synthetic_needed" ]]; then
+            rm -f "/tmp/grc_synthetic_needed"
+            if [[ "${_test_rc}" -eq 0 ]]; then
+                _test_rc=1
+            fi
+            echo "GRC JUnit synthetic failure emitted; marking _test_rc=1" >&2
+        fi
+    else
+        echo "ERROR: GRC JUnit scrub failed; not publishing unscrubbed carrier" >&2
+        rm -f "${_grc_staging_scrubbed}" "${_grc_staging_unscrubbed}"
+        if [[ "${_test_rc}" -eq 0 ]]; then
+            _test_rc=1
+        fi
+    fi
+    rm -f "${_grc_staging_unscrubbed}"
+else
+    echo "ERROR: GRC canonical staging not created at ${_grc_staging_unscrubbed}" >&2
+    if [[ "${_test_rc}" -eq 0 ]]; then
+        _test_rc=1
+    fi
+    rm -f "${_grc_staging_scrubbed}"
+fi
 set -x
 
 # --- OPP placement restore and assert (INTEROP-9711) ----------------------
@@ -371,34 +521,108 @@ if [[ "${_OPP_ACTIVE}" -eq 1 || "${_OPP_QUERY_FAILED}" -eq 1 ]]; then
     {
         echo "=== OPP label restore $(date -u '+%Y-%m-%dT%H:%M:%SZ') ==="
         for _opp_key in "${_OPP_LABEL_KEYS[@]}"; do
+            _opp_baseline_src="${_opp_baseline_private:-${_OPP_EVIDENCE_DIR}/02-managedcluster-labels.json}"
+            [[ -f "${_opp_baseline_src}" ]] || _opp_baseline_src="${_OPP_EVIDENCE_DIR}/02-managedcluster-labels.json"
             _opp_pre="$(python3 -c '
 import json, sys
 try:
     d = json.load(open(sys.argv[1]))
-    v = d.get("labels", {}).get(sys.argv[2])
-    print(v if v is not None else "")
+    labels = d.get("labels", {})
+    if sys.argv[2] not in labels:
+        print("<absent>")
+    else:
+        v = labels.get(sys.argv[2])
+        print(v if v is not None else "")
 except Exception:
-    print("")
-' "${_OPP_EVIDENCE_DIR}/02-managedcluster-labels.json" "${_opp_key}")"
+    print("<absent>")
+' "${_opp_baseline_src}" "${_opp_key}")"
             _opp_cur="$(oc get managedcluster "${_OPP_MC_NAME}" -o json 2>/dev/null | python3 -c '
 import json, sys
 try:
     d = json.load(sys.stdin)
-    v = d["metadata"].get("labels", {}).get(sys.argv[1])
-    print(v if v is not None else "")
+    labels = d["metadata"].get("labels", {})
+    if sys.argv[1] not in labels:
+        print("<absent>")
+    else:
+        v = labels.get(sys.argv[1])
+        print(v if v is not None else "")
 except Exception:
-    print("")
+    print("<absent>")
 ' "${_opp_key}")"
             if [[ "${_opp_pre}" != "${_opp_cur}" ]]; then
                 echo "restoring label ${_opp_key}: '${_opp_cur}' -> '${_opp_pre}'"
-                if [[ -z "${_opp_pre}" ]]; then
-                    oc label managedclusters "${_OPP_MC_NAME}" "${_opp_key}-" --overwrite 2>&1 || true
+                if [[ "${_opp_pre}" == "<absent>" ]]; then
+                    # Baseline had no label: delete if present
+                    if [[ "${_opp_cur}" != "<absent>" ]]; then
+                        typeset -i _opp_label_rc=0
+                        for _opp_try_label in 1 2 3; do
+                            oc label managedclusters "${_OPP_MC_NAME}" "${_opp_key}-" --overwrite 2>&1 && break
+                            _opp_label_rc=$?
+                            sleep 2
+                        done
+                        (( _opp_label_rc == 0 )) || echo "WARNING: failed to delete label ${_opp_key} after 3 attempts" >&2
+                    fi
                 else
-                    oc label managedclusters "${_OPP_MC_NAME}" "${_opp_key}=${_opp_pre}" --overwrite 2>&1 || true
+                    # Baseline had value (may be empty): restore with value
+                    typeset -i _opp_label_rc=0
+                    for _opp_try_label in 1 2 3; do
+                        if [[ -z "${_opp_pre}" ]]; then
+                            oc label managedclusters "${_OPP_MC_NAME}" "${_opp_key}=" --overwrite 2>&1 && break
+                        else
+                            oc label managedclusters "${_OPP_MC_NAME}" "${_opp_key}=${_opp_pre}" --overwrite 2>&1 && break
+                        fi
+                        _opp_label_rc=$?
+                        sleep 2
+                    done
+                    (( _opp_label_rc == 0 )) || echo "WARNING: failed to restore label ${_opp_key} after 3 attempts" >&2
                 fi
             fi
         done
     } > "${_OPP_EVIDENCE_DIR}/04-label-restore.log" 2>&1
+    fi
+    # Verify label restoration independently of placement (finding 1)
+    typeset -i _opp_restore_ok=1
+    if [[ "${_OPP_BASELINE_OK}" -eq 1 ]]; then
+        for _opp_key in "${_OPP_LABEL_KEYS[@]}"; do
+            _opp_baseline_src="${_opp_baseline_private:-${_OPP_EVIDENCE_DIR}/02-managedcluster-labels.json}"
+            [[ -f "${_opp_baseline_src}" ]] || _opp_baseline_src="${_OPP_EVIDENCE_DIR}/02-managedcluster-labels.json"
+            _opp_verify_pre="$(python3 -c '
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    labels = d.get("labels", {})
+    if sys.argv[2] not in labels:
+        print("<absent>")
+    else:
+        v = labels.get(sys.argv[2])
+        print(v if v is not None else "")
+except Exception:
+    print("<absent>")
+' "${_opp_baseline_src}" "${_opp_key}")"
+            _opp_verify_cur="$(oc get managedcluster "${_OPP_MC_NAME}" -o json 2>/dev/null | python3 -c '
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    labels = d["metadata"].get("labels", {})
+    if sys.argv[1] not in labels:
+        print("<absent>")
+    else:
+        v = labels.get(sys.argv[1])
+        print(v if v is not None else "")
+except Exception:
+    print("<absent>")
+' "${_opp_key}")"
+            if [[ "${_opp_verify_pre}" != "${_opp_verify_cur}" ]]; then
+                echo "ERROR: label ${_opp_key} restore verification failed: expected '${_opp_verify_pre}' got '${_opp_verify_cur}'" >&2
+                echo "label ${_opp_key} mismatch: expected '${_opp_verify_pre}' got '${_opp_verify_cur}'" >> "${_OPP_EVIDENCE_DIR}/04-label-restore.log" 2>&1 || true
+                _opp_restore_ok=0
+            fi
+        done
+        if (( _opp_restore_ok == 0 )); then
+            echo "OPP label restore verification FAILED" >&2
+        fi
+    else
+        _opp_restore_ok=0
     fi
 
     # Wait (bounded, up to 5 minutes) for the placement to re-select
@@ -476,11 +700,12 @@ print(json.dumps(result, indent=2))
         _opp_inv_ok=1
     fi
     typeset -i _opp_base_ok="${_OPP_BASELINE_OK}"
-    typeset -i _opp_failures=$(( (1 - _opp_inv_ok) + (1 - _opp_sel) + (1 - _opp_base_ok) ))
+    typeset -i _opp_failures=$(( (1 - _opp_inv_ok) + (1 - _opp_sel) + (1 - _opp_base_ok) + (1 - _opp_restore_ok) ))
     _opp_junit="${ARTIFACT_DIR}/junit_grc_placement_restore.xml"
+    set +x
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"grc-placement-restore\" tests=\"3\" failures=\"${_opp_failures}\">"
+        echo "<testsuite name=\"lp-interop--ACM--OPP--grc-placement-restore\" tests=\"4\" failures=\"${_opp_failures}\">"
         echo "  <testcase classname=\"grc-placement-restore\" name=\"operatorpolicy-inventory-nonempty\">"
         if [[ "${_opp_inv_ok}" -ne 1 ]]; then
             if [[ "${_OPP_QUERY_FAILED}" -eq 1 ]]; then
@@ -500,8 +725,15 @@ print(json.dumps(result, indent=2))
             echo "    <failure message=\"$(_opp_xesc "placement ${_OPP_PLACEMENT_NAME} does not select ${_OPP_MC_NAME} after the GRC suite; see 04-label-restore.log, 05-placement-status-post.json and 06-placementdecisions-post.json in this step artifacts")\"></failure>"
         fi
         echo "  </testcase>"
+        echo "  <testcase classname=\"grc-placement-restore\" name=\"label-restore-verified\">"
+        if [[ "${_opp_restore_ok}" -ne 1 ]]; then
+            echo "    <failure message=\"$(_opp_xesc "label restore verification failed; see 04-label-restore.log")\"></failure>"
+        fi
+        echo "  </testcase>"
         echo "</testsuite>"
     } > "${_opp_junit}"
+    set -x
+    cp "${_opp_junit}" "/tmp/junit_grc_placement_restore_backup.xml" 2>/dev/null || true
     if [[ "${_opp_failures}" -gt 0 ]]; then
         echo "OPP placement checks FAILED; see ${_opp_junit}" >&2
         if [[ "${_test_rc}" -eq 0 ]]; then
