@@ -3029,6 +3029,111 @@ tests:
     test:
     - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: metal-ds-ipi-ovn-metal3-api-customnoupgrade-f999
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        FEATURE_SET=CustomNoUpgrade
+        FEATURE_GATES=BareMetalHostV1Beta1=true,MetalHostClaimsAPI=true
+    test:
+    - as: verify-metal3-apis
+      commands: |
+        set -euo pipefail
+        export LC_ALL=C
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        mkdir -p "${ARTIFACT_DIR}"
+        MIN_VERSION="5.1.0-0.nightly-2026-11-20-143715"
+        version="$(oc get clusterversion version -o jsonpath='{.status.desired.version}')"
+        feature_set="$(oc get featuregate cluster -o jsonpath='{.spec.featureSet}')"
+        echo "payload=${version}"
+        echo "featureSet=${feature_set:-<empty>}"
+        oc get featuregate cluster -o yaml | tee "${ARTIFACT_DIR}/featuregate.yaml"
+        oc get crd -o name | grep metal3.io | tee "${ARTIFACT_DIR}/metal3-crds.txt" || true
+        [[ "${version}" == "${MIN_VERSION}" || "${version}" > "${MIN_VERSION}" ]] || { echo "payload ${version} is older than ${MIN_VERSION}"; exit 1; }
+        [[ "${feature_set}" == "CustomNoUpgrade" ]] || { echo "expected CustomNoUpgrade, got ${feature_set:-<empty>}"; exit 1; }
+        enabled="$(oc get featuregate cluster -o jsonpath='{range .spec.customNoUpgrade.enabled[*]}{.}{"\n"}{end}')"
+        echo "${enabled}" | grep -qx "BareMetalHostV1Beta1"
+        echo "${enabled}" | grep -qx "MetalHostClaimsAPI"
+        bmh="$(oc get crd baremetalhosts.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
+        hd="$(oc get crd hardwaredata.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
+        echo "${bmh}" | tee "${ARTIFACT_DIR}/baremetalhosts.versions"
+        echo "${hd}" | tee "${ARTIFACT_DIR}/hardwaredata.versions"
+        echo "${bmh}" | grep -qx "v1alpha1:served=true:storage=true"
+        echo "${bmh}" | grep -qx "v1beta1:served=true:storage=false"
+        echo "${hd}" | grep -qx "v1alpha1:served=true:storage=true"
+        echo "${hd}" | grep -qx "v1beta1:served=true:storage=false"
+        oc get crd hostclaims.metal3.io hostdeploypolicies.metal3.io
+        hc="$(oc get crd hostclaims.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
+        hdp="$(oc get crd hostdeploypolicies.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
+        echo "${hc}" | tee "${ARTIFACT_DIR}/hostclaims.versions"
+        echo "${hdp}" | tee "${ARTIFACT_DIR}/hostdeploypolicies.versions"
+        echo "${hc}" | grep -qx "v1alpha1:served=true:storage=true"
+        echo "${hdp}" | grep -qx "v1alpha1:served=true:storage=true"
+        for crd in hostfirmwaresettings.metal3.io hostfirmwarecomponents.metal3.io firmwareschemas.metal3.io preprovisioningimages.metal3.io bmceventsubscriptions.metal3.io dataimages.metal3.io hostupdatepolicies.metal3.io baremetalswitches.metal3.io hostnetworkattachments.metal3.io; do
+          oc get "crd/${crd}" >/dev/null
+        done
+        echo "PASS metal3 APIs are served with the feature gates enabled"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+- as: metal-ds-ipi-ovn-metal3-api-default-f999
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+    test:
+    - as: verify-metal3-apis
+      commands: |
+        set -euo pipefail
+        export LC_ALL=C
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        mkdir -p "${ARTIFACT_DIR}"
+        MIN_VERSION="5.1.0-0.nightly-2026-11-20-143715"
+        version="$(oc get clusterversion version -o jsonpath='{.status.desired.version}')"
+        feature_set="$(oc get featuregate cluster -o jsonpath='{.spec.featureSet}')"
+        echo "payload=${version}"
+        echo "featureSet=${feature_set:-<empty>}"
+        oc get featuregate cluster -o yaml | tee "${ARTIFACT_DIR}/featuregate.yaml"
+        oc get crd -o name | grep metal3.io | tee "${ARTIFACT_DIR}/metal3-crds.txt" || true
+        [[ "${version}" == "${MIN_VERSION}" || "${version}" > "${MIN_VERSION}" ]] || { echo "payload ${version} is older than ${MIN_VERSION}"; exit 1; }
+        [[ -z "${feature_set}" || "${feature_set}" == "Default" ]] || { echo "expected the default feature set, got ${feature_set}"; exit 1; }
+        disabled="$(oc get featuregate cluster -o jsonpath='{range .status.featureGates[*].disabled[*]}{.name}{"\n"}{end}')"
+        echo "${disabled}" | grep -qx "BareMetalHostV1Beta1"
+        echo "${disabled}" | grep -qx "MetalHostClaimsAPI"
+        bmh="$(oc get crd baremetalhosts.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
+        hd="$(oc get crd hardwaredata.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
+        echo "${bmh}" | tee "${ARTIFACT_DIR}/baremetalhosts.versions"
+        echo "${hd}" | tee "${ARTIFACT_DIR}/hardwaredata.versions"
+        echo "${bmh}" | grep -qx "v1alpha1:served=true:storage=true"
+        if echo "${bmh}" | grep -q "v1beta1"; then echo "BareMetalHost v1beta1 is served"; exit 1; fi
+        echo "${hd}" | grep -qx "v1alpha1:served=true:storage=true"
+        if echo "${hd}" | grep -q "v1beta1"; then echo "HardwareData v1beta1 is served"; exit 1; fi
+        if oc get crd hostclaims.metal3.io >/dev/null 2>&1; then echo "hostclaims.metal3.io is installed"; exit 1; fi
+        if oc get crd hostdeploypolicies.metal3.io >/dev/null 2>&1; then echo "hostdeploypolicies.metal3.io is installed"; exit 1; fi
+        for crd in hostfirmwaresettings.metal3.io hostfirmwarecomponents.metal3.io firmwareschemas.metal3.io preprovisioningimages.metal3.io bmceventsubscriptions.metal3.io dataimages.metal3.io hostupdatepolicies.metal3.io baremetalswitches.metal3.io hostnetworkattachments.metal3.io; do
+          oc get "crd/${crd}" >/dev/null
+        done
+        echo "PASS metal3 APIs are hidden on the default feature set"
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
 - as: metal-ds-ipi-ovn-ipv4-fips-f14
   capabilities:
   - intranet
@@ -4243,127 +4348,6 @@ tests:
     test:
     - chain: openshift-e2e-test-mco-qe-longrun
     workflow: cucushift-installer-rehearse-vsphere-upi-zones
-- as: metal-ipi-ovn-vmedia-metal3-api-customnoupgrade-f999
-  capabilities:
-  - intranet
-  cron: 0 0 31 2 *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AUX_HOST: openshift-qe-metal-ci.ocp.eng.rdu2.dc.redhat.com
-      FEATURE_GATES: '["BareMetalHostV1Beta1=true", "MetalHostClaimsAPI=true"]'
-      FEATURE_SET: CustomNoUpgrade
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      masters: "3"
-      workers: "2"
-    test:
-    - as: verify-metal3-apis
-      commands: |
-        hold_lab() {
-          echo "Holding the lab cluster for 3 hours so you can log in"
-          sleep 10800
-        }
-        trap hold_lab EXIT
-        set -euo pipefail
-        export LC_ALL=C
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-        mkdir -p "${ARTIFACT_DIR}"
-        MIN_VERSION="5.1.0-0.nightly-2026-11-20-143715"
-        version="$(oc get clusterversion version -o jsonpath='{.status.desired.version}')"
-        feature_set="$(oc get featuregate cluster -o jsonpath='{.spec.featureSet}')"
-        echo "payload=${version}"
-        echo "featureSet=${feature_set:-<empty>}"
-        oc get featuregate cluster -o yaml | tee "${ARTIFACT_DIR}/featuregate.yaml"
-        oc get crd -o name | grep metal3.io | tee "${ARTIFACT_DIR}/metal3-crds.txt" || true
-        [[ "${version}" == "${MIN_VERSION}" || "${version}" > "${MIN_VERSION}" ]] || { echo "payload ${version} is older than ${MIN_VERSION}"; exit 1; }
-        [[ "${feature_set}" == "CustomNoUpgrade" ]] || { echo "expected CustomNoUpgrade, got ${feature_set:-<empty>}"; exit 1; }
-        enabled="$(oc get featuregate cluster -o jsonpath='{range .spec.customNoUpgrade.enabled[*]}{.}{"\n"}{end}')"
-        echo "${enabled}" | grep -qx "BareMetalHostV1Beta1"
-        echo "${enabled}" | grep -qx "MetalHostClaimsAPI"
-        bmh="$(oc get crd baremetalhosts.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
-        hd="$(oc get crd hardwaredata.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
-        echo "${bmh}" | tee "${ARTIFACT_DIR}/baremetalhosts.versions"
-        echo "${hd}" | tee "${ARTIFACT_DIR}/hardwaredata.versions"
-        echo "${bmh}" | grep -qx "v1alpha1:served=true:storage=true"
-        echo "${bmh}" | grep -qx "v1beta1:served=true:storage=false"
-        echo "${hd}" | grep -qx "v1alpha1:served=true:storage=true"
-        echo "${hd}" | grep -qx "v1beta1:served=true:storage=false"
-        oc get crd hostclaims.metal3.io hostdeploypolicies.metal3.io
-        hc="$(oc get crd hostclaims.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
-        hdp="$(oc get crd hostdeploypolicies.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
-        echo "${hc}" | tee "${ARTIFACT_DIR}/hostclaims.versions"
-        echo "${hdp}" | tee "${ARTIFACT_DIR}/hostdeploypolicies.versions"
-        echo "${hc}" | grep -qx "v1alpha1:served=true:storage=true"
-        echo "${hdp}" | grep -qx "v1alpha1:served=true:storage=true"
-        for crd in hostfirmwaresettings.metal3.io hostfirmwarecomponents.metal3.io firmwareschemas.metal3.io preprovisioningimages.metal3.io bmceventsubscriptions.metal3.io dataimages.metal3.io hostupdatepolicies.metal3.io baremetalswitches.metal3.io hostnetworkattachments.metal3.io; do
-          oc get "crd/${crd}" >/dev/null
-        done
-        echo "PASS metal3 APIs are served with the feature gates enabled"
-      from: cli
-      grace_period: 1m0s
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: baremetal-lab-ipi-virtual-media
-- as: metal-ipi-ovn-vmedia-metal3-api-default-f999
-  capabilities:
-  - intranet
-  cron: 0 0 31 2 *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      AUX_HOST: openshift-qe-metal-ci.ocp.eng.rdu2.dc.redhat.com
-      RESERVE_BOOTSTRAP: "false"
-      architecture: amd64
-      masters: "3"
-      workers: "2"
-    test:
-    - as: verify-metal3-apis
-      commands: |
-        hold_lab() {
-          echo "Holding the lab cluster for 3 hours so you can log in"
-          sleep 10800
-        }
-        trap hold_lab EXIT
-        set -euo pipefail
-        export LC_ALL=C
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-        mkdir -p "${ARTIFACT_DIR}"
-        MIN_VERSION="5.1.0-0.nightly-2026-11-20-143715"
-        version="$(oc get clusterversion version -o jsonpath='{.status.desired.version}')"
-        feature_set="$(oc get featuregate cluster -o jsonpath='{.spec.featureSet}')"
-        echo "payload=${version}"
-        echo "featureSet=${feature_set:-<empty>}"
-        oc get featuregate cluster -o yaml | tee "${ARTIFACT_DIR}/featuregate.yaml"
-        oc get crd -o name | grep metal3.io | tee "${ARTIFACT_DIR}/metal3-crds.txt" || true
-        [[ "${version}" == "${MIN_VERSION}" || "${version}" > "${MIN_VERSION}" ]] || { echo "payload ${version} is older than ${MIN_VERSION}"; exit 1; }
-        [[ -z "${feature_set}" || "${feature_set}" == "Default" ]] || { echo "expected the default feature set, got ${feature_set}"; exit 1; }
-        disabled="$(oc get featuregate cluster -o jsonpath='{range .status.featureGates[*].disabled[*]}{.name}{"\n"}{end}')"
-        echo "${disabled}" | grep -qx "BareMetalHostV1Beta1"
-        echo "${disabled}" | grep -qx "MetalHostClaimsAPI"
-        bmh="$(oc get crd baremetalhosts.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
-        hd="$(oc get crd hardwaredata.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
-        echo "${bmh}" | tee "${ARTIFACT_DIR}/baremetalhosts.versions"
-        echo "${hd}" | tee "${ARTIFACT_DIR}/hardwaredata.versions"
-        echo "${bmh}" | grep -qx "v1alpha1:served=true:storage=true"
-        if echo "${bmh}" | grep -q "v1beta1"; then echo "BareMetalHost v1beta1 is served"; exit 1; fi
-        echo "${hd}" | grep -qx "v1alpha1:served=true:storage=true"
-        if echo "${hd}" | grep -q "v1beta1"; then echo "HardwareData v1beta1 is served"; exit 1; fi
-        if oc get crd hostclaims.metal3.io >/dev/null 2>&1; then echo "hostclaims.metal3.io is installed"; exit 1; fi
-        if oc get crd hostdeploypolicies.metal3.io >/dev/null 2>&1; then echo "hostdeploypolicies.metal3.io is installed"; exit 1; fi
-        for crd in hostfirmwaresettings.metal3.io hostfirmwarecomponents.metal3.io firmwareschemas.metal3.io preprovisioningimages.metal3.io bmceventsubscriptions.metal3.io dataimages.metal3.io hostupdatepolicies.metal3.io baremetalswitches.metal3.io hostnetworkattachments.metal3.io; do
-          oc get "crd/${crd}" >/dev/null
-        done
-        echo "PASS metal3 APIs are hidden on the default feature set"
-      from: cli
-      grace_period: 1m0s
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: baremetal-lab-ipi-virtual-media
 - as: metal-ipi-ovn-vmedia-disk-encryption-f7
   capabilities:
   - intranet
