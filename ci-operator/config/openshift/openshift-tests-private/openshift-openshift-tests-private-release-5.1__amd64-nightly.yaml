@@ -3057,11 +3057,10 @@ tests:
         oc get crd -o name | grep metal3.io | tee "${ARTIFACT_DIR}/metal3-crds.txt" || true
         [[ "${version}" == "${MIN_VERSION}" || "${version}" > "${MIN_VERSION}" ]] || { echo "payload ${version} is older than ${MIN_VERSION}"; exit 1; }
         [[ "${feature_set}" == "CustomNoUpgrade" ]] || { echo "expected CustomNoUpgrade, got ${feature_set:-<empty>}"; exit 1; }
-        enabled="$(oc get featuregate cluster -o jsonpath='{range .spec.customNoUpgrade.enabled[*]}{.}{"\n"}{end}')"
-        echo "enabled gates:"
-        printf '%s\n' "${enabled}"
-        grep -qx "BareMetalHostV1Beta1" <<< "${enabled}" || { echo "FAIL BareMetalHostV1Beta1 is not enabled"; exit 1; }
-        grep -qx "MetalHostClaimsAPI" <<< "${enabled}" || { echo "FAIL MetalHostClaimsAPI is not enabled"; exit 1; }
+        enabled="$(oc get featuregate cluster -o jsonpath='{.spec.customNoUpgrade.enabled}')"
+        echo "enabled gates: ${enabled}"
+        grep -q '"BareMetalHostV1Beta1"' <<< "${enabled}" || { echo "FAIL BareMetalHostV1Beta1 is not enabled"; exit 1; }
+        grep -q '"MetalHostClaimsAPI"' <<< "${enabled}" || { echo "FAIL MetalHostClaimsAPI is not enabled"; exit 1; }
         bmh="$(oc get crd baremetalhosts.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
         hd="$(oc get crd hardwaredata.metal3.io -o jsonpath='{range .spec.versions[*]}{.name}{":served="}{.served}{":storage="}{.storage}{"\n"}{end}')"
         echo "baremetalhosts:"
