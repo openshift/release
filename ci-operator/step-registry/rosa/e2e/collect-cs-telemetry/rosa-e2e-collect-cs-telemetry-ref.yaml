@@ -104,9 +104,46 @@ ref:
     artifact, and the query response and selectors stay in a scratch
     directory outside ARTIFACT_DIR that is removed on every exit path.
 
-    The collection status is always explicit, so absence is never read as
-    evidence that a resync did not run: collected, no_events_in_window,
-    truncated (a result set that filled the query limit, so the list may
-    be incomplete), partial (at least one selector query failed),
-    query_failed, parse_failed, token_unavailable, or
-    selector_unavailable.
+    One query is made per identifier, up to a fixed cap on how many
+    identifiers are queried. When the run had more than that, the extra
+    ones are not queried and selector_coverage reports truncated, so an
+    identifier that was never queried cannot be mistaken for one that
+    emitted no events. Separately, the whole query phase has a deadline
+    well inside the step timeout: once too little of it remains to be
+    worth starting a query, the remaining queries are skipped and the
+    report says so, because a step killed on its timeout writes no report
+    at all.
+
+    The collection object always carries the same four keys:
+
+      status             one of the values below
+      phase_windows      present, unavailable, or unknown when no parse ran
+      selector_coverage  complete, truncated when the cap excluded a
+                         cluster identifier, or unknown when the
+                         identifiers were never gathered
+      result_coverage    complete, truncated when a result set filled the
+                         query limit, or unknown when no parse ran
+
+    The status is always explicit, so absence is never read as evidence
+    that a resync did not run:
+
+      collected             events were collected and nothing was lost
+      no_events_in_window   a valid, complete response carried no events
+      truncated             nothing was lost, but the list may still be
+                            incomplete: see selector_coverage and
+                            result_coverage for which bound applied
+      partial               something was lost: a selector query failed,
+                            returned an empty body, or was skipped; a
+                            response was unusable; the merged responses
+                            could not be read; or an event was rejected.
+                            Events outside the window are an expected
+                            discard and do not make a collection partial.
+                            A loss outranks a bound, so partial is
+                            reported even when a bound also applied.
+      query_failed          no selector query produced a usable response
+      parse_failed          the responses could not be parsed
+      token_unavailable     no RHOBS token, so nothing was queried
+      selector_unavailable  no cluster identifier to scope a query to
+      scratch_unavailable   no scratch directory, so the response could
+                            not be held outside ARTIFACT_DIR and nothing
+                            was queried

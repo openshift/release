@@ -7,8 +7,10 @@ script on its own and does not mount this repository. So rather than testing a c
 tests extract the parser from the shipped script and run it exactly as the step does, so a
 change to the script that breaks the contract fails here.
 
-The ci/prow/classic-idp-parser presubmit runs these on any change to this directory or to the
-step whose parser they extract; /test classic-idp-parser reruns it.
+classic_idp_step_test.py alongside this module covers the shell around the parser.
+
+The ci/prow/classic-idp-parser presubmit runs both suites on any change to this directory or
+to the steps they exercise; /test classic-idp-parser reruns it.
 
 Run with:
     make test-classic-idp-parser
@@ -107,7 +109,7 @@ class ParserCase(unittest.TestCase):  # pylint: disable=too-many-public-methods
         cls._work.cleanup()
 
     def run_parser(self, lines, phases=(), query_ok="true", truncated="false",
-                   documents=None, start=START, end=END):
+                   documents=None, start=START, end=END, selector_coverage="complete"):
         """Run the shipped parser over Loki documents and return (report, raw text)."""
         work = Path(tempfile.mkdtemp(dir=self._work.name))
         merged, phase_file, out = work / "merged.json", work / "phases", work / "report.json"
@@ -117,7 +119,7 @@ class ParserCase(unittest.TestCase):  # pylint: disable=too-many-public-methods
         phase_file.write_text("".join(f"{n} {a} {b}\n" for n, a, b in phases))
         result = subprocess.run(
             [sys.executable, "-I", str(self.parser), str(merged), str(phase_file), str(out),
-             str(start), str(end), query_ok, truncated],
+             str(start), str(end), query_ok, truncated, selector_coverage],
             capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         text = out.read_text()
@@ -188,8 +190,129 @@ class ParserCase(unittest.TestCase):  # pylint: disable=too-many-public-methods
                 report, text = self.run_parser([line])
                 self.assertEqual(report["events"], [], bucket)
                 self.assertEqual(report["rejected"][bucket], 1, report["rejected"])
+                # A dropped in-window event is data this report does not have. Only the
+                # window filter discarding an event from outside the job is expected, so
+                # only that one may leave the status reading as a clean empty result.
+                expected = "no_events_in_window" if bucket == "out_of_window" else "partial"
+                self.assertEqual(report["collection"]["status"], expected, bucket)
                 for sentinel in SENTINELS:
                     self.assertNotIn(sentinel, text)
+
+    def test_unhashable_enum_values_are_rejected_not_fatal(self):
+        # A payload field is whatever the line carried. Testing set membership on a list
+        # raises TypeError, which would abort the parse and discard every valid event in
+        # the same response - the step then reports parse_failed for one bad line.
+        good = event(time=LATER)
+        for field, bucket in [("op", "unknown_op"), ("outcome", "unknown_outcome"),
+                              ("flow", "unknown_flow"), ("toggle", "unknown_toggle"),
+                              ("toggle_reason", "unknown_toggle")]:
+            for value in ([], {}, 7):
+                with self.subTest(field=field, value=str(value)):
+                    report, _ = self.run_parser([event(**{field: value}), good])
+                    self.assertEqual(len(report["events"]), 1, report["rejected"])
+                    self.assertEqual(report["rejected"][bucket], 1, report["rejected"])
+                    self.assertEqual(report["collection"]["status"], "partial")
+
+    def test_out_of_window_alone_is_not_partial(self):
+        report, _ = self.run_parser([event(time=OUT_OF_WINDOW), event()])
+        self.assertEqual(len(report["events"]), 1)
+        self.assertEqual(report["rejected"]["out_of_window"], 1)
+        self.assertEqual(report["collection"]["status"], "collected")
+
+    # ---- response validity ----------------------------------------------------------
+    def test_error_envelope_is_not_a_clean_empty_result(self):
+        # A 200 carrying a backend error has no data at all. Reporting that as
+        # no_events_in_window would read as "the resync did not run".
+        report, _ = self.run_parser(
+            [], documents=[{"status": "error", "error": "backend unavailable"}])
+        self.assertEqual(report["events"], [])
+        self.assertEqual(report["rejected"]["invalid_response"], 1)
+        self.assertEqual(report["collection"]["status"], "partial")
+
+    def test_invalid_result_shapes_are_counted_not_silently_empty(self):
+        for document in ({"data": None}, {"data": "nope"}, {"data": {}},
+                         {"data": {"result": "nope"}}, {"data": {"result": {}}}, [],
+                         {"status": "error", "data": {"result": []}}):
+            with self.subTest(document=str(document)[:40]):
+                report, _ = self.run_parser([], documents=[document])
+                self.assertEqual(report["events"], [])
+                self.assertEqual(report["rejected"]["invalid_response"], 1, report["rejected"])
+                self.assertEqual(report["collection"]["status"], "partial")
+
+    def test_a_valid_empty_response_still_reports_no_events(self):
+        for document in ({"data": {"result": []}},
+                         {"status": "success", "data": {"result": []}}):
+            with self.subTest(document=str(document)[:40]):
+                report, _ = self.run_parser([], documents=[document])
+                self.assertEqual(sum(report["rejected"].values()), 0, report["rejected"])
+                self.assertEqual(report["collection"]["status"], "no_events_in_window")
+
+    def test_a_non_list_values_is_counted_not_fatal(self):
+        # The envelope check stops at data.result; this is one level further in. Iterating
+        # a scalar raises TypeError, which would end the parse and throw away the valid
+        # events of every other selector along with this stream.
+        good = {"data": {"result": [{"values": [["0", event()]]}]}}
+        for values in (5, True, 1.5, "nope", {"0": "x"}, None):
+            with self.subTest(values=str(values)):
+                report, _ = self.run_parser(
+                    [], documents=[{"data": {"result": [{"values": values}]}}, good])
+                self.assertEqual(len(report["events"]), 1, report)
+                if values is None:
+                    # An absent values list is an empty stream, not a malformed one.
+                    self.assertEqual(sum(report["rejected"].values()), 0, report["rejected"])
+                    self.assertEqual(report["collection"]["status"], "collected")
+                else:
+                    self.assertEqual(report["rejected"]["unparsable_envelope"], 1,
+                                     report["rejected"])
+                    self.assertEqual(report["collection"]["status"], "partial")
+
+    def test_one_invalid_response_does_not_discard_the_others(self):
+        report, _ = self.run_parser(
+            [], documents=[{"status": "error", "error": "backend unavailable"},
+                           {"data": {"result": [{"values": [["0", event()]]}]}}])
+        self.assertEqual(len(report["events"]), 1, report)
+        self.assertEqual(report["rejected"]["invalid_response"], 1)
+        self.assertEqual(report["collection"]["status"], "partial")
+
+    # ---- selector coverage ----------------------------------------------------------
+    def test_selector_truncation_is_reported(self):
+        # More cluster ids than the step can query: an id that was never queried must not
+        # be indistinguishable from one that emitted nothing.
+        report, _ = self.run_parser([], selector_coverage="truncated")
+        self.assertEqual(report["collection"]["selector_coverage"], "truncated")
+        self.assertEqual(report["collection"]["status"], "truncated")
+        collected, _ = self.run_parser([event()], selector_coverage="truncated")
+        self.assertEqual(collected["collection"]["status"], "truncated")
+        self.assertEqual(len(collected["events"]), 1)
+
+    def test_selector_coverage_is_recorded_when_complete(self):
+        report, _ = self.run_parser([event()])
+        self.assertEqual(report["collection"]["selector_coverage"], "complete")
+        self.assertEqual(report["collection"]["result_coverage"], "complete")
+        self.assertEqual(report["collection"]["status"], "collected")
+
+    def test_a_loss_outranks_a_bound(self):
+        # Hitting the selector cap and losing a query is the expected combination: more
+        # than eight cluster ids is what causes both. "The list may be incomplete" must
+        # not be reported in place of "something was lost".
+        for kwargs in ({"selector_coverage": "truncated", "query_ok": "false"},
+                       {"truncated": "true", "query_ok": "false"},
+                       {"selector_coverage": "truncated", "truncated": "true",
+                        "query_ok": "false"}):
+            with self.subTest(**kwargs):
+                report, _ = self.run_parser([event()], **kwargs)
+                self.assertEqual(report["collection"]["status"], "partial", kwargs)
+        # The bound stays readable whichever status won.
+        report, _ = self.run_parser([event()], selector_coverage="truncated",
+                                    truncated="true", query_ok="false")
+        self.assertEqual(report["collection"]["selector_coverage"], "truncated")
+        self.assertEqual(report["collection"]["result_coverage"], "truncated")
+
+    def test_a_loss_inside_the_window_also_outranks_a_bound(self):
+        report, _ = self.run_parser([event(op="delete_everything")],
+                                    selector_coverage="truncated")
+        self.assertEqual(report["rejected"]["unknown_op"], 1)
+        self.assertEqual(report["collection"]["status"], "partial")
 
     # ---- build shape ----------------------------------------------------------------
     def test_build_shape_does_not_claim_git_provenance(self):
@@ -252,7 +375,7 @@ class ParserCase(unittest.TestCase):  # pylint: disable=too-many-public-methods
         phase_file.write_text("")
         result = subprocess.run(
             [sys.executable, "-I", str(self.parser), str(merged), str(phase_file), str(out),
-             str(START), str(END), "true", "false"], capture_output=True, text=True,
+             str(START), str(END), "true", "false", "false"], capture_output=True, text=True,
             check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
         report = json.loads(out.read_text())
@@ -350,22 +473,30 @@ class ParserCase(unittest.TestCase):  # pylint: disable=too-many-public-methods
 
     # ---- malformed inputs -----------------------------------------------------------
     def test_malformed_documents_do_not_crash_the_step(self):
+        # Nothing here is a usable answer, so none of it may be reported as a collection
+        # that found no events.
         for document in ([], {"data": None}, {"data": {"result": [None]}},
                          {"data": {"result": [{"values": [["only-one"], [], ["0", 1], ["0", None]]}]}}):
             with self.subTest(document=str(document)[:40]):
                 report, _ = self.run_parser([], documents=[document])
                 self.assertEqual(report["events"], [])
+                self.assertEqual(report["collection"]["status"], "partial", report["rejected"])
 
-    def test_unreadable_merged_file_is_not_fatal(self):
+    def test_unreadable_merged_file_is_reported_partial(self):
+        # The step could not read back any response at all. An empty event list on its own
+        # would read as "no resync ran", so the failure is counted and reported.
         work = Path(tempfile.mkdtemp(dir=self._work.name))
         out = work / "report.json"
         (work / "phases").write_text("")
         result = subprocess.run(
             [sys.executable, "-I", str(self.parser), str(work / "absent.json"),
-             str(work / "phases"), str(out), str(START), str(END), "true", "false"],
+             str(work / "phases"), str(out), str(START), str(END), "true", "false", "false"],
             capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(out.read_text())["events"], [])
+        report = json.loads(out.read_text())
+        self.assertEqual(report["events"], [])
+        self.assertEqual(report["rejected"]["unreadable_input"], 1)
+        self.assertEqual(report["collection"]["status"], "partial")
 
     # ---- artifact field allowlist ---------------------------------------------------
     def test_artifact_fields_are_allowlisted(self):

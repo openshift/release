@@ -55,7 +55,12 @@ CLASSIC_REPORT="${ARTIFACT_DIR}/classic-idp-resync-events.json"
 # must never be under ARTIFACT_DIR. Without one there is nowhere safe to put them and Classic
 # collection is skipped rather than degraded.
 CLASSIC_WORK="$(mktemp -d)" || CLASSIC_WORK=""
-classic_cleanup() { [[ -n "${CLASSIC_WORK}" ]] && rm -rf "${CLASSIC_WORK}"; }
+# The explicit success keeps the EXIT trap from turning "there was no scratch to remove"
+# into a non-zero exit status for the whole step.
+classic_cleanup() {
+  [[ -n "${CLASSIC_WORK}" ]] && rm -rf "${CLASSIC_WORK}"
+  return 0
+}
 trap classic_cleanup EXIT INT TERM
 
 # Collect the run's cluster identifiers using the same SHARED_DIR convention as
@@ -66,45 +71,90 @@ if [[ -z "$CLASSIC_WORK" ]]; then
   CLASSIC_SKIP=true
 fi
 
-CLASSIC_SELECTORS="${CLASSIC_WORK:-/dev/null}/selectors"
-[[ "$CLASSIC_SKIP" == "true" ]] || : > "$CLASSIC_SELECTORS"
-
 # Bounded sanitized phase windows written by the test step, if it ran. Each line is an enum
 # and two timestamps, which is what lets an event be attributed to the import under test
-# rather than to any other write in the same job. Absent is reported, never guessed.
+# rather than to any other write in the same job. Absent is reported, never guessed. The
+# stand-in for an absent handoff lives in scratch: with no scratch there is nowhere to put
+# one, and a root-level path would turn a missing handoff into a failed step.
 CLASSIC_PHASES="${SHARED_DIR}/classic-idp-phase-windows"
-if [[ ! -s "$CLASSIC_PHASES" ]]; then
-  CLASSIC_PHASES="${CLASSIC_WORK}/no-phases"
-  : > "$CLASSIC_PHASES"
-fi
-for candidate in "${SHARED_DIR}/cluster-id" "${SHARED_DIR}/ocm-fvt-cluster-ids"; do
-  if [[ -s "$candidate" ]]; then
-    # Only values shaped like a cluster id, and a bounded number of them: each one costs a
-    # query inside the step's timeout.
-    grep -oE '[a-z0-9]{20,40}' < "$candidate" >> "$CLASSIC_SELECTORS" || true
-  fi
-done
+# At most this many cluster ids are queried: each one costs a query inside the step's timeout.
+CLASSIC_SELECTOR_CAP=8
+CLASSIC_SELECTORS=""
+# complete, truncated, or unknown when the selectors were never gathered. Reported either
+# way: "no cluster id was excluded" and "we never looked" are different statements.
+CLASSIC_SELECTOR_COVERAGE=unknown
+# Everything below needs scratch to hold the selectors and the raw responses, so it is all
+# skipped together rather than half-done.
 if [[ "$CLASSIC_SKIP" != "true" ]]; then
-  sort -u "$CLASSIC_SELECTORS" | head -8 > "${CLASSIC_WORK}/selectors.bounded" || true
-  mv "${CLASSIC_WORK}/selectors.bounded" "$CLASSIC_SELECTORS" || true
+  CLASSIC_SELECTORS="${CLASSIC_WORK}/selectors"
+  : > "$CLASSIC_SELECTORS"
+  if [[ ! -s "$CLASSIC_PHASES" ]]; then
+    CLASSIC_PHASES="${CLASSIC_WORK}/no-phases"
+    : > "$CLASSIC_PHASES"
+  fi
+  for candidate in "${SHARED_DIR}/cluster-id" "${SHARED_DIR}/ocm-fvt-cluster-ids"; do
+    if [[ -s "$candidate" ]]; then
+      # Only values shaped like a cluster id.
+      grep -oE '[a-z0-9]{20,40}' < "$candidate" >> "$CLASSIC_SELECTORS" || true
+    fi
+  done
+  LC_ALL=C sort -u "$CLASSIC_SELECTORS" > "${CLASSIC_WORK}/selectors.unique" || true
+  # An id the cap excludes is still an id that may have emitted events, so a report that
+  # dropped one must not read as "no resync ran": the exclusion is published. The fallback
+  # keeps a scratch write that failed from ending the step here, with no report at all.
+  CLASSIC_SELECTORS_SEEN=$(wc -l < "${CLASSIC_WORK}/selectors.unique" 2>/dev/null || echo 0)
+  CLASSIC_SELECTOR_COVERAGE=complete
+  if (( CLASSIC_SELECTORS_SEEN > CLASSIC_SELECTOR_CAP )); then
+    CLASSIC_SELECTOR_COVERAGE=truncated
+    echo "WARNING: ${CLASSIC_SELECTORS_SEEN} cluster id(s) found, querying the first ${CLASSIC_SELECTOR_CAP}"
+  fi
+  head -n "${CLASSIC_SELECTOR_CAP}" "${CLASSIC_WORK}/selectors.unique" > "$CLASSIC_SELECTORS" || true
+  rm -f "${CLASSIC_WORK}/selectors.unique"
 fi
 
+# A report written without a query having been parsed. It still carries the coverage
+# fields, so a consumer reads the same keys whatever the status.
 classic_report_only() {
-  python3 - "$CLASSIC_REPORT" "$1" "$START_TIME" "$END_TIME" <<'PYEOF'
+  python3 - "$CLASSIC_REPORT" "$1" "$START_TIME" "$END_TIME" "$CLASSIC_SELECTOR_COVERAGE" <<'PYEOF'
 import json, sys
 from datetime import datetime, timezone
 path, status, start_ts, end_ts = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
+coverage = sys.argv[5]
 iso = lambda t: datetime.fromtimestamp(t, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 with open(path, "w") as handle:
     json.dump({"schema": "rosa.classic.idp.resync.report/v1",
                "window": {"start": iso(start_ts), "end": iso(end_ts)},
-               "collection": {"status": status},
+               # Nothing was parsed, so the handoff was never read and the result set
+               # never existed: unknown, not a claim that either was absent.
+               "collection": {"status": status,
+                              "phase_windows": "unknown",
+                              "selector_coverage": coverage,
+                              "result_coverage": "unknown"},
                "events": [], "rejected": {}, "anomalies": {}}, handle, indent=2)
 PYEOF
   echo "  Classic IDP resync: ${1}, wrote ${CLASSIC_REPORT}"
 }
 
-TOKEN=$(curl -sf -X POST "$ISSUER_URL" \
+# The step is given 10m. One HCP query plus up to CLASSIC_SELECTOR_CAP Classic queries of
+# QUERY_TIMEOUT each can exceed that, and a step killed on its timeout writes no report at
+# all - which the documented contract says must never be mistaken for "no resync ran". So
+# bound the whole query phase, leaving the remainder of the step for parsing and writing.
+QUERY_TIMEOUT=120
+QUERY_BUDGET=480
+# Below this there is no point starting a query: it would be reported as a failure that
+# says nothing about the backend. Report the budget instead.
+QUERY_MINIMUM=15
+QUERY_DEADLINE=$(( $(date +%s) + QUERY_BUDGET ))
+# Seconds a query may take: what is left of the budget, capped at the per-query timeout.
+# Fails when too little is left to be worth starting one.
+query_seconds() {
+  local remaining=$(( QUERY_DEADLINE - $(date +%s) ))
+  (( remaining >= QUERY_MINIMUM )) || return 1
+  (( remaining < QUERY_TIMEOUT )) && { echo "$remaining"; return 0; }
+  echo "$QUERY_TIMEOUT"
+}
+
+TOKEN=$(curl -sf --max-time 60 -X POST "$ISSUER_URL" \
     -d "grant_type=client_credentials" \
     -d "client_id=$CLIENT_ID" \
     -d "client_secret=$CLIENT_SECRET" | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])" 2>/dev/null) || {
@@ -117,8 +167,15 @@ QUERY="{k8s_namespace_name=\"${CS_NAMESPACE}\"} |= \"[ROSA HCP -\""
 
 RAW_FILE="${ARTIFACT_DIR}/cs-telemetry-raw.json"
 HCP_QUERY_OK=true
+HCP_PARSE_OK=true
 
-if ! curl -sf --max-time 120 \
+if ! HCP_MAX_TIME="$(query_seconds)"; then
+  echo "WARNING: query budget exhausted before the HCP query, skipping it"
+  HCP_QUERY_OK=false
+  HCP_MAX_TIME=0
+fi
+
+if [[ "$HCP_QUERY_OK" == "true" ]] && ! curl -sf --max-time "$HCP_MAX_TIME" \
     -H "Authorization: Bearer $TOKEN" \
     --data-urlencode "query=$QUERY" \
     --data-urlencode "start=${START_TIME}000000000" \
@@ -131,8 +188,11 @@ if ! curl -sf --max-time 120 \
   HCP_QUERY_OK=false
 fi
 
+# A 200 with a body this parser cannot read makes it exit non-zero. Under errexit that would
+# end the step here, before any Classic query or report - the same way a failed HCP query used
+# to. Handle it like one: record it and carry on to the Classic path.
 if [[ "$HCP_QUERY_OK" == "true" ]]; then
-python3 - "$RAW_FILE" "$CS_NAMESPACE" "$START_TIME" "$END_TIME" "$RHOBS_ENV" > "${ARTIFACT_DIR}/cs-telemetry.log" <<'PYEOF'
+if ! python3 - "$RAW_FILE" "$CS_NAMESPACE" "$START_TIME" "$END_TIME" "$RHOBS_ENV" > "${ARTIFACT_DIR}/cs-telemetry.log" <<'PYEOF'
 import sys, json, re
 from datetime import datetime, timezone
 from collections import defaultdict
@@ -243,19 +303,31 @@ if not entries:
 
 print("=" * 80)
 PYEOF
+then
+  echo "WARNING: HCP telemetry parse failed, continuing to Classic IDP collection"
+  HCP_PARSE_OK=false
+  # The log file holds whatever the parser managed to print before it stopped. Say so in
+  # the artifact itself: a reader of the file alone would otherwise take it for complete.
+  echo "ERROR: this report is incomplete - the parser failed partway through" \
+    >> "${ARTIFACT_DIR}/cs-telemetry.log"
+fi
+fi
 
-EVENT_COUNT=$(python3 -c "
+if [[ "$HCP_QUERY_OK" == "true" && "$HCP_PARSE_OK" == "true" ]]; then
+  EVENT_COUNT=$(python3 -c "
 import json
 d=json.load(open('${ARTIFACT_DIR}/cs-telemetry-raw.json'))
 print(sum(len(r.get('values',[])) for r in d.get('data',{}).get('result',[])))
 " 2>/dev/null || echo "?")
 
-echo "  Events collected: $EVENT_COUNT"
-echo "  Output: ${ARTIFACT_DIR}/cs-telemetry.log"
+  echo "  Events collected: $EVENT_COUNT"
+  echo "  Output: ${ARTIFACT_DIR}/cs-telemetry.log"
 fi
 
 if [[ "$CLASSIC_SKIP" == "true" ]]; then
-  echo "  Classic IDP resync: skipped, no scratch directory"
+  # The report needs no scratch, only ARTIFACT_DIR, so the explicit-status contract still
+  # holds here: a consumer must be able to tell this apart from the step never having run.
+  classic_report_only "scratch_unavailable"
 elif [[ ! -s "$CLASSIC_SELECTORS" ]]; then
   # No identifier to select on. Reported explicitly: an empty event list without
   # this status would read as "the resync did not happen".
@@ -271,7 +343,14 @@ else
   while IFS= read -r selector; do
     [[ -n "$selector" ]] || continue
     CLASSIC_QUERY="{k8s_namespace_name=\"${CS_NAMESPACE}\"} |= \"[ROSA CLASSIC IDP]\" |= \"[cid='${selector}']\""
-    if ! curl -sf --max-time 120 \
+    if ! CLASSIC_MAX_TIME="$(query_seconds)"; then
+      # Out of budget. Skipping is what lets the report still be written: a step killed on
+      # its timeout writes nothing at all.
+      echo "WARNING: query budget exhausted, skipping remaining Classic selector(s)"
+      CLASSIC_QUERY_OK=false
+      break
+    fi
+    if ! curl -sf --max-time "$CLASSIC_MAX_TIME" \
         -H "Authorization: Bearer $TOKEN" \
         --data-urlencode "query=$CLASSIC_QUERY" \
         --data-urlencode "start=${START_TIME}000000000" \
@@ -280,6 +359,14 @@ else
         --data-urlencode "direction=forward" \
         -G "$LOKI_BASE/query_range" \
         -o "${CLASSIC_WORK}/sel.json" 2>/dev/null; then
+      CLASSIC_QUERY_OK=false
+      continue
+    fi
+    if [[ ! -s "${CLASSIC_WORK}/sel.json" ]]; then
+      # curl is satisfied by a 204, or by a 200 a proxy emptied. The parser would see no
+      # document at all and have nothing to count, so an empty body would read as "no
+      # events" rather than as the answer that never arrived. Treat it as a failed query.
+      echo "WARNING: empty Classic query response, treating as a failed query"
       CLASSIC_QUERY_OK=false
       continue
     fi
@@ -305,7 +392,8 @@ except Exception:
     classic_report_only "query_failed"
   else
     if ! python3 - "${CLASSIC_WORK}/merged.json" "$CLASSIC_PHASES" "$CLASSIC_REPORT" \
-        "$START_TIME" "$END_TIME" "$CLASSIC_QUERY_OK" "$CLASSIC_TRUNCATED" <<'PYEOF'
+        "$START_TIME" "$END_TIME" "$CLASSIC_QUERY_OK" "$CLASSIC_TRUNCATED" \
+        "$CLASSIC_SELECTOR_COVERAGE" <<'PYEOF'
 # classic-idp-resync-parser: hack/classic-idp-telemetry/classic_idp_parser_test.py locates
 # this block by the marker above; keep them in step.
 import json, re, sys
@@ -315,6 +403,10 @@ merged_path, phases_path, out_path = sys.argv[1], sys.argv[2], sys.argv[3]
 start_ts, end_ts = int(sys.argv[4]), int(sys.argv[5])
 query_ok = sys.argv[6] == "true"
 truncated = sys.argv[7] == "true"
+# complete, truncated, or unknown. The step queries a bounded number of cluster ids; when
+# the run had more, the ones left out may have emitted events, so the list cannot be
+# presented as the whole of them.
+selector_coverage = sys.argv[8]
 
 TAG = "[ROSA CLASSIC IDP]"
 EVENT_SCHEMA = "rosa.classic.idp.resync/v1"
@@ -341,8 +433,11 @@ rejected = {k: 0 for k in ("unparsable_envelope", "unwrap_failed", "undecodable_
                            "unknown_outcome", "unknown_flow", "unknown_toggle",
                            "invalid_time", "out_of_window", "invalid_generation",
                            "invalid_attempt", "oversize_line", "unknown_phase",
-                           "malformed_document")}
+                           "malformed_document", "invalid_response", "unreadable_input")}
 anomalies = {"build_not_recorded": 0}
+# Rejections that are the collection working as intended rather than data lost: an event
+# outside the job's own window is meant to be discarded.
+EXPECTED_REJECTIONS = frozenset(("out_of_window",))
 
 
 def iso(epoch):
@@ -422,12 +517,22 @@ def build_shape(build):
     return build, "git_object_name"
 
 
+def enum_ok(value, allowed):
+    """Membership in a closed set, without assuming the value can be hashed. A payload field
+    is whatever the line carried: a list or a dict there would raise TypeError and take the
+    whole response down with it, discarding the valid events alongside it."""
+    return isinstance(value, str) and value in allowed
+
+
 def documents(path):
     """The merged file holds one JSON document per query. Decode them in sequence."""
     try:
         with open(path) as handle:
             text = handle.read()
     except OSError:
+        # Nothing could be read at all. Counted, so the report is partial rather than an
+        # empty list that reads as "no resync ran".
+        rejected["unreadable_input"] += 1
         return
     decoder, index, length = json.JSONDecoder(), 0, len(text)
     while index < length:
@@ -459,15 +564,37 @@ events = []
 # an empty response, or one that was not a JSON object at all - leave no gap and cannot
 # make a single-cluster run look like a multi-cluster one.
 for group, telemetry in enumerate(documents(merged_path)):
+    # A 200 is not by itself a usable answer: Loki reports a backend failure in the body, and
+    # a log pipeline may return something else entirely. An unusable response is counted, so
+    # that a report with no events says the query failed rather than that nothing happened.
     if not isinstance(telemetry, dict):
+        rejected["invalid_response"] += 1
+        continue
+    if telemetry.get("status") not in (None, "success"):
+        rejected["invalid_response"] += 1
         continue
     data = telemetry.get("data")
-    streams = (data.get("result") if isinstance(data, dict) else None) or []
+    if not isinstance(data, dict):
+        rejected["invalid_response"] += 1
+        continue
+    streams = data.get("result")
+    if not isinstance(streams, list):
+        rejected["invalid_response"] += 1
+        continue
     for stream in streams:
         if not isinstance(stream, dict):
             rejected["unparsable_envelope"] += 1
             continue
-        for entry in stream.get("values") or []:
+        entries = stream.get("values")
+        if entries is None:
+            continue
+        if not isinstance(entries, list):
+            # Anything else here is not iterable, or iterates into something unexpected.
+            # Counted rather than iterated: a TypeError would end the parse and discard
+            # every other selector's events along with this one.
+            rejected["unparsable_envelope"] += 1
+            continue
+        for entry in entries:
             if not isinstance(entry, list) or len(entry) != 2:
                 rejected["unparsable_envelope"] += 1
                 continue
@@ -498,17 +625,17 @@ for group, telemetry in enumerate(documents(merged_path)):
                 # rather than filtered down to the fields this parser happens to know.
                 rejected["unexpected_field"] += 1
                 continue
-            if payload.get("op") not in OPS:
+            if not enum_ok(payload.get("op"), OPS):
                 rejected["unknown_op"] += 1
                 continue
-            if payload.get("outcome") not in OUTCOMES:
+            if not enum_ok(payload.get("outcome"), OUTCOMES):
                 rejected["unknown_outcome"] += 1
                 continue
-            if payload.get("flow") not in FLOWS:
+            if not enum_ok(payload.get("flow"), FLOWS):
                 rejected["unknown_flow"] += 1
                 continue
-            if payload.get("toggle") not in TOGGLES or \
-                    payload.get("toggle_reason") not in TOGGLE_REASONS:
+            if not enum_ok(payload.get("toggle"), TOGGLES) or \
+                    not enum_ok(payload.get("toggle_reason"), TOGGLE_REASONS):
                 rejected["unknown_toggle"] += 1
                 continue
             try:
@@ -566,10 +693,17 @@ for recorded in unique:
         recorded["cluster_group"] = dense[recorded["cluster_group"]]
 unique.sort(key=lambda e: (e.get("cluster_group", 0), e["invocation"], e["time"], e["attempt"]))
 
-if truncated:
-    status = "truncated"
-elif not query_ok or rejected["malformed_document"]:
+# Anything dropped other than an expected discard is data this report does not have, so the
+# list cannot be presented as complete - and an empty list must not read as "no resync ran".
+lost = sum(count for reason, count in rejected.items()
+           if reason not in EXPECTED_REJECTIONS)
+
+# A loss outranks a bound: "something was lost" is the stronger statement, and both bounds
+# stay readable in the coverage fields whichever status is reported.
+if not query_ok or lost:
     status = "partial"
+elif truncated or selector_coverage == "truncated":
+    status = "truncated"
 elif unique:
     status = "collected"
 else:
@@ -579,7 +713,10 @@ with open(out_path, "w") as handle:
     json.dump({"schema": "rosa.classic.idp.resync.report/v1",
                "window": {"start": iso(start_ts), "end": iso(end_ts)},
                "collection": {"status": status,
-                              "phase_windows": "present" if phases else "unavailable"},
+                              "phase_windows": "present" if phases else "unavailable",
+                              "selector_coverage": selector_coverage,
+                              "result_coverage":
+                                  "truncated" if truncated else "complete"},
                "events": unique, "rejected": rejected, "anomalies": anomalies},
               handle, indent=2)
 print(f"  Classic IDP resync: {status}, {len(unique)} event(s), "
