@@ -273,6 +273,17 @@ if ! oc wait --for=create securedclusters.platform.stackrox.io --all --timeout=9
     echo "[smoke] SecuredCluster terminal wait: no SecuredCluster CR created within 900s" >&2
 fi
 
+# No SecuredCluster workload in lane: emit skipped rows with note instead of
+# failing after budget wait (INTEROP-9723 fallback). Check before reading
+# SHARED_DIR so a readiness skip does not cause a missing-file exit without
+# a recorded failure.
+if ! oc get securedclusters.platform.stackrox.io --all-namespaces -o name 2>/dev/null | grep -q "securedclusters"; then
+    _add_case "scanner-v4-ready" skipped "NoSecuredCluster" "no SecuredCluster in lane: scanner not evaluated"
+    _add_case "stackrox-opp-smoke" skipped "NoSecuredCluster" "no SecuredCluster in lane: smoke not evaluated"
+    exit 0
+fi
+
+
 # ---------------------------------------------------------------------------
 # Present: run the SMOKE suite (existing flow)
 # ---------------------------------------------------------------------------
