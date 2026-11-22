@@ -471,6 +471,8 @@ fi
 # order is not deterministic: take every one. Only well-formed lines are copied, so a damaged
 # file cannot put anything unexpected into SHARED_DIR for the post step to parse, and the
 # total is capped so a looping writer cannot fill the shared volume.
+# hack/classic-idp-telemetry/classic_idp_step_test.py locates this block by the comment
+# above and runs it on its own; keep them in step.
 classic_idp_windows="${SHARED_DIR}/classic-idp-phase-windows"
 # The accepted stamp is exactly the one the post step parses (%Y-%m-%dT%H:%M:%S.%fZ with
 # six fractional digits). Holding the producer to it keeps a line the consumer will drop

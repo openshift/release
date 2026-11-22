@@ -31,6 +31,9 @@ if [[ -z "$START_TIME" ]]; then
 fi
 END_TIME=$(date +%s)
 
+# The credentials mount declared in rosa-e2e-collect-cs-telemetry-ref.yaml.
+# hack/classic-idp-telemetry/classic_idp_step_test.py relocates this path to run the script
+# without one; keep the three readers below spelling it the same way.
 CLIENT_ID=$(cat /usr/local/rhobs-oidc/client_id)
 CLIENT_SECRET=$(cat /usr/local/rhobs-oidc/client_secret)
 ISSUER_URL=$(cat /usr/local/rhobs-oidc/oidc_issuer_url 2>/dev/null || echo "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token")
