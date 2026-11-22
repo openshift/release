@@ -135,7 +135,7 @@ else
     echo "Tagging VPCs with expirationDate=${expirationDate} (TTL 8h, --iso=minutes --utc)" 
     typeset clusterNames=""
     # Prefer live ClusterDeployments from the hub (has hub kubeconfig via SHARED_DIR).
-    clusterNames="$(oc get clusterdeployments -A -o json 2>/dev/null | jq -r '.items[] | select(.metadata.name | test("^opp-aws-")) | .metadata.name' 2>/dev/null || true)"
+    clusterNames="$(oc get clusterdeployments -A --request-timeout=30s -o json 2>/dev/null | jq -r '.items[] | select(.metadata.name | test("^opp-aws-")) | .metadata.name' 2>/dev/null || true)"
     if [[ -z "${clusterNames:-}" ]]; then
         echo "No opp-aws-* ClusterDeployments via oc, checking reports for cluster names..." 
         if [[ -d reports ]]; then
