@@ -715,6 +715,7 @@ if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs; then
         _add_case "clusters-connected" skipped "NoSecuredCluster" "no SecuredCluster in lane: clusters-connected not evaluated"
         _add_case "policies-loaded" skipped "NoSecuredCluster" "no SecuredCluster in lane: policies-loaded not evaluated"
         _add_case "sensor-ready" skipped "NoSecuredCluster" "no SecuredCluster in lane: sensor-ready not evaluated (budget remaining $(_budget_remaining)s)"
+        if [[ "${ACS_EXPECTATION}" == "required" ]]; then _add_case "securedcluster-discovery" failed "Discovery" "SecuredCluster discovery timeout after 900s: no SecuredCluster CR found while ACS_EXPECTATION=required (budget remaining $(_budget_remaining)s)"; _add_case "stackrox-opp-readiness" failed "Discovery" "SecuredCluster discovery failed while ACS_EXPECTATION=required (budget remaining $(_budget_remaining)s)"; exit 1; fi
         if (( _assert_rc != 0 )); then _add_case "stackrox-opp-readiness" failed "Assertion" "earlier assertion failed and SecuredCluster workload is absent (budget remaining $(_budget_remaining)s)"; exit 1; fi
         _add_case "stackrox-opp-readiness" skipped "NoSecuredCluster" "no SecuredCluster in lane: readiness assertions not evaluated (budget remaining $(_budget_remaining)s)"
         exit 0
