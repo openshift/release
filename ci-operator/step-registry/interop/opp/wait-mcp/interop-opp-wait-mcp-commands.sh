@@ -941,6 +941,19 @@ typeset -i consecutivePasses=0
 typeset -i consecutiveFailures=0
 typeset -i currentPollInterval=${pollInterval}
 
+# Sleep no longer than the wait budget allows: a poll interval that starts one
+# second before the deadline would otherwise hold the failure classification
+# back for the whole interval, so the timeout is reported late and the
+# diagnostics that explain it are delayed with it.
+_bounded_sleep() {
+  typeset -i _want="${1:-0}" _left
+  _left=$(( deadline - SECONDS ))
+  (( _left < 1 )) && _left=1
+  (( _want > _left )) && _want=${_left}
+  (( _want > 0 )) && sleep "${_want}"
+  return 0
+}
+
 echo "Polling MCPs for up to ${effectiveTimeout}s (need ${consecutiveRequired} consecutive clean polls)..."
 echo "Progress-based extension: +${progressExtension}s per detection, max total ${maxTimeout}s"
 
@@ -971,7 +984,7 @@ while (( SECONDS < deadline )); do
         consecutivePasses=0
         _signatureRepeat=0
         _lastSignatureReason=""
-        sleep "${currentPollInterval}"
+        _bounded_sleep "${currentPollInterval}"
         continue
     fi
 
@@ -1180,7 +1193,7 @@ PY
         fi
     fi
 
-    sleep "${currentPollInterval}"
+    _bounded_sleep "${currentPollInterval}"
 done
 
 typeset -i elapsed=$(( SECONDS - startSeconds ))
