@@ -831,6 +831,31 @@ tests:
     - ref: openshift-qe-evpn
     workflow: openshift-qe-installer-aws
   timeout: 6h0m0s
+- always_run: false
+  as: evpn-scale-cpu-usages-workloads
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m6a.4xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
+      EXTERNAL_WEBSERVER_IP: 172.27.187.82
+      ITERATIONS: "5"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
+    post:
+    - ref: openshift-qe-installer-aws-deprovision-bastion
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: ipi-install-post-featureset
+    - chain: create-infra-move-ingress-monitoring-registry
+    - ref: openshift-qe-installer-aws-provision-bastion
+    test:
+    - ref: openshift-qe-bgp-setup-evpn
+    - ref: openshift-qe-evpn
+    workflow: openshift-qe-installer-aws
+  timeout: 14h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-eng
