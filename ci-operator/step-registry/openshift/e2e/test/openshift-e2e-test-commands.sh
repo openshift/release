@@ -293,7 +293,13 @@ powervs*)
     fi
     ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
-external) export TEST_PROVIDER='{"type":"external"}' ;;
+external)
+    if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
+        export TEST_PROVIDER='{"type":"external","disconnected":true}'
+    else
+        export TEST_PROVIDER='{"type":"external"}'
+    fi
+    ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
