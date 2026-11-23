@@ -53,6 +53,7 @@ ref:
       `oc get mcp` poll (failures of other oc calls do not count).
     - UPDATING-oscillating: updating, neither the updated nor the ready
       count progressing, and the pool not fully updated.
+    - STABLE: every non-paused pool converged at the deadline but the CONSECUTIVE_CHECKS clean-poll gate was not reached.
     - UNKNOWN: none of the above.
     On wait-path failures (deadline, degraded, not-converging, churn,
     api-unreachable, in-loop health gate) a bounded evidence bundle (machines,
@@ -61,12 +62,13 @@ ref:
     Invalid input and offline self-test failures exit before the wait
     loop and do not collect a bundle.
 
-    Diagnostics (INTEROP-9646): phase 0 runs two offline self-tests
+    Diagnostics (INTEROP-9646): phase 0 runs three offline self-tests
     before touching the cluster - the predicate self-test (four recorded
-    run fixtures, pinned verdicts) and a trap self-test that forks this
+    run fixtures, pinned verdicts), the classifier self-test (two converged
+    fixtures, terminal and poll pins), and a trap self-test that forks this
     script against a mock oc, SIGTERMs it in the poll loop, and asserts
     the TERM contract (exit 143, JUnit failure reason, scrubbed xtrace
-    bundle, bounded grace). Either self-test failing the contract exits
+    bundle, bounded grace). Any of the three self-tests failing the contract exits
     2 (Invalid step input); environmental harness failures record
     trap_selftest=warn and continue. The first Degraded sighting and the final
     classification emit every non-paused MCP condition (type, status, reason,

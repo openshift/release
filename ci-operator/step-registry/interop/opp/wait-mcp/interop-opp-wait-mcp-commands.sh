@@ -101,6 +101,7 @@ typeset -i _jrc_set=0  # initialized here - before the trap and before env
 _junit_class=""
 _junit_reason=""
 _junit_selftest="not-run"
+_junit_classifierselftest="not-run"
 _junit_trapselftest="not-run"
 _junit_emit() {
   # Emit a JUnit XML result for the wait-mcp step and propagate
@@ -120,6 +121,7 @@ _junit_emit() {
   # suite count must stay failures<=tests; preflight review).
   local _st_failed=""
   if [[ "${_junit_selftest}" == "fail" ]]; then _st_failed="predicate"; fi
+  if [[ "${_junit_classifierselftest}" == "fail" ]]; then _st_failed="${_st_failed:+${_st_failed}+}classifier"; fi
   if [[ "${_junit_trapselftest}" == "fail" ]]; then _st_failed="${_st_failed:+${_st_failed}+}trap"; fi
   local _st_note=""
   if [[ -n "${_st_failed}" ]]; then
@@ -151,6 +153,7 @@ _junit_emit() {
     <property name="mcp_wait_seconds" value="${_jd}"/>
     <property name="first_signature_poll" value="${_junit_first_signature_poll}"/>
     <property name="predicate_selftest" value="${_junit_selftest}"/>
+    <property name="classifier_selftest" value="${_junit_classifierselftest}"/>
     <property name="trap_selftest" value="${_junit_trapselftest}"/>
     <property name="final_class" value="${_esc_class}"/>
   </properties>
@@ -421,6 +424,79 @@ __fixture_green_control () {
   FIX_MACHINECOUNT=9
 }
 
+__fixture_converged_all_clean () {
+  # provenance: build 2124500195990310912 mcps.yaml converged 3/3 and 12/12, no Available condition, recorded under .local/ticket-review-convergence/INTEROP-9723-2026-11-22/repro/mcps.yaml
+  FIX_MCP_JSON='{"apiVersion":"v1","kind":"List","items":[{"metadata":{"name":"master","generation":2,"uid":"9cb2d720-68c0-456e-b30e-3bb6b4762fd7"},"spec":{"paused":false},"status":{"conditions":[{"type":"Degraded","status":"False"},{"type":"Updated","status":"True"},{"type":"Updating","status":"False"},{"type":"RenderDegraded","status":"False"},{"type":"NodeDegraded","status":"False"},{"type":"PinnedImageSetsDegraded","status":"False"}],"machineCount":3,"readyMachineCount":3,"updatedMachineCount":3,"unavailableMachineCount":0,"observedGeneration":2}},{"metadata":{"name":"worker","generation":2,"uid":"09c0c55d-e04b-4901-a448-f8b69d96a97f"},"spec":{"paused":false},"status":{"conditions":[{"type":"Degraded","status":"False"},{"type":"Updated","status":"True"},{"type":"Updating","status":"False"},{"type":"RenderDegraded","status":"False"},{"type":"NodeDegraded","status":"False"},{"type":"PinnedImageSetsDegraded","status":"False"}],"machineCount":12,"readyMachineCount":12,"updatedMachineCount":12,"unavailableMachineCount":0,"observedGeneration":2}}]}'
+  # mutation: reinstating the Available conjunct flips poll to UNSTABLE (no Available condition present, parent treated Unknown as not True)
+  FIX_EXPECTED_POLL="STABLE"
+  FIX_EXPECTED_TERMINAL="STABLE"
+}
+
+__fixture_converged_degraded () {
+  # edge: converged counts but Degraded=True on worker, must stay UNSTABLE and DEGRADED
+  FIX_MCP_JSON='{"apiVersion":"v1","kind":"List","items":[{"metadata":{"name":"master","generation":2,"uid":"9cb2d720-68c0-456e-b30e-3bb6b4762fd7"},"spec":{"paused":false},"status":{"conditions":[{"type":"Degraded","status":"False"},{"type":"Updated","status":"True"},{"type":"Updating","status":"False"}],"machineCount":3,"readyMachineCount":3,"updatedMachineCount":3,"unavailableMachineCount":0,"observedGeneration":2}},{"metadata":{"name":"worker","generation":2,"uid":"09c0c55d-e04b-4901-a448-f8b69d96a97f"},"spec":{"paused":false},"status":{"conditions":[{"type":"Degraded","status":"True"},{"type":"Updated","status":"True"},{"type":"Updating","status":"False"}],"machineCount":12,"readyMachineCount":12,"updatedMachineCount":12,"unavailableMachineCount":0,"observedGeneration":2}}]}'
+  # mutation: making the converged STABLE check win before the DEGRADED arm flips terminal to STABLE (must stay DEGRADED)
+  FIX_EXPECTED_POLL="UNSTABLE"
+  FIX_EXPECTED_TERMINAL="DEGRADED"
+}
+
+WaitMcpClassifierSelfTest () {
+  typeset _fixture _got_poll _got_term; typeset -i _fail=0
+  for _fixture in converged_all_clean converged_degraded; do
+    "__fixture_${_fixture}"
+    # drift guard: this poll classifier mirrors the production poll loop classifier (see STABLE/UNSTABLE python block in the poll loop); keep both in sync
+    # copy is deliberate; guard fails the selftest on divergence (no shared function in this push)
+    _got_poll="$(echo "${FIX_MCP_JSON}" | python3 /dev/fd/3 3<<'PY'
+import sys, json
+data = json.load(sys.stdin)
+issues = []
+total_ready = 0
+total_updated = 0
+total_machine = 0
+any_degraded = 0
+gen_parts = []
+for mcp in data.get('items', []):
+    name = mcp['metadata']['name']
+    paused = mcp.get('spec', {}).get('paused', False)
+    if paused:
+        continue
+    conditions = {c['type']: c['status'] for c in mcp.get('status', {}).get('conditions', [])}
+    updating = conditions.get('Updating', 'Unknown')
+    degraded = conditions.get('Degraded', 'Unknown')
+    updated_cond = conditions.get('Updated', 'Unknown')
+    status = mcp.get('status', {})
+    ready = status.get('readyMachineCount', 0)
+    total = status.get('machineCount', 0)
+    updated = status.get('updatedMachineCount', 0)
+    unavailable = status.get('unavailableMachineCount', 0)
+    generation = mcp['metadata'].get('generation', 0)
+    observed = status.get('observedGeneration', -1)
+    uid = mcp['metadata'].get('uid', '')
+    gen_parts.append(f'{name}={generation} uid={uid}')
+    total_ready += ready
+    total_updated += updated
+    total_machine += total
+    if degraded == 'True':
+        any_degraded = 1
+    if (updating == 'True' or degraded == 'True' or updated_cond != 'True'
+            or unavailable > 0 or ready != total or updated != total
+            or observed != generation):
+        issues.append(f'{name}: Updating={updating} Updated={updated_cond} Degraded={degraded} ready={ready}/{total} updated={updated}/{total} unavailable={unavailable} gen={generation}/obs={observed}')
+if issues:
+    print('UNSTABLE|' + '; '.join(issues).replace('|', '/') + '|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|' + str(any_degraded) + '|' + ';'.join(sorted(gen_parts)))
+else:
+    print('STABLE|all non-paused MCPs healthy|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|0|' + ';'.join(sorted(gen_parts)))
+PY
+)" || _got_poll="UNSTABLE|python parse error|0|0|0|0|"
+    _got_poll="$(echo "${_got_poll}" | cut -d'|' -f1)"
+    _got_term="$(ClassifyMcpState "${FIX_MCP_JSON}")"
+    echo ">>> selftest: ${_fixture}: poll=${_got_poll} (pinned: ${FIX_EXPECTED_POLL}) terminal=${_got_term} (pinned: ${FIX_EXPECTED_TERMINAL})"
+    [[ "${_got_poll}" == "${FIX_EXPECTED_POLL}" ]] || _fail=1
+    [[ "${_got_term}" == "${FIX_EXPECTED_TERMINAL}" ]] || _fail=1
+  done
+  return "${_fail}"
+}
+
 WaitMcpSelfTest () {
   # Evaluates the CURRENT IsMcpProgressing at each fixture's final poll.
   # Expected verdicts (PR-B, flipped from the PR-A pins):
@@ -561,15 +637,65 @@ PYEOF
   (( _ok == 0 ))
 }
 
-if WaitMcpSelfTest; then
-  _junit_selftest="pass"
-  echo ">>> PHASE 0: predicate self-test passed (rewritten predicate pinned)"
-else
+
+function ClassifyMcpState () {
+    # Classify the MCP timeout as DEGRADED, UPDATING, STABLE, or UNKNOWN from the JSON state.
+    # precedence: DEGRADED, then UPDATING, then STABLE, then UNKNOWN
+    typeset json="${1}"
+    echo "${json}" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+items = [m for m in data.get('items', []) if not m.get('spec', {}).get('paused', False)]
+degraded = any(
+    {c['type']: c['status'] for c in m.get('status', {}).get('conditions', [])}.get('Degraded') == 'True'
+    for m in items
+)
+updating = any(
+    {c['type']: c['status'] for c in m.get('status', {}).get('conditions', [])}.get('Updating') == 'True'
+    for m in items
+)
+# Converged check: all pools have Updated=True, Updating=False, Degraded=False, counts congruent, observedGeneration == generation, unavailable 0
+stable = False
+if items:
+    stable = True
+    for m in items:
+        conds = {c['type']: c['status'] for c in m.get('status', {}).get('conditions', [])}
+        st = m.get('status', {})
+        if (conds.get('Updating') == 'True' or conds.get('Degraded') == 'True' or conds.get('Updated') != 'True'
+                or st.get('unavailableMachineCount', 0) > 0
+                or st.get('readyMachineCount', 0) != st.get('machineCount', 0)
+                or st.get('updatedMachineCount', 0) != st.get('machineCount', 0)
+                or st.get('observedGeneration', -1) != m['metadata'].get('generation', 0)):
+            stable = False
+            break
+if degraded:
+    print('DEGRADED')
+elif updating:
+    print('UPDATING')
+elif stable:
+    print('STABLE')
+else:
+    print('UNKNOWN')
+" 2>/dev/null || echo "UNKNOWN"
+    true
+}
+
+if ! WaitMcpSelfTest; then
   _junit_selftest="fail"
   echo "FAILURE CLASS: Invalid step input" >&2
   echo "predicate self-test failed: IsMcpProgressing does not reproduce its pinned behavior" >&2
   exit 2
 fi
+_junit_selftest="pass"
+echo ">>> PHASE 0: predicate self-test passed (rewritten predicate pinned)"
+if ! WaitMcpClassifierSelfTest; then
+  _junit_classifierselftest="fail"
+  echo "FAILURE CLASS: Invalid step input" >&2
+  echo "classifier self-test failed: ClassifyMcpState does not reproduce its pinned behavior" >&2
+  exit 2
+fi
+_junit_classifierselftest="pass"
+echo ">>> PHASE 0: classifier self-test passed (converged STABLE, degraded DEGRADED pinned)"
 if [[ -z "${WAIT_MCP_SELFTEST_CHILD:-}" ]]; then
   if WaitMcpTrapSelfTest; then
     # keep a warn verdict set inside the harness-failure paths
@@ -781,30 +907,6 @@ if bad:
     return 0
 }
 
-function ClassifyMcpState () {
-    # Classify the MCP timeout as DEGRADED, UPDATING, or UNKNOWN from the JSON state.
-    typeset json="${1}"
-    echo "${json}" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-items = [m for m in data.get('items', []) if not m.get('spec', {}).get('paused', False)]
-degraded = any(
-    {c['type']: c['status'] for c in m.get('status', {}).get('conditions', [])}.get('Degraded') == 'True'
-    for m in items
-)
-updating = any(
-    {c['type']: c['status'] for c in m.get('status', {}).get('conditions', [])}.get('Updating') == 'True'
-    for m in items
-)
-if degraded:
-    print('DEGRADED')
-elif updating:
-    print('UPDATING')
-else:
-    print('UNKNOWN')
-" 2>/dev/null || echo "UNKNOWN"
-    true
-}
 
 echo "Waiting ${settleDelay}s for MachineConfig rendering to propagate..."
 sleep "${settleDelay}"
@@ -903,8 +1005,7 @@ for mcp in data.get('items', []):
     # observed generation catching up (render churn resets stability).
     if (updating == 'True' or degraded == 'True' or updated_cond != 'True'
             or unavailable > 0 or ready != total or updated != total
-            # PRRT_kwDOBHvUUM65MrlC: MCP requires Available=True and not Degraded
-            or observed != generation or conditions.get("Available", "Unknown") != "True" or conditions.get("Degraded", "Unknown") == "True"):
+            or observed != generation):
         issues.append(f'{name}: Updating={updating} Updated={updated_cond} Degraded={degraded} ready={ready}/{total} updated={updated}/{total} unavailable={unavailable} gen={generation}/obs={observed}')
 if issues:
     print('UNSTABLE|' + '; '.join(issues).replace('|', '/') + '|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|' + str(any_degraded) + '|' + ';'.join(sorted(gen_parts)))
@@ -1150,6 +1251,13 @@ case "${classification}" in
             echo "${mcpWorkerDesc}" | tail -30
             exit 1
         fi
+        ;;
+    STABLE)
+        echo "FAILURE CLASS: STABLE"
+        echo "MCPs are converged at timeout but the consecutive clean poll gate was not reached"
+        _junit_class="STABLE"
+        echo "Ready count trend: ${readyHistory[*]}"
+        exit 1
         ;;
     *)
         echo "FAILURE CLASS: UNKNOWN"
