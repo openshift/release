@@ -23,16 +23,23 @@ ref:
   - name: COMPONENT
     default: istio-mesh-revision
     documentation: |-
-      The component(s) to update. Comma-separated for multiple components; leave
-      empty for all components (the tool's default).
+      The component to update. Comma-separated or empty (all components)
+      selections are supported for read-only discovery in check mode; update
+      mode requires exactly one component, because each bump PR and its branch
+      are scoped to a single component.
   - name: GITHUB_REPO_ORG
     default: Azure
     documentation: |-
-      The organization of the GitHub repository.
+      The organization of the GitHub repository. Must match the
+      aro-hcp-github-app-auth step's scope: the token it mints is repo-scoped,
+      so overriding this without changing that step makes the PR poll fail
+      with 403/404.
   - name: GITHUB_REPO_NAME
     default: ARO-HCP
     documentation: |-
-      The name of the GitHub repository.
+      The name of the GitHub repository. Must match the
+      aro-hcp-github-app-auth step's scope for the same reason as
+      GITHUB_REPO_ORG.
   - name: GITHUB_REPO_BRANCH
     default: main
     documentation: |-
@@ -48,7 +55,10 @@ ref:
   - name: GITHUB_PR_TITLE
     default: Automated - Update component versions
     documentation: |-
-      The title of the GitHub pull request.
+      The base title of the GitHub pull request. The component name is
+      appended (e.g. "... - istio-mesh-revision") so each component gets its
+      own PR and branch; prcreator reuses the same branch on repeated runs,
+      which prevents duplicate PRs for the same component.
   - name: GITHUB_PR_USER
     default: aro-hcp-robot[bot]
     documentation: |-
@@ -69,6 +79,11 @@ ref:
     default: "0"
     documentation: |-
       The debug level. 0 for no debug, 1 for debug, 2 for debug with verbose output.
+  - name: PR_CHECK_MAX_ATTEMPTS
+    default: "8"
+    documentation: |-
+      The maximum number of attempts to poll GitHub for the pull request that
+      prcreator created, with exponential backoff between attempts.
   credentials:
   - mount_path: /var/run/aro-hcp-robot
     group: aro-hcp-robot
