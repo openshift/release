@@ -49,24 +49,13 @@ chain:
     documentation: "Only mirror community e2e test images (from mirror-images-list.yaml), not QE-specific images."
   documentation: |-
     Provisions a disconnected OpenShift cluster on AWS with platform type
-    external. Reuses the existing disconnected VPC, bastion host, and
-    mirror-images steps from the IPI disconnected chain, then runs the
-    platform-external UPI install with CloudFormation templates against
-    the precreated VPC (private subnets without NAT gateway, VPC
-    endpoints for AWS services). Bootstrap is placed on a private subnet
-    to enforce network isolation — it fetches ignition from S3 via the
-    VPC endpoint and pulls images exclusively from the mirror registry.
-    The chain:
-      1. Creates a disconnected VPC (private subnets + VPC endpoints)
-      2. Provisions a bastion host with mirror registry and proxy
-      3. Mirrors the release payload to the bastion registry
-      4. Configures the install with mirror and external platform settings
-      5. Deploys cluster infrastructure via CloudFormation (all nodes
-         on private subnets)
-      6. Waits for install completion
-      7. Trusts the mirror registry CA for in-cluster consumers
-      8. Disables default OperatorHub catalog sources
-      9. Mirrors community e2e test images and applies IDMS/ITMS so
-         tag-based upstream image pulls (registry.k8s.io) are
-         redirected to the bastion mirror
-     10. Destroys the bootstrap resources
+    external for e2e conformance testing. Creates an isolated VPC
+    (private subnets without NAT, VPC endpoints for AWS services) with
+    a bastion host that provides a mirror registry and egress proxy.
+    Mirrors the release payload and community e2e test images to the
+    bastion registry, configures the installer with mirror and trust
+    settings, and deploys cluster infrastructure via CloudFormation
+    UPI templates. After install completion, disables default
+    OperatorHub catalog sources and applies IDMS/ITMS so the cluster
+    pulls all images from the bastion mirror. Destroys the bootstrap
+    resources once the control plane is self-hosting.
