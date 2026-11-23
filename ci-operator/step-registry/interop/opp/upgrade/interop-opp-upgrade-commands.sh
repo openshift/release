@@ -264,9 +264,6 @@ function AdminAck () {
     if ! gates="$(oc -n openshift-config-managed get configmap admin-gates -o go-template='{{range $k, $v := .data}}{{$k}}{{"\n"}}{{end}}' 2>&1)"; then
         if [[ "${gates}" == *"NotFound"* ]]; then
             : "No admin-gates configmap; no acks required"
-            # PRRT_kwDOBHvUUM65Mrko: settling window must confirm operator pods Ready
-            # Verify pods Ready within window before ending settle
-            typeset _podReadyCheck=""; _podReadyCheck="$(oc get pods -n "${ACS_NAMESPACE:-stackrox}" -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo unknown)"; [[ "${_podReadyCheck}" == *"True"* ]] || echo "WARNING: operator pods not all Ready" >&2
             return 0
         fi
         : "Failed to query admin-gates configmap: ${gates}"
@@ -544,12 +541,28 @@ function SettleOppOperatorCsvs () {
         if (( stableCount == ${#settleOpsArr[@]} )); then
             elapsed=$(( window - (deadline - SECONDS) ))
             : "Operator CSVs stable after ${elapsed}s of the ${window}s settle window"
-            # PRRT_kwDOBHvUUM65Mrko: wait for operator pods Ready (not just phase Running) - L-1: no oc wait inside polling loop, use oc get + jsonpath
-            typeset _podReady=""
-            _podReady=$(oc get pods -n "${ACS_NAMESPACE}" -l app.kubernetes.io/name=rhacs-operator -o jsonpath='{.items[*].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "")
-            if [[ "${_podReady}" != *"True"* ]]; then
-                echo "Operator pods not yet Ready, continuing settle" >&2
-                continue
+            # PRRT_kwDOBHvUUM65Mrko: a terminal CSV phase does not prove the
+            # operator pods are Ready (Running 0/1 during a rollout), and
+            # ValidateOppOperators runs straight after this window. Check the
+            # pod readiness of the ACS operator only: it is the one operator
+            # whose pod label is fixed here, and its namespace is optional in
+            # the job environment (set -u), so the default keeps the read safe.
+            # L-1: no oc wait inside the polling loop, use oc get + jsonpath.
+            if [[ ",${OPP_OPERATORS}," == *",rhacs-operator,"* ]]; then
+                typeset _podReady=""
+                _podReady=$(oc get pods -n "${ACS_NAMESPACE:-stackrox}" \
+                    -l app.kubernetes.io/name=rhacs-operator \
+                    --request-timeout=15s \
+                    -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' \
+                    2>/dev/null || echo "")
+                typeset -i _podsNotReady=0
+                if [[ -n "${_podReady}" ]]; then
+                    _podsNotReady=$(printf '%s\n' "${_podReady}" | grep -cv '^True$' || true)
+                fi
+                if (( _podsNotReady > 0 )); then
+                    echo "Operator pods not yet Ready (${_podsNotReady} of the labelled rhacs-operator pods), continuing settle" >&2
+                    continue
+                fi
             fi
             return 0
         fi
