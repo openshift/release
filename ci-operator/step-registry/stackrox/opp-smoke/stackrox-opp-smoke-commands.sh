@@ -272,14 +272,19 @@ _add_classification "acs-present" passed
 # 900s is the readiness-side timeout, mirrored here so smoke fails with same reason if
 # the CR never appears.
 if ! oc wait --for=create securedclusters.platform.stackrox.io --all --all-namespaces --timeout=900s 1>/dev/null 2>&1; then
-    _add_case "securedcluster-discovery" failed "Timeout" "SecuredCluster discovery timeout after 900s: no SecuredCluster CR created within 900s"
+    if [[ "${ACS_EXPECTATION}" == "required" ]]; then
+        _add_case "securedcluster-discovery" failed "Timeout" "SecuredCluster discovery timeout after 900s: no SecuredCluster CR created within 900s"
+    else
+        _add_case "securedcluster-discovery" skipped "NoSecuredCluster" "no SecuredCluster CR created within 900s and ACS_EXPECTATION=${ACS_EXPECTATION}: not required in this lane"
+    fi
     echo "[smoke] SecuredCluster terminal wait: no SecuredCluster CR created within 900s" >&2
 fi
 
-# No SecuredCluster workload in lane: emit skipped rows with note instead of
-# failing after budget wait (INTEROP-9723 fallback). Check before reading
-# SHARED_DIR so a readiness skip does not cause a missing-file exit without
-# a recorded failure.
+# No SecuredCluster workload in lane: the terminal wait above records a failed
+# securedcluster-discovery case when the CR never appears, and this branch fails
+# the step rather than skipping (a skipped row never gates a lane, so a required
+# lane must not exit 0 here). Check before reading SHARED_DIR so a readiness skip
+# does not cause a missing-file exit without a recorded failure.
 # Capture first, then test for emptiness: `-o name` prints the lowercase
 # singular kind (`securedcluster.platform.stackrox.io/<name>`), so matching
 # the plural spelling skips every lane; the capture also keeps grep's SIGPIPE
@@ -292,7 +297,12 @@ if ! _scList="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedcluste
 fi
 if [[ -z "${_scList}" ]]; then
     _add_case "scanner-v4-ready" skipped "NoSecuredCluster" "no SecuredCluster in lane: scanner not evaluated"
-    _add_case "stackrox-opp-smoke" skipped "NoSecuredCluster" "no SecuredCluster in lane: smoke not evaluated"
+    if [[ "${ACS_EXPECTATION}" == "required" ]]; then
+        _add_case "securedcluster-discovery" failed "Discovery" "SecuredCluster list empty after the terminal wait (recorded failures ${_N_FAILURES}); workload is absent while ACS_EXPECTATION=required"
+        _add_case "stackrox-opp-smoke" failed "Discovery" "SecuredCluster discovery failed (recorded failures ${_N_FAILURES}); workload is absent while ACS_EXPECTATION=required"
+        exit 1
+    fi
+    _add_case "stackrox-opp-smoke" skipped "NoSecuredCluster" "no SecuredCluster in lane: smoke not evaluated (ACS_EXPECTATION=${ACS_EXPECTATION})"
     exit 0
 fi
 # ---------------------------------------------------------------------------
