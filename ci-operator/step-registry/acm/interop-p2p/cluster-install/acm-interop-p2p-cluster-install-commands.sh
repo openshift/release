@@ -467,7 +467,7 @@ ocEOF
     # INTEROP-9750: tag p2p spoke install-config with expirationDate so the periodic
     # aws-deprovision-collector (aws-deprovision-collector-commands.sh:209) can select
     # leaked spoke VPCs when the workflow aborts. Without userTags the collector has
-    # no signal — e.g. leaked acm-spoke-c694d-1-9vvcj from failed rehearse-88800 (cleaned
+    # no signal, e.g. leaked acm-spoke-c694d-1-9vvcj from failed rehearse-88800 (cleaned
     # in INTEROP-9746). TTL 12h (date -d '12 hours' --iso=minutes --utc) covers the
     # 450m provision budget (ACM_SPOKE_INSTALL_TIMEOUT_MINUTES=450, 7.5h) + test window
     # + buffer and exceeds the step's 11h timeout; collector adds 30m grace via

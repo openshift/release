@@ -65,7 +65,7 @@ unset CYPRESS_OPTIONS_HUB_PASSWORD
 # Leak evidence: 15 untagged opp-aws-* clusters (4 full + 11 shells, all us-east-2)
 # cleaned in INTEROP-9746; creator identified as CLC Hive/CAPI path which never runs
 # ipi-conf-aws (spoke evidence: acm-interop-p2p-cluster-install has no userTags;
-# CLC path is same defect class — options.yaml has no tag surface, confirmed in
+# CLC path is same defect class: options.yaml has no tag surface, confirmed in
 # 07-clc-tag-surface-recon.md §3).
 # Mechanism: Hive ClusterDeployment -> install-config.yaml rendered server-side by
 # Hive, never via ipi-conf-aws-commands.sh:33,272-273, so VPCs lack expirationDate
@@ -75,7 +75,7 @@ unset CYPRESS_OPTIONS_HUB_PASSWORD
 # TTL 8h (date -d '8 hours' --iso=minutes --utc) gives 5h+ headroom over greens 45-48m
 # / watchdog-capped 75m and matches ipi-conf-aws house convention; collector adds
 # 30m grace via CLUSTER_TTL="30 minutes ago" -> reap >=8.5h after creation.
-# Landing spot: step-wrapper fallback (c) — rhpit/interop-tests is a near-empty shim
+# Landing spot: step-wrapper fallback (c): rhpit/interop-tests is a near-empty shim
 # (no execute_clc_interop_commands.sh in any branch: main/ascerra/PR heads all 4 files)
 # and stolostron/clc-ui-e2e is private (404 via gh api repos/stolostron/clc-ui-e2e).
 # This wrapper is team-owned (OWNERS cspi-qe-ocp-lp/dtthuynh/vboulos), runs even when
@@ -85,7 +85,7 @@ unset CYPRESS_OPTIONS_HUB_PASSWORD
 # the collector periodic (INTEROP-9751) plus eventual upstream fix close that window.
 : "Tagging CLC-created opp-aws-* VPCs with expirationDate for collector GC (INTEROP-9749)..."
 set +e
-# Credentials for aws CLI — same file the step injects into options.yaml.
+# Credentials for aws CLI: same file the step injects into options.yaml.
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR:-}/.awscred"
 export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
 typeset expirationDate=""
@@ -95,7 +95,7 @@ if [[ -z "${expirationDate:-}" ]]; then
 elif [[ ! -f "${AWS_SHARED_CREDENTIALS_FILE:-}" ]]; then
     echo "WARNING: AWS credentials not found at ${AWS_SHARED_CREDENTIALS_FILE}, skipping VPC tagging" >&2
 else
-    # Bootstrap aws CLI if missing — clc-ui-e2e image lacks it (round-2 finding: every rehearsal
+    # Bootstrap aws CLI if missing: clc-ui-e2e image lacks it (round-2 finding: every rehearsal
     # logged "WARNING: aws CLI not found, skipping VPC tagging"). Precedent: INTEROP-9517
     # (fcc1c63a77786:ci-operator/step-registry/interop/aws-cspi-qe-cleanup/interop-aws-cspi-qe-cleanup-commands.sh)
     # bootstrapped AWS CLI v2 in a golang image via curl+unzip to /tmp:
