@@ -17,26 +17,26 @@ fi
 
 source ${SHARED_DIR}/nutanix_context.sh
 
-# The CSI operator is installed from the certified-operators catalog
-# (channel stable-3.x) by default. This version sets
-# terminationMessagePolicy=FallbackToLogsOnError on all of its
-# containers, which keeps the termination-message-policy monitor green
-# (see OCPBUGS-99481).
+# The CSI operator is installed from the Nutanix beta dev catalog
+# (quay.io/ntnx-csi/nutanix-csi-operator-catalog:latest) by default.
+# This is the only catalog that resolves the nutanixcsioperator package
+# on 5.0 nightly clusters: the certified-operators catalog does not
+# publish a bundle compatible with 5.0 yet (OLM resolution fails with
+# "no operators found in package nutanixcsioperator").
 #
-# RHCOS 10 jobs must opt in to the Nutanix beta dev catalog
-# (quay.io/ntnx-csi/nutanix-csi-operator-catalog:latest) by setting
-# NUTANIX_CSI_USE_BETA_CATALOG=true until a certified,
-# RHCOS-10-compatible CSI operator build is published to
-# certified-operators. The beta operator does not set
-# terminationMessagePolicy on its containers, so jobs using it must
-# keep --disable-monitor=termination-message-policy until the
-# certified build is available.
-if [[ "${NUTANIX_CSI_USE_BETA_CATALOG:-false}" == "true" ]]; then
-  NUTANIX_CSI_SUBSCRIPTION_SOURCE="nutanix-csi-operator-beta"
-  NUTANIX_CSI_SUBSCRIPTION_CHANNEL="stable"
-else
+# Jobs that install the CSI operator on a 4.x cluster (for example the
+# 4.22 -> 5.0 upgrade job, which provisions from stable-initial 4.22)
+# can set NUTANIX_CSI_USE_CERTIFIED_CATALOG=true to install from
+# certified-operators on the stable-3.x channel instead. The certified
+# operator (v3.9.0) sets terminationMessagePolicy=FallbackToLogsOnError
+# on all of its containers, which keeps the termination-message-policy
+# monitor green (see OCPBUGS-99481); the beta operator does not.
+if [[ "${NUTANIX_CSI_USE_CERTIFIED_CATALOG:-false}" == "true" ]]; then
   NUTANIX_CSI_SUBSCRIPTION_SOURCE="certified-operators"
   NUTANIX_CSI_SUBSCRIPTION_CHANNEL="stable-3.x"
+else
+  NUTANIX_CSI_SUBSCRIPTION_SOURCE="nutanix-csi-operator-beta"
+  NUTANIX_CSI_SUBSCRIPTION_CHANNEL="stable"
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Creating CSI manifests..."
@@ -48,7 +48,17 @@ metadata:
   name: openshift-cluster-csi-drivers
 EOF
 
-if [[ "${NUTANIX_CSI_USE_BETA_CATALOG:-false}" == "true" ]]; then
+if [[ "${NUTANIX_CSI_USE_CERTIFIED_CATALOG:-false}" == "true" ]]; then
+  cat > "${SHARED_DIR}/manifest_0001-nutanix-csi-ntnx-pc-secret.yaml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ntnx-pc-secret
+  namespace: openshift-cluster-csi-drivers
+stringData:
+  key: ${NUTANIX_HOST}:${NUTANIX_PORT}:${NUTANIX_USERNAME}:${NUTANIX_PASSWORD}
+EOF
+else
   cat > "${SHARED_DIR}/manifest_0001-nutanix-csi-operator-beta-catalog-source.yaml" << EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -63,16 +73,6 @@ spec:
   updateStrategy:
     registryPoll:
       interval: 5m
-EOF
-else
-  cat > "${SHARED_DIR}/manifest_0001-nutanix-csi-ntnx-pc-secret.yaml" << EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: ntnx-pc-secret
-  namespace: openshift-cluster-csi-drivers
-stringData:
-  key: ${NUTANIX_HOST}:${NUTANIX_PORT}:${NUTANIX_USERNAME}:${NUTANIX_PASSWORD}
 EOF
 fi
 
@@ -111,7 +111,18 @@ spec:
   sourceNamespace: openshift-marketplace
 EOF
 
-if [[ "${NUTANIX_CSI_USE_BETA_CATALOG:-false}" == "true" ]]; then
+if [[ "${NUTANIX_CSI_USE_CERTIFIED_CATALOG:-false}" == "true" ]]; then
+  cat > "${SHARED_DIR}/manifest_0005-nutanix-csi-storage.yaml" << EOF
+apiVersion: crd.nutanix.com/v1alpha1
+kind: NutanixCsiStorage
+metadata:
+  name: nutanixcsistorage
+  namespace: openshift-cluster-csi-drivers
+spec:
+  ntnxInitConfigMap:
+    usePC: true
+EOF
+else
   cat > "${SHARED_DIR}/manifest_0005-nutanix-csi-storage.yaml" << EOF
 apiVersion: crd.nutanix.com/v1alpha1
 kind: NutanixCsiStorage
@@ -126,42 +137,9 @@ spec:
       value: ""
       effect: "NoSchedule"
 EOF
-else
-  cat > "${SHARED_DIR}/manifest_0005-nutanix-csi-storage.yaml" << EOF
-apiVersion: crd.nutanix.com/v1alpha1
-kind: NutanixCsiStorage
-metadata:
-  name: nutanixcsistorage
-  namespace: openshift-cluster-csi-drivers
-spec:
-  ntnxInitConfigMap:
-    usePC: true
-EOF
 fi
 
-if [[ "${NUTANIX_CSI_USE_BETA_CATALOG:-false}" == "true" ]]; then
-  cat > "${SHARED_DIR}/manifest_0006-nutanix-csi-storage-class.yaml" << EOF
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: nutanix-volume
-  annotations:
-    storageclass.kubernetes.io/is-default-class: "true"
-provisioner: csi.nutanix.com
-parameters:
-  csi.storage.k8s.io/provisioner-secret-name: ntnx-secret
-  csi.storage.k8s.io/provisioner-secret-namespace: openshift-cluster-csi-drivers
-  csi.storage.k8s.io/node-publish-secret-name: ntnx-secret
-  csi.storage.k8s.io/node-publish-secret-namespace: openshift-cluster-csi-drivers
-  csi.storage.k8s.io/controller-expand-secret-name: ntnx-secret
-  csi.storage.k8s.io/controller-expand-secret-namespace: openshift-cluster-csi-drivers
-  csi.storage.k8s.io/fstype: ext4
-  storageContainer: ${PE_STORAGE_CONTAINER}
-  storageType: NutanixVolumes
-allowVolumeExpansion: true
-reclaimPolicy: Delete
-EOF
-else
+if [[ "${NUTANIX_CSI_USE_CERTIFIED_CATALOG:-false}" == "true" ]]; then
   cat > "${SHARED_DIR}/manifest_0006-nutanix-csi-storage-class.yaml" << EOF
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -185,13 +163,33 @@ parameters:
 allowVolumeExpansion: true
 reclaimPolicy: Delete
 EOF
+else
+  cat > "${SHARED_DIR}/manifest_0006-nutanix-csi-storage-class.yaml" << EOF
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nutanix-volume
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: csi.nutanix.com
+parameters:
+  csi.storage.k8s.io/provisioner-secret-name: ntnx-secret
+  csi.storage.k8s.io/provisioner-secret-namespace: openshift-cluster-csi-drivers
+  csi.storage.k8s.io/node-publish-secret-name: ntnx-secret
+  csi.storage.k8s.io/node-publish-secret-namespace: openshift-cluster-csi-drivers
+  csi.storage.k8s.io/controller-expand-secret-name: ntnx-secret
+  csi.storage.k8s.io/controller-expand-secret-namespace: openshift-cluster-csi-drivers
+  csi.storage.k8s.io/fstype: ext4
+  storageContainer: ${PE_STORAGE_CONTAINER}
+  storageType: NutanixVolumes
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+EOF
 fi
 
 oc apply -f "${SHARED_DIR}/manifest_0000-nutanix-csi-openshift-cluster-csi-drivers-namespace.yaml"
 
-if [[ "${NUTANIX_CSI_USE_BETA_CATALOG:-false}" == "true" ]]; then
-  oc apply -f "${SHARED_DIR}/manifest_0001-nutanix-csi-operator-beta-catalog-source.yaml"
-else
+if [[ "${NUTANIX_CSI_USE_CERTIFIED_CATALOG:-false}" == "true" ]]; then
   # The certified Nutanix CSI operator deployment references an image
   # pull secret named "regcred". Without it, kubelet emits repeated
   # FailedToRetrieveImagePullSecret events that trip the
@@ -205,6 +203,8 @@ else
     --dry-run=client -o yaml | oc apply -f -
 
   oc apply -f "${SHARED_DIR}/manifest_0001-nutanix-csi-ntnx-pc-secret.yaml"
+else
+  oc apply -f "${SHARED_DIR}/manifest_0001-nutanix-csi-operator-beta-catalog-source.yaml"
 fi
 
 oc apply -f "${SHARED_DIR}/manifest_0002-nutanix-csi-ntnx-secret.yaml"
