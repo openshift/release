@@ -51,6 +51,16 @@ GATED_CHECK_IDS=("OPCT-022" "OPCT-023A" "OPCT-023B")
 retrieve_rc="NOT_RUN"
 retrieve_tee_rc="NOT_RUN"
 retrieve_pipe_rc="NOT_RUN"
+# retrieve_reason names which of retrieve_artifact's failure paths was taken,
+# so the JUnit testcase reports the actual cause instead of one generic
+# message. Two of the four paths leave both retrieve rcs at 0 (the archive is
+# missing or ambiguous rather than the command having failed), which the exit
+# codes alone cannot distinguish.
+#   retrieve_failed    = 'opct retrieve' itself exited nonzero
+#   tee_failed         = retrieve succeeded, the tee pipeline did not
+#   no_archive         = no *.tar* produced in the results directory
+#   multiple_archives  = more than one *.tar*, cannot pick one safely
+retrieve_reason="NOT_RUN"
 results_rc="NOT_RUN"
 report_rc="NOT_RUN"
 publish_rc="NOT_RUN"
@@ -188,6 +198,7 @@ function emit_summary() {
 retrieve_rc=${retrieve_rc}
 retrieve_tee_rc=${retrieve_tee_rc}
 retrieve_pipe_rc=${retrieve_pipe_rc}
+retrieve_reason=${retrieve_reason}
 results_rc=${results_rc}
 report_rc=${report_rc}
 publish_rc=${publish_rc}
@@ -240,6 +251,17 @@ function _exit_handler() {
     exit_class=2
   fi
   emit_summary || true
+  # Catch-all: the step is failing but no stage recorded a failing testcase,
+  # so the Prow test view would show nothing red while the job is red. This
+  # happens on paths that abort outside a guarded stage -- an errexit abort
+  # (e.g. the 'mv' of the result archive), a setup failure before the first
+  # stage, or a signal caught mid-stage. Emit one testcase carrying the exit
+  # class so the failure is always visible as a test, not only as an exit
+  # code.
+  if [[ ${exit_class} -ne 0 && ${junit_failures} -eq 0 ]]; then
+    junit_case "[opct] results step completed" \
+      "the step failed with exit_class=${exit_class} (incoming_rc=${incoming_rc}, signal=${_caught_signal:-none}) but no stage reported a failure; see opct-results-summary.txt and the step log"
+  fi
   # Written here rather than in the main flow so the report still lands on
   # early-return and signal paths.
   emit_junit || true
@@ -302,6 +324,7 @@ function retrieve_artifact() {
   fi
 
   if [[ ${retrieve_rc} -ne 0 ]]; then
+    retrieve_reason="retrieve_failed"
     show_msg "ERROR: '${OPCT_CLI} retrieve' failed with exit code ${retrieve_rc} (tee=${retrieve_tee_rc})"
     return 1
   fi
@@ -309,6 +332,7 @@ function retrieve_artifact() {
   # tee failure is a processing error (log may be incomplete) even if
   # retrieve itself succeeded.
   if [[ ${retrieve_tee_rc} -ne 0 ]]; then
+    retrieve_reason="tee_failed"
     show_msg "ERROR: tee pipeline failed with exit code ${retrieve_tee_rc} (retrieve=${retrieve_rc})"
     return 1
   fi
@@ -317,13 +341,16 @@ function retrieve_artifact() {
   # missing or ambiguous results without relying on ls output parsing.
   local -a archives=("${ARTIFACT_DIR}"/opct-results/*.tar*)
   if [[ ${#archives[@]} -eq 0 || ! -f "${archives[0]}" ]]; then
+    retrieve_reason="no_archive"
     show_msg "ERROR: no result archive found in ${ARTIFACT_DIR}/opct-results/"
     return 1
   fi
   if [[ ${#archives[@]} -gt 1 ]]; then
+    retrieve_reason="multiple_archives"
     show_msg "ERROR: multiple result archives found in ${ARTIFACT_DIR}/opct-results/ (${#archives[@]} files)"
     return 1
   fi
+  retrieve_reason="ok"
   RESULT_FILE="${archives[0]}"
 }
 
@@ -504,11 +531,23 @@ if ! retrieve_artifact; then
   show_msg "ERROR: Failed to retrieve result artifact."
   # retrieve_rc / retrieve_tee_rc / retrieve_pipe_rc were set inside retrieve_artifact
   exit_class=$((exit_class | 2))
-  # retrieve_artifact also fails when the archive is missing or ambiguous,
-  # in which case both codes are 0 -- report them without implying the
-  # command itself returned nonzero.
+  # retrieve_artifact fails for four distinct reasons; two of them leave both
+  # exit codes at 0 (the archive is missing or ambiguous rather than the
+  # command having failed), so retrieve_reason names the actual cause.
+  case "${retrieve_reason}" in
+    retrieve_failed)
+      retrieve_detail="'${OPCT_CLI} retrieve' exited with code ${retrieve_rc} (tee_rc=${retrieve_tee_rc})" ;;
+    tee_failed)
+      retrieve_detail="the tee pipeline exited with code ${retrieve_tee_rc}, so log-retrieve.txt may be incomplete ('${OPCT_CLI} retrieve' itself returned ${retrieve_rc})" ;;
+    no_archive)
+      retrieve_detail="'${OPCT_CLI} retrieve' returned ${retrieve_rc} but produced no result archive in ${ARTIFACT_DIR}/opct-results/" ;;
+    multiple_archives)
+      retrieve_detail="more than one result archive found in ${ARTIFACT_DIR}/opct-results/; cannot choose one safely" ;;
+    *)
+      retrieve_detail="failed to retrieve a single result archive (retrieve_rc=${retrieve_rc}, tee_rc=${retrieve_tee_rc})" ;;
+  esac
   junit_case "[opct] retrieve result archive" \
-    "failed to retrieve a single result archive (retrieve_rc=${retrieve_rc}, tee_rc=${retrieve_tee_rc})
+    "${retrieve_detail}
 $(tail -n 5 "${ARTIFACT_DIR}/log-retrieve.txt" 2>/dev/null)
 see log-retrieve.txt and the errors above"
 else
