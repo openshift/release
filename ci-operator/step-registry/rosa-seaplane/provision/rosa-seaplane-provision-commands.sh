@@ -33,12 +33,12 @@ declare -p REPOSITORY_URL REPOSITORY_BRANCH PINNED_SHA > "${SHARED_DIR}/rosa-sea
 echo "Pinned ${REPOSITORY_URL}@${REPOSITORY_BRANCH} at ${PINNED_SHA}"
 
 # Write one override file per ROSA_REGIONAL_COMPONENTS entry that has a
-# target, with IMAGE_REPO/IMAGE_TAG replaced by the image the image-push step
-# pushed for that entry's repo (listed in SHARED_DIR/component-images).
+# target, with IMAGE_REPO/IMAGE_TAG replaced by the image-push result and
+# PR_SOURCE_SHA replaced by the triggering PR's source commit.
 # Prints one "<target>:<override-file>" line per override.
 write_overrides() {
   python3 <<'PYEOF'
-import os, sys, yaml
+import os, re, sys, yaml
 shared = os.environ["SHARED_DIR"]
 pushed = {}
 pushed_file = os.path.join(shared, "component-images")
@@ -47,6 +47,7 @@ if os.path.exists(pushed_file):
         for line in f:
             repo, _, tag = line.strip().rpartition(":")
             pushed[repo] = tag
+source_revision = os.environ.get("PULL_PULL_SHA", "")
 components = yaml.safe_load(os.environ["ROSA_REGIONAL_COMPONENTS"]) or []
 for i, c in enumerate(components):
     repo = c.get("repo", "")
@@ -59,6 +60,10 @@ for i, c in enumerate(components):
         text = text.replace("IMAGE_REPO", repo)
     if repo in pushed:
         text = text.replace("IMAGE_TAG", pushed[repo])
+    if "PR_SOURCE_SHA" in text:
+        if not re.fullmatch(r"[0-9a-fA-F]{40}", source_revision):
+            sys.exit("ERROR: PR_SOURCE_SHA requires PULL_PULL_SHA to contain a full 40-character commit SHA")
+        text = text.replace("PR_SOURCE_SHA", source_revision)
     path = os.path.join(shared, f"component-override-{i}.yaml")
     with open(path, "w") as f:
         f.write(text)
