@@ -51,6 +51,64 @@ working-tree state and identity evidence. Each `results` row supplies
 `version_source` / `authority`. These stable fields are sufficient for a future
 read-only watcher without adding update-PR or notification behavior.
 
+## Release-owned agentic-ci advisory
+
+The three weekly jobs already run this step in their respective `agentic-dev`
+images. The `agentic` variants build that image from the inputs below, copy the
+target repository to `/workspace`, and install `agentic-ci` with
+`python3 -m pip install` and an exact pin in the inline Dockerfile.
+
+| Target repository | Devcontainer input image stream tag |
+|---|---|
+| `openshift/sippy` | `ci/sippy:sippy-devcontainer` |
+| `openshift/origin` | `ci/origin-devcontainer:origin-devcontainer` |
+| `openshift-eng/ship-status-dash` | `ci/ship-status-dash:ship-status-dash-devcontainer` |
+
+The same report command reads the running interpreter's version and installed
+distribution metadata via `importlib.metadata`. On-demand runs observe the local
+interpreter. The reference's `run_as_script` runs the report directly. This
+check reads metadata without importing or dispatching the package CLI.
+
+`agentic-ci-advisory.json` records the observation, source config path, status
+and candidate. The Markdown has a separate openshift/release section. Advisory
+outcomes are independent of the schema-1 target-repository JSON, inventory
+counts, and exit status. Both core inventory artifacts are written before the
+advisory lookup starts. `candidate_available` means a strictly newer final
+`0.5.x` release has a non-yanked `py3-none-any` wheel whose PyPI metadata
+supports the observed final Python version. The checker bounds the PyPI lookup
+to 30 seconds and 2 MiB and accepts an inclusive Python minimum, optionally with
+an exclusive maximum.
+It lists newer final series for review. Missing observations, lookup failures,
+and newer patches without supported wheel evidence produce `unverified` when
+no candidate can be established.
+
+The target checkout revision identifies the repository copied into the image.
+The release configuration is supplied separately to ci-operator. This step
+has neither a verified release config commit nor the three pin declarations
+from one snapshot. The advisory therefore leaves the config revision and pin
+unset. Matching observations across jobs are evidence about those runtimes.
+
+### Review a grouped bump in openshift/release
+
+1. Resolve current public `openshift/release` main to one full commit. Read the
+   three `__agentic.yaml` config blobs from it and verify that each
+   `agentic-dev` definition has one active exact pin and that all three pins
+   agree. Recheck public PyPI and verify the exact candidate wheel against the
+   Python versions for all three build inputs.
+2. Change the three pin values together. Run `make update` and `make checkconfig`
+   and review the diff. Build each exact-candidate `agentic-dev` image in a
+   build-only environment without promotion. Record image IDs and verify both
+   Python and `importlib.metadata.version("agentic-ci")` in each result.
+3. Run an import-only CLI smoke for each built image with the entrypoint
+   overridden, networking disabled, and no credentials or host mounts.
+   Verify the candidate's console entry point can be imported without dispatch.
+   Keep solver workflows out of the check. `EVAL_MODE` can still publish.
+4. Recheck main and PyPI before opening one human-reviewed PR with the commit,
+   candidate and validation evidence. Use an existing PR for the same bump,
+   leave maintainer-closed bumps closed, and keep auto-merge disabled.
+
+## Running on demand
+
 Run the same checker on demand against a public target checkout:
 
 ```sh

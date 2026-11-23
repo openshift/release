@@ -12,12 +12,14 @@ import http.client
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
+from importlib import metadata
 from pathlib import Path
 from typing import Any, Optional, Union
 
@@ -30,8 +32,13 @@ REPOSITORY_NAME = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 NPM_PACKAGE = re.compile(r"^(?:[A-Za-z0-9_.~-]+|@[A-Za-z0-9_.~-]+/[A-Za-z0-9_.~-]+)$")
 PYPI_PACKAGE = re.compile(r"^[A-Za-z0-9_.-]+$")
 CLASSIFICATIONS = {"pinned", "floating", "repo-coupled", "manual"}
+AGENTIC_CI_METADATA_LIMIT = 2 * 1024 * 1024
+AGENTIC_CI_LOOKUP_TIMEOUT = 30
+PYTHON_BOUND = r"[0-9]{1,3}(?:\.[0-9]{1,3}){0,2}"
+PYTHON_RANGE = re.compile(rf">=\s*({PYTHON_BOUND})(?:\s*,\s*<\s*({PYTHON_BOUND}))?")
 
 SOURCES: dict[str, dict[str, str]] = {
+    "agentic-ci": {"kind": "pypi", "package": "agentic-ci"},
     "apm-cli": {"kind": "pypi", "package": "apm-cli"},
     "delve": {
         "kind": "git_tags",
@@ -503,7 +510,9 @@ class Fetcher:
     def __init__(self) -> None:
         self.cache: dict[str, Any] = {}
 
-    def get_package_json(self, source: dict[str, str]) -> dict[str, Any]:
+    def get_package_json(
+        self, source: dict[str, str], *, max_bytes: Optional[int] = None
+    ) -> dict[str, Any]:
         url = source_url(source)
         if url in self.cache:
             return self.cache[url]
@@ -524,7 +533,14 @@ class Fetcher:
         try:
             with opener.open(request, timeout=30) as response:
                 validate_fixed_endpoint(response.geturl(), url)
-                body = response.read().decode("utf-8")
+                body = (
+                    response.read()
+                    if max_bytes is None
+                    else response.read(max_bytes + 1)
+                )
+                if max_bytes is not None and len(body) > max_bytes:
+                    raise CheckError("package metadata exceeds the response size limit")
+                text = body.decode("utf-8")
         except (
             OSError,
             UnicodeError,
@@ -535,7 +551,7 @@ class Fetcher:
                 f"package lookup failed for {source_description(source)}: {exc}"
             ) from exc
         try:
-            payload = json.loads(body)
+            payload = json.loads(text)
         except json.JSONDecodeError as exc:
             raise CheckError(
                 f"package lookup returned invalid JSON for {source_description(source)}: {exc}"
@@ -1022,6 +1038,172 @@ def check(
     return results
 
 
+def agentic_ci_wheel(
+    version: str, files: list[dict[str, Any]], python: tuple[int, ...]
+) -> Optional[dict[str, str]]:
+    filename = f"agentic_ci-{version}-py3-none-any.whl"
+    for file in files:
+        if file.get("filename") != filename or file.get("packagetype") != "bdist_wheel":
+            continue
+        requirement = file.get("requires_python")
+        if not isinstance(requirement, str):
+            continue
+        bounds = PYTHON_RANGE.fullmatch(requirement.strip())
+        if not bounds:
+            continue
+        lower, upper = (
+            tuple(int(part) for part in value.split(".")) if value else ()
+            for value in bounds.groups()
+        )
+        if python < lower or (upper and python >= upper):
+            continue
+        digests = file.get("digests")
+        sha256 = digests.get("sha256") if isinstance(digests, dict) else None
+        if isinstance(sha256, str) and re.fullmatch(r"[a-f0-9]{64}", sha256):
+            return {
+                "filename": filename,
+                "requires_python": requirement,
+                "sha256": sha256,
+            }
+    return None
+
+
+def fetch_agentic_ci_metadata(
+    fetcher: Fetcher, source: dict[str, str]
+) -> dict[str, Any]:
+    if not hasattr(signal, "SIGALRM"):
+        raise CheckError("bounded PyPI advisory lookup requires POSIX timing support")
+
+    def timed_out(_signum: int, _frame: Any) -> None:
+        raise CheckError("public PyPI advisory lookup exceeded its deadline")
+
+    previous = signal.signal(signal.SIGALRM, timed_out)
+    signal.alarm(AGENTIC_CI_LOOKUP_TIMEOUT)
+    try:
+        return fetcher.get_package_json(source, max_bytes=AGENTIC_CI_METADATA_LIMIT)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
+
+
+def check_agentic_ci(repository: str, fetcher: Fetcher) -> dict[str, Any]:
+    """Compare one runtime observation with PyPI without inferring a config pin."""
+    source = SOURCES["agentic-ci"]
+    python = tuple(sys.version_info[:3])
+    owner, name = repository.split("/")
+    advisory: dict[str, Any] = {
+        "schema_version": 1,
+        "advisory_only": True,
+        "package": source["package"],
+        "job_repository": repository,
+        "observation_source": "running interpreter importlib.metadata",
+        "observed_version": None,
+        "python_version": ".".join(map(str, python)),
+        "python_release_level": sys.version_info.releaselevel,
+        "release_config": {
+            "repository": "openshift/release",
+            "path": f"ci-operator/config/{repository}/{owner}-{name}-main__agentic.yaml",
+            "revision": None,
+            "pin": None,
+        },
+        "version_source": source_description(source),
+        "status": "unverified",
+        "candidate": None,
+        "newer_series": [],
+        "newer_patches_without_verified_wheel": [],
+    }
+    try:
+        distributions = list(metadata.distributions(name=source["package"]))
+        if len(distributions) != 1:
+            raise CheckError(
+                f"expected one installed agentic-ci distribution, found {len(distributions)}"
+            )
+        installed = distributions[0].metadata
+        names = installed.get_all("Name") or []
+        versions = installed.get_all("Version") or []
+        if (
+            len(names) != 1
+            or re.sub(r"[-_.]+", "-", names[0].lower()) != source["package"]
+            or len(versions) != 1
+            or not re.fullmatch(r"[a-zA-Z0-9_.+!-]{1,80}", versions[0])
+        ):
+            raise CheckError(
+                "installed agentic-ci metadata requires one matching Name and one version"
+            )
+        observed = versions[0]
+        advisory["observed_version"] = observed
+        current = parse_version(observed)
+        if current[:2] != (0, 5):
+            raise CheckError(
+                "installed agentic-ci is outside the maintained 0.5.x series"
+            )
+        if sys.version_info.releaselevel != "final":
+            raise CheckError("wheel compatibility requires a final Python interpreter")
+
+        payload = fetch_agentic_ci_metadata(fetcher, source)
+        info, releases = payload.get("info"), payload.get("releases")
+        if not isinstance(info, dict) or info.get("name") != source["package"]:
+            raise CheckError("PyPI metadata does not identify agentic-ci")
+        if not isinstance(releases, dict) or not isinstance(
+            releases.get(observed), list
+        ):
+            raise CheckError("PyPI release metadata is missing the observed version")
+
+        patches: dict[tuple[int, int, int], list[dict[str, Any]]] = {}
+        later_series: dict[tuple[int, ...], tuple[int, int, int]] = {}
+        for version, files in releases.items():
+            try:
+                parsed = parse_version(version)
+            except CheckError:
+                continue
+            if parsed <= current or version != ".".join(map(str, parsed)):
+                continue
+            if not isinstance(files, list) or any(
+                not isinstance(file, dict) or not isinstance(file.get("yanked"), bool)
+                for file in files
+            ):
+                raise CheckError("PyPI release has invalid file or yanked metadata")
+            published = [file for file in files if not file["yanked"]]
+            if not published:
+                continue
+            if parsed[:2] == (0, 5):
+                patches[parsed] = published
+            else:
+                series = parsed[:2]
+                later_series[series] = max(parsed, later_series.get(series, parsed))
+        advisory["newer_series"] = [
+            ".".join(map(str, version))
+            for version in sorted(later_series.values(), reverse=True)
+        ]
+        if not patches:
+            advisory.update(
+                status="no_newer_patch",
+                reason="PyPI has no newer final 0.5.x patch with non-yanked files",
+            )
+            return advisory
+        for parsed in sorted(patches, reverse=True):
+            version = ".".join(map(str, parsed))
+            wheel = agentic_ci_wheel(version, patches[parsed], python)
+            if wheel:
+                advisory.update(
+                    status="candidate_available",
+                    candidate={"version": version, **wheel},
+                    reason="PyPI wheel metadata matches this interpreter",
+                )
+                return advisory
+            advisory["newer_patches_without_verified_wheel"].append(version)
+        raise CheckError(
+            "no newer final 0.5.x patch has a verified wheel for this interpreter"
+        )
+    except CheckError as exc:
+        advisory["reason"] = str(exc)
+    except (OSError, KeyError, ValueError, RecursionError):
+        advisory["reason"] = (
+            "could not read installed distribution or public PyPI metadata"
+        )
+    return advisory
+
+
 def write_reports(
     results: list[dict[str, Any]],
     output_dir: Path,
@@ -1030,6 +1212,7 @@ def write_reports(
     repository_revision: str,
     inventory_source: str,
     checkout_identity: str,
+    fetcher: Fetcher,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
@@ -1107,9 +1290,40 @@ def write_reports(
             )
             + " |"
         )
-    atomic_write_text(
-        output_dir / "devcontainer-dependency-report.md", "\n".join(lines) + "\n"
+    markdown_path = output_dir / "devcontainer-dependency-report.md"
+    atomic_write_text(markdown_path, "\n".join(lines) + "\n")
+
+    # Both inventory artifacts are available before the optional lookup starts.
+    agentic_ci = check_agentic_ci(repository, fetcher)
+    detail = "- Details and later series: [agentic-ci-advisory.json](agentic-ci-advisory.json)."
+    try:
+        atomic_write_text(
+            output_dir / "agentic-ci-advisory.json",
+            json.dumps(agentic_ci, indent=2, sort_keys=True) + "\n",
+        )
+    except OSError as exc:
+        print(f"could not write agentic-ci advisory artifact: {exc}", file=sys.stderr)
+        detail = "- The separate advisory artifact could not be written."
+    candidate = agentic_ci["candidate"]
+    lines.extend(
+        [
+            "",
+            "## openshift/release advisory",
+            "",
+            f"- agentic-ci observed in this runtime: `{agentic_ci['observed_version'] or 'unknown'}`",
+            f"- Python: `{agentic_ci['python_version']}` ({agentic_ci['python_release_level']})",
+            f"- Status: `{agentic_ci['status']}`. {agentic_ci['reason']}.",
+            f"- Candidate for this interpreter: `{candidate['version'] if candidate else 'none'}`",
+            "- The configured pin and release config revision are unverified.",
+            detail,
+        ]
     )
+    try:
+        atomic_write_text(markdown_path, "\n".join(lines) + "\n")
+    except OSError as exc:
+        print(
+            f"could not append agentic-ci advisory to Markdown: {exc}", file=sys.stderr
+        )
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -1162,11 +1376,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
         ensure_output_outside_repository(args.output_dir, args.repository_root)
         phase = "checking dependency versions"
+        fetcher = Fetcher()
         results = check(
             args.repository,
             dependencies,
             patterns,
-            Fetcher(),
+            fetcher,
             captured_files,
             revision,
         )
@@ -1178,6 +1393,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             repository_revision=revision,
             inventory_source=inventory_source,
             checkout_identity=checkout_identity,
+            fetcher=fetcher,
         )
     except (OSError, CheckError) as exc:
         print(
