@@ -291,18 +291,23 @@ function oc_adm_top_nodes_loop() {
 
 function suite() {
     if [ -f "${SHARED_DIR}/excluded_tests" ]; then
+        # Match exact names and substrings so short theme patterns (Power/AWS
+        # TEST_SKIPS style) still apply after openshift-tests renames/tags tests.
         cat > ${SHARED_DIR}/invert_excluded.py <<EOSCRIPT
 #!/usr/libexec/platform-python
 import sys
 all_tests = set()
-excluded_tests = set()
+excluded_tests = []
 for l in sys.stdin.readlines():
     all_tests.add(l.strip())
 with open(sys.argv[1], "r") as f:
     for l in f.readlines():
-        excluded_tests.add(l.strip())
-test_suite = all_tests - excluded_tests
-for t in test_suite:
+        e = l.strip()
+        if e:
+            excluded_tests.append(e)
+for t in sorted(all_tests):
+    if any(e == t or e in t for e in excluded_tests):
+        continue
     print(t)
 EOSCRIPT
         chmod +x ${SHARED_DIR}/invert_excluded.py
