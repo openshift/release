@@ -15,25 +15,20 @@ umask 077
 # shellcheck disable=SC2317
 _propagate_junit () {
     [[ -n "${SHARED_DIR:-}" ]] || return 0
-    # The helper writes the merged report to ARTIFACT_DIR and removes the raw report
-    # before the shared copy, so a failed or truncated shared copy leaves the shared
-    # root without a report unless the merged artifact is restored here first.
-    if ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${SHARED_DIR}/${mergedJunitFile}')" 2>/dev/null; then
-        if [[ -s "${ARTIFACT_DIR}/${mergedJunitFile}" ]] && python3 -c "import xml.etree.ElementTree as ET; ET.parse('${ARTIFACT_DIR}/${mergedJunitFile}')" 2>/dev/null; then
-            cp "${ARTIFACT_DIR}/${mergedJunitFile}" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null || true
+    if python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null; then
+        return 0
+    fi
+    if [[ -s "${ARTIFACT_DIR}/${mergedJunitFile}" ]] && python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${ARTIFACT_DIR}/${mergedJunitFile}" 2>/dev/null; then
+        if cp "${ARTIFACT_DIR}/${mergedJunitFile}" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null; then
+            return 0
+        fi
+        if cp "${ARTIFACT_DIR}/${mergedJunitFile}" "${SHARED_DIR}/" 2>/dev/null; then
             return 0
         fi
     fi
-    # Check merged artifact in ARTIFACT_DIR before declaring shared copy failed (thread PRRT_kwDOBHvUUM65Mrjd)
-    if [[ -s "${ARTIFACT_DIR}/${mergedJunitFile}" ]] && python3 -c "import xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${ARTIFACT_DIR}/${mergedJunitFile}" 2>/dev/null; then
-        cp "${ARTIFACT_DIR}/${mergedJunitFile}" "${SHARED_DIR}/" 2>/dev/null || true
-        return 0
-    fi
-    if [[ -s "${SHARED_DIR}/${mergedJunitFile}" ]]; then
-        # Verify shared file is valid XML; if not, recover raw report with prefix
-        if ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${SHARED_DIR}/${mergedJunitFile}')" 2>/dev/null; then
-            if [[ -n "${LP_QE__CR__TS_NAME__PFX__ACM:-}" ]]; then
-                python3 -c "
+    if [[ -s "${junitFile}" ]]; then
+        if [[ -n "${LP_QE__CR__TS_NAME__PFX__ACM:-}" ]]; then
+            if python3 -c "
 import xml.etree.ElementTree as ET, os, sys
 pfx=os.environ.get('LP_QE__CR__TS_NAME__PFX__ACM','')
 src=sys.argv[1]
@@ -48,33 +43,27 @@ try:
     t.write(dst, encoding='utf-8', xml_declaration=True)
 except Exception:
     import shutil; shutil.copy(src, dst)
-" "${junitFile}" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null || cp "${junitFile}" "${SHARED_DIR}/${mergedJunitFile}" || true
-            else
-                cp "${junitFile}" "${SHARED_DIR}/" || true
+" "${junitFile}" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null; then
+                if python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null; then
+                    return 0
+                fi
+            fi
+            if cp "${junitFile}" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null; then
+                return 0
+            fi
+            if cp "${junitFile}" "${SHARED_DIR}/" 2>/dev/null; then
+                return 0
+            fi
+        else
+            if cp "${junitFile}" "${SHARED_DIR}/" 2>/dev/null; then
+                return 0
+            fi
+            if cp "${junitFile}" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null; then
+                return 0
             fi
         fi
-        return 0
     fi
-    if [[ -n "${LP_QE__CR__TS_NAME__PFX__ACM:-}" ]]; then
-        python3 -c "
-import xml.etree.ElementTree as ET, os, sys
-pfx=os.environ.get('LP_QE__CR__TS_NAME__PFX__ACM','')
-src=sys.argv[1]
-dst=sys.argv[2]
-try:
-    t=ET.parse(src)
-    r=t.getroot()
-    for ts in r.findall('.//testsuite'):
-        n=ts.get('name','')
-        if n and not n.startswith(pfx):
-            ts.set('name', f'{pfx}--{n}')
-    t.write(dst, encoding='utf-8', xml_declaration=True)
-except Exception:
-    import shutil; shutil.copy(src, dst)
-" "${junitFile}" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null || cp "${junitFile}" "${SHARED_DIR}/" || true
-    else
-        cp "${junitFile}" "${SHARED_DIR}/" || true
-    fi
+    return 1
 }
 
 # Suite naming for the JUnit post-processing library: compose its suite-name
@@ -822,12 +811,21 @@ def lastn($d): split("/") | .[-$d:] | join("/");
 ################################################################################
 # Load ExitTrap library for Component Readiness JUnit remapping
 # Per Best Practices: Use exact pattern from library documentation.
-eval "$(
+typeset _exitTrapHelper=""
+typeset -i _exitTrapDlRc=0
+if ! _exitTrapHelper="$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
         https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-)"
+)"; then
+    _exitTrapDlRc=$?
+    printf '%s\n' "WARNING: failed to download ExitTrap helper (rc=${_exitTrapDlRc})" >&2
+elif [[ -z "${_exitTrapHelper}" ]]; then
+    printf '%s\n' "WARNING: ExitTrap helper download returned empty body" >&2
+else
+    eval "${_exitTrapHelper}"
+fi
 
 # Post-process the JUnit XML for Component Readiness routing.  This runs from
 # the EXIT trap, which clears errexit first, so the helper is called unguarded:
@@ -861,34 +859,41 @@ PostProcessJunit () {
 # early `exit`, would meet an unset variable under `set -u`.
 typeset -i _trapExit=0
 typeset -i _genRc=0
+typeset -i _propRc=0
+typeset -i _trapFail=0
 trap '{
     _trapExit=$?
     set +e
     _genRc=0
+    _propRc=0
+    _trapFail=0
     GenerateJunitXml || _genRc=$?
-    # Validate report after generation: artifact volume full can leave no report or truncated XML (thread PRRT_kwDOBHvUUM65LZ2n)
-    if (( _genRc == 0 )); then
-        if [[ ! -s "${junitFile}" ]] || ! python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${junitFile}" 2>/dev/null; then
-            echo "ERROR: JUnit report missing or invalid at ${junitFile}" >&2
-            if (( _trapExit == 0 )); then exit 1; fi
-        fi
-    else
-        if (( _trapExit == 0 )); then
-            echo "ERROR: JUnit report missing or invalid at ${junitFile} (GenerateJunitXml rc=${_genRc})" >&2
-            exit 1
-        fi
+    if (( _genRc != 0 )); then
+        echo "ERROR: JUnit report generation failed at ${junitFile} (rc=${_genRc})" >&2
+        _trapFail=1
+    elif [[ ! -s "${junitFile}" ]] || ! python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${junitFile}" 2>/dev/null; then
+        echo "ERROR: JUnit report missing or invalid at ${junitFile}" >&2
+        _trapFail=1
     fi
     PostProcessJunit
-    _propagate_junit
+    _propagate_junit || _propRc=$?
+    if (( _propRc != 0 )); then
+        echo "ERROR: failed to publish JUnit report to SHARED_DIR" >&2
+        _trapFail=1
+    fi
     if [[ -n "${SHARED_DIR:-}" ]]; then
-        if ! python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null && ! python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${junitFile}" 2>/dev/null; then
-            echo "ERROR: JUnit report not present in SHARED_DIR and local report invalid" >&2
-            if (( _trapExit == 0 )); then exit 1; fi
+        if ! python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null && ! python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${SHARED_DIR}/$(basename "${junitFile}")" 2>/dev/null; then
+            echo "ERROR: JUnit report not present in SHARED_DIR" >&2
+            _trapFail=1
         fi
     fi
     rm -f /tmp/acs-admin-password
-    # Preserve original exit when all validations passed
-    if (( _trapExit != 0 )); then exit "${_trapExit}"; fi
+    if (( _trapFail != 0 )) && (( _trapExit == 0 )); then
+        exit 1
+    fi
+    if (( _trapExit != 0 )); then
+        exit "${_trapExit}"
+    fi
     true
 }' EXIT
 
