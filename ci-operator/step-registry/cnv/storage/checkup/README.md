@@ -230,8 +230,8 @@ and ten checkup VMs. Their schedules are staggered in UTC:
 | Azure | `openshift-org-azure` | `Standard_D16s_v5` | `file.csi.azure.com` | Mondays 06:00 UTC |
 | GCP | `openshift-org-gcp` | `c3-standard-8` | `pd.csi.storage.gke.io` | Mondays 09:00 UTC |
 
-The OCP 5.0 nightly baseline follows the manually verified cluster; the CNV
-build is selected separately. Ten-VM rehearsals confirmed driver selection,
+The jobs select the OCP 5.1 nightly stream; the CNV development build is
+selected separately. Ten-VM rehearsals confirmed driver selection,
 snapshot/restore behavior, and post-step cleanup on all three platforms with the
 previous 30-minute checkup budget. The shorter default budgets are a new trial.
 The GCP PD coverage story [CNV-72113](https://redhat.atlassian.net/browse/CNV-72113)
