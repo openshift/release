@@ -259,7 +259,6 @@ function WaitFor () {
         shift
     fi
 
-    typeset -i elapsed=0
     typeset -i iteration=0
     typeset -i cap=waitCap
     typeset -i rem
@@ -269,16 +268,17 @@ function WaitFor () {
         echo "[readiness] BUDGET EXHAUSTED before waiting for: ${description}"
         return 1
     fi
+    typeset -i _deadline=$(( $(date +%s) + cap ))
     echo "[readiness] Waiting for: ${description} (cap ${cap}s, budget remaining $(_budget_remaining)s)"
     while true; do
         if "${checkFn}" "$@"; then
             echo "[readiness] OK: ${description}"
             return 0
         fi
-        elapsed=$((elapsed + pollInterval))
-        iteration=$((iteration + 1))
-        if [[ "${elapsed}" -ge "${cap}" ]]; then
-            echo "[readiness] TIMEOUT after ${elapsed}s waiting for: ${description} (budget remaining $(_budget_remaining)s)"
+        typeset -i _now=0
+        _now=$(date +%s)
+        if (( _now >= _deadline )); then
+            echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (budget remaining $(_budget_remaining)s)"
             return 1
         fi
         rem="$(_budget_remaining)"
@@ -286,13 +286,17 @@ function WaitFor () {
             echo "[readiness] BUDGET EXHAUSTED while waiting for: ${description}"
             return 1
         fi
+        typeset -i _remain=$(( _deadline - _now ))
+        (( _remain > rem )) && _remain=rem
+        typeset -i _sleepFor=$(( _remain < pollInterval ? _remain : pollInterval ))
+        iteration=$((iteration + 1))
         # Every 5th iteration, dump periodic diagnostics if a function is provided
         if [[ -n "${diagnosticsFn}" ]] && (( iteration % 5 == 0 )); then
-            echo "[readiness]   --- periodic diagnostics (iteration ${iteration}, ${elapsed}/${cap}s) ---"
+            echo "[readiness]   --- periodic diagnostics (iteration ${iteration}, $(( _now - (_deadline - cap) ))/${cap}s) ---"
             "${diagnosticsFn}" || true
         fi
-        echo "[readiness]   ...retrying in ${pollInterval}s (${elapsed}/${cap}s, budget remaining ${rem}s)"
-        sleep "${pollInterval}"
+        echo "[readiness]   ...retrying in ${_sleepFor}s ($(( _now - (_deadline - cap) ))/${cap}s, budget remaining ${rem}s)"
+        sleep "${_sleepFor}"
     done
     true
 }
