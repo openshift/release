@@ -182,6 +182,34 @@ elif resource_type == "central":
             condition_counts["unknown"]
         )
     )
+elif resource_type == "securedcluster":
+    conditions = []
+    for item in matched:
+        item_conditions = status_of(item).get("conditions")
+        conditions.extend(item_conditions if isinstance(item_conditions, list) else [])
+    condition_counts = {"true": 0, "false": 0, "unknown": 0}
+    for condition in conditions:
+        condition_status = mapping(condition).get("status")
+        category = condition_status.lower() if isinstance(condition_status, str) and condition_status in {"True", "False"} else "unknown"
+        condition_counts[category] += 1
+    print(
+        "resources={} conditions={} true={} false={} unknown={}".format(
+            len(matched), len(conditions), condition_counts["true"], condition_counts["false"],
+            condition_counts["unknown"]
+        )
+    )
+elif resource_type == "policy":
+    counts = categorize(
+        (status_of(item).get("compliant") for item in matched),
+        {"Compliant"},
+        {"Pending"},
+        {"NonCompliant"},
+    )
+    print(
+        "resources={} healthy={} progressing={} failed={} unknown={}".format(
+            len(matched), counts["healthy"], counts["progressing"], counts["failed"], counts["unknown"]
+        )
+    )
 else:
     sys.exit(1)
 ' "${resourceType}" "${nameFilter}" 2>/dev/null
@@ -240,6 +268,30 @@ function CentralStatus () {
     typeset output=""
     output="$(oc get centrals.platform.stackrox.io -A -o json 2>/dev/null \
         | FormatDiagnosticStatus central)" && [[ -n "${output}" ]] || return 1
+    echo "${output}"
+}
+
+# Summarize SecuredCluster conditions without printing identifiers.
+function SecuredClusterStatus () {
+    typeset output=""
+    output="$(timeout 10 oc get securedclusters.platform.stackrox.io --all-namespaces -o json 2>/dev/null \
+        | FormatDiagnosticStatus securedcluster)" && [[ -n "${output}" ]] || return 1
+    echo "${output}"
+}
+
+# Summarize OPP policy compliance without printing policy names.
+function PolicyStatus () {
+    typeset output=""
+    output="$(timeout 10 oc get policies -n policies -o json 2>/dev/null \
+        | FormatDiagnosticStatus policy)" && [[ -n "${output}" ]] || return 1
+    echo "${output}"
+}
+
+# Summarize sensor pods in the Central namespace without printing pod names.
+function SensorPodStatus () {
+    typeset output=""
+    output="$(timeout 10 oc get pods -n "${centralNs}" -l app=sensor -o json 2>/dev/null \
+        | FormatDiagnosticStatus pod)" && [[ -n "${output}" ]] || return 1
     echo "${output}"
 }
 
@@ -344,32 +396,19 @@ function DiscoverScNs () {
 
 function PeriodicSecuredClusterDiagnostics () {
     echo "[readiness] --- SecuredCluster CRs so far (all namespaces) ---"
-    # PRRT_kwDOBHvUUM65Uiu_: sanitize discovery callbacks; PRRT_kwDOBHvUUM65on2S: bound by timeout
-    timeout 10 bash -c 'oc get securedclusters.platform.stackrox.io --all-namespaces -o json 2>/tmp/sc-periodic-err.log | head -c 1024' 2>/dev/null || echo "[readiness]   SecuredCluster periodic query failed or timed out" >&2
+    SecuredClusterStatus || echo "[readiness]   SecuredCluster periodic query failed or timed out" >&2
     echo "[readiness] --- OPP policy status (the policy set creates the SecuredCluster) ---"
-    timeout 10 oc get policies -n policies 2>/dev/null || echo "[readiness]   policy query failed or timed out" >&2
+    PolicyStatus || echo "[readiness]   policy query failed or timed out" >&2
 }
 
 function SecuredClusterDiscoveryFailureDiagnostics () {
     echo "[readiness] === SecuredCluster discovery failure diagnostics ==="
     echo "[readiness] --- SecuredCluster CRs in any state, all namespaces ---"
-    # PRRT_kwDOBHvUUM65on2Z: capture real rc not negated status
-    typeset -i _scListRc=0
-    oc get securedclusters.platform.stackrox.io --all-namespaces -o json > /tmp/sc-list.json 2> /tmp/sc-list-err.log || _scListRc=$?
-    if (( _scListRc != 0 )); then
-        echo "[readiness]   SecuredCluster query failed rc=${_scListRc}" >&2
-    else
-        if [[ ! -s /tmp/sc-list.json ]]; then
-            echo "[readiness]   No SecuredCluster CRs found at all"
-        else
-            cat /tmp/sc-list.json
-        fi
-    fi
+    SecuredClusterStatus || echo "[readiness]   No SecuredCluster CRs found at all"
     echo "[readiness] --- OPP policy status (the policy set creates the SecuredCluster) ---"
-    oc get policies -n policies || true
+    PolicyStatus || echo "[readiness]   (none)"
     echo "[readiness] --- Sensor pods in ${centralNs} ---"
-    oc get pods -n "${centralNs}" -l app=sensor 2>/dev/null || \
-        echo "[readiness]   No sensor pods found in ${centralNs}"
+    SensorPodStatus || echo "[readiness]   No sensor pods found in ${centralNs}"
     echo "[readiness] === End failure diagnostics ==="
 }
 
