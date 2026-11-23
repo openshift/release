@@ -2,9 +2,34 @@ ref:
   as: ipi-install-nutanix-csi
   from: cli
   commands: ipi-install-nutanix-csi-commands.sh
+  env:
+    - name: NUTANIX_CSI_USE_BETA_CATALOG
+      default: "false"
+      documentation: |-
+        Install the CSI operator from the Nutanix beta dev catalog
+        (quay.io/ntnx-csi/nutanix-csi-operator-catalog:latest) instead of the
+        certified-operators catalog. Only use this if the certified operator
+        does not support the node OS or cluster version under test (for
+        example, RHCOS 10 before a compatible certified build was available).
+        The beta operator does not set terminationMessagePolicy on its
+        containers, so jobs using it must keep
+        --disable-monitor=termination-message-policy while the beta catalog
+        is in use (OCPBUGS-99481).
   resources:
     requests:
       cpu: 100m
       memory: 200Mi
   documentation: |-
     The ipi-install-nutanix-csi step installs the Nutanix CSI driver on the cluster.
+
+    By default the CSI operator is installed from the certified-operators catalog
+    on the stable-3.x channel. That operator sets
+    terminationMessagePolicy=FallbackToLogsOnError on all of its containers,
+    which keeps the termination-message-policy monitor green (OCPBUGS-99481).
+
+    Set NUTANIX_CSI_USE_BETA_CATALOG=true to install the operator from the
+    Nutanix beta dev catalog (quay.io/ntnx-csi/nutanix-csi-operator-catalog:latest)
+    instead. Only use this if the certified operator does not support the node
+    OS or cluster version under test. The beta operator does not set
+    terminationMessagePolicy on its containers, so jobs using it must keep
+    --disable-monitor=termination-message-policy while the beta catalog is in use.
