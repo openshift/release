@@ -634,28 +634,28 @@ print(json.dumps(result, indent=2))
     _opp_junit="${ARTIFACT_DIR}/junit_grc_placement_restore.xml"
     typeset -i _opp_junit_write_rc=0
     {
-        echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"grc-placement-restore\" tests=\"3\" failures=\"${_opp_failures}\">"
-        echo "  <testcase classname=\"grc-placement-restore\" name=\"operatorpolicy-inventory-nonempty\">"
+        echo '<?xml version="1.0" encoding="UTF-8"?>' || _opp_junit_write_rc=1
+        echo "<testsuite name=\"grc-placement-restore\" tests=\"3\" failures=\"${_opp_failures}\">" || _opp_junit_write_rc=1
+        echo "  <testcase classname=\"grc-placement-restore\" name=\"operatorpolicy-inventory-nonempty\">" || _opp_junit_write_rc=1
         if [[ "${_opp_inv_ok}" -ne 1 ]]; then
             if [[ "${_OPP_QUERY_FAILED}" -eq 1 ]]; then
-                echo "    <failure message=\"$(_opp_xesc "pre-GRC capture never ran: the OPP placement query failed (rc=${_OPP_QUERY_RC}); see 00-placement-query-error.log")\"></failure>"
+                echo "    <failure message=\"$(_opp_xesc "pre-GRC capture never ran: the OPP placement query failed (rc=${_OPP_QUERY_RC}); see 00-placement-query-error.log")\"></failure>" || _opp_junit_write_rc=1
             else
-                echo "    <failure message=\"$(_opp_xesc "operatorpolicy inventory at pre-GRC capture: ${_OPP_POLICY_COUNT} objects")\"></failure>"
+                echo "    <failure message=\"$(_opp_xesc "operatorpolicy inventory at pre-GRC capture: ${_OPP_POLICY_COUNT} objects")\"></failure>" || _opp_junit_write_rc=1
             fi
         fi
-        echo "  </testcase>"
-        echo "  <testcase classname=\"grc-placement-restore\" name=\"label-baseline-readable\">"
+        echo "  </testcase>" || _opp_junit_write_rc=1
+        echo "  <testcase classname=\"grc-placement-restore\" name=\"label-baseline-readable\">" || _opp_junit_write_rc=1
         if [[ "${_opp_base_ok}" -ne 1 ]]; then
-            echo "    <failure message=\"$(_opp_xesc "pre-suite local-cluster label snapshot unreadable; the label restore was skipped")\"></failure>"
+            echo "    <failure message=\"$(_opp_xesc "pre-suite local-cluster label snapshot unreadable; the label restore was skipped")\"></failure>" || _opp_junit_write_rc=1
         fi
-        echo "  </testcase>"
-        echo "  <testcase classname=\"grc-placement-restore\" name=\"placement-selects-local-cluster\">"
+        echo "  </testcase>" || _opp_junit_write_rc=1
+        echo "  <testcase classname=\"grc-placement-restore\" name=\"placement-selects-local-cluster\">" || _opp_junit_write_rc=1
         if [[ "${_opp_sel}" -ne 1 ]]; then
-            echo "    <failure message=\"$(_opp_xesc "placement ${_OPP_PLACEMENT_NAME} does not select ${_OPP_MC_NAME} after the GRC suite: selection could not be verified within 5 minutes; see 04-label-restore.log, 05-placement-status-post.json and 06-placementdecisions-post.json in this step artifacts")\"></failure>"
+            echo "    <failure message=\"$(_opp_xesc "placement ${_OPP_PLACEMENT_NAME} does not select ${_OPP_MC_NAME} after the GRC suite: selection could not be verified within 5 minutes; see 04-label-restore.log, 05-placement-status-post.json and 06-placementdecisions-post.json in this step artifacts")\"></failure>" || _opp_junit_write_rc=1
         fi
-        echo "  </testcase>"
-        echo "</testsuite>"
+        echo "  </testcase>" || _opp_junit_write_rc=1
+        echo "</testsuite>" || _opp_junit_write_rc=1
     } > "${_opp_junit}" || _opp_junit_write_rc=1
     if (( _opp_junit_write_rc != 0 )) || [[ ! -s "${_opp_junit}" ]] || ! tail -n1 "${_opp_junit}" 2>/dev/null | grep -qF "</testsuite>"; then
         echo "ERROR: failed to write JUnit report ${_opp_junit} (write rc=${_opp_junit_write_rc})" >&2
