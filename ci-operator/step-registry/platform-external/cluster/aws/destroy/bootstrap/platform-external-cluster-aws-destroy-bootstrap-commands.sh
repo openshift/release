@@ -20,6 +20,11 @@ GATHER_BOOTSTRAP_ARGS="$(<"${SHARED_DIR}"/GATHER_BOOTSTRAP_ARGS)"
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 
 source "${SHARED_DIR}/init-fn.sh" || true
+# Ensure log is available even when init-fn.sh was not created
+# (e.g. teardown after early abort before platform-external-pre-init ran).
+if ! type log &>/dev/null; then
+  log() { echo "$(date -u --rfc-3339=seconds) - $*"; }
+fi
 
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
