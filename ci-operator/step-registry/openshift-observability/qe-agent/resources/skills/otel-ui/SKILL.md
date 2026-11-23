@@ -48,7 +48,7 @@ Mandatory. Read `/tmp/qe-agent-modules/junit-triage.md` and follow it. Suite rul
 - The specs run serially: the first `<failure>` is the root cause, the `skipped` cases after it did not run. Its text has the assertion, the locator and the call log; the `Error Context:` and `[[ATTACHMENT|…]]` paths (page snapshot, screenshot, trace) are in the test step's artifacts, which this pod cannot read; the reruns of Step 3 write their own.
 - The chainsaw XML only says `exit status 1`. Read `${SHARED_DIR}/qe-agent-ui-chainsaw-output.log` (last 100 KiB of Chainsaw's console output): it names the failed step, what it printed and what the catch operations collected (collector status, pod logs, events). No Playwright XML, or one without cases, means the run failed before the specs: in the steps `enable-user-workload-monitoring`, `deploy-collectors`, `generate-telemetry` or `wait-for-dashboard-metrics` (the data pipeline), or in the console login. With no JUnit file at all but this log present, the step failed before any report (a failed clone, a missing password file, the time limit): diagnose from the log, this overrides the module's rule to exit.
 
-If missing: read `${SHARED_DIR}/qe-agent-junit-*.xml`, extract each suite name and failed `<testcase>` (`<failure>`/`<error>` message and full text), group by suite, and exit with a clear message if there are no files. If more than 5 tests fail, look for one shared root cause and diagnose the simplest failing test as the representative (Steps 2–5); with no pattern, diagnose individually, capped at 3. Write any pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.md`.
+If missing: read `${QE_JUNIT_DIR}/qe-agent-junit-*.xml`, extract each suite name and failed `<testcase>` (`<failure>`/`<error>` message and full text), group by suite, and exit with a clear message if there are no files. If more than 5 tests fail, look for one shared root cause and diagnose the simplest failing test as the representative (Steps 2–5); with no pattern, diagnose individually, capped at 3. Write any pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.md`.
 
 ---
 
@@ -211,7 +211,7 @@ Mandatory. Follow "Incident note" in `/tmp/qe-agent-modules/analysis-summary.md`
 
 ## Step 5e — If JOB_CONFIG: Recommend a Job Configuration Change
 
-The test and product are fine, but the job lacks something (the kubeadmin password file, the console operator, `OPENSHIFT_CREATE_DASHBOARD=true` in the operator bundle, access to the telemetrygen image). Don't modify tests or write `jira-payload.json`. In `qe-agent-analysis.md`, give the evidence and the exact change: the job is `e2e-ui-ocp-4-22` in `ci-operator/config/openshift/open-telemetry-opentelemetry-operator/` — branch `rhosdt-0.158` variant `art-build` for premerge, branch `main` variant `upstream` for upstream; use whichever matches `step_script_ref`.
+The test and product are fine, but the job lacks something (the kubeadmin password file, the console operator, `OPENSHIFT_CREATE_DASHBOARD=true` in the operator bundle, access to the telemetrygen image). Don't modify tests or write `jira-payload.json`. In `qe-agent-analysis.md`, give the evidence and the exact change: the job is `e2e-ui-ocp-4-22` in `ci-operator/config/openshift/open-telemetry-opentelemetry-operator/` — branch `rhosdt-0.158` or `rhosdt-0.163` variant `art-build` for premerge, branch `main` variant `upstream` for upstream; use whichever matches `step_script_ref`.
 
 ---
 
@@ -227,7 +227,7 @@ Mandatory. Follow "Analysis summary" in `/tmp/qe-agent-modules/analysis-summary.
 - The qe-agent runs in a fresh pod — `/tmp/` is empty at start; Step 0b sets up the tests
 - `$KUBECONFIG` points to the test cluster; `oc`, `kubectl`, `chainsaw`, `yq`, `jq`, `curl`, `git`, Node.js, npm and Chromium (`PLAYWRIGHT_BROWSERS_PATH`) are in PATH: do not run `npx playwright install`
 - The tests read `KUBEADMIN_PASSWORD_FILE` themselves for the console login: never `cat` or print it, and never put it in a command
-- All output goes to `$ARTIFACT_DIR` (GCS) or `$SHARED_DIR`; do not copy large files to `$SHARED_DIR` (1 MiB Secret limit)
+- All output goes to `$ARTIFACT_DIR` (GCS). Never write into `$SHARED_DIR`: it is a 1 MiB Kubernetes Secret synced when this pod exits, and files written there can fail the step.
 - **Namespace restriction**: MUST NOT access, read, list, or modify any `kube-system` resource — an all-namespaces query filtered afterward still fetches it, so scope every command to named namespaces or a label selector (`-A` is only used above with a `--field-selector` on the collector name)
 - Do not call external APIs (Jira, GitHub, Slack); the wrapper script handles integrations after exit
 - This step runs `best_effort: true` — always exit 0, even incomplete

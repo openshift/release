@@ -1,0 +1,33 @@
+ref:
+  as: hypershift-azure-setup-private-link-v2
+  cli: latest
+  commands: hypershift-azure-setup-private-link-v2-commands.sh
+  credentials:
+  - mount_path: /etc/hypershift-ci-jobs-self-managed-azure
+    collection: hypershift-team
+    group: ops/clusters/sm-azure-root-ci
+    field: azure-credentials
+    as: credentials.json
+  - mount_path: /etc/hypershift-ci-jobs-self-managed-azure-private
+    collection: hypershift-team
+    group: ops/clusters/sm-azure-root-ci
+    field: private-link-credentials
+    as: private-credentials.json
+  env:
+  - name: AZURE_PRIVATE_CREDS_FILE
+    default: /etc/hypershift-ci-jobs-self-managed-azure-private/private-credentials.json
+    documentation: Dedicated credentials for managing Private Link Services.
+  - default: ${SHARED_DIR}/management_cluster_kubeconfig
+    name: KUBECONFIG
+    documentation: Path to the management cluster kubeconfig, written by the nested management cluster setup step.
+  - name: AZURE_PRIVATE_LINK_ASSIGN_ROLES
+    default: 'true'
+    documentation: Grant the dedicated Private Link principal Network Contributor on the temporary management and VNet resource
+      groups. The credentials file must include its objectId.
+  from: hypershift-tests
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 10m0s

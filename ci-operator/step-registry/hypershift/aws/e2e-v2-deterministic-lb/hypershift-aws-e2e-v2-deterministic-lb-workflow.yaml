@@ -1,0 +1,54 @@
+workflow:
+  as: hypershift-aws-e2e-v2-deterministic-lb
+  documentation: |-
+    The HyperShift AWS e2e v2 deterministic LoadBalancer IP workflow
+    provisions a nested management cluster, installs the HyperShift operator,
+    reserves an EIP in the management cluster account, creates AWS guest
+    clusters with the deterministic LB variant, runs the v2 test suite, and
+    releases the EIP after the guest clusters are destroyed.
+
+    The deterministic-lb variant is selected by the TEST_PLAN in the job. The
+    EIP and public subnet are written to SHARED_DIR/eip.env and consumed by the
+    create-guests and run-tests steps. The deterministic-lb variant and the
+    deterministic-lb-ip label filter are provided by openshift/hypershift#10237.
+    A run that does not execute the spec is not coverage: the JUnit must report
+    the spec as passed, not skipped. The spec skips when the EIP pre-step
+    variables are missing, so a green job with a skipped spec proves nothing.
+
+    The EIP is tagged with the management cluster's
+    kubernetes.io/cluster/<infra-id>=owned tag and an expirationDate. If the
+    release step never runs, the management cluster's own destroy path releases
+    the EIP, and the hypershift janitor finds the management cluster through its
+    VPC and runs the same destroy. This assumes the janitor's credentials cover
+    the same AWS account as the job. This lane
+    covers the AWS nested management-cluster path for CNTRLPLANE-4579; the
+    Agent/MetalLB, Azure, Cilium and KubeVirt lanes are separate and are not
+    covered here.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Cesar Wong (cewong@redhat.com)
+    - Bryan Cox (brcox@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - ref: hypershift-resolve-nodepool-releases
+    - ref: hypershift-write-test-plan
+    - ref: hypershift-deterministic-lb-eip-lib
+    - ref: hypershift-reserve-deterministic-lb-eip
+    - chain: hypershift-aws-create-guests
+    test:
+    - chain: hypershift-aws-run-e2e-v2
+    post:
+    - chain: hypershift-aws-dump-guests
+    - chain: hypershift-aws-destroy-guests
+    - ref: hypershift-release-deterministic-lb-eip
+    - chain: hypershift-destroy-nested-management-cluster
+    env:
+      HYPERSHIFT_PLATFORM: "aws"
+      HYPERSHIFT_STORAGE_KMS_KEY_ALIAS: "alias/hypershift-ci"
