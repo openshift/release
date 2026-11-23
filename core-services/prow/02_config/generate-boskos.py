@@ -445,8 +445,10 @@ CONFIG = {
     },
     # Orange zone (OZ) VPN homogeneous amd64 (x-xx): masters + compute on xkvmocp08.
     # Sibling of hetero libvirt-s390x-vpn-amd64 (z-zx), which uses xkvmocp08 as day-2 only.
+    # Capacity 2: host can fit ~3 full clusters; leave headroom while sharing with z-zx day-2.
     'libvirt-amd64-vpn-quota-slice': {
-        'libvirt-amd64-vpn-0-0': 1
+        'libvirt-amd64-vpn-0-0': 1,
+        'libvirt-amd64-vpn-0-1': 1
     },
     'libvirt-s390x-vpn-quota-slice': {},
     'libvirt-s390x-vpn-oz-quota-slice': {},
@@ -808,7 +810,7 @@ CONFIG['libvirt-s390x-vpn-hcp-quota-slice']['libvirt-s390x-oz-3-3'] = 1
 # GSM: libvirt-s390x-vpn-ipv6-0-0 hostname/IPs on lnxocp12.
 
 # Homogeneous amd64 (x-xx) on OZ xkvmocp08: full CP+compute (not day-2 of z-zx).
-# GSM: libvirt-amd64-vpn-0-0 hostname/IPs on xkvmocp08. Bastion: sshd-10 / libvirt-10-xo.
+# GSM: libvirt-amd64-vpn-0-0 / 0-1 hostname/IPs on xkvmocp08. Bastion: sshd-10 / libvirt-10-xo.
 
 # Orange zone (OZ) kubevirt06 (0) + kubevirt07 (1), 1 HA + 1 SNO lease each
 for i in range(2):
