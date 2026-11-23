@@ -201,6 +201,8 @@ _run_selftest() {
 _classify() {
     typeset out="" items="" attempt="" crdlist=""
     typeset -i rc=0
+    typeset _traceWasOff=0
+    [[ $- == *x* ]] || _traceWasOff=1
     for attempt in 1 2 3; do
         # CRD existence first, via a list read that succeeds either way: a
         # missing resource type is a DETERMINISTIC absence (no Central can
@@ -213,26 +215,33 @@ _classify() {
         # Absence classified here is PROVISIONAL on a required lane: the main
         # flow holds it for a bounded window before finalizing (provisional-
         # hold block below), and it is final only for absent-by-design.
+        set +x
         if crdlist="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd -o name 2>/dev/null)"; then
             if ! grep -q '^customresourcedefinition\.apiextensions\.k8s\.io/centrals\.platform\.stackrox\.io$' <<< "${crdlist}"; then
                 _ACS_STATE="absent"
+                (( _traceWasOff == 0 )) && set -x
                 return 0
             fi
             if out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json 2>/dev/null)"; then
+                set +x
                 items="$(printf '%s' "${out}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("items",[])))' 2>/dev/null)" || rc=1
+                set +x
                 if (( rc == 0 )); then
                     if (( items > 0 )); then
                         _ACS_STATE="present"
                     else
                         _ACS_STATE="absent"
                     fi
+                    (( _traceWasOff == 0 )) && set -x
                     return 0
                 fi
             fi
         fi
+        (( _traceWasOff == 0 )) && set -x
         rc=0
         sleep $(( attempt * 2 ))
     done
+    (( _traceWasOff == 0 )) && set -x
     _ACS_STATE="unknown"
     return 0
 }
@@ -548,9 +557,13 @@ function PeriodicOperatorDiagnostics () {
 # ---------------------------------------------------------------------------
 function CheckCentralPresent () {
     typeset out="" items=""
-    oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1 || return 1
-    out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json 2>/dev/null)" || return 1
-    items="$(printf '%s' "${out}" | JsonLength items)" || return 1
+    typeset _traceWasOff=0
+    [[ $- == *x* ]] || _traceWasOff=1
+    set +x
+    oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1 || { (( _traceWasOff == 0 )) && set -x; return 1; }
+    out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json 2>/dev/null)" || { (( _traceWasOff == 0 )) && set -x; return 1; }
+    items="$(printf '%s' "${out}" | JsonLength items)" || { (( _traceWasOff == 0 )) && set -x; return 1; }
+    (( _traceWasOff == 0 )) && set -x
     (( items > 0 ))
 }
 
