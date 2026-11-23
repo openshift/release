@@ -86,14 +86,22 @@ case "${job_name}" in
 rehearse-*) rehearsal=true ;;
 esac
 
-# A rehearsal stays read-only unless it explicitly opts in. The opt-in exists to
-# prove the publication path once; the merged configuration never sets it.
-if [[ "${rehearsal}" == true && "${PRIORITIES_REHEARSAL_PUBLISH:-false}" != true ]]; then
-    info "rehearsal ${job_name}: forcing read-only behaviour"
+# Publication is limited to the scheduled job, or to a rehearsal of it that
+# explicitly opts in. A rehearsal arrives as a presubmit ProwJob whose name keeps
+# the scheduled job as a suffix, so the type alone cannot decide this.
+if [[ "${job_name}" != *"${SCHEDULED_JOB}" ]]; then
+    info "job ${job_name} is not the scheduled ${SCHEDULED_JOB}: forcing read-only behaviour"
     publish=false
 fi
-if [[ "${job_type}" != periodic || "${job_name}" != *"${SCHEDULED_JOB}" ]]; then
-    info "job ${job_name} (${job_type}) is not the scheduled periodic: forcing read-only behaviour"
+if [[ "${rehearsal}" == true ]]; then
+    # The opt-in exists to prove the publication path once; the merged
+    # configuration never sets it, so rehearsals stay read-only by default.
+    if [[ "${PRIORITIES_REHEARSAL_PUBLISH:-false}" != true ]]; then
+        info "rehearsal ${job_name}: forcing read-only behaviour"
+        publish=false
+    fi
+elif [[ "${job_type}" != periodic ]]; then
+    info "job ${job_name} (${job_type}) is not a periodic: forcing read-only behaviour"
     publish=false
 fi
 if [[ "${publish}" == true ]]; then
