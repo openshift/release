@@ -24,20 +24,6 @@ from pathlib import Path
 _parse_failures = 0
 
 
-def _suite_name():
-    """Canonical component-first suite name (INTEROP-9629).
-
-    Derives from LP_QE__CR__TS_NAME__PFX__OCP when the lane opts in via
-    MAP_TESTS (lp-interop--OCP--OPP--skip-gate per ADR 0007); otherwise
-    the historical runtime-first name is preserved so unconfigured
-    consumers see no change.
-    """
-    pfx = os.environ.get("LP_QE__CR__TS_NAME__PFX__OCP", "")
-    if os.environ.get("MAP_TESTS", "").strip().lower() == "true" and pfx:
-        return f"{pfx}--skip-gate"
-    return "lp-interop--OPP--skip-gate"
-
-
 def parse_junit(path):
     """Parse a single JUnit XML file and return per-suite tallies.
 
@@ -99,7 +85,7 @@ def write_evidence_incomplete_junit(artifact_dir, threshold, reason):
     out = Path(artifact_dir) / "skip-ratio-gate.xml"
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        f'<testsuite name="{_suite_name()}" tests="1" failures="0">',
+        f'<testsuite name="lp-interop--OPP--skip-gate" tests="1" failures="0">',
         f'  <testcase name="skip-ratio-gate (evidence-incomplete)" classname="interop-opp-skip-ratio-gate">',
         f'    <system-out>EVIDENCE-INCOMPLETE: {reason}. '
         f'Skip-ratio gate requires valid test results to measure. '
@@ -121,7 +107,7 @@ def write_gate_junit(artifact_dir, total, passed, failed, skipped, errored,
     fail_count = 1 if breach else 0
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
-        f'<testsuite name="{_suite_name()}" tests="1" failures="{fail_count}">',
+        f'<testsuite name="lp-interop--OPP--skip-gate" tests="1" failures="{fail_count}">',
         f'  <testcase name="{tc_name}" classname="interop-opp-skip-ratio-gate">',
     ]
     if breach:
