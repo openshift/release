@@ -507,6 +507,24 @@ function Main () {
         echo >&2 "ERROR: ${_junit_reason}"
         exit 3
     fi
+    # Patch precondition baseline (stale-baseline race finding): capture the
+    # Subscription resourceVersion together with the installed-version
+    # baseline and make the channel patch conditional on it. OLM can complete
+    # a pending automatic InstallPlan between the baseline read and the patch,
+    # advancing status.installedCSV without changing spec; the patch
+    # precondition then rejects the change. Fail closed when the read fails:
+    # an empty value must never become a passing precondition.
+    typeset _sub_rv=""
+    _sub_rv="$(oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
+        -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
+        -o jsonpath='{.metadata.resourceVersion}' 2>/dev/null || true)"
+    if [[ -z "${_sub_rv}" ]]; then
+        _junit_reason="acs-upgrade rejected: cannot read subscription resourceVersion for patch precondition (${ACS_SUBSCRIPTION_NAME} in ${ACS_SUBSCRIPTION_NAMESPACE})"
+        echo >&2 "ERROR: ${_junit_reason}"
+        exit 3
+    fi
+    echo "Subscription baseline: resourceVersion=${_sub_rv}"
+
     currentChannel="$(GetCurrentChannel)"
     echo "Current: CSV=${currentCsv} Version=${currentVersion} Channel=${currentChannel}"
 
@@ -551,10 +569,6 @@ function Main () {
             echo >&2 "ERROR: ${_junit_reason}"
             exit 3
         fi
-        # PRRT_kwDOBHvUUM65RJoY: re-read subscription generation before patch to avoid stale baseline
-        typeset _sub_gen_before="" _sub_uid_before=""
-        _sub_gen_before="$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.generation}' 2>/dev/null || echo "")"
-        _sub_uid_before="$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.uid}' 2>/dev/null || echo "")"
         versionCmp="$(VersionCompare "${targetHeadVersion}" "${currentVersion}")"
         if (( versionCmp < 0 )); then
             _junit_reason="acs-upgrade rejected: downgrade (target channel ${targetChannel} head ${targetHeadVersion} < installed ${currentVersion})"
@@ -567,19 +581,22 @@ function Main () {
             exit 3
         fi
 
-        # Guard patch against concurrent Subscription change
-        typeset _sub_gen_now="" _sub_uid_now=""
-        _sub_gen_now="$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.generation}' 2>/dev/null || echo "")"
-        _sub_uid_now="$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.metadata.uid}' 2>/dev/null || echo "")"
-        if [[ "${_sub_gen_now}" != "${_sub_gen_before}" || "${_sub_uid_now}" != "${_sub_uid_before}" ]]; then
-            echo "ERROR: Subscription changed during upgrade check (generation ${_sub_gen_before}->${_sub_gen_now}, uid ${_sub_uid_before}->${_sub_uid_now}); aborting patch" >&2
-            exit 1
-        fi
-
-        oc patch subscription "${ACS_SUBSCRIPTION_NAME}" \
+        # Patch precondition (stale-baseline race finding): the JSON test
+        # operation on /metadata/resourceVersion is evaluated atomically with
+        # the channel change by the API server, so a Subscription that changed
+        # after the baseline read (for example a pending automatic InstallPlan
+        # completing and advancing status.installedCSV) rejects the whole
+        # patch. On a conflict or failed patch, fail closed with exit 3 and a
+        # JUnit-visible reason.
+        _patch_err=""
+        if ! _patch_err="$(oc patch subscription "${ACS_SUBSCRIPTION_NAME}" \
             -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
-            --type merge \
-            -p "{\"spec\":{\"channel\":\"${targetChannel}\"}}"
+            --type json \
+            -p "[{\"op\":\"test\",\"path\":\"/metadata/resourceVersion\",\"value\":\"${_sub_rv}\"},{\"op\":\"replace\",\"path\":\"/spec/channel\",\"value\":\"${targetChannel}\"}]" 2>&1)"; then
+            _junit_reason="acs-upgrade rejected: channel patch failed against baseline resourceVersion ${_sub_rv} (subscription changed since the baseline read or patch rejected): ${_patch_err}"
+            echo >&2 "ERROR: ${_junit_reason}"
+            exit 3
+        fi
 
         echo "Waiting for new InstallPlan (pre-patch ref: ${prePatchPlan:-none})..."
         sleep 10
