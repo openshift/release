@@ -98,6 +98,45 @@ for n in "${nodes[@]}"; do
   if ((critical)); then grep -i kubelet "$ARTIFACT_DIR/$n-inhibitors.txt" | grep -q shutdown || die "Missing shutdown inhibitor on $n"; fi
 done
 wait_healthy
+if [[ $VRRP_PHASE == prepare-upgrade ]]; then
+  # Persist state transitions in the original boot's journal. An oc debug or
+  # watch stream through the API VIP itself can disconnect during handoff.
+  start=$(date +%s)
+  holder > "$ARTIFACT_DIR/initial-holder.txt"
+  read -r -d '' observe <<'OBSERVE' || :
+set -eu
+vip=$1
+read -r family table < <(nft -j list ruleset | jq -r '[.nftables[].rule? | select(.comment=="OCP_API_LB_REDIRECT") | [.family,.table]] | unique[] | @tsv' | head -1)
+[[ -n $family && -n $table ]]
+old=
+while :; do
+  addresses=$(ip -4 -o address show to "$vip/32") || exit 1
+  owner=absent; [[ -z $addresses ]] || owner=present
+  rules=$(nft list table "$family" "$table" 2>/dev/null) && {
+    redirect=absent
+    if grep -F "ip daddr $vip " <<<"$rules" | grep -F OCP_API_LB_REDIRECT >/dev/null; then redirect=present; fi
+  } || {
+    # A deleted table is evidence of absence only if enumeration succeeded.
+    redirect=unknown
+    if tables=$(nft list tables) && ! grep -Fxq "table $family $table" <<<"$tables"; then redirect=absent; fi
+  }
+  state="vip=$owner redirect=$redirect"
+  if [[ $old != "$state" ]]; then echo "$state"; old=$state; fi
+  sleep 0.5
+done
+OBSERVE
+  for n in "${nodes[@]}"; do
+    host "$n" "sudo systemd-run --unit=vrrp-upgrade-observe -p DefaultDependencies=no -p RuntimeMaxSec=4h /bin/bash -c $(printf '%q' "$observe") -- $vip"
+    host "$n" "for i in {1..10}; do sudo journalctl -u vrrp-upgrade-observe --since @$start --no-pager -o cat | grep '^vip=.* redirect=present$' && exit 0; sleep 1; done; exit 1" > "$ARTIFACT_DIR/$n-observer-start.txt"
+    # Preserve VRRP events in the node journal even if kubelet removes old pod logs.
+    # shellcheck disable=SC2016 # Expand the container log glob and array on the node.
+    host "$n" 'sudo bash -c '\''logs=(/var/log/containers/keepalived-*_openshift-vsphere-infra_keepalived-*.log); test -e "${logs[0]}" && systemd-run --unit=vrrp-upgrade-peer -p RuntimeMaxSec=4h tail -n0 -F "${logs[@]}"'\'''
+    host "$n" 'cat /proc/sys/kernel/random/boot_id' > "$ARTIFACT_DIR/$n-initial-boot.txt"
+  done
+  printf '%s\n' "$start" > "$SHARED_DIR/vrrp-upgrade-start"
+  exit 0
+fi
+[[ $VRRP_PHASE == pilot ]] || die "Unknown phase: $VRRP_PHASE"
 declare -A boots
 for node in "${nodes[@]}"; do boots[$node]=$(host "$node" 'cat /proc/sys/kernel/random/boot_id'); done
 workers=()
