@@ -9,10 +9,6 @@ trap 'rm -rf -- "${WORK_DIR}"' EXIT
 MONITOR_DIR="${EDGE_TOOLING_DIR}/edge-ocp-ci-monitor"
 REPORT_STEM="edge-ci-monitor-summary"
 
-python3 -m venv "${WORK_DIR}/venv"
-PYTHON="${WORK_DIR}/venv/bin/python"
-"${PYTHON}" -m pip install -r "${MONITOR_DIR}/requirements.txt"
-
 # Use the SDK in the image for public Prow artifacts and keep its config writable.
 export CLOUDSDK_CONFIG="${WORK_DIR}/gcloud"
 export CLOUDSDK_AUTH_DISABLE_CREDENTIALS=true
@@ -41,7 +37,7 @@ START_SECONDS=${SECONDS}
 MONITOR_LOG="${ARTIFACT_DIR}/edge-ci-monitor.log"
 # Send stderr to tee for live diagnostics and keep the machine-readable stdout separate.
 CHAI_MCP_TOKEN="${CHAI_MCP_TOKEN}" CHAI_MCP_URL="${CHAI_MCP_URL}" PYTHONPATH="${MONITOR_DIR}" \
-    "${PYTHON}" -u -m edge_ocp_ci_monitor "${args[@]}" \
+    python -u -m edge_ocp_ci_monitor "${args[@]}" \
     2>&1 > "${WORK_DIR}/monitor.stdout" | tee "${MONITOR_LOG}" || MONITOR_EXIT=$?
 unset CHAI_MCP_TOKEN CHAI_MCP_URL
 
