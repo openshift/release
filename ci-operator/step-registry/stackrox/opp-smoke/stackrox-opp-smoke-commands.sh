@@ -256,7 +256,7 @@ if [[ "${_ACS_STATE}" == "absent" ]]; then
     if [[ "${ACS_EXPECTATION}" == "required" ]]; then
         _add_classification "acs-required-but-absent" failed "Classification" \
             "acs-central-not-created: Central CR absent on a successful read while ACS_EXPECTATION=required"
-        _add_case "stackrox-opp-smoke" failed "Timeout" "SecuredCluster discovery timeout after 900s: Central CR absent while ACS_EXPECTATION=required"
+        _add_case "stackrox-opp-smoke" failed "Classification" "Central CR absent on a successful read while ACS_EXPECTATION=required (no discovery wait)"
         echo "[smoke] Central CR absent but required by ACS_EXPECTATION"
         exit 1
     fi
@@ -466,7 +466,7 @@ fi
 echo "[smoke] Test run finished with exit code: ${testExit}"
 # Terminal-state result: emit step-named testcase with 900s SecuredCluster discovery timeout reason on failure
 if (( testExit != 0 || _N_FAILURES > 0 )); then
-    _add_case "stackrox-opp-smoke" failed "Timeout" "SecuredCluster discovery timeout after 900s or smoke test failure (exit ${testExit}, failures ${_N_FAILURES})"
+    _add_case "stackrox-opp-smoke" failed "TestFailure" "smoke test failure (Gradle exit ${testExit}, recorded failures ${_N_FAILURES})"
     exit 1
 fi
 _add_case "stackrox-opp-smoke" passed

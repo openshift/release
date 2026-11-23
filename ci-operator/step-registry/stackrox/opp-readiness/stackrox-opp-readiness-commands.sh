@@ -957,7 +957,7 @@ echo "${scNs}"       > "${SHARED_DIR}/SC_NS"
 set -x
 
 if (( _assert_rc != 0 )); then
-    _add_case "stackrox-opp-readiness" failed "Timeout" "SecuredCluster discovery timeout after 900s or readiness assertion failed (budget remaining $(_budget_remaining)s)"
+    _add_case "stackrox-opp-readiness" failed "Assertion" "readiness assertion failed (budget remaining $(_budget_remaining)s; see individual assertion cases for type and reason)"
     echo "[readiness] One or more readiness assertions failed; see ${_CARRIER}"
     exit 1
 fi
