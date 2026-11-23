@@ -108,27 +108,16 @@ TEMP_DIR=$(mktemp -d /tmp/ibi-target-hub-deploy.XXXXXX)
 trap cleanup EXIT
 install -m 600 /var/group_variables/common/all/ansible_ssh_private_key "${TEMP_DIR}/ssh-key"
 
-# Resolve inventory precedence locally without exposing inventory or requiring jq.
-if ansible bastion -i ./inventories/ocp-deployment/build-inventory.py \
-  -m ansible.builtin.copy \
-  -a "dest=${TEMP_DIR}/bastion-identity mode=0600 content='{{ ansible_host }} {{ ansible_user }}'" \
-  --extra-vars '{"ansible_connection":"local","ansible_become":false,"ansible_python_interpreter":"{{ ansible_playbook_python }}"}' \
-  >"${TEMP_DIR}/inventory.log" 2>&1; then
-  if [[ ! -s "${TEMP_DIR}/bastion-identity" ]]; then
-    echo "Target bastion inventory resolution produced no connection identity." >&2
-    exit 1
-  fi
-else
-  status=$?
-  echo "Could not resolve target bastion inventory (Ansible exit status ${status})." >&2
-  exit "${status}"
+# Match seed hub deployment: read connection fields from the generated inventory.
+if ! BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion | sed "s/'//g") ||
+   ! BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' /eco-ci-cd/inventories/ocp-deployment/group_vars/all | sed "s/'//g"); then
+  echo "Could not read target bastion address and user from inventory." >&2
+  exit 1
 fi
-BASTION_IDENTITY=$(cat "${TEMP_DIR}/bastion-identity")
-if [[ ! "${BASTION_IDENTITY}" =~ ^[^[:space:]]+[[:blank:]][^[:space:]]+$ ]]; then
+if [[ ! "${BASTION_IP} ${BASTION_USER}" =~ ^[^[:space:]]+[[:blank:]][^[:space:]]+$ ]]; then
   echo "Target bastion inventory must provide one address and one user." >&2
   exit 1
 fi
-read -r BASTION_IP BASTION_USER <<< "${BASTION_IDENTITY}"
 
 if CLUSTER_VERSION=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   -i "${TEMP_DIR}/ssh-key" "${BASTION_USER}@${BASTION_IP}" \
