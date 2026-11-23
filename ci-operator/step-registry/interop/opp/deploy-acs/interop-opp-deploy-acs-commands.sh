@@ -634,16 +634,74 @@ except Exception:
       # Verify namespace creation event separate from removal signal (PRRT_kwDOBHvUUM65yNGJ): require independent creator proof
       typeset _ns_created_recent=false
       typeset _ns_create_time=""
+      typeset _creator_evidence=false
       _ns_create_time="$(oc get namespace "${ACS_NAMESPACE}" -o jsonpath='{.metadata.creationTimestamp}' 2>/dev/null || echo "")"
       if [[ -n "${_ns_create_time}" ]]; then
         typeset -i _ns_epoch
         _ns_epoch=$(date -d "${_ns_create_time}" +%s 2>/dev/null || echo 0)
-        # If namespace created within step window (last 2h) consider independent proof, else fresh installability not proven
-        if (( _ns_epoch >= _junit_start )); then
+        # Strictly after step start with same-second margin excluded
+        if (( _ns_epoch > _junit_start + 1 )); then
           _ns_created_recent=true
+          # Creator evidence: OperatorPolicy targeting this namespace is Compliant
+          # and its Compliant transition was observed after namespace creation;
+          # when creator identity cannot be proven, do not set the flag
+          # (conservative fail, retain install path).
+          typeset _op_compliant_time=""
+          _op_compliant_time=$(printf '%s' "${_op_status}" | python3 -c '
+import json, sys
+target_ns = sys.argv[1]
+try:
+    d = json.load(sys.stdin)
+    items = d.get("items", [d])
+    def eff_ns(item):
+        sub = item.get("spec", {}).get("subscription", {}) or {}
+        return sub.get("namespace")
+    for i in items:
+        if i.get("metadata", {}).get("name") == "operatorpolicy-rhacs-operator" and eff_ns(i) == target_ns:
+            for c in i.get("status", {}).get("conditions", []):
+                if c.get("type") == "Compliant" and c.get("status") == "True":
+                    print(c.get("lastTransitionTime", "") or c.get("lastUpdateTime", "") or "")
+                    break
+            break
+except Exception:
+    pass
+' "${ACS_NAMESPACE}" 2>/dev/null || echo "")
+          if [[ -n "${_op_compliant_time}" ]]; then
+            typeset -i _op_compliant_epoch
+            _op_compliant_epoch=$(date -d "${_op_compliant_time}" +%s 2>/dev/null || echo 0)
+            if (( _op_compliant_epoch > _ns_epoch )); then
+              _creator_evidence=true
+            fi
+          fi
+          if [[ "${_creator_evidence}" != "true" ]]; then
+            typeset _op_gen_ok=""
+            _op_gen_ok=$(printf '%s' "${_op_status}" | python3 -c '
+import json, sys
+target_ns = sys.argv[1]
+try:
+    d = json.load(sys.stdin)
+    items = d.get("items", [d])
+    def eff_ns(item):
+        sub = item.get("spec", {}).get("subscription", {}) or {}
+        return sub.get("namespace")
+    for i in items:
+        if i.get("metadata", {}).get("name") == "operatorpolicy-rhacs-operator" and eff_ns(i) == target_ns:
+            gen = i.get("metadata", {}).get("generation", 0) or 0
+            obs = i.get("status", {}).get("observedGeneration", 0) or 0
+            ct = i.get("metadata", {}).get("creationTimestamp", "")
+            if ct and gen and obs and obs >= gen:
+                print("ok")
+            break
+except Exception:
+    pass
+' "${ACS_NAMESPACE}" 2>/dev/null || echo "")
+            if [[ "${_op_gen_ok}" == "ok" ]]; then
+              _creator_evidence=true
+            fi
+          fi
         fi
       fi
-      if [[ "${_existing_csv}" == "Succeeded" ]] && [[ "${_ns_created_recent}" == "true" ]]; then
+      if [[ "${_existing_csv}" == "Succeeded" ]] && [[ "${_ns_created_recent}" == "true" ]] && [[ "${_creator_evidence}" == "true" ]]; then
         echo ">>> workaround_removal_ready=true (OperatorPolicy Compliant, current CSV ${_sd_csv} Succeeded, namespace creation verified) - not installing"
         _prop "workaround_removal_ready" "true"
         _prop "acs_subscription" "adopted"
@@ -876,9 +934,10 @@ else
     _prop "acs_namespace" "race-tolerated"
     rm -f "${_ns_err}"
   else
-    ( set +x
-      _classify "acs-namespace-error" "failed to create namespace ${ACS_NAMESPACE} ($(_api_err_class "$(cat "${_ns_err}")"))"
-    )
+    _api_quiet
+    _ns_err_text=$(cat "${_ns_err}" 2>/dev/null || echo unknown)
+    _api_loud
+    _classify "acs-namespace-error" "failed to create namespace ${ACS_NAMESPACE} ($(_api_err_class "${_ns_err_text}"))"
     echo "ERROR: ${_class_detail}" >&2
     rm -f "${_ns_err}"
     _dump_diagnostics
@@ -1053,8 +1112,10 @@ else
   set -o pipefail
   set -e
   if (( _sub_create_rc != 0 )); then
+    _api_quiet
     typeset _sub_create_err_text=""
     _sub_create_err_text=$(cat "${_sub_create_err}" 2>/dev/null || echo unknown)
+    _api_loud
     if [[ -s "${_sub_create_err}" ]]; then
       printf '  (subscription create failed: %s)\n' "$(_api_err_class "${_sub_create_err_text}")" >&2
     fi
@@ -1210,11 +1271,11 @@ typeset _wait2_err="" _wait2_rc=0
     _wait2_rc=1
   fi
   if (( _wait2_rc != 0 )); then
+    _api_quiet
     if [[ -s "${_wait2_err}" ]]; then
-      printf '  (succeeded wait failed: %s)\n' "$(_api_err_class "$(cat "${_wait2_err}")")" >&2
+      printf '  (succeeded wait failed: %s)\n' "$(_api_err_class "$(cat "${_wait2_err}" 2>/dev/null || echo unknown)")" >&2
     fi
     rm -f "${_wait2_err}"
-    # Retain query rc to distinguish Forbidden vs timeout (PRRT_kwDOBHvUUM65yNGO)
     typeset -i _phase_rc=0
     _phase=$(oc get csv "${csvName}" -n "${ACS_NAMESPACE}" -o jsonpath='{.status.phase}' 2>"${_wait2_err}.phase" ) || _phase_rc=$?
     if (( _phase_rc != 0 )); then
@@ -1227,12 +1288,13 @@ typeset _wait2_err="" _wait2_rc=0
       fi
     fi
     rm -f "${_wait2_err}.phase"
+    typeset _deadline_exhausted=false
+    if (( $(date +%s) >= install_deadline )); then
+      _deadline_exhausted=true
+    fi
+    _api_loud
     _probe_notfound=0
     _api_quiet
-    # Same shape test as the precondition: a missing helper or a wrapper
-    # message carrying "not found" is a failed probe, not an absent CSV, so
-    # only the API server's NotFound answer selects the "never created"
-    # detail. No pipe over the probe error (it can be a full API error body).
     if [[ "${csv_probe_out}" == *"Error from server (NotFound)"* ]]; then _probe_notfound=1; fi
     _api_loud
     # Precedence: a classified Subscription condition outranks the CSV phase and
@@ -1247,10 +1309,14 @@ typeset _wait2_err="" _wait2_rc=0
       _classify "acs-csv-failed" "CSV ${csvName} reached phase Failed"
     elif [[ "${_phase}" == "query-failed" ]]; then
       _classify "acs-csv-query-failed" "CSV ${csvName} query failed (rc=${_phase_rc}: $(_api_err_class "${_phase_err}"))"
-    elif [[ "${_phase}" == "unknown" ]] && (( _probe_notfound )); then
-      _classify "acs-csv-timeout" "CSV object ${csvName} never created within ${ACS_INSTALL_TIMEOUT}s (currentCSV published, object absent)"
-    else
+    elif (( _probe_notfound )); then
+      _classify "acs-csv-missing" "CSV object ${csvName} never created (currentCSV published, object absent; phase query: ${_phase})"
+    elif [[ "${_phase}" == "unknown" ]]; then
+      _classify "acs-csv-unknown-phase" "CSV ${csvName} phase unknown (phase: ${_phase})"
+    elif [[ "${_deadline_exhausted}" == "true" ]]; then
       _classify "acs-csv-timeout" "CSV ${csvName} not Succeeded after ${ACS_INSTALL_TIMEOUT}s (phase: ${_phase})"
+    else
+      _classify "acs-csv-unknown-phase" "CSV ${csvName} not Succeeded after ${ACS_INSTALL_TIMEOUT}s (phase: ${_phase}; deadline not exhausted)"
     fi
     echo "ERROR: ${_class_detail}"
     _dump_diagnostics
