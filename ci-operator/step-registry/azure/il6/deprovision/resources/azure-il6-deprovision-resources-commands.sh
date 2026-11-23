@@ -48,9 +48,17 @@ echo "is a child resource of the shared VNet and cannot be created anywhere else
 
 # ----------------------------------------------------------------- subnets
 #
-# Ordering: azure-deprovision-resourcegroup runs before this step. It takes the bastion VM and its
-# NIC with the per-run group, which is what releases the subnet -- while a NIC is attached, the
-# delete below returns InUseSubnetCannotBeDeleted.
+# Ordering: this step runs LAST, after azure-il6-detach-subnet-nsgs and then
+# azure-deprovision-resourcegroup. Both predecessors are load-bearing, because the bastion's
+# references form a cycle across the two groups:
+#
+#     bastion NIC (per-run group) --> subnet (shared VNet) --> NSG (per-run group)
+#
+# azure-deprovision-resourcegroup is what takes the bastion VM and its NIC, and so what releases
+# the subnet; while a NIC is attached, the delete below returns InUseSubnetCannotBeDeleted. But
+# that group delete cannot itself succeed while a subnet still references an NSG inside the group
+# -- Azure returns InUseNetworkSecurityGroupCannotBeDeleted and the step dies under errexit,
+# leaking the group. azure-il6-detach-subnet-nsgs drops that edge first so both can complete.
 echo
 echo "--- subnets"
 mapfile -t subnets < <(az network vnet subnet list \

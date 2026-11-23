@@ -134,8 +134,15 @@ if [[ "${on_emulated_plane}" -eq 1 ]]; then
     fi
 
     echo
-    echo "=== 6/6 resources in ${AZURE_IL6_RESOURCE_GROUP} on the emulated plane ==="
-    # Specifically this group, not whatever happens to sort first. The emulator fronts the
+    echo "=== 6/6 typed Network and Compute reads on the emulated plane ==="
+    # Two different groups, deliberately. The VNet is a child resource of the shared, permanent
+    # group and cannot live anywhere else. The bastion VM lives in the per-run group that
+    # azure-provision-resourcegroup created. Looking for the VM in the shared group is how an
+    # earlier version of this check reported a phantom "the emulated Compute view disagrees with
+    # the commercial one" -- the emulator was answering correctly about a group the VM had been
+    # moved out of.
+    #
+    # Specifically these groups, not whatever happens to sort first. The emulator fronts the
     # whole commercial subscription, so [0] lands on some unrelated team's group whose
     # resource types the emulated ARM may not even be able to render -- which is how a
     # previous run got 'Bad Request' from groupbshared0805-rg and failed on someone else's
@@ -168,16 +175,36 @@ if [[ "${on_emulated_plane}" -eq 1 ]]; then
             echo "  This one matters: the installer cannot read the BYO VNet without it."
         fi
 
-        # The bastion this job just created, named by azure-provision-bastionhost.
+        # The bastion this job just created, named by azure-provision-bastionhost. It is in the
+        # per-run group, NOT the shared one: azure-provision-resourcegroup creates that group and
+        # records its name, and azure-provision-bastionhost provisions the VM, NIC, public IP,
+        # disk, image and NSG into it so that teardown is a single 'az group delete'.
         bastion_vm="${NAMESPACE}-${UNIQUE_HASH}-bastion"
-        on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az vm list -g ${AZURE_IL6_RESOURCE_GROUP} -o table" || true
-        found_vm="$(on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az vm list -g ${AZURE_IL6_RESOURCE_GROUP} --query \"[?name=='${bastion_vm}'].name\" -o tsv" | tr -d '\r')"
-        if [[ "${found_vm}" == "${bastion_vm}" ]]; then
-            echo "OK: the emulated ARM returned ${bastion_vm} from Microsoft.Compute."
+        rg_file="${SHARED_DIR}/resourcegroup"
+        if [[ ! -s "${rg_file}" ]]; then
+            fail "${rg_file} is missing or empty, so the group holding ${bastion_vm} is unknown."
+            echo "  azure-provision-resourcegroup must run before azure-provision-bastionhost."
         else
-            fail "${bastion_vm} was not returned by az vm list on the emulated plane."
-            echo "  The VM demonstrably exists -- the CI pod has been SSHing to it -- so the"
-            echo "  emulated Compute view disagrees with the commercial one."
+            bastion_rg="$(<"${rg_file}")"
+            echo
+            echo "--- Microsoft.Compute in the per-run group ${bastion_rg} ---"
+            bastion_rg_region="$(on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az group show -n ${bastion_rg} --query location -o tsv" | tr -d '\r')"
+            if [[ -z "${bastion_rg_region}" ]]; then
+                fail "the per-run group ${bastion_rg} is not visible through the emulated ARM."
+                echo "  It exists on the commercial plane -- the bastion was built in it -- so the"
+                echo "  emulated Resources view is not reflecting groups created during the run."
+            else
+                echo "The emulated plane reports ${bastion_rg} in region '${bastion_rg_region}'."
+            fi
+            on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az vm list -g ${bastion_rg} -o table" || true
+            found_vm="$(on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az vm list -g ${bastion_rg} --query \"[?name=='${bastion_vm}'].name\" -o tsv" | tr -d '\r')"
+            if [[ "${found_vm}" == "${bastion_vm}" ]]; then
+                echo "OK: the emulated ARM returned ${bastion_vm} from Microsoft.Compute."
+            else
+                fail "${bastion_vm} was not returned by az vm list -g ${bastion_rg}."
+                echo "  The VM demonstrably exists -- the CI pod has been SSHing to it -- so the"
+                echo "  emulated Compute view disagrees with the commercial one."
+            fi
         fi
 
         # Informational. Recorded so the gap is visible to the emulator team, but not

@@ -1,0 +1,51 @@
+ref:
+  as: azure-il6-detach-subnet-nsgs
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-il6-detach-subnet-nsgs-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: AZURE_IL6_RESOURCE_GROUP
+    default: "CI-Azure-IL6-DoNotDelete"
+    documentation: |-
+      The shared, permanent resource group that holds the VNet whose subnets are detached here.
+      This step never deletes anything in it, and never deletes the group itself.
+  - name: AZURE_IL6_VNET_NAME
+    default: "RHOCP-CI-AzureIL6-virtual-network"
+    documentation: |-
+      The shared, permanent VNet holding the subnets. Never deleted or otherwise modified beyond
+      clearing the networkSecurityGroup field on this run's own subnets.
+  documentation: |-
+    Clears the networkSecurityGroup association from the subnets this run added to the shared
+    emulator VNet, matched on the ${NAMESPACE}-${UNIQUE_HASH} prefix recorded in
+    ${SHARED_DIR}/azure_il6_subnet_prefix by azure-il6-provision-subnets.
+
+    This exists to break a reference cycle that spans two resource groups:
+
+      bastion NIC (per-run group) -> subnet (shared VNet) -> NSG (per-run group)
+
+    azure-deprovision-resourcegroup cannot delete the per-run group while a subnet in the shared
+    VNet still references an NSG inside it -- Azure returns
+    InUseNetworkSecurityGroupCannotBeDeleted -- and azure-il6-deprovision-resources cannot delete
+    that subnet first, because the bastion NIC is still attached and Azure returns
+    InUseSubnetCannotBeDeleted. Neither ordering of those two steps works on its own.
+
+    Dropping the subnet -> NSG edge here makes the remaining graph acyclic, so the post chain is:
+
+      azure-il6-detach-subnet-nsgs     clears subnet -> NSG
+      azure-deprovision-resourcegroup  deletes the VM, NIC, public IP, disks, NSGs, storage
+                                       account and private DNS zone with the per-run group
+      azure-il6-deprovision-resources  deletes the now-unreferenced, NIC-free subnets
+
+    This step is deliberately incapable of deleting anything at all. It only ever clears a field,
+    and only on subnets whose name carries this run's prefix, so it cannot disturb a concurrent
+    run or the emulator's own public-subnet and GatewaySubnet.
+
+    Best-effort: a failure to detach is logged and does not abort teardown, so a partial cleanup
+    cannot mask the real failure that a job is being torn down for.

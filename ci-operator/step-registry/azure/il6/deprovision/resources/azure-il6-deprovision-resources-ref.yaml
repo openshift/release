@@ -33,9 +33,12 @@ ref:
     azure-deprovision-resourcegroup. Subnets are the exception only because a subnet is a child
     resource of the VNet, so it cannot be created outside the VNet's group.
 
-    Ordering: azure-deprovision-resourcegroup must run BEFORE this step. Deleting the per-run
-    group is what removes the bastion NIC, and a subnet with a NIC still attached fails to delete
-    with InUseSubnetCannotBeDeleted. That step also sources
+    Ordering: this step runs LAST in post, after azure-il6-detach-subnet-nsgs and then
+    azure-deprovision-resourcegroup. Deleting the per-run group is what removes the bastion NIC,
+    and a subnet with a NIC still attached fails to delete with InUseSubnetCannotBeDeleted -- but
+    that group delete cannot succeed either while a subnet still references an NSG inside the
+    group, which is why the detach step has to come first. See azure-il6-detach-subnet-nsgs for
+    the full cycle. azure-deprovision-resourcegroup also sources
     ${SHARED_DIR}/remove_resources_by_cli.sh, so the mirror registry's public DNS A record in
     BASE_RESOURCE_GROUP is already gone by the time this one runs.
 

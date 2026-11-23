@@ -31,9 +31,10 @@ ref:
   - name: AZURE_IL6_RESOURCE_GROUP
     default: CI-Azure-IL6-DoNotDelete
     documentation: |-
-      The shared, permanent resource group. Checked explicitly because the emulator fronts the
-      whole commercial subscription, so this is the only group the job can meaningfully assert
-      anything about.
+      The shared, permanent resource group, which holds the VNet. Checked explicitly because the
+      emulator fronts the whole commercial subscription, so naming the group is the only way to
+      assert anything meaningful. The bastion VM is NOT here: it lives in the per-run group named
+      by ${SHARED_DIR}/resourcegroup, which the Compute check reads instead.
   - name: AZURE_IL6_VNET_NAME
     default: RHOCP-CI-AzureIL6-virtual-network
     documentation: |-
@@ -60,6 +61,12 @@ ref:
       'az network vnet list' exits 0 with an empty table. Testing the return code alone would
       report success for an emulated ARM that answered with nothing, so the typed queries assert
       on content: the VNet must come back by name, and Compute must return the bastion.
+
+    The two typed reads are addressed at two different groups. The VNet is read from
+    AZURE_IL6_RESOURCE_GROUP, the shared permanent group, because a VNet's subnets are child
+    resources and the VNet cannot live anywhere else. The bastion VM is read from the per-run
+    group recorded in ${SHARED_DIR}/resourcegroup by azure-provision-resourcegroup, because that
+    is where azure-provision-bastionhost puts it.
 
     The login deliberately uses the commercial azure-qe principal from the cluster profile.
     Whether the emulator honours it is one of the questions this step exists to answer.
