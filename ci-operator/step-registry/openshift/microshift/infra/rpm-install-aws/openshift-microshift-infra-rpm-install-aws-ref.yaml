@@ -23,6 +23,24 @@ ref:
     documentation: >-
       Get MicroShift code from git instead of the image. This is because this step may be used in jobs where
       pipeline:src image may not belong to MicroShift repo.
+  - name: MULTISTAGE_PARAM_OVERRIDE_MICROSHIFT_EXACT_PAYLOAD_RETEST
+    default: "false"
+    documentation: >-
+      Opt-in, default-off switch for supported manual retesting of a MicroShift
+      conformance job against an exact, already-published amd64 OCP nightly.
+      Leave "false" for all automated runs: scheduled periodics and presubmits
+      keep skipping the rebase, and release-controller / payload verification
+      (whose ProwJob id contains "nightly") keeps rebasing exactly as before.
+      Set it to "true" only when a human triggers this periodic through Gangway
+      and also provides the exact nightly as RELEASE_IMAGE_LATEST (ci-operator
+      resolves "latest" to that pull-spec and re-exports it, together with the
+      external ORIGINAL_RELEASE_IMAGE_LATEST, into this step). When "true" the
+      step fails closed unless ORIGINAL_RELEASE_IMAGE_LATEST is the canonical
+      trusted exact amd64 pullspec
+      registry.ci.openshift.org/ocp/release:<release>.Z-0.nightly-YYYY-MM-DD-HHMMSS,
+      where <release> is derived from the job's own name. This is a manual
+      retest, not controller verification: the ProwJob id stays a UUID and the
+      run never claims controller gate status.
   credentials:
   - collection: redhat-et
     group: microshift-rhsm-creds
