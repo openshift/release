@@ -1,4 +1,8 @@
 base_images:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: latest
   hypershift-operator:
     name: hypershift-operator
     namespace: hypershift
@@ -84,6 +88,12 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-openstack-ipi
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-release-5.2}
+  container:
+    from: commitchecker
+  optional: true
 - as: security
   steps:
     workflow: openshift-ci-security

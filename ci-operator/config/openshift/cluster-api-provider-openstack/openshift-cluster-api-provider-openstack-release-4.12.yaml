@@ -3,6 +3,10 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: base
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: latest
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -48,6 +52,12 @@ tests:
   commands: IS_CONTAINER=TRUE make lint
   container:
     from: src
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-release-4.12}
+  container:
+    from: commitchecker
+  optional: true
 zz_generated_metadata:
   branch: release-4.12
   org: openshift
