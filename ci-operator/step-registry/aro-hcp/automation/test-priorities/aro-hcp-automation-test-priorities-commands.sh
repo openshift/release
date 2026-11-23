@@ -288,6 +288,15 @@ for fixture in "${fixture_paths[@]:-}"; do
     fi
 done
 
+# The published change set is the plan plus the suite fixtures it regenerated:
+# the fixtures are derived, so they are not in the planner summary, but CI
+# regenerates them and a pull request without them fails the suite test.
+readonly PUBLISH_CHANGES="${PRIVATE_DIR}/changes-with-fixtures.json"
+fixture_json=$(printf '%s\n' "${fixture_paths[@]:-}" | jq -R 'select(length > 0)' | jq -s 'map({path: .})') ||
+    error "cannot encode the suite fixtures"
+jq --argjson fixtures "${fixture_json}" '.changes += $fixtures' "${CHANGES}" >"${PUBLISH_CHANGES}" ||
+    error "cannot extend the change summary with the suite fixtures"
+
 # ---------------------------------------------------------------------------
 # Report body
 # ---------------------------------------------------------------------------
@@ -315,7 +324,7 @@ receipt=$("${RUNNER}" priorities-publish \
     --title "${TITLE}" \
     --body-file "${PRIVATE_DIR}/body.md" \
     --marker "${MARKER}" \
-    --changes "${CHANGES}" \
+    --changes "${PUBLISH_CHANGES}" \
     --git-name "${GITHUB_BOT_NAME}" \
     --git-email "${GITHUB_BOT_EMAIL}" \
     --actor "${GITHUB_BOT_LOGIN}" \
