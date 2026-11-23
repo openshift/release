@@ -29,11 +29,22 @@ git -C "${work_dir}/art-tools" rev-parse HEAD
 git clone --quiet --depth=1 --branch "${RELEASE_DATA_REF}" \
   https://gitlab.cee.redhat.com/releng/konflux-release-data.git "${work_dir}/release-data"
 
+pyxis_args=()
+if [[ "${VALIDATE_PYXIS:-false}" == "true" ]]; then
+  git clone --quiet --depth=1 \
+    https://gitlab.cee.redhat.com/releng/pyxis-repo-configs.git "${work_dir}/pyxis-repo-configs"
+  printf 'Pyxis configuration revision: '
+  git -C "${work_dir}/pyxis-repo-configs" rev-parse HEAD
+
+  pyxis_args=(--pyxis-root "${work_dir}/pyxis-repo-configs")
+fi
+
 # Validate the metadata checkout with the trusted art-tools validator.
 uv run --project "${work_dir}/art-tools" --locked --no-dev python -I -m validator.ci \
   --repo "${repo_root}" \
   --rpa-root "${work_dir}/release-data/config" \
   --application "${KONFLUX_APPLICATION}" \
+  "${pyxis_args[@]}" \
   --github-token-file /etc/github-private/oauth \
   --registry-auth-file /var/run/secrets/ci-pull-credentials/.dockerconfigjson \
   --report "${ARTIFACT_DIR}/validation.json"
