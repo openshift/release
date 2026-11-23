@@ -158,7 +158,8 @@ validate_agent_branch
 publish_agent_pr \
     "${JIRA_ISSUE_KEY}: ${ISSUE_SUMMARY}" \
     "$(printf '## %s: %s\n\nFixes: https://redhat.atlassian.net/browse/%s\n' \
-        "${JIRA_ISSUE_KEY}" "${ISSUE_SUMMARY}" "${JIRA_ISSUE_KEY}")"
+        "${JIRA_ISSUE_KEY}" "${ISSUE_SUMMARY}" "${JIRA_ISSUE_KEY}")" \
+    "$(select_agent_model)"
 
 PHASE_PR_DURATION=$(( $(date +%s) - PHASE_PR_START ))
 
