@@ -330,6 +330,9 @@ function GetQuayAuth () {
         typeset initResult=''
         # The payload is built by json.dumps and piped in via stdin, so the
         # generated password is safely escaped and never part of any argv.
+        # no -L: the generated password is in the POST body, so a redirect on
+        # this endpoint must not be followed.  -f still fails the call on an
+        # HTTP error, and the retry loop reads a redirect body as a failure.
         # PRRT_kwDOBHvUUM65TpNF: single init request with bounded retry
         typeset -i _initTry=0
         for _initTry in 1 2 3; do
@@ -527,6 +530,9 @@ function CreateTestOrg () {
             # (the variables are exported above), and piped in via stdin, so
             # the password appears in neither the helper's argv nor the curl
             # command line.
+            # no -L: the password and the X-CSRF-Token header are on this POST,
+            # so a redirect must not be followed; -f fails the call on an HTTP
+            # error, and a redirect body is not a signin success.
             signinResult="$(python3 -c "
 import json, os
 print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['QUAY_PASSWORD']}))
