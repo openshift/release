@@ -1,0 +1,30 @@
+workflow:
+  as: openshift-e2e-external-aws-disconnected
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: platform-external-cluster-aws-pre-disconnected
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather
+    - chain: platform-external-cluster-aws-post-disconnected
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      PROVIDER_NAME: aws
+      PLATFORM_EXTERNAL_CCM_ENABLED: "no"
+      DISCONNECTED_INSTALL: "yes"
+      TEST_ARGS: '--disable-monitor=service-type-load-balancer-availability'
+      ZONES_COUNT: "2"
+      MIRROR_IN_BASTION: "yes"
+      QE_IMAGES: "false"
+  documentation: |-
+    E2E workflow to validate OpenShift clusters installed on AWS with
+    platform type external in a disconnected environment. Provisions a
+    VPC with private subnets (no NAT gateway) and VPC endpoints for AWS
+    services, a bastion host running a mirror registry and egress proxy,
+    mirrors the release payload, and installs the cluster using
+    CloudFormation UPI templates against the disconnected VPC. Tests run
+    the standard OpenShift conformance suite.
