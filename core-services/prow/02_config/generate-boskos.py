@@ -684,6 +684,12 @@ CONFIG = {
         'westus2': 10,
         'centralus': 10
     },
+    'aws-ecoeng-nvidia-quota-slice': {
+        'us-east-1': 5,
+        'us-east-2': 5,
+        'us-west-1': 5,
+        'us-west-2': 5,
+    },
     'aws-edge-infra-quota-slice': {
         'us-east-1': 5,
         'us-east-2': 5,
