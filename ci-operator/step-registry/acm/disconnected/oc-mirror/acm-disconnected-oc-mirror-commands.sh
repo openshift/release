@@ -117,23 +117,72 @@ EOF
     cat "${TMP_DIR}/isc-acm-mce.yaml"
 }
 
+# mirror_operators() {
+#     log "Mirroring ACM/MCE operators to ${MIRROR_REGISTRY_HOST}..."
+
+#     log "Mirroring directly from source to ${MIRROR_REGISTRY_HOST}..."
+#     /tmp/oc-mirror --v2 \
+#         --config="${TMP_DIR}/isc-acm-mce.yaml" \
+#         --workspace "file://${TMP_DIR}" \
+#         "docker://${MIRROR_REGISTRY_HOST}" \
+#         --src-tls-verify=false \
+#         --dest-tls-verify=false \
+#         --retry-times=5 \
+#         --image-timeout=30m \
+#         --log-level=debug 2>&1 | tee "${ARTIFACT_DIR}/acm_mce_mirror.log" || {
+#         log "ERROR: oc-mirror failed"
+#         return 1
+#     }
+
+#     log "Mirroring complete"
+# }
+
 mirror_operators() {
     log "Mirroring ACM/MCE operators to ${MIRROR_REGISTRY_HOST}..."
-
-    log "Mirroring directly from source to ${MIRROR_REGISTRY_HOST}..."
-    /tmp/oc-mirror --v2 \
-        --config="${TMP_DIR}/isc-acm-mce.yaml" \
-        --workspace "file://${TMP_DIR}" \
-        "docker://${MIRROR_REGISTRY_HOST}" \
-        --src-tls-verify=false \
-        --dest-tls-verify=false \
-        --retry-times=5 \
-        --image-timeout=30m \
-        --log-level=debug 2>&1 | tee "${ARTIFACT_DIR}/acm_mce_mirror.log" || {
-        log "ERROR: oc-mirror failed"
+ 
+    local max_attempts=3
+    local attempt=1
+    local rc=1
+ 
+    while (( attempt <= max_attempts )); do
+        log "Mirroring attempt ${attempt}/${max_attempts} (direct source -> ${MIRROR_REGISTRY_HOST})..."
+ 
+        # oc-mirror v2 is incremental/resumable: re-using the same --workspace
+        # means each re-run only re-pulls the images that failed previously, so
+        # a fresh process (new connections + new presigned CDN URLs) can finish
+        # the large images that exhausted --retry-times in the prior attempt.
+        /tmp/oc-mirror --v2 \
+            --config="${TMP_DIR}/isc-acm-mce.yaml" \
+            --workspace "file://${TMP_DIR}" \
+            "docker://${MIRROR_REGISTRY_HOST}" \
+            --src-tls-verify=false \
+            --dest-tls-verify=false \
+            --retry-times=5 \
+            --image-timeout=30m \
+            --log-level=debug 2>&1 | tee "${ARTIFACT_DIR}/acm_mce_mirror_attempt${attempt}.log"
+        rc=${PIPESTATUS[0]}   # capture oc-mirror's exit, not tee's
+ 
+        # keep the latest attempt as the canonical log the collector picks up
+        cp -f "${ARTIFACT_DIR}/acm_mce_mirror_attempt${attempt}.log" "${ARTIFACT_DIR}/acm_mce_mirror.log"
+ 
+        if (( rc == 0 )); then
+            log "Mirroring succeeded on attempt ${attempt}"
+            break
+        fi
+ 
+        log "WARNING: oc-mirror attempt ${attempt}/${max_attempts} failed (rc=${rc})."
+        (( attempt++ ))
+        if (( attempt <= max_attempts )); then
+            log "Sleeping 120s before resuming from cached workspace..."
+            sleep 120
+        fi
+    done
+ 
+    if (( rc != 0 )); then
+        log "ERROR: oc-mirror failed after ${max_attempts} attempts"
         return 1
-    }
-
+    fi
+ 
     log "Mirroring complete"
 }
 
