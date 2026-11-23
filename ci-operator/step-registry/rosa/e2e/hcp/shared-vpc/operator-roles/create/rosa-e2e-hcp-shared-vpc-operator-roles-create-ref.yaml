@@ -1,0 +1,29 @@
+ref:
+  as: rosa-e2e-hcp-shared-vpc-operator-roles-create
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: rosa-e2e-hcp-shared-vpc-operator-roles-create-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The environment for rosa login. The supported values are [production, staging, integration].
+  - name: HOSTED_CP
+    default: "true"
+    documentation: Enable the use of hosted control planes (HyperShift).
+  - name: CHANNEL_GROUP
+    default: "stable"
+    documentation: The channel group where to to get the openshift version. The supported groups are [stable, candidate, nightly].
+  - name: ENABLE_SHARED_VPC
+    default: "yes"
+    documentation: Grant permissions to create and manage Route 53 DNS records in private Route 53 hosted zone associated with intended shared VPC.
+  documentation: |-
+    rosa/e2e scoped override of rosa-sts-operator-roles-create for the HCP
+    shared VPC workflow (ROSAENG-63353): rosa create operator-roles rejects
+    --shared-vpc-role-arn on HCP clusters unless --vpc-endpoint-role-arn is
+    supplied as well, and the shared step does not pass it. Both role ARNs
+    (hosted_zone_role_arn and vpc_endpoint_role_arn) are written to SHARED_DIR
+    by rosa-e2e-hcp-shared-vpc-prepare, which must run before this step.

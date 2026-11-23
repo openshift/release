@@ -165,11 +165,6 @@ export CONTAINER_PLATFORM_VERSION
 CONTAINER_PLATFORM_VERSION=$(oc version --output json 2>/dev/null | jq -r '.openshiftVersion' | cut -d'.' -f1,2 || echo "unknown")
 echo "Platform: ${CONTAINER_PLATFORM} ${CONTAINER_PLATFORM_VERSION}"
 
-# Save platform info to SHARED_DIR for data-router step
-printf "%s" "${IS_OPENSHIFT}" > "${SHARED_DIR}/IS_OPENSHIFT.txt"
-printf "%s" "${CONTAINER_PLATFORM}" > "${SHARED_DIR}/CONTAINER_PLATFORM.txt"
-printf "%s" "${CONTAINER_PLATFORM_VERSION}" > "${SHARED_DIR}/CONTAINER_PLATFORM_VERSION.txt"
-
 # ── Clone & checkout ─────────────────────────────────────────────────────────
 
 git clone "https://github.com/${GITHUB_ORG_NAME}/${GITHUB_REPOSITORY_NAME}.git"
@@ -200,9 +195,6 @@ else
 fi
 echo "RHDH_VERSION: ${RHDH_VERSION}, INSTALLATION_METHOD: ${INSTALLATION_METHOD}"
 
-# Save RHDH version to SHARED_DIR for data-router step
-printf "%s" "${RHDH_VERSION}" > "${SHARED_DIR}/RHDH_VERSION.txt"
-
 # ── Artifact collection ──────────────────────────────────────────────────────
 
 collect_artifacts() {
@@ -210,20 +202,6 @@ collect_artifacts() {
         echo "[INFO] Copying artifacts to ${ARTIFACT_DIR}"
         cp -a playwright-report "${ARTIFACT_DIR}/" 2>&1 || echo "[WARNING] playwright-report not found"
         cp -a node_modules/.cache/e2e-test-results "${ARTIFACT_DIR}/" 2>&1 || echo "[WARNING] e2e-test-results not found"
-    fi
-    # Copy JUnit results to SHARED_DIR for data-router step
-    # Gzip to stay under Kubernetes Secret 1 MiB limit (raw XML can exceed it)
-    if [[ -f "playwright-report/junit-results.xml" ]]; then
-        gzip -c "playwright-report/junit-results.xml" > "${SHARED_DIR}/junit-results.xml.gz"
-        local gz_size
-        gz_size=$(stat -c%s "${SHARED_DIR}/junit-results.xml.gz" 2>/dev/null || stat -f%z "${SHARED_DIR}/junit-results.xml.gz")
-        local max_size=$((800 * 1024))
-        if (( gz_size > max_size )); then
-            echo "[WARNING] junit-results.xml.gz is $(( gz_size / 1024 )) KB, exceeds $(( max_size / 1024 )) KB limit. Removing from SHARED_DIR to prevent Secret update failure."
-            rm -f "${SHARED_DIR}/junit-results.xml.gz"
-        else
-            echo "[INFO] Copied junit-results.xml.gz to ${SHARED_DIR}/ ($(( gz_size / 1024 )) KB)"
-        fi
     fi
 }
 

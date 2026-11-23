@@ -41,6 +41,7 @@ MANIFEST = "evals.yaml"
 STEP_TIMEOUT = 13800  # Leave ten minutes inside the Prow step's four-hour limit.
 EVAL_TIMEOUT = 12600
 CONFIG_RESOLUTION_TIMEOUT = 60
+SESSION_ARCHIVE = "claude-sessions.tar"  # /ci:continue-session finds claude-session*.tar*.
 
 
 
@@ -459,6 +460,35 @@ def archive_strays(runs, run_id, eval_name, artifacts):
     return sorted(strays.values())
 
 
+def archive_sessions(env, artifacts):
+    """Archive Claude's projects directory for /ci:continue-session; best effort.
+
+    Claude writes sessions under CLAUDE_CONFIG_DIR (the CI image sets it),
+    else ~/.claude. A written archive is announced to openshift-claude-post
+    through SHARED_DIR. Archiving never changes the run's result.
+    """
+    try:
+        config = env.get("CLAUDE_CONFIG_DIR") or Path(env.get("HOME") or Path.home()) / ".claude"
+        projects = Path(config) / "projects"
+        if not projects.is_dir() or not any(projects.iterdir()):
+            print(f"No Claude sessions under {projects}; skipping session archive", flush=True)
+            return
+        # Plain tar for the same reason as eval-run.tar: CI strips .gz suffixes.
+        destination = artifacts / SESSION_ARCHIVE
+        temporary = destination.with_suffix(".tmp")
+        try:
+            with tarfile.open(temporary, "w") as output:
+                output.add(projects, arcname="projects")
+            temporary.replace(destination)
+        finally:
+            temporary.unlink(missing_ok=True)
+        if env.get("SHARED_DIR"):
+            (Path(env["SHARED_DIR"]) / "claude-session-available").touch()
+        print(f"Archived Claude sessions from {projects} to {SESSION_ARCHIVE}", flush=True)
+    except Exception as error:  # pylint: disable=broad-exception-caught
+        print(f"WARNING: Claude session archive failed: {type(error).__name__}: {error}", flush=True)
+
+
 def summary_data(artifacts, entries, errors):
     """Build the versioned, model-independent summary shared by agents and HTML."""
     counts = {status: sum(entry["status"] == status for entry in entries)
@@ -821,6 +851,7 @@ def run_evals(repo, entries, files, artifacts, env, *, deadline=None):  # pylint
         print(f"ERROR: {error}", flush=True)
     finally:
         write_reports(artifacts, results, index, errors)
+        archive_sessions(env, artifacts)
     return int(any(result[2] for result in results))
 
 

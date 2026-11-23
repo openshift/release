@@ -278,16 +278,22 @@ systemd:
         [Service]
         Restart=always
         RestartSec=3
+        # The LB VM is only reachable through CI and its journal cannot be
+        # collected afterwards, so mirror the container's output to the console.
+        StandardOutput=journal+console
+        StandardError=journal+console
         ExecStartPre=-/bin/podman kill haproxy
         ExecStartPre=-/bin/podman rm haproxy
-        ExecStartPre=/bin/podman pull quay.io/openshift/origin-haproxy-router
+        ExecStartPre=/bin/sh -c 'if ! podman pull registry.access.redhat.com/hi/haproxy:latest; then echo "haproxy: image pull failed"; exit 1; fi'
+        ExecStartPre=-/bin/sh -c 'podman image inspect --format "haproxy: using image {{{{.Id}}}} ({{{{.Digest}}}})" registry.access.redhat.com/hi/haproxy:latest || echo "haproxy: image inspection failed"'
         ExecStart=/bin/podman run --name haproxy \
         --net=host \
         --privileged \
-        --entrypoint=/usr/sbin/haproxy \
+        --user 0 \
         -v /etc/haproxy/haproxy.conf:/var/lib/haproxy/conf/haproxy.conf:Z \
-        quay.io/openshift/origin-haproxy-router -f /var/lib/haproxy/conf/haproxy.conf
-        ExecStop=/bin/podman rm -f haproxy
+        registry.access.redhat.com/hi/haproxy:latest \
+        -f /var/lib/haproxy/conf/haproxy.conf
+        ExecStopPost=-/bin/sh -c 'podman logs --tail 200 haproxy 2>&1; podman rm -f haproxy 2>&1'
 
         [Install]
         WantedBy=multi-user.target

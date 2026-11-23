@@ -627,6 +627,10 @@ tests:
     cd ../openshift
     go mod vendor
     make test || status=$?
+    cd ../test/crd-integration
+    go mod vendor
+    cd ../
+    make test-crd || status=$?
     exit $status
   container:
     from: src
@@ -992,16 +996,6 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
 - always_run: false
-  as: e2e-metal-ipi-ovn-bgp-virt-dualstack
-  capabilities:
-  - intranet
-  optional: true
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      CNV_PRERELEASE_LATEST_CHANNEL: "true"
-    workflow: baremetalds-e2e-ovn-bgp-virt-dualstack
-- always_run: false
   as: e2e-metal-core-networking-virt-nmstate-dual-serial-ote-tp
   capabilities:
   - intranet
@@ -1011,6 +1005,17 @@ tests:
     env:
       CNV_PRERELEASE_LATEST_CHANNEL: "true"
       FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: ovn-kubernetes/conformance/serial/virtualization
+    workflow: baremetalds-e2e-ovn-bgp-virt-dualstack
+- always_run: false
+  as: e2e-metal-core-networking-virt-nmstate-dual-serial-ote
+  capabilities:
+  - intranet
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CNV_PRERELEASE_LATEST_CHANNEL: "true"
       TEST_SUITE: ovn-kubernetes/conformance/serial/virtualization
     workflow: baremetalds-e2e-ovn-bgp-virt-dualstack
 - always_run: false

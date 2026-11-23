@@ -27,6 +27,27 @@ fi
 echo "Test failures detected — proceeding with qe-agent analysis."
 
 # ---------------------------------------------------------------------------
+# 2a. Move the JUnit inputs out of SHARED_DIR (a 1 MiB Secret synced at pod
+#     exit) so nothing the agent writes next to them can fail the step.
+# ---------------------------------------------------------------------------
+readonly QE_JUNIT_DIR="/tmp/qe-agent-junit"
+export QE_JUNIT_DIR
+mkdir -p "${QE_JUNIT_DIR}"
+
+shopt -s nullglob
+_junit_moved=0
+for _junit in "${SHARED_DIR}"/qe-agent-junit-*; do
+  if mv "${_junit}" "${QE_JUNIT_DIR}/"; then
+    _junit_moved=$((_junit_moved + 1))
+  else
+    echo "WARNING: could not move ${_junit} out of SHARED_DIR."
+  fi
+done
+shopt -u nullglob
+
+echo "JUnit inputs: ${_junit_moved} file(s) relocated to ${QE_JUNIT_DIR} (out of SHARED_DIR)."
+
+# ---------------------------------------------------------------------------
 # 3. Verify Claude CLI is available
 # ---------------------------------------------------------------------------
 if ! command -v claude &>/dev/null; then
@@ -180,7 +201,7 @@ timeout "${_CLAUDE_TIMEOUT}m" claude --print \
   --verbose \
   --output-format stream-json \
   --system-prompt "${SKILL_CONTENT}" \
-  "SHARED_DIR=${SHARED_DIR} ARTIFACT_DIR=${ARTIFACT_DIR}. The test step context is in ${SHARED_DIR}/qe-agent-context.json and JUnit XML files are at ${SHARED_DIR}/qe-agent-junit-*.xml. Execute the skill starting with Step 0: read ${SHARED_DIR}/qe-agent-context.json." \
+  "SHARED_DIR=${SHARED_DIR} ARTIFACT_DIR=${ARTIFACT_DIR} QE_JUNIT_DIR=${QE_JUNIT_DIR}. The test step context is in ${SHARED_DIR}/qe-agent-context.json and the JUnit XML files are in ${QE_JUNIT_DIR}/qe-agent-junit-*.xml — pod-local copies the wrapper moved out of SHARED_DIR, so they are NOT in SHARED_DIR. Never write into ${SHARED_DIR} (it is a 1 MiB Kubernetes Secret synced when this pod exits); write scratch files to /tmp and results to ${ARTIFACT_DIR}. Execute the skill starting with Step 0: read ${SHARED_DIR}/qe-agent-context.json." \
   > "${_QE_STREAM}" 2>&1 \
   || true
 

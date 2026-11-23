@@ -2,6 +2,18 @@ ref:
   as: vsphere-legacy-infra-check
   from: cli
   commands: vsphere-legacy-infra-check-commands.sh
+  env:
+  - name: VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER
+    default: post-bootstrap
+    documentation: >-
+      Mirrors the install step's flag of the same name so this check can report
+      the carrier formats against what the job intended. Used only to explain
+      a mismatch between openshift-config/cloud-provider-config and the
+      in-cluster source openshift-config-managed/kube-cloud-config (who writes
+      that copy is gated on VSphereMultiVCenterDay2: verbatim INI while the
+      gate is off, CCMO-normalized YAML once it is on). A mismatch is reported
+      as a warning, never a failure -- when the ordering is actually wrong the
+      install dies before this step runs.
   resources:
     requests:
       cpu: 10m
@@ -12,7 +24,9 @@ ref:
     on the upi-conf-vsphere ref), simulating clusters installed via UPI or
     before OpenShift 4.13 that never had this data populated, and which the
     installer never backfills on upgrade (SPLAT-3028). Confirms the
-    Infrastructure CR is actually in this state, then checks ClusterOperator
-    health, vSphere cloud-controller-manager and CSI driver pod health, and
-    scans cloud-controller-manager logs for the OCPBUGS-136178 regression
-    signature ("No Virtual Center hosts defined").
+    Infrastructure CR is actually in this state and that
+    openshift-config/cloud-provider-config really is the legacy INI, reports
+    the formats of the managed and ControllerConfig copies, then checks
+    ClusterOperator health, vSphere cloud-controller-manager and CSI driver pod
+    health, and scans cloud-controller-manager logs for the OCPBUGS-136178
+    regression signature ("No Virtual Center hosts defined").

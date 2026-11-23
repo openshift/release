@@ -157,8 +157,10 @@ fi
 CLUSTER_NAME=""
 DOMAIN_PREFIX_SWITCH=""
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]] && [[ -e "${SHARED_DIR}/cluster-name" ]]; then
-  # For Shared VPC cluster, cluster name is determined in step aws-provision-route53-private-hosted-zone
-  #   as Private Hosted Zone needs to be ready before installing Shared VPC cluster
+  # For Shared VPC cluster, cluster name is determined in the shared VPC
+  #   provisioning steps (aws-provision-route53-private-hosted-zone or
+  #   rosa-e2e-hcp-shared-vpc-prepare), as the Private Hosted Zone needs to be
+  #   ready before installing a Shared VPC cluster
   CLUSTER_NAME=$(head -n 1 "${SHARED_DIR}/cluster-name")
 else
   CLUSTER_NAME=${CLUSTER_NAME:-$CLUSTER_PREFIX}
@@ -780,11 +782,31 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   SHARED_VPC_HOSTED_ZONE_ID=$(head -n 1 "${SHARED_DIR}/hosted_zone_id")
   SHARED_VPC_ROLE_ARN=$(head -n 1 "${SHARED_DIR}/hosted_zone_role_arn")
   SHARED_VPC_BASE_DOMAIN=$(head -n 1 "${SHARED_DIR}/rosa_dns_domain")
-  SHARED_VPC_SWITCH="--base-domain ${SHARED_VPC_BASE_DOMAIN} --private-hosted-zone-id ${SHARED_VPC_HOSTED_ZONE_ID} --shared-vpc-role-arn ${SHARED_VPC_ROLE_ARN}"
+  # --ingress-private-hosted-zone-id and --route53-role-arn replace the
+  # deprecated --private-hosted-zone-id and --shared-vpc-role-arn flags.
+  SHARED_VPC_SWITCH="--base-domain ${SHARED_VPC_BASE_DOMAIN} --ingress-private-hosted-zone-id ${SHARED_VPC_HOSTED_ZONE_ID} --route53-role-arn ${SHARED_VPC_ROLE_ARN}"
 
   record_cluster "aws.sts" "private_hosted_zone_id" ${SHARED_VPC_HOSTED_ZONE_ID}
   record_cluster "aws.sts" "private_hosted_zone_role_arn" ${SHARED_VPC_ROLE_ARN}
   record_cluster "dns" "base_domain" ${SHARED_VPC_BASE_DOMAIN}
+
+  # Hosted Control Plane shared VPC clusters additionally require the VPC
+  # endpoint role and the internal communication hosted zone (rosa create
+  # cluster fails flag validation without them). Both are prepared in the
+  # shared account by rosa-e2e-hcp-shared-vpc-prepare, which publishes
+  # vpc_endpoint_role_arn and hcp_internal_communication_hosted_zone_id.
+  if [[ "${HOSTED_CP}" == "true" ]]; then
+    if [[ ! -s "${SHARED_DIR}/vpc_endpoint_role_arn" || ! -s "${SHARED_DIR}/hcp_internal_communication_hosted_zone_id" ]]; then
+      echo "Error: ENABLE_SHARED_VPC with HOSTED_CP requires ${SHARED_DIR}/vpc_endpoint_role_arn and ${SHARED_DIR}/hcp_internal_communication_hosted_zone_id (created by rosa-e2e-hcp-shared-vpc-prepare), exiting."
+      exit 1
+    fi
+    VPC_ENDPOINT_ROLE_ARN=$(head -n 1 "${SHARED_DIR}/vpc_endpoint_role_arn")
+    HCP_INTERNAL_COMMUNICATION_HOSTED_ZONE_ID=$(head -n 1 "${SHARED_DIR}/hcp_internal_communication_hosted_zone_id")
+    # OCM requires the shared route53 and VPC endpoint roles as additional
+    # allowed principals on the Hosted Control Plane's VPC Endpoint Service.
+    SHARED_VPC_SWITCH="${SHARED_VPC_SWITCH} --vpc-endpoint-role-arn ${VPC_ENDPOINT_ROLE_ARN} --hcp-internal-communication-hosted-zone-id ${HCP_INTERNAL_COMMUNICATION_HOSTED_ZONE_ID} --additional-allowed-principals ${SHARED_VPC_ROLE_ARN},${VPC_ENDPOINT_ROLE_ARN}"
+    record_cluster "aws.sts" "vpc_endpoint_role_arn" ${VPC_ENDPOINT_ROLE_ARN}
+  fi
 fi
 
 DRY_RUN_SWITCH=""
@@ -966,3 +988,16 @@ fi
 CLUSTER_ID=$(cat "${CLUSTER_INFO}" | grep '^ID:' | tr -d '[:space:]' | cut -d ':' -f 2)
 echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
 echo -n "${CLUSTER_ID}" > "${SHARED_DIR}/cluster-id"
+
+# Capture cluster scope metadata for per-run analysis (ROSAENG-76176).
+# Consumed by rosa-eng-dashboard change observability (ROSAENG-76159).
+echo -n "${CLUSTER_ID}" > "${ARTIFACT_DIR}/cluster-id"
+[[ -n "${CLUSTER_SECTOR}" ]] && echo -n "${CLUSTER_SECTOR}" > "${ARTIFACT_DIR}/cluster-sector"
+echo -n "${OCM_LOGIN_ENV}" > "${ARTIFACT_DIR}/ocm-login-env"
+if [[ "${HOSTED_CP}" == "true" ]]; then
+  echo "hcp" > "${ARTIFACT_DIR}/topology"
+  ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/hypershift" 2>/dev/null \
+    | jq -r '.management_cluster // empty' > "${ARTIFACT_DIR}/management-cluster" || true
+else
+  echo "classic" > "${ARTIFACT_DIR}/topology"
+fi

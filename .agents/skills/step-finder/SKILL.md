@@ -41,8 +41,13 @@ All query tokens must match (name, path, or documentation).
    - step → `- ref: <name>`
    - chain → `- chain: <name>`
    - workflow → `workflow: <name>`
-4. Regenerate artifacts: `make update`
-5. Validate: `make validate-step-registry` and `make checkconfig`
+4. Regenerate artifacts: `make update`. It runs `ci-operator-checkconfig`
+   through `make jobs`.
+5. Validate generated Prow configuration: `make checkconfig`.
+
+For details on these validation targets, see the root AGENTS.md sections on
+[CI Job Configuration](../../../AGENTS.md#ci-job-configuration) and
+[Step Registry Validation](../../../AGENTS.md#step-registry-validation).
 
 ## Component types
 
