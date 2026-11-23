@@ -73,6 +73,16 @@ if (( totalBudget >= 1800 )); then
     exit 1
 fi
 
+# INTEROP-9629: canonical component-first suite name. When the lane opts in
+# via MAP_TESTS plus LP_QE__CR__TS_NAME__PFX__ODF, the suite name derives
+# from the component prefix (lp-interop--ODF--OPP--odf-health per ADR 0007);
+# otherwise the historical runtime-first name is preserved byte-identically
+# so unconfigured consumers see no change.
+typeset _ts_pfx="lp-interop--OPP"
+if [ "${MAP_TESTS:-}" = "true" ] && [ -n "${LP_QE__CR__TS_NAME__PFX__ODF:-}" ]; then
+    _ts_pfx="${LP_QE__CR__TS_NAME__PFX__ODF}"
+fi
+
 typeset junitFile="${ARTIFACT_DIR}/junit_odf_health.xml"
 
 typeset -a tcNamesArr=()
@@ -129,7 +139,7 @@ function WriteJunit () {
 
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"lp-interop--OPP--odf-health\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        echo "<testsuite name=\"${_ts_pfx}--odf-health\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
         typeset -i i=0
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
