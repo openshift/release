@@ -544,27 +544,27 @@ function SettleOppOperatorCsvs () {
             # PRRT_kwDOBHvUUM65Mrko: a terminal CSV phase does not prove the
             # operator pods are Ready (Running 0/1 during a rollout), and
             # ValidateOppOperators runs straight after this window. Check the
-            # pod readiness of the ACS operator only: it is the one operator
-            # whose pod label is fixed here, and its namespace is optional in
-            # the job environment (set -u), so the default keeps the read safe.
-            # L-1: no oc wait inside the polling loop, use oc get + jsonpath.
-            if [[ ",${OPP_OPERATORS}," == *",rhacs-operator,"* ]]; then
-                typeset _podReady=""
-                _podReady=$(oc get pods -n "${ACS_NAMESPACE:-stackrox}" \
-                    -l app.kubernetes.io/name=rhacs-operator \
-                    --request-timeout=15s \
-                    -o jsonpath='{range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' \
-                    2>/dev/null || echo "")
-                typeset -i _podsNotReady=0
-                if [[ -n "${_podReady}" ]]; then
-                    _podsNotReady=$(printf '%s\n' "${_podReady}" | grep -cv '^True$' || true)
-                fi
-                if (( _podsNotReady > 0 )); then
-                    echo "Operator pods not yet Ready (${_podsNotReady} of the labelled rhacs-operator pods), continuing settle" >&2
+            # same namespaces ValidateOppOperators checks, derived from the
+            # CSV listing read above, with the same not-ready predicate. A
+            # failed pod list keeps the window open (fail closed); the final
+            # verdict stays with ValidateOppOperators.
+            typeset -i _podsOk=1
+            typeset _podNs='' _podList='' _notReady=''
+            for _podNs in $(awk -F'\t' -v ops="${OPP_OPERATORS}" 'BEGIN{n=split(ops,arr,",")} {for(i=1;i<=n;i++) if(index($2,arr[i])==1){ns[$1]=1;break}} END{for(k in ns) print k}' <<< "${settleCsvs}"); do
+                if ! _podList="$(oc get pods -n "${_podNs}" --no-headers --request-timeout=15s 2>/dev/null)"; then
+                    echo "Pod list failed in ${_podNs}, continuing settle" >&2
+                    _podsOk=0
                     continue
                 fi
+                _notReady="$(NotReadyOppPods "${_podList}")"
+                if [[ -n "${_notReady}" ]]; then
+                    echo "Non-ready pods in ${_podNs}, continuing settle" >&2
+                    _podsOk=0
+                fi
+            done
+            if (( _podsOk == 1 )); then
+                return 0
             fi
-            return 0
         fi
         typeset -i _sleepFor=15
         _remaining=$(( deadline - SECONDS ))
