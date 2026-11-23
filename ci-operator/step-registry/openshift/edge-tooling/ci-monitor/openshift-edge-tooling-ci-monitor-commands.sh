@@ -1,285 +1,86 @@
 #!/bin/bash
-
-set -o nounset
-set -o errexit
-set -o pipefail
-
-echo "=== Edge Enablement CI Monitor ==="
-echo "Started at $(date -u '+%Y-%m-%d %H:%M UTC')"
-
-# ---------------------------------------------------------------------------
-# Load secrets (xtrace disabled to prevent leaking credentials in logs)
-# ---------------------------------------------------------------------------
+set -euo pipefail
 set +x
 
-if [[ -f "${GITHUB_APP_ID_PATH}" ]] && [[ -f "${GITHUB_KEY_PATH}" ]]; then
-    GITHUB_TOKEN="$(gh-token generate --app-id "$(< "${GITHUB_APP_ID_PATH}")" --key "${GITHUB_KEY_PATH}" | jq -r '.token')"
-    if [[ -z "${GITHUB_TOKEN}" ]] || [[ "${GITHUB_TOKEN}" == "null" ]]; then
-        echo "ERROR: Failed to generate GitHub token from App credentials."
-        exit 1
-    fi
-    export GITHUB_TOKEN
-    echo "GitHub token generated."
-else
-    echo "ERROR: GitHub App credentials not found."
-    exit 1
-fi
+echo "=== Edge OCP CI Monitor ==="
 
-if [[ -f "${JIRA_API_TOKEN_PATH}" ]]; then
-    export JIRA_TOKEN
-    JIRA_TOKEN=$(cat "${JIRA_API_TOKEN_PATH}")
-    echo "JIRA token loaded."
-fi
+WORK_DIR=$(mktemp -d)
+trap 'rm -rf -- "${WORK_DIR}"' EXIT
+MONITOR_DIR="${EDGE_TOOLING_DIR}/edge-ocp-ci-monitor"
+REPORT_STEM="edge-ci-monitor-summary"
 
-if [[ -f "${JIRA_USERNAME_PATH}" ]]; then
-    export JIRA_USERNAME
-    JIRA_USERNAME=$(cat "${JIRA_USERNAME_PATH}")
-    echo "JIRA username loaded."
-fi
+python3 -m venv "${WORK_DIR}/venv"
+PYTHON="${WORK_DIR}/venv/bin/python"
+"${PYTHON}" -m pip install -r "${MONITOR_DIR}/requirements.txt"
 
-# ---------------------------------------------------------------------------
-# Install gcloud CLI for Prow artifact access (no root required)
-# ---------------------------------------------------------------------------
-GCLOUD_VER="565.0.0"
-GCLOUD_SHA="733e3640b5892baecd997474cb1b2cfe80204b6584c64166c3d78bae3f1108c3"
-GCLOUD_TGZ="/tmp/google-cloud-cli.tar.gz"
+# Use the SDK in the image for public Prow artifacts and keep its config writable.
+export CLOUDSDK_CONFIG="${WORK_DIR}/gcloud"
+export CLOUDSDK_AUTH_DISABLE_CREDENTIALS=true
 
-echo "Installing gcloud CLI ${GCLOUD_VER}..."
-curl -sSL --connect-timeout 10 --max-time 300 --fail \
-    "https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-${GCLOUD_VER}-linux-x86_64.tar.gz" \
-    -o "${GCLOUD_TGZ}"
-if ! echo "${GCLOUD_SHA}  ${GCLOUD_TGZ}" | sha256sum -c -; then
-    echo "ERROR: Failed to verify gcloud CLI checksum."
-    exit 1
-fi
-tar -xzf "${GCLOUD_TGZ}" -C /tmp
-rm -f "${GCLOUD_TGZ}"
-# Redirect gcloud config to a writable directory — /home/claude/.config/gcloud/
-# is not writable in CI pods, causing install.sh to fail with PermissionError.
-export CLOUDSDK_CONFIG="/tmp/gcloud-config"
-mkdir -p "${CLOUDSDK_CONFIG}"
-/tmp/google-cloud-sdk/install.sh --quiet --path-update true
-export PATH="/tmp/google-cloud-sdk/bin:${PATH}"
-
-# ---------------------------------------------------------------------------
-# Configure Claude permissions for headless CI execution
-# ---------------------------------------------------------------------------
-CLAUDE_HOME="/home/claude/.claude"
-mkdir -p "${CLAUDE_HOME}"
-
-if [ ! -f "${CLAUDE_HOME}/.claude.json" ]; then
-    echo "{}" > "${CLAUDE_HOME}/.claude.json"
-fi
-
-cat > "${CLAUDE_HOME}/settings.json" <<'EOF'
-{
-  "permissions": {
-    "allow": [
-      "Read(//tmp/**)",
-      "Write(//tmp/**)",
-      "Bash(python3:*)",
-      "Bash(python:*)",
-      "Bash(pip:*)",
-      "Bash(curl:*)",
-      "Bash(gsutil:*)",
-      "Bash(gcloud:*)",
-      "Bash(gcloud storage:*)",
-      "Bash(cat:*)",
-      "Bash(jq:*)",
-      "Bash(grep:*)",
-      "Bash(ls:*)",
-      "Bash(date:*)",
-      "Bash(wc:*)",
-      "Bash(pip install:*)",
-      "Bash(pip3 install:*)",
-      "Bash(python -m pytest:*)",
-      "Bash(python3 -m pytest:*)",
-      "Bash(python -m payload_monitor:*)",
-      "Bash(python3 -m payload_monitor:*)",
-      "Skill(ci:*)",
-      "Skill(edge-ocp-ci:*)"
-    ]
-  }
-}
-EOF
-echo "Claude permissions configured."
-
-# ---------------------------------------------------------------------------
-# Set up workspace
-# ---------------------------------------------------------------------------
-WORKDIR=$(mktemp -d /tmp/ci-monitor-XXXXXX)
-cd "${WORKDIR}"
-
-copy_artifacts() {
-    echo "Copying artifacts to ${ARTIFACT_DIR}..."
-    local report_dir="${EDGE_TOOLING_DIR}/payload-monitor/reports"
-    if [[ -d "${report_dir}" ]]; then
-        local latest_html
-        latest_html=$(ls -t "${report_dir}"/*.html 2>/dev/null | head -1)
-        if [[ -n "${latest_html}" ]]; then
-            cp "${latest_html}" "${ARTIFACT_DIR}/edge-ci-monitor-summary.html"
-            # Use the summary belonging to this report, not an older run.
-            local sippy_summary="${latest_html%.html}.sippy-summary.json"
-            if [[ -r "${sippy_summary}" ]]; then
-                cp "${sippy_summary}" "${SHARED_DIR}/sippy-summary.json"
-            fi
-        fi
-        cp "${report_dir}"/*.json "${ARTIFACT_DIR}/" 2>/dev/null || true
-    fi
-
-    # Extract blocking/informing job summaries into a single file for
-    # downstream steps.  Each line is prefixed BLOCKING| or INFORMING|.
-    # SHARED_DIR is backed by a K8s Secret (1 MB limit) so only the
-    # extracted data is shared — not the full multi-MB stream-JSON log.
-    if [[ -r "${ARTIFACT_DIR}/claude-analysis.log" ]]; then
-        {
-            sed -n '/BLOCKING_JOBS_START/,/BLOCKING_JOBS_END/p' "${ARTIFACT_DIR}/claude-analysis.log" \
-                | grep -oE 'BLOCKING\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[a-zA-Z0-9._-]+'
-            sed -n '/INFORMING_JOBS_START/,/INFORMING_JOBS_END/p' "${ARTIFACT_DIR}/claude-analysis.log" \
-                | grep -oE 'INFORMING\|[^|]+\|https://[^|]+\|[^|]+\|[0-9]+\.[0-9]+\|[a-zA-Z0-9._-]+'
-        } | sort -u > "${SHARED_DIR}/failing-jobs.txt" || true
-    fi
-
-    # Archive Claude session for local continuation
-    if [[ -d "${CLAUDE_HOME}/projects" ]]; then
-        echo "Archiving Claude session..."
-        if tar -czf "${ARTIFACT_DIR}/claude-sessions-$(date +%Y%m%d-%H%M%S).tar.gz" \
-            -C "${CLAUDE_HOME}" projects/ 2>/dev/null; then
-            touch "${SHARED_DIR}/claude-session-available"
-        fi
-    fi
-}
-trap copy_artifacts EXIT TERM INT
-
-# ---------------------------------------------------------------------------
-# Register local marketplaces and install plugins
-# ---------------------------------------------------------------------------
-# Workaround: --continue + -p is broken (anthropics/claude-code#42376).
-export CLAUDE_CODE_ENTRYPOINT=cli
-
-echo "Cloning ai-helpers for CI analysis skills..."
-gh repo clone openshift-eng/ai-helpers ai-helpers -- --depth 1 --branch main
-
-echo "Registering local marketplaces..."
-claude plugin marketplace add "${EDGE_TOOLING_DIR}"
-claude plugin marketplace add "${WORKDIR}/ai-helpers"
-
-echo "Installing plugins..."
-claude plugin install edge-ocp-ci
-claude plugin install ci
-
-# ---------------------------------------------------------------------------
-# Build skill arguments from env vars
-# ---------------------------------------------------------------------------
-SKILL_ARGS=""
+args=(--output "${WORK_DIR}/${REPORT_STEM}.html" --json)
 if [[ -n "${MONITOR_VERSIONS}" ]]; then
-    SKILL_ARGS+="--versions ${MONITOR_VERSIONS} "
+    args+=(--versions "${MONITOR_VERSIONS}")
 fi
 if [[ "${SKIP_PROW}" == "true" ]]; then
-    SKILL_ARGS+="--skip-prow "
+    args+=(--skip-prow)
 fi
 if [[ "${WITH_TIMING}" == "true" ]]; then
-    SKILL_ARGS+="--with-timing "
+    args+=(--with-timing)
 fi
 if [[ -n "${PAYLOAD_COUNT}" ]]; then
-    SKILL_ARGS+="--payloads ${PAYLOAD_COUNT} "
+    args+=(--payloads "${PAYLOAD_COUNT}")
 fi
 
-# ===========================================================================
-# Invoke Claude with the generate-dashboard skill
-# ===========================================================================
-echo ""
-echo "=== Invoking Claude with edge-ocp-ci:generate-dashboard ==="
+# The monitor can still generate a dashboard if Chai credentials are unavailable.
+CHAI_MCP_TOKEN=$(cat /var/run/chai-bot/mcp-token 2>/dev/null || true)
+CHAI_MCP_URL=$(cat /var/run/chai-bot/mcp-url 2>/dev/null || true)
 
-ALLOWED_TOOLS="Agent SendMessage Bash Read Write Edit Grep Glob WebFetch WebSearch Task Skill"
+cd "${WORK_DIR}"
+MONITOR_EXIT=0
+START_SECONDS=${SECONDS}
+MONITOR_LOG="${ARTIFACT_DIR}/edge-ci-monitor.log"
+# Send stderr to tee for live diagnostics and keep the machine-readable stdout separate.
+CHAI_MCP_TOKEN="${CHAI_MCP_TOKEN}" CHAI_MCP_URL="${CHAI_MCP_URL}" PYTHONPATH="${MONITOR_DIR}" \
+    "${PYTHON}" -u -m edge_ocp_ci_monitor "${args[@]}" \
+    2>&1 > "${WORK_DIR}/monitor.stdout" | tee "${MONITOR_LOG}" || MONITOR_EXIT=$?
+unset CHAI_MCP_TOKEN CHAI_MCP_URL
 
-PHASE_START=$(date +%s)
-CLAUDE_EXIT=0
-timeout 7200 claude \
-    --model "${CLAUDE_MODEL}" \
-    --allowedTools "${ALLOWED_TOOLS}" \
-    --output-format stream-json \
-    --max-turns 150 \
-    -p "/edge-ocp-ci:generate-dashboard ${SKILL_ARGS}" \
-    --verbose 2>&1 | tee "${ARTIFACT_DIR}/claude-analysis.log" || CLAUDE_EXIT=$?
-
-PHASE_DURATION=$(( $(date +%s) - PHASE_START ))
-
-# Handle timeout — nudge Claude to wrap up
-PHASE_NUDGE_START=$(date +%s)
-NUDGE_EXIT=0
-if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
-    echo ""
-    echo "Claude timed out. Nudging to wrap up..."
-    timeout 600 claude \
-        --model "${CLAUDE_MODEL}" \
-        --continue \
-        --allowedTools "${ALLOWED_TOOLS}" \
-        --output-format stream-json \
-        --max-turns 15 \
-        -p "Time is up. Write whatever analysis you have to the JSON file now (Step 5), then merge into the dashboard (Step 6)." \
-        --verbose 2>&1 | tee -a "${ARTIFACT_DIR}/claude-analysis.log" || NUDGE_EXIT=$?
-fi
-PHASE_NUDGE_DURATION=$(( $(date +%s) - PHASE_NUDGE_START ))
-
-# ===========================================================================
-# JUnit XML for CI tracking
-# ===========================================================================
-TOTAL_DURATION=$(( PHASE_DURATION + PHASE_NUDGE_DURATION ))
-JUNIT_FILE="${ARTIFACT_DIR}/junit_ci-monitor.xml"
-
-PHASE_PREFIX="[sig-edge-enablement]"
-PHASE_CASES="  <testcase name=\"${PHASE_PREFIX} CI monitor\" time=\"${PHASE_DURATION}\"/>"
-PHASE_COUNT=1
-
-FAILURE_COUNT=0
-TIMEOUT_CASES=""
-TIMEOUT_TEST_COUNT=1
-
-if [[ "${CLAUDE_EXIT}" -eq 124 ]]; then
-    FAILURE_COUNT=1
-    TIMEOUT_CASES="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_DURATION}\">
-    <failure message=\"Claude timed out.\">Claude exceeded the time limit and had to be nudged to wrap up.</failure>
-  </testcase>"
-
-    PHASE_CASES="${PHASE_CASES}
-  <testcase name=\"${PHASE_PREFIX} Recovery nudge\" time=\"${PHASE_NUDGE_DURATION}\"/>"
-    PHASE_COUNT=2
-
-    if [[ "${NUDGE_EXIT}" -ne 0 ]]; then
-        FAILURE_COUNT=2
-        TIMEOUT_TEST_COUNT=2
-        TIMEOUT_CASES="${TIMEOUT_CASES}
-  <testcase name=\"${PHASE_PREFIX} Claude should recover after nudge\" time=\"${PHASE_NUDGE_DURATION}\">
-    <failure message=\"Claude failed to recover\">Claude was nudged but did not produce analysis (exit: ${NUDGE_EXIT}).</failure>
-  </testcase>"
+# Publish any reports generated before the process exited.
+for suffix in html json sippy-summary.json; do
+    report="${REPORT_STEM}.${suffix}"
+    if [[ -s "${report}" ]]; then
+        cp "${report}" "${ARTIFACT_DIR}/"
     fi
-elif [[ "${CLAUDE_EXIT}" -ne 0 ]]; then
-    FAILURE_COUNT=1
-    TIMEOUT_CASES="  <testcase name=\"${PHASE_PREFIX} Claude should complete successfully\" time=\"${PHASE_DURATION}\">
-    <failure message=\"Claude exited with code ${CLAUDE_EXIT}\">Claude failed with exit code ${CLAUDE_EXIT}.</failure>
-  </testcase>"
-else
-    TIMEOUT_CASES="  <testcase name=\"${PHASE_PREFIX} Claude should complete in a reasonable time\" time=\"${PHASE_DURATION}\"/>"
+done
+if [[ "${MONITOR_EXIT}" -eq 0 && ! -s "${REPORT_STEM}.html" ]]; then
+    echo "Edge OCP CI Monitor finished without a dashboard." >&2
+    MONITOR_EXIT=1
 fi
 
-TEST_COUNT=$(( PHASE_COUNT + TIMEOUT_TEST_COUNT ))
-cat > "${JUNIT_FILE}" <<EOF
+FAILURES=0
+FAILURE=""
+if [[ "${MONITOR_EXIT}" -ne 0 ]]; then
+    FAILURES=1
+    FAILURE="<failure message=\"Edge OCP CI Monitor failed (exit ${MONITOR_EXIT}). See edge-ci-monitor.log.\"/>"
+fi
+DURATION=$(( SECONDS - START_SECONDS ))
+cat > "${ARTIFACT_DIR}/junit_ci-monitor.xml" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="edge-ci-monitor" tests="${TEST_COUNT}" failures="${FAILURE_COUNT}" time="${TOTAL_DURATION}">
-${PHASE_CASES}
-${TIMEOUT_CASES}
+<testsuite name="edge-ci-monitor" tests="1" failures="${FAILURES}" time="${DURATION}">
+  <testcase name="[sig-edge-enablement] CI monitor" time="${DURATION}">${FAILURE}</testcase>
 </testsuite>
 EOF
-
-echo ""
-echo "JUnit XML written to ${JUNIT_FILE}"
-
-if [[ "${CLAUDE_EXIT}" -eq 0 ]] || { [[ "${CLAUDE_EXIT}" -eq 124 ]] && [[ "${NUDGE_EXIT}" -eq 0 ]]; }; then
-    touch "${SHARED_DIR}/monitor-completed"
-elif grep -q 'BLOCKING_JOBS_START\|edge failures' "${ARTIFACT_DIR}/claude-analysis.log" 2>/dev/null; then
-    echo "Claude failed (exit ${CLAUDE_EXIT}) but payload_monitor data found — enabling Slack notification."
-    touch "${SHARED_DIR}/monitor-completed"
+if [[ "${MONITOR_EXIT}" -ne 0 ]]; then
+    exit "${MONITOR_EXIT}"
 fi
 
-echo "=== Edge CI Monitor complete ==="
+# Share only the fields Slack uses. The monitor's final status line can also
+# include diagnostics, so copy only the status and completed/requested counts.
+sed -nE '/^(BLOCKING|INFORMING)\|/p' "${WORK_DIR}/monitor.stdout" \
+    | cut -d '|' -f 1-6 | sort -u > "${SHARED_DIR}/failing-jobs.txt"
+if [[ -s "${REPORT_STEM}.sippy-summary.json" ]]; then
+    cp "${REPORT_STEM}.sippy-summary.json" "${SHARED_DIR}/sippy-summary.json"
+fi
+sed -nE 's/^[0-9:]+ INFO +edge_ocp_ci_monitor — Chai analysis: (complete|partial|unavailable|not_needed) \(([0-9]+\/[0-9]+) targets\).*/\1 \2/p' \
+    "${MONITOR_LOG}" | tail -n 1 > "${SHARED_DIR}/chai-analysis-status.txt"
+touch "${SHARED_DIR}/monitor-completed"

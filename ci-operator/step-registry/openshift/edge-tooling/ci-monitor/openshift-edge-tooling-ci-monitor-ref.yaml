@@ -3,15 +3,9 @@ ref:
   from: edge-tooling-ai-helpers
   commands: openshift-edge-tooling-ci-monitor-commands.sh
   credentials:
-  - collection: ci-claude-code
-    group: claude-openshift-ci
-    mount_path: /var/run/claude-code-service-account
-  - collection: redhat-et
-    group: create-pr-credentials
-    mount_path: /var/run/pr-creds
-  - collection: technical-release-team
-    group: jira-token
-    mount_path: /var/run/jira-token
+  - collection: ocp-edge
+    group: chai-bot
+    mount_path: /var/run/chai-bot
   env:
   - name: MONITOR_VERSIONS
     default: ""
@@ -27,32 +21,6 @@ ref:
   - name: PAYLOAD_COUNT
     default: "3"
     documentation: Number of recent payloads to analyze per version/topology.
-  - name: CLAUDE_CODE_USE_VERTEX
-    default: "1"
-  - name: CLOUD_ML_REGION
-    default: "global"
-  - name: ANTHROPIC_VERTEX_PROJECT_ID
-    default: "openshift-ci-prow-agents"
-  - name: GOOGLE_APPLICATION_CREDENTIALS
-    default: "/var/run/claude-code-service-account/google-token"
-  - name: CLAUDE_MODEL
-    default: "claude-sonnet-5"
-  - name: GITHUB_APP_ID_PATH
-    default: "/var/run/pr-creds/app_id"
-    documentation: |-
-      Path to GitHub App ID for generating installation tokens.
-  - name: GITHUB_KEY_PATH
-    default: "/var/run/pr-creds/key.pem"
-    documentation: |-
-      Path to GitHub App private key for generating installation tokens.
-  - name: JIRA_API_TOKEN_PATH
-    default: "/var/run/jira-token/token"
-    documentation: |-
-      Path to JIRA API token for searching existing bugs.
-  - name: JIRA_USERNAME_PATH
-    default: "/var/run/jira-token/username"
-    documentation: |-
-      Path to the Atlassian account email/username for JIRA Basic Auth.
   resources:
     requests:
       cpu: 500m
@@ -60,10 +28,8 @@ ref:
   timeout: 4h0m0s
   grace_period: 1m0s
   documentation: |-
-    Runs the Edge Enablement Payload Monitor to generate an interactive
-    HTML dashboard of nightly payload health across edge topologies
-    (SNO, TNA, TNF). Collects data from Release Controller, Sippy,
-    Component Readiness, and Prow artifacts, then invokes Claude to
-    analyze blocking failures and enrich the dashboard with root-cause
-    analysis. Slack notifications are handled by Prow's reporter_config
-    on the generated periodic job.
+    Runs the Edge OCP CI Monitor to report on nightly payloads across
+    SNO, TNA, and TNF. The dashboard includes Sippy job health, Component
+    Readiness, and Chai Bot investigations of blocking failures and
+    selected Sippy findings. Shares job counts and Chai analysis status
+    with the Slack post step.

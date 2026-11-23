@@ -75,7 +75,7 @@ version_summary() {
 
 # ---------------------------------------------------------------------------
 # Read Sippy counts before choosing the status header.
-# The payload monitor counts every distinct Sippy job/release with at least
+# The monitor counts every distinct Sippy job/release with at least
 # three runs and relative change < -50%, independently of AI target selection.
 # A null count means Sippy data was unavailable for that release.
 # ---------------------------------------------------------------------------
