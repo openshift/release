@@ -531,10 +531,16 @@ except Exception:
             break
         fi
         _opp_timeout=$(( _opp_remain < 30 ? _opp_remain : 30 ))
-        if [[ "$(oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" --request-timeout=${_opp_timeout}s -o json 2>/dev/null | python3 -c '
+        _opp_pd_json="$(mktemp)"
+        _opp_pd_rc=0
+        timeout "${_opp_timeout}" oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" --request-timeout=${_opp_timeout}s -o json 2>/dev/null >"${_opp_pd_json}" || _opp_pd_rc=$?
+        if (( _opp_pd_rc == 124 )); then
+            _opp_pd_out="unknown"
+        else
+            _opp_pd_out="$(python3 -c '
 import json, sys
 try:
-    d = json.load(sys.stdin)
+    d = json.load(open(sys.argv[1]))
     names = []
     for item in d.get("items", []):
         for dec in item.get("status", {}).get("decisions", []) or []:
@@ -543,7 +549,10 @@ try:
     print("yes" if "local-cluster" in names else "no")
 except Exception:
     print("no")
-')" == "yes" ]]; then
+' "${_opp_pd_json}")"
+        fi
+        rm -f "${_opp_pd_json}"
+        if [[ "${_opp_pd_out}" == "yes" ]]; then
             _opp_dec="yes"
         else
             if (( $(date +%s) >= _opp_deadline )); then
@@ -554,10 +563,16 @@ except Exception:
                 break
             fi
             _opp_timeout=$(( _opp_remain < 30 ? _opp_remain : 30 ))
-            _opp_dec="$(oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" --request-timeout=${_opp_timeout}s -o json 2>/dev/null | python3 -c '
+            _opp_pl_json="$(mktemp)"
+            _opp_pl_rc=0
+            timeout "${_opp_timeout}" oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" --request-timeout=${_opp_timeout}s -o json 2>/dev/null >"${_opp_pl_json}" || _opp_pl_rc=$?
+            if (( _opp_pl_rc == 124 )); then
+                _opp_dec="unknown"
+            else
+                _opp_dec="$(python3 -c '
 import json, sys
 try:
-    d = json.load(sys.stdin)
+    d = json.load(open(sys.argv[1]))
     s = d.get("status", {})
     names = s.get("clusterNames")
     if names is None:
@@ -565,7 +580,9 @@ try:
     print("yes" if "local-cluster" in [n for n in names if n] else "no")
 except Exception:
     print("no")
-')"
+' "${_opp_pl_json}")"
+            fi
+            rm -f "${_opp_pl_json}"
         fi
         if (( $(date +%s) >= _opp_deadline )); then
             break
