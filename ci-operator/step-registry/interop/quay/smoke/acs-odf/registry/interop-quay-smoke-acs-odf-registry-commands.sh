@@ -711,11 +711,19 @@ function RunPushPull () {
     # PRRT_kwDOBHvUUM65TpNJ: pull by digest not tag to avoid TOCTOU; digest from inspect
     typeset pullDir='/tmp/quay-pull-verify'
     rm -rf "${pullDir}"
+    # The inspect runs on its own so its exit status is the inspect's, not a
+    # pipeline's: an inspect that failed and an inspect that answered without a
+    # Digest are different failures, and the recorded message names which one.
+    typeset inspectJson=''
+    typeset -i inspectRc=0
+    inspectJson=$(SSL_CERT_FILE="${quayCaFile}" skopeo inspect --authfile="${authFile}" "docker://${pushTarget}" 2>/dev/null) || inspectRc=$?
     typeset imageDigest=""
-    imageDigest=$(SSL_CERT_FILE="${quayCaFile}" skopeo inspect --authfile="${authFile}" "docker://${pushTarget}" 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('Digest',''))") || imageDigest=""
+    if (( inspectRc == 0 )); then
+        imageDigest=$(printf '%s' "${inspectJson}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('Digest',''))") || imageDigest=""
+    fi
     if [[ -z "${imageDigest}" ]]; then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "Could not determine image digest after push" "${elapsed}"
+        RecordResult "${testName}" "failed" "Could not determine image digest after push (skopeo inspect exit ${inspectRc}, digest '${imageDigest:-empty}')" "${elapsed}"
         return 1
     fi
     typeset pushTargetDigest="${pushTarget%%:*}@${imageDigest}"
