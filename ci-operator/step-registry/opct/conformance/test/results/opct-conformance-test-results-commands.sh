@@ -286,7 +286,10 @@ function retrieve_artifact() {
   # pipeline statement.  PIPESTATUS must be read on the very next line;
   # any intervening command (including '|| true') resets it.
   # Under pipefail, $? is the rightmost nonzero or 0 if all succeed.
-  ${OPCT_CLI} retrieve "${ARTIFACT_DIR}/opct-results" | tee -a "${ARTIFACT_DIR}"/log-retrieve.txt
+  # stderr is merged into the pipeline so that a shell-level failure (missing
+  # binary, OOM kill) still leaves its reason in log-retrieve.txt, which the
+  # JUnit failure body tails. tee keeps it on the console as well.
+  ${OPCT_CLI} retrieve "${ARTIFACT_DIR}/opct-results" 2>&1 | tee -a "${ARTIFACT_DIR}"/log-retrieve.txt
   local -a ps=("${PIPESTATUS[@]}")
   retrieve_rc=${ps[0]:-1}
   retrieve_tee_rc=${ps[1]:-1}
@@ -332,7 +335,9 @@ function show_results() {
   # inside 'if !', which disables errexit for the entire function body.
   show_msg "\t>> running: ${OPCT_CLI} results\n"
   local rc=0
-  ${OPCT_CLI} results "${RESULT_FILE}" > "${ARTIFACT_DIR}"/log-results.txt || rc=$?
+  # stderr is merged so a shell-level failure (missing binary, OOM kill) still
+  # leaves its reason in the log the JUnit failure body tails.
+  ${OPCT_CLI} results "${RESULT_FILE}" > "${ARTIFACT_DIR}"/log-results.txt 2>&1 || rc=$?
   results_rc=${rc}
   if [[ ${rc} -ne 0 ]]; then
     show_msg "ERROR: '${OPCT_CLI} results' exited with code ${rc}"
@@ -346,7 +351,7 @@ function show_results() {
     --skip-server \
     --log-level=debug \
     --save-to "${ARTIFACT_DIR}"/opct-report \
-    "${RESULT_FILE}" > "${ARTIFACT_DIR}"/log-report.txt || rc=$?
+    "${RESULT_FILE}" > "${ARTIFACT_DIR}"/log-report.txt 2>&1 || rc=$?
   report_rc=${rc}
   if [[ ${rc} -ne 0 ]]; then
     show_msg "ERROR: '${OPCT_CLI} report' exited with code ${rc}"
@@ -618,7 +623,7 @@ mv -v "${RESULT_FILE}" "${artifact_result}"
 show_msg "\n\t> Publish results in baseline artifacts storage. meta=[${OBJECT_PATH}]\n"
 export OPCT_ENABLE_ADM_BASELINE="1"
 local_publish_rc=0
-${OPCT_CLI} adm baseline publish --log-level=debug "${artifact_result}" > "${ARTIFACT_DIR}"/log-publish.txt || local_publish_rc=$?
+${OPCT_CLI} adm baseline publish --log-level=debug "${artifact_result}" > "${ARTIFACT_DIR}"/log-publish.txt 2>&1 || local_publish_rc=$?
 publish_rc=${local_publish_rc}
 show_msg "> Debug log saved at {ARTIFACT_DIR}/log-publish.txt\n"
 
@@ -677,7 +682,7 @@ junit_case "[opct] publish baseline"
 # re-index the result to expose the valid baseline.
 show_msg "\n\t> Re-indexing the baseline artifacts to be consumed by 'report' and 'opct adm baseline list'\n"
 local_indexer_rc=0
-${OPCT_CLI} adm baseline indexer --log-level=debug > "${ARTIFACT_DIR}"/log-publish-indexer.txt || local_indexer_rc=$?
+${OPCT_CLI} adm baseline indexer --log-level=debug > "${ARTIFACT_DIR}"/log-publish-indexer.txt 2>&1 || local_indexer_rc=$?
 indexer_rc=${local_indexer_rc}
 show_msg "> Debug log saved at {ARTIFACT_DIR}/log-publish-indexer.txt\n"
 
