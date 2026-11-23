@@ -271,7 +271,8 @@ _add_classification "acs-present" passed
 # Ensures the SecuredCluster discovery has a terminal creation wait before smoke proceeds;
 # 900s is the readiness-side timeout, mirrored here so smoke fails with same reason if
 # the CR never appears.
-if ! oc wait --for=create securedclusters.platform.stackrox.io --all --timeout=900s 1>/dev/null 2>&1; then
+if ! oc wait --for=create securedclusters.platform.stackrox.io --all --all-namespaces --timeout=900s 1>/dev/null 2>&1; then
+    _add_case "securedcluster-discovery" failed "Timeout" "SecuredCluster discovery timeout after 900s: no SecuredCluster CR created within 900s"
     echo "[smoke] SecuredCluster terminal wait: no SecuredCluster CR created within 900s" >&2
 fi
 
