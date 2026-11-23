@@ -1026,8 +1026,19 @@ else
     # list could not see it and this create cannot collide with it, so without
     # a second look two groups would stay in the namespace and every CSV in it
     # would sit in TooManyOperatorGroups. One re-list settles it.
+    # The same bounded re-list applies on this path: a list taken once can
+    # miss a group another writer created in the same window, or answer from a
+    # connection that failed, and either way the concurrent-writer check below
+    # would read the wrong count. (PRRT_kwDOBHvUUM65LZ23)
     _og_after=""
-    if _og_after=$(_og_names); then
+    _og_after_ok=false
+    typeset -i _og_after_try=0
+    for _og_after_try in 1 2 3; do
+      if _og_after=$(_og_names); then _og_after_ok=true; break; fi
+      (( _og_after_try < 3 )) || break
+      sleep $(( _og_after_try * 2 ))
+    done
+    if [[ "${_og_after_ok}" == "true" ]]; then
       _og_after_objs=$(printf '%s\n' "${_og_after}" | grep '^operatorgroup' || true)
       _og_after_count=$(printf '%s\n' "${_og_after_objs}" | grep -c . || true)
       if (( _og_after_count > 1 )); then
