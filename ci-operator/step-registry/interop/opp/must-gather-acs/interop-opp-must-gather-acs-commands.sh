@@ -4,7 +4,11 @@
 # swallowing a failure inside a subshell.
 set -euxo pipefail; shopt -s inherit_errexit
 
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+# PRRT_kwDOBHvUUM65ui2E: fixture mode needs no CI environment, so a missing
+# SHARED_DIR must not stop the script before the self-test dispatch.
+if [[ -n "${SHARED_DIR:-}" ]]; then
+    export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+fi
 
 # ─── oc error classification (shared) ───────────────────────────────────────
 # A non-zero `oc get` exit means the query failed; what it failed with is read
@@ -22,9 +26,24 @@ oc_notfound() { # oc_notfound <rc> <stderr-text>
   grep -qE '(^|: )Error from server \(NotFound\)' <<< "${2:-}"
 }
 
-# _central_backend_target <namespace> <service>
-# Prints "<address> <port>" for one ready backend of the service, taken from
-# the EndpointSlices the endpoint controller maintains for it.
+# _api_err_class <stderr-text>: collapse an API error to a fixed category so
+# no server-controlled text reaches a log or an artifact.
+_api_err_class() {
+  case "$1" in
+    "")                                                             echo "empty" ;;
+    *[Uu]nauthorized*|*"must be logged in"*)                        echo "unauthorized" ;;
+    *[Ff]orbidden*|*"cannot get"*|*"cannot list"*|*"cannot create"*) echo "forbidden" ;;
+    *"not found"*|*NotFound*)                                       echo "not-found" ;;
+    *[Tt]imeout*|*"unable to return a response"*)                   echo "timeout" ;;
+    *"no such host"*|*"connection refused"*|*"connect: "*|*EOF*)     echo "transport-error" ;;
+    *)                                                              echo "other" ;;
+  esac
+}
+
+# _central_backend_target <namespace> <service> [<stderr-file>] [<route-target-port>]
+# Prints one "<address> <port>" line per ready backend of the service, taken
+# from the EndpointSlices the endpoint controller maintains for it. When a
+# Route target port is given, the port is the one OpenShift resolves for it.
 # Exit status: 0 with output for a ready backend; 0 with no output when the
 # EndpointSlices were read and list no ready backend; 2 when the read fails;
 # 3 when the read returns a body that cannot be parsed. The two error states
@@ -38,6 +57,12 @@ _central_backend_target() {
     # Discarding it left the caller's recorded "the EndpointSlice read
     # failed" state without a cause; the default keeps other callers quiet.
     typeset _errfile="${3:-/dev/null}"
+    # Fourth argument: the Route's spec.port.targetPort. OpenShift resolves a
+    # string target port by Service port name and a numeric one by number, so
+    # the EndpointSlice port has to be chosen with that value; the previous
+    # form read an annotation that a Route does not carry and then sorted the
+    # remaining ports, which picked whichever port happened to sort first.
+    typeset _rt_port="${4:-}"
     typeset _oc_rc=0
     set +x
     _slice_json="$(oc get endpointslices -n "$1" \
@@ -57,47 +82,39 @@ try:
 except ValueError:
     sys.exit(3)
 
+routeTargetPort = (sys.argv[1] if len(sys.argv) > 1 else "").strip()
+candidates = []
 for item in data.get("items", []):
-    # Prefer port matching Route targetPort if available, otherwise named https or first port
-    routeTargetPort = ""
-    try:
-        routeTargetPort = (item.get("metadata", {}).get("annotations", {}).get("route.openshift.io/target-port", "") or "")
-    except Exception:
-        routeTargetPort = ""
     ports = [p for p in item.get("ports", []) or [] if p.get("port")]
     if not ports:
         continue
+    # PRRT_kwDOBHvUUM65MrkM: the Route target port decides the EndpointSlice
+    # port. A string target port is a Service port name, a numeric one is a
+    # port number.
     if routeTargetPort:
-        for p in ports:
-            if str(p.get("targetPort", "")) == routeTargetPort or str(p.get("port")) == routeTargetPort:
-                ports = [p]
-                break
-    # Resolve Route targetPort via spec.port.targetPort per OpenShift string/numeric resolution
-    # PRRT_kwDOBHvUUM65MrkM: read spec.port.targetPort for EndpointSlice port match, not https sort
-    _route_target = ""
-    try:
-        # Attempt to get Route targetPort from annotation or spec if available
-        _route_target = (item.get("metadata", {}).get("annotations", {}).get("route.openshift.io/target-port", "") or "")
-    except Exception:
-        _route_target = ""
-    if _route_target:
-        # Match EndpointSlice port by targetPort: numeric matches port number, string matches name
-        _matched = [p for p in ports if str(p.get("port")) == str(_route_target) or str(p.get("name")) == str(_route_target) or str(p.get("targetPort", "")) == str(_route_target)]
-        if _matched:
-            ports = _matched
-    else:
-        # Fallback: single-port service has one entry; prefer explicitly named https port when multiple
+        if routeTargetPort.isdigit():
+            matched = [p for p in ports if str(p.get("port")) == routeTargetPort]
+        else:
+            matched = [p for p in ports if str(p.get("name")) == routeTargetPort]
+        if matched:
+            ports = matched
+    if len(ports) > 1:
+        # Single-port service has one entry; prefer an explicitly named https
+        # port when several remain.
         ports.sort(key=lambda p: 0 if p.get("name") == "https" else 1)
     for endpoint in item.get("endpoints", []) or []:
         if (endpoint.get("conditions") or {}).get("ready") is False:
             continue
-        addresses = endpoint.get("addresses") or []
-        if addresses:
-            # PRRT_kwDOBHvUUM65RJoI: try next ready backend on failure, not exit on first
-            for _addr in addresses:
-                print(_addr, ports[0]["port"])
-                sys.exit(0)
-')" || return 3
+        for _addr in endpoint.get("addresses") or []:
+            pair = "%s %s" % (_addr, ports[0]["port"])
+            if pair not in candidates:
+                candidates.append(pair)
+# PRRT_kwDOBHvUUM65RJoI: every ready backend is a candidate, so a Pod that
+# terminates between this read and the connection does not remove the only
+# address the download could use.
+print("\n".join(candidates))
+sys.exit(0)
+' "${_rt_port}")" || return 3
     printf '%s\n' "${_backend_target}"
 }
 
@@ -220,8 +237,17 @@ collect_acs_diagnostics() {
             # Central's own CA. Routes with a custom certificate that includes
             # the route host pass the direct preflight above and never reach
             # this retry.
-            _central_svc="$(oc get route central -n "${WORKLOAD_NS}" \
-              -o jsonpath='{.spec.to.name}' 2>/dev/null || true)"
+            # The Route's spec.port.targetPort decides which EndpointSlice
+            # port the fallback may use. Both fields come from one query, with
+            # tracing off.
+            typeset _route_svc_tp=''
+            ( set +x; _route_svc_tp="$(oc get route central -n "${WORKLOAD_NS}" \
+              -o jsonpath='{.spec.to.name}{"|"}{.spec.port.targetPort}' 2>/dev/null || true)" )
+            _central_svc="${_route_svc_tp%%|*}"
+            typeset _central_route_tp=''
+            if [[ "${_route_svc_tp}" == *'|'* ]]; then
+                _central_route_tp="${_route_svc_tp#*|}"
+            fi
             typeset _central_backend='' _central_addr='' _central_port=''
             typeset _central_svc_dns='' _central_connect_to=''
             typeset -i _central_backend_rc=0 _central_direct_rc=0
@@ -230,7 +256,7 @@ collect_acs_diagnostics() {
                 _backend_errfile=$(mktemp)
                 _central_backend="$(
                   _central_backend_target "${WORKLOAD_NS}" "${_central_svc}" \
-                    "${_backend_errfile}"
+                    "${_backend_errfile}" "${_central_route_tp}"
                 )" || _central_backend_rc=$?
                 if [[ -s "${_backend_errfile}" ]]; then
                     printf "EndpointSlice query failed: %s\n" "$(_api_err_class "$(head -c 200 "${_backend_errfile}")")" >&2
@@ -240,28 +266,48 @@ collect_acs_diagnostics() {
             if [[ "${_central_backend_rc}" -eq 0 &&
                   -n "${_central_svc}" && -n "${_central_backend}" ]]; then
                 _central_svc_dns="${_central_svc}.${WORKLOAD_NS}.svc"
-                read -r _central_addr _central_port <<<"${_central_backend}"
-                if [[ "${_central_addr}" == *:* ]]; then
-                    _central_addr="[${_central_addr}]"
-                fi
-                _central_connect_to="${_central_svc_dns}:443:${_central_addr}:${_central_port}"
-                if curl -sS -o /dev/null --cacert "${CENTRAL_CA_FILE}" \
-                      --connect-to "${_central_connect_to}" \
-                      --connect-timeout 10 --max-time 30 -w '' \
-                      "https://${_central_svc_dns}/v1/debug/diagnostics" \
-                      2>/dev/null; then
-                    TLS_MODE="verified"
-                    CURL_TLS_OPTS="--cacert ${CENTRAL_CA_FILE} --connect-to ${_central_connect_to}"
-                    CENTRAL_URL_HOST="${_central_svc_dns}"
-                    # Log and artifact text name no service host, backend
-                    # address or port (INTEROP-9647 log sanitization): curl's
-                    # own stderr, which carries the service DNS name, is
-                    # discarded and the failure is recorded as its exit status.
-                    echo "TLS verified against Central's own CA through a ready backend endpoint of the route target service, with the certificate's service name as SNI and verified name (route host outside certificate DNS names)"
-                else
-                    _central_direct_rc=$?
-                    echo "Backend-direct TLS preflight against a ready backend endpoint failed (curl exit ${_central_direct_rc}); see tls-preflight.err." >&2
-                    echo "backend-direct preflight failed: curl exit ${_central_direct_rc}" >>"${TLS_PREFLIGHT_ERR}"
+                # Every ready backend is tried in turn: a Pod that terminated
+                # after the EndpointSlice read leaves one candidate dead while
+                # another can still serve the bundle. The sweep is bounded by
+                # the candidate count and by a small fixed cap, and each
+                # attempt keeps its own short connect/max time, so a stalled
+                # backend cannot consume the step.
+                typeset -i _central_tries=0 _central_failed_tries=0
+                while read -r _central_addr _central_port; do
+                    if [[ -z "${_central_addr}" || -z "${_central_port}" ]]; then
+                        continue
+                    fi
+                    if (( _central_tries >= 3 )); then
+                        break
+                    fi
+                    _central_tries=$(( _central_tries + 1 ))
+                    if [[ "${_central_addr}" == *:* ]]; then
+                        _central_addr="[${_central_addr}]"
+                    fi
+                    _central_connect_to="${_central_svc_dns}:443:${_central_addr}:${_central_port}"
+                    if curl -sS -o /dev/null --cacert "${CENTRAL_CA_FILE}" \
+                          --connect-to "${_central_connect_to}" \
+                          --connect-timeout 10 --max-time 30 -w '' \
+                          "https://${_central_svc_dns}/v1/debug/diagnostics" \
+                          2>/dev/null; then
+                        TLS_MODE="verified"
+                        CURL_TLS_OPTS="--cacert ${CENTRAL_CA_FILE} --connect-to ${_central_connect_to}"
+                        CENTRAL_URL_HOST="${_central_svc_dns}"
+                        # Log and artifact text name no service host, backend
+                        # address or port (INTEROP-9647 log sanitization):
+                        # curl's own stderr, which carries the service DNS
+                        # name, is discarded and the failure is recorded as its
+                        # exit status.
+                        echo "TLS verified against Central's own CA through a ready backend endpoint of the route target service, with the certificate's service name as SNI and verified name (route host outside certificate DNS names)"
+                        break
+                    else
+                        _central_direct_rc=$?
+                        _central_failed_tries=$(( _central_failed_tries + 1 ))
+                        echo "Backend-direct TLS preflight against a ready backend endpoint failed (curl exit ${_central_direct_rc}); trying the next ready backend." >&2
+                    fi
+                done <<<"${_central_backend}"
+                if [[ "${TLS_MODE}" != "verified" ]] && (( _central_failed_tries > 0 )); then
+                    echo "backend-direct preflight failed on ${_central_failed_tries} ready backend(s): last curl exit ${_central_direct_rc}" >>"${TLS_PREFLIGHT_ERR}"
                 fi
             else
                 # Record why the retry could not run: a missing route target, a
@@ -346,6 +392,11 @@ collect_acs_diagnostics() {
     # the OLM evidence capture section.
     rm -f "${CURL_CFG}"
 }
+
+# PRRT_kwDOBHvUUM65ui2E: the live acquisition below reads the cluster, so it
+# runs from a function that fixture mode skips. self_test and the classification
+# helpers it needs are defined further down, which is where the dispatch lives.
+run_live_acquisition() {
 
 collect_acs_diagnostics || true
 
@@ -838,7 +889,13 @@ print(json.dumps(result, indent=2))
 elif oc_notfound "${POLICY_CRD_RC}" "${POLICY_CRD_OUTPUT}"; then
   echo "CRD_ABSENT: policies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/09-policies.json"
 else
-  echo "probe_error: policy CRD lookup failed (rc=${POLICY_CRD_RC}): ${POLICY_CRD_OUTPUT}" > "${EVIDENCE_DIR}/09-policies.json"
+  set +x
+  _diag_token="unknown"
+  case "${POLICY_CRD_OUTPUT}" in *Forbidden*|*forbidden*) _diag_token="forbidden";; *NotFound*|*notFound*) _diag_token="not-found";; *) _diag_token="error";; esac
+  # Classification only: the server's own error text is API-controlled and does
+  # not belong in an artifact. (PRRT_kwDOBHvUUM65ui1w)
+  echo "probe_error: policy CRD lookup failed (rc=${POLICY_CRD_RC} token=${_diag_token})" > "${EVIDENCE_DIR}/09-policies.json"
+  set -x
 fi
 CONFIGPOLICY_CRD_OUTPUT=$(oc get crd configurationpolicies.policy.open-cluster-management.io 2>&1)
 CONFIGPOLICY_CRD_RC=$?
@@ -862,7 +919,11 @@ print(json.dumps(result, indent=2))
 elif oc_notfound "${CONFIGPOLICY_CRD_RC}" "${CONFIGPOLICY_CRD_OUTPUT}"; then
   echo "CRD_ABSENT: configurationpolicies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/10-configpolicies.json"
 else
-  echo "probe_error: configurationpolicy CRD lookup failed (rc=${CONFIGPOLICY_CRD_RC}): ${CONFIGPOLICY_CRD_OUTPUT}" > "${EVIDENCE_DIR}/10-configpolicies.json"
+  set +x
+  _diag_token="unknown"
+  case "${CONFIGPOLICY_CRD_OUTPUT}" in *Forbidden*|*forbidden*) _diag_token="forbidden";; *NotFound*|*notFound*) _diag_token="not-found";; *) _diag_token="error";; esac
+  echo "probe_error: configurationpolicy CRD lookup failed (rc=${CONFIGPOLICY_CRD_RC} token=${_diag_token})" > "${EVIDENCE_DIR}/10-configpolicies.json"
+  set -x
 fi
 
 # 10. ACM CSV version and governance-policy-addon-controller image ref:
@@ -892,6 +953,14 @@ for i in data.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/11-acm-csv-addon-controller.json" 2>&1 || \
   echo "probe_error: acm csv query failed" > "${EVIDENCE_DIR}/11-acm-csv-addon-controller.json"
+}
+
+if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" == "1" ]]; then
+    # Fixture mode runs the classification fixtures only.
+    :
+else
+    run_live_acquisition
+fi
 
 # ─── Removal predicate (per-run terms) ──────────────────────────────────────
 # Evaluates the per-run facts defined in
@@ -1223,7 +1292,13 @@ print(f"wrote {out}")
 PYEOF
 }
 
-write_status_properties
+# PRRT_kwDOBHvUUM65ui2E: fixture mode writes these terms into its own temporary
+# evidence directory, so the live call must not run without a captured bundle.
+if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" == "1" ]]; then
+    :
+else
+    write_status_properties
+fi
 
 # ─── Cross-artifact agreement assertions ────────────────────────────────────
 # A query failure must never read as absence, and captures that describe the
