@@ -63,6 +63,15 @@ assert_no_secrets() {
   assert_not_contains "${file}" '123456789012'
 }
 
+# A snapshot is a new public artifact, so it must not carry the identifier of the
+# cluster it describes: the artifact directory it is written into already says which
+# step run produced it.
+assert_no_cluster_identifier() {
+  local file="$1"
+  assert_not_contains "${file}" 'mock-cluster-id'
+  assert_contains "${file}" 'no identifier is published here'
+}
+
 # These files are published as public CI artifacts, so they must carry no resolver
 # infrastructure: neither the address of a resolver nor any part of a resolver
 # configuration. 192.0.2.10 stands in for the resolver addresses that appear in dig's
@@ -257,7 +266,9 @@ case "${1:-}" in
     fi
     api_url="null"
     if [[ "${MOCK_SCENARIO}" == "dns_full" ]]; then
-      api_url='"https://api.ci-rosa-h-test.example.com:443"'
+      # Deliberately not the name the step would derive from .name plus
+      # .dns.base_domain, so a probe of this host proves the URL was used.
+      api_url='"https://api-from-url.ci-rosa-h-test.example.com:443"'
     fi
     cat <<JSON
 {
@@ -366,7 +377,9 @@ EOF
   # The CI image that runs these tests (quay.io/openshift/ci:ci_shellcheck_latest)
   # ships no jq, so fall back to a stand-in that understands only the filters this
   # step uses. Real jq is used whenever it is installed.
-  if ! command -v jq >/dev/null; then
+  # Set FORCE_STUB_JQ=true to exercise the stand-in on a machine that has jq, so
+  # both parser paths can be checked.
+  if [[ "${FORCE_STUB_JQ:-false}" == true ]] || ! command -v jq >/dev/null; then
     cat > "${mock_dir}/jq" <<'EOF'
 #!/bin/bash
 set -o nounset
@@ -428,6 +441,12 @@ object_of() {
   printf '%s' "${json}" | grep -oE "\"${key}\"[[:space:]]*:[[:space:]]*\{[^}]*\}" | head -1
 }
 
+# First object of an array-valued key, which is all the Route 53 filters need.
+first_element_of() {
+  local key="$1" json="$2"
+  printf '%s' "${json}" | grep -oE "\"${key}\"[[:space:]]*:[[:space:]]*\[[[:space:]]*\{[^}]*\}" | head -1
+}
+
 case "${filter}" in
   '."AWS Account ID"') out=$(scalar_of 'AWS Account ID' "${input}") ;;
   '.state'|'.name'|'.infra_id'|'.timers') out=$(scalar_of "${filter#.}" "${input}") ;;
@@ -436,6 +455,8 @@ case "${filter}" in
   '.dns.base_domain') out=$(scalar_of base_domain "$(object_of dns "${input}")") ;;
   '.product.id') out=$(scalar_of id "$(object_of product "${input}")") ;;
   '.status.description') out=$(scalar_of description "$(object_of status "${input}")") ;;
+  '.HostedZones[0].Name') out=$(scalar_of Name "$(first_element_of HostedZones "${input}")") ;;
+  '.HostedZones[0].Id') out=$(scalar_of Id "$(first_element_of HostedZones "${input}")") ;;
   *) out="" ;;
 esac
 
@@ -525,6 +546,7 @@ test_dns_chronology_survives_install_log_refetch() {
   assert_not_contains "${observation}" "could not be assumed"
   assert_no_secrets "${observation}"
   assert_no_resolver_details "${observation}"
+  assert_no_cluster_identifier "${observation}"
 
   # The later install log no longer carries the DNS error; the snapshot is the only
   # artifact that still shows when it was observed.
@@ -744,6 +766,8 @@ test_byte_cap_defers_omitted_lines_to_a_later_observation() {
   assert_not_contains "${case_dir}/byte-cap-lines-02" "lookup api-b01.ci-rosa-h-test.example.com on"
   assert_no_resolver_details "${first}"
   assert_no_resolver_details "${second}"
+  assert_no_cluster_identifier "${first}"
+  assert_no_cluster_identifier "${second}"
 }
 
 # A snapshot that could not be written leaves its DNS lines unrecorded, so the next
@@ -861,17 +885,41 @@ test_api_url_and_route53_labelling() {
   rc=$?
   set -e
   assert_status "${rc}" 1 "fatal install error"
-  assert_probe_is_bounded_and_mocked "${case_dir}" "api.ci-rosa-h-test.example.com"
+  # The probe host comes from .api.url, which is a different name from the one the
+  # step would derive from .name plus .dns.base_domain.
+  assert_probe_is_bounded_and_mocked "${case_dir}" "api-from-url.ci-rosa-h-test.example.com"
 
   local diagnostics="${case_dir}/artifacts/dns-diagnostics.txt"
+  assert_contains "${diagnostics}" "API URL: https://api-from-url.ci-rosa-h-test.example.com:443"
+  assert_contains "${diagnostics}" "API hostname: api-from-url.ci-rosa-h-test.example.com"
+  assert_not_contains "${diagnostics}" "derived API hostname"
   # The authoritative nameserver is taken from the answer, never from the diagnostic
   # line dig prints when it cannot reach a resolver.
-  assert_contains "${diagnostics}" "=== dig @ns-mock.example.com. api.ci-rosa-h-test.example.com (authoritative) ==="
+  assert_contains "${diagnostics}" "=== dig @ns-mock.example.com. api-from-url.ci-rosa-h-test.example.com (authoritative) ==="
   assert_contains "${diagnostics}" "=== Route 53 hosted zone records ==="
   assert_contains "${diagnostics}" "Record state as read at"
   assert_contains "${diagnostics}" "history, so this says nothing about when a record was created or changed."
+  # The hosted zone matched and its records were actually read, which the stand-in
+  # parser used on an image without jq must also reach.
+  assert_contains "${diagnostics}" "Hosted zone: ci-rosa-h-test.example.com. (ID: MOCKZONE)"
+  assert_contains "${case_dir}/state/aws-arguments" "route53 list-resource-record-sets --hosted-zone-id MOCKZONE"
   assert_no_secrets "${diagnostics}"
   assert_no_resolver_details "${diagnostics}"
+}
+
+# The snapshot must reach its file through one write whose status is checked. A group
+# of writes redirected into the file reports only the status of its last command, so an
+# earlier failure would be masked by a later line that still succeeded and a partial
+# snapshot would be counted as saved.
+test_snapshot_reaches_its_file_through_one_checked_write() {
+  local -i writes
+  writes=$(grep -cE '> *"\$\{observation_file\}"' "${COMMAND_SCRIPT}" || true)
+  (( writes == 1 )) || fail "expected exactly one write into the observation file, found ${writes}"
+  if ! grep -A1 -E '> *"\$\{observation_file\}"' "${COMMAND_SCRIPT}" \
+      | grep -qE '\|\|[[:space:]]*observation_written="no"'; then
+    grep -n -A1 -E '> *"\$\{observation_file\}"' "${COMMAND_SCRIPT}" >&2
+    fail "the write into the observation file must record its failure"
+  fi
 }
 
 # The step must not copy resolver configuration into an artifact at all: no reader of
@@ -886,6 +934,7 @@ test_dns_chronology_survives_install_log_refetch
 test_failure_diagnostics_label_probe_origin_and_time
 test_script_makes_no_management_cluster_resolver_claim
 test_script_publishes_no_resolver_configuration
+test_snapshot_reaches_its_file_through_one_checked_write
 test_probe_failures_do_not_change_step_result
 test_non_dns_failure_behaviour_is_unchanged
 test_unobserved_dns_error_is_not_claimed_as_observed

@@ -322,7 +322,7 @@ capture_dns_observation() {
         echo "=== ROSA install-log DNS error observation ${observation_index} ==="
         echo "Observed at: ${observed_at} (UTC, clock of this CI step pod)"
         echo "Observed by: rosa-cluster-wait-ready-cluster, install-log health check after ${health_check} polls with an unchanged cluster state"
-        echo "Cluster ID:  ${CLUSTER_ID}"
+        echo "Cluster:     the one this step run is waiting for; no identifier is published here"
         echo "OCM cluster state at observation: ${cluster_state}"
         echo ""
         echo "Written while the step was still waiting for the cluster, before any fail-fast"
