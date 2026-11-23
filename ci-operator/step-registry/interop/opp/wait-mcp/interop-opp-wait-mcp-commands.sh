@@ -167,7 +167,7 @@ _junit_emit() {
     <property name="trap_selftest" value="${_junit_trapselftest}"/>
     <property name="final_class" value="${_esc_class}"/>
   </properties>
-  <testcase name="${_jn}" classname="lp-interop.OPP.${_jn}" time="${_jd}">
+  <testcase name="${_jn}" classname="interop-opp-wait-mcp" time="${_jd}">
     ${_fx}
   </testcase>
 </testsuite>

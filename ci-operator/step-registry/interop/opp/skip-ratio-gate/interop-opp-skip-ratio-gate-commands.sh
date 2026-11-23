@@ -100,7 +100,7 @@ def write_evidence_incomplete_junit(artifact_dir, threshold, reason):
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         f'<testsuite name="{_suite_name()}" tests="1" failures="0">',
-        f'  <testcase name="skip-ratio-gate (evidence-incomplete)" classname="interop.opp.skip-ratio-gate">',
+        f'  <testcase name="skip-ratio-gate (evidence-incomplete)" classname="interop-opp-skip-ratio-gate">',
         f'    <system-out>EVIDENCE-INCOMPLETE: {reason}. '
         f'Skip-ratio gate requires valid test results to measure. '
         f'Threshold={threshold:.4f}</system-out>',
@@ -122,7 +122,7 @@ def write_gate_junit(artifact_dir, total, passed, failed, skipped, errored,
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
         f'<testsuite name="{_suite_name()}" tests="1" failures="{fail_count}">',
-        f'  <testcase name="{tc_name}" classname="interop.opp.skip-ratio-gate">',
+        f'  <testcase name="{tc_name}" classname="interop-opp-skip-ratio-gate">',
     ]
     if breach:
         lines.append(

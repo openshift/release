@@ -144,7 +144,7 @@ function WriteJunit () {
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
             name="$(XmlEscape "${tcNamesArr[$i]}")"
-            echo "  <testcase classname=\"lp-interop--OPP--odf-health\" name=\"${name}\">"
+            echo "  <testcase classname=\"interop-opp-odf-health\" name=\"${name}\">"
             if [[ "${tcResultsArr[$i]}" == "fail" ]]; then
                 typeset msg=""
                 msg="$(XmlEscape "${tcMessagesArr[$i]}")"

@@ -199,6 +199,35 @@ fi
 set -e
 
 : "Copying artifacts..."
+
 cp -r reports "${ARTIFACT_DIR}/"
+
+# Rewrite JUnit classname to step name (INTEROP-9729): preserve name and suite
+python3 <<'PYEOF' 2>/dev/null || true
+import os, pathlib, xml.etree.ElementTree as ET
+artifact_dir = os.environ.get("ARTIFACT_DIR", "/tmp/artifacts")
+candidates = []
+for base in ["reports", f"{artifact_dir}/reports"]:
+    try:
+        candidates.extend(pathlib.Path(base).rglob("*.xml"))
+    except Exception:
+        continue
+seen = set()
+for jf in candidates:
+    if str(jf) in seen:
+        continue
+    seen.add(str(jf))
+    try:
+        tree = ET.parse(str(jf))
+        root = tree.getroot()
+        changed = 0
+        for tc in root.iter("testcase"):
+            tc.set("classname", "acm-tests-clc-create")
+            changed += 1
+        if changed:
+            tree.write(str(jf), encoding="utf-8", xml_declaration=True)
+    except Exception:
+        continue
+PYEOF
 
 exit "${_test_rc}"

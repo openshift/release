@@ -466,6 +466,35 @@ find test-output -name '*.xml' -not -path 'test-output/cypress/*' -print0 2>/dev
     done
 set -x
 
+# Rewrite JUnit classname to step name (INTEROP-9729): preserve name and suite
+python3 <<'PYEOF' 2>/dev/null || true
+import os, pathlib, xml.etree.ElementTree as ET
+artifact_dir = os.environ.get("ARTIFACT_DIR", "/tmp/artifacts")
+candidates = []
+for base in ["test-output", "test-output/cypress", artifact_dir, f"{artifact_dir}/cypress"]:
+    try:
+        candidates.extend(pathlib.Path(base).rglob("*.xml"))
+    except Exception:
+        continue
+# Also handle any xml that was copied to artifact dir with different names
+seen = set()
+for jf in candidates:
+    if str(jf) in seen:
+        continue
+    seen.add(str(jf))
+    try:
+        tree = ET.parse(str(jf))
+        root = tree.getroot()
+        changed = 0
+        for tc in root.iter("testcase"):
+            tc.set("classname", "acm-tests-grc")
+            changed += 1
+        if changed:
+            tree.write(str(jf), encoding="utf-8", xml_declaration=True)
+    except Exception:
+        continue
+PYEOF
+
 # --- OPP placement restore and assert (INTEROP-9711) ----------------------
 # Restore the local-cluster labels the GRC suite may have changed (the
 # exclusive clusterset label was moved to global mid-suite), wait for the
