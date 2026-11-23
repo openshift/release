@@ -27,6 +27,11 @@ workflow:
       best_effort: true
     - ref: rosa-gap-analysis-cluster-install-delete-metrics
       best_effort: true
+    # Diagnostics before teardown: rosa-gather-hcp-diagnostics logs into
+    # backplane and queries the management cluster for HCP/CAPI resources,
+    # which the state-driven teardown deletes.
+    - chain: rosa-gather-hcp-diagnostics
+      best_effort: true
     # Terraform teardown only: the cluster exists in the terraform state that
     # rhcs-e2e-setup saved to ${SHARED_DIR}/statefiles.tar.gz. Never use
     # rosa-cluster-deprovision / rosa-e2e-cleanup-vpc / aws-deprovision-stacks
@@ -34,8 +39,6 @@ workflow:
     # and the state-driven teardown removes them; the rosa variants would leak
     # or double-delete.
     - ref: rhcs-e2e-teardown
-      best_effort: true
-    - chain: rosa-gather-hcp-diagnostics
       best_effort: true
   documentation: |-
     The Terraform row of the ROSAENG-308 provision x validate matrix: the
