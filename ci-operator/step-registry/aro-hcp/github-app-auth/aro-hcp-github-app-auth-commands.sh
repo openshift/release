@@ -83,11 +83,15 @@ if [[ "${missing_permissions}" != "[]" ]]; then
     exit 1
 fi
 
-# Exit just before posting so that pj-rehearse can test everything above this line
+# Exit just before posting so that pj-rehearse can test everything above this line,
+# unless a rehearsal explicitly opts in to mint and hand the token downstream.
 if [[ -n "${REPO_OWNER:-}${REPO_NAME:-}" \
     && "${REPO_OWNER:-}/${REPO_NAME:-}" != "${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}" ]]; then
-    echo "This job runs for ${REPO_OWNER:-}/${REPO_NAME:-}, not ${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}. Verified the App credentials, but token minting will be skipped." >&2
-    exit 0
+    if [[ "${GITHUB_APP_AUTH_REHEARSAL_MINT:-false}" != true ]]; then
+        echo "This job runs for ${REPO_OWNER:-}/${REPO_NAME:-}, not ${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}. Verified the App credentials, but token minting will be skipped." >&2
+        exit 0
+    fi
+    echo "Rehearsal minting is explicitly enabled for ${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}." >&2
 fi
 
 # Scope the token to the single repository the comment is posted on.
