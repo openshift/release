@@ -142,6 +142,8 @@ activation a single-line diff.
 | `*-kata` | ✅ active | — | — |
 | `*-peerpods` | ✅ active | ✅ active | disabled (placeholder) |
 | `*-coco` | disabled (placeholder) | disabled (4.22 placeholder) | disabled (placeholder) |
+| `*-kata-disconnected` | ✅ active | — | — |
+| `*-peerpods-disconnected` | disabled (placeholder) | — | — |
 
 Update this table whenever a job type is activated or disabled.
 
@@ -156,7 +158,7 @@ Variant    4.22   4.21   4.20
 ---------- -----  -----  -----
 azure-kata  5 0   10 0   15 0     # window 00:05–00:15, ~3h jobs
 azure-pp   20 3   25 3   30 3     # window 03:20–03:30 (after kata closes)
-aws-pp      6 0   11 0   16 0     # parallel with Azure (no shared capacity)
+aws-pp     36 0   41 0   46 0     # window 00:36–00:46 (after cli-yq rebuild; see below)
 ```
 
 **Azure capacity constraint:** Azure is shared and each job runs ~3h. New Azure
@@ -164,9 +166,15 @@ job types must be scheduled into a non-overlapping window after the previous
 window closes. The current kata window (00:05–00:15 start, done by ~03:05–03:15)
 is followed by the peerpods window (03:20–03:30).
 
-**AWS runs in parallel with Azure** — there is no shared capacity constraint, so
-AWS jobs slot into the same early window (00:06–00:16) with a 1-minute drift
-from the Azure kata slots to avoid Prow API collisions.
+**AWS runs in parallel with Azure** — there is no shared capacity constraint.
+AWS jobs run in the 00:36–00:46 window (shifted +30 minutes from the original
+00:06–00:16 slots): the nightly `cli-yq` multi-arch image rebuild
+(MultiArchBuildConfig `cli-yq`, namespace `ci`) completes around 00:08 UTC and
+removes the previous image digest on re-push, so jobs starting in the
+00:00–00:16 window resolved `ocp/cli-yq:latest` before the rebuild landed and
+then failed with ImagePullBackOff (manifest unknown) in the
+`sandboxed-containers-operator-aws-region-override` step. The 5-minute stagger
+between variants is preserved.
 
 ### Conventions when enabling a new job type
 
@@ -202,11 +210,18 @@ and `make jobs` and commit.
 Always regenerate and validate after editing configs:
 ```bash
 make ci-operator-config   # determinize config formatting & key ordering
-make jobs                 # prowgen + checkconfig + sanitize
+make jobs                 # ci-operator-checkconfig + prowgen + sanitize
+make checkconfig          # validate Prow configuration
 ```
-`make jobs` runs **`checkconfig`**, which resolves the image graph — this is what
-catches `from:`/`build_root` mistakes locally. Commit the edited configs **and**
-any regenerated files under `ci-operator/jobs/`. Never hand-edit `ci-operator/jobs/`.
+`make jobs` first runs `ci-operator-checkconfig`, which validates config-to-
+registry references and the static image graph (`defaults.FromConfigStatic`),
+catching `from:`/`build_root` mistakes locally. The in-cluster
+`ci/prow/ci-operator-registry` job runs configresolver with a service account; it
+loads the config and registry and checks in-cluster access, then exits before
+integrated image-stream lookup. `make jobs` then generates and sanitizes Prow
+jobs. The separate `make checkconfig` target validates Prow configuration.
+Commit the edited configs **and** any regenerated files under
+`ci-operator/jobs/`. Never hand-edit `ci-operator/jobs/`.
 
 Notes:
 - openshift/release presubmits are rehearsed with **`/pj-rehearse <job-name>`**,

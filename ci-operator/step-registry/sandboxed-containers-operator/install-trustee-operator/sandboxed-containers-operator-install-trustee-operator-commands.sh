@@ -234,6 +234,16 @@ function render_trustee_operator_chart() {
     "--set" "namespaceOverride=${TRUSTEE_NAMESPACE}"
   )
 
+  # The chart ships an ImageTagMirrorSet/ImageDigestMirrorSet named
+  # "trustee-registry", the same name used by the mirror set the OSC install
+  # step applies from the trustee-fbc repository. Letting the chart create it
+  # would overwrite that authoritative set with its own copy, so skip it
+  # whenever those mirrors are already on the cluster.
+  if [[ -f "${SHARED_DIR}/konflux-mirrors-applied" ]]; then
+    helm_args+=("--set" "dev.createMirrorSets=false")
+    echo ">>> Helm parameters: dev.createMirrorSets=false (konflux mirror sets already applied)" >&2
+  fi
+
   # Add catalog source configuration if custom image provided
   if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]]; then
     helm_args+=(
@@ -293,11 +303,76 @@ function render_trustee_operands_chart() {
 # Installation Functions
 #========================================
 
+# Apply the chart's mirror sets on their own and let the rollout finish before
+# anything subscribes.
+#
+# A mirror set is a change to /etc/containers/registries.conf, which the MCO
+# rolls out by draining and rebooting every node. Applying it in the same pass
+# as the Subscription loses that race: OLM creates the bundle-unpack pod within
+# seconds, it lands on a node still carrying the old config, and the pre-GA
+# bundle is pulled straight from registry.redhat.io, where Konflux builds are
+# never published ("manifest unknown"). OLM gives that unpack job 10 minutes and
+# does not retry it unless the OperatorGroup carries
+# operatorframework.io/bundle-unpack-min-retry-interval, which the chart does
+# not set, so the Subscription then stays wedged until the job is deleted by
+# hand. Whether the install survives comes down to which node the unpack pod
+# happens to land on, which is why this fails often but not always.
+#
+# The full chart applied afterwards re-renders these same objects; re-applying
+# identical content is a no-op and triggers no second rollout.
+function apply_trustee_mirror_sets() {
+  local charts_dir="$1"
+  local operator_chart="${charts_dir}/trustee-operator"
+  local mirrors_yaml="${SCRATCH}/mirrorsets.yaml"
+
+  echo ">>> Rendering trustee mirror sets ahead of the Subscription" >&2
+  if ! helm template trustee-operator "${operator_chart}" \
+    --set "namespaceOverride=${TRUSTEE_NAMESPACE}" \
+    --set "dev.enabled=true" \
+    --set "dev.image=${TRUSTEE_CATALOG_SOURCE_IMAGE}" \
+    --show-only templates/mirrorsets.yaml > "${mirrors_yaml}" 2>/dev/null; then
+    # Keep going rather than fail: without this phase the install is just back
+    # to racing the rollout, which is the pre-existing behaviour.
+    echo ">>> WARN: could not render mirrorsets.yaml from the chart — skipping the" >&2
+    echo ">>>       pre-apply; the install will race the mirror rollout" >&2
+    return 0
+  fi
+
+  # Checked explicitly: this function is called from a "|| return 1" list, which
+  # suppresses errexit inside it.
+  echo ">>> Applying trustee mirror sets" >&2
+  if ! oc apply -f "${mirrors_yaml}"; then
+    echo ">>> ERROR: failed to apply trustee mirror sets" >&2
+    return 1
+  fi
+
+  # Give the MCO time to observe the new registries.conf; the pools still report
+  # Updated=True for a moment after the apply and the wait would pass on it.
+  sleep 30
+
+  if ! wait_until "all MachineConfigPools updated" 1800 30 \
+    "oc wait mcp --all --for=condition=Updated --timeout=0s 2>/dev/null"; then
+    echo ">>> ERROR: MachineConfigPools did not settle after 30 minutes" >&2
+    oc get mcp || true
+    oc get nodes || true
+    return 1
+  fi
+
+  echo ">>> Trustee mirrors are live on all nodes" >&2
+}
+
 # Install trustee operator via OLM using helm-rendered manifests
 function install_trustee_operator() {
   local charts_dir="$1"
 
   echo ">>> Installing Trustee operator"
+
+  # Only the dev-catalog path pulls pre-GA images that need mirroring. GA and
+  # disconnected jobs render no mirror sets and are left untouched. The marker
+  # means mirror_konflux already applied the authoritative sets and waited.
+  if [[ -n "${TRUSTEE_CATALOG_SOURCE_IMAGE}" ]] && [[ ! -f "${SHARED_DIR}/konflux-mirrors-applied" ]]; then
+    apply_trustee_mirror_sets "${charts_dir}" || return 1
+  fi
 
   # Render operator chart
   local operator_yaml="${SCRATCH}/operator-manifests.yaml"

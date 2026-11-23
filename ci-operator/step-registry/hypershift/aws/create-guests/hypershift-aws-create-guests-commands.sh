@@ -6,6 +6,11 @@ export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
 export HYPERSHIFT_BINARY="${HYPERSHIFT_BINARY:-/hypershift/bin/hypershift}"
 export AWS_SHARED_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
 
+# The deterministic LB E2E pre-step writes the EIP/subnet and region here.
+if [[ -f "${SHARED_DIR}/eip.env" ]]; then
+    source "${SHARED_DIR}/eip.env"
+fi
+
 if [[ -f "${SHARED_DIR}/nodepool_release_images" ]]; then
     source "${SHARED_DIR}/nodepool_release_images"
 fi

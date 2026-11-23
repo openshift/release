@@ -6,8 +6,8 @@ set -o errexit
 set -o pipefail
 
 # Global constants
-readonly POWERVC_TOOL_VERSION="v2.4.12"
-readonly YQ_VERSION="v4.53.6"
+readonly POWERVC_TOOL_VERSION="v2.4.14"
+readonly YQ_VERSION="v4.54.3"
 readonly MAX_DESTROY_ATTEMPTS=3
 readonly SECRETS_DIR="/var/run/powervc-ipi-cicd-secrets/powervc-creds"
 
@@ -159,7 +159,7 @@ function download_tool_w_sha() {
 # the EXIT trap when the subshell returns.
 #
 # Arguments:
-#   $1 - yq release version tag (required, e.g. v4.53.6).
+#   $1 - yq release version tag (required, e.g. v4.54.3).
 #   $2 - (optional) release asset name. Defaults to yq_linux_amd64.
 #   $3 - (optional) destination path for the installed binary. Defaults to yq.
 # Returns:

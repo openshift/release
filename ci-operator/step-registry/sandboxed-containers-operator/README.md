@@ -63,10 +63,15 @@ Controlled by environment variables in job configurations:
 - **`CATALOG_SOURCE_IMAGE`** - Custom FBC (File-Based Catalog) image
   - Default: `""` (empty, uses existing catalog specified by `CATALOG_SOURCE_NAME`)
   - For testing: `"quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest"`
+    (tracks the FBC main branch; per-release repos `osc-test-fbc-vN-M` track the
+    `release-N.M` branches, e.g. `osc-test-fbc-v1-14` while a release is under test)
 
 **Behavior:**
 - If `CATALOG_SOURCE_IMAGE` is empty: uses existing catalog specified by `CATALOG_SOURCE_NAME`
 - If `CATALOG_SOURCE_IMAGE` is set: creates a new CatalogSource with that image
+- If it is a quay.io image tagged `:latest`: the `install-osc-operator` step
+  resolves it at runtime to the newest `<X.Y.Z>-<unix_epoch>` build tag of that
+  repository, so the exact catalog tested is recorded and reproducible
 
 ### Trustee Catalog Source
 
@@ -123,6 +128,10 @@ Catalog images can be referenced using different tag strategies with distinct tr
 ```yaml
 CATALOG_SOURCE_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest
 ```
+
+Note: when the `install-osc-operator` step sees a quay.io image tagged `:latest`,
+it queries the Quay API and pins the job to the newest immutable
+`<X.Y.Z>-<unix_epoch>` tag of that repository instead of using the floating tag.
 
 **How it resolves:**
 1. At job execution time, container runtime queries Quay.io registry

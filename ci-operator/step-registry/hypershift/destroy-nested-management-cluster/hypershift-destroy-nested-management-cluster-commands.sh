@@ -35,6 +35,7 @@ if [[ "${CLOUD_PROVIDER}" == "Azure" ]]; then
   bin/hypershift destroy cluster azure \
     --azure-creds=${AZURE_GUEST_INFRA_CREDENTIALS_FILE} \
     --name="${CLUSTER_NAME}" \
+    --infra-id="${CLUSTER_NAME}" \
     --namespace="${HYPERSHIFT_NAMESPACE}" \
     --location=${HYPERSHIFT_AZURE_LOCATION} \
     --dns-zone-rg-name=os4-common \

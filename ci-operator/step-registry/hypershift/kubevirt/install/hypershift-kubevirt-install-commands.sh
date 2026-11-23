@@ -11,6 +11,22 @@ then
     exit 1
 fi
 
+# Fail fast on a quiet period the convergence barrier could never reach, instead
+# of at the end of MGMT_CONVERGENCE_TIMEOUT.
+for setting in MGMT_CONVERGENCE_TIMEOUT MGMT_CONVERGENCE_QUIET_PERIOD
+do
+    if [[ ! "${!setting}" =~ ^[0-9]+$ ]]
+    then
+        echo "${setting} environment variable value '${!setting}' is not a whole number of seconds"
+        exit 1
+    fi
+done
+if [[ "${MGMT_CONVERGENCE_QUIET_PERIOD}" -ge "${MGMT_CONVERGENCE_TIMEOUT}" ]]
+then
+    echo "MGMT_CONVERGENCE_QUIET_PERIOD '${MGMT_CONVERGENCE_QUIET_PERIOD}' must be smaller than MGMT_CONVERGENCE_TIMEOUT '${MGMT_CONVERGENCE_TIMEOUT}'"
+    exit 1
+fi
+
 
 function add_pullsecret() {
   local REGISTRY=$1
@@ -28,6 +44,86 @@ function add_pullsecret() {
   rm /tmp/.dockerconfigjson /tmp/.dockerconfigjson.new
 }
 
+
+# oc get has no deadline of its own, so bound it: an apiserver that accepts
+# connections but stops answering would otherwise hold the barrier open past
+# MGMT_CONVERGENCE_TIMEOUT. oc wait is already bounded by its own --timeout.
+OC_REQUEST_TIMEOUT="60s"
+
+# A pool keeps reporting Updated=True for its previous configuration until the
+# MCO renders the new MachineConfigs, so first check that the ones created by
+# CNV's virt-platform-autopilot have reached their pool. The autopilot labels
+# them, so ask the apiserver for the ones belonging to each pool that exists
+# rather than matching names here: a role no pool is named after, such as one
+# the autopilot renders for a pool this cluster does not have, then never holds
+# the barrier open.
+# Any failed query returns non-zero, so an unanswered apiserver reads as "not
+# applied" rather than as "nothing left to apply".
+function autopilot_configs_applied() {
+  local pools pool configs config applied
+  pools="$(oc get mcp -o name --request-timeout="${OC_REQUEST_TIMEOUT}")" || return 1
+  while read -r pool; do
+    [[ -n "${pool}" ]] || continue
+    pool="${pool##*/}"
+    configs="$(oc get machineconfig -o name --request-timeout="${OC_REQUEST_TIMEOUT}" \
+      -l "machineconfiguration.openshift.io/role=${pool},${MGMT_AUTOPILOT_MC_SELECTOR}")" || return 1
+    [[ -n "${configs}" ]] || continue
+    applied="$(oc get mcp "${pool}" -o jsonpath='{.status.configuration.source[*].name}' --request-timeout="${OC_REQUEST_TIMEOUT}")" || return 1
+    while read -r config; do
+      [[ -n "${config}" ]] || continue
+      config="${config##*/}"
+      if ! tr ' ' '\n' <<<"${applied}" | grep -qx "${config}"; then
+        echo "MachineConfigPool ${pool} has not applied ${config} yet"
+        return 1
+      fi
+    done <<<"${configs}"
+  done <<<"${pools}"
+}
+
+# $1 is how long to wait for the pools to finish updating.
+function management_nodes_settled() {
+  autopilot_configs_applied &&
+    oc wait mcp --all --for=condition=Updated=True --timeout="$1" >/dev/null &&
+    oc wait mcp --all --for=condition=Updating=False --timeout=0s >/dev/null &&
+    oc wait mcp --all --for=condition=Degraded=False --timeout=0s >/dev/null &&
+    oc wait node --all --for=condition=Ready --timeout=0s >/dev/null
+}
+
+# The MachineConfigs created by virt-platform-autopilot (psi kernel argument,
+# swap) make the MCO reboot every node of their pools, and HyperConverged
+# Available says nothing about that rollout. Masters are schedulable here and
+# host hosted control plane pods including etcd, so a rollout that is still in
+# flight takes the hosted cluster down mid-test. Wait for it to finish and for
+# the nodes to stay settled for a quiet period, so a rollout starting late is
+# caught too.
+function wait_for_management_nodes() {
+  local deadline=$(( SECONDS + MGMT_CONVERGENCE_TIMEOUT ))
+  local stable_since="" timeout
+  echo "Waiting up to ${MGMT_CONVERGENCE_TIMEOUT}s for the management nodes to settle on their MachineConfigs"
+  while (( SECONDS < deadline )); do
+    # Block until the rollout is over, then only sample during the quiet period
+    # so that anything going unhealthy restarts it.
+    timeout="$(( deadline - SECONDS ))s"
+    if [[ -n "${stable_since}" ]]; then
+      timeout=0s
+    fi
+    if management_nodes_settled "${timeout}"; then
+      stable_since="${stable_since:-${SECONDS}}"
+      if (( SECONDS - stable_since >= MGMT_CONVERGENCE_QUIET_PERIOD )); then
+        echo "Management nodes stayed settled for ${MGMT_CONVERGENCE_QUIET_PERIOD}s"
+        return 0
+      fi
+    else
+      stable_since=""
+    fi
+    sleep 15
+  done
+  echo "Error: management nodes did not settle within ${MGMT_CONVERGENCE_TIMEOUT}s"
+  oc get mcp -o wide --request-timeout="${OC_REQUEST_TIMEOUT}" || true
+  oc get nodes -o wide --request-timeout="${OC_REQUEST_TIMEOUT}" || true
+  oc get machineconfig --request-timeout="${OC_REQUEST_TIMEOUT}" || true
+  return 1
+}
 
 # Get yq tool
 YQ="/tmp/yq"
@@ -202,14 +298,27 @@ EOF
 
 oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
 
-# CDI auto-detects only volumeMode=Block for gp3-csi in its StorageProfile.
-# KubeVirt DataVolumes created by HyperShift request volumeMode=Filesystem,
-# which CDI rejects because no matching claimPropertySet exists.
-# Patch the StorageProfile to also advertise Filesystem so DataVolumes can bind.
+# CNV is installed, but the MachineConfig rollout it triggers may still be in
+# flight. Do not let the step report success until the management nodes are back.
+# A hosted management cluster has no MachineConfigPools to wait for.
+if [[ ${CONTROL_PLANE_TOPOLOGY} != "External" ]]
+then
+  wait_for_management_nodes
+fi
+
+# CDI auto-detects only volumeMode=Block for gp3-csi in its StorageProfile, and a
+# DataVolume that asks for Filesystem without naming its access modes then has
+# nothing to take them from and never binds. Advertise Filesystem as well so such
+# a DataVolume can bind, but keep Block first: CDI picks the first claimPropertySet
+# for a DataVolume that names no volumeMode at all, and on gp3-csi a Filesystem
+# root disk is an image file that CDI sizes to the free space of the PVC's
+# filesystem and KubeVirt resizes again on every start of the domain. A guest that
+# reboots out of its Ignition first boot then comes back to a smaller disk than the
+# GPT that first boot grew to the end of, and drops into the dracut emergency shell.
 if oc get storageprofile gp3-csi &>/dev/null; then
-  echo "Patching gp3-csi StorageProfile to include Filesystem volumeMode"
+  echo "Patching gp3-csi StorageProfile to also advertise Filesystem volumeMode"
   oc patch storageprofile gp3-csi --type=merge -p \
-    '{"spec":{"claimPropertySets":[{"accessModes":["ReadWriteOnce"],"volumeMode":"Filesystem"},{"accessModes":["ReadWriteOnce"],"volumeMode":"Block"}]}}'
+    '{"spec":{"claimPropertySets":[{"accessModes":["ReadWriteOnce"],"volumeMode":"Block"},{"accessModes":["ReadWriteOnce"],"volumeMode":"Filesystem"}]}}'
 fi
 
 echo "Installing VM console logger in order to aid debugging potential VM boot issues"
