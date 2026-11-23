@@ -36,14 +36,13 @@ if [[ -n "${HYPERSHIFT_STORAGE_KMS_KEY_ALIAS:-}" ]]; then
     fi
 fi
 
-# Etcd KMS encryption: resolve the key alias to its full ARN and export it as
-# HYPERSHIFT_ETCD_KMS_KEY_ARN so that the kms-reencryption ClusterSpec variant
-# can pass it as --kms-key-arn. IAM policies require an ARN in the Resource
-# field; passing an alias/name directly is rejected by AWS.
+# Etcd KMS encryption: forward the key alias as HYPERSHIFT_ETCD_KMS_KEY_ARN so
+# that the kms-reencryption ClusterSpec variant can pass it as --kms-key-arn.
+# The create-guests binary resolves alias/name values to full ARNs internally
+# via the AWS SDK before constructing IAM policies.
 if [[ -n "${HYPERSHIFT_ETCD_KMS_KEY_ALIAS:-}" ]]; then
-    etcd_kms_arn="$(aws kms describe-key --key-id "${HYPERSHIFT_ETCD_KMS_KEY_ALIAS}" --query 'KeyMetadata.Arn' --output text)"
-    echo "Resolved HYPERSHIFT_ETCD_KMS_KEY_ALIAS=${HYPERSHIFT_ETCD_KMS_KEY_ALIAS} to ARN ${etcd_kms_arn}"
-    export HYPERSHIFT_ETCD_KMS_KEY_ARN="${etcd_kms_arn}"
+    echo "Forwarding HYPERSHIFT_ETCD_KMS_KEY_ALIAS=${HYPERSHIFT_ETCD_KMS_KEY_ALIAS} as HYPERSHIFT_ETCD_KMS_KEY_ARN"
+    export HYPERSHIFT_ETCD_KMS_KEY_ARN="${HYPERSHIFT_ETCD_KMS_KEY_ALIAS}"
 fi
 
 /hypershift/bin/create-guests
