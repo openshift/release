@@ -25,6 +25,28 @@ tests:
   secrets:
   - mount_path: /usr/local/github-credentials
     name: github-credentials-openshift-ci-robot-private-git-cloner
+- as: smoke-fvt
+  commands: |
+    unset GOFLAGS
+    export HOME=/tmp
+    git config --global url."https://$(cat /usr/local/github-credentials/oauth)@github.com/".insteadOf "https://github.com/"
+    make ginkgo-install
+    source /usr/local/cs-qe-credentials/ocm-tokens
+    export AWS_SHARED_CREDENTIALS_FILE=/usr/local/cs-qe-credentials/aws-cred
+    export SHARED_VPC_AWS_SHARED_CREDENTIALS_FILE=/usr/local/cs-qe-credentials/aws-shared-vpc-credentials
+    export OCM_ENV=integration
+    export QE_FLAG=smoke-pre-submit
+    export CLUSTER_PROFILE=rosa-hcp-ad
+    ./bin/ginkgo -v --timeout 25m -focus '@id_sanity' --output-dir "${ARTIFACT_DIR}" --junit-report junit-smoke-fvt.xml ./cases/cms
+  container:
+    from: src
+  optional: true
+  secrets:
+  - mount_path: /usr/local/github-credentials
+    name: github-credentials-openshift-ci-robot-private-git-cloner
+  - mount_path: /usr/local/cs-qe-credentials
+    name: cs-qe-credentials
+  timeout: 40m0s
 zz_generated_metadata:
   branch: master
   org: openshift-online
