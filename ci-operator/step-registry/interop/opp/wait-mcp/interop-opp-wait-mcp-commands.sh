@@ -76,17 +76,7 @@ _junit_emit() {
   _je=$(date +%s) || _je=${_junit_start}
   local _jd=$((_je - _junit_start))
   local _jn="wait-mcp"
-  # INTEROP-9629: canonical component-first suite name. When the lane opts in
-  # via MAP_TESTS plus LP_QE__CR__TS_NAME__PFX__OCP, the suite name and the
-  # artifact filename derive from the component prefix
-  # (lp-interop--OCP--OPP--wait-mcp per ADR 0007); otherwise the historical
-  # runtime-first name is preserved byte-identically so unconfigured
-  # consumers see no change.
-  local _ts_pfx="lp-interop--OPP"
-  if [ "${MAP_TESTS:-}" = "true" ] && [ -n "${LP_QE__CR__TS_NAME__PFX__OCP:-}" ]; then
-    _ts_pfx="${LP_QE__CR__TS_NAME__PFX__OCP}"
-  fi
-  local _jf="${ARTIFACT_DIR:-/tmp}/junit_${_ts_pfx}--${_jn}.xml"
+  local _jf="${ARTIFACT_DIR:-/tmp}/junit_lp-interop--OPP--${_jn}.xml"
   local _fc=0 _fx=""
   # XML-escape via sed: bash >= 5.2 patsub_replacement expands a bare & in
   # ${var//pat/repl} to the matched text (breaking &lt; into <lt;), and older
@@ -106,7 +96,7 @@ _junit_emit() {
   fi
   cat > "${_jf}" <<JUNITEOF || true
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="${_ts_pfx}--${_jn}" tests="2" failures="$((_fc + _st_fc))" errors="0" skipped="0" time="${_jd}">
+<testsuite name="lp-interop--OPP--${_jn}" tests="2" failures="$((_fc + _st_fc))" errors="0" skipped="0" time="${_jd}">
   <properties>
     <property name="polls" value="${_junit_polls}"/>
     <property name="extensions" value="${extensionsApplied}"/>
