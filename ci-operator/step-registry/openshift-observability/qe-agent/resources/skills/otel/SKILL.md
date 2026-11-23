@@ -11,13 +11,14 @@ This skill drives an agentic loop that takes failing CI test results for the Ope
 
 | JUnit prefix | Suite | Framework | Repo |
 |---|---|---|---|
-| `junit_otel_*` | OpenTelemetry Operator | chainsaw | `https://github.com/openshift/open-telemetry-opentelemetry-operator` |
+| `junit_otel_e2e_instrumentation_go_*` | OpenTelemetry Operator, Go auto-instrumentation suite (upstream step only) | `go test` (gotestsum) | `https://github.com/openshift/open-telemetry-opentelemetry-operator` |
+| any other `junit_otel_*` | OpenTelemetry Operator | chainsaw | same |
 
 ---
 
 ## Step 0 — Read Setup Context and Fetch the Step Script
 
-Read `${SHARED_DIR}/qe-agent-context.json`, written at exit by either `distributed-tracing-tests-opentelemetry-premerge` (branch `rhosdt-0.158`) or `distributed-tracing-tests-opentelemetry-upstream` (branch `main`), for example:
+Read `${SHARED_DIR}/qe-agent-context.json`, written at exit by either `distributed-tracing-tests-opentelemetry-premerge` (branch `rhosdt-0.158` or `rhosdt-0.163`) or `distributed-tracing-tests-opentelemetry-upstream` (branch `main`), for example:
 
 ```json
 {
@@ -34,7 +35,7 @@ Read `${SHARED_DIR}/qe-agent-context.json`, written at exit by either `distribut
 ```
 
 - `step_script_ref` — path relative to `ci-operator/step-registry/` in the openshift/release repo; always use the value from the file, never a hard-coded path
-- `env` — export exactly the keys present in the file. Premerge: `OPERATOR_IMG`/`OTEL_COLLECTOR_IMAGE`/`TARGETALLOCATOR_IMG` identify the images under test, `RUN_TESTS`/`SKIP_TESTS` (mutually exclusive) select the suite. Upstream has the same `RUN_TESTS`/`SKIP_TESTS` but `OPERATOROPAMPBRIDGE_IMG`/`OPAMP_BRIDGE_SERVER` in place of `OTEL_COLLECTOR_IMAGE`, plus five `INSTRUMENTATION_*_IMG` vars (`JAVA`/`NODEJS`/`PYTHON`/`DOTNET`/`APACHE_HTTPD`) that the setup section's own validation requires
+- `env` — export exactly the keys present in the file. Premerge: `OPERATOR_IMG`/`OTEL_COLLECTOR_IMAGE`/`TARGETALLOCATOR_IMG` identify the images under test, `RUN_TESTS`/`SKIP_TESTS` (mutually exclusive) select the suite. Upstream has the same `RUN_TESTS`/`SKIP_TESTS` but `OPERATOROPAMPBRIDGE_IMG`/`OPAMP_BRIDGE_SERVER` in place of `OTEL_COLLECTOR_IMAGE`, plus five `INSTRUMENTATION_*_IMG` vars (`JAVA`/`NODEJS`/`PYTHON`/`DOTNET`/`APACHE_HTTPD`) and `OTLPSINK_IMG` that the setup section's own validation requires
 
 Construct the raw GitHub URL and fetch the script:
 
@@ -71,7 +72,7 @@ If `qe-agent-context.json` does not exist, infer the suite from the JUnit file n
 
 ## Step 1 — Parse JUnit XMLs and Identify Failures
 
-Mandatory. Read `/tmp/qe-agent-modules/junit-triage.md` and follow it. Typical shared root causes here: operator crash, missing CRD, install failure. Representative test: the one with the fewest steps in `chainsaw-test.yaml`. If missing: read `${SHARED_DIR}/qe-agent-junit-*.xml`, extract each suite name and failed `<testcase>` (`<failure>`/`<error>` message and full text), group by suite, and exit with a clear message if there are no files. If more than 5 tests fail, look for one shared root cause and diagnose the simplest failing test as the representative (Steps 2–5); with no pattern, diagnose individually, capped at 3. Write any pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.md`.
+Mandatory. Read `/tmp/qe-agent-modules/junit-triage.md` and follow it. Typical shared root causes here: operator crash, missing CRD, install failure. Representative test: the one with the fewest steps in `chainsaw-test.yaml`. If missing: read `${QE_JUNIT_DIR}/qe-agent-junit-*.xml`, extract each suite name and failed `<testcase>` (`<failure>`/`<error>` message and full text), group by suite, and exit with a clear message if there are no files. If more than 5 tests fail, look for one shared root cause and diagnose the simplest failing test as the representative (Steps 2–5); with no pattern, diagnose individually, capped at 3. Write any pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.md`.
 
 ---
 
@@ -172,6 +173,23 @@ After all 4 runs, count how many passed vs failed. Record the pass/fail pattern 
 - Look for assertions that depend on ordering of concurrent resources
 
 If the failure is reproducible even 1 out of 4 runs, classify as `FLAKY` and proceed to Step 5c to fix it.
+
+### Go auto-instrumentation suite
+
+The upstream step also runs `tests/e2e-instrumentation-go`, a Go test suite, through `make e2e-instrumentation-go-default` (report `junit_otel_e2e_instrumentation_go_default.xml`, the operator's default agent images, run before the step sets the CI-built images on the operator) and `make e2e-instrumentation-go` (report `junit_otel_e2e_instrumentation_go_pipeline_images.xml`, the CI-built images set in the Instrumentation CRs). Its test cases are `TestInstrumentation/<case>` and `TestJavaCrossNamespaceInstrumentation`, with one subtest per assessment. The source is `tests/e2e-instrumentation-go/instrumentation_test.go`, the manifests are in its `testdata/` and the helpers in `internal/testing/e2e/`. Set `TEST_DIR=tests/e2e-instrumentation-go` and rerun the failing case with `go test` instead of the chainsaw commands above:
+
+```bash
+make gotestsum
+# For a failure in the _default report, first unset INSTRUMENTATION_JAVA_IMG INSTRUMENTATION_NODEJS_IMG
+# INSTRUMENTATION_PYTHON_IMG INSTRUMENTATION_DOTNET_IMG INSTRUMENTATION_APACHE_HTTPD_IMG; the operator CSV state rule
+# of Step 0b applies (the step sets RELATED_IMAGE_AUTO_INSTRUMENTATION_* on the operator after the _default run).
+./bin/gotestsum --junitfile "${ARTIFACT_DIR}/junit_rerun_otel.xml" -- \
+  -tags e2e -count=1 -timeout 30m -run '<pattern>' ./tests/e2e-instrumentation-go/...
+```
+
+`<pattern>` is `^TestInstrumentation$/^<case>$` for a case of `TestInstrumentation` (for example `^TestInstrumentation$/^java$`) and `^TestJavaCrossNamespaceInstrumentation$` for that test. Check that the report has the test: a pattern that matches nothing passes with 0 tests.
+
+Each test creates and deletes its own namespaces, so no cleanup is needed between reruns. On failure the test output, also in the JUnit failure text, has the pod and container states, the namespace events, the container and operator logs, and an inventory of the telemetry the sink received. Use the flakiness loop above with `junit_rerun_otel_run${i}.xml`.
 
 ---
 
@@ -317,6 +335,6 @@ Mandatory. Follow "Analysis summary" in `/tmp/qe-agent-modules/analysis-summary.
 - The cluster is already provisioned and the OpenTelemetry operator is already installed — do not reinstall the operator
 - The test repo is set up by Step 0b using commands from the fetched step script — the repo path is the destination shown in the script (e.g., `/tmp/opentelemetry-tests`). The qe-agent runs in a fresh pod so `/tmp/` is always empty at start; Step 0b populates it
 - `$KUBECONFIG` is set and points to the test cluster; `oc`, `kubectl`, and `chainsaw` are available in PATH
-- All output files must go to `$ARTIFACT_DIR` (uploaded to GCS by the sidecar) or `$SHARED_DIR` (accessible to other steps)
+- All output files must go to `$ARTIFACT_DIR` (uploaded to GCS by the sidecar). Never write into `$SHARED_DIR`: it is a 1 MiB Kubernetes Secret synced when this pod exits, and files written there can fail the step.
 - **Namespace restriction**: You MUST NOT access, read, list, or modify any resources in the `kube-system` namespace. This namespace contains cloud provider credentials and platform-critical components. Do not run `oc get`, `oc describe`, `oc logs`, `kubectl`, or any other command that targets `kube-system`. If a diagnostic command defaults to all namespaces (e.g., `oc get pods -A`), filter out `kube-system` from the output before analysis
 - This step runs `best_effort: true` — always exit 0 even if analysis is incomplete

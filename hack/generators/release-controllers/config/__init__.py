@@ -38,9 +38,10 @@ class RCPaths:
 
         # The updated configuration and deployment files, to app.ci, are located here:
         self.path_rc_deployments = self.path_base.joinpath('clusters/app.ci/release-controller')
+        # RPM mirror resources are applied from the shared build-cluster path.
+        # The legacy vsphere02 path is no longer covered by an ApplicationSet.
         self.path_rc_rpms = [
             self.path_base.joinpath('clusters/build-clusters/build-shared/release-controller'),
-            self.path_base.joinpath('clusters/build-clusters/vsphere02/release-controller'),
         ]
 
         # CRT Resources

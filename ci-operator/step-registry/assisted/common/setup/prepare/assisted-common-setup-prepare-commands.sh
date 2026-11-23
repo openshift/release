@@ -174,7 +174,6 @@ cat > run_test_playbook.yaml <<-"EOF"
     CLUSTERTYPE: "{{ lookup('env', 'CLUSTERTYPE')}}"
     OPENSHIFT_INSTALL_RELEASE_IMAGE: "{{ lookup('env', 'OPENSHIFT_INSTALL_RELEASE_IMAGE')}}"
     CLUSTER_PROFILE_PULL_SECRET: "{{ lookup('file', '{{ CLUSTER_PROFILE_DIR }}/pull-secret') }}"
-    BREW_REGISTRY_REDHAT_IO_PULL_SECRET: "{{ lookup('file', '/var/run/vault/brew-registry-redhat-io-pull-secret/pull-secret') }}"
   pre_tasks:
     - name: wait for ssh
       ansible.builtin.wait_for_connection:
@@ -188,14 +187,10 @@ cat > run_test_playbook.yaml <<-"EOF"
       ansible.builtin.file:
         path: /usr/config
         state: absent
-    - name: Update pull secrets with brew.registry.redhat.io auth
-      ansible.builtin.set_fact:
-        pull_secret: "{{ CLUSTER_PROFILE_PULL_SECRET | combine(BREW_REGISTRY_REDHAT_IO_PULL_SECRET, recursive=true) }}"
-      no_log: true
     - name: Setup pull-secret on remote
       become: true
       ansible.builtin.copy:
-        content: "{{ pull_secret | to_nice_json }}"
+        content: "{{ CLUSTER_PROFILE_PULL_SECRET | to_nice_json }}"
         dest: /root/pull-secret
       no_log: true
     - name: Copy vsphere credentials file

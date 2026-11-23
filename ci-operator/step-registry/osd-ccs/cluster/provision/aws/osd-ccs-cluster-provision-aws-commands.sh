@@ -25,21 +25,47 @@ fi
 COMPUTE_NODES=${COMPUTE_NODES:-$default_compute_nodes}
 
 # Obtain aws credentials
-AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+if [[ -f "${CLUSTER_PROFILE_DIR}/osd-ccs-aws-credentials" ]]; then
+  echo "Using OSD AWS CCS credentials (osdCcsAdmin) from the cluster profile"
+  AWSCRED="${CLUSTER_PROFILE_DIR}/osd-ccs-aws-credentials"
+else
+  AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+fi
 if [[ -f "${AWSCRED}" ]]; then
-  AWS_ACCOUNT_ID=$(cat "${AWSCRED}" | grep aws_account_id | tr -d ' ' | cut -d '=' -f 2)
-  AWS_ACCESS_KEY_ID=$(cat "${AWSCRED}" | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f 2)
-  AWS_SECRET_ACCESS_KEY=$(cat "${AWSCRED}" | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f 2)
+  AWS_ACCESS_KEY_ID=$(grep -m1 'aws_access_key_id' "${AWSCRED}" | tr -d ' ' | cut -d '=' -f2)
+  AWS_SECRET_ACCESS_KEY=$(grep -m1 'aws_secret_access_key' "${AWSCRED}" | tr -d ' ' | cut -d '=' -f2)
+  # Get the AWS account ID associated with the selected credentials
+  AWS_CALLER_ARN=$(AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}" aws sts get-caller-identity --query Arn --output text)
+  AWS_ACCOUNT_ID=$(echo "${AWS_CALLER_ARN}" | cut -d ':' -f5)
+  echo "AWS caller identity: ${AWS_CALLER_ARN}"
 else
   echo "Did not find compatible cloud provider cluster_profile"
   exit 1
 fi
 
 # Log in
+read_profile_file() {
+  local file="${1}"
+  if [[ -f "${CLUSTER_PROFILE_DIR}/${file}" ]]; then
+    cat "${CLUSTER_PROFILE_DIR}/${file}"
+  fi
+}
+
 OCM_VERSION=$(ocm version)
-OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
-ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
+SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
+SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
+OCM_TOKEN=$(read_profile_file "ocm-token")
+
+if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials using ocm cli ${OCM_VERSION}"
+  ocm login --url "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+elif [[ -n "${OCM_TOKEN}" ]]; then
+  echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
+  ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
+else
+  echo "Cannot login! You need to securely supply SSO credentials or an ocm-token in the cluster profile!"
+  exit 1
+fi
 
 # Check whether the cluster with the same cluster name existes.
 OLD_CLUSTER_ID=$(ocm list clusters --columns=id --parameter search="name is '${CLUSTER_NAME}'" | tail -n 1)
@@ -83,7 +109,7 @@ echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Fips: ${FIPS}"
 
 # Cluster payload
-# Using the default aws credentials but not the user osdCcsAdmin's credentials to provision cluster
+# Build the cluster payload using the selected AWS CCS credentials
 CLUSTER_PAYLOAD=$(echo -e '{
   "name": "'${CLUSTER_NAME}'",
   "region": {

@@ -1,9 +1,6 @@
 ref:
   as: openshift-observability-logging-e2e-tests
-  from_image:
-    namespace: logging
-    name: obs-tests-runner
-    tag: main
+  from: obs-tests-runner
   cli: latest
   commands: openshift-observability-logging-e2e-tests-commands.sh
   timeout: 6h0m0s
@@ -40,7 +37,22 @@ ref:
     (https://github.com/openshift-eng/openshift-logging-e2e-tests) against the cluster in KUBECONFIG and
     writes a JUnit report to ARTIFACT_DIR.
 
+    The step runs in the obs-tests-runner image, which the using configuration must provide: either
+    build it from the test suite source with an images entry (so the suites exercise the pull request
+    under test), or import the promoted logging/obs-tests-runner:main stream with a base_images entry
+    (to run the merged suites). Configurations that provide neither fail when the step pod starts,
+    after the cluster has been provisioned, because the image cannot be found.
+
     The suites expect cluster-logging-operator and loki-operator to be installed before the step runs,
     as subscriptions in the openshift-logging and openshift-operators-redhat namespaces. Tests that need
     additional operators (for example opentelemetry-product) subscribe them from the redhat-operators
     catalog unless they are pre-installed, for example with the install-operators step.
+
+    On exit the step writes qe-agent-context.json to SHARED_DIR for the openshift-observability-qe-agent
+    post-step. When tests failed it also copies the JUnit XMLs there as qe-agent-junit-<i>.xml, reduced
+    with xsltproc so they fit SHARED_DIR's 1 MiB Kubernetes Secret limit: <system-out>/<system-err> is
+    stripped from passing testcases and failing testcases stay complete. Images built before libxslt was
+    installed have no xsltproc and skip the copy. The qe-agent wrapper moves the copies out of SHARED_DIR
+    before the agent runs. The copies are dropped when they still do not fit, which is recorded as
+    junit_truncated in the context file, and the full reports always stay in ARTIFACT_DIR, where Prow
+    uploads them.

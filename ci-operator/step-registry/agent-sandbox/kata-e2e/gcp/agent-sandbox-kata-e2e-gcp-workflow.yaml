@@ -1,0 +1,25 @@
+workflow:
+  as: agent-sandbox-kata-e2e-gcp
+  steps:
+    env:
+      OSC_INSTALL: "true"
+      AGENT_SANDBOX_INSTALL: "true"
+      SANDBOX_RUNTIME_CLASS: "kata"
+      COMPUTE_NODE_TYPE: "n2-standard-4"
+      COMPUTE_NODE_REPLICAS: "2"
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: sandboxed-containers-operator-env-cm
+    - ref: sandboxed-containers-operator-install-osc-operator
+    - ref: agent-sandbox-install-operator
+    test:
+    - ref: agent-sandbox-e2e-test
+    post:
+    - ref: sandboxed-containers-operator-gather-must-gather
+      best_effort: true
+      optional_on_success: true
+    - chain: ipi-gcp-post
+  documentation: |-
+    Provisions a GCP OCP cluster, installs OSC (kata runtime) and the
+    agent-sandbox operator, then runs runtime-class e2e tests (lifecycle +
+    startup comparison) against kata sandboxes.
