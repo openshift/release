@@ -140,7 +140,7 @@ aws s3 mb s3://"${INFRA_STACK_NAME}"
 # Track for cleanup by aws-deprovision-s3buckets
 echo "s3://${INFRA_STACK_NAME}" >> "${SHARED_DIR}/to_be_removed_s3_bucket_list"
 
-if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
+if [[ "${DISCONNECTED_INSTALL:-no}" == "yes" ]]; then
   echo "============================================="
   echo "DISCONNECTED: consuming precreated VPC"
   echo "============================================="
@@ -325,7 +325,7 @@ add_param_to_json VpcId "${VPC_ID}" "${cf_params_bootstrap}"
 # private subnet with no NAT gateway enforces network isolation.  Bootstrap
 # accesses S3 for its ignition via the VPC S3 endpoint and communicates with
 # NLB targets over the VPC-internal network.
-if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
+if [[ "${DISCONNECTED_INSTALL:-no}" == "yes" ]]; then
   add_param_to_json PublicSubnet "${PRIVATE_SUBNET_0}" "${cf_params_bootstrap}"
 else
   add_param_to_json PublicSubnet "$(echo ${PUBLIC_SUBNETS%%,*} | sed 's/"//g')" "${cf_params_bootstrap}"
@@ -355,7 +355,7 @@ wait "$!"
 
 # In disconnected mode the bootstrap is on a private subnet and has no
 # public IP.  Use the private IP for gather and SSH (via bastion proxy).
-if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
+if [[ "${DISCONNECTED_INSTALL:-no}" == "yes" ]]; then
   BOOTSTRAP_IP="$(aws cloudformation describe-stacks --stack-name "${BOOTSTRAP_STACK_NAME}" \
     --query 'Stacks[].Outputs[?OutputKey == `BootstrapPrivateIp`].OutputValue' --output text)"
 else
@@ -462,7 +462,7 @@ echo -e "compute: ${COMPUTE_0_IP} ${COMPUTE_1_IP} ${COMPUTE_2_IP}"
 
 echo "${GATHER_BOOTSTRAP_ARGS}" > "${SHARED_DIR}"/GATHER_BOOTSTRAP_ARGS
 
-if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
+if [[ "${DISCONNECTED_INSTALL:-no}" == "yes" ]]; then
   # In disconnected mode, the CF template's private-zone *.apps record
   # points to the external NLB (public subnets).  Nodes on private subnets
   # without NAT cannot reach public NLB IPs, so ingress health checks fail.

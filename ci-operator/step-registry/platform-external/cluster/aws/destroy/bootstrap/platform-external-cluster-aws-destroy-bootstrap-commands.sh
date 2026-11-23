@@ -42,7 +42,7 @@ function save_stack_events_to_artifacts() {
 
 function gather_bootstrap_and_fail() {
   if test -n "${GATHER_BOOTSTRAP_ARGS}"; then
-    if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]] && \
+    if [[ "${DISCONNECTED_INSTALL:-no}" == "yes" ]] && \
        [[ -s "${SHARED_DIR}/bastion_public_address" ]] && \
        [[ -s "${SHARED_DIR}/bastion_ssh_user" ]] && \
        type gather_bootstrap_via_bastion &>/dev/null; then

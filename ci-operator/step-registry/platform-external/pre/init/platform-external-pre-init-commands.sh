@@ -196,7 +196,7 @@ function collect_bootstrap_handler() {
     make_install_dir
     if ! command -v openshift-install &> /dev/null; then
       log "[\${handler_name}]: ERROR: openshift-install not found, cannot gather bootstrap logs"
-    elif [[ "\${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]] && [[ -s "\${SHARED_DIR}/bastion_public_address" ]] && [[ -s "\${SHARED_DIR}/bastion_ssh_user" ]]; then
+    elif [[ "\${DISCONNECTED_INSTALL:-no}" == "yes" ]] && [[ -s "\${SHARED_DIR}/bastion_public_address" ]] && [[ -s "\${SHARED_DIR}/bastion_ssh_user" ]]; then
       gather_bootstrap_via_bastion "\${SSH_PRIV_KEY_PATH}" "\${BOOTSTRAP_IP}"
     else
       # Direct gather for connected path (bootstrap has public IP)

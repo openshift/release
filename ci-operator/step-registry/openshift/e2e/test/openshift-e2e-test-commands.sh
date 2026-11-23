@@ -294,7 +294,7 @@ powervs*)
     ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
 external)
-    if [[ "${PLATFORM_EXTERNAL_DISCONNECTED:-no}" == "yes" ]]; then
+    if [[ "${DISCONNECTED_INSTALL:-no}" == "yes" ]]; then
         export TEST_PROVIDER='{"type":"external","disconnected":true}'
     else
         export TEST_PROVIDER='{"type":"external"}'
