@@ -76,20 +76,21 @@ prepare_seedgeneration() {
 }
 
 prepare_capture_access() {
-  local bastion_identity
   ARTIFACT_WORK=$(mktemp -d /tmp/ibi-seed-artifacts.XXXXXX)
   trap cleanup EXIT
   cp /var/group_variables/common/all/ansible_ssh_private_key "$ARTIFACT_WORK/ssh-key"
   chmod 600 "$ARTIFACT_WORK/ssh-key"
 
-  # Resolve inventory precedence without printing private inventory variables.
-  bastion_identity=$(
-    exec 2>"${ARTIFACT_WORK}/inventory.log" || exit 1
-    ansible-inventory -i "${CNF_INVENTORY_PATH}/switch-config.yaml" --host bastion |
-      jq -er '[.ansible_host, .ansible_user] | join(" ")'
-  )
-  read -r BASTION_IP BASTION_USER <<< "$bastion_identity"
-  [[ -n "$BASTION_IP" && -n "$BASTION_USER" ]]
+  # Match hub deployment: read connection fields from the generated inventory.
+  if ! BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${CNF_INVENTORY_PATH}/host_vars/bastion.yaml" | sed "s/'//g") ||
+     ! BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${CNF_INVENTORY_PATH}/group_vars/all.yaml" | sed "s/'//g"); then
+    echo "Could not read seed bastion address and user from inventory." >&2
+    return 1
+  fi
+  if [[ ! "${BASTION_IP} ${BASTION_USER}" =~ ^[^[:space:]]+[[:blank:]][^[:space:]]+$ ]]; then
+    echo "Seed bastion inventory must provide one address and one user." >&2
+    return 1
+  fi
   [[ "$CLUSTER_NAME" =~ ^[a-z0-9-]+$ && "$SEED_SPOKE_CLUSTER" =~ ^[a-z0-9-]+$ ]]
 }
 

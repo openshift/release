@@ -43,21 +43,28 @@ configure_ansible() {
 
 run_report() {
   : "${TARGET_CLUSTER_NAME:?TARGET_CLUSTER_NAME is required for the shared uploader}"
-  jq -n --arg shared "$SHARED_DIR" --arg output "${ARTIFACT_DIR}/reportportal" \
-    --arg work "${TEMP_DIR}/reports" --arg version "$VERSION" \
-    --arg kubeconfig "/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/kubeconfig" \
-    --arg launch "$IBI_REPORTPORTAL_LAUNCH_NAME" --arg build "${BUILD_ID:-unknown}" \
-    '{ibi_report_shared_dir:$shared, ibi_report_output_dir:$output,
-      ibi_report_work_dir:$work, ibi_report_version:$version,
-      ibi_report_launch_name:$launch, ibi_report_build_id:$build,
-      ibi_report_hub_kubeconfig:$kubeconfig}' > "${TEMP_DIR}/inputs.json"
-
   echo "Collecting IBI stage reports and uploading to Report Portal."
   # Inventory and upload diagnostics may contain credentials; publish only
   # the playbook's reporting-status.json and launch link.
   local status=0
+  # Environment lookups preserve exact strings without shell or JSON value escaping.
+  IBI_REPORT_SHARED_DIR="$SHARED_DIR" \
+  IBI_REPORT_OUTPUT_DIR="${ARTIFACT_DIR}/reportportal" \
+  IBI_REPORT_WORK_DIR="${TEMP_DIR}/reports" \
+  IBI_REPORT_VERSION="$VERSION" \
+  IBI_REPORT_LAUNCH_NAME="$IBI_REPORTPORTAL_LAUNCH_NAME" \
+  IBI_REPORT_BUILD_ID="${BUILD_ID:-unknown}" \
+  IBI_REPORT_HUB_KUBECONFIG="/home/telcov10n/project/generated/${TARGET_CLUSTER_NAME}/auth/kubeconfig" \
   ansible-playbook ./playbooks/ran/ibi-report.yml \
-    -i "${TEMP_DIR}/inventory/hosts.yml" -e "@${TEMP_DIR}/inputs.json" \
+    -i "${TEMP_DIR}/inventory/hosts.yml" --extra-vars '{
+      "ibi_report_shared_dir": "{{ lookup(\"ansible.builtin.env\", \"IBI_REPORT_SHARED_DIR\") }}",
+      "ibi_report_output_dir": "{{ lookup(\"ansible.builtin.env\", \"IBI_REPORT_OUTPUT_DIR\") }}",
+      "ibi_report_work_dir": "{{ lookup(\"ansible.builtin.env\", \"IBI_REPORT_WORK_DIR\") }}",
+      "ibi_report_version": "{{ lookup(\"ansible.builtin.env\", \"IBI_REPORT_VERSION\") }}",
+      "ibi_report_launch_name": "{{ lookup(\"ansible.builtin.env\", \"IBI_REPORT_LAUNCH_NAME\") }}",
+      "ibi_report_build_id": "{{ lookup(\"ansible.builtin.env\", \"IBI_REPORT_BUILD_ID\") }}",
+      "ibi_report_hub_kubeconfig": "{{ lookup(\"ansible.builtin.env\", \"IBI_REPORT_HUB_KUBECONFIG\") }}"
+    }' \
     > "${TEMP_DIR}/reporting.log" 2>&1 || status=$?
   printf 'IBI reporting status: %s. See reportportal artifacts for details.\n' "$status"
   if [[ -s "${ARTIFACT_DIR}/reportportal/reportportal-url.txt" ]]; then
