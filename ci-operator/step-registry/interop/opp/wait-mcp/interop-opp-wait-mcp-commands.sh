@@ -136,7 +136,7 @@ _junit_emit() {
   _esc_class=$(printf '%s' "${_junit_class}" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g')
   if (( _jr != 0 )); then
     _fc=1
-    _fx="<failure message=\"${_jn} exited with code ${_jr}${_esc_class:+: ${_esc_class}}\" type=\"StepFailure\">${_jn} exited with code ${_jr}.${_esc_reason:+ Verbatim condition: ${_esc_reason}}${_st_note}</failure>"
+    _fx="<failure message=\"${_jn} exited with code ${_jr}${_esc_class:+: ${_esc_class}}\" reason=\"${_esc_reason}\" type=\"StepFailure\">${_jn} exited with code ${_jr}.${_esc_reason:+ Verbatim condition: ${_esc_reason}}${_st_note}</failure>"
   fi
   # Self-test verdicts are suite PROPERTIES, not testcases: the
   # skip-ratio gate aggregates tests= across suites, and a meta-test
@@ -173,7 +173,7 @@ JUNITEOF
 # precedent: capture the code first, set +e/+u, emit and bundle each guarded,
 # single trailing exit).
 trap '_rc=$?; if (( ! _jrc_set )); then _jrc=${_rc}; _jrc_set=1; fi; set +e; set +u; _junit_emit "${_jrc}"; _opp_cleanup; exit "${_jrc}"' EXIT
-trap '_jrc=143; _jrc_set=1; exit 143' TERM INT
+trap '_junit_class="step-terminated-sigterm"; _junit_reason="terminated by SIGTERM (step timeout)"; _jrc=143; _jrc_set=1; exit 143' TERM INT
 
 # --- Bounded oc wrapper for diagnostic/failure-path calls: never hangs,
 #     never fails the step by itself (callers that need exit status use the
@@ -440,11 +440,19 @@ __fixture_converged_degraded () {
   FIX_EXPECTED_TERMINAL="DEGRADED"
 }
 
+__fixture_converged_unknown_conditions () {
+  # edge: converged counts but Updating and Degraded Unknown, must stay UNSTABLE (Unknown is not clean)
+  FIX_MCP_JSON='{"apiVersion":"v1","kind":"List","items":[{"metadata":{"name":"master","generation":2,"uid":"9cb2d720-68c0-456e-b30e-3bb6b4762fd7"},"spec":{"paused":false},"status":{"conditions":[{"type":"Degraded","status":"Unknown"},{"type":"Updated","status":"True"},{"type":"Updating","status":"Unknown"}],"machineCount":3,"readyMachineCount":3,"updatedMachineCount":3,"unavailableMachineCount":0,"observedGeneration":2}},{"metadata":{"name":"worker","generation":2,"uid":"09c0c55d-e04b-4901-a448-f8b69d96a97f"},"spec":{"paused":false},"status":{"conditions":[{"type":"Degraded","status":"Unknown"},{"type":"Updated","status":"True"},{"type":"Updating","status":"Unknown"}],"machineCount":12,"readyMachineCount":12,"updatedMachineCount":12,"unavailableMachineCount":0,"observedGeneration":2}}]}'
+  # mutation: allowing Unknown for Updating or Degraded to count as clean would flip poll to STABLE (must stay UNSTABLE)
+  FIX_EXPECTED_POLL="UNSTABLE"
+  FIX_EXPECTED_TERMINAL="UNKNOWN"
+}
+
 WaitMcpClassifierSelfTest () {
   typeset _fixture _got_poll _got_term; typeset -i _fail=0
-  for _fixture in converged_all_clean converged_degraded; do
+  for _fixture in converged_all_clean converged_degraded converged_unknown_conditions; do
     "__fixture_${_fixture}"
-    # drift guard: this poll classifier mirrors the production poll loop classifier (see STABLE/UNSTABLE python block in the poll loop); keep both in sync
+    # drift guard: this poll classifier mirrors the production poll loop classifier (see STABLE/UNSTABLE python block in the poll loop); keep both in sync (both require Updating and Degraded explicitly False, rejecting Unknown)
     # copy is deliberate; guard fails the selftest on divergence (no shared function in this push)
     _got_poll="$(echo "${FIX_MCP_JSON}" | python3 /dev/fd/3 3<<'PY'
 import sys, json
@@ -478,7 +486,7 @@ for mcp in data.get('items', []):
     total_machine += total
     if degraded == 'True':
         any_degraded = 1
-    if (updating == 'True' or degraded == 'True' or updated_cond != 'True'
+    if (updating != 'False' or degraded != 'False' or updated_cond != 'True'
             or unavailable > 0 or ready != total or updated != total
             or observed != generation):
         issues.append(f'{name}: Updating={updating} Updated={updated_cond} Degraded={degraded} ready={ready}/{total} updated={updated}/{total} unavailable={unavailable} gen={generation}/obs={observed}')
@@ -619,7 +627,8 @@ try:
     f = tc.find("failure")
     assert f is not None, "no failure element"
     # PRRT_kwDOBHvUUM65on1z: separate TERM reason vs exit code (check reason field)
-    assert "143" in (f.get("message") or "") or "TERM" in (f.get("reason") or ""), f"failure message: {f.get('message')} reason: {f.get('reason')}"
+    assert "143" in (f.get("message") or ""), f"failure message: {f.get('message')}"
+    assert "TERM" in (f.get("message") or "") or "TERM" in (f.get("reason") or "") or "TERM" in (f.text or ""), f"failure message: {f.get('message')} reason: {f.get('reason')} text: {f.text}"
 except Exception as e:
     print(f"trap self-test: JUnit assertion failed: {e}", file=sys.stderr)
     sys.exit(1)
@@ -661,7 +670,7 @@ if items:
     for m in items:
         conds = {c['type']: c['status'] for c in m.get('status', {}).get('conditions', [])}
         st = m.get('status', {})
-        if (conds.get('Updating') == 'True' or conds.get('Degraded') == 'True' or conds.get('Updated') != 'True'
+        if (conds.get('Updating') != 'False' or conds.get('Degraded') != 'False' or conds.get('Updated') != 'True'
                 or st.get('unavailableMachineCount', 0) > 0
                 or st.get('readyMachineCount', 0) != st.get('machineCount', 0)
                 or st.get('updatedMachineCount', 0) != st.get('machineCount', 0)
@@ -960,6 +969,8 @@ while (( SECONDS < deadline )); do
             exit 1
         fi
         consecutivePasses=0
+        _signatureRepeat=0
+        _lastSignatureReason=""
         sleep "${currentPollInterval}"
         continue
     fi
@@ -1001,9 +1012,9 @@ for mcp in data.get('items', []):
     total_machine += total
     if degraded == 'True':
         any_degraded = 1
-    # Stability requires the condition tokens AND count congruence AND the
+    # Stability requires the condition tokens (Updating and Degraded explicitly False, not Unknown) AND count congruence AND the
     # observed generation catching up (render churn resets stability).
-    if (updating == 'True' or degraded == 'True' or updated_cond != 'True'
+    if (updating != 'False' or degraded != 'False' or updated_cond != 'True'
             or unavailable > 0 or ready != total or updated != total
             or observed != generation):
         issues.append(f'{name}: Updating={updating} Updated={updated_cond} Degraded={degraded} ready={ready}/{total} updated={updated}/{total} unavailable={unavailable} gen={generation}/obs={observed}')
@@ -1026,6 +1037,8 @@ PY
     if [[ "${statusDetail}" == "python parse error" ]]; then
         echo "WARNING: MCP status parse error; retaining last valid generation fingerprint" >&2
         consecutivePasses=0
+        _signatureRepeat=0
+        _lastSignatureReason=""
         continue
     fi
     # Validate as plain strings first: a typeset -i target evaluates its input
