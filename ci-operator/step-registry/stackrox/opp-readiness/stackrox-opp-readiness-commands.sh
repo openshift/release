@@ -382,11 +382,14 @@ function DiscoverScNs () {
     # The OPP policy set co-locates the SecuredCluster with Central; query
     # the central namespace first, then fall back to all namespaces for
     # layouts that separate them.
-    scNs="$(oc get securedclusters.platform.stackrox.io -n "${centralNs}" \
+    # Both queries are bounded: WaitFor advances its budget by pollInterval
+    # only, so a stalled call would suspend the 900s readiness budget instead
+    # of consuming it, and the timeout would be reported late.
+    scNs="$(timeout 10 oc get securedclusters.platform.stackrox.io -n "${centralNs}" \
         -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
         || true
     if [[ -z "${scNs}" ]]; then
-        scNs="$(oc get securedclusters.platform.stackrox.io --all-namespaces \
+        scNs="$(timeout 10 oc get securedclusters.platform.stackrox.io --all-namespaces \
             -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
             || return 1
     fi
@@ -404,11 +407,11 @@ function PeriodicSecuredClusterDiagnostics () {
 function SecuredClusterDiscoveryFailureDiagnostics () {
     echo "[readiness] === SecuredCluster discovery failure diagnostics ==="
     echo "[readiness] --- SecuredCluster CRs in any state, all namespaces ---"
-    SecuredClusterStatus || echo "[readiness]   No SecuredCluster CRs found at all"
+    SecuredClusterStatus || echo "[readiness]   SecuredCluster list failed; resource state unknown" >&2
     echo "[readiness] --- OPP policy status (the policy set creates the SecuredCluster) ---"
-    PolicyStatus || echo "[readiness]   (none)"
+    PolicyStatus || echo "[readiness]   policy list failed; resource state unknown" >&2
     echo "[readiness] --- Sensor pods in ${centralNs} ---"
-    SensorPodStatus || echo "[readiness]   No sensor pods found in ${centralNs}"
+    SensorPodStatus || echo "[readiness]   Sensor pod list failed in ${centralNs}; resource state unknown" >&2
     echo "[readiness] === End failure diagnostics ==="
 }
 
