@@ -47,7 +47,7 @@ function wait_mcp_ready () {
     # Give MCO time to start the rollout before waiting for completion. A pool may still
     # report Updated=True from an earlier change, so the initial wait is best-effort.
     oc wait mcp --all --for=condition=Updating=True --timeout=5m || true
-    oc wait mcp --all --for=condition=Updated=True --timeout=20m
+    oc wait mcp --all --for=condition=Updated=True --timeout="${MCP_WAIT_TIMEOUT:-20m}"
 }
 
 #Create custom catalog source

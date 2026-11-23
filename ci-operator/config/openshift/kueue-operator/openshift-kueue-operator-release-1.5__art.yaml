@@ -11,21 +11,37 @@ build_root:
   from_repository: true
 images:
   items:
-  - dockerfile_literal: |
+  - additional_architectures:
+    - arm64
+    dockerfile_literal: |
       FROM src
-      RUN wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+      RUN YQ_ARCH=$(uname -m | sed -e 's/^x86_64$/amd64/' -e 's/^aarch64$/arm64/') && \
+          wget -qO /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${YQ_ARCH}" && \
+          chmod +x /usr/local/bin/yq
       RUN dnf install -y jq skopeo git && dnf clean all
     from: src
     to: kueue-operator-src
 prowgen:
   disable_sparse_checkout: true
 releases:
+  arm64-5-0-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "5.0"
   latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
       version: "4.22"
+  ocp-5-0-latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "5.0"
 resources:
   '*':
     limits:
@@ -202,6 +218,123 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e-downstream-art
+- as: test-e2e-downstream-5-0-disruptive
+  capabilities:
+  - arm64
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "5.0"
+  minimum_interval: 96h
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    env:
+      KUEUE_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
+      KUEUE_INDEX_IMAGE_TAG: kueue-1.5__v5.0__kueue-rhel9-operator
+      KUEUE_OPERATOR_CHANNEL: stable-v1.5
+      KUEUE_OPERATOR_SOURCE: fbc-operator-catalog
+    post:
+    - chain: kueue-operator-post
+    test:
+    - chain: kueue-operator-test-e2e-downstream-disruptive-art
+- as: test-e2e-downstream-dra-cc-5-0
+  capabilities:
+  - arm64
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ocp-5-0-latest
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      DRA_GPU_ALLOW_MULTIPLE_ALLOCATIONS: "true"
+      KUEUE_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
+      KUEUE_INDEX_IMAGE_TAG: kueue-1.5__v5.0__kueue-rhel9-operator
+      KUEUE_OPERATOR_CHANNEL: stable-v1.5
+      KUEUE_OPERATOR_SOURCE: fbc-operator-catalog
+    post:
+    - chain: kueue-operator-post-must-gather
+    - chain: ipi-aws-post
+    - ref: send-results-to-reportportal
+    test:
+    - ref: dra-example-driver-install
+    - chain: kueue-operator-test-e2e-downstream-dra-cc-art
+    workflow: ipi-aws
+- as: test-e2e-5-0-arm64
+  capabilities:
+  - arm64
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-5-0-latest
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      CONTAINER_IMAGE: quay.io/curl/curl:latest
+      KUEUE_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
+      KUEUE_INDEX_IMAGE_TAG: kueue-1.5__v5.0__kueue-rhel9-operator
+      KUEUE_OPERATOR_CHANNEL: stable-v1.5
+      KUEUE_OPERATOR_SOURCE: fbc-operator-catalog
+      MCP_WAIT_TIMEOUT: 40m
+      OCP_ARCH: arm64
+    post:
+    - chain: kueue-operator-post-must-gather
+    - chain: ipi-aws-post
+    - ref: send-results-to-reportportal
+    test:
+    - chain: kueue-operator-test-e2e-downstream-art
+    workflow: ipi-aws
+- as: test-e2e-5-0-fips
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ocp-5-0-latest
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      FIPS_ENABLED: "true"
+      KUEUE_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
+      KUEUE_INDEX_IMAGE_TAG: kueue-1.5__v5.0__kueue-rhel9-operator
+      KUEUE_OPERATOR_CHANNEL: stable-v1.5
+      KUEUE_OPERATOR_SOURCE: fbc-operator-catalog
+    post:
+    - chain: kueue-operator-post-must-gather
+    - chain: ipi-aws-post
+    - ref: send-results-to-reportportal
+    test:
+    - ref: fips-check
+    - chain: kueue-operator-test-e2e-downstream-art
+    workflow: ipi-aws
 - as: test-e2e-dra-gpu-4-22
   cron: '@daily'
   reporter_config:
@@ -209,7 +342,7 @@ tests:
     job_states_to_report:
     - failure
     - error
-    report_template: ':failed: Job *{{.Spec.Job}} ended with *{{.Status.State}}*.
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
       <{{.Status.URL}}|View logs>'
   steps:
     cluster_profile: openshift-org-aws
@@ -223,8 +356,10 @@ tests:
       KUEUE_OPERATOR_SOURCE: fbc-operator-catalog
       NVIDIA_DRA_DRIVER_VERSION: 25.12.0
     post:
+    - chain: kueue-operator-post-must-gather
     - ref: nvidia-cleanup
-    - chain: kueue-operator-post
+    - chain: ipi-aws-post
+    - ref: send-results-to-reportportal
     test:
     - chain: kueue-operator-test-e2e-dra-art
     workflow: ipi-aws
@@ -396,6 +531,69 @@ tests:
     - chain: kueue-operator-post
     test:
     - chain: kueue-operator-test-e2e-upstream-art
+- as: test-e2e-upstream-dra-5-0
+  capabilities:
+  - arm64
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ocp-5-0-latest
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      DRA_GPU_PARTITIONS: "4"
+      E2E_TARGET_FOLDERS: dra/whole-device dra/counter
+      KUEUE_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
+      KUEUE_INDEX_IMAGE_TAG: kueue-1.5__v5.0__kueue-rhel9-operator
+      KUEUE_OPERATOR_CHANNEL: stable-v1.5
+      KUEUE_OPERATOR_SOURCE: fbc-operator-catalog
+    post:
+    - chain: kueue-operator-post-must-gather
+    - chain: ipi-aws-post
+    - ref: send-results-to-reportportal
+    test:
+    - ref: kueue-operator-test-e2e-dra-enable-feature-gate
+    - ref: dra-example-driver-install
+    - chain: kueue-operator-test-e2e-upstream-art
+    workflow: ipi-aws
+- as: test-e2e-upstream-dra-cc-5-0
+  capabilities:
+  - arm64
+  cron: '@daily'
+  reporter_config:
+    channel: '#forum-node-jira'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: ':failed: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      <{{.Status.URL}}|View logs>'
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ocp-5-0-latest
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      DRA_GPU_ALLOW_MULTIPLE_ALLOCATIONS: "true"
+      E2E_TARGET_FOLDERS: dra/capacity
+      KUEUE_INDEX_IMAGE_REPO: quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc
+      KUEUE_INDEX_IMAGE_TAG: kueue-1.5__v5.0__kueue-rhel9-operator
+      KUEUE_OPERATOR_CHANNEL: stable-v1.5
+      KUEUE_OPERATOR_SOURCE: fbc-operator-catalog
+    post:
+    - chain: kueue-operator-post-must-gather
+    - chain: ipi-aws-post
+    - ref: send-results-to-reportportal
+    test:
+    - ref: dra-example-driver-install
+    - chain: kueue-operator-test-e2e-upstream-art
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-1.5
   org: openshift

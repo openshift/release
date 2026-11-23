@@ -1,0 +1,20 @@
+chain:
+  as: kueue-operator-post-must-gather
+  steps:
+    - as: kueue-must-gather
+      cli: latest
+      commands: |
+        test -f "${SHARED_DIR}/env" && source "${SHARED_DIR}/env" || true
+        make run-must
+      from: kueue-operator-src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+  documentation: |-
+    Runs the Kueue must-gather (make run-must) from the kueue-operator-src image.
+
+    Use this instead of the kueue-operator-post chain when the ipi-aws-post chain
+    runs in the same post phase: ipi-aws-post deprovisions through ipi-deprovision,
+    which already gathers the standard must-gather, so including both would define
+    the gather-must-gather step twice and fail step resolution.
