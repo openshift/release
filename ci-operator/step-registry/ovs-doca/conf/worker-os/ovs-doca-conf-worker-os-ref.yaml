@@ -1,0 +1,26 @@
+ref:
+  as: ovs-doca-conf-worker-os
+  from: cli
+  commands: ovs-doca-conf-worker-os-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: OVS_DOCA_LAYERED_IMAGE
+    default: ""
+    documentation: |-
+      Full pullspec of the pre-built DOCA-layered RHCOS image (a bootable
+      ostree container) that the worker pool should rebase onto. Must be
+      pullable by the nodes: anonymous pull from a public registry, or
+      covered by the cluster pull-secret. Control-plane nodes are not
+      touched and keep the stock OS. Required.
+  documentation: |-
+    Writes an install-time MachineConfig carrying the worker role label,
+    with spec.osImageURL set to the pre-built DOCA-layered RHCOS image.
+    ipi-install includes the manifest in the installer's manifests, so
+    worker nodes rebase onto the layered image during cluster provisioning
+    (day-0) while control-plane nodes keep the stock OS.
+
+    Must run before ipi-install in the pre chain. Pair with
+    ovs-doca-validate-node-package and OVS_DOCA_VALIDATE_NODE_ROLES=worker.
