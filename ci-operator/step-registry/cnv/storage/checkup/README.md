@@ -165,13 +165,12 @@ still be written.
 Job status reads retry transient API failures until the Job deadline and retain
 the last complete Job document in the artifacts.
 
-The cloud jobs now trial the shared default budgets. Their previous ten-VM
-rehearsals passed with 20 minutes per VMI operation, 30 minutes for the checkup,
-and 2100 seconds for the Job. The new values require a rehearsal:
+Previous ten-VM rehearsals passed with 20 minutes per VMI operation, 30 minutes
+for the checkup, and 2100 seconds for the Job. The current jobs use these budgets.
 
 | Input | Cloud job value |
 | --- | --- |
-| `CHECKUP_VMI_TIMEOUT` | `3m` |
+| `CHECKUP_VMI_TIMEOUT` | AWS `6m`, Azure and GCP `3m` |
 | `CHECKUP_TIMEOUT` | `10m` |
 | `CHECKUP_JOB_TIMEOUT_SECONDS` | `900` (15 minutes) |
 
@@ -188,8 +187,9 @@ passed within the 30-minute checkup budget. The AWS snapshot-backed boot-source
 setup moves source snapshot creation into the preparation phase. A later ten-VM
 rehearsal completed the checkup in 317 seconds with the 30-minute budget. The
 default ten-minute budget was tried before this setup and failed while the first
-PVC-backed golden-image snapshot was pending; it has not yet been tested with the
-snapshot-backed boot source.
+PVC-backed golden-image snapshot was pending. With snapshot-backed boot sources,
+the [AWS rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2124828233328234496)
+reached live migration, then timed out after three minutes waiting for the VM snapshot.
 Each parent job retains a five-hour limit, including installation and teardown.
 
 ### Collected artifacts
