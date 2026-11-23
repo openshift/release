@@ -15,6 +15,34 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 source "${SHARED_DIR}/env"
 extract_opct
 
+# --- Gated OPCT checks (const) ----------------------------------------------
+# Checks that gate the job. These are OPCT's own execution-validity checks,
+# read from the report rather than recomputed here, so CI inherits OPCT's
+# definition of a broken run instead of duplicating the logic.
+# Per OPCT maintainer direction, Slack G012C6LKVM2/p1795182222655659.
+#
+#   OPCT-022  "Detected one or more plugin(s) with potential invalid result"
+#             internal/report/slo.go. Mode-aware: checks plugins 05+99 in
+#             upgrade mode, 10+20+99 otherwise. Fails when a plugin has
+#             Stat.Total == Stat.Failed (every result a failure, i.e. the
+#             suite never really ran) or when an expected plugin is absent
+#             from the report entirely (crashed before emitting a summary).
+#   OPCT-023A "Sanity [10-openshift-kube-conformance]: potential missing
+#             tests in suite" -- plugin 10 must report more than 300 tests.
+#   OPCT-023B "Sanity [20-openshift-conformance-validated]: potential
+#             missing tests in suite" -- plugin 20 must report more than
+#             3000 tests.
+#
+# 023A/023B report "skip" in upgrade mode, where those plugins do not run,
+# so they never produce a false positive there.
+#
+# The set is deliberately explicit. Most OPCT checks describe cluster
+# quality rather than execution validity and fail routinely on healthy runs
+# -- OPCT-010A/010B (etcd slow-request latency) fail on nearly every run
+# observed, including clean ones -- so gating on "any failed check" would
+# red every job.
+GATED_CHECK_IDS=("OPCT-022" "OPCT-023A" "OPCT-023B")
+
 # --- Return-code accounting ------------------------------------------------
 # Each processing stage gets a dedicated variable initialised to NOT_RUN so
 # that an unexecuted stage is never confused with exit-code 0.  Raw codes
@@ -326,32 +354,9 @@ function show_results() {
   fi
 }
 
-# Checks that gate the job. These are OPCT's own execution-validity checks,
-# read from the report rather than recomputed here, so CI inherits OPCT's
-# definition of a broken run instead of duplicating the logic.
-# Per OPCT maintainer direction, Slack G012C6LKVM2/p1795182222655659.
-#
-#   OPCT-022  "Detected one or more plugin(s) with potential invalid result"
-#             internal/report/slo.go. Mode-aware: checks plugins 05+99 in
-#             upgrade mode, 10+20+99 otherwise. Fails when a plugin has
-#             Stat.Total == Stat.Failed (every result a failure, i.e. the
-#             suite never really ran) or when an expected plugin is absent
-#             from the report entirely (crashed before emitting a summary).
-#   OPCT-023A "Sanity [10-openshift-kube-conformance]: potential missing
-#             tests in suite" -- plugin 10 must report more than 300 tests.
-#   OPCT-023B "Sanity [20-openshift-conformance-validated]: potential
-#             missing tests in suite" -- plugin 20 must report more than
-#             3000 tests.
-#
-# 023A/023B report "skip" in upgrade mode, where those plugins do not run,
-# so they never produce a false positive there.
-#
-# The set is deliberately explicit. Most OPCT checks describe cluster
-# quality rather than execution validity and fail routinely on healthy runs
-# -- OPCT-010A/010B (etcd slow-request latency) fail on nearly every run
-# observed, including clean ones -- so gating on "any failed check" would
-# red every job.
-GATED_CHECK_IDS=("OPCT-022" "OPCT-023A" "OPCT-023B")
+# The gated check set (GATED_CHECK_IDS) is declared at the top of the
+# script next to the other constants; see there for why each check is
+# included and why the set is explicit rather than "any failed check".
 
 # check_runtime_gate fails the job when OPCT reports that a plugin did not
 # execute validly. Conformance test outcomes are deliberately NOT gated:
@@ -409,8 +414,25 @@ function check_runtime_gate() {
   if [[ ${#gated_hits[@]} -ne 0 ]]; then
     runtime_gate_reason="OPCT reported invalid plugin execution; failed check(s): ${gated_hits[*]}"
     show_msg "ERROR: Runtime gate FAILED: ${runtime_gate_reason}"
+    local check_slo check_doc check_json check_body
     for id in "${gated_hits[@]}"; do
-      junit_case "[opct] check ${id}" "${id} failed: see opct-report.json (.checks.failures) and the plugin logs"
+      # Reuse the check's own metadata from the report -- .slo (human
+      # description) and .documentation (rules URL) -- so the JUnit testcase
+      # is self-describing in Spyglass without opening opct-report.json.
+      # Per OPCT maintainer review, PR 87541 r4649973721.
+      IFS=$'\t' read -r check_slo check_doc check_json < <(jq -r --arg id "${id}" '
+        [.checks.failures[] | select(.id == $id)][0]
+        | [(.slo // ""), (.documentation // ""), (tojson)]
+        | @tsv
+      ' "${report_json}" 2>/dev/null) || true
+      [[ -z "${check_slo:-}" ]] && check_slo="${id}"
+      check_body="${check_json:-${id} failed}"
+      if [[ -n "${check_doc}" ]]; then
+        check_body+=$'\n'"see test documentation ${check_doc}, opct-report.json (.checks.failures) and the plugin logs"
+      else
+        check_body+=$'\n'"see opct-report.json (.checks.failures) and the plugin logs"
+      fi
+      junit_case "[opct] check ${id} - ${check_slo}" "${check_body}"
     done
     junit_case "[opct] OPCT execution-validity checks" "${runtime_gate_reason}"
     return 1
@@ -481,7 +503,9 @@ if ! retrieve_artifact; then
   # in which case both codes are 0 -- report them without implying the
   # command itself returned nonzero.
   junit_case "[opct] retrieve result archive" \
-    "failed to retrieve a single result archive (retrieve_rc=${retrieve_rc}, tee_rc=${retrieve_tee_rc}); see log-retrieve.txt and the errors above"
+    "failed to retrieve a single result archive (retrieve_rc=${retrieve_rc}, tee_rc=${retrieve_tee_rc})
+$(tail -n 5 "${ARTIFACT_DIR}/log-retrieve.txt" 2>/dev/null)
+see log-retrieve.txt and the errors above"
 else
   junit_case "[opct] retrieve result archive"
 fi
@@ -500,13 +524,17 @@ if [[ -n "${RESULT_FILE:-}" ]]; then
     0)       junit_case "[opct] run opct results" ;;
     NOT_RUN) junit_skip "[opct] run opct results" "not executed" ;;
     *)       junit_case "[opct] run opct results" \
-               "'${OPCT_CLI} results' exited with code ${results_rc}; see log-results.txt" ;;
+               "'${OPCT_CLI} results' exited with code ${results_rc}
+$(tail -n 5 "${ARTIFACT_DIR}/log-results.txt" 2>/dev/null)
+see log-results.txt" ;;
   esac
   case "${report_rc}" in
     0)       junit_case "[opct] run opct report" ;;
     NOT_RUN) junit_skip "[opct] run opct report" "not executed ('opct results' failed first)" ;;
     *)       junit_case "[opct] run opct report" \
-               "'${OPCT_CLI} report' exited with code ${report_rc}; see log-report.txt" ;;
+               "'${OPCT_CLI} report' exited with code ${report_rc}
+$(tail -n 5 "${ARTIFACT_DIR}/log-report.txt" 2>/dev/null)
+see log-report.txt" ;;
   esac
 else
   show_msg "WARNING: Skipping results generation -- no result archive available."
@@ -615,7 +643,9 @@ if grep -qE 'error (processing results|populating report|saving consolidated sum
   # Indexer depends on a trustworthy publish -- mark NOT_RUN.
   indexer_rc="NOT_RUN"
   junit_case "[opct] publish baseline" \
-    "'${OPCT_CLI} adm baseline publish' logged a processing error (exit code ${local_publish_rc}); see log-publish.txt"
+    "'${OPCT_CLI} adm baseline publish' logged a processing error (exit code ${local_publish_rc})
+$(tail -n 5 "${ARTIFACT_DIR}/log-publish.txt" 2>/dev/null)
+see log-publish.txt"
   junit_skip "[opct] reindex baseline" "not executed (publish failed)"
   emit_summary
   exit ${exit_class}
@@ -632,7 +662,9 @@ elif [[ ${local_publish_rc} -ne 0 ]]; then
     show_msg "ERROR: '${OPCT_CLI} adm baseline publish' failed with exit code ${local_publish_rc}"
     exit_class=$((exit_class | 2))
     junit_case "[opct] publish baseline" \
-      "'${OPCT_CLI} adm baseline publish' failed with exit code ${local_publish_rc}; see log-publish.txt"
+      "'${OPCT_CLI} adm baseline publish' failed with exit code ${local_publish_rc}
+$(tail -n 5 "${ARTIFACT_DIR}/log-publish.txt" 2>/dev/null)
+see log-publish.txt"
   fi
   # Indexer depends on successful publish -- mark NOT_RUN either way.
   indexer_rc="NOT_RUN"
@@ -653,7 +685,9 @@ if [[ ${local_indexer_rc} -ne 0 ]]; then
   show_msg "ERROR: '${OPCT_CLI} adm baseline indexer' failed with exit code ${local_indexer_rc}"
   exit_class=$((exit_class | 2))
   junit_case "[opct] reindex baseline" \
-    "'${OPCT_CLI} adm baseline indexer' failed with exit code ${local_indexer_rc}; see log-publish-indexer.txt"
+    "'${OPCT_CLI} adm baseline indexer' failed with exit code ${local_indexer_rc}
+$(tail -n 5 "${ARTIFACT_DIR}/log-publish-indexer.txt" 2>/dev/null)
+see log-publish-indexer.txt"
   emit_summary
   exit ${exit_class}
 fi
