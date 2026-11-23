@@ -150,12 +150,16 @@ _propagate_junit () {
 trap '{( set +e; GenerateJunit; _propagate_junit; true )}' EXIT
 # Load ExitTrap library for JUnit XML post-processing at script level
 # (must be loaded before trap can fire to avoid secondary errors).
-eval "$(
-    typeset -a _fURL=()
-    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-    "${_fURL[@]}" \
-        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-)"
+typeset _etHelperScript=""
+typeset -i _etHelperRc=0
+typeset -a _fURL=()
+type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+_etHelperScript="$("${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh 2>&1)" || _etHelperRc=$?
+if (( _etHelperRc == 0 )) && [[ -n "${_etHelperScript}" ]]; then
+    eval "${_etHelperScript}"
+else
+    echo "WARNING: ExitTrap helper download failed (rc=${_etHelperRc}); JUnit will be raw only" >&2
+fi
 # Validate helper download completeness: truncated download exits via set -e but minimal trap already installed
 if ! type -t ExitTrap--PostProcessPrep 1>/dev/null; then
     echo "WARNING: ExitTrap helper download incomplete; JUnit will be raw only" >&2
@@ -260,7 +264,7 @@ typeset -i policyGateStart=0
 policyGateStart=$(date +%s)
 typeset policyCountJson=''
 typeset -i policyCountRc=0
-until policyCountJson="$(_oc_get_bounded get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || policyCountRc=$?; (( policyCountRc != 0 )) && { RecordResult "policy-query" "failed" "failed to query policies in namespace policies (rc=${policyCountRc})" "0"; printf '%s\n' "Error: failed to query policies (rc=${policyCountRc})" >&2; RecordResult "failed-policies-query" "failed" "oc get policies query failed with exit code ${policyCountRc}" "$(( $(date +%s) - policyGateStart ))"; exit 1; }; (( policyCountJson >= expectedMinPolicies )); do
+until policyCountJson="$(_oc_get_bounded get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || policyCountRc=$?; (( policyCountRc != 0 )) && { printf '%s\n' "Error: failed to query policies (rc=${policyCountRc})" >&2; RecordResult "openshift-plus-policy-set-deployed" "failed" "failed to query policies in namespace policies (rc=${policyCountRc})" "$(( $(date +%s) - policyGateStart ))"; exit 1; }; (( policyCountJson >= expectedMinPolicies )); do
   ((SECONDS > pollDeadline)) && {
     printf '%s\n' "Error: fewer than ${expectedMinPolicies} policies after 10 minutes" >&2
     RecordResult "openshift-plus-policy-set-deployed" "failed" "Fewer than ${expectedMinPolicies} policies in namespace policies after 10 minutes" "$(( $(date +%s) - policyGateStart ))"
@@ -315,7 +319,7 @@ placementStart=$(date +%s)
 if oc wait "placement/placement-openshift-plus-clusters" -n policies \
     --for=create --timeout=300s 1>/dev/null; then
   if oc patch placement placement-openshift-plus-clusters -n policies --type json \
-    -p '[{"op":"test","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1/key","value":"local-cluster"},{"op":"test","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1/operator","value":"NotIn"},{"op":"remove","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1"}]'; then
+    -p '[{"op":"test","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1/key","value":"local-cluster"},{"op":"test","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1/operator","value":"NotIn"},{"op":"test","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1/values","value":["true"]},{"op":"remove","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1"}]'; then
     RecordResult "local-cluster-placement-predicate-removed" "passed" "" "$(( $(date +%s) - placementStart ))"
   else
     printf '%s\n' "Warning: could not remove local-cluster NotIn predicate from placement (continuing with upstream default)" >&2
@@ -446,7 +450,7 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
     return 1
   }
   typeset allPolicies=""
-  allPolicies="$(oc get policies -n policies -o name)" || true
+  allPolicies="$(_oc_get_bounded get policies -n policies -o name)" || true
   for p in "${skipPoliciesArr[@]}"; do
     if ! PolicyExists "${p}" <<< "${allPolicies}"; then
       printf '[%s] WARNING: policy "%s" from LPC_LP_OPP__ACM_PS__SKIP_POLICIES not found in cluster (ignoring)\n' \
@@ -666,7 +670,8 @@ while :; do
   typeset -i passNow=0
   passNow=$(date +%s)
   typeset -i _remainingBudget=$(( stepDeadline - passNow - 120 ))
-  if (( _remainingBudget < 600 )); then
+  # Allow a bounded final verification pass when enough budget remains for one wait plus diagnostics (120s reserve already subtracted)
+  if (( _remainingBudget < 150 )); then
     printf '[%s] ERROR: no time left in the step budget for another compliance pass (remaining %ds)\n' \
       "$(date -u +%FT%TZ)" "${_remainingBudget}" >&2
     RecordResult "policies-compliant" "failed" "Compliance wait stopped after $(( (passNow - complianceStart) / 60 )) minutes: the step time budget was exhausted before the policy set stabilized${missingExpectedNote}${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
@@ -699,7 +704,7 @@ while :; do
   if (( ${#skipPoliciesArr[@]} > 0 )); then
     # Fetch the full policy list first: fail hard if oc cannot reach the cluster
     typeset policyList=""
-    policyList="$(oc get policies -n policies -o name)" || {
+    policyList="$(_oc_get_bounded get policies -n policies -o name)" || {
       printf '[%s] ERROR: failed to list policies in namespace "policies"\n' \
         "$(date -u +%FT%TZ)" >&2
       RecordResult "policies-compliant" "failed" "Failed to list policies in namespace policies" "$(( $(date +%s) - complianceStart ))"
@@ -710,6 +715,10 @@ while :; do
 
     if (( ${#applyPoliciesArr[@]} > 0 )); then
       : "Waiting for ${#applyPoliciesArr[@]} non-skipped polic(ies) to become Compliant…"
+      typeset -i _waitNow=0
+      _waitNow=$(date +%s)
+      _remainingBudget=$(( stepDeadline - _waitNow - 120 ))
+      (( _remainingBudget < 10 )) && _remainingBudget=10
       typeset -i _waitTimeout=${_remainingBudget}
       (( _waitTimeout > 2400 )) && _waitTimeout=2400
       if ! oc wait -n policies \
@@ -717,9 +726,9 @@ while :; do
         --timeout="${_waitTimeout}s" "${applyPoliciesArr[@]}"; then
         printf '%s\n' "Non-skipped policies failed to become compliant:" >&2
         RecordResult "policies-compliant" "failed" "Non-skipped policies failed to become compliant within 40 minutes${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
-        oc get policies -n policies --ignore-not-found | FilterSkippedPolicies
-        oc get policies -n policies --ignore-not-found -o yaml
-        oc describe policies -n policies
+        timeout 30s oc get policies -n policies --ignore-not-found | FilterSkippedPolicies || true
+        timeout 60s oc get policies -n policies --ignore-not-found -o yaml || true
+        timeout 60s oc describe policies -n policies || true
         exit 1
       fi
     else
@@ -728,6 +737,10 @@ while :; do
     fi
   else
     : "No policies to skip: waiting for ALL policies to become Compliant…"
+    typeset -i _waitNow=0
+    _waitNow=$(date +%s)
+    _remainingBudget=$(( stepDeadline - _waitNow - 120 ))
+    (( _remainingBudget < 10 )) && _remainingBudget=10
     typeset -i _waitTimeout=${_remainingBudget}
     (( _waitTimeout > 2400 )) && _waitTimeout=2400
     if ! oc wait policies --all -n policies \
@@ -735,9 +748,9 @@ while :; do
       --timeout="${_waitTimeout}s"; then
       printf '%s\n' "Policies failed to become compliant:" >&2
       RecordResult "policies-compliant" "failed" "Policies failed to become compliant within 40 minutes" "$(( $(date +%s) - complianceStart ))"
-      oc get policies -n policies --ignore-not-found
-      oc get policies -n policies --ignore-not-found -o yaml
-      oc describe policies -n policies
+      timeout 30s oc get policies -n policies --ignore-not-found || true
+      timeout 60s oc get policies -n policies --ignore-not-found -o yaml || true
+      timeout 60s oc describe policies -n policies || true
       exit 1
     fi
   fi
