@@ -10,7 +10,6 @@ repo="openshift-service-mesh/${component}"
 supported_versions=(1.30 1.31)
 case ${component} in
   istio|proxy|ztunnel) upstream_repo="istio/${component}" ;;
-  sail-operator) upstream_repo=istio-ecosystem/sail-operator ;;
   *) echo "Unsupported RELEASE_COMPONENT: ${component}" >&2; exit 1 ;;
 esac
 
@@ -156,46 +155,22 @@ bot_login=
 failed=0
 for release_line in "${supported_versions[@]}"; do
   y_branch="release-${release_line}"
-  downstream_line=${release_line}
-  if [[ ${component} == sail-operator ]]; then
-    case ${release_line} in
-      1.30) downstream_line=3.4 ;;
-      1.31) downstream_line=3.5 ;;
-      *) echo "No sail-operator release line for upstream ${release_line}" >&2; exit 1 ;;
-    esac
-  fi
-  midstream_ref="refs/remotes/midstream/release-${downstream_line}"
+  midstream_ref="refs/remotes/midstream/${y_branch}"
   git show-ref --verify --quiet "${midstream_ref}" || continue
   # List tag names without fetching their histories; exclude prereleases.
   tag=$(git ls-remote --tags --refs upstream "refs/tags/${release_line}.*" |
     awk -F/ '$3 ~ /^[0-9]+\.[0-9]+\.[0-9]+$/ {print $3}' |
     sort -V | tail -n 1)
   [[ -n ${tag} ]] || continue
+  target="release-${tag}"
+  # Branches are only ever created complete, so an existing branch is never changed.
+  if git show-ref --verify --quiet "refs/remotes/midstream/${target}"; then
+    echo "Skipping existing ${target}"
+    continue
+  fi
   upstream_ref="refs/remotes/upstream/${y_branch}"
   git fetch --no-tags upstream "+refs/tags/${tag}:refs/tags/${tag}" "+refs/heads/${y_branch}:${upstream_ref}"
   tag_commit=$(git rev-parse "refs/tags/${tag}^{commit}")
-
-  if [[ ${component} == sail-operator ]]; then
-    # Operator patch numbers are independent of upstream's. Ignore suffix branches.
-    latest=$(git for-each-ref --format='%(refname:strip=3)' refs/remotes/midstream/ |
-      awk -v prefix="release-${downstream_line}." 'index($0, prefix) == 1 && substr($0, length(prefix) + 1) ~ /^[0-9]+$/' |
-      sort -V | tail -n 1)
-    target="release-${downstream_line}.0"
-    if [[ -n ${latest} ]]; then
-      if is_ancestor "${tag_commit}" "refs/remotes/midstream/${latest}"; then
-        echo "Skipping ${release_line}: ${latest} already contains ${tag}"
-        continue
-      fi
-      target="release-${downstream_line}.$((10#${latest##*.} + 1))"
-    fi
-  else
-    target="release-${tag}"
-    # Branches are only ever created complete, so an existing branch is never changed.
-    if git show-ref --verify --quiet "refs/remotes/midstream/${target}"; then
-      echo "Skipping existing ${target}"
-      continue
-    fi
-  fi
 
   # Security releases are tagged on a side branch whose commits are cherry-picked
   # back to the y-stream branch with new SHAs, so the newest commit the tag shares
@@ -205,7 +180,7 @@ for release_line in "${supported_versions[@]}"; do
   # Midstream patches are reconciled with upstream once, by the y-stream sync.
   # Wait for it to reach the branch point instead of repeating that work here.
   if ! is_ancestor "${branch_point}" "${midstream_ref}"; then
-    echo "Waiting for release-${downstream_line} to sync upstream ${branch_point} before creating ${target}"
+    echo "Waiting for ${y_branch} to sync upstream ${branch_point} before creating ${target}"
     continue
   fi
   # Upstream release branches are linear, so a midstream commit containing any
@@ -232,7 +207,7 @@ for release_line in "${supported_versions[@]}"; do
   # The empty lease rejects the push if the branch was created since the fetch.
   git push --quiet --force-with-lease="refs/heads/${target}:" midstream "${commit}:refs/heads/${target}"
   if [[ ${commit} == "${cut_point}" ]]; then
-    echo "Created ${target} at ${cut_point}, the last release-${downstream_line} commit before upstream ${first_after:-<none>}"
+    echo "Created ${target} at ${cut_point}, the last ${y_branch} commit before upstream ${first_after:-<none>}"
   else
     echo "Created ${target} at ${commit}, merging upstream tag ${tag} into ${cut_point}"
   fi
