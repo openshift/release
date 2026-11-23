@@ -1,0 +1,72 @@
+images:
+  items:
+  - dockerfile_path: images/openspec-agent-worker.Dockerfile
+    to: openspec-agent-worker
+  - dockerfile_path: prow-workflow/agile-workflow.Dockerfile
+    to: agile-workflow-input
+  - dockerfile_path: prow-workflow/qe-workflow.Dockerfile
+    to: qe-workflow-input
+promotion:
+  to:
+  - excluded_images:
+    - agile-workflow-input
+    - qe-workflow-input
+    name: openspec-agent
+    namespace: oape
+    tag_by_commit: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.20"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: agile-workflow
+  run_if_changed: ^prow-workflow/agile-workflow
+  steps:
+    pre:
+    - as: extract-params
+      commands: |
+        cp /params.env "${SHARED_DIR}/params.env"
+        cp /jira-spec.md "${SHARED_DIR}/jira-spec.md"
+        cat "${SHARED_DIR}/params.env"
+      from: agile-workflow-input
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+    - ref: openspec-mint-gh-token
+    test:
+    - ref: openspec-agile-workflow
+- always_run: false
+  as: qe-workflow
+  run_if_changed: ^prow-workflow/qe-workflow
+  steps:
+    cluster_profile: openshift-org-aws
+    pre:
+    - as: extract-params
+      commands: |
+        cp /params.env "${SHARED_DIR}/params.env"
+        cat "${SHARED_DIR}/params.env"
+      from: qe-workflow-input
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+    - ref: openspec-mint-gh-token
+    - chain: ipi-aws-pre
+    test:
+    - ref: openspec-qe-workflow
+    post:
+    - chain: ipi-aws-post
+zz_generated_metadata:
+  branch: onboard-ci
+  org: swghosh
+  repo: oap-openspec-worfklow
