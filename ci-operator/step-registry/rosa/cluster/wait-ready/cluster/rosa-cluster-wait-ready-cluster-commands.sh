@@ -273,7 +273,16 @@ EOF
 # failure criteria are untouched. The reads use the credentials this job already holds:
 # nothing is configured, assumed or elevated, and only this run's own cluster zone and
 # its ancestors are queried.
-ROUTE53_CLI_TIMEOUT=30
+#
+# The worst case is six calls: the cluster zone, ROUTE53_MAX_ANCESTORS ancestors, and
+# one read each for the API record, the cluster zone's nameservers and the delegation.
+# At ROUTE53_CLI_TIMEOUT that is a minute, which matters because this section runs after
+# the step has already failed: when the wait loop has used its whole CLUSTER_TIMEOUT,
+# what is left to write these diagnostics in is the ref's grace_period, and the install
+# log, the cluster description and the DNS probes above have to fit in it too. A Route 53
+# list call that has not answered in ten seconds is not going to answer usefully; it is
+# reported as lookup-timed-out and the section moves on.
+ROUTE53_CLI_TIMEOUT=10
 ROUTE53_MAX_ZONES=5
 ROUTE53_MAX_ANCESTORS=2
 ROUTE53_MAX_RECORDS=10

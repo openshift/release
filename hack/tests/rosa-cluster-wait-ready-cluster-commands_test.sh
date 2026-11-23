@@ -171,8 +171,11 @@ assert_route53_reads_are_bounded() {
   local case_dir="$1" expected_reads="$2" line allowed
   shift 2
   local -a allowed_zones=("$@")
-  local -i reads=0
+  local -i reads=0 cli_timeout
   assert_file_exists "${case_dir}/state/aws-arguments"
+  # Taken from the step rather than restated here, so the two cannot drift apart.
+  cli_timeout=$(sed -nE 's/^ROUTE53_CLI_TIMEOUT=([0-9]+)$/\1/p' "${COMMAND_SCRIPT}")
+  (( cli_timeout > 0 )) || fail "could not read ROUTE53_CLI_TIMEOUT from the step"
   while IFS= read -r line; do
     if [[ "${line}" == *"configure"* || "${line}" == *"assume-role"* ]]; then
       fail "the step must not change or assume credentials: ${line}"
@@ -181,7 +184,7 @@ assert_route53_reads_are_bounded() {
     reads=$(( reads + 1 ))
     [[ "${line}" == *"--max-items"* ]] \
       || fail "unbounded Route 53 read: ${line}"
-    grep -Fq -- "30 aws ${line}" "${case_dir}/state/timeout-arguments" \
+    grep -Fq -- "${cli_timeout} aws ${line}" "${case_dir}/state/timeout-arguments" \
       || fail "Route 53 read was not time-bounded: ${line}"
     if [[ "${line}" == *"--dns-name"* ]]; then
       local matched=false
@@ -196,6 +199,11 @@ assert_route53_reads_are_bounded() {
   done < "${case_dir}/state/aws-arguments"
   (( reads == expected_reads )) \
     || fail "expected ${expected_reads} Route 53 reads, saw ${reads}"
+  # This section runs after the step has already failed, so it spends the ref's
+  # grace_period, which the install log, the cluster description and the DNS probes
+  # need as well. Bound what this part of it can cost when every call hangs.
+  (( reads * cli_timeout <= 120 )) \
+    || fail "worst case ${reads} reads x ${cli_timeout}s exceeds the diagnostics budget"
 }
 
 # Every DNS probe must be time-bounded, and it must have gone through the mocked dig
