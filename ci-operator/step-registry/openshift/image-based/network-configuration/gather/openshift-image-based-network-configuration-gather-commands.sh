@@ -22,6 +22,29 @@ set -xeuo pipefail
 
 cd ${remote_workdir}/ib-orchestrate-vm
 
+vm_artifacts_dir=ipc-workdir/artifacts/vm
+mkdir -p "\${vm_artifacts_dir}"
+
+# Host-side view of the VM, independent of whether it is reachable.
+vnet=\$(sudo virsh domiflist ${IBI_VM_NAME} | awk '\$1 ~ /^vnet/ {print \$1; exit}' || true)
+br_name=""
+if [[ -n "\${vnet}" && -e "/sys/class/net/\${vnet}/master" ]]; then
+  br_name=\$(basename "\$(readlink "/sys/class/net/\${vnet}/master")")
+fi
+sudo virsh domifaddr ${IBI_VM_NAME} --source arp > "\${vm_artifacts_dir}/domifaddr-arp.txt" 2>&1 || true
+ip neigh show > "\${vm_artifacts_dir}/host-neigh.txt" 2>&1 || true
+[[ -n "\${br_name}" ]] && bridge fdb show br "\${br_name}" > "\${vm_artifacts_dir}/bridge-fdb.txt" 2>&1 || true
+sudo virsh screenshot ${IBI_VM_NAME} "\${vm_artifacts_dir}/console.ppm" > /dev/null 2>&1 || true
+sudo chown -R "\$(id -u):\$(id -g)" "\${vm_artifacts_dir}" || true
+
+# IPC recreates the libvirt network on the new subnet, leaving the host with no
+# route to the node's original IP. Re-add the original gateway address so that
+# ipc-gather's SSH fallback can reach a node that never moved off, or rolled
+# back to, its original address.
+if [[ -n "${IPC_ORIGINAL_IPV4_GATEWAY_CIDR}" && -n "\${br_name}" ]]; then
+  sudo ip addr add "${IPC_ORIGINAL_IPV4_GATEWAY_CIDR}" dev "\${br_name}" || true
+fi
+
 make ipc-gather \
   IPC_CLUSTER_NAME=${IPC_CLUSTER_NAME} \
   IBI_VM_NAME=${IBI_VM_NAME}
