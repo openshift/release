@@ -8,8 +8,8 @@ AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 
 AZURE_WORKLOAD_IDENTITIES_LOCATION="/etc/hypershift-ci-jobs-self-managed-azure-e2e/workload-identities.json"
-AZURE_SA_TOKEN_ISSUER_KEY_PATH="/etc/hypershift-ci-jobs-self-managed-azure-e2e/serviceaccount-signer.private"
-AZURE_OIDC_ISSUER_URL="https://smazure.blob.core.windows.net/smazure"
+AZURE_SA_TOKEN_ISSUER_KEY_PATH="/etc/hypershift-ci-jobs-self-managed-azure-signer/serviceaccount-signer.private"
+AZURE_OIDC_ISSUER_URL="$(cat /etc/hypershift-ci-jobs-self-managed-azure-oidc/oidc-issuer-url)" || exit 1
 
 az --version
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
@@ -105,7 +105,7 @@ hack/ci-test-e2e.sh -test.v \
   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
   --e2e.base-domain=hcp-sm-azure.azure.devcluster.openshift.com \
   --e2e.azure-location=${HYPERSHIFT_AZURE_LOCATION} \
-  --e2e.oidc-issuer-url=${AZURE_OIDC_ISSUER_URL} \
+  --e2e.oidc-issuer-url="${AZURE_OIDC_ISSUER_URL}" \
   --e2e.sa-token-issuer-private-key-path=${AZURE_SA_TOKEN_ISSUER_KEY_PATH} \
     ${N1_NP_VERSION_TEST_ARGS:-} \
     ${N2_NP_VERSION_TEST_ARGS:-} \
