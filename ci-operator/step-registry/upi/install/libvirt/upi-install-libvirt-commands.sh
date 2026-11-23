@@ -376,10 +376,16 @@ EOF
   ${OCPINSTALL} --dir "${INSTALL_DIR}" agent create cluster-manifests
 
 else
-  RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.release")
-  QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
-  VOLUME_NAME="ocp-${BRANCH}-rhcos-${RHCOS_VERSION}-qemu.${ARCH}.qcow2"
-  EXPECTED_CHECKSUM=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.uncompressed-sha256")
+  # install-config uses GOARCH (amd64/arm64); CoreOS stream JSON uses GNU names (x86_64/aarch64).
+  case "${ARCH}" in
+    amd64) STREAM_ARCH="x86_64" ;;
+    arm64) STREAM_ARCH="aarch64" ;;
+    *) STREAM_ARCH="${ARCH}" ;;
+  esac
+  RHCOS_VERSION=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${STREAM_ARCH}.artifacts.qemu.release")
+  QCOW_URL=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${STREAM_ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.location")
+  VOLUME_NAME="ocp-${BRANCH}-rhcos-${RHCOS_VERSION}-qemu.${STREAM_ARCH}.qcow2"
+  EXPECTED_CHECKSUM=$(${OCPINSTALL} coreos print-stream-json | yq-v4 -oy ".architectures.${STREAM_ARCH}.artifacts.qemu.formats[\"qcow2.gz\"].disk.uncompressed-sha256")
   DOWNLOAD_NEW_IMAGE=true
 
   # Check if we need to update the source volume

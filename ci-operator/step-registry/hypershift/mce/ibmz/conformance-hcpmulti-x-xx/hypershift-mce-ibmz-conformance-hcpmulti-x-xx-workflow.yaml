@@ -1,0 +1,53 @@
+workflow:
+  as: hypershift-mce-ibmz-conformance-hcpmulti-x-xx
+  documentation: |-
+    Phase 1: provision a homogeneous amd64 (x-xx) OpenShift management cluster on
+    libvirt-amd64-vpn (xkvmocp08) using the same UPI/libvirt VPN pre/post steps as
+    openshift-e2e-libvirt-vpn, then install MCE / virt / HPP / MetalLB on that mgmt
+    cluster.
+
+    Sibling of hypershift-mce-ibmz-conformance-hcpmulti-kubevirt (z-zx hetero mgmt).
+    Hosted-cluster creation with Z (s390x) KubeVirt workers is intentionally deferred
+    to a follow-up — create-hcpmulti currently assumes s390x guest arch and Z LPAR
+    haproxy/NodePort wiring.
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    # ── Management cluster: homogeneous amd64 (x-xx) on libvirt-amd64-vpn ──
+    # Same pre steps as openshift-e2e-libvirt-vpn (not the hetero z-zx path)
+    - ref: upi-libvirt-cleanup-pre
+    - chain: upi-conf-libvirt
+    - ref: ipi-debug-missing-static-pod-controller-degraded
+    - ref: ipi-conf-etcd-on-ramfs
+    - ref: hypershift-mce-ibmz-conf-psi-karg
+    - chain: upi-install-libvirt
+
+    # ── Operator installs on mgmt (prep for later HCP) ────────────────────
+    - chain: hypershift-mce-ibmz-install-operators-mgmt
+
+    # Phase 2 (follow-up): hypershift-mce-ibmz-create-hcpmulti with Z workers
+
+    test:
+    - ref: cucushift-installer-check-cluster-health
+
+    post:
+    - ref: ipi-conf-debug-kdump-gather-logs
+    - chain: gather
+    - ref: upi-libvirt-cleanup-post
+    dnsConfig:
+      nameservers:
+      - 172.30.38.188
+      searches:
+      - "bastion-z.svc.cluster.local"
+
+    env:
+      CONTROL_COUNT: "3"
+      COMPUTE_COUNT: "2"
+      CNV_SUBSCRIPTION_SOURCE: 'redhat-operators'
+      METALLB_POOL_HOST_START: "56"
+      METALLB_POOL_HOST_END: "57"
+      # Match hcpmulti-z-zx sizing so nested HCP can land without re-tuning
+      DOMAIN_MEMORY: "63356"   # ~64 GiB
+      DOMAIN_VCPUS: "16"
+      VOLUME_CAPACITY: "200G"
+      SKIP_MONITOR_TEST: "true"
