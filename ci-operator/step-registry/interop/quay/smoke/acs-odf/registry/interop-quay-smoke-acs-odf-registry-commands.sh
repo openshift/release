@@ -168,7 +168,12 @@ EOF
   </testsuite>
 </testsuites>
 EOF
-    if python3 -c "import xml.etree.ElementTree as ET; ET.parse('${_junitTmp}')" 2>/dev/null; then
+    if python3 -c "
+import sys, xml.etree.ElementTree as ET
+root = ET.parse(sys.argv[1]).getroot()
+if len(root.findall('.//testcase')) != int(sys.argv[2]):
+    sys.exit(1)
+" "${_junitTmp}" "${total}" 2>/dev/null; then
         mv -f "${_junitTmp}" "${junitFile}"
         cat "${junitFile}"
     else
@@ -179,7 +184,6 @@ EOF
             return 1
         fi
     fi
-    true
 }
 
 # shellcheck disable=SC2317
@@ -191,12 +195,21 @@ _propagate_junit () {
 
 # Load ExitTrap library for JUnit XML post-processing at script level
 # (must be loaded before trap can fire to avoid secondary errors).
-eval "$(
+typeset _exitTrapHelper=""
+typeset -i _exitTrapDlRc=0
+if ! _exitTrapHelper="$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
         https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-)"
+)"; then
+    _exitTrapDlRc=$?
+    printf '%s\n' "WARNING: failed to download ExitTrap helper (rc=${_exitTrapDlRc})" >&2
+elif [[ -z "${_exitTrapHelper}" ]]; then
+    printf '%s\n' "WARNING: ExitTrap helper download returned empty body" >&2
+else
+    eval "${_exitTrapHelper}"
+fi
 
 # Post-process the JUnit XML for Component Readiness routing.  Guarded on
 # purpose: this runs from the EXIT trap, and an unloaded helper (download
@@ -732,6 +745,9 @@ function RunPushPull () {
     else
         pushTargetDigest="${pushTarget}@${imageDigest}"
     fi
+    # Publish digest-anchored pullspec for ACS scan and polling
+    typeset -g quayImageDigest="${imageDigest}"
+    typeset -g quayPushTargetDigest="${pushTargetDigest}"
     if ! SSL_CERT_FILE="${quayCaFile}" skopeo copy --src-tls-verify=true \
         --src-authfile="${authFile}" \
         "docker://${pushTargetDigest}" \
@@ -784,30 +800,34 @@ function RunOdfStorageCheck () {
     typeset -i obcPickRc=0
     quayObc=$(printf '%s' "${obcJson}" | \
         python3 -c "
-import sys, json, os
-registry = os.environ.get('QUAY_REGISTRY', '')
-data = json.load(sys.stdin)
-owned = []
-hinted = []
-for item in data.get('items', []):
-    meta = item.get('metadata') or {}
-    name = meta.get('name') or ''
-    if not name:
-        continue
-    refs = [r for r in (meta.get('ownerReferences') or [])
-            if r.get('kind') == 'QuayRegistry']
-    bound = ((item.get('status') or {}).get('phase') == 'Bound')
-    if any(r.get('name') == registry for r in refs if registry):
-        owned.append((0 if bound else 1, name))
-    elif registry and (name == registry or name.startswith(registry + '-')):
-        if not any(r.get('name') != registry and r.get('kind') == 'QuayRegistry' for r in (meta.get('ownerReferences') or [])):
-            hinted.append((0 if bound else 1, name))
-pick = sorted(owned) or sorted(hinted)
-if pick:
-    print(pick[0][1])
-    sys.exit(0)
-sys.exit(1)
-" 2>&1) || obcPickRc=$?
+import sys, json, os, traceback
+try:
+    registry = os.environ.get('QUAY_REGISTRY', '')
+    data = json.load(sys.stdin)
+    owned = []
+    hinted = []
+    for item in data.get('items', []):
+        meta = item.get('metadata') or {}
+        name = meta.get('name') or ''
+        if not name:
+            continue
+        refs = [r for r in (meta.get('ownerReferences') or [])
+                if r.get('kind') == 'QuayRegistry']
+        bound = ((item.get('status') or {}).get('phase') == 'Bound')
+        if any(r.get('name') == registry for r in refs if registry):
+            owned.append((0 if bound else 1, name))
+        elif registry and (name == registry or name.startswith(registry + '-')):
+            if not any(r.get('name') != registry and r.get('kind') == 'QuayRegistry' for r in (meta.get('ownerReferences') or [])):
+                hinted.append((0 if bound else 1, name))
+    pick = sorted(owned) or sorted(hinted)
+    if pick:
+        print(pick[0][1])
+        sys.exit(0)
+    sys.exit(1)
+except Exception:
+    traceback.print_exc()
+    sys.exit(2)
+") || obcPickRc=$?
 
     if (( obcPickRc != 0 && obcPickRc != 1 )); then
         elapsed=$(( $(date +%s) - start ))
@@ -820,30 +840,34 @@ sys.exit(1)
         while true; do
             typeset -i _pickRc=0
             quayObc=$(printf '%s' "${obcJson}" | python3 -c "
-import sys, json, os
-registry = os.environ.get('QUAY_REGISTRY', '')
-data = json.load(sys.stdin)
-owned = []
-hinted = []
-for item in data.get('items', []):
-    meta = item.get('metadata') or {}
-    name = meta.get('name') or ''
-    if not name:
-        continue
-    refs = [r for r in (meta.get('ownerReferences') or []) if r.get('kind') == 'QuayRegistry']
-    bound = ((item.get('status') or {}).get('phase') == 'Bound')
-    if any(r.get('name') == registry for r in refs if registry):
-        owned.append((0 if bound else 1, name))
-    elif registry and (name == registry or name.startswith(registry + '-')):
-        # Only hint if not owned by a different QuayRegistry
-        if not any(r.get('name') != registry and r.get('kind') == 'QuayRegistry' for r in (meta.get('ownerReferences') or [])):
-            hinted.append((0 if bound else 1, name))
-pick = sorted(owned) or sorted(hinted)
-if pick:
-    print(pick[0][1])
-    sys.exit(0)
-sys.exit(1)
-" 2>&1) || _pickRc=$?
+import sys, json, os, traceback
+try:
+    registry = os.environ.get('QUAY_REGISTRY', '')
+    data = json.load(sys.stdin)
+    owned = []
+    hinted = []
+    for item in data.get('items', []):
+        meta = item.get('metadata') or {}
+        name = meta.get('name') or ''
+        if not name:
+            continue
+        refs = [r for r in (meta.get('ownerReferences') or []) if r.get('kind') == 'QuayRegistry']
+        bound = ((item.get('status') or {}).get('phase') == 'Bound')
+        if any(r.get('name') == registry for r in refs if registry):
+            owned.append((0 if bound else 1, name))
+        elif registry and (name == registry or name.startswith(registry + '-')):
+            # Only hint if not owned by a different QuayRegistry
+            if not any(r.get('name') != registry and r.get('kind') == 'QuayRegistry' for r in (meta.get('ownerReferences') or [])):
+                hinted.append((0 if bound else 1, name))
+    pick = sorted(owned) or sorted(hinted)
+    if pick:
+        print(pick[0][1])
+        sys.exit(0)
+    sys.exit(1)
+except Exception:
+    traceback.print_exc()
+    sys.exit(2)
+") || _pickRc=$?
             if (( _pickRc == 0 )); then
                 break
             elif (( _pickRc == 1 )); then
@@ -977,9 +1001,16 @@ function RegisterQuayInAcs () {
 import sys, json, os
 host = os.environ['QUAY_HOST']
 data = json.load(sys.stdin)
+def _norm(ep):
+    ep = (ep or '').strip()
+    if '://' in ep:
+        ep = ep.split('://', 1)[1]
+    ep = ep.rstrip('/')
+    return ep.lower()
+hostNorm = _norm(host)
 for i in data.get('integrations', []):
-    # PRRT_kwDOBHvUUM65Mrmu: full endpoint match not partial substring
-    if i.get('docker', {}).get('endpoint', '') == host:
+    ep = i.get('docker', {}).get('endpoint', '')
+    if _norm(ep) == hostNorm:
         print(i['id'])
         sys.exit(0)
 sys.exit(1)
@@ -1104,6 +1135,19 @@ function RunAcsScan () {
     fi
 
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
+    # Digest-anchored pullspec for ACS scan and polling; tag kept only as display label
+    typeset acsScanTarget="${pushTarget}"
+    typeset acsDigest="${quayImageDigest:-}"
+    if [[ -n "${quayPushTargetDigest:-}" ]]; then
+        acsScanTarget="${quayPushTargetDigest}"
+    elif [[ -n "${acsDigest}" ]]; then
+        acsScanTarget="${pushTarget%%:*}@${acsDigest}"
+        if [[ "${pushTarget}" == *":"* && "${pushTarget}" != *":/"* ]]; then
+            acsScanTarget="${pushTarget%%:*}@${acsDigest}"
+        else
+            acsScanTarget="${pushTarget}@${acsDigest}"
+        fi
+    fi
 
     # TLS verification for the ACS Central API.  The admin credential, and the
     # Quay credential carried in the registration body, are only ever sent
@@ -1159,7 +1203,7 @@ function RunAcsScan () {
         RecordResult "${testName}" "failed" "Failed to register Quay in ACS" "${elapsed}"
         return 1
     fi
-    if ! RequestAcsScan "${acsHost}" "${pushTarget}"; then
+    if ! RequestAcsScan "${acsHost}" "${quayPushTargetDigest:-${acsScanTarget}}"; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "ACS scan request failed" "${elapsed}"
         return 1
@@ -1182,7 +1226,7 @@ function RunAcsScan () {
             set +x
             curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time "${_acsMaxTime}" \
                 --config <(printf 'user = "admin:%s"\n' "$(EscapeForCurlUser < "${acsPassFile}")") \
-                "https://${acsHost}/v1/images?query=Image:${pushTarget}" 2>"${scanErrFile}"
+                "https://${acsHost}/v1/images?query=Image:${quayPushTargetDigest:-${acsScanTarget}}" 2>"${scanErrFile}"
         )" || scanRc=$?
 
         # The helper answers 0 (image present), 1 (image absent) or anything
@@ -1193,13 +1237,30 @@ function RunAcsScan () {
         typeset -i parseRc=2
         if (( scanRc == 0 )); then
             parseRc=0
-            printf '%s' "${scanResult}" | python3 -c "
-import sys, json
+            printf '%s' "${scanResult}" | QUAY_IMAGE_DIGEST="${acsDigest}" python3 -c "
+import sys, json, os
 try:
     data = json.load(sys.stdin)
 except Exception:
     sys.exit(2)
-sys.exit(0 if data.get('images') else 1)
+images = data.get('images') or []
+if not images:
+    sys.exit(1)
+digest = os.environ.get('QUAY_IMAGE_DIGEST', '')
+if digest:
+    for img in images:
+        if img.get('id') == digest:
+            sys.exit(0)
+        if digest in (img.get('name') or ''):
+            sys.exit(0)
+        meta = img.get('metadata') or {}
+        v1 = (meta.get('v1') or {}) if isinstance(meta, dict) else {}
+        if v1.get('digest') == digest or v1.get('imageDigest') == digest:
+            sys.exit(0)
+        if digest in str(img):
+            sys.exit(0)
+    sys.exit(1)
+sys.exit(0)
 " || parseRc=$?
         fi
 
@@ -1226,7 +1287,7 @@ sys.exit(0 if data.get('images') else 1)
         fi
 
         if (( attempts % 4 == 3 )); then
-            RequestAcsScan "${acsHost}" "${pushTarget}" || true
+            RequestAcsScan "${acsHost}" "${quayPushTargetDigest:-${acsScanTarget}}" || true
         fi
 
         attempts=$((attempts + 1))
