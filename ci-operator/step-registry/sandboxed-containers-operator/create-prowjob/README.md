@@ -31,7 +31,7 @@ The script supports the following commands:
 
 - Different behavior for Pre-GA vs GA releases
 - Uses `:latest` tag by default for catalog images
-  - The actual latest tag (X.Y.Z-epoch_time format) is resolved at runtime by the `env-cm` step
+  - The actual latest tag (X.Y.Z-epoch_time format) is resolved at runtime by the `install-osc-operator` step
   - This ensures jobs always use the most recent catalog image when they run
 - Generated files are not merged
   - /PJ-REHEARSE in the PR to run prowjobs
@@ -65,7 +65,7 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
 | `OCP_CHANNEL`              | `fast`                   | OCP release channel. Default is `fast` because it contains all versions that could become `stable`.  Further explanation below | `stable`, `fast`, `candidate`, or `eus` |
 | `AWS_REGION_OVERRIDE`      | `us-east-2`              | AWS region for testing                                                      | Any valid AWS region     |
 | `CUSTOM_AZURE_REGION`      | `eastus`                 | Azure region for testing                                                    | Any valid Azure region   |
-| `OSC_CATALOG_TAG`          | `latest`                 | Defaults to `:latest`. Actual tag resolved at runtime by `env-cm` step. Can override with specific version tag (e.g., `1.11.1-1766149846`) or SHA | repo tag or SHA          |
+| `OSC_CATALOG_TAG`          | `latest`                 | Defaults to `:latest`. Actual tag resolved at runtime by `install-osc-operator` step. Can override with specific version tag (e.g., `1.11.1-1766149846`) or SHA | repo tag or SHA          |
 | `INSTALL_KATA_RPM`         | `true`                   | Whether to install Kata RPM                                                 | `true` or `false`        |
 | `KATA_RPM_VERSION`         | `3.17.0-3.rhaos4.19.el9` | Kata RPM version (when `INSTALL_KATA_RPM=true`)                             | RPM version format       |
 | `PROW_RUN_TYPE`            | `candidate`              | Prow job run type                                                           | `candidate` or `release` |
@@ -76,7 +76,7 @@ PROW_API_TOKEN=your_token_here ci-operator/step-registry/sandboxed-containers-op
 
 #### Pre-GA (Development) Mode
 - Uses `:latest` tag for catalog images by default
-  - The `env-cm` step resolves the actual latest tag (X.Y.Z-epoch_time format) at runtime
+  - The `install-osc-operator` step resolves the actual latest tag (X.Y.Z-epoch_time format) at runtime
   - This ensures jobs always test against the most recent build
 - Creates `brew-catalog` source with the resolved catalog tag
 
@@ -141,18 +141,18 @@ ci-operator/step-registry/sandboxed-containers-operator/create-prowjob/sandboxed
 
 ### Runtime Tag Resolution
 
-The `create-prowjob` script uses `:latest` as the default tag. The actual latest tag is resolved at **runtime** by the `env-cm` step when the job executes.
+The `create-prowjob` script uses `:latest` as the default tag. The actual latest tag is resolved at **runtime** by the `install-osc-operator` step when the job executes.
 
 ### How It Works
-1. **At config generation time**: `CATALOG_SOURCE_IMAGE` is set to `quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest`
-2. **At job runtime**: The `env-cm` step checks the tag:
-   - If the tag is `:latest`, it queries the Quay API to find the most recent `X.Y.Z-unix_epoch` tag
+1. **At config generation time**: `CATALOG_SOURCE_IMAGE` is set to `quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:latest` (or the per-release `osc-test-fbc-vN-M` repo while a release is under test)
+2. **At job runtime**: The `install-osc-operator` step checks the tag:
+   - If the tag is `:latest` on a quay.io image, it queries the Quay API to find the most recent `X.Y.Z-unix_epoch` tag of that repository
    - If the tag is anything else (specific version or SHA), it is passed through unchanged
 3. **Supported tag formats**:
    - `latest` - resolved to newest `X.Y.Z-unix_epoch` tag at runtime
    - `X.Y.Z-unix_epoch` (e.g., `1.11.1-1766149846`) - passed through unchanged
    - SHA (e.g., `sha256:abc123...` or short SHA) - passed through unchanged
-4. **Source**: `quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc`
+4. **Source**: `quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc` (tracks the FBC main branch; per-release `osc-test-fbc-vN-M` repos track the `release-N.M` branches)
 
 
 ## Run Command
@@ -251,7 +251,7 @@ The script includes comprehensive validation:
 
 ### Catalog Tag Discovery Issues
 
-Tag resolution happens at runtime in the `env-cm` step. To troubleshoot:
+Tag resolution happens at runtime in the `install-osc-operator` step. To troubleshoot:
 
 ```bash
 # Test connectivity to Quay API

@@ -128,7 +128,7 @@ workdir=$(mktemp -d)
 # Generally we do not update boot image for bastion host very often, we just use it as a jump
 # host, mirror registry, and proxy server, these services do not have frequent update.
 # So hard-code them here.
-IMAGE_NAME="${BASTION_IMAGE_NAME:-fedora-coreos-41-20241122-3-0-gcp-x86-64}"
+IMAGE_NAME="${BASTION_IMAGE_NAME:-fedora-coreos-45-20261030-3-1-gcp-x86-64}"
 IMAGE_PROJECT="${BASTION_IMAGE_PROJECT:-fedora-coreos-cloud}"
 echo "Using ${IMAGE_NAME} image from ${IMAGE_PROJECT} project"
 

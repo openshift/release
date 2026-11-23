@@ -11,37 +11,55 @@ set -o pipefail
 # "manifest unknown" when pulling registry.redhat.io/quay/... directly.
 #
 # To fix this we mirror registry.redhat.io/quay -> registry.stage.redhat.io/quay with an
-# ImageDigestMirrorSet and wait for the MachineConfigPool rollout.
+# ImageDigestMirrorSet (an ImageContentSourcePolicy on OCP 4.12, which has no IDMS CRD)
+# and wait for the MachineConfigPool rollout.
 #
 # registry.stage.redhat.io pull credentials must already be present in the cluster global
 # pull secret. Wire the shared `merge-stage-registry-credentials` step BEFORE this step in
 # the ci-operator config; it merges the stage credentials (from the openshift-qe vault)
 # and waits for its own MCP rollout.
 
-IDMS_NAME="quay-stage-registry"
+MIRROR_NAME="quay-stage-registry"
 
-# Create an ImageDigestMirrorSet redirecting registry.redhat.io/quay digests to
-# registry.stage.redhat.io/quay, where ART publishes pre-release Quay images. The GA
-# RHEL dependencies (registry.redhat.io/rhel8|rhel9/...) stay on production and are not
-# mirrored. The default mirrorSourcePolicy (AllowContactingSource) lets pulls fall back
-# to production for any digest already promoted there.
-function create_idms () {
-  cat <<EOF | oc apply -f -
+# Mirror registry.redhat.io/quay digests to registry.stage.redhat.io/quay, where ART
+# publishes pre-release Quay images. The GA RHEL dependencies
+# (registry.redhat.io/rhel8|rhel9/...) stay on production and are not mirrored. Pulls
+# fall back to production for any digest already promoted there.
+function create_mirror_config () {
+  local idms_crd
+  idms_crd=$(oc get crd imagedigestmirrorsets.config.openshift.io --ignore-not-found -o name)
+  if [[ -n "${idms_crd}" ]]; then
+    echo "Creating ImageDigestMirrorSet ${MIRROR_NAME}"
+    cat <<EOF | oc apply -f -
 apiVersion: config.openshift.io/v1
 kind: ImageDigestMirrorSet
 metadata:
-  name: ${IDMS_NAME}
+  name: ${MIRROR_NAME}
 spec:
   imageDigestMirrors:
   - source: registry.redhat.io/quay
     mirrors:
     - registry.stage.redhat.io/quay
 EOF
+  else
+    echo "ImageDigestMirrorSet CRD not found; creating ImageContentSourcePolicy ${MIRROR_NAME}"
+    cat <<EOF | oc apply -f -
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: ${MIRROR_NAME}
+spec:
+  repositoryDigestMirrors:
+  - source: registry.redhat.io/quay
+    mirrors:
+    - registry.stage.redhat.io/quay
+EOF
+  fi
 }
 
-# Wait for the MachineConfigPool rollout triggered by the IDMS.
+# Wait for the MachineConfigPool rollout triggered by the mirror config.
 function wait_mcp_ready () {
-    echo "Waiting for MachineConfigPool rollout after IDMS creation..."
+    echo "Waiting for MachineConfigPool rollout after mirror config creation..."
     # Give MCO time to start the rollout before waiting for completion. A pool may still
     # report Updated=True from an earlier change, so the initial wait is best-effort.
     oc wait mcp --all --for=condition=Updating=True --timeout=5m || true
@@ -131,7 +149,7 @@ if [ "$QUAY_OPERATOR_SOURCE" == "redhat-operators" ]; then
 else #Install Quay operator with the ART pre-release FBC image
   resolve_index_image
   echo "Installing Quay from ART FBC image: $MULTISTAGE_PARAM_OVERRIDE_QUAY_INDEX_IMAGE"
-  create_idms
+  create_mirror_config
   wait_mcp_ready
   create_catalog_source
   check_catalog_source_status

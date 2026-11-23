@@ -11,7 +11,6 @@ if [ "${JOB_NAME_SAFE}" != "launch" ]; then
 fi
 
 export AWS_DEFAULT_REGION=us-west-2  # TODO: Derive this?
-export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere/.awscred
 export AWS_MAX_ATTEMPTS=50
 export AWS_RETRY_MODE=adaptive
 export HOME=/tmp

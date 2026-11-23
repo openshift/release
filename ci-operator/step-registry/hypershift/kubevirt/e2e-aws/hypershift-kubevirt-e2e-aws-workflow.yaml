@@ -18,6 +18,12 @@ workflow:
       ETCD_STORAGE_CLASS: gp3-csi
       KUBEVIRT_CSI_INFRA: gp3-csi
       CNV_SUBSCRIPTION_SOURCE: redhat-operators
+      # gp3-csi root disks have to be raw block devices. A Filesystem one is an
+      # image file that CDI sizes to the free space of the PVC's filesystem, and
+      # KubeVirt resizes it again on every start of the domain, so the guest sees
+      # a smaller disk after it reboots out of its Ignition first boot and the GPT
+      # that first boot grew to the old end of the disk no longer describes it.
+      KUBEVIRT_ROOT_VOLUME_VOLUME_MODE: Block
     pre:
       - chain: ipi-aws-ovn-pre
       - chain: ipi-install

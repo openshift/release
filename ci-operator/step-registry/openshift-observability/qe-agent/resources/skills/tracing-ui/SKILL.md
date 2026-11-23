@@ -56,7 +56,7 @@ Then continue with Steps 1–6 in the cloned repo. If `qe-agent-context.json` is
 
 ## Step 1 — Parse JUnit XMLs and Identify Failures
 
-Mandatory. Read `/tmp/qe-agent-modules/junit-triage.md` and follow it. Typical shared root causes here: plugin not loaded, auth failure, UI not responding, network error, a failed `before` hook. Pattern signals: the same error string (`Cannot read properties of null`, `401 Unauthorized`) or the same failing Cypress command (`cy.visit`, `cy.get`). If missing: read `${SHARED_DIR}/qe-agent-junit-*.xml`, extract each suite name and failed `<testcase>` (`<failure>`/`<error>` message and full text), group by suite, and exit with a clear message if there are no files. If more than 5 tests fail, look for one shared root cause and diagnose the simplest failing test as the representative (Steps 2–5); with no pattern, diagnose individually, capped at 3. Write any pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.md`.
+Mandatory. Read `/tmp/qe-agent-modules/junit-triage.md` and follow it. Typical shared root causes here: plugin not loaded, auth failure, UI not responding, network error, a failed `before` hook. Pattern signals: the same error string (`Cannot read properties of null`, `401 Unauthorized`) or the same failing Cypress command (`cy.visit`, `cy.get`). If missing: read `${QE_JUNIT_DIR}/qe-agent-junit-*.xml`, extract each suite name and failed `<testcase>` (`<failure>`/`<error>` message and full text), group by suite, and exit with a clear message if there are no files. If more than 5 tests fail, look for one shared root cause and diagnose the simplest failing test as the representative (Steps 2–5); with no pattern, diagnose individually, capped at 3. Write any pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.md`.
 
 ---
 
@@ -244,7 +244,7 @@ Mandatory. Follow "Analysis summary" in `/tmp/qe-agent-modules/analysis-summary.
 - The cluster is already provisioned with COO and the Tracing UI console plugin installed — do not reinstall them
 - The qe-agent runs in a fresh pod — `/tmp/` is empty at start; Step 0b clones the test repo there
 - `$KUBECONFIG` points to the test cluster; `oc`, `kubectl`, `jq`, `npm`/`npx` are in PATH
-- Do **not** copy screenshots/videos to `$SHARED_DIR` (1 MiB Secret limit); only JUnit XML is safe there. Write output to `$ARTIFACT_DIR` (GCS) or `$SHARED_DIR` (shared with other steps)
+- Do **not** copy screenshots/videos anywhere. Write output to `$ARTIFACT_DIR` (GCS). Never write into `$SHARED_DIR`: it is a 1 MiB Kubernetes Secret synced when this pod exits, and files written there can fail the step.
 - **Namespace restriction**: MUST NOT access, read, list, or modify any `kube-system` resource — an all-namespaces query filtered afterward still fetches it, so scope every command to named namespaces or a label selector that excludes it (e.g. `-l app.kubernetes.io/name=...`, as used above), not `-A` piped to `grep -v kube-system`
 - Do not call external APIs (Jira, GitHub, Slack); the wrapper script handles integrations after exit
 - This step runs `best_effort: true` — always exit 0, even incomplete

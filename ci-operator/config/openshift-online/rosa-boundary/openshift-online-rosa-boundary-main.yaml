@@ -8,10 +8,15 @@ base_images:
     namespace: ocp
     tag: "9"
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-9-release-golang-1.26-openshift-4.23
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/hi/go:1.27.4-builder@sha256:d13bab862a001b80130e837be57ae574b24ba8d8b31f178074c7c08877f63967
+      ENV GOPATH=/tmp/go
+      ENV GOCACHE=/tmp/go-build-cache
+      RUN mkdir -p /go/src "${GOPATH}" "${GOCACHE}" && \
+          chmod -R g+rwX /go "${GOPATH}" "${GOCACHE}"
+      # ci-operator's source build must read its root-owned OAuth credential.
+      # Keep the builder's root user; do not relax credential file permissions.
 images:
   items:
   - dockerfile_literal: |
