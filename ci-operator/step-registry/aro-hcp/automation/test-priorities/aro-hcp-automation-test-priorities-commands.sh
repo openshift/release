@@ -81,13 +81,22 @@ if [[ "${job_type}" == "periodic" && "${build_id}" =~ ^[0-9]+$ ]]; then
 fi
 
 publish=${PRIORITIES_PUBLISH}
-if [[ "${job_name}" == rehearse-* || "${job_type}" != periodic ]]; then
+rehearsal=false
+case "${job_name}" in
+rehearse-*) rehearsal=true ;;
+esac
+
+# A rehearsal stays read-only unless it explicitly opts in. The opt-in exists to
+# prove the publication path once; the merged configuration never sets it.
+if [[ "${rehearsal}" == true && "${PRIORITIES_REHEARSAL_PUBLISH:-false}" != true ]]; then
+    info "rehearsal ${job_name}: forcing read-only behaviour"
+    publish=false
+fi
+if [[ "${job_type}" != periodic || "${job_name}" != *"${SCHEDULED_JOB}" ]]; then
     info "job ${job_name} (${job_type}) is not the scheduled periodic: forcing read-only behaviour"
     publish=false
 fi
 if [[ "${publish}" == true ]]; then
-    [[ "${job_name}" == "${SCHEDULED_JOB}" ]] ||
-        error "publication requires the scheduled job ${SCHEDULED_JOB}, got '${job_name}'"
     [[ "${build_id}" =~ ^[0-9]+$ ]] || error "publication requires a numeric Prow build ID, got '${build_id}'"
 fi
 info "job ${job_name} (${job_type}), build ${build_id}, publication ${publish}"
