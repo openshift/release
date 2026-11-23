@@ -172,10 +172,12 @@ validate_and_set_defaults() {
     # Set catalog source variables based on TEST_RELEASE_TYPE
     if [[ "${TEST_RELEASE_TYPE}" == "Pre-GA" ]]; then
       # OSC Catalog Configuration - always use :latest tag
-      # The env-cm step will resolve the actual latest tag at runtime
+      # The install-osc-operator step will resolve the actual latest tag at runtime
+      # (default repo: osc-test-fbc tracking the FBC main branch; per-release
+      # osc-test-fbc-vN-M repos track the release-N.M branches)
       OSC_CATALOG_TAG="${OSC_CATALOG_TAG:-latest}"
       echo "Using OSC_CATALOG_TAG: ${OSC_CATALOG_TAG}"
-      CATALOG_SOURCE_IMAGE="${CATALOG_SOURCE_IMAGE:-quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc:${OSC_CATALOG_TAG}}"
+      CATALOG_SOURCE_IMAGE="${CATALOG_SOURCE_IMAGE:-quay.io/redhat-user-workloads/ose-osc-tenant/osc-test-fbc-v1-14:${OSC_CATALOG_TAG}}"
       CATALOG_SOURCE_NAME="${CATALOG_SOURCE_NAME:-brew-catalog}"
     else # GA
       CATALOG_SOURCE_NAME="redhat-operators"
@@ -210,7 +212,7 @@ show_usage() {
     echo "  MUST_GATHER_ON_FAILURE_ONLY    - Must-gather on failure only: true or false (default: true)"
     echo "  AWS_REGION_OVERRIDE            - AWS region (default: us-east-2)"
     echo "  CUSTOM_AZURE_REGION            - Azure region (default: eastus)"
-    echo "  OSC_CATALOG_TAG                - OSC catalog tag (default: latest, resolved at runtime by env-cm step)"
+    echo "  OSC_CATALOG_TAG                - OSC catalog tag (default: latest, resolved at runtime by install-osc-operator step)"
     echo "  TRUSTEE_URL                    - Trustee URL (default: empty)"
     echo "  INITDATA                       - Initdata from Trustee(default: empty) The gzipped and base64 encoded initdata.toml file from Trustee"
 }

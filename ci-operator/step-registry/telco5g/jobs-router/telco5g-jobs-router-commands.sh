@@ -4,6 +4,32 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+release_stream_pullspec() {
+    local version="$1"
+    local url="https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${version}.0-0.nightly/latest"
+    local response http body pullspec
+    if ! response=$(curl -q -L -sS --retry 5 --retry-delay 10 -w $'\n%{http_code}' "$url"); then
+        echo "ERROR: could not query the OCP release stream ${version}.0-0.nightly" >&2
+        echo "       ${url}" >&2
+        return 1
+    fi
+    http="${response##*$'\n'}"
+    body="${response%$'\n'*}"
+    if [[ "$http" != "200" ]]; then
+        echo "ERROR: OCP release stream ${version}.0-0.nightly is not available (HTTP ${http})" >&2
+        printf '       %s\n' "$body" >&2
+        echo "       ${url}" >&2
+        return 1
+    fi
+    if ! pullspec=$(jq -er '.pullSpec' <<<"$body" 2>/dev/null) || [[ -z "$pullspec" ]]; then
+        echo "ERROR: OCP release stream ${version}.0-0.nightly did not return a pullSpec" >&2
+        printf '       %s\n' "$body" >&2
+        echo "       ${url}" >&2
+        return 1
+    fi
+    printf '%s\n' "$pullspec"
+}
+
 echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
 [ -e "$HOME/fix_uid.sh" ] && "$HOME/fix_uid.sh" || echo "$HOME/fix_uid.sh was not found" >&2
@@ -52,9 +78,10 @@ if [[ "$PROW_JOB_ID" = *"nightly"* ]] && [[ "$JOB_TYPE" == "periodic" ]]; then
     echo "export KCLI_PARAM='-P openshift_image=$IMG_URL'" >> "$MAINENV"
     echo "export SNO_PARAM='-f ${IMG}'" >> "$MAINENV"
 elif [[ "$JOB_TYPE" == "periodic" ]]; then
-    IMG_URL=$(curl -q -L -s --retry 5 --retry-delay 10 \
-        "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${T5CI_VERSION}.0-0.nightly/latest" \
-        | jq -r ".pullSpec")
+    if ! IMG_URL=$(release_stream_pullspec "$T5CI_VERSION"); then
+        echo "ERROR: no OCP release ${T5CI_VERSION}.0-0.nightly is available to install; refusing to start" >&2
+        exit 1
+    fi
 
     echo "export T5_JOB_TRIGGER=periodic" >> "$MAINENV"
     echo "export T5_JOB_DESC='periodic-${T5CI_JOB_TYPE}'" >> "$MAINENV"
@@ -63,9 +90,10 @@ elif [[ "$JOB_TYPE" == "periodic" ]]; then
     echo "export KCLI_PARAM='-P tag=${T5CI_VERSION} -P version=nightly'" >> "$MAINENV"
     echo "export SNO_PARAM='-t ${T5CI_VERSION} -r nightly'" >> "$MAINENV"
 elif [[ "$JOB_TYPE" == "presubmit" ]] || [[ "$JOB_NAME" == *"rehears"* ]]; then
-    IMG_URL=$(curl -q -L -s --retry 5 --retry-delay 10 \
-        "https://amd64.ocp.releases.ci.openshift.org/api/v1/releasestream/${T5CI_VERSION}.0-0.nightly/latest" \
-        | jq -r ".pullSpec")
+    if ! IMG_URL=$(release_stream_pullspec "$T5CI_VERSION"); then
+        echo "ERROR: no OCP release ${T5CI_VERSION}.0-0.nightly is available to install; refusing to start" >&2
+        exit 1
+    fi
 
     echo "export T5_JOB_TRIGGER=rehearse" >> "$MAINENV"
     echo "export T5_JOB_DESC=rehearse-${T5CI_JOB_TYPE}" >> "$MAINENV"

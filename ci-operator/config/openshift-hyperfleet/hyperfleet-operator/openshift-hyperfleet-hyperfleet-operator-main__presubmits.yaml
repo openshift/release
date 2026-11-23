@@ -1,8 +1,8 @@
 base_images:
-  nested-podman:
-    name: nested-podman
-    namespace: ci
-    tag: latest
+  operator-sdk:
+    name: "4.19"
+    namespace: origin
+    tag: operator-sdk
 build_root:
   image_stream_tag:
     name: builder
@@ -10,45 +10,49 @@ build_root:
     tag: rhel-9-golang-1.26-openshift-4.23
 images:
   items:
-  - dockerfile_literal: |
-      FROM nested-podman
-      COPY src/ /opt/app-root/src
-      WORKDIR /opt/app-root/src/hyperfleet-operator
-      USER root
-      RUN dnf install -y make gettext && dnf clean all
-    from: nested-podman
-    inputs:
-      src:
-        paths:
-        - destination_dir: src
-          source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-operator
-    optional: true
-    to: podman-test
+  - dockerfile_path: Dockerfile
+    to: hyperfleet-operator
+operator:
+  bundles:
+  - as: hyperfleet-operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-operator.*
+    with: pipeline:hyperfleet-operator
 prowgen:
   expose: true
   private: true
 resources:
   '*':
     requests:
-      cpu: "1"
-      memory: 1G
+      cpu: 100m
+      memory: 200Mi
 tests:
-- as: bundle
-  capabilities:
-  - nested-podman
-  commands: |
-    set -euo pipefail
-    # KUSTOMIZE_VARIANT and VALIDATE_RELATED_IMAGES match BUILD_ARGS in the
-    # operator repo's .tekton/hyperfleet-operator-bundle-{push,tag}.yaml.
-    # Keep them in sync.
-    make bundle-build CONTAINER_TOOL=podman \
-      KUSTOMIZE_VARIANT=config/manifests/prod \
-      VALIDATE_RELATED_IMAGES=true \
-      BUNDLE_IMG=localhost/hyperfleet-operator-bundle:ci
-  container:
-    from: podman-test
-  nested_podman: true
-  run_if_changed: ^(bundle\.Dockerfile$|Makefile$|config/|validators/)
+- as: e2e-in-cluster-install
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.22"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace hyperfleet
+        operator-sdk run bundle --timeout=10m -n hyperfleet "$OO_BUNDLE"
+        oc wait --for=condition=Available -n hyperfleet deployment -l app.kubernetes.io/name=hyperfleet-operator --timeout=5m
+      dependencies:
+      - env: OO_BUNDLE
+        name: hyperfleet-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift-hyperfleet

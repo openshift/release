@@ -198,8 +198,6 @@ set -e
 set -o pipefail
 
 MIRROR_REGISTRY="$1"
-AUTHFILE="${HOME}/auth/auth.compact.json"
-ACCEPT_POLICY='{"default":[{"type":"insecureAcceptAnything"}]}'
 
 if [[ -z "${MIRROR_REGISTRY}" ]]; then
   echo "MIRROR_REGISTRY not set, skipping image mirror"
@@ -209,8 +207,6 @@ fi
 for image in container-perf-tools/oslat:latest container-perf-tools/stress-ng:latest; do
   echo "Mirroring quay.io/${image} → ${MIRROR_REGISTRY}/${image}"
   skopeo copy \
-    --policy <(echo "${ACCEPT_POLICY}") \
-    --authfile "${AUTHFILE}" \
     --dest-tls-verify=false \
     "docker://quay.io/${image}" \
     "docker://${MIRROR_REGISTRY}/${image}"
