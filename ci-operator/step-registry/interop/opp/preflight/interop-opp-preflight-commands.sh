@@ -302,7 +302,7 @@ function CheckOppCompatibility () {
         AppendCheck "opp_compatibility_matrix" "warn" "${details}"
         # PRRT_kwDOBHvUUM65TpMz: floor marker removed - no step consumed compat-floor-below.txt (git grep found only the write); post-upgrade enforcement tracked INTEROP-9553 as design decision, preflight remains informational
         if [[ -n "${belowFloor}" ]]; then
-            echo "WARN: operator below target floor ${ocpKey} will be re-checked post-upgrade" > "${ARTIFACT_DIR}/compat-floor-preflight-warn.txt" 2>/dev/null || true
+            echo "WARN: operator below target floor ${ocpKey}; post-upgrade floor enforcement is deferred (tracked in INTEROP-9553)" > "${ARTIFACT_DIR}/compat-floor-preflight-warn.txt" 2>/dev/null || true
         fi
     else
         : "All OPP operators are compatible with OCP ${ocpKey}"
