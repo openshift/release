@@ -254,6 +254,557 @@ EOF
     return 0
 }
 
+# Route 53 evidence, reduced to allowlisted states and counts.
+#
+# The failure path used to copy the whole 'list-resource-record-sets' response for the
+# cluster's hosted zone into this public artifact, together with whatever the AWS CLI
+# wrote to stderr. That dump published every record the zone held - the addresses and
+# alias targets of the API and of the ingress wildcard among them - and still left the
+# questions a DNS failure actually raises unanswered: is the API record there at all, is
+# the zone delegated, and does the delegation point at the nameservers the zone was
+# assigned. The reads below answer those questions and publish only the states and counts
+# enumerated in the legend they print. Response bodies, record values, nameserver names,
+# hosted-zone identifiers and AWS CLI error output are read by this step and never
+# written out.
+#
+# Everything here is bounded and best effort. Every call is timeout-bounded and asks for
+# a bounded number of items, the number of candidate zones is capped, each failure is
+# classified instead of propagated, and the step's exit status, readiness criteria and
+# failure criteria are untouched. The reads use the credentials this job already holds:
+# nothing is configured, assumed or elevated, and only this run's own cluster zone and
+# its ancestors are queried.
+ROUTE53_CLI_TIMEOUT=30
+ROUTE53_MAX_ZONES=5
+ROUTE53_MAX_ANCESTORS=2
+ROUTE53_MAX_RECORDS=10
+ROUTE53_TRUNCATED_FILTER='if (.IsTruncated == true) or (.NextToken != null) then "yes" else "no" end'
+ROUTE53_ZONE_FILTER='.HostedZones[] | [.Name, .Id, ((.Config.PrivateZone // false) | tostring)] | @tsv'
+ROUTE53_RRSET_FILTER='.ResourceRecordSets[] | [.Name, .Type, ((.ResourceRecords // []) | map(.Value) | join(","))] | @tsv'
+
+# Give a DNS name a single trailing dot and one case, so that a name taken from the
+# cluster description and a name returned by the Route 53 API can be compared.
+dns_name_key() {
+    printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]' | sed -e 's/\.*$//' -e 's/$/./'
+}
+
+# Classify a failed AWS CLI call without publishing anything it produced. The stderr of
+# the AWS CLI carries request identifiers, ARNs and account numbers, so it is read here
+# and never copied into the artifact.
+route53_failure_state() {
+    local status="$1" stderr_file="$2"
+    if (( status == 124 )); then
+        echo "lookup-timed-out"
+    elif grep -qiE 'accessdenied|access denied|not authorized|unauthorizedoperation|explicit deny|expiredtoken|invalidclienttokenid|signaturedoesnotmatch' \
+        "${stderr_file}" 2>/dev/null; then
+        echo "lookup-denied"
+    else
+        echo "lookup-failed"
+    fi
+}
+
+# Run one bounded Route 53 read. Sets route53_call_state to 'ok' or to a failure state,
+# and route53_call_body to the response on success. The body stays in memory and is only
+# ever parsed: both callers below snapshot what they need out of it before the next call.
+route53_call_state=""
+route53_call_body=""
+route53_call() {
+    local stderr_file
+    local status=0
+
+    route53_call_state="lookup-failed"
+    route53_call_body=""
+    stderr_file=$(mktemp 2>/dev/null) || return 0
+    route53_call_body=$(timeout "${ROUTE53_CLI_TIMEOUT}" aws route53 "$@" --output json \
+        2>"${stderr_file}") || status=$?
+    if (( status != 0 )); then
+        route53_call_state=$(route53_failure_state "${status}" "${stderr_file}")
+        route53_call_body=""
+    elif [[ -z "${route53_call_body}" ]]; then
+        # The CLI always writes a document, so an empty body is not an empty result
+        # set: it is a read that did not answer, and jq would read it as neither.
+        route53_call_state="lookup-failed"
+    else
+        route53_call_state="ok"
+    fi
+    rm -f "${stderr_file}" 2>/dev/null || true
+    return 0
+}
+
+# Parse the captured response with ${1}. Returns the parser's own status, so a reply this
+# step cannot read is reported as a failed lookup instead of being mistaken for an empty
+# one: "we could not tell" and "there is nothing there" are different findings.
+route53_parse() {
+    printf '%s' "${route53_call_body}" | jq -r "$1" 2>/dev/null
+}
+
+# Find the hosted zone whose name is exactly ${1}, reading at most ROUTE53_MAX_ZONES
+# entries. A name query is answered with the zones that sort at or after that name, so a
+# lexically adjacent zone - the zone of an unrelated cluster, or of another tenant of the
+# same base domain - can come back in place of the one asked for. Only an exact name
+# match is accepted; the name and the identifier of anything else the API returned are
+# discarded here and never published or queried further.
+#
+# An account can hold a public and a private zone of the same name. Only the public one
+# can carry or satisfy a public delegation, so it is preferred, and the private one is
+# used only when it is all there is.
+#
+# Sets route53_zone_state to one of:
+#   visible | not-visible | lookup-truncated | lookup-denied | lookup-timed-out |
+#   lookup-failed
+# with route53_zone_id and route53_zone_visibility set when the state is 'visible'.
+# 'not-visible' means the whole remaining list was read and held no such zone;
+# 'lookup-truncated' means the bounded read ended before the list did, so absence was
+# not established.
+route53_zone_state=""
+route53_zone_id=""
+route53_zone_visibility=""
+route53_lookup_zone() {
+    local zone_name="$1"
+    local wanted lines name id private truncated
+    local public_id="" private_id=""
+
+    route53_zone_state="lookup-failed"
+    route53_zone_id=""
+    route53_zone_visibility=""
+    wanted=$(dns_name_key "${zone_name}")
+
+    route53_call list-hosted-zones-by-name --dns-name "${zone_name}" \
+        --max-items "${ROUTE53_MAX_ZONES}"
+    if [[ "${route53_call_state}" != "ok" ]]; then
+        route53_zone_state="${route53_call_state}"
+        return 0
+    fi
+    lines=$(route53_parse "${ROUTE53_ZONE_FILTER}") || return 0
+
+    while IFS=$'\t' read -r name id private; do
+        [[ -n "${name}" ]] || continue
+        [[ "$(dns_name_key "${name}")" == "${wanted}" ]] || continue
+        if [[ "${private}" == "true" ]]; then
+            [[ -n "${private_id}" ]] || private_id="${id##*/}"
+        else
+            [[ -n "${public_id}" ]] || public_id="${id##*/}"
+        fi
+    done <<< "${lines}"
+
+    if [[ -n "${public_id}" && -n "${private_id}" ]]; then
+        route53_zone_visibility="public-and-private"
+    elif [[ -n "${public_id}" ]]; then
+        route53_zone_visibility="public"
+    elif [[ -n "${private_id}" ]]; then
+        route53_zone_visibility="private"
+    fi
+    route53_zone_id="${public_id:-${private_id}}"
+    if [[ -n "${route53_zone_id}" ]]; then
+        route53_zone_state="visible"
+        return 0
+    fi
+
+    truncated=$(route53_parse "${ROUTE53_TRUNCATED_FILTER}") || return 0
+    if [[ "${truncated}" == "yes" ]]; then
+        route53_zone_state="lookup-truncated"
+    else
+        route53_zone_state="not-visible"
+    fi
+    return 0
+}
+
+# Read the record sets at exactly ${2} in hosted zone ${1}, restricted to type ${3} when
+# one is given. Bounded: one timeout-bounded call for at most ROUTE53_MAX_RECORDS record
+# sets, started at the name itself, which the API orders first.
+#
+# Sets route53_record_state to one of:
+#   present | absent | lookup-denied | lookup-timed-out | lookup-failed
+# route53_record_count to the number of matching record sets, route53_record_types to the
+# record types found at that name, route53_record_truncated to whether the bounded read
+# ended before the zone listing did, and route53_record_values to the record values. The
+# values feed the delegation comparison below and are never published.
+route53_record_state=""
+route53_record_count=0
+route53_record_types=""
+route53_record_values=""
+route53_record_truncated="no"
+route53_lookup_records() {
+    local zone_id="$1" record_name="$2" wanted_type="${3:-}"
+    local wanted lines name type values truncated
+
+    route53_record_state="lookup-failed"
+    route53_record_count=0
+    route53_record_types=""
+    route53_record_values=""
+    route53_record_truncated="no"
+    wanted=$(dns_name_key "${record_name}")
+
+    route53_call list-resource-record-sets --hosted-zone-id "${zone_id}" \
+        --start-record-name "${wanted}" --max-items "${ROUTE53_MAX_RECORDS}"
+    if [[ "${route53_call_state}" != "ok" ]]; then
+        route53_record_state="${route53_call_state}"
+        return 0
+    fi
+    lines=$(route53_parse "${ROUTE53_RRSET_FILTER}") || return 0
+
+    route53_record_state="absent"
+    while IFS=$'\t' read -r name type values; do
+        [[ -n "${name}" ]] || continue
+        [[ "$(dns_name_key "${name}")" == "${wanted}" ]] || continue
+        # Only a record type from this list is ever published; anything else is counted
+        # but reported as OTHER, so an unexpected value cannot reach the artifact.
+        case "${type}" in
+            A|AAAA|CAA|CNAME|DS|HTTPS|MX|NAPTR|NS|PTR|SOA|SPF|SRV|SSHFP|SVCB|TLSA|TXT) ;;
+            *) type="OTHER" ;;
+        esac
+        [[ -z "${wanted_type}" || "${type}" == "${wanted_type}" ]] || continue
+        route53_record_state="present"
+        route53_record_count=$(( route53_record_count + 1 ))
+        route53_record_types="${route53_record_types:+${route53_record_types},}${type}"
+        [[ -z "${values}" ]] || route53_record_values+="${values//,/$'\n'}"$'\n'
+    done <<< "${lines}"
+
+    truncated=$(route53_parse "${ROUTE53_TRUNCATED_FILTER}") || return 0
+    [[ "${truncated}" != "yes" ]] || route53_record_truncated="yes"
+    return 0
+}
+
+# Walk up from the cluster zone ${1} to the nearest hosted zone an ancestor name has.
+# Bounded by ROUTE53_MAX_ANCESTORS, and never asking about a single-label name, which is
+# a public suffix rather than a zone of this cluster.
+#
+# Sets route53_ancestor_state to one of:
+#   parent-zone-match | ancestor-zone-match | no-visible-match | search-bounded |
+#   not-attempted | lookup-truncated | lookup-denied | lookup-timed-out | lookup-failed
+# 'search-bounded' says the walk stopped at its own cap, so the ancestors beyond it were
+# never asked about and their absence is not established.
+route53_ancestor_name=""
+route53_ancestor_id=""
+route53_ancestor_state="not-attempted"
+route53_ancestor_visibility=""
+route53_find_ancestor_zone() {
+    local candidate="$1"
+    local steps=0
+
+    route53_ancestor_name=""
+    route53_ancestor_id=""
+    route53_ancestor_state="not-attempted"
+    route53_ancestor_visibility=""
+
+    while (( steps < ROUTE53_MAX_ANCESTORS )); do
+        candidate="${candidate#*.}"
+        if [[ "${candidate}" != *.* ]]; then
+            # Every ancestor that could be a zone has now been read.
+            [[ "${route53_ancestor_state}" == "not-attempted" ]] \
+                || route53_ancestor_state="no-visible-match"
+            return 0
+        fi
+        steps=$(( steps + 1 ))
+        route53_lookup_zone "${candidate}"
+        case "${route53_zone_state}" in
+            visible)
+                route53_ancestor_name="${candidate}"
+                route53_ancestor_id="${route53_zone_id}"
+                route53_ancestor_visibility="${route53_zone_visibility}"
+                if (( steps == 1 )); then
+                    route53_ancestor_state="parent-zone-match"
+                else
+                    route53_ancestor_state="ancestor-zone-match"
+                fi
+                return 0
+                ;;
+            not-visible)
+                route53_ancestor_state="no-visible-match"
+                ;;
+            *)
+                route53_ancestor_state="${route53_zone_state}"
+                return 0
+                ;;
+        esac
+    done
+    # The cap stopped the walk. Say so only when an ancestor was in fact left unasked;
+    # otherwise the walk did reach the end of what it would ever query.
+    if [[ "${candidate#*.}" == *.* ]]; then
+        route53_ancestor_state="search-bounded"
+    elif [[ "${route53_ancestor_state}" != "not-attempted" ]]; then
+        route53_ancestor_state="no-visible-match"
+    fi
+    return 0
+}
+
+# One nameserver per line, lower case, without a trailing dot, sorted and de-duplicated,
+# so that a delegation and an assignment can be compared as sets. The values stay inside
+# this step: only the outcome of the comparison and the counts are published.
+#
+# These run inside the block that writes the public artifact, so their own stderr would
+# land in it; it is dropped rather than published, as everything else here is.
+normalise_ns_values() {
+    { tr '[:upper:]' '[:lower:]' | tr -d '[:blank:]' | sed -e 's/\.*$//' -e '/^$/d' | sort -u; } 2>/dev/null
+}
+
+count_ns_values() {
+    local values="${1:-}"
+    [[ -n "${values}" ]] || { echo 0; return 0; }
+    { printf '%s\n' "${values}" | normalise_ns_values | wc -l | tr -d '[:space:]'; } 2>/dev/null
+}
+
+# The fields this section publishes, and the only values each of them can take. A reader
+# coming back to the artifact later should not have to guess what a value means or
+# whether a value could have been something else.
+print_route53_legend() {
+    cat <<'EOF'
+Viewpoint: the AWS account this job already holds credentials for. No credential is
+  configured, assumed or elevated for these reads, and only this run's own cluster zone
+  and its ancestors are queried. "Not visible" below means this account could not see it
+  at the time above, not that it does not exist.
+No history: the API returns current state only, so nothing here says when a record was
+  created, changed or propagated, nor whether it had already propagated when the client
+  in the install log failed to resolve the name.
+Published fields: only the states and counts below. The API response bodies, the record
+  values, the nameserver names, the hosted-zone identifiers and the error output of the
+  AWS CLI are read by this step and deliberately left out of this public artifact.
+Zone states:        exact-match | parent-zone-match | ancestor-zone-match |
+                    no-visible-match | search-bounded | lookup-truncated |
+                    lookup-denied | lookup-timed-out | lookup-failed | not-attempted
+Zone visibility:    public | private | public-and-private
+Record states:      present | absent | not-checked | lookup-denied | lookup-timed-out |
+                    lookup-failed
+Topologies:         delegated-child-zone | parent-zone-only | child-zone-not-visible |
+                    undetermined
+Delegation verdict: match | mismatch | not-delegated | not-comparable |
+                    not-applicable
+EOF
+}
+
+# Report one record read as a state plus, when the read actually settled the question,
+# its counts. A read that failed publishes no count: a zero there would read as "none
+# found" when nothing was found out at all.
+print_route53_record_line() {
+    local state="$1" counts="$2" truncated="${3:-no}"
+    local line="  ${state}"
+    if [[ "${state}" == "present" || "${state}" == "absent" ]]; then
+        [[ -z "${counts}" ]] || line="${line}; ${counts}"
+        [[ "${truncated}" != "yes" ]] || line="${line}; bounded read truncated: yes"
+    fi
+    echo "${line}"
+}
+
+# Emit the Route 53 section of the failure-time DNS diagnostics for ${1}, the cluster's
+# DNS zone. Writes only the states and counts the legend above describes.
+print_route53_evidence() {
+    local cluster_zone="${1:-}"
+    local child_state="" child_id="" child_visibility="" child_public="no"
+    local ancestor_public="no" records_zone_id="" records_zone_label=""
+    local child_ns="" parent_ns="" child_ns_state="not-checked" parent_ns_state="not-checked"
+    local child_ns_count=0 parent_ns_count=0 parent_ns_truncated="no"
+    local topology="undetermined" delegation="not-comparable"
+
+    echo "=== Route 53 evidence (as seen from this CI job) ==="
+    echo "Read at: $(date -u '+%Y-%m-%dT%H:%M:%SZ') (UTC, clock of this CI step pod)"
+    echo "Read by: rosa-cluster-wait-ready-cluster, in a ci-operator step pod, after the"
+    echo "  step had already declared the install failed."
+    print_route53_legend
+    echo ""
+
+    if [[ -z "${cluster_zone}" ]]; then
+        echo "Cluster zone lookup: not-attempted (the cluster DNS zone could not be derived)"
+        echo ""
+        return 0
+    fi
+    # A trailing dot would make the single-label guard of the walk below read one label
+    # too many, and would send a public suffix to the API.
+    cluster_zone=$(printf '%s' "${cluster_zone}" | sed -e 's/\.*$//')
+
+    route53_lookup_zone "${cluster_zone}"
+    case "${route53_zone_state}" in
+        visible)
+            child_state="exact-match"
+            child_id="${route53_zone_id}"
+            child_visibility="${route53_zone_visibility}"
+            ;;
+        not-visible)
+            child_state="no-visible-match"
+            ;;
+        lookup-truncated)
+            # The bounded read did not settle it, but the ancestor zone and the records
+            # it may hold are a separate question and still worth reading.
+            child_state="lookup-truncated"
+            ;;
+        *)
+            # A read this viewpoint cannot complete will not complete for an ancestor
+            # either, and this section makes no unbounded attempt to prove otherwise.
+            echo "Cluster zone lookup (${cluster_zone}): ${route53_zone_state}"
+            echo "No further Route 53 read was attempted after this result."
+            echo ""
+            return 0
+            ;;
+    esac
+    [[ "${child_visibility}" != "public" && "${child_visibility}" != "public-and-private" ]] \
+        || child_public="yes"
+
+    # A ROSA cluster zone legitimately may have no hosted zone of its own: its records
+    # can live directly in the base-domain zone. The nearest visible ancestor is looked
+    # for either way - it is where those records would be, and it is also the zone that
+    # has to carry the delegation when the cluster zone does have one.
+    route53_find_ancestor_zone "${cluster_zone}"
+    [[ "${route53_ancestor_visibility}" != "public" && "${route53_ancestor_visibility}" != "public-and-private" ]] \
+        || ancestor_public="yes"
+
+    echo "Cluster zone lookup (${cluster_zone}): ${child_state}"
+    [[ -z "${child_visibility}" ]] || echo "  zone visibility: ${child_visibility}"
+    if [[ -n "${route53_ancestor_name}" ]]; then
+        echo "Ancestor zone lookup: ${route53_ancestor_state} (${route53_ancestor_name})"
+        [[ -z "${route53_ancestor_visibility}" ]] \
+            || echo "  zone visibility: ${route53_ancestor_visibility}"
+    else
+        echo "Ancestor zone lookup: ${route53_ancestor_state}"
+    fi
+
+    # The delegation is read whenever an ancestor zone is visible, including when no
+    # hosted zone for the cluster zone is: a delegation with no visible child zone is
+    # itself a finding, and reporting it as a plain parent-zone-only layout would hide
+    # the case where the child zone lives in another account or has been deleted.
+    if [[ -n "${route53_ancestor_id}" ]]; then
+        route53_lookup_records "${route53_ancestor_id}" "${cluster_zone}" "NS"
+        parent_ns_state="${route53_record_state}"
+        parent_ns="${route53_record_values}"
+        parent_ns_count=${route53_record_count}
+        parent_ns_truncated="${route53_record_truncated}"
+    fi
+
+    if [[ -n "${child_id}" ]]; then
+        records_zone_id="${child_id}"
+        records_zone_label="the cluster zone"
+        topology="delegated-child-zone"
+    elif [[ -n "${route53_ancestor_id}" ]]; then
+        records_zone_id="${route53_ancestor_id}"
+        records_zone_label="the ${route53_ancestor_name} zone"
+        if [[ "${child_state}" == "no-visible-match" && "${parent_ns_state}" == "absent" \
+              && "${parent_ns_truncated}" != "yes" ]]; then
+            topology="parent-zone-only"
+        elif [[ "${child_state}" == "no-visible-match" && "${parent_ns_state}" == "present" ]]; then
+            topology="child-zone-not-visible"
+        fi
+    fi
+
+    case "${topology}" in
+        delegated-child-zone)
+            echo "Topology: delegated-child-zone"
+            echo "  The cluster zone has a hosted zone of its own."
+            if [[ "${child_public}" == "yes" ]]; then
+                echo "  Its parent is expected to delegate to it."
+            else
+                echo "  It is private, so it answers only inside the VPCs it is associated with"
+                echo "  and no public delegation to it is expected."
+            fi
+            ;;
+        parent-zone-only)
+            echo "Topology: parent-zone-only"
+            echo "  No hosted zone for the cluster zone is visible and the ancestor zone holds no"
+            echo "  delegation for it, so its records are expected directly in the ancestor zone."
+            echo "  This is a valid ROSA layout and not by itself a fault."
+            ;;
+        child-zone-not-visible)
+            echo "Topology: child-zone-not-visible"
+            echo "  The ancestor zone delegates the cluster zone, but no hosted zone for it is"
+            echo "  visible from this viewpoint: it may live in an account this job cannot read,"
+            echo "  or it may have been deleted while the delegation stayed behind."
+            ;;
+        *)
+            echo "Topology: undetermined"
+            echo "  The reads above did not establish where this cluster's records are kept."
+            ;;
+    esac
+
+    # The API record is the name the install log failed to resolve, so whether it exists
+    # at all is the first question this section has to answer.
+    echo "API record (api.${cluster_zone})"
+    if [[ -z "${records_zone_id}" ]]; then
+        echo "  not-checked; no hosted zone to read it from"
+    else
+        local api_counts
+        route53_lookup_records "${records_zone_id}" "api.${cluster_zone}"
+        api_counts="in ${records_zone_label}; record sets: ${route53_record_count}"
+        [[ -z "${route53_record_types}" ]] \
+            || api_counts="${api_counts}, types: ${route53_record_types}"
+        print_route53_record_line "${route53_record_state}" "${api_counts}" \
+            "${route53_record_truncated}"
+    fi
+
+    echo "Nameservers assigned to the cluster zone"
+    if [[ -n "${child_id}" ]]; then
+        route53_lookup_records "${child_id}" "${cluster_zone}" "NS"
+        child_ns_state="${route53_record_state}"
+        child_ns="${route53_record_values}"
+        child_ns_count=${route53_record_count}
+        print_route53_record_line "${child_ns_state}" \
+            "record sets: ${child_ns_count}, nameservers: $(count_ns_values "${child_ns}")" \
+            "${route53_record_truncated}"
+    elif [[ "${child_state}" == "no-visible-match" ]]; then
+        echo "  not-checked; no hosted zone for the cluster zone is visible"
+    else
+        echo "  not-checked; the cluster zone lookup did not complete (${child_state})"
+    fi
+
+    if [[ -n "${route53_ancestor_name}" ]]; then
+        echo "Delegation of the cluster zone in the ${route53_ancestor_name} zone"
+    else
+        echo "Delegation of the cluster zone in an ancestor zone"
+    fi
+    if [[ -n "${route53_ancestor_id}" ]]; then
+        print_route53_record_line "${parent_ns_state}" \
+            "record sets: ${parent_ns_count}, nameservers: $(count_ns_values "${parent_ns}")" \
+            "${parent_ns_truncated}"
+    else
+        echo "  not-checked; no ancestor zone was read (${route53_ancestor_state})"
+    fi
+
+    # Only two reads that both succeeded can disagree, and only a public zone can carry
+    # or satisfy a public delegation. Anything else stays short of a verdict rather than
+    # being published as a delegation fault.
+    if [[ "${child_ns_state}" == "present" && "${parent_ns_state}" == "present" ]]; then
+        if [[ "${child_public}" != "yes" || "${ancestor_public}" != "yes" ]]; then
+            delegation="not-applicable"
+        elif [[ "$(printf '%s\n' "${child_ns}" | normalise_ns_values)" \
+                == "$(printf '%s\n' "${parent_ns}" | normalise_ns_values)" ]]; then
+            delegation="match"
+        else
+            delegation="mismatch"
+        fi
+    elif [[ "${child_ns_state}" == "present" && "${parent_ns_state}" == "absent" \
+            && "${parent_ns_truncated}" != "yes" ]]; then
+        if [[ "${child_public}" != "yes" || "${ancestor_public}" != "yes" ]]; then
+            delegation="not-applicable"
+        else
+            delegation="not-delegated"
+        fi
+    elif [[ "${topology}" == "parent-zone-only" ]]; then
+        # There is no child zone to delegate to, so the absence of a delegation is the
+        # expected state and not a finding.
+        delegation="not-applicable"
+    fi
+    echo "Delegation verdict: ${delegation}"
+    case "${delegation}" in
+        mismatch)
+            echo "  The ancestor zone delegates the cluster zone to a different set of"
+            echo "  nameservers than the cluster zone was assigned, so resolvers can be"
+            echo "  following a stale or foreign delegation. The nameserver names themselves"
+            echo "  are not published here."
+            ;;
+        not-delegated)
+            echo "  The cluster zone has its own hosted zone and its own nameservers, but the"
+            echo "  ancestor zone holds no delegation for it, so a resolver starting from the"
+            echo "  parent cannot reach those records."
+            ;;
+        not-applicable)
+            if [[ "${topology}" == "parent-zone-only" ]]; then
+                echo "  Parent-zone-only: there is no child zone for the ancestor to delegate to."
+            else
+                echo "  A private hosted zone carries no public delegation, so the two sides are"
+                echo "  not comparable (cluster zone: ${child_visibility:-not read}, ancestor"
+                echo "  zone: ${route53_ancestor_visibility:-not read})."
+            fi
+            ;;
+    esac
+    echo ""
+    return 0
+}
+
 # Preserve the install-log context of a newly observed DNS error while the step is still
 # waiting, so a later re-fetch of the install log does not erase the chronology.
 capture_dns_observation() {
@@ -661,7 +1212,9 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
       echo "Captured by: rosa-cluster-wait-ready-cluster, running in a ci-operator step pod"
       echo "Cluster ID: ${CLUSTER_ID}"
       echo "This file is published as a public CI artifact: resolver addresses and internal"
-      echo "infrastructure names are redacted, and no resolver configuration is copied here."
+      echo "infrastructure names are redacted, no resolver configuration is copied here, and"
+      echo "the Route 53 section below reports states and counts rather than any part of an"
+      echo "API response."
       echo ""
       if [[ "${dns_errors_observed}" == "yes" ]]; then
         echo "Earlier DNS errors were seen in install-log output while the step was still waiting."
@@ -729,32 +1282,13 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
         fi
       fi
 
-      # Route 53: dump the hosted-zone record sets for the cluster's DNS name
+      # Route 53: what this job can see of the cluster zone, its delegation and the API
+      # record, as states and counts only. See print_route53_evidence above for why the
+      # earlier full record-set dump is no longer published.
       if aws sts get-caller-identity &>/dev/null; then
-        echo "=== Route 53 hosted zone records ==="
-        echo "Record state as read at $(date -u '+%Y-%m-%dT%H:%M:%SZ') (UTC). The API returns no"
-        echo "history, so this says nothing about when a record was created or changed."
-        if [[ -n "${cluster_zone}" ]]; then
-          hz_json=$(aws route53 list-hosted-zones-by-name \
-            --dns-name "${cluster_zone}" \
-            --max-items 1 \
-            --output json 2>/dev/null || true)
-          hz_name=$(echo "${hz_json}" | jq -r '.HostedZones[0].Name // empty' 2>/dev/null || true)
-          hz_id=$(echo "${hz_json}" | jq -r '.HostedZones[0].Id // empty' 2>/dev/null | sed 's|/hostedzone/||' || true)
-          if [[ "${hz_name}" == "${cluster_zone}." ]]; then
-            echo "Hosted zone: ${hz_name} (ID: ${hz_id})"
-            aws route53 list-resource-record-sets \
-              --hosted-zone-id "${hz_id}" \
-              --output json 2>&1 || true
-          else
-            echo "No exact Route 53 hosted zone match for: ${cluster_zone} (closest: ${hz_name:-none})"
-          fi
-        else
-          echo "Cluster DNS zone not available, skipping Route 53 lookup"
-        fi
-        echo ""
+        print_route53_evidence "${cluster_zone}" || true
       else
-        echo "=== Route 53 ==="
+        echo "=== Route 53 evidence (as seen from this CI job) ==="
         echo "AWS credentials not available for Route 53 lookup"
         echo ""
       fi
