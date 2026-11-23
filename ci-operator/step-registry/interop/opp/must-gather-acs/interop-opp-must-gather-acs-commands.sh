@@ -993,9 +993,13 @@ sub_name = sub.get("name") if sub else None
 sub_ns = sub.get("namespace") if sub else None
 # PRRT_kwDOBHvUUM65yNGT: select OperatorPolicy by full Subscription identity, no name-only fallback
 rhacs_op = [o for o in ops if o.get("name") == "operatorpolicy-rhacs-operator" and o.get("spec", {}).get("subscriptionName") == sub_name and o.get("spec", {}).get("subscriptionNamespace") == sub_ns] if sub_name and sub_ns else []
+# Ambiguous match must not pass on list order: require exactly one policy
+rhacs_op_count = len(rhacs_op)
+rhacs_op_ambiguous = rhacs_op_count > 1
+rhacs_op_single = rhacs_op[0] if rhacs_op_count == 1 else None
 
 sub_channel = sub.get("channel") if sub else None
-op_spec = (rhacs_op[0].get("spec") or {}) if rhacs_op else {}
+op_spec = (rhacs_op_single.get("spec") or {}) if rhacs_op_single else {}
 op_channel = op_spec.get("channel")
 
 # Target binding: the OperatorPolicy must name THIS subscription. A policy
@@ -1016,6 +1020,8 @@ op_sub_name = op_spec.get("subscriptionName")
 op_sub_namespace = op_spec.get("subscriptionNamespace")
 if ops_s not in ("ok", "absent"):
     op_owns_sub = None
+elif rhacs_op_ambiguous:
+    op_owns_sub = None
 elif not rhacs_op:
     op_owns_sub = False
 elif sub is None:
@@ -1029,8 +1035,8 @@ else:
             and op_sub_namespace == (sub.get("namespace") or "")
         )
 op_compliant = None
-if rhacs_op:
-    conds = rhacs_op[0].get("conditions") or []
+if rhacs_op_single:
+    conds = rhacs_op_single.get("conditions") or []
     op_compliant = any(
         c.get("type") == "Compliant" and c.get("status") == "True"
         for c in conds
@@ -1047,7 +1053,7 @@ if rhacs_op:
 # enforcement at a level this step does not capture.
 op_remediation = None
 op_compliance = None
-if rhacs_op and ops_s in ("ok", "absent"):
+if rhacs_op_single and ops_s in ("ok", "absent"):
     op_remediation = (
         str(op_spec.get("remediationAction") or "").strip().lower() or None
     )
@@ -1159,19 +1165,19 @@ terms = {
     "packagemanifest_resolves_current_csv": (
         str(packagemanifest_resolves_current_csv).lower()
         if packagemanifest_resolves_current_csv is not None else "unknown"),
-    "operatorpolicy_present": (str(bool(rhacs_op)).lower()
+    "operatorpolicy_present": ("unknown" if rhacs_op_ambiguous else str(bool(rhacs_op)).lower()
                                if ops_s in ("ok", "absent") else "unknown"),
-    "operatorpolicy_compliant": (str(op_compliant).lower()
+    "operatorpolicy_compliant": ("unknown" if rhacs_op_ambiguous else str(op_compliant).lower()
                                   if op_compliant is not None else "unknown"),
-    "operatorpolicy_spec_channel": op_channel or "unknown",
+    "operatorpolicy_spec_channel": ("unknown" if rhacs_op_ambiguous else op_channel or "unknown"),
     "operatorpolicy_targets_subscription": (
-        str(op_owns_sub).lower() if op_owns_sub is not None else "unknown"),
-    "operatorpolicy_remediation_action": op_remediation or "unknown",
+        "unknown" if rhacs_op_ambiguous else str(op_owns_sub).lower() if op_owns_sub is not None else "unknown"),
+    "operatorpolicy_remediation_action": ("unknown" if rhacs_op_ambiguous else op_remediation or "unknown"),
     "operatorpolicy_enforcing": (
-        str(op_enforcing).lower() if op_enforcing is not None else "unknown"),
-    "operatorpolicy_compliance_type": op_compliance or "unknown",
+        "unknown" if rhacs_op_ambiguous else str(op_enforcing).lower() if op_enforcing is not None else "unknown"),
+    "operatorpolicy_compliance_type": ("unknown" if rhacs_op_ambiguous else op_compliance or "unknown"),
     "operatorpolicy_recreates_subscription": (
-        str(op_recreates).lower() if op_recreates is not None else "unknown"),
+        "unknown" if rhacs_op_ambiguous else str(op_recreates).lower() if op_recreates is not None else "unknown"),
     "acm_csv_version": acm_version or "unknown",
     "addon_controller_image": (addon_images[0].get("image")
                                 if addon_images else "unknown"), # PRRT_kwDOBHvUUM65yNGZ: ACM version and controller image from same CSV
@@ -1192,6 +1198,7 @@ terms = {
 terms["removal_preconditions_met"] = str(
     # PRRT_kwDOBHvUUM65yNGc: guard removal readiness with generation check, not just timestamp
     inputs_classified and generation_match
+    and rhacs_op_count == 1
     and terms["operatorpolicy_compliant"] == "true"
     and terms["operatorpolicy_targets_subscription"] == "true"
     and terms["operatorpolicy_enforcing"] == "true"
@@ -1628,6 +1635,42 @@ FIXTURE
   _expect rhacs_csv_phase Installing
   _expect removal_preconditions_met false
 
+  # Ambiguous OperatorPolicy: two policies match the same subscription
+  # identity in different namespaces. The result must be order independent:
+  # all operatorpolicy terms read as unknown and the predicate stays false.
+  cat > "${tmp}/01-operatorpolicy.json" <<'FIXTURE'
+[{"name": "operatorpolicy-rhacs-operator", "namespace": "policies", "spec": {"subscriptionName": "rhacs-operator", "subscriptionNamespace": "rhacs-operator", "channel": "stable", "remediationAction": "enforce", "complianceType": "musthave"}, "conditions": [{"type": "Compliant", "status": "True"}]}, {"name": "operatorpolicy-rhacs-operator", "namespace": "policies2", "spec": {"subscriptionName": "rhacs-operator", "subscriptionNamespace": "rhacs-operator", "channel": "stable", "remediationAction": "enforce", "complianceType": "musthave"}, "conditions": [{"type": "Compliant", "status": "True"}]}]
+FIXTURE
+  cat > "${tmp}/03-subscription.json" <<'FIXTURE'
+[{"name": "rhacs-operator", "namespace": "rhacs-operator", "apiVersion": "operators.coreos.com/v1alpha1", "currentCSV": "rhacs-operator.v4.11.6", "state": "AtLatestKnown", "conditions": [], "channel": "stable", "source": "redhat-operators", "generation": 1}]
+FIXTURE
+  echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "rhacs-operator", "phase": "Succeeded", "reason": "Succeeded", "generation": 1}]' > "${tmp}/05-csv.json"
+  echo '[{"name": "central", "namespace": "stackrox", "available": {"type": "Available", "status": "True"}}]' > "${tmp}/07-central-cr.json"
+  echo '{"name": "rhacs-operator", "catalogSource": "redhat-operators", "catalogSourceNamespace": "openshift-marketplace", "channels": [{"name": "stable", "currentCSV": "rhacs-operator.v4.11.6"}]}' > "${tmp}/08-packagemanifest-rhacs.json"
+  echo '[{"name": "advanced-cluster-management.v2.17.4", "version": "2.17.4", "governancePolicyAddonControllerImages": [{"name": "governance-policy-addon-controller", "image": "registry.redhat.io/acm2/governance-policy-addon-controller-rhel9:v2.17.4"}]}]' > "${tmp}/11-acm-csv-addon-controller.json"
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect removal_preconditions_met false
+  _expect operatorpolicy_present unknown
+  _expect operatorpolicy_compliant unknown
+  _expect operatorpolicy_targets_subscription unknown
+  _expect operatorpolicy_enforcing unknown
+  _expect operatorpolicy_recreates_subscription unknown
+  _expect operatorpolicy_spec_channel unknown
+  _expect operatorpolicy_remediation_action unknown
+  _expect operatorpolicy_compliance_type unknown
+  # Reverse list order must give the same result
+  cat > "${tmp}/01-operatorpolicy.json" <<'FIXTURE'
+[{"name": "operatorpolicy-rhacs-operator", "namespace": "policies2", "spec": {"subscriptionName": "rhacs-operator", "subscriptionNamespace": "rhacs-operator", "channel": "stable", "remediationAction": "enforce", "complianceType": "musthave"}, "conditions": [{"type": "Compliant", "status": "True"}]}, {"name": "operatorpolicy-rhacs-operator", "namespace": "policies", "spec": {"subscriptionName": "rhacs-operator", "subscriptionNamespace": "rhacs-operator", "channel": "stable", "remediationAction": "enforce", "complianceType": "musthave"}, "conditions": [{"type": "Compliant", "status": "True"}]}]
+FIXTURE
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect removal_preconditions_met false
+  _expect operatorpolicy_present unknown
+  _expect operatorpolicy_compliant unknown
+  _expect operatorpolicy_targets_subscription unknown
+  _expect operatorpolicy_enforcing unknown
+  _expect operatorpolicy_recreates_subscription unknown
+  _expect operatorpolicy_spec_channel unknown
+
   # Error classification: only the API server's NotFound error shape counts
   # as absence, so a missing helper, a wrapper failure, or a denied request
   # can never be read as a confirmed absence.
@@ -1657,7 +1700,7 @@ FIXTURE
     rm -rf "${tmp}"
     return 22
   fi
-  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, target-mismatch, unset-target, no-OperatorPolicy, non-enforcing, removal-blocking, unspecified-enforcement, upgrade-pending, non-Succeeded-phase, and FALSE fixtures all classified correctly, and only the API server NotFound error shape classifies as absence"
+  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, target-mismatch, unset-target, no-OperatorPolicy, non-enforcing, removal-blocking, unspecified-enforcement, upgrade-pending, non-Succeeded-phase, ambiguous-OperatorPolicy, and FALSE fixtures all classified correctly, and only the API server NotFound error shape classifies as absence"
   rm -rf "${tmp}"
   return 0
 }
