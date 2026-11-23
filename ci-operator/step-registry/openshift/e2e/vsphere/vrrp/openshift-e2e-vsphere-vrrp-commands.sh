@@ -146,11 +146,14 @@ for i in 1 2 3; do
   for peer in "${nodes[@]}"; do
     [[ $peer != "$n" ]] || continue
     # Capture headers only on survivors, matching the API instance, not ingress.
-    oc debug "node/$peer" --image="$tool_image" -- timeout 1200 tcpdump -lntti any \
+    # The enclosing ci-operator namespace does not exist on the installed cluster.
+    oc debug -n default "node/$peer" --image="$tool_image" -- timeout 1200 tcpdump -lntti any \
       "ip proto 112 and ip[((ip[0]&15)<<2)+1]=$vrid" > "$dir/advert-$peer.txt" 2>"$dir/tcpdump-$peer.err" &
-    workers+=("$!")
+    observer=$!
+    workers+=("$observer")
     deadline=$((SECONDS+90))
     until grep -F "${addr[$n]} >" "$dir/advert-$peer.txt" | grep -Eq 'prio(rity)? [1-9]'; do
+      kill -0 "$observer" 2>/dev/null || die "Observer exited before baseline; see tcpdump-$peer.err"
       ((SECONDS < deadline)) || die "No baseline advert from $n for VRID $vrid on $peer"; sleep 2
     done
   done
