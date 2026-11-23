@@ -28,6 +28,10 @@ BUILD_ORDER = [f"build{i:02d}" for i in range(1, 14)]
 MGMT_CLUSTERS = ["hosted-mgmt"]
 CLUSTER_ORDER = BUILD_ORDER + MGMT_CLUSTERS
 
+# Clusters that no longer run ci-scheduling-admission-webhook;
+# exclude them from the scheduling-webhook availability monitor.
+NO_SCHEDULING_WEBHOOK_MONITOR = {"build05"}
+
 
 def splice(path, begin, end, body):
     with open(path, encoding="utf-8") as fh:
@@ -54,6 +58,15 @@ def yaml_comment_block(body: str) -> str:
 
 
 def monitor_entry(cluster_name: str, console_url: str) -> str:
+    scheduling_webhook_query = ""
+    if cluster_name not in NO_SCHEDULING_WEBHOOK_MONITOR:
+        scheduling_webhook_query = """\
+        - query: "kube_deployment_status_replicas_available{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"} > 0 or absent(kube_deployment_status_replicas_available{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"})"
+          failure_query: "kube_deployment_status_replicas_available{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"}"
+          duration: "5m"
+          step: "30s"
+          severity: "Degraded"
+"""
     return f"""\
   - component_slug: "build-farm"
     sub_component_slug: "{cluster_name}"
@@ -105,12 +118,7 @@ def monitor_entry(cluster_name: str, console_url: str) -> str:
           duration: "15m"
           step: "1m"
           severity: "Degraded"
-        - query: "kube_deployment_status_replicas_available{{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"}} > 0 or absent(kube_deployment_status_replicas_available{{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"}})"
-          failure_query: "kube_deployment_status_replicas_available{{namespace=\\"ci-scheduling-webhook\\",deployment=\\"ci-scheduling-admission-webhook\\"}}"
-          duration: "5m"
-          step: "30s"
-          severity: "Degraded"
-"""
+{scheduling_webhook_query}"""
 
 
 def mgmt_monitor_entry(cluster_name: str, console_url: str) -> str:

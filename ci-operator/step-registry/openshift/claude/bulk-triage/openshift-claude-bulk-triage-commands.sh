@@ -258,8 +258,12 @@ fi
 # Test-name prefix: failures of this job are routed to the Test Framework component.
 PHASE_PREFIX='[Jira:"Test Framework"]'
 
+MARKDOWN_TO_HTML="/opt/ai-helpers/plugins/prow-agent/scripts/markdown_to_html.py"
+
 render_summary_html() {
-    # Deterministic markdown -> HTML (stdlib only, no LLM). Quick runs summarise burst-status.json instead.
+    # Deterministic markdown -> HTML with the shared ai-helpers renderer (no LLM). Quick runs summarise
+    # burst-status.json instead. Best effort: the markdown report stays the primary artifact, so a missing
+    # report, an image without the renderer, or a rendering failure only logs a message.
     local src="${WORKDIR:-}/${REPORT_FILE}" title="${REPORT_FILE}"
     if [[ "${TRIAGE_ANALYSIS}" == "quick" ]]; then
         [[ -s "${ARTIFACT_DIR}/burst-status.json" ]] || return 0
@@ -272,134 +276,22 @@ render_summary_html() {
             + ([.observation.views[] | "| \(.view) | \(.fetch) | \(.open // "—") | \(.open_untriaged // "—") | \(.opened_7d // "—") | \(.closed_7d // "—") |"] | join("\n")) + "\n"' \
             "${ARTIFACT_DIR}/burst-status.json" > "${src}" 2>/dev/null || return 0
     fi
-    [[ -s "${src}" ]] || return 0
-    python3 - "${src}" "${ARTIFACT_DIR}/${SUMMARY_HTML}" "${title}" <<'PYEOF' || echo "Warning: could not render ${SUMMARY_HTML}."
-import html, re, sys
-
-src, out, title = sys.argv[1:4]
-lines = open(src, encoding="utf-8", errors="replace").read().splitlines()
-
-
-def inline(t):
-    codes = []
-
-    def keep(m):
-        codes.append("<code>%s</code>" % html.escape(m.group(1)))
-        return "\x00%d\x00" % (len(codes) - 1)
-
-    t = re.sub(r"`([^`]+)`", keep, t)
-    t = html.escape(t, quote=False)
-    links = []
-
-    def link(href, text):
-        links.append('<a href="%s">%s</a>' % (href.replace('"', "%22"), text))
-        return "\x01%d\x01" % (len(links) - 1)
-
-    t = re.sub(r"\[([^\]]+)\]\((https?://[^)\s]+)\)", lambda m: link(m.group(2), m.group(1)), t)
-    t = re.sub(r"https?://[^\s<)\]]+", lambda m: link(m.group(0), m.group(0)), t)
-    t = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", t)
-    t = re.sub(r"(?<![\w*])\*([^*\s][^*]*?)\*(?![\w*])", r"<em>\1</em>", t)
-    t = re.sub(r"\x01(\d+)\x01", lambda m: links[int(m.group(1))], t)
-    return re.sub(r"\x00(\d+)\x00", lambda m: codes[int(m.group(1))], t)
-
-
-def cells(row):
-    row = row.strip()
-    if row.startswith("|"):
-        row = row[1:]
-    if row.endswith("|"):
-        row = row[:-1]
-    return [c.strip() for c in re.split(r"(?<!\\)\|", row)]
-
-
-body, para, i = [], [], 0
-
-
-def flush():
-    if para:
-        body.append("<p>%s</p>" % inline(" ".join(para)))
-        para.clear()
-
-
-while i < len(lines):
-    s = lines[i].strip()
-    if s.startswith("```"):
-        flush()
-        i += 1
-        code = []
-        while i < len(lines) and not lines[i].strip().startswith("```"):
-            code.append(lines[i])
-            i += 1
-        body.append("<pre><code>%s</code></pre>" % html.escape("\n".join(code)))
-    elif not s:
-        flush()
-    elif re.match(r"^#{1,6}\s", s):
-        flush()
-        n = len(s) - len(s.lstrip("#"))
-        body.append("<h%d>%s</h%d>" % (n, inline(s[n:].strip()), n))
-    elif re.match(r"^(-{3,}|\*{3,}|_{3,})$", s):
-        flush()
-        body.append("<hr>")
-    elif s.startswith("|") and i + 1 < len(lines) and re.match(r"^\|?\s*:?-{2,}", lines[i + 1].strip()):
-        flush()
-        head = cells(s)
-        i += 2
-        rows = []
-        while i < len(lines) and lines[i].strip().startswith("|"):
-            rows.append(cells(lines[i]))
-            i += 1
-        body.append("<table><thead><tr>%s</tr></thead><tbody>%s</tbody></table>" % (
-            "".join("<th>%s</th>" % inline(c) for c in head),
-            "".join("<tr>%s</tr>" % "".join("<td>%s</td>" % inline(c) for c in r) for r in rows)))
-        continue
-    elif re.match(r"^([-*+]|\d+[.)])\s", s):
-        flush()
-        tag = "ol" if s[0].isdigit() else "ul"
-        items = []
-        while i < len(lines) and lines[i].strip():
-            t = lines[i].strip()
-            m = re.match(r"^([-*+]|\d+[.)])\s+(.*)$", t)
-            if m:
-                items.append(m.group(2))
-            elif items:
-                items[-1] += " " + t
-            else:
-                break
-            i += 1
-        body.append("<%s>%s</%s>" % (tag, "".join("<li>%s</li>" % inline(x) for x in items), tag))
-        continue
-    elif s.startswith(">"):
-        flush()
-        quote = []
-        while i < len(lines) and lines[i].strip().startswith(">"):
-            quote.append(lines[i].strip()[1:].strip())
-            i += 1
-        body.append("<blockquote>%s</blockquote>" % inline(" ".join(quote)))
-        continue
-    else:
-        para.append(s)
-    i += 1
-flush()
-
-# Explicit colours for both schemes: Prow shows this page in a transparent iframe, so without a background the
-# job page's own (often dark) theme shows through and dark text becomes unreadable.
-css = (":root{color-scheme:light dark;--fg:#1f2328;--bg:#ffffff;--muted:#57606a;--line:#d0d7de;--soft:#f6f8fa;--link:#0969da}"
-       "@media (prefers-color-scheme:dark){:root{--fg:#e6edf3;--bg:#0d1117;--muted:#9198a1;--line:#3d444d;--soft:#161b22;--link:#4493f8}}"
-       "html{background:var(--bg)}body{background:var(--bg);color:var(--fg);font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;"
-       "font-size:14px;line-height:1.5;margin:0;padding:16px;overflow-wrap:anywhere}"
-       "h1,h2,h3,h4,h5,h6{color:var(--fg);margin:20px 0 8px;line-height:1.25}h1{font-size:1.6em}h2{font-size:1.35em;"
-       "border-bottom:1px solid var(--line);padding-bottom:4px}h3{font-size:1.15em}a{color:var(--link)}"
-       "table{border-collapse:collapse;margin:8px 0;display:block;max-width:100%;overflow-x:auto}"
-       "th,td{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}th{background:var(--soft)}"
-       "tbody tr:nth-child(even){background:var(--soft)}"
-       "code{background:var(--soft);color:var(--fg);padding:1px 4px;border-radius:4px;font-size:90%}"
-       "pre{background:var(--soft);padding:8px;overflow:auto}pre code{padding:0}"
-       "hr{border:0;border-top:1px solid var(--line);margin:16px 0}"
-       "blockquote{border-left:4px solid var(--line);margin:0;padding:0 12px;color:var(--muted)}")
-with open(out, "w", encoding="utf-8") as f:
-    f.write('<!DOCTYPE html>\n<html><head><meta charset="utf-8"><title>%s</title><style>%s</style></head><body>\n%s\n</body></html>\n'
-            % (html.escape(title), css, "\n".join(body)))
-PYEOF
+    if [[ ! -s "${src}" ]]; then
+        echo "No markdown report to render; skipping ${SUMMARY_HTML}."
+        return 0
+    fi
+    if [[ ! -f "${MARKDOWN_TO_HTML}" ]]; then
+        echo "Warning: ${MARKDOWN_TO_HTML} is not in this image; skipping ${SUMMARY_HTML}."
+        return 0
+    fi
+    # The html lens puts artifact names into the job page without escaping them.
+    if [[ ! "${SUMMARY_HTML}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+        echo "Warning: TRIAGE_VIEW has characters other than letters, digits, '.', '_' and '-'; skipping the HTML summary."
+        return 0
+    fi
+    # The renderer writes through a temporary file, so a failure or timeout leaves no partial page.
+    timeout 60 python3 "${MARKDOWN_TO_HTML}" --title "${title}" "${src}" "${ARTIFACT_DIR}/${SUMMARY_HTML}" \
+        || echo "Warning: could not render ${SUMMARY_HTML}."
 }
 
 # Ensure the report and session logs are copied to artifacts even if the script exits early

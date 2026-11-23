@@ -24,7 +24,6 @@ CALL_TIMEOUT=60
 # Ceiling on the whole step. A per-call timeout alone does not bound it: against
 # a hung API server every call burns its full timeout and the sum runs for hours.
 DEADLINE_AT=$(( $(date +%s) + 600 ))
-LOG_TAIL=2000
 
 ABSENT="${ARTIFACT_DIR}/absent-resources.txt"
 SUMMARY="${ARTIFACT_DIR}/gather-summary.txt"
@@ -343,12 +342,14 @@ while IFS= read -r ns; do
         echo "[quay-gather] SKIPPED (deadline reached): logs for ${ns}/${pod}/${container}" >>"${ABSENT}"
         break
       fi
+      # Whole log, no --tail, so the logs cover the full test window. Size
+      # assumes the kubelet's log rotation bounds what one call returns.
       # Count only logs that were actually retrieved: run() always leaves a file,
       # with a FAILED marker inside when the call failed, so counting files would
       # report collection that never happened. A call that streamed log content
       # and then failed (RUN_PARTIAL) did collect evidence, and counts.
       if run "${logdir}/${pod}-${container}.log" \
-        logs -n "${ns}" "${pod}" -c "${container}" --tail="${LOG_TAIL}" \
+        logs -n "${ns}" "${pod}" -c "${container}" \
         || [[ "${RUN_PARTIAL}" == true ]]; then
         ns_logs=$(( ns_logs + 1 )); TOTAL_LOGS=$(( TOTAL_LOGS + 1 ))
       fi
@@ -357,7 +358,7 @@ while IFS= read -r ns; do
       # so pods that never restarted add no noise.
       prev="${logdir}/${pod}-${container}-previous.log"
       timeout "${CALL_TIMEOUT}" oc logs -n "${ns}" "${pod}" -c "${container}" \
-        --previous --tail="${LOG_TAIL}" >"${prev}" 2>/dev/null
+        --previous >"${prev}" 2>/dev/null
       prev_status=$?
       if [[ "${prev_status}" -ne 0 && -s "${prev}" ]]; then
         # Killed mid-stream: keep the partial capture but say so in-band.

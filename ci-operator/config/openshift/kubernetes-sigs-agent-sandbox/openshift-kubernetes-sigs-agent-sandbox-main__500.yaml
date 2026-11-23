@@ -1,0 +1,41 @@
+base_images:
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 2Gi
+tests:
+- as: kata-e2e-azure
+  cron: 0 6 * * 3
+  steps:
+    cluster_profile: openshift-org-azure
+    env:
+      AGENT_SANDBOX_CATALOG_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/agent-sandbox-test-fbc:4d7e8911ab68aa439817f6601c07bcafe9e44b6b
+    workflow: agent-sandbox-kata-e2e-azure
+- as: kata-e2e-gcp
+  cron: 0 6 * * 3
+  steps:
+    cluster_profile: openshift-org-gcp
+    env:
+      AGENT_SANDBOX_CATALOG_IMAGE: quay.io/redhat-user-workloads/ose-osc-tenant/agent-sandbox-test-fbc:4d7e8911ab68aa439817f6601c07bcafe9e44b6b
+    workflow: agent-sandbox-kata-e2e-gcp
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: kubernetes-sigs-agent-sandbox
+  variant: "500"

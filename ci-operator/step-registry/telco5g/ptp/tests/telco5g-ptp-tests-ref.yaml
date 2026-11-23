@@ -5,6 +5,18 @@ ref:
     name: telco-runner
     tag: latest
   commands: telco5g-ptp-tests-commands.sh
+  # The step releases the shared PTP session lock from an EXIT trap.
+  grace_period: 1m
+  credentials:
+  - collection: telco5g
+    group: cikey
+    mount_path: /var/run/ci-key
+  - collection: telco5g
+    group: bastionip
+    mount_path: /var/run/bastion-ip
+  - collection: telco5g
+    group: bastionuser
+    mount_path: /var/run/bastion-user
   timeout: 3h45m
   resources:
     requests:
@@ -23,9 +35,29 @@ ref:
   - name: T5CI_DEPLOY_UPSTREAM
     default: ""
     documentation: If job should deploy upstream or downstream operator
+  - name: DAEMON_BRANCH
+    default: ""
+    documentation: |-
+      Branch or git ref built for the upstream linuxptp-daemon image.
+      Defaults to the PTP operator branch under test.
+  - name: CEP_BRANCH
+    default: ""
+    documentation: |-
+      Branch or git ref built for the upstream cloud-event-proxy image.
+      Defaults to the PTP operator branch under test. CEPv2 (5.1+) is
+      built from the linuxptp-daemon branch instead.
   - name: EVENT_PROXY_IMAGE
     default: ""
     documentation: |-
       Cloud-event-proxy (CEPv2) image pullspec used for downstream 5.1+ runs.
+  - name: PTP_LOG_RELAY_BIND
+    default: ""
+    documentation: Bind address for the temporary PTP log relay (default 0.0.0.0).
+  - name: PTP_LOG_RELAY_PORT
+    default: ""
+    documentation: Port for the temporary PTP log relay (default 8080).
+  - name: PTP_LOG_RELAY_TOKEN
+    default: ""
+    documentation: Bearer token for the relay; empty disables authentication.
   documentation: |-
     Run cnf-features-deploy selected e2e tests.

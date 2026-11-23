@@ -23,6 +23,9 @@ unset NAMESPACE
 
 TESTS_EXT=openshift-logging-e2e-tests-tests-ext
 
+# SHARED_DIR is a Kubernetes Secret (1 MiB total): stay well below that.
+readonly QE_AGENT_SHARED_DIR_BUDGET=$((900 * 1024))
+
 # Dump the operator state next to the test results to ease debugging of failures.
 function collect_operator_state() {
     echo "Collecting operator state into ${ARTIFACT_DIR}"
@@ -32,31 +35,114 @@ function collect_operator_state() {
     done
 }
 
+# Copy reduced JUnit XMLs (see the XSL below) into SHARED_DIR for the qe-agent.
+# Sets junit_copied, junit_truncated and junit_skipped in the caller.
+# Must never fail the step.
+function copy_junit_xmls_for_qe_agent() {
+    junit_copied=0
+    junit_truncated=false
+    junit_skipped=""
+    rm -f "${SHARED_DIR}"/qe-agent-junit-*.xml 2>/dev/null || true
+
+    if ! command -v xsltproc >/dev/null 2>&1; then
+        echo "WARNING: xsltproc not found, skipping the JUnit copy for the qe-agent." >&2
+        junit_skipped="no-xsltproc"
+        return 0
+    fi
+
+    local reduce_xsl="${TMPDIR:-/tmp}/qe-agent-reduce-junit.xsl"
+    if ! cat > "${reduce_xsl}" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Drop the test output of passing testcases; copy everything else. -->
+<xsl:stylesheet version="1.0" xmlns:xsl="http://www.w3.org/1999/XSL/Transform">
+  <xsl:output method="xml" encoding="UTF-8"
+              cdata-section-elements="system-out system-err failure error"/>
+  <xsl:template match="@*|node()">
+    <xsl:copy>
+      <xsl:apply-templates select="@*|node()"/>
+    </xsl:copy>
+  </xsl:template>
+  <xsl:template match="testcase[not(failure) and not(error)]/system-out"/>
+  <xsl:template match="testcase[not(failure) and not(error)]/system-err"/>
+</xsl:stylesheet>
+EOF
+    then
+        echo "WARNING: could not write ${reduce_xsl}, skipping the JUnit copy for the qe-agent." >&2
+        junit_skipped="xsl-unwritable"
+        return 0
+    fi
+
+    local i=0
+    local junit_seen=0
+    local xml
+    while IFS= read -r xml; do
+        junit_seen=$((junit_seen + 1))
+        if xsltproc --nonet "${reduce_xsl}" "${xml}" > "${SHARED_DIR}/qe-agent-junit-${i}.xml" 2>/dev/null; then
+            junit_copied=$((junit_copied + 1))
+            i=$((i + 1))
+        else
+            rm -f "${SHARED_DIR}/qe-agent-junit-${i}.xml" 2>/dev/null || true
+            echo "WARNING: could not copy ${xml} into SHARED_DIR for the qe-agent." >&2
+        fi
+    done < <(find "${ARTIFACT_DIR}" -name "*.xml" 2>/dev/null | sort)
+
+    if [[ "${junit_copied}" -eq 0 ]]; then
+        # No reports at all stays unexplained on purpose (junit-triage.md).
+        if [[ "${junit_seen}" -gt 0 ]]; then
+            junit_skipped="reduce-failed"
+        fi
+        return 0
+    fi
+
+    local total_bytes
+    total_bytes="$(du -sb "${SHARED_DIR}" 2>/dev/null | cut -f1)" || true
+    # Fail closed: an unreadable size counts as over budget.
+    total_bytes="${total_bytes:-$((QE_AGENT_SHARED_DIR_BUDGET + 1))}"
+    if ((total_bytes > QE_AGENT_SHARED_DIR_BUDGET)); then
+        echo "WARNING: SHARED_DIR is ${total_bytes} bytes with the JUnit copies (budget ${QE_AGENT_SHARED_DIR_BUDGET}), removing the copies." >&2
+        rm -f "${SHARED_DIR}"/qe-agent-junit-*.xml 2>/dev/null || true
+        junit_copied=0
+        junit_truncated=true
+    fi
+}
+
 # Write a flat context file and JUnit XMLs to SHARED_DIR for the qe-agent post-step.
 # SHARED_DIR only supports flat files (no subdirectories); subdirs are not propagated between steps.
 function notify_qe_agent() {
     local has_failures=false
     grep -rqE '<(failure|error)[ >]' "${ARTIFACT_DIR}" 2>/dev/null && has_failures=true
 
-    local i=0
-    while IFS= read -r xml; do
-        cp "${xml}" "${SHARED_DIR}/qe-agent-junit-${i}.xml" 2>/dev/null || true
-        i=$((i + 1))
-    done < <(find "${ARTIFACT_DIR}" -name "*.xml" 2>/dev/null)
+    # The qe-agent exits early when there are no failures: skip the copy then.
+    local junit_copied=0
+    local junit_truncated=false
+    local junit_skipped=""
+    if [[ "${has_failures}" == "true" ]]; then
+        copy_junit_xmls_for_qe_agent
+    fi
+
+    # Where humans find the unreduced report: the artifacts of this step's pod.
+    local junit_full_report=""
+    if [[ -n "${report_name:-}" && -s "${ARTIFACT_DIR}/${report_name}" ]]; then
+        junit_full_report="${ARTIFACT_DIR}/${report_name}"
+    fi
 
     cat > "${SHARED_DIR}/qe-agent-context.json" <<EOF
 {
   "step_script_ref": "openshift-observability/logging-e2e-tests/openshift-observability-logging-e2e-tests-commands.sh",
   "has_test_failures": ${has_failures},
+  "junit_truncated": ${junit_truncated},
+  "junit_skipped": "${junit_skipped}",
+  "junit_full_report": "${junit_full_report}",
   "env": {
     "TEST_SUITE": "${TEST_SUITE:-}"
   }
 }
 EOF
-    echo "QE agent context and ${i} JUnit XML(s) written to SHARED_DIR (has_test_failures=${has_failures})"
+    echo "QE agent context and ${junit_copied} reduced JUnit XML(s) written to SHARED_DIR (has_test_failures=${has_failures}, junit_truncated=${junit_truncated})"
 }
 
-trap 'collect_operator_state; notify_qe_agent' EXIT
+# Best effort: under errexit a failing helper would override the test exit code.
+trap 'collect_operator_state || true; notify_qe_agent || true' EXIT
 
 # Prow picks up JUnit reports named junit*.xml from ARTIFACT_DIR.
 report_name="junit_$(echo "${TEST_SUITE}" | tr '/-' '__').xml"

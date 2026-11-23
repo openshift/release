@@ -2,7 +2,9 @@
 
 set -euo pipefail
 
-CREDENTIALS_FILE="/var/run/secrets/rhoai-quay-pull/pull-secret"
+CREDENTIALS_FILE="${RHOAI_CREDENTIALS_FILE:-/var/run/secrets/rhoai-quay-pull/pull-secret}"
+# Quay auth endpoint used to validate credentials before mutating the cluster.
+QUAY_AUTH_URL="${QUAY_AUTH_URL:-https://quay.io/v2/auth?service=quay.io}"
 
 if [[ ! -r "${CREDENTIALS_FILE}" ]]; then
   echo "ERROR: Missing RHOAI Quay credentials at ${CREDENTIALS_FILE}"
@@ -43,6 +45,15 @@ fi
 
 if ! DECODED="$(printf '%s' "${AUTH}" | base64 -d 2>/dev/null)" || [[ "${DECODED}" != *:* ]]; then
   echo "ERROR: RHOAI Quay credentials must be base64(user:token)"
+  exit 1
+fi
+
+# Validate credentials against the Quay auth endpoint before touching the
+# cluster (same check docker login performs; bad credentials yield HTTP 401).
+# Credentials are passed via stdin config so they never appear in process args.
+if ! printf 'user = "%s:%s"\n' "${DECODED%%:*}" "${DECODED#*:}" | \
+  curl -fsS --max-time 30 --config - "${QUAY_AUTH_URL}" >/dev/null; then
+  echo "ERROR: Quay rejected the credentials for user \"${DECODED%%:*}\" (or auth endpoint unreachable)"
   exit 1
 fi
 unset DECODED
