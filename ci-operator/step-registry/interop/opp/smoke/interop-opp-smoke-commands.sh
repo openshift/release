@@ -459,9 +459,19 @@ TestAcsSensors() {
             .items[] | "\(.metadata.name):\(.status.phase)"
         ')"; then
             if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/sensor.err"; then
+                # Confirm absence via independent discovery, only skip after verified
+                typeset _acsSensorConfirmOut=""
+                typeset -i _acsSensorConfirmRc=0
+                _acsSensorConfirmOut="$(oc api-resources --verbs=list --namespaced -o name 2>&1)" || _acsSensorConfirmRc=$?
+                if (( _acsSensorConfirmRc != 0 )); then
+                    AddResult "acs-sensors" "fail" "Failed to query sensor pods in ${scNs}: ${_acsSensorConfirmOut}"
+                    return
+                fi
+                if printf '%s' "${_acsSensorConfirmOut}" | grep -qw "pods"; then
+                    AddResult "acs-sensors" "fail" "Failed to query sensor pods in ${scNs}: $(cat "${_opp_smoke_tmp}/sensor.err")"
+                    return
+                fi
                 AddResult "acs-sensors" "skip" "pods resource not served by this cluster"
-                # PRRT_kwDOBHvUUM65RJof: empty list vs API failure needs distinct handling, confirm absence
-                typeset _acsSensorRc=0; typeset _acsSensorErr=""; _acsSensorErr="$(oc get pods -n stackrox -l app=censor -o name 2>&1)" || _acsSensorRc=$?; if (( _acsSensorRc !=0 )); then echo "ERROR: sensor query failed rc=${_acsSensorRc}" >&2; return 1; fi
                 return
             fi
             AddResult "acs-sensors" "fail" "Failed to query sensor pods in ${scNs}"
