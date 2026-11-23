@@ -45,15 +45,44 @@ _opp_trap_handler() {
   type -t GenerateJunit >/dev/null && GenerateJunit || _genRc=$?
   type -t _propagate_junit >/dev/null && _propagate_junit
   type -t PostProcessJunit >/dev/null && PostProcessJunit
+  # Once the merge produced the routed report, the raw copy must leave
+  # SHARED_DIR: the downstream reporter reads "${SHARED_DIR}/*.xml", so a run
+  # that leaves both copies reports every test twice. The raw copy stays when
+  # the merge did not produce a file, so the failure path still carries a
+  # report.
+  if [[ -n "${SHARED_DIR:-}" && -n "${junitFile:-}" && -s "${SHARED_DIR}/junit--interop-quay-smoke-acs-odf-registry.xml" ]]; then
+      rm -f "${SHARED_DIR}/$(basename "${junitFile}")"
+  fi
   # If report generation failed and original exit was success, fail the step
   if (( _genRc != 0 && exitCode == 0 )); then
       echo "ERROR: JUnit report generation failed for otherwise successful run" >&2
       exit 1
   fi
-  # Verify at least one valid report reached SHARED_DIR or ARTIFACT_DIR
+  # Verify that the report the configured routing mode consumes is valid: with
+  # a component prefix set, only the merged report whose suite names carry that
+  # prefix is read by Component Readiness, so a valid raw report must not stand
+  # in for a merge that did not happen.
   if (( exitCode == 0 )); then
-      if ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${junitFile}')" 2>/dev/null && ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${SHARED_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml')" 2>/dev/null; then
-          echo "ERROR: no valid JUnit report in ${junitFile} or SHARED_DIR for successful run" >&2
+      typeset _mergedFile="${SHARED_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml"
+      if [[ ! -s "${_mergedFile}" && -s "${ARTIFACT_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml" ]]; then
+          _mergedFile="${ARTIFACT_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml"
+      fi
+      if [[ -n "${LP_QE__CR__TS_NAME__PFX__QUAY:-}" ]]; then
+          if ! python3 -c "
+import sys, xml.etree.ElementTree as ET
+path, pfx = sys.argv[1], sys.argv[2]
+try:
+    root = ET.parse(path).getroot()
+except Exception:
+    sys.exit(1)
+names = [ts.get('name', '') for ts in root.iter('testsuite')]
+sys.exit(0 if names and all(n.startswith(pfx) for n in names) else 1)
+" "${_mergedFile}" "${LP_QE__CR__TS_NAME__PFX__QUAY}--" 2>/dev/null; then
+              echo "ERROR: LP_QE__CR__TS_NAME__PFX__QUAY is set but ${_mergedFile} is missing, invalid, or does not carry the component prefix; the run would report green with no routable JUnit" >&2
+              exit 1
+          fi
+      elif ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${junitFile}')" 2>/dev/null && ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${_mergedFile}')" 2>/dev/null; then
+          echo "ERROR: no valid JUnit report in ${junitFile} or ${_mergedFile} for successful run" >&2
           exit 1
       fi
   fi
