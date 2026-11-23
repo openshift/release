@@ -92,7 +92,7 @@ _write_carrier() {
             [[ -n "${c}" ]] && echo "  ${c}"
         done
         echo '</testsuite>'
-    } > "${_CARRIER}" 2>/dev/null || true
+    } > "${_CARRIER}" 2>/dev/null || return 1
 }
 
 _write_shared_copy() {
@@ -101,7 +101,7 @@ _write_shared_copy() {
     # ${ARTIFACT_DIR} only). A required-but-absent failure is NEVER downgraded:
     # the reporter copy must carry the honest <failure> element.
     [[ -n "${SHARED_DIR:-}" ]] || return 0
-    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
+    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || return 1
     if [[ "${_ACS_STATE}" == "absent" && "${ACS_EXPECTATION}" == "absent-by-design" ]]; then
         {
             echo '<?xml version="1.0" encoding="UTF-8"?>'
@@ -116,17 +116,19 @@ _write_shared_copy() {
                 fi
             done
             echo '</testsuite>'
-        } > "${SHARED_DIR}/junit/junit_${_SUITE}.xml" 2>/dev/null || true
+        } > "${SHARED_DIR}/junit/junit_${_SUITE}.xml" 2>/dev/null || return 1
     else
-        cp "${_CARRIER}" "${SHARED_DIR}/junit/" 2>/dev/null || true
+        cp "${_CARRIER}" "${SHARED_DIR}/junit/" 2>/dev/null || return 1
     fi
 }
 
 _finalize() {
     (( _FINALIZED )) && return 0
     _FINALIZED=1
-    _write_carrier
-    _write_shared_copy
+    typeset -i _fin=0
+    _write_carrier || _fin=1
+    _write_shared_copy || _fin=1
+    return "${_fin}"
 }
 
 # Pre-seed a default-failing carrier: a hard SIGKILL before classification
@@ -152,7 +154,7 @@ _terminate() {
 trap '_terminate TERM' TERM
 trap '_terminate INT' INT
 _jrc=0
-trap '_jrc=$?; set +e; set +x; rm -f "${_curlCfg:-}"; if (( _jrc != 0 && _N_FAILURES == 0 )); then _add_case "step-exited-nonzero" failed "StepExit" "step exited ${_jrc} without a recorded failure (state=${_ACS_STATE:-unclassified})"; fi; _finalize; exit "${_jrc}"' EXIT
+trap '_jrc=$?; set +e; set +x; rm -f "${_curlCfg:-}"; if (( _jrc != 0 && _N_FAILURES == 0 )); then _add_case "step-exited-nonzero" failed "StepExit" "step exited ${_jrc} without a recorded failure (state=${_ACS_STATE:-unclassified})"; fi; typeset -i _fin_rc=0; _finalize || _fin_rc=1; if (( _fin_rc != 0 && _jrc == 0 )); then _jrc=1; fi; exit "${_jrc}"' EXIT
 
 # ---------------------------------------------------------------------------
 # Env-seam validation (fail-closed, unconditional - runs even when
