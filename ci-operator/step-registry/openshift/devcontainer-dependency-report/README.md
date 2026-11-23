@@ -70,12 +70,15 @@ interpreter. The reference's `run_as_script` runs the report directly. This
 check reads metadata without importing or dispatching the package CLI.
 
 `agentic-ci-advisory.json` records the observation, source config path, status
-and candidate. The Markdown has a separate openshift/release section. Advisory
-outcomes are independent of the schema-1 target-repository JSON, inventory
-counts, and exit status. Both core inventory artifacts are written before the
-advisory lookup starts. `candidate_available` means a strictly newer final
-`0.5.x` release has a non-yanked `py3-none-any` wheel whose PyPI metadata
-supports the observed final Python version. The checker bounds the PyPI lookup
+and candidate. The Markdown has a separate openshift/release section. Expected
+advisory metadata, lookup, and artifact write failures leave the schema-1
+target-repository JSON, inventory counts, and exit status unchanged. Both core
+inventory artifacts are written before the advisory lookup starts. Unexpected
+implementation errors still fail the step. `candidate_available` means a
+strictly newer final `0.5.x` release has a non-yanked `py3-none-any` wheel whose
+PyPI metadata supports the observed final Python version. The checker verifies
+a non-yanked wheel for the observed release before evaluating newer releases.
+It bounds the PyPI lookup
 to 30 seconds and 2 MiB and accepts an inclusive Python minimum, optionally with
 an exclusive maximum.
 It lists newer final series for review. Missing observations, lookup failures,
