@@ -45,6 +45,11 @@ chain:
         if [[ -n ${ETCD_STORAGE_CLASS} ]]; then
           STORAGE_CLASS_FLAG="--e2e.etcd-storage-class=${ETCD_STORAGE_CLASS}"
         fi
+
+        ROOT_VOLUME_MODE_FLAG=""
+        if [[ -n ${KUBEVIRT_ROOT_VOLUME_VOLUME_MODE} ]]; then
+          ROOT_VOLUME_MODE_FLAG="--e2e.kubevirt-root-volume-volume-mode=${KUBEVIRT_ROOT_VOLUME_VOLUME_MODE}"
+        fi
       
         export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
         export RESTRICTED_INFRA_KUBECONFIG="/tmp/secret/restricted_infra_kubeconfig"
@@ -76,6 +81,7 @@ chain:
                   --e2e.kubevirt-infra-kubeconfig=${RESTRICTED_INFRA_KUBECONFIG} \
                   ${STORAGE_CLASS_FLAG} \
                   --e2e.kubevirt-infra-namespace=${EXTERNAL_INFRA_NS} \
+                  ${ROOT_VOLUME_MODE_FLAG} \
                   --e2e.annotations=hypershift.openshift.io/management-platform=${INFRA_PLATFORM_TYPE}
     credentials:
       - mount_path: /etc/ci-pull-credentials
@@ -95,6 +101,8 @@ chain:
         name: EXTERNAL_INFRA_NS
       - default: ""
         name: ETCD_STORAGE_CLASS
+      - default: ""
+        name: KUBEVIRT_ROOT_VOLUME_VOLUME_MODE
     from: hypershift-tests
     grace_period: 30m0s
     resources:
