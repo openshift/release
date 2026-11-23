@@ -620,9 +620,16 @@ except Exception:
       # claiming readiness: the install path adopts the existing Subscription
       # (it never creates over one) and the CSV wait classifies the outcome.
       _sd_csv=""
-      _existing_csv=""
+      # undecided is a state of its own: a failed or unreadable probe is not an
+      # absent or non-Succeeded CSV.  The withheld property below carries it, so
+      # an API error is visible in the evidence instead of reading as a phase.
+      _existing_csv="undecided"
       if _sd_csv=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.status.currentCSV}' 2>/dev/null) && [[ -n "${_sd_csv}" ]]; then
-        _existing_csv=$(oc get csv "${_sd_csv}" -n "${ACS_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null) || _existing_csv=""
+        _existing_csv=$(oc get csv "${_sd_csv}" -n "${ACS_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null) || _existing_csv="undecided"
+      fi
+      # A CSV that answered with no phase is not a phase either.
+      if [[ -z "${_existing_csv}" ]]; then
+        _existing_csv="undecided"
       fi
       # Verify namespace creation event separate from removal signal (PRRT_kwDOBHvUUM65yNGJ): require independent creator proof
       typeset _ns_created_recent=false
@@ -644,8 +651,8 @@ except Exception:
         _prop "csv_phase" "Succeeded"
         exit 0
       fi
-      echo ">>> NOTE: OperatorPolicy Compliant, but current CSV '${_existing_csv:-unresolved}' (Subscription currentCSV '${_sd_csv:-empty}') is not Succeeded: self-disable withheld, installing"
-      _prop "csv_self_disable_withheld" "${_existing_csv:-unresolved}"
+      echo ">>> NOTE: OperatorPolicy Compliant, but current CSV '${_existing_csv}' (Subscription currentCSV '${_sd_csv:-empty}') is not Succeeded: self-disable withheld, installing"
+      _prop "csv_self_disable_withheld" "${_existing_csv}"
     elif [[ "${_self_disable}" == "ambiguous" ]]; then
       echo ">>> NOTE: more than one OperatorPolicy claims subscription namespace ${ACS_NAMESPACE}: self-disable withheld, installing"
       _prop "operatorpolicy_match" "ambiguous"
