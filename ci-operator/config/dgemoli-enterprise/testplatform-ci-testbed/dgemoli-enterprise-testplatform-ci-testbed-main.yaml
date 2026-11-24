@@ -1,0 +1,31 @@
+binary_build_commands: CGO_ENABLED=0 GOOS=linux make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-5.0
+images:
+  items:
+  - dockerfile_path: Containerfile
+    inputs:
+      bin:
+        paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/dgemoli-enterprise/testplatform-ci-testbed/bin/hello
+    to: hello-world
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: dgemoli-enterprise
+  repo: testplatform-ci-testbed
