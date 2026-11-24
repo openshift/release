@@ -642,6 +642,14 @@ function SettleOppOperatorCsvs () {
         typeset -i _remaining=$(( deadline - SECONDS ))
         (( _remaining <= 0 )) && break
         settleCsvs="$(oc get csv -A --request-timeout="${_remaining}s" -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.phase}}{{end}}{{"\n"}}{{end}}' 2>/dev/null || true)"
+        # Recompute the budget before the second read: the CSV listing above
+        # spent part of it, so two reads must not each claim the whole window
+        # and outlast the deadline the loop checks only at the top.
+        _remaining=$(( deadline - SECONDS ))
+        if (( _remaining <= 0 )); then
+            : "Settle budget exhausted after the CSV listing; the Subscription read is skipped"
+            break
+        fi
         settleSubs="$(oc get subscriptions.operators.coreos.com -A --request-timeout="${_remaining}s" -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.currentCSV}}{{"\t"}}{{.installedCSV}}{{end}}{{"\n"}}{{end}}' 2>/dev/null || true)"
         stableCount=0
         for settleOp in "${settleOpsArr[@]}"; do
