@@ -566,6 +566,7 @@ function RunTestCase2 () {
     : "NOTE: Waiting for ACS to scan the httpd-example image built in Test Case 1."
     acsFailureMsg='ACS integration test failed'
     typeset _acsQueryToken=''
+    typeset -i _acsListOk=0
 
     # Fetch ACS credentials.  The admin password is written to an
     # ephemeral file inside a subshell with xtrace disabled (Best
@@ -764,6 +765,13 @@ def lastn($d): split("/") | .[-$d:] | join("/");
             if httpdImageJson="$(AcsListMatchingImages "${acsHost}" "${acsPassFile}" "${jqFilter}" \
                 "${deployedRepo}" "${deployedRepoDepth}" "${deployedDigest}" "${acsTlsOpts[@]}")"; then
                 _acsQueryOk=1
+                # A successful listing clears the failure category and records
+                # that a list worked: the message on exhaustion has to describe
+                # this run, not a transient failure a later attempt recovered
+                # from. A category set by a failed attempt stays until the next
+                # success, so the retry loop keeps it while it still applies.
+                _acsQueryToken=''
+                _acsListOk=1
                 break
             else
                 typeset _acsErr=""
@@ -838,7 +846,7 @@ def lastn($d): split("/") | .[-$d:] | join("/");
         # never happened, and the row has to say which one it was.
         if (( multiMatchCount > 1 )); then
             acsFailureMsg="ACS returned ${multiMatchCount} matching records for ${deployedRepo} after $((retries * retryInterval))s; the check accepts exactly one record"
-        elif [[ -n "${_acsQueryToken}" ]]; then
+        elif [[ -n "${_acsQueryToken}" ]] && (( _acsListOk == 0 )); then
             acsFailureMsg="ACS could not be queried after $((retries * retryInterval))s (failure category: ${_acsQueryToken}); no scan result is established"
         fi
         printf '%s\n' "ERROR: ${acsFailureMsg}" >&2
