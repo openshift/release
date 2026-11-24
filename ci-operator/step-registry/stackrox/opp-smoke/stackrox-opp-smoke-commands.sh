@@ -146,14 +146,14 @@ _propagate_junit () {
     # reporters.  The carrier file is excluded here: its SHARED_DIR copy is
     # governed by the D4 channel split in _write_shared_copy.
     [[ -n "${SHARED_DIR:-}" ]] || return 0
-    mkdir -p "${SHARED_DIR}/junit"
+    mkdir -p "${SHARED_DIR}/junit" || return 1
     find "${ARTIFACT_DIR}" -maxdepth 1 -name '*.xml' \
         ! -name "junit_${_SUITE}.xml" \
-        -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+        -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || return 1
 }
 
 _jrc=0
-trap '_jrc=$?; set +e; set +x; if (( _jrc != 0 && _N_FAILURES == 0 )); then _add_case "step-exited-nonzero" failed "StepExit" "step exited ${_jrc} without a recorded failure (state=${_ACS_STATE:-unclassified})"; fi; _propagate_junit; typeset -i _fin_rc=0; _finalize || _fin_rc=1; if (( _fin_rc != 0 && _jrc == 0 )); then _jrc=1; fi; exit "${_jrc}"' EXIT
+trap '_jrc=$?; set +e; set +x; if (( _jrc != 0 && _N_FAILURES == 0 )); then _add_case "step-exited-nonzero" failed "StepExit" "step exited ${_jrc} without a recorded failure (state=${_ACS_STATE:-unclassified})"; fi; if ! _propagate_junit; then _add_case "junit-propagation" failed "Propagation" "failed to propagate JUnit results to SHARED_DIR"; fi; typeset -i _fin_rc=0; _finalize || _fin_rc=1; if (( _fin_rc != 0 )); then if (( _N_FAILURES == 0 )); then _add_case "carrier-finalize" failed "Propagation" "failed to finalize JUnit carrier"; fi; if (( _jrc == 0 )); then _jrc=1; fi; fi; exit "${_jrc}"' EXIT
 
 # ---------------------------------------------------------------------------
 # Self-test (D6 named executor): machinery validation, always on
