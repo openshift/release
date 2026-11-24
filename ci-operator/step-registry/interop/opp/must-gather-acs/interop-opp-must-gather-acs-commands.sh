@@ -241,8 +241,10 @@ collect_acs_diagnostics() {
             # port the fallback may use. Both fields come from one query, with
             # tracing off.
             typeset _route_svc_tp=''
-            ( set +x; _route_svc_tp="$(oc get route central -n "${WORKLOAD_NS}" \
-              -o jsonpath='{.spec.to.name}{"|"}{.spec.port.targetPort}' 2>/dev/null || true)" )
+            set +x
+            _route_svc_tp="$(oc get route central -n "${WORKLOAD_NS}" \
+              -o jsonpath='{.spec.to.name}{"|"}{.spec.port.targetPort}' 2>/dev/null || true)"
+            set -x
             _central_svc="${_route_svc_tp%%|*}"
             typeset _central_route_tp=''
             if [[ "${_route_svc_tp}" == *'|'* ]]; then
@@ -364,15 +366,59 @@ collect_acs_diagnostics() {
     set -x
 
     # shellcheck disable=SC2086
-    HTTP_CODE=$(curl -s ${CURL_TLS_OPTS} --connect-timeout 10 --max-time 120 -K "${CURL_CFG}" -w '%{http_code}' \
-      "https://${CENTRAL_URL_HOST}/v1/debug/diagnostics" \
-      -o "${ARTIFACT_DIR}/acs-must-gather/acs-diagnostic-bundle.zip" 2>&1) || {
-        echo "WARNING: curl failed to connect to Central."
+    # Backend download with bounded retry: if the selected backend terminates
+    # after preflight, the download fails. Refresh the candidate list and
+    # retry up to three times before givng up, consistent with the existing
+    # EndpointSlice retry patterns in this file.
+    HTTP_CODE=""
+    typeset -i _dl_attempt=0 _dl_max=3
+    while (( _dl_attempt < _dl_max )); do
+        _dl_attempt=$((_dl_attempt + 1))
+        HTTP_CODE=$(curl -s ${CURL_TLS_OPTS} --connect-timeout 10 --max-time 120 -K "${CURL_CFG}" -w '%{http_code}' \
+          "https://${CENTRAL_URL_HOST}/v1/debug/diagnostics" \
+          -o "${ARTIFACT_DIR}/acs-must-gather/acs-diagnostic-bundle.zip" 2>&1) || {
+            echo "WARNING: curl attempt ${_dl_attempt}/${_dl_max} failed to connect to Central." >&2
+            HTTP_CODE="000"
+        }
+        if [[ "${HTTP_CODE}" == "200" ]] && [[ -s "${ARTIFACT_DIR}/acs-must-gather/acs-diagnostic-bundle.zip" ]]; then
+            break
+        fi
+        if (( _dl_attempt < _dl_max )); then
+            echo "Retrying diagnostic bundle download (attempt $((_dl_attempt + 1))/${_dl_max}) after refreshing backend candidates..." >&2
+            # Refresh backend candidates before retrying, so a newly-ready
+            # endpoint can be selected after the previous one terminated.
+            if [[ -n "${_central_svc}" ]]; then
+                typeset _retry_backend="" _retry_rc=0 _retry_err
+                _retry_err=$(mktemp)
+                set +x
+                _retry_backend="$(_central_backend_target "${WORKLOAD_NS}" "${_central_svc}" "${_retry_err}" "${_central_route_tp}")" || _retry_rc=$?
+                set -x
+                rm -f "${_retry_err}"
+                if (( _retry_rc == 0 )) && [[ -n "${_retry_backend}" ]]; then
+                    # Update TLS connect-to if a backend-specific override is in use
+                    if [[ "${CURL_TLS_OPTS}" == *"--connect-to"* ]]; then
+                        typeset _retry_addr="" _retry_port=""
+                        read -r _retry_addr _retry_port <<< "$(head -n1 <<< "${_retry_backend}")"
+                        if [[ -n "${_retry_addr}" && -n "${_retry_port}" ]]; then
+                            if [[ "${_retry_addr}" == *:* ]]; then _retry_addr="[${_retry_addr}]"; fi
+                            typeset _retry_svc_dns="${_central_svc}.${WORKLOAD_NS}.svc"
+                            typeset _retry_connect="${_retry_svc_dns}:443:${_retry_addr}:${_retry_port}"
+                            CURL_TLS_OPTS="--cacert ${CENTRAL_CA_FILE} --connect-to ${_retry_connect}"
+                            CENTRAL_URL_HOST="${_retry_svc_dns}"
+                        fi
+                    fi
+                fi
+            fi
+            sleep 2 || true
+        fi
+    done
+    # Transport failures after retries still need the FAILED marker that the
+    # single-shot path created in its curl fallback.
+    if [[ "${HTTP_CODE}" == "000" ]] && [[ ! -s "${ARTIFACT_DIR}/acs-must-gather/acs-diagnostic-bundle.zip" ]]; then
+        echo "WARNING: curl failed to connect to Central after ${_dl_max} attempts." >&2
         echo "FAILED: curl transport error" > "${ARTIFACT_DIR}/acs-must-gather/FAILED"
         BUNDLE_STATUS="failed:transport"
-        HTTP_CODE="000"
-    }
-
+    fi
     if [[ "${HTTP_CODE}" == "200" ]] && \
        [[ -s "${ARTIFACT_DIR}/acs-must-gather/acs-diagnostic-bundle.zip" ]]; then
         echo "ACS diagnostic bundle downloaded (HTTP ${HTTP_CODE})."
