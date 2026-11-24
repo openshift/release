@@ -65,6 +65,12 @@ if [ "${MAP_TESTS}" = "true" ]; then
             if (( ${_opp_backup_ok:-0} )); then
                 _grc_restore_carrier "/tmp/junit_grc_placement_restore_backup.xml" "${ARTIFACT_DIR}/junit_grc_placement_restore.xml"
             fi
+            # Remove the capitalized carrier after a successful shared handoff
+            # (MAP_TESTS=true helper writes ARTIFACT_DIR/jUnit.xml and copies to
+            # SHARED_DIR). Keep the shared copy and the lowercase carrier.
+            if (( _grc_helper_rc == 0 )) && [[ -f "${SHARED_DIR:-}/jUnit.xml" ]]; then
+                rm -f "${ARTIFACT_DIR}/jUnit.xml"
+            fi
             if (( (_grc_restore_failed || _grc_helper_rc != 0) )) && (( _grc_exit_rc == 0 )); then
                 _grc_exit_rc=1
             fi
@@ -144,6 +150,63 @@ _scrub_leaktk_patterns() {
         "$1"
 }
 
+# Scrub JSON-escaped secret forms: apply the value pattern to decoded string
+# values so secrets containing " or \ that appear escaped in the serialized
+# JSON are still redacted. Operates in-place on the staged file; on failure
+# it returns non-zero and the caller discards the staged output.
+# Usage: _scrub_json_secrets FILE [expect-json]
+#   expect-json=0 (default): a file that does not decode is left to the text
+#     passes (JSON load failure is a no-op), which is what .txt evidence needs.
+#   expect-json=1: a file that does not decode fails the scrub. Undecodable
+#     .json evidence cannot be value-scrubbed, so it must not be published.
+_scrub_json_secrets() {
+    local _jf="$1" _expect="${2:-0}"
+    _SCRUB_JFILE="${_jf}" _SCRUB_PATTERN="${_secrets_pattern}" _SCRUB_EXPECT_JSON="${_expect}" python3 <<'PYEOF_JSON_SCRUB' 2>&1
+import os, re, json, sys
+jfile=os.environ.get("_SCRUB_JFILE","")
+pat=os.environ.get("_SCRUB_PATTERN","")
+expect_json=os.environ.get("_SCRUB_EXPECT_JSON","0")=="1"
+if not pat or not jfile:
+    raise SystemExit(0)
+try:
+    rx=re.compile(pat)
+except re.error as e:
+    print(f"secret pattern compile failed: {e}", file=sys.stderr)
+    raise SystemExit(1)
+try:
+    with open(jfile) as f:
+        data=json.load(f)
+except (OSError, ValueError) as e:
+    if expect_json:
+        print(f"json secret scrub failed: not decodable JSON: {e}", file=sys.stderr)
+        raise SystemExit(1)
+    # Text evidence: leave the file to the text passes.
+    raise SystemExit(0)
+def scrub_obj(o):
+    if isinstance(o, str):
+        return rx.sub("[REDACTED]", o)
+    if isinstance(o, dict):
+        return {k: scrub_obj(v) for k, v in o.items()}
+    if isinstance(o, list):
+        return [scrub_obj(x) for x in o]
+    return o
+tmp=jfile+".jsonscrub.tmp"
+try:
+    with open(tmp, 'w') as f:
+        json.dump(scrub_obj(data), f, indent=2)
+        f.write("\n")
+    with open(tmp) as f:
+        json.load(f)
+    os.replace(tmp, jfile)
+except (OSError, ValueError) as e:
+    print(f"json secret scrub failed: {e}", file=sys.stderr)
+    raise SystemExit(1)
+finally:
+    if os.path.exists(tmp):
+        os.unlink(tmp)
+PYEOF_JSON_SCRUB
+}
+
 # Temp allocation, checked (errexit is disabled). mktemp can fail on a full or
 # unwritable /tmp, and an empty result would turn later redirects and globs
 # into paths under "/", so every allocation goes through these helpers.
@@ -209,11 +272,21 @@ if [[ -f "$_sa_token_file" ]]; then
     unset _sa_token
 fi
 
-# Build a sed alternation pattern from the collected secret values.
+# Build a sed alternation pattern from the collected secret values, longest
+# first. sed matches leftmost-longest, but the Python consumers of this
+# pattern (_scrub_json_secrets and the XML value scrub) take the first
+# alternative that matches at a position, so a shorter value collected before
+# a longer value it prefixes would be redacted on its own and the rest of the
+# longer value would be published. Equal-length values keep collection order.
 _secrets_pattern=""
-for _val in "${_secret_vals[@]+"${_secret_vals[@]}"}"; do
+while IFS= read -r _val; do
     _secrets_pattern="${_secrets_pattern:+${_secrets_pattern}|}$(_sed_ere_escape "$_val")"
-done
+done < <(
+    for ((_val_i = 0; _val_i < ${#_secret_vals[@]}; _val_i++)); do
+        printf '%s\t%s\n' "${#_secret_vals[_val_i]}" "${_secret_vals[_val_i]}"
+    done | sort -t $'\t' -k1,1nr -s | cut -f2-
+)
+unset _val_i
 
 # --- OPP placement snapshot (INTEROP-9711) --------------------------------
 # The GRC suite relabels managedclusters/local-cluster into the global
@@ -387,15 +460,29 @@ print(json.dumps(result, indent=2))
         _mk_tmp _opp_tmp
         _opp_dest="${_OPP_EVIDENCE_DIR}/$(basename "${_opp_f}")"
         typeset -i _opp_scrub_ok=1
-        if [[ -n "${_secrets_pattern}" ]]; then
-            if ! sed -E "s/${_secrets_pattern}/[REDACTED]/g" "${_opp_f}" > "${_opp_tmp}"; then
-                echo "ERROR: OPP evidence value scrub failed for ${_opp_f}" >&2
+        typeset -i _opp_expect_json=0
+        if [[ "${_opp_f}" == *.json ]]; then
+            _opp_expect_json=1
+        fi
+        if ! cp "${_opp_f}" "${_opp_tmp}"; then
+            echo "ERROR: OPP evidence staging copy failed for ${_opp_f}" >&2
+            _opp_scrub_ok=0
+            rm -f "${_opp_tmp}"
+        fi
+        # Decoded-value pass first: the text pass below truncates a collected
+        # value that ends in a backslash, leaving the document undecodable, and
+        # a decode failure skips this pass, so the escaped forms would be
+        # published unredacted.
+        if (( _opp_scrub_ok )); then
+            if ! _scrub_json_secrets "${_opp_tmp}" "${_opp_expect_json}"; then
+                echo "ERROR: OPP evidence JSON value scrub failed for ${_opp_f}" >&2
                 _opp_scrub_ok=0
                 rm -f "${_opp_tmp}"
             fi
-        else
-            if ! cp "${_opp_f}" "${_opp_tmp}"; then
-                echo "ERROR: OPP evidence staging copy failed for ${_opp_f}" >&2
+        fi
+        if (( _opp_scrub_ok )) && [[ -n "${_secrets_pattern}" ]]; then
+            if ! sed -E -i "s/${_secrets_pattern}/[REDACTED]/g" "${_opp_tmp}"; then
+                echo "ERROR: OPP evidence value scrub failed for ${_opp_f}" >&2
                 _opp_scrub_ok=0
                 rm -f "${_opp_tmp}"
             fi
@@ -1207,6 +1294,7 @@ except Exception:
         _OPP_SNAPSHOT_FAILED=1
     else
         mkdir -p "${_OPP_POST_RAW_STAGING}" "${_OPP_EVIDENCE_DIR}"
+        typeset -i _opp_cap_rc=0
         oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | \
             python3 -c '
 import json, sys
@@ -1216,7 +1304,13 @@ print(json.dumps({
     "namespace": d["metadata"]["namespace"],
     "status": d.get("status", {})
 }, indent=2))
-' > "${_OPP_POST_RAW_STAGING}/05-placement-status-post.json" 2>&1
+' > "${_OPP_POST_RAW_STAGING}/05-placement-status-post.json" 2>&1 || _opp_cap_rc=$?
+        if (( _opp_cap_rc != 0 )); then
+            rm -f "${_OPP_POST_RAW_STAGING}/05-placement-status-post.json"
+            echo "ERROR: OPP placement status capture failed (rc=${_opp_cap_rc}); not published" >&2
+            _OPP_SNAPSHOT_FAILED=1
+        fi
+        _opp_cap_rc=0
         oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | \
             python3 -c '
 import json, sys
@@ -1228,22 +1322,35 @@ for item in d.get("items", []):
         "decisions": item.get("status", {}).get("decisions")
     })
 print(json.dumps(result, indent=2))
-' > "${_OPP_POST_RAW_STAGING}/06-placementdecisions-post.json" 2>&1
+' > "${_OPP_POST_RAW_STAGING}/06-placementdecisions-post.json" 2>&1 || _opp_cap_rc=$?
+        if (( _opp_cap_rc != 0 )); then
+            rm -f "${_OPP_POST_RAW_STAGING}/06-placementdecisions-post.json"
+            echo "ERROR: OPP placementdecision capture failed (rc=${_opp_cap_rc}); not published" >&2
+            _OPP_SNAPSHOT_FAILED=1
+        fi
         for _opp_f in "${_OPP_POST_RAW_STAGING}"/*.json; do
             [[ -f "${_opp_f}" ]] || continue
             _opp_tmp=""
             _mk_tmp _opp_tmp
             _opp_dest="${_OPP_EVIDENCE_DIR}/$(basename "${_opp_f}")"
             typeset -i _opp_scrub_ok=1
-            if [[ -n "${_secrets_pattern}" ]]; then
-                if ! sed -E "s/${_secrets_pattern}/[REDACTED]/g" "${_opp_f}" > "${_opp_tmp}"; then
-                    echo "ERROR: OPP evidence value scrub failed for ${_opp_f}" >&2
+            if ! cp "${_opp_f}" "${_opp_tmp}"; then
+                echo "ERROR: OPP evidence staging copy failed for ${_opp_f}" >&2
+                _opp_scrub_ok=0
+                rm -f "${_opp_tmp}"
+            fi
+            # Same order as the pre-suite loop: decoded values before the text
+            # pass, which can truncate an escaped trailing backslash.
+            if (( _opp_scrub_ok )); then
+                if ! _scrub_json_secrets "${_opp_tmp}" 1; then
+                    echo "ERROR: OPP evidence JSON value scrub failed for ${_opp_f}" >&2
                     _opp_scrub_ok=0
                     rm -f "${_opp_tmp}"
                 fi
-            else
-                if ! cp "${_opp_f}" "${_opp_tmp}"; then
-                    echo "ERROR: OPP evidence staging copy failed for ${_opp_f}" >&2
+            fi
+            if (( _opp_scrub_ok )) && [[ -n "${_secrets_pattern}" ]]; then
+                if ! sed -E -i "s/${_secrets_pattern}/[REDACTED]/g" "${_opp_tmp}"; then
+                    echo "ERROR: OPP evidence value scrub failed for ${_opp_f}" >&2
                     _opp_scrub_ok=0
                     rm -f "${_opp_tmp}"
                 fi
