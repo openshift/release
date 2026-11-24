@@ -532,11 +532,12 @@ if [[ "${_op_crd_state}" == "present" ]]; then
   # absence: no policy of that kind can exist, so the install path runs.
   _op_query_ok=false
   _op_status=""
+  _op_err=$(mktemp)
   for _op_attempt in 1 2 3; do
     # Fully-qualified group and kind, the form the CRD probe above uses: a bare
     # kind resolves by name alone, so any other registered group serving an
     # OperatorPolicy would answer for this one.
-    if _op_status=$(oc get operatorpolicies.policy.open-cluster-management.io -A -o json 2>&1); then
+    if _op_status=$(oc get operatorpolicies.policy.open-cluster-management.io -A -o json 2>"${_op_err}"); then
       _op_query_ok=true
       break
     fi
@@ -544,16 +545,20 @@ if [[ "${_op_crd_state}" == "present" ]]; then
     sleep 5
   done
   if [[ "${_op_query_ok}" != "true" ]]; then
-    if [[ "${_op_status}" == *"Error from server (NotFound)"* ]]; then
+    _api_quiet
+    _op_err_text=$(cat "${_op_err}" 2>/dev/null || echo unknown)
+    _api_loud
+    if [[ "${_op_err_text}" == *"Error from server (NotFound)"* ]]; then
       _prop "operatorpolicy_query" "not-found"
       _op_status=""
     else
-      _classify "acs-operatorpolicy-query-failed" "operatorpolicy list failed cluster-wide after 3 attempts ($(_api_err_class "${_op_status}")); self-disable undecidable, not installing"
+      _classify "acs-operatorpolicy-query-failed" "operatorpolicy list failed cluster-wide after 3 attempts ($(_api_err_class "${_op_err_text}")); self-disable undecidable, not installing"
       echo "ERROR: ${_class_detail}"
       _dump_diagnostics
       exit 1
     fi
   fi
+  rm -f "${_op_err}"
   if [[ -n "${_op_status}" ]]; then
     _self_disable=$(printf '%s' "${_op_status}" | python3 -c '
 import json, sys
@@ -752,29 +757,34 @@ _prop "workaround_removal_ready" "false"
 _sub_state="undecided"
 _sub_existing_channel=""
 _sub_probe=""
+_sub_err=$(mktemp)
 _api_quiet
 for _sub_attempt in 1 2 3; do
-  if _sub_probe=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>&1); then
+  if _sub_probe=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>"${_sub_err}"); then
     _sub_state="present"
     _sub_existing_channel="${_sub_probe}"
     break
   fi
   # The same shape test the sibling probes use: a missing helper or a wrapper
   # message carrying the phrase is a broken capture path, not an API answer.
-  if [[ "${_sub_probe}" == *"Error from server (NotFound)"* ]]; then
+  _sub_err_text=$(cat "${_sub_err}" 2>/dev/null || echo unknown)
+  if [[ "${_sub_err_text}" == *"Error from server (NotFound)"* ]]; then
     _sub_state="absent"
     break
   fi
   # No sleep after the last attempt: there is no retry left to use it.
   if (( _sub_attempt >= 3 )); then
-    echo ">>> subscription probe failed (attempt ${_sub_attempt}/3), no attempts left: $(_api_err_class "${_sub_probe}")"
+    _sub_err_text=$(cat "${_sub_err}" 2>/dev/null || echo unknown)
+    echo ">>> subscription probe failed (attempt ${_sub_attempt}/3), no attempts left: $(_api_err_class "${_sub_err_text}")"
     break
   fi
   _sub_backoff=$(( _sub_attempt == 1 ? 5 : 15 ))
-  echo ">>> subscription probe failed (attempt ${_sub_attempt}/3), retrying in ${_sub_backoff}s: $(_api_err_class "${_sub_probe}")"
+  _sub_err_text=$(cat "${_sub_err}" 2>/dev/null || echo unknown)
+  echo ">>> subscription probe failed (attempt ${_sub_attempt}/3), retrying in ${_sub_backoff}s: $(_api_err_class "${_sub_err_text}")"
   sleep "${_sub_backoff}"
 done
 _api_loud
+rm -f "${_sub_err}"
 _prop "subscription_probe" "${_sub_state}"
 
 # --- Fail-fast precondition: packagemanifest must exist, and the channel this
@@ -789,9 +799,10 @@ _prop "subscription_probe" "${_sub_state}"
 _precondition_ok=false
 _pm_raw=""
 _pm_notfound=false
+_pm_err=$(mktemp)
 _api_quiet
 for _attempt in 1 2 3; do
-  if _pm_raw=$(oc get packagemanifest rhacs-operator -n openshift-marketplace -o json 2>&1); then
+  if _pm_raw=$(oc get packagemanifest rhacs-operator -n openshift-marketplace -o json 2>"${_pm_err}"); then
     _precondition_ok=true
     break
   fi
@@ -802,7 +813,8 @@ for _attempt in 1 2 3; do
   # and make the "(successful query)" detail below false. The shape test also
   # needs no pipe over this payload (a full packagemanifest JSON), so a
   # producer still writing when the test answers cannot take SIGPIPE.
-  if [[ "${_pm_raw}" == *"Error from server (NotFound)"* ]]; then
+  _pm_err_text=$(cat "${_pm_err}" 2>/dev/null || echo unknown)
+  if [[ "${_pm_err_text}" == *"Error from server (NotFound)"* ]]; then
     _pm_notfound=true
     break
   fi
@@ -810,13 +822,16 @@ for _attempt in 1 2 3; do
   # the 30s came straight out of the shared work budget on the path that was
   # already failing. The sibling OperatorGroup ladder ends the same way.
   if (( _attempt >= 3 )); then
-    echo ">>> precondition query failed (attempt ${_attempt}/3), no attempts left: $(_api_err_class "${_pm_raw}")"
+    _pm_err_text=$(cat "${_pm_err}" 2>/dev/null || echo unknown)
+    echo ">>> precondition query failed (attempt ${_attempt}/3), no attempts left: $(_api_err_class "${_pm_err_text}")"
     break
   fi
   _backoff=$(( _attempt == 1 ? 5 : 15 ))
-  echo ">>> precondition query failed (attempt ${_attempt}/3), retrying in ${_backoff}s: $(_api_err_class "${_pm_raw}")"
+  _pm_err_text=$(cat "${_pm_err}" 2>/dev/null || echo unknown)
+  echo ">>> precondition query failed (attempt ${_attempt}/3), retrying in ${_backoff}s: $(_api_err_class "${_pm_err_text}")"
   sleep "${_backoff}"
 done
+rm -f "${_pm_err}"
 _catalog_listing=false
 if [[ "${_precondition_ok}" == "true" ]]; then
   _catalog_listing=true
@@ -826,14 +841,14 @@ elif [[ "${_sub_state}" == "present" ]]; then
     echo ">>> NOTE: packagemanifest rhacs-operator not found in openshift-marketplace; Subscription rhacs-operator already exists - not gating adoption on the catalog listing"
   else
     _prop "catalog_precondition" "query-failed-adopted"
-    echo ">>> NOTE: packagemanifest query failed after 3 attempts ($(_api_err_class "${_pm_raw}")); Subscription rhacs-operator already exists - not gating adoption on the catalog listing"
+    echo ">>> NOTE: packagemanifest query failed after 3 attempts ($(_api_err_class "${_pm_err_text}")); Subscription rhacs-operator already exists - not gating adoption on the catalog listing"
   fi
 elif [[ "${_sub_state}" == "undecided" ]]; then
   # Both answers are unknown at once: the probe never answered and the catalog
   # listing is unavailable. A Subscription may exist, so neither a missing nor
   # an erroring catalog may be reported in its place; the probe's own failure
   # is the classification and the catalog outcome is a class in the detail.
-  _classify "acs-subscription-query-failed" "subscription rhacs-operator probe errored after 3 attempts ($(_api_err_class "${_sub_probe}")) with the catalog listing also unavailable ($(_api_err_class "${_pm_raw}"))"
+  _classify "acs-subscription-query-failed" "subscription rhacs-operator probe errored after 3 attempts ($(_api_err_class "${_sub_err_text}")) with the catalog listing also unavailable ($(_api_err_class "${_pm_err_text}"))"
   echo "ERROR: ${_class_detail}"
   exit 1
 elif [[ "${_pm_notfound}" == "true" ]]; then
@@ -841,7 +856,7 @@ elif [[ "${_pm_notfound}" == "true" ]]; then
   echo "ERROR: ${_class_detail}"
   exit 1
 else
-  _classify "acs-catalog-query-failed" "packagemanifest query errored after 3 attempts (non-reverting class: $(_api_err_class "${_pm_raw}"))"
+  _classify "acs-catalog-query-failed" "packagemanifest query errored after 3 attempts (non-reverting class: $(_api_err_class "${_pm_err_text}"))"
   echo "ERROR: ${_class_detail}"
   exit 1
 fi
