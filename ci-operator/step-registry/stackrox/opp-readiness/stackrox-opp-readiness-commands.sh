@@ -807,13 +807,13 @@ if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platfo
 fi
 
 if ! WaitFor "Central CR namespace discovery" DiscoverCentralNs PeriodicOperatorDiagnostics; then
-    if (( _centralCrdInitiallyOk )); then
+    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
         _add_case "central-crd" passed
     else
         _add_case "central-crd" failed "Assertion" "Central CRD not registered"
         _assert_rc=1
     fi
-    if (( _scCrdInitiallyOk )); then
+    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
         _add_case "securedcluster-crd" passed
     else
         _add_case "securedcluster-crd" failed "Assertion" "SecuredCluster CRD not registered"
@@ -834,25 +834,17 @@ echo "[readiness] Central namespace: ${centralNs}"
 # the WaitFor DiscoverScNs call is the real bounded existence wait.
 if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs; then
     # Emit deferred CRD cases before handling discovery failure
-    if (( _centralCrdInitiallyOk )); then
+    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
         _add_case "central-crd" passed
     else
-        if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
-            _add_case "central-crd" passed
-        else
-            _add_case "central-crd" failed "Assertion" "Central CRD not registered"
-            _assert_rc=1
-        fi
+        _add_case "central-crd" failed "Assertion" "Central CRD not registered"
+        _assert_rc=1
     fi
-    if (( _scCrdInitiallyOk )); then
+    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
         _add_case "securedcluster-crd" passed
     else
-        if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
-            _add_case "securedcluster-crd" passed
-        else
-            _add_case "securedcluster-crd" failed "Assertion" "SecuredCluster CRD not registered"
-            _assert_rc=1
-        fi
+        _add_case "securedcluster-crd" failed "Assertion" "SecuredCluster CRD not registered"
+        _assert_rc=1
     fi
     # DiscoverScNs fails both for a failed read and for a 0-exit read that
     # yields no namespace: only the second is an absent workload. Re-read once
@@ -881,25 +873,17 @@ if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs; then
 fi
 echo "[readiness] SecuredCluster namespace: ${scNs}"
 # Emit deferred CRD assertions after successful discovery, re-checking late registration
-if (( _centralCrdInitiallyOk )); then
+if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
     _add_case "central-crd" passed
 else
-    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
-        _add_case "central-crd" passed
-    else
-        _add_case "central-crd" failed "Assertion" "Central CRD not registered"
-        _assert_rc=1
-    fi
+    _add_case "central-crd" failed "Assertion" "Central CRD not registered"
+    _assert_rc=1
 fi
-if (( _scCrdInitiallyOk )); then
+if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
     _add_case "securedcluster-crd" passed
 else
-    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
-        _add_case "securedcluster-crd" passed
-    else
-        _add_case "securedcluster-crd" failed "Assertion" "SecuredCluster CRD not registered"
-        _assert_rc=1
-    fi
+    _add_case "securedcluster-crd" failed "Assertion" "SecuredCluster CRD not registered"
+    _assert_rc=1
 fi
 
 # ---------------------------------------------------------------------------
