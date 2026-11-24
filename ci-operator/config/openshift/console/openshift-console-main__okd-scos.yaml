@@ -1,12 +1,12 @@
 base_images:
+  ocp_builder_rhel-9-base-nodejs-openshift-5.1:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-nodejs-openshift-5.1
   ocp_builder_rhel-9-golang-1.26-openshift-5.1:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.26-openshift-5.1
-  ocp_builder_rhel-9-openshift-nodejs-base-5.1.art:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-openshift-nodejs-base-5.1.art
   origin_scos-5.1_base-stream10:
     name: scos-5.1
     namespace: origin
@@ -22,20 +22,22 @@ build_root:
     tag: rhel-9-golang-1.26-openshift-5.1
 images:
   items:
-  - build_args:
+  - additional_architectures:
+    - arm64
+    build_args:
     - name: TAGS
       value: scos
     dockerfile_path: Dockerfile
     from: origin_scos-5.1_base-stream10
     inputs:
+      ocp_builder_rhel-9-base-nodejs-openshift-5.1:
+        as:
+        - nodebuilder
+        - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-5.1
       ocp_builder_rhel-9-golang-1.26-openshift-5.1:
         as:
         - gobuilder
         - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-5.1
-      ocp_builder_rhel-9-openshift-nodejs-base-5.1.art:
-        as:
-        - nodebuilder
-        - registry.ci.openshift.org/ocp/builder:rhel-9-base-nodejs-openshift-5.1
     to: console
   - build_args:
     - name: TAGS
