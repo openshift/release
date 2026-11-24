@@ -40,6 +40,11 @@ _api_err_class() {
   esac
 }
 
+# _quiet_begin/_quiet_end: turn tracing off for a region and restore the
+# caller's state, so a nested scope cannot re-enable tracing early.
+_quiet_begin() { _quiet_was_on=0; case $- in *x*) _quiet_was_on=1; set +x ;; esac; }
+_quiet_end()   { if [[ "${_quiet_was_on}" == "1" ]]; then set -x; fi; }
+
 # _central_backend_target <namespace> <service> [<stderr-file>] [<route-target-port>]
 # Prints one "<address> <port>" line per ready backend of the service, taken
 # from the EndpointSlices the endpoint controller maintains for it. When a
@@ -64,10 +69,10 @@ _central_backend_target() {
     # remaining ports, which picked whichever port happened to sort first.
     typeset _rt_port="${4:-}"
     typeset _oc_rc=0
-    set +x
+    typeset _cb_was_on=0; case $- in *x*) _cb_was_on=1; set +x;; esac
     _slice_json="$(oc get endpointslices -n "$1" \
       -l "kubernetes.io/service-name=$2" -o json 2>"${_errfile}")" || _oc_rc=$?
-    if (( _oc_rc != 0 )); then set -x; return 2; fi
+    if (( _oc_rc != 0 )); then if (( _cb_was_on )); then set -x; fi; return 2; fi
     # _errfile is temporary, not artifact; raw error text never leaves as artifact
     if [[ -s "${_errfile}" ]]; then
         printf 'EndpointSlice query failed: %s\n' "$(head -c 200 "${_errfile}")" >&2
@@ -113,9 +118,9 @@ for item in data.get("items", []):
 # address the download could use.
 print("\n".join(candidates))
 sys.exit(0)
-' "${_rt_port}")" || { set -x; return 3; }
+' "${_rt_port}")" || { if (( _cb_was_on )); then set -x; fi; return 3; }
     printf '%s\n' "${_backend_target}"
-    set -x
+    if (( _cb_was_on )); then set -x; fi
 }
 
 # ─── ACS Diagnostic Collection ──────────────────────────────────────────────
@@ -245,10 +250,9 @@ collect_acs_diagnostics() {
             # port the fallback may use. Both fields come from one query, with
             # tracing off.
             typeset _route_svc_tp=''
-            set +x
+            _quiet_begin
             _route_svc_tp="$(oc get route central -n "${WORKLOAD_NS}" \
               -o jsonpath='{.spec.to.name}{"|"}{.spec.port.targetPort}' 2>/dev/null || true)"
-            set -x
             _central_svc="${_route_svc_tp%%|*}"
             typeset _central_route_tp=''
             if [[ "${_route_svc_tp}" == *'|'* ]]; then
@@ -265,9 +269,7 @@ collect_acs_diagnostics() {
                     "${_backend_errfile}" "${_central_route_tp}"
                 )" || _central_backend_rc=$?
                 if [[ -s "${_backend_errfile}" ]]; then
-                    set +x
                     printf "EndpointSlice query failed: %s\n" "$(_api_err_class "$(head -c 200 "${_backend_errfile}")")" >&2
-                    set -x
                 fi
                 rm -f "${_backend_errfile}"
             fi
@@ -292,7 +294,6 @@ collect_acs_diagnostics() {
                     if [[ "${_central_addr}" == *:* ]]; then
                         _central_addr="[${_central_addr}]"
                     fi
-                    set +x
                     _central_connect_to="${_central_svc_dns}:443:${_central_addr}:${_central_port}"
                     if curl -sS -o /dev/null --cacert "${CENTRAL_CA_FILE}" \
                           --connect-to "${_central_connect_to}" \
@@ -314,8 +315,8 @@ collect_acs_diagnostics() {
                         _central_failed_tries=$(( _central_failed_tries + 1 ))
                         echo "Backend-direct TLS preflight against a ready backend endpoint failed (curl exit ${_central_direct_rc}); trying the next ready backend." >&2
                     fi
-                    set -x
                 done <<<"${_central_backend}"
+                _quiet_end
                 if [[ "${TLS_MODE}" != "verified" ]] && (( _central_failed_tries > 0 )); then
                     echo "backend-direct preflight failed on ${_central_failed_tries} ready backend(s): last curl exit ${_central_direct_rc}" >>"${TLS_PREFLIGHT_ERR}"
                 fi
@@ -378,6 +379,7 @@ collect_acs_diagnostics() {
     # after preflight, the download fails. Refresh the candidate list and
     # retry up to three times before givng up, consistent with the existing
     # EndpointSlice retry patterns in this file.
+    _quiet_begin
     HTTP_CODE=""
     typeset -i _dl_attempt=0 _dl_max=3
     while (( _dl_attempt < _dl_max )); do
@@ -403,9 +405,7 @@ collect_acs_diagnostics() {
             if [[ -n "${_central_svc}" ]]; then
                 typeset _retry_backend="" _retry_rc=0 _retry_err
                 _retry_err=$(mktemp)
-                set +x
                 _retry_backend="$(_central_backend_target "${WORKLOAD_NS}" "${_central_svc}" "${_retry_err}" "${_central_route_tp}")" || _retry_rc=$?
-                set -x
                 rm -f "${_retry_err}"
                 if (( _retry_rc == 0 )) && [[ -n "${_retry_backend}" ]]; then
                     # Update TLS connect-to if a backend-specific override is in use
@@ -425,6 +425,7 @@ collect_acs_diagnostics() {
             sleep 2 || true
         fi
     done
+    _quiet_end
     # Transport failures after retries still need the FAILED marker that the
     # single-shot path created in its curl fallback. Remove any partial
     # file from a timed-out curl so it is never treated as publishable.
