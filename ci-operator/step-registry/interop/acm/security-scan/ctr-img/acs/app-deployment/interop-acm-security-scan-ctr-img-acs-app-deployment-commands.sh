@@ -483,6 +483,8 @@ AcsListMatchingImages () {
     typeset -i pageCap=100
     typeset -i _acsRetry=0
     typeset _acsLastErr=""  # sanitized error token for 401 retry (thread PRRT_kwDOBHvUUM65RJn1)
+    typeset _acsErrFile="${ARTIFACT_DIR:-/tmp}/acs-curl.err"
+    typeset _acsFailKind='error'
     # Deadline is shared with caller when acsDeadline is set; reserve 60s for report
     typeset -i _acsDeadlineLocal=${acsDeadline:-0}
     typeset -i page=0
@@ -502,12 +504,14 @@ AcsListMatchingImages () {
     while :; do
         if (( page >= pageCap )); then
             fetchRc=1
+            _acsFailKind='page-cap'
             break
         fi
         # A page request can block for its whole --max-time, so stop before the
         # shared budget is exhausted and let the caller read a failed listing.
         if (( _acsDeadlineLocal > 0 )) && (( SECONDS + 60 >= _acsDeadlineLocal )); then
             fetchRc=1
+            _acsFailKind='deadline'
             break
         fi
         offset=$(( page * pageLimit ))
@@ -518,7 +522,8 @@ AcsListMatchingImages () {
             set +x
             curl -fsSL "${tlsOpts[@]}" --connect-timeout 15 --max-time 60 \
                 --config <(printf 'user = "admin:%s"\n' "$(cat "${passFile}")") \
-                "https://${host}/v1/images?pagination.limit=${pageLimit}&pagination.offset=${offset}"
+                "https://${host}/v1/images?pagination.limit=${pageLimit}&pagination.offset=${offset}" \
+                2>"${_acsErrFile}"
         )" || { fetchRc=$?; break; }
         pageRecords=$(printf '%s' "${pageJson}" | /tmp/jq '.images | length') || { fetchRc=1; break; }
         pageMatches=$(printf '%s' "${pageJson}" | /tmp/jq --arg repo "${repo}" \
@@ -533,7 +538,23 @@ AcsListMatchingImages () {
         fi
         page+=1
     done
-    (( fetchRc == 0 )) || return "${fetchRc}"
+    if (( fetchRc != 0 )); then
+        set +x
+        if [[ "${_acsFailKind}" == 'error' && -s "${_acsErrFile}" ]]; then
+            case "$(cat "${_acsErrFile}")" in
+                *401*|*nauthorized*)            _acsFailKind='unauthorized' ;;
+                *403*|*orbidden*)               _acsFailKind='forbidden' ;;
+                *404*|*NotFound*)               _acsFailKind='not-found' ;;
+                *"timed out"*|*imeout*)         _acsFailKind='timeout' ;;
+                *"Failed to connect"*|*"Could not resolve"*) _acsFailKind='transport' ;;
+            esac
+        fi
+        printf '%s\n' "${_acsFailKind}" > "${ARTIFACT_DIR:-/tmp}/acs-err.log" 2>/dev/null || true
+        rm -f "${_acsErrFile}"
+        set -x
+        return "${fetchRc}"
+    fi
+    rm -f "${_acsErrFile}"
     printf '%s\n' "${matches}"
 }
 
@@ -544,6 +565,7 @@ function RunTestCase2 () {
     : "====== Test Case 2: Test ACS Integration ======"
     : "NOTE: Waiting for ACS to scan the httpd-example image built in Test Case 1."
     acsFailureMsg='ACS integration test failed'
+    typeset _acsQueryToken=''
 
     # Fetch ACS credentials.  The admin password is written to an
     # ephemeral file inside a subshell with xtrace disabled (Best
@@ -746,12 +768,12 @@ def lastn($d): split("/") | .[-$d:] | join("/");
             else
                 typeset _acsErr=""
                 _acsErr=$(cat "${ARTIFACT_DIR:-/tmp}/acs-err.log" 2>/dev/null || echo unknown)
-                if [[ "${_acsErr}" == *"401"* || "${_acsErr}" == *"403"* || "${_acsErr}" == *"Forbidden"* ]]; then
-                    echo "ACS query failed with ${_acsErr}, retry ${_acsTry}/3" >&2
+                _acsQueryToken="${_acsErr:-unknown}"
+                if [[ "${_acsErr}" == 'unauthorized' || "${_acsErr}" == 'forbidden' ]]; then
+                    echo "ACS query failed (${_acsErr}), retry ${_acsTry}/3" >&2
                     sleep $(( _acsTry * 2 ))
                     continue
                 else
-                    # PRRT_kwDOBHvUUM65RJn1: distinguish request failure from empty results; keep failure marker
                     httpdImageJson='__QUERY_FAILED__'
                     break
                 fi
@@ -816,8 +838,10 @@ def lastn($d): split("/") | .[-$d:] | join("/");
         # never happened, and the row has to say which one it was.
         if (( multiMatchCount > 1 )); then
             acsFailureMsg="ACS returned ${multiMatchCount} matching records for ${deployedRepo} after $((retries * retryInterval))s; the check accepts exactly one record"
-            printf '%s\n' "ERROR: ${acsFailureMsg}" >&2
+        elif [[ -n "${_acsQueryToken}" ]]; then
+            acsFailureMsg="ACS could not be queried after $((retries * retryInterval))s (failure category: ${_acsQueryToken}); no scan result is established"
         fi
+        printf '%s\n' "ERROR: ${acsFailureMsg}" >&2
         return 1
     fi
 
