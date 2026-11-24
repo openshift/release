@@ -691,9 +691,17 @@ if [[ "${_ACS_STATE}" == "absent" && "${ACS_EXPECTATION}" == "required" ]]; then
             _add_classification "acs-state-indeterminate" failed "Classification" "acs-unclassified:central-query/read failed during provisional hold; never classified as absent without a successful read"
             exit 3
         fi
-        if CheckCentralPresent; then
+        CheckCentralPresent
+        typeset -i _recheck_rc=$?
+        if (( _recheck_rc == 0 )); then
             _ACS_STATE="present"
             echo "[readiness] ACS state re-classified after provisional hold (late success): ${_ACS_STATE}"
+        elif (( _recheck_rc == 2 )); then
+            echo "[readiness] provisional hold recheck: read failed, failing indeterminate" >&2
+            _ACS_STATE="unknown"
+            _add_classification "acs-state-indeterminate" failed "Classification" "acs-unclassified:central-query/read failed during provisional hold recheck; never classified as absent without a successful read"
+            _ensure_assertion_rows
+            exit 3
         else
             echo "[readiness] provisional hold expired: finalizing absent"
         fi
