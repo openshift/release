@@ -246,6 +246,9 @@ if ! _exitTrapHelper="$(
 elif [[ -z "${_exitTrapHelper}" ]]; then
     printf '%s\n' "WARNING: ExitTrap helper download returned empty body" >&2
 else
+    # Pin transitive dependency: the helper at 2420b542 fetches EnsureReqs.sh from refs/heads/main (moving branch)
+    # Replace with commit-qualified raw URL so the pin fully controls the supply chain
+    _exitTrapHelper="${_exitTrapHelper//refs\/heads\/main/2420b542141e9009f29ce02551244ebc43ed7060}"
     eval "${_exitTrapHelper}"
 fi
 
