@@ -1166,10 +1166,9 @@ if acm_version is None:
 if not addon_images:
     for a in acm:
         addon_images += a.get("governancePolicyAddonControllerImages") or []
-# PRRT_kwDOBHvUUM65yNGc: capture generation for removal guard
-sub_generation = sub.get("generation") if sub and isinstance(sub, dict) else None
-csv_generation = rhacs_csvs[0].get("generation") if rhacs_csvs and isinstance(rhacs_csvs[0], dict) else None
-generation_match = (sub_generation is not None and csv_generation is not None and str(sub_generation) == str(csv_generation))
+# Generation is a per-object counter: a Subscription generation and a CSV
+# generation are not comparable, so membership is carried by the currentCSV,
+# phase, channel and catalog terms below.
 
 # Catalog binding: the packagemanifest that provides the
 # package must live in the subscription's effective catalog source. With
@@ -1265,8 +1264,7 @@ terms = {
 # operator deployed: a CSV still Installing, Replacing, Failed, or Pending
 # leaves the install unsettled even when the CSV is the resolved one.
 terms["removal_preconditions_met"] = str(
-    # PRRT_kwDOBHvUUM65yNGc: guard removal readiness with generation check, not just timestamp
-    inputs_classified and generation_match
+    inputs_classified
     and rhacs_op_count == 1
     and terms["operatorpolicy_compliant"] == "true"
     and terms["operatorpolicy_targets_subscription"] == "true"
@@ -1496,7 +1494,7 @@ FIXTURE
 [{"name": "rhacs-operator", "namespace": "rhacs-operator",
   "apiVersion": "operators.coreos.com/v1alpha1",
   "currentCSV": "rhacs-operator.v4.11.6", "state": "AtLatestKnown",
-  "conditions": [], "channel": "stable", "source": "redhat-operators", "generation": 1}]
+  "conditions": [], "channel": "stable", "source": "redhat-operators", "generation": 3}]
 FIXTURE
   echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "rhacs-operator", "phase": "Succeeded", "reason": "Succeeded", "generation": 1}]' > "${tmp}/05-csv.json"
   echo '[{"name": "central", "namespace": "stackrox", "available": {"type": "Available", "status": "True"}}]' > "${tmp}/07-central-cr.json"
