@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # ensure LEASED_RESOURCE is set 
+# Using for bootstrap
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "Failed to acquire lease"
   exit 1
