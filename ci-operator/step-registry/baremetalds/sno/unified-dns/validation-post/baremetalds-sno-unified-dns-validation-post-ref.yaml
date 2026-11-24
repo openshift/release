@@ -1,0 +1,28 @@
+ref:
+  as: baremetalds-sno-unified-dns-validation-post
+  from: tests
+  grace_period: 10m
+  timeout: 30m0s
+  commands: baremetalds-sno-unified-dns-validation-post-commands.sh
+  env:
+  - name: SNO_DNS_STEP
+    default: validation-post
+    documentation: |-
+      Which step the shared baremetalds-sno-unified-dns-validation-commands.sh runs. This ref runs the
+      same read-only validation as baremetalds-sno-unified-dns-validation, labelled
+      validation-post so its JUnit and evidence do not collide with the first
+      run; do not change it.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    The same read-only steady-state checks as baremetalds-sno-unified-dns-validation,
+    re-run after the disruptive reboot (D1) and NetworkManager change (D2)
+    steps. ci-operator forbids listing one ref twice in a test, so this alias
+    shares the script through a symlink and differs only by SNO_DNS_STEP.
+
+    Writes ${ARTIFACT_DIR}/junit_sno-unified-dns-validation-post.xml plus the
+    evidence under ${ARTIFACT_DIR}/sno-unified-dns-evidence/validation-post/.
+    Hard checks fail the step; soft checks warn until the first runs confirm
+    the values.

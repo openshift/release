@@ -1,0 +1,27 @@
+ref:
+  as: baremetalds-sno-unified-dns-reboot
+  from: tests
+  grace_period: 10m
+  timeout: 1h0m0s
+  commands: baremetalds-sno-unified-dns-reboot-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    D1 disruptive check of SNO unified DNS (OCPSTRAT-3609 test plan §5.3):
+    MCO-driven reboot via `oc adm reboot-machine-config-pool mcp/master` and
+    `oc adm wait-for-node-reboot nodes --all`, then verification that the node
+    came back with the resolv.conf takeover done and no manual step: the boot
+    id changed, the first nameserver is the node IP, the sno-resolv-prepender
+    service's last run succeeded, and api-int is answered by the node's CoreDNS.
+
+    The boot-to-takeover time is the first `Finished sno-resolv-prepender`
+    line of the post-reboot boot in the journal, saved to
+    ${ARTIFACT_DIR}/sno-unified-dns-evidence/reboot/takeover-seconds.txt with
+    its source in takeover-seconds-source.txt. When the journal has no such
+    line, the prepender's monotonic exit timestamp is saved separately as
+    takeover-seconds-upper-bound.txt (the last run, not the takeover). The
+    bound is soft until a value is agreed. One JUnit testcase per check is
+    written to ${ARTIFACT_DIR}/junit_sno-unified-dns-reboot.xml. The full
+    steady-state checks are re-run afterwards by baremetalds-sno-unified-dns-validation-post.

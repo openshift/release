@@ -1,0 +1,29 @@
+ref:
+  as: baremetalds-sno-unified-dns-validation
+  from: tests
+  grace_period: 10m
+  timeout: 30m0s
+  commands: baremetalds-sno-unified-dns-validation-commands.sh
+  env:
+  - name: SNO_DNS_STEP
+    default: validation
+    documentation: |-
+      Labels this run in the JUnit file name and the evidence directory. This ref uses the
+      default; baremetalds-sno-unified-dns-validation-post symlinks the same script and sets
+      validation-post so the two runs do not collide. Do not change it.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Read-only steady-state validation of SNO unified DNS (CoreDNS rendered by
+    the MCO under the UnifiedClusterManagedDNSAndLB FeatureGate, dnsmasq gone),
+    per the OCPSTRAT-3609 test plan §5.3.
+
+    Runs over SSH from the dev-scripts hypervisor: one `oc debug node` session
+    dumps the node facts, and the checks run on the hypervisor, using dig from
+    there for the DNS queries. Writes one JUnit testcase per check to
+    ${ARTIFACT_DIR}/junit_sno-unified-dns-validation.xml and saves the evidence
+    (resolv.conf, Corefile, ss, journal, SELinux labels, per-check logs) under
+    ${ARTIFACT_DIR}/sno-unified-dns-evidence/validation/. Hard checks fail the
+    step; soft checks warn until the first runs confirm the values.
