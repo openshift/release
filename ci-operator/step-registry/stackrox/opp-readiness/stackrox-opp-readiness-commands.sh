@@ -323,15 +323,6 @@ function WaitFor () {
         typeset -i _now=0
         _now=$(date +%s)
         if (( _now >= _deadline )); then
-            if "${checkFn}" "$@"; then
-                _now=$(date +%s)
-                if (( _now >= _deadline )); then
-                    echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (post-deadline probe success not accepted, budget remaining $(_budget_remaining)s)"
-                    return 1
-                fi
-                echo "[readiness] OK: ${description}"
-                return 0
-            fi
             echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (budget remaining $(_budget_remaining)s)"
             return 1
         fi
@@ -357,6 +348,9 @@ function WaitFor () {
         typeset -i _remain=$(( _deadline - _now ))
         (( _remain > rem )) && _remain=rem
         typeset -i _sleepFor=$(( _remain < pollInterval ? _remain : pollInterval ))
+        if (( _remain <= pollInterval )); then
+            _sleepFor=$(( _remain - 1 ))
+        fi
         iteration=$((iteration + 1))
         # Every 5th iteration, dump periodic diagnostics if a function is provided
         if [[ -n "${diagnosticsFn}" ]] && (( iteration % 5 == 0 )); then
@@ -375,6 +369,9 @@ function WaitFor () {
             _remain=$(( _deadline - _now ))
             (( _remain > rem )) && _remain=rem
             _sleepFor=$(( _remain < pollInterval ? _remain : pollInterval ))
+            if (( _remain <= pollInterval )); then
+                _sleepFor=$(( _remain - 1 ))
+            fi
         fi
         echo "[readiness]   ...retrying in ${_sleepFor}s ($(( _now - (_deadline - cap) ))/${cap}s, budget remaining ${rem}s)"
         sleep "${_sleepFor}"
@@ -893,6 +890,7 @@ if WaitFor "Central route" CheckCentralRoute; then
     _add_case "central-route" passed
     echo "[readiness] Central route discovered: ${centralUrl}"
 else
+    centralUrl=""
     _add_case "central-route" failed "Assertion" "Central route not found in ${centralNs} (budget remaining $(_budget_remaining)s)"
     _assert_rc=1
     echo "[readiness] Central route not found in ${centralNs} (budget remaining $(_budget_remaining)s)"
