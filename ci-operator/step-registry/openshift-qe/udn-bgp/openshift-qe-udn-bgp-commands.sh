@@ -143,6 +143,9 @@ if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
   EXTRA_FLAGS+=" --local-indexing"
 fi
 EXTRA_FLAGS+=" --gc-metrics=false --profile-type=${PROFILE_TYPE}"
+EXTRA_FLAGS+=" --export-worker-count=${UDN_BGP_EXPORT_WORKER_COUNT:-${ITERATIONS}}"
+EXTRA_FLAGS+=" --layer2"
+EXTRA_FLAGS+=" --log-level=debug"
 EXTRA_FLAGS+=" --frr-external-ip=${FRR_PEER_IP}"
 
 export WORKLOAD=udn-bgp
