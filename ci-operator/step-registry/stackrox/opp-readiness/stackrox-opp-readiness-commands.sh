@@ -716,6 +716,15 @@ if [[ "${_ACS_STATE}" == "absent" && "${ACS_EXPECTATION}" == "required" ]]; then
             _add_classification "acs-state-indeterminate" failed "Classification" "acs-unclassified:central-query/read failed during provisional hold; never classified as absent without a successful read"
             exit 3
         fi
+        typeset -i _recheck_budget
+        _recheck_budget="$(_budget_remaining)"
+        if (( _recheck_budget == 0 )); then
+            echo "[readiness] provisional hold recheck: budget exhausted, failing indeterminate" >&2
+            _ACS_STATE="unknown"
+            _add_classification "acs-state-indeterminate" failed "Classification" "acs-unclassified:central-query/read failed during provisional hold recheck; never classified as absent without a successful read"
+            _ensure_assertion_rows
+            exit 3
+        fi
         typeset -i _recheck_rc=0
         if CheckCentralPresent; then
             _recheck_rc=0
