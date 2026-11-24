@@ -331,7 +331,7 @@ function DiscoverScNs () {
     # the central namespace first, then fall back to all namespaces for
     # layouts that separate them.
     scNs="$(oc get securedclusters.platform.stackrox.io -n "${centralNs}" \
-        -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
+        -o jsonpath='{.items[0].metadata.namespace}')" \
         || true
     if [[ -z "${scNs}" ]]; then
         scNs="$(oc get securedclusters.platform.stackrox.io --all-namespaces \
@@ -344,9 +344,9 @@ function DiscoverScNs () {
 
 function PeriodicSecuredClusterDiagnostics () {
     echo "[readiness] --- SecuredCluster CRs so far (all namespaces) ---"
-    oc get securedclusters.platform.stackrox.io --all-namespaces 2>/dev/null || true
+    oc get securedclusters.platform.stackrox.io --all-namespaces || true
     echo "[readiness] --- OPP policy status (the policy set creates the SecuredCluster) ---"
-    oc get policies -n policies 2>/dev/null || true
+    oc get policies -n policies || true
 }
 
 function SecuredClusterDiscoveryFailureDiagnostics () {
@@ -357,7 +357,7 @@ function SecuredClusterDiscoveryFailureDiagnostics () {
     echo "[readiness] --- OPP policy status (the policy set creates the SecuredCluster) ---"
     oc get policies -n policies || true
     echo "[readiness] --- Sensor pods in ${centralNs} ---"
-    oc get pods -n "${centralNs}" -l app=sensor 2>/dev/null || \
+    oc get pods -n "${centralNs}" -l app=sensor || \
         echo "[readiness]   No sensor pods found in ${centralNs}"
     echo "[readiness] === End failure diagnostics ==="
 }
