@@ -24,8 +24,9 @@ explicitly select a valid development image for the rehearsal.
    and CNV-managed golden images. It selects an explicit `CHECKUP_STORAGE_CLASS`,
    otherwise the virtualization default, otherwise the Kubernetes default. A
    missing or ambiguous effective default fails preparation.
-5. `cnv-storage-checkup-snapshot-sources` configures snapshot-backed golden-image
-   sources on each cloud and waits until their DataSources reference ready snapshots.
+5. AWS and GCP use `cnv-storage-checkup-snapshot-sources` to prepare snapshot-backed
+   golden images. Azure uses `cnv-storage-checkup-pvc-sources` to prepare
+   PVC-backed images and copy-based clones.
 6. `cnv-storage-checkup-run` resolves its image from the prepared installed-CSV
    context, creates a dedicated namespace and permissions, and runs the shipped
    checkup through its ConfigMap/Job interface. The Namespace, RBAC, ConfigMap,
@@ -53,12 +54,15 @@ on Azure and GCP. Those reduced runs established functionality but do not
 validate the ten-VM configuration. Worker sizing must account for guest memory,
 virtualization overhead, boot-source imports, and CNV.
 
-Each cloud source job asserts its CSI provisioner, then the shared snapshot step
+Each cloud source job asserts its CSI provisioner. On AWS and GCP the snapshot step
 patches the selected StorageProfile to use snapshot-backed DataImportCron boot
 sources. It waits for every managed golden-image DataSource to reference a ready
 VolumeSnapshot before running the checkup. CDI can restore many VM volumes from
 one prepared snapshot instead of creating a temporary snapshot of the same
 source PVC for each clone.
+Azure instead configures PVC-backed golden images and copy-based clones to avoid
+the Azure File NFS snapshot restore failure observed during golden-image cloning.
+This approach still requires the checkup's separate VM snapshot and restore checks.
 The failed AWS run selected `gp3-csi`, whose StorageProfile reported
 `cloneStrategy=snapshot` and `dataImportCronSourceFormat=pvc`; its managed
 DataSources referenced PVCs.
