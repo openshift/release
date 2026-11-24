@@ -619,6 +619,17 @@ print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/03-subscription.json" 2>&1 || \
   echo "probe_error: subscription query failed" > "${EVIDENCE_DIR}/03-subscription.json"
 
+# An initial capture failure is a fact about this run and must survive the
+# refresh below, which replaces 03-subscription.json: the status is read here,
+# where the failure happens, and reported by run_assertions even when the later
+# re-read succeeds. A valid empty list is a successful capture, so only the
+# failure marker sets it.
+if grep -qE '^(probe_error:|QUERY FAILED)' "${EVIDENCE_DIR}/03-subscription.json" 2>/dev/null; then
+  _sub_initial_failed=true
+  printf '%s\n' "probe_error: initial subscription capture failed" \
+    > "${EVIDENCE_DIR}/03-subscription.initial-failed"
+fi
+
 # 4. InstallPlan - capture name, status.phase, status.conditions
 echo "[4/10] InstallPlan..."
 oc get installplan -A -o json 2>/dev/null | \
@@ -1735,6 +1746,13 @@ run_assertions() {
   done
   if [[ "${_sub_refresh_failed}" == "true" ]]; then
     echo "ASSERTION FAILURE (21): the Subscription refresh failed, so the subscription terms are unknown"
+    failed=21
+  fi
+  # The refresh overwrites 03-subscription.json, so a successful re-read would
+  # otherwise hide that the capture this run started from failed. The refreshed
+  # evidence is kept for diagnostics; the initial failure is reported here.
+  if [[ "${_sub_initial_failed:-false}" == "true" ]]; then
+    echo "ASSERTION FAILURE (21): the initial Subscription capture failed, so the subscription terms rest on the refresh alone (initial status kept in 03-subscription.initial-failed)"
     failed=21
   fi
   # (b) Packagemanifest agreement: the per-package capture is selected from
