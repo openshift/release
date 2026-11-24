@@ -22,12 +22,13 @@ oc-mirror, OMR, OSUS, Quay, RHOSDT and zero-trust. These jobs are required;
 validation failures block matching metadata changes from merging. Ensure metadata,
 source access and RPA mappings are ready for each stream.
 
-A job can run when its branch selector matches the PR's target branch and the PR changes metadata matched by `run_if_changed`.
-The existing 16 ACM/MCE jobs remain required; their validation failures block
-merging. Each additional branch needs its own CI
-configuration referencing the same workflow. New y-streams
-are not automatically onboarded to the job. A `__periodics.yaml` variant is only
-needed for scheduled runs. Tide merge policy and branch protection are separate.
+The job reports its required status for PRs targeting a configured branch.
+On `rhosdt-0.158`, PRs with no changes under `images/` run local schema and
+semantic validation against the PR's changed metadata. Changes under `images/`
+run full validation, including when an image file is moved out of the directory.
+The job runs full validation on other branches and when the PR base cannot be
+verified in the checkout. Each additional branch needs its own CI configuration
+referencing the same workflow. Tide merge policy and branch protection are separate.
 
 ## Checks
 
