@@ -92,7 +92,9 @@ checkup it selects the virtualization default before CNV imports golden images.
 
 - AWS creates `checkup-ebs-io2` with `type: io2` and runs the workers in one
   availability zone for EBS Multi-Attach.
-- Azure selects the existing `azurefile-csi` class from Azure File CSI.
+- Azure creates `checkup-azurefile-nfs` using Azure File CSI with NFS and
+  `Premium_LRS`. This configuration is a trial following a golden-image import
+  failure caused by a permissions change on the default Azure File class.
 - GCP runs one shipped checkup on zonal `hyperdisk-balanced`. Three C3
   workers share one zone so the source and destination can attach the same
   RWX Block guest disk during live migration. CDI imports the golden image
