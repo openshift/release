@@ -117,7 +117,8 @@ WriteJunit() {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
         echo "<testsuite name=\"lp-interop--OPP--smoke\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
         # Effective configuration in the JUnit carrier: publish what actually ran.
-        # Re-verify in a rehearsal that lane-level overrides reach this step.
+        # Lane overrides must use the CIOP-4 names asserted above; the pre-rename
+        # OPP_OPERATORS and SMOKE_SETTLE_SECONDS no longer reach this step.
         echo "  <properties>"
         echo "    <property name=\"opp_operators\" value=\"$(XmlEscape "${INTEROP__OPP__SMOKE__OPERATORS}")\"/>"
         echo "    <property name=\"smoke_settle_seconds\" value=\"$(XmlEscape "${INTEROP__OPP__SMOKE__SETTLE_SECONDS}")\"/>"
