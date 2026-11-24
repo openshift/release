@@ -1295,7 +1295,10 @@ PYEOF
 if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" == "1" ]]; then
     :
 else
-    write_status_properties
+    if ! write_status_properties; then
+        echo "ASSERTION FAILURE (21): acs-central-status.properties could not be written, so the removal predicate terms are missing from the evidence" >&2
+        exit 21
+    fi
 fi
 
 # ─── Cross-artifact agreement assertions ────────────────────────────────────
