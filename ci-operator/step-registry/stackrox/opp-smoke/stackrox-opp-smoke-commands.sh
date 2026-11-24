@@ -147,9 +147,11 @@ _propagate_junit () {
     # governed by the D4 channel split in _write_shared_copy.
     [[ -n "${SHARED_DIR:-}" ]] || return 0
     mkdir -p "${SHARED_DIR}/junit" || return 1
-    find "${ARTIFACT_DIR}" -maxdepth 1 -name '*.xml' \
-        ! -name "junit_${_SUITE}.xml" \
-        -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || return 1
+    typeset _f="" _rc=0
+    while IFS= read -r -d '' _f; do
+        cp "${_f}" "${SHARED_DIR}/junit/" 2>/dev/null || _rc=1
+    done < <(find "${ARTIFACT_DIR}" -maxdepth 1 -name '*.xml' ! -name "junit_${_SUITE}.xml" -print0 2>/dev/null)
+    return "${_rc}"
 }
 
 _jrc=0
