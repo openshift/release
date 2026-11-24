@@ -139,7 +139,7 @@ function WriteJunit () {
 
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"${_ts_pfx}--odf-health\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        echo "<testsuite name=\"$(XmlEscape "${_ts_pfx}")--odf-health\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
         typeset -i i=0
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
