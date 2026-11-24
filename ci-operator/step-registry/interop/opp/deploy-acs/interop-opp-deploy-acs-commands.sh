@@ -794,7 +794,11 @@ except Exception:
         _prop "csv_phase" "Succeeded"
         exit 0
       fi
-      echo ">>> NOTE: OperatorPolicy Compliant, but current CSV '${_existing_csv}' (Subscription currentCSV '${_sd_csv:-empty}') is not Succeeded: self-disable withheld, installing"
+      if [[ "${_existing_csv}" == "Succeeded" ]]; then
+        echo ">>> NOTE: OperatorPolicy Compliant and current CSV '${_sd_csv}' is Succeeded, but workaround removal remains disabled pending independent creator verification (fresh-cluster rehearsal follow-up): installing"
+      else
+        echo ">>> NOTE: OperatorPolicy Compliant, but current CSV '${_existing_csv}' (Subscription currentCSV '${_sd_csv:-empty}') is not Succeeded: self-disable withheld, installing"
+      fi
       _prop "csv_self_disable_withheld" "${_existing_csv}"
     elif [[ "${_self_disable}" == "ambiguous" ]]; then
       echo ">>> NOTE: more than one OperatorPolicy claims subscription namespace ${ACS_NAMESPACE}: self-disable withheld, installing"
@@ -1371,6 +1375,7 @@ fi
 # the phase on the object stage 1 saw. `--timeout=0s` means check once and
 # return, so an exhausted budget still classifies rather than hanging.
 typeset -i _csv_created=0
+typeset _csv_presence="unknown"
 _api_quiet
 install_left=$(( install_deadline - $(date +%s) ))
 (( install_left < 0 )) && install_left=0
@@ -1379,6 +1384,7 @@ typeset _wait1_err="" _wait1_rc=0
   ( set +x; oc wait csv "${csvName}" -n "${ACS_NAMESPACE}" --for=create --timeout="${install_left}s" 2>"${_wait1_err}" ) || _wait1_rc=$?
   if (( _wait1_rc == 0 )); then
     _csv_created=1
+    _csv_presence="present"
     csv_probe_out=""
     rm -f "${_wait1_err}"
   else
@@ -1392,6 +1398,11 @@ typeset _wait1_err="" _wait1_rc=0
     # gets stage 2 (the probe succeeded, so there is something to wait on).
     if csv_probe_out=$(oc get csv "${csvName}" -n "${ACS_NAMESPACE}" -o name 2>&1); then
         _csv_created=1
+        _csv_presence="present"
+    else
+        if [[ "${csv_probe_out}" == *"Error from server (NotFound)"* ]]; then
+          _csv_presence="absent"
+        fi
     fi
 fi
 _api_loud
@@ -1420,13 +1431,20 @@ typeset _wait2_err="" _wait2_rc=0
       _phase_err_class=$(_api_err_class "${_phase_err}")
       # Only NotFound keeps the phase unknown (the probe below classifies it
       # as missing); every other read error is a query failure (CodeRabbit 4637035653).
+      # Track latest successful presence/absence observation: a NotFound phase
+      # read after a successful presence probe is a query failure or a
+      # replacement, not an unknown phase; a failed read must not overwrite a
+      # successful absence.
       if [[ "${_phase_err}" == *"NotFound"* || "${_phase_err}" == *"not found"* ]]; then
         _phase="unknown"
+        _csv_presence="absent"
       else
         _phase="query-failed"
       fi
       # Persist for the post-quiet classification below
       typeset _phase_query_class="${_phase_err_class}"
+    else
+      _csv_presence="present"
     fi
     rm -f "${_wait2_err}.phase"
     typeset -i _csv_recovered=0
@@ -1434,10 +1452,6 @@ typeset _wait2_err="" _wait2_rc=0
     if (( $(date +%s) >= install_deadline )); then
       _deadline_exhausted=true
     fi
-    _api_loud
-    _probe_notfound=0
-    _api_quiet
-    if [[ "${csv_probe_out}" == *"Error from server (NotFound)"* ]]; then _probe_notfound=1; fi
     _api_loud
     # Precedence: a classified Subscription condition outranks the CSV phase and
     # the deadline, exactly as the no-currentCSV branch above applies it. An
@@ -1457,8 +1471,17 @@ typeset _wait2_err="" _wait2_rc=0
       elif _csv_now=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
           -o jsonpath='{.status.currentCSV}' 2>/dev/null); then
         if [[ "${_csv_now}" == "${csvName}" ]]; then
-          _csv_recovered=1
-          echo ">>> NOTE: CSV ${csvName} is Succeeded; the phase wait returned rc=${_wait2_rc} on its final poll, accepting the observed Succeeded phase"
+          # Recheck InstallPlan blocker that may have arisen between the
+          # earlier _cond_classify and this currentCSV verification.
+          _cond_classify
+          if (( ! _cond_read_ok )); then
+            _classify "acs-subscription-query-failed" "Subscription condition read failed during CSV recovery recheck; no blocker can be ruled out (CSV ${csvName}, phase ${_phase})"
+          elif [[ -n "${_cond_class}" ]]; then
+            _classify "${_cond_class}" "${_cond_detail} (CSV ${csvName}, phase ${_phase})"
+          else
+            _csv_recovered=1
+            echo ">>> NOTE: CSV ${csvName} is Succeeded; the phase wait returned rc=${_wait2_rc} on its final poll, accepting the observed Succeeded phase"
+          fi
         fi
       else
         _classify "acs-subscription-query-failed" "Subscription currentCSV read failed during CSV recovery; the waited CSV cannot be confirmed as current (CSV ${csvName}, phase ${_phase})"
@@ -1470,7 +1493,7 @@ typeset _wait2_err="" _wait2_rc=0
       _classify "acs-csv-failed" "CSV ${csvName} reached phase Failed"
     elif [[ "${_phase}" == "query-failed" ]]; then
       _classify "acs-csv-query-failed" "CSV ${csvName} query failed (rc=${_phase_rc}: ${_phase_query_class:-$(_api_err_class "${_phase_err:-unknown}")})"
-    elif (( _probe_notfound )); then
+    elif [[ "${_csv_presence}" == "absent" ]]; then
       _classify "acs-csv-missing" "CSV object ${csvName} never created (currentCSV published, object absent; phase query: ${_phase})"
     elif [[ "${_phase}" == "unknown" ]]; then
       _classify "acs-csv-unknown-phase" "CSV ${csvName} phase unknown (phase: ${_phase})"
