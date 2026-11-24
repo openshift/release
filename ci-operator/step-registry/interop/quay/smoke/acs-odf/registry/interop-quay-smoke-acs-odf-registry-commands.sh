@@ -102,6 +102,14 @@ mkdir -p "${ARTIFACT_DIR}"
 # merges this file into junit--interop-quay-smoke-acs-odf-registry.xml.
 typeset junitFile="${ARTIFACT_DIR}/junit_interop-quay-smoke-acs-odf-registry.xml"
 
+# A merged report from an earlier run must not survive into the reporting glob:
+# SHARED_DIR outlives this pod, and the post-processing merge can return without
+# replacing the file (no XML found, or a failing yq copy), which would leave the
+# earlier report to be harvested as this run's result. Removing it during
+# initialization means a run that publishes nothing reports nothing, instead of
+# the previous run's verdict.
+rm -f "${SHARED_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml" 2>/dev/null || true
+
 # Suite naming for the JUnit post-processing library: compose its suite-name
 # template from the component-suffixed prefix variable the consuming job sets.
 # The step ref declares the prefix with no default on purpose, so a step-local
