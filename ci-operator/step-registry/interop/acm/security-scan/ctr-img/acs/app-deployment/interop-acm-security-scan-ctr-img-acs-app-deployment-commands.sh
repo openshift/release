@@ -217,6 +217,14 @@ EOF
 </testsuites>
 EOF
 
+    typeset -i _expectedTests=${#allTestCasesArr[@]}
+    typeset -i _actualTests=0
+    _actualTests=$(python3 -c 'import sys, xml.etree.ElementTree as ET; print(len(ET.parse(sys.argv[1]).getroot().findall(".//testcase")))' "${junitFile}" 2>/dev/null) || _actualTests=-1
+    if (( _actualTests != _expectedTests )); then
+        echo "ERROR: JUnit report at ${junitFile} has ${_actualTests} testcase elements, expected ${_expectedTests}" >&2
+        return 1
+    fi
+
     : "JUnit XML generated at: ${junitFile}"
     cat "${junitFile}"
     true
@@ -823,13 +831,13 @@ def lastn($d): split("/") | .[-$d:] | join("/");
 # Per Best Practices: Use exact pattern from library documentation.
 typeset _exitTrapHelper=""
 typeset -i _exitTrapDlRc=0
-if ! _exitTrapHelper="$(
+_exitTrapHelper="$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
         https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-)"; then
-    _exitTrapDlRc=$?
+)" || _exitTrapDlRc=$?
+if (( _exitTrapDlRc != 0 )); then
     printf '%s\n' "WARNING: failed to download ExitTrap helper (rc=${_exitTrapDlRc})" >&2
 elif [[ -z "${_exitTrapHelper}" ]]; then
     printf '%s\n' "WARNING: ExitTrap helper download returned empty body" >&2
