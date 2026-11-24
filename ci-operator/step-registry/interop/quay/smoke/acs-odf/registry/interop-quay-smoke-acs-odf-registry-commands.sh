@@ -256,8 +256,6 @@ PostProcessJunit () {
     typeset -i _junitPreSize=0
     [[ -f "${junitFile}" ]] && _junitPreSize=$(wc -c < "${junitFile}" 2>/dev/null || echo 0)
     if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
-        # PRRT_kwDOBHvUUM65Mrls: pin jq helper alongside ExitTrap
-        curl -fsSL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq 2>/dev/null && chmod +x /tmp/jq && /tmp/jq --version | grep -q "jq-1.6"
         ExitTrap--PostProcessPrep junit--interop-quay-smoke-acs-odf-registry.xml
         typeset -i _junitRc=$?
         if (( _junitRc != 0 )); then
