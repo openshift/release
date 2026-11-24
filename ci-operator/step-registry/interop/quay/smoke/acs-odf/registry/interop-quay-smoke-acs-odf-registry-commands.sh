@@ -16,7 +16,7 @@ _opp_cleanup() {
   set +x
   # Credential hygiene: these files must not survive the step, on the
   # success and the failure path alike.
-  rm -f /tmp/quay-auth.json /tmp/quay-cookies.txt "${acsPassFile:-/tmp/acs-admin-password}" /tmp/acs-ingress-ca.crt /tmp/acs-central-ca.crt
+  rm -f /tmp/quay-auth.json /tmp/quay-cookies.txt "${acsPassFile:-/tmp/acs-admin-password}" /tmp/acs-ingress-ca.crt /tmp/acs-central-ca.crt /tmp/quay-init-password /tmp/quay-push.digest
   rm -rf /tmp/quay-ca-candidates
   # Scrub credentials before copying
   sed -i -E \
@@ -64,10 +64,8 @@ _opp_trap_handler() {
   # prefix is read by Component Readiness, so a valid raw report must not stand
   # in for a merge that did not happen.
   if (( exitCode == 0 )); then
-      typeset _mergedFile="${SHARED_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml"
-      if [[ ! -s "${_mergedFile}" && -s "${ARTIFACT_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml" ]]; then
-          _mergedFile="${ARTIFACT_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml"
-      fi
+      typeset _sharedMerged="${SHARED_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml"
+      typeset _localMerged="${ARTIFACT_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml"
       if [[ -n "${LP_QE__CR__TS_NAME__PFX__QUAY:-}" ]]; then
           if ! python3 -c "
 import sys, xml.etree.ElementTree as ET
@@ -78,12 +76,12 @@ except Exception:
     sys.exit(1)
 names = [ts.get('name', '') for ts in root.iter('testsuite')]
 sys.exit(0 if names and all(n.startswith(pfx) for n in names) else 1)
-" "${_mergedFile}" "${LP_QE__CR__TS_NAME__PFX__QUAY}--" 2>/dev/null; then
-              echo "ERROR: LP_QE__CR__TS_NAME__PFX__QUAY is set but ${_mergedFile} is missing, invalid, or does not carry the component prefix; the run would report green with no routable JUnit" >&2
+" "${_sharedMerged}" "${LP_QE__CR__TS_NAME__PFX__QUAY}--" 2>/dev/null; then
+              echo "ERROR: LP_QE__CR__TS_NAME__PFX__QUAY is set but ${_sharedMerged} is missing, invalid, or does not carry the component prefix; the run would report green with no routable JUnit" >&2
               exit 1
           fi
-      elif ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${junitFile}')" 2>/dev/null && ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${_mergedFile}')" 2>/dev/null; then
-          echo "ERROR: no valid JUnit report in ${junitFile} or ${_mergedFile} for successful run" >&2
+      elif ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${junitFile}')" 2>/dev/null && ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${_sharedMerged}')" 2>/dev/null && ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${_localMerged}')" 2>/dev/null; then
+          echo "ERROR: no valid JUnit report in ${junitFile}, ${_sharedMerged} or ${_localMerged} for successful run" >&2
           exit 1
       fi
   fi
@@ -207,7 +205,14 @@ root = ET.parse(sys.argv[1]).getroot()
 if len(root.findall('.//testcase')) != int(sys.argv[2]):
     sys.exit(1)
 " "${_junitTmp}" "${total}" 2>/dev/null; then
-        mv -f "${_junitTmp}" "${junitFile}"
+        if ! mv -f "${_junitTmp}" "${junitFile}"; then
+            echo "ERROR: failed to move JUnit report from ${_junitTmp} to ${junitFile}" >&2
+            rm -f "${_junitTmp}"
+            if (( failures == 0 )); then
+                echo "ERROR: required JUnit artifact not produced for successful run" >&2
+            fi
+            return 1
+        fi
         cat "${junitFile}"
     else
         echo "ERROR: JUnit report at ${_junitTmp} is invalid or incomplete" >&2
@@ -373,7 +378,12 @@ function GetQuayAuth () {
     if [[ "${authOk}" == false ]]; then
         typeset initPassword=''
         initPassword="$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(20)))")"
+        typeset quayInitPassFile='/tmp/quay-init-password'
+        printf '%s' "${initPassword}" > "${quayInitPassFile}"
+        chmod 600 "${quayInitPassFile}"
         typeset initResult=''
+        typeset initBody=''
+        typeset initHttp=''
         # The payload is built by json.dumps and piped in via stdin, so the
         # generated password is safely escaped and never part of any argv.
         # no -L: the generated password is in the POST body, so a redirect on
@@ -381,25 +391,64 @@ function GetQuayAuth () {
         # HTTP error, and the retry loop reads a redirect body as a failure.
         # PRRT_kwDOBHvUUM65TpNF: single init request with bounded retry
         typeset -i _initTry=0
+        typeset _alreadyExists=false
         for _initTry in 1 2 3; do
-            initResult="$(printf '%s' "${initPassword}" | python3 -c "
+            typeset initRaw=''
+            initRaw="$(printf '%s' "${initPassword}" | python3 -c "
 import json, sys
 print(json.dumps({'username': 'quayadmin', 'password': sys.stdin.read().strip(), 'email': 'quayadmin@example.com', 'access_token': True}))
-" | curl -fsS "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" \
+" | curl -sS -w '\n%{http_code}' "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" \
                     -H "Content-Type: application/json" \
-                    -d @-)" || initResult=""
-            if [[ -n "${initResult}" ]]; then
+                    -d @- 2>&1)" || true
+            initHttp="$(printf '%s' "${initRaw}" | tail -n1)"
+            initBody="$(printf '%s' "${initRaw}" | sed '$d')"
+            if [[ "${initHttp}" =~ ^2[0-9]{2}$ && -n "${initBody}" ]]; then
+                initResult="${initBody}"
                 break
             fi
-            sleep $(( _initTry * 2 ))
+            if printf '%s' "${initBody}" | grep -qi "already exists\|user exists"; then
+                _alreadyExists=true
+                initResult="${initBody}"
+                break
+            fi
+            if (( _initTry < 3 )); then
+                sleep $(( _initTry * 2 ))
+            fi
         done
-
-        QUAY_TOKEN="$(printf '%s' "${initResult}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")" || QUAY_TOKEN=""
-        if [[ -n "${QUAY_TOKEN}" ]]; then
-            QUAY_USER="quayadmin"
-            QUAY_PASSWORD="${initPassword}"
-            authOk=true
-            echo "INFO: Quay admin user initialized via /api/v1/user/initialize" >&2
+        if [[ "${_alreadyExists}" == true ]]; then
+            echo "INFO: user already exists, attempting login with persisted password" >&2
+            typeset _loginCsrf=''
+            _loginCsrf="$(curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/csrf_token" -c /tmp/quay-cookies.txt 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('csrf_token',''))")" || _loginCsrf=""
+            if [[ -n "${_loginCsrf}" ]]; then
+                typeset _loginResult=''
+                _loginResult="$(python3 -c "
+import json, os
+print(json.dumps({'username': os.environ['QUAY_USER_FALLBACK'], 'password': open(os.environ['QUAY_PASS_FILE']).read().strip()}))
+" | QUAY_USER_FALLBACK="quayadmin" QUAY_PASS_FILE="${quayInitPassFile}" curl -sS "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/signin" \
+                    -H "Content-Type: application/json" \
+                    -H "X-CSRF-Token: ${_loginCsrf}" \
+                    -b /tmp/quay-cookies.txt -c /tmp/quay-cookies.txt \
+                    -d @- 2>&1)" || _loginResult=""
+                typeset _loginOk=''
+                _loginOk="$(printf '%s' "${_loginResult}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('success',''))" 2>/dev/null)" || _loginOk=""
+                if [[ "${_loginOk}" == "True" ]]; then
+                    QUAY_USER="quayadmin"
+                    QUAY_PASSWORD="${initPassword}"
+                    authOk=true
+                    echo "INFO: recovered Quay admin via login with persisted password after user exists" >&2
+                fi
+            fi
+            if [[ "${authOk}" == false ]]; then
+                echo "WARNING: login with persisted password failed; init response: ${initBody:0:200}" >&2
+            fi
+        else
+            QUAY_TOKEN="$(printf '%s' "${initResult}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)" || QUAY_TOKEN=""
+            if [[ -n "${QUAY_TOKEN}" ]]; then
+                QUAY_USER="quayadmin"
+                QUAY_PASSWORD="${initPassword}"
+                authOk=true
+                echo "INFO: Quay admin user initialized via /api/v1/user/initialize" >&2
+            fi
         fi
     fi
 
@@ -458,7 +507,7 @@ for r in items:
     # verify it; each candidate is proved against the endpoint below, so
     # widening the sources cannot admit an anchor that does not fit.
     oc get secrets -n "${QUAY_NS}" -o json | \
-        QUAY_OWNER="${QUAY_REGISTRY}" QUAY_BUNDLE_SECRET="${QUAY_CONFIG_BUNDLE:-}" CA_DIR="${quayCaDir}" python3 -c "
+        QUAY_OWNER="${QUAY_REGISTRY}" QUAY_OWNER_UID="${QUAY_UID:-}" QUAY_BUNDLE_SECRET="${QUAY_CONFIG_BUNDLE:-}" CA_DIR="${quayCaDir}" python3 -c "
 import base64, json, os, sys
 
 try:
@@ -467,6 +516,7 @@ except Exception:
     items = []
 
 owner = os.environ['QUAY_OWNER']
+owner_uid = os.environ.get('QUAY_OWNER_UID') or ''
 ca_dir = os.environ['CA_DIR']
 counts = {'20-owned': 0, '25-ssl': 0}
 
@@ -478,26 +528,46 @@ def write(prefix, payload):
         fh.write(payload)
 
 
-    bundle = os.environ.get('QUAY_BUNDLE_SECRET') or ''
+bundle = os.environ.get('QUAY_BUNDLE_SECRET') or ''
+
+def is_owned(refs):
+    for r in refs:
+        if owner_uid and r.get('uid') == owner_uid:
+            return True
+    return False
+
+# Primary: secrets owned by selected QuayRegistry (uid match) or the config bundle secret
 for s in items:
     meta = s.get('metadata') or {}
     refs = meta.get('ownerReferences') or []
-    owned = any((r.get('name') or '') == owner for r in refs)
+    owned = is_owned(refs)
     data = s.get('data') or {}
     from_bundle = bool(bundle) and meta.get('name') == bundle
-    if not owned:
-        if from_bundle and data.get('ssl.cert'):
-            write('25-ssl', base64.b64decode(data['ssl.cert']))
-        elif data.get('ssl.cert') and (meta.get('labels') or {}).get('app') == 'quay':
-            write('25-ssl', base64.b64decode(data['ssl.cert']))
-        if from_bundle and data.get('ca.crt'):
-            write('20-owned', base64.b64decode(data['ca.crt']))
+    if not owned and not from_bundle:
         continue
-    for key in ('ca.crt', 'tls.crt'):
-        if data.get(key):
-            write('20-owned', base64.b64decode(data[key]))
-    if data.get('ssl.cert'):
-        write('25-ssl', base64.b64decode(data['ssl.cert']))
+    if owned:
+        for key in ('ca.crt', 'tls.crt'):
+            if data.get(key):
+                write('20-owned', base64.b64decode(data[key]))
+        if data.get('ssl.cert'):
+            write('25-ssl', base64.b64decode(data['ssl.cert']))
+    elif from_bundle:
+        if data.get('ssl.cert'):
+            write('25-ssl', base64.b64decode(data['ssl.cert']))
+        if data.get('ca.crt'):
+            write('20-owned', base64.b64decode(data['ca.crt']))
+
+# Fallback: label-matched unowned secrets only when no owned candidate exists
+if counts['20-owned'] == 0 and counts['25-ssl'] == 0:
+    fallback_used = False
+    for s in items:
+        meta = s.get('metadata') or {}
+        data = s.get('data') or {}
+        if data.get('ssl.cert') and (meta.get('labels') or {}).get('app') == 'quay':
+            write('25-ssl', base64.b64decode(data['ssl.cert']))
+            fallback_used = True
+    if fallback_used:
+        print('WARNING: no owned Quay TLS secret found for %s (uid %s); falling back to label app=quay secrets' % (owner, owner_uid), file=sys.stderr)
 " || true
 
     # The ingress CA signs route certificates that no operator issued.
@@ -747,8 +817,11 @@ function RunPushPull () {
       chmod 600 "${authFile}"
     true )
 
+    typeset digestFile='/tmp/quay-push.digest'
+    rm -f "${digestFile}"
     if ! SSL_CERT_FILE="${quayCaFile}" skopeo copy --dest-tls-verify=true \
         --dest-authfile="${authFile}" \
+        --digestfile "${digestFile}" \
         docker://registry.access.redhat.com/ubi9-minimal:latest \
         "docker://${pushTarget}" 2>&1; then
         elapsed=$(( $(date +%s) - start ))
@@ -760,30 +833,35 @@ function RunPushPull () {
     # `skopeo inspect` stops at the manifest, so a registry that serves
     # manifests but cannot return a layer blob from object storage would
     # still pass.  Copy the image into a local dir transport instead.
-    # PRRT_kwDOBHvUUM65TpNJ: pull by digest not tag to avoid TOCTOU; digest from inspect
+    # PRRT_kwDOBHvUUM65TpNJ: pull by digest not tag to avoid TOCTOU; digest from push digestfile preferred
     typeset pullDir='/tmp/quay-pull-verify'
     rm -rf "${pullDir}"
-    # The inspect runs on its own so its exit status is the inspect's, not a
-    # pipeline's: an inspect that failed and an inspect that answered without a
-    # Digest are different failures, and the recorded message names which one.
+    typeset imageDigest=""
+    if [[ -s "${digestFile}" ]]; then
+        imageDigest="$(cat "${digestFile}")"
+        imageDigest="${imageDigest%% *}"
+        imageDigest="$(printf '%s' "${imageDigest}" | tr -d '[:space:]')"
+    fi
+    # Fallback to inspect only when push did not record a digest; residual race: tag may have been replaced between push and inspect
     typeset inspectJson=''
     typeset -i inspectRc=0
-    inspectJson=$(SSL_CERT_FILE="${quayCaFile}" skopeo inspect --authfile="${authFile}" "docker://${pushTarget}" 2>/dev/null) || inspectRc=$?
-    typeset imageDigest=""
-    if (( inspectRc == 0 )); then
-        imageDigest=$(printf '%s' "${inspectJson}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('Digest',''))") || imageDigest=""
+    if [[ -z "${imageDigest}" ]]; then
+        inspectJson=$(SSL_CERT_FILE="${quayCaFile}" skopeo inspect --authfile="${authFile}" "docker://${pushTarget}" 2>/dev/null) || inspectRc=$?
+        if (( inspectRc == 0 )); then
+            imageDigest=$(printf '%s' "${inspectJson}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('Digest',''))") || imageDigest=""
+        fi
     fi
     if [[ -z "${imageDigest}" ]]; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "Could not determine image digest after push (skopeo inspect exit ${inspectRc}, digest '${imageDigest:-empty}')" "${elapsed}"
         return 1
     fi
-    typeset pushTargetDigest="${pushTarget%%:*}@${imageDigest}"
-    if [[ "${pushTarget}" == *":"* && "${pushTarget}" != *":/"* ]]; then
-        pushTargetDigest="${pushTarget%%:*}@${imageDigest}"
-    else
-        pushTargetDigest="${pushTarget}@${imageDigest}"
+    # Strip only the final tag segment (after last slash) when constructing repo@digest; preserves registry port
+    typeset repoPart="${pushTarget}"
+    if [[ "${pushTarget##*/}" == *":"* ]]; then
+        repoPart="${pushTarget%:*}"
     fi
+    typeset pushTargetDigest="${repoPart}@${imageDigest}"
     # Publish digest-anchored pullspec for ACS scan and polling
     typeset -g quayImageDigest="${imageDigest}"
     typeset -g quayPushTargetDigest="${pushTargetDigest}"
@@ -885,6 +963,9 @@ except Exception:
     if [[ -z "${quayObc}" ]]; then
         # NooBaa may still be provisioning the claim; wait for it to appear before failing
         typeset -i _claimDeadline=$(( $(date +%s) + 300 ))
+        typeset -i _obcListErr=0
+        typeset -i _obcPickErr=0
+        typeset _obcListMsg=""
         while true; do
             typeset -i _pickRc=0
             quayObc=$(printf '%s' "${obcJson}" | python3 -c "
@@ -937,20 +1018,27 @@ except Exception:
                 obcJson=$(timeout "${_claimRemain}s" oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>"${ARTIFACT_DIR:-/tmp}/obc-err.log")
                 _obcRetryRc=$?
                 if (( _obcRetryRc != 0 )); then
-                    # obc list query produced an error, do not treat as no-match
+                    _obcListErr=${_obcRetryRc}
+                    _obcListMsg="$(cat "${ARTIFACT_DIR:-/tmp}/obc-err.log" 2>/dev/null || echo "oc get failed")"
                     quayObc=""
                     break
                 fi
                 continue
             else
-                # Selector helper error, do not retry as no-match
+                _obcPickErr=${_pickRc}
                 quayObc=""
                 break
             fi
         done
         if [[ -z "${quayObc}" ]]; then
             elapsed=$(( $(date +%s) - start ))
-            RecordResult "${testName}" "failed" "No ObjectBucketClaim found in Quay namespace ${QUAY_NS}" "${elapsed}"
+            if (( _obcListErr != 0 )); then
+                RecordResult "${testName}" "failed" "ObjectBucketClaim list query failed in namespace ${QUAY_NS} (exit ${_obcListErr}: ${_obcListMsg:0:500})" "${elapsed}"
+            elif (( _obcPickErr != 0 && _obcPickErr != 1 )); then
+                RecordResult "${testName}" "failed" "ObjectBucketClaim selector failed in namespace ${QUAY_NS} (helper exit ${_obcPickErr}: ${quayObc:0:200})" "${elapsed}"
+            else
+                RecordResult "${testName}" "failed" "No ObjectBucketClaim found in Quay namespace ${QUAY_NS} after 300s timeout (selector exit 1)" "${elapsed}"
+            fi
             return 1
         fi
     fi
@@ -1060,9 +1148,18 @@ host = os.environ['QUAY_HOST']
 data = json.load(sys.stdin)
 def _norm(ep):
     ep = (ep or '').strip()
+    scheme = ''
     if '://' in ep:
-        ep = ep.split('://', 1)[1]
+        scheme, ep = ep.split('://', 1)
+        scheme = scheme.lower()
     ep = ep.rstrip('/')
+    host_part = ep.split('/', 1)[0]
+    rest = ep[len(host_part):]
+    if ':' in host_part:
+        h, p = host_part.rsplit(':', 1)
+        if p == '443' and scheme in ('https', ''):
+            host_part = h
+            ep = host_part + rest
     return ep.lower()
 hostNorm = _norm(host)
 for i in data.get('integrations', []):
@@ -1198,12 +1295,11 @@ function RunAcsScan () {
     if [[ -n "${quayPushTargetDigest:-}" ]]; then
         acsScanTarget="${quayPushTargetDigest}"
     elif [[ -n "${acsDigest}" ]]; then
-        acsScanTarget="${pushTarget%%:*}@${acsDigest}"
-        if [[ "${pushTarget}" == *":"* && "${pushTarget}" != *":/"* ]]; then
-            acsScanTarget="${pushTarget%%:*}@${acsDigest}"
-        else
-            acsScanTarget="${pushTarget}@${acsDigest}"
+        typeset _acsRepo="${pushTarget}"
+        if [[ "${pushTarget##*/}" == *":"* ]]; then
+            _acsRepo="${pushTarget%:*}"
         fi
+        acsScanTarget="${_acsRepo}@${acsDigest}"
     fi
 
     # TLS verification for the ACS Central API.  The admin credential, and the
