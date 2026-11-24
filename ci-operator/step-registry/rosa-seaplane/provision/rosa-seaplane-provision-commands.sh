@@ -34,11 +34,15 @@ echo "Pinned ${REPOSITORY_URL}@${REPOSITORY_BRANCH} at ${PINNED_SHA}"
 
 # Write one override file per ROSA_REGIONAL_COMPONENTS entry that has a
 # target, with IMAGE_REPO/IMAGE_TAG replaced by the image-push result and
-# PR_SOURCE_SHA replaced by the triggering PR's source commit.
+# PR_SOURCE_SHA replaced by the rosa-seaplane-api commit from JOB_SPEC.
 # Prints one "<target>:<override-file>" line per override.
 write_overrides() {
   python3 <<'PYEOF'
-import os, re, sys, yaml
+import json, os, re, sys, yaml
+
+CHART_SOURCE_ORG = "openshift-online"
+CHART_SOURCE_REPO = "rosa-seaplane-api"
+
 shared = os.environ["SHARED_DIR"]
 pushed = {}
 pushed_file = os.path.join(shared, "component-images")
@@ -47,7 +51,38 @@ if os.path.exists(pushed_file):
         for line in f:
             repo, _, tag = line.strip().rpartition(":")
             pushed[repo] = tag
-source_revision = os.environ.get("PULL_PULL_SHA", "")
+
+
+def chart_source_sha():
+    # PULL_PULL_SHA is the triggering PR head. On an api presubmit that is
+    # the chart commit we want. On pj-rehearse of openshift/release it is
+    # the release commit, which is not in rosa-seaplane-api and makes Argo
+    # CD 422. Resolve from JOB_SPEC the same way clonerefs does: the
+    # openshift-online/rosa-seaplane-api ref (pull SHA, else base_sha).
+    spec = {}
+    raw = os.environ.get("JOB_SPEC") or ""
+    if raw:
+        try:
+            spec = json.loads(raw)
+        except json.JSONDecodeError:
+            spec = {}
+    refs = [r for r in [spec.get("refs"), *(spec.get("extra_refs") or [])] if r]
+    for r in refs:
+        if r.get("org") != CHART_SOURCE_ORG or r.get("repo") != CHART_SOURCE_REPO:
+            continue
+        pulls = r.get("pulls") or []
+        sha = (pulls[0].get("sha") if pulls else None) or r.get("base_sha") or ""
+        if sha:
+            return sha
+    if (
+        os.environ.get("REPO_OWNER") == CHART_SOURCE_ORG
+        and os.environ.get("REPO_NAME") == CHART_SOURCE_REPO
+    ):
+        return os.environ.get("PULL_PULL_SHA") or ""
+    return ""
+
+
+source_revision = chart_source_sha()
 components = yaml.safe_load(os.environ["ROSA_REGIONAL_COMPONENTS"]) or []
 for i, c in enumerate(components):
     repo = c.get("repo", "")
@@ -62,7 +97,11 @@ for i, c in enumerate(components):
         text = text.replace("IMAGE_TAG", pushed[repo])
     if "PR_SOURCE_SHA" in text:
         if not re.fullmatch(r"[0-9a-fA-F]{40}", source_revision):
-            sys.exit("ERROR: PR_SOURCE_SHA requires PULL_PULL_SHA to contain a full 40-character commit SHA")
+            sys.exit(
+                "ERROR: PR_SOURCE_SHA needs a 40-character commit SHA of "
+                f"{CHART_SOURCE_ORG}/{CHART_SOURCE_REPO} from JOB_SPEC refs/extra_refs "
+                f"(got {source_revision!r})"
+            )
         text = text.replace("PR_SOURCE_SHA", source_revision)
     path = os.path.join(shared, f"component-override-{i}.yaml")
     with open(path, "w") as f:
