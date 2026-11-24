@@ -4,11 +4,144 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+cancel_parallel_setup() {
+  if (( interrupted == 0 )); then
+    interrupted="$1"
+    local pid
+    for pid in "${install_pids[@]}"; do
+      kill -TERM -- "-${pid}" 2>/dev/null || true
+    done
+  fi
+}
+
+run_parallel_setup() {
+  local role file prefix manifest worker_dir pid status
+  local interrupted=0 failed=0
+  local -A install_pids=() install_statuses=()
+  local -a inputs=(cir packet-conf.sh server-ip server-sshport dev-scripts-additional-config)
+  local -a outputs=(
+    kubeconfig kubeadmin-password install-status.txt ds-vars.conf console.url
+    dev-scripts-additional-config cir-extra cir-nodes bm.json devscripts-logs-collected
+  )
+
+  if [[ ! -f "${SHARED_DIR}/ofcir-role" || "$(<"${SHARED_DIR}/ofcir-role")" != target ]]; then
+    echo "The target OFCIR context must be active before parallel setup" >&2
+    return 1
+  fi
+
+  parallel_dir="$(mktemp -d)"
+  trap 'rm -rf -- "${parallel_dir}"' EXIT
+  shopt -s nullglob
+  for role in source target; do
+    worker_dir="${parallel_dir}/${role}"
+    mkdir -p "${worker_dir}" "${ARTIFACT_DIR}/${role}"
+    prefix="${SHARED_DIR}/"
+    if [[ "${role}" == source ]]; then
+      prefix+="ofcir-source-"
+    fi
+    for file in "${inputs[@]}"; do
+      if [[ -f "${prefix}${file}" ]]; then
+        cp -p -- "${prefix}${file}" "${worker_dir}/${file}"
+      fi
+    done
+    for manifest in "${prefix}"manifest_*.{yaml,yml}; do
+      cp -p -- "${manifest}" "${worker_dir}/${manifest#"${prefix}"}"
+    done
+    if [[ ! -s "${worker_dir}/server-ip" || ! -s "${worker_dir}/packet-conf.sh" || ! -s "${worker_dir}/cir" ]]; then
+      echo "Missing OFCIR connection files for ${role} setup" >&2
+      return 1
+    fi
+    printf '%s' "${role}" > "${worker_dir}/ofcir-role"
+  done
+
+  if [[ "$(<"${parallel_dir}/source/server-ip")" == "$(<"${parallel_dir}/target/server-ip")" ]]; then
+    echo "Source and target must lease different OFCIR hosts" >&2
+    return 1
+  fi
+
+  # Each background job gets its own process group so cancellation reaches its SSH processes.
+  set -m
+  trap 'cancel_parallel_setup 143' TERM
+  trap 'cancel_parallel_setup 130' INT
+  for role in source target; do
+    if (( interrupted != 0 )); then
+      break
+    fi
+    echo "Starting ${role} dev-scripts setup"
+    SHARED_DIR="${parallel_dir}/${role}" ARTIFACT_DIR="${ARTIFACT_DIR}/${role}" \
+      bash "$0" --parallel-worker > "${ARTIFACT_DIR}/${role}/setup.log" 2>&1 &
+    install_pids[${role}]=$!
+    # A signal can arrive between the launch and recording the PID.
+    if (( interrupted != 0 )); then
+      kill -TERM -- "-${install_pids[${role}]}" 2>/dev/null || true
+    fi
+  done
+  set +m
+
+  for role in "${!install_pids[@]}"; do
+    pid="${install_pids[${role}]}"
+    status=0
+    wait "${pid}" || status=$?
+    # A trapped signal can interrupt wait before the worker collects its logs.
+    while (( interrupted != 0 )) && kill -0 "${pid}" 2>/dev/null; do
+      status=0
+      wait "${pid}" || status=$?
+    done
+    unset "install_pids[${role}]"
+    install_statuses[${role}]="${status}"
+    echo "${role} dev-scripts setup exited with status ${status}"
+    if (( status != 0 )); then
+      failed=1
+    fi
+  done
+  trap - TERM INT
+
+  for role in "${!install_statuses[@]}"; do
+    worker_dir="${parallel_dir}/${role}"
+    if [[ ! -s "${worker_dir}/install-status.txt" ]]; then
+      printf '%s\n' "${install_statuses[${role}]}" > "${worker_dir}/install-status.txt"
+    fi
+    for file in "${outputs[@]}"; do
+      if [[ -f "${worker_dir}/${file}" ]]; then
+        cp -p -- "${worker_dir}/${file}" "${SHARED_DIR}/ofcir-${role}-${file}"
+        # The target context is active until the workflow switches back to source.
+        if [[ "${role}" == target ]]; then
+          cp -p -- "${worker_dir}/${file}" "${SHARED_DIR}/${file}"
+        fi
+      fi
+    done
+    file="management_cluster_kubeconfig_${role}"
+    if [[ -s "${worker_dir}/${file}" ]]; then
+      cp -p -- "${worker_dir}/${file}" "${SHARED_DIR}/${file}"
+    fi
+  done
+
+  if (( interrupted != 0 )); then
+    return "${interrupted}"
+  fi
+  return "${failed}"
+}
+
+if [[ "${DEVSCRIPTS_SETUP_PARALLEL:-false}" == true && "${1:-}" != --parallel-worker ]]; then
+  run_parallel_setup
+  exit 0
+fi
+
 echo "************ baremetalds devscripts setup command ************"
 
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
+
+# Get env values from cir extradata, including when collecting early failures.
+EXTRAFILE=${SHARED_DIR}/cir-extra
+function getExtraVal(){
+    if [ ! -f "$EXTRAFILE" ] || [ "$(stat -c %s "$EXTRAFILE")" -lt 2 ] ; then
+        echo "$2"
+        return
+    fi
+    jq -r --arg default "$2" ".$1 // \$default" "$EXTRAFILE"
+}
 
 # Get dev-scripts logs and other configuration
 finished()
@@ -67,7 +200,16 @@ finished()
     echo "$retval" > "${SHARED_DIR}/install-status.txt"
   fi
 }
-trap finished EXIT TERM
+ssh_timeout_options=(-s 9)
+if [[ "${1:-}" == --parallel-worker ]]; then
+  trap finished EXIT
+  trap 'exit 143' TERM
+  trap 'exit 130' INT
+  # Keep SSH in the worker's process group so cancellation stops the whole command.
+  ssh_timeout_options+=(--foreground)
+else
+  trap finished EXIT TERM
+fi
 
 # Make sure this host hasn't been previously used
 ssh "${SSHOPTS[@]}" "root@${IP}" mkdir /root/nodesfirstuse
@@ -91,15 +233,6 @@ do
   manifest="$( basename "${item}" )"
   scp "${SSHOPTS[@]}" "${item}" "root@${IP}:manifests/${manifest##manifest_}"
 done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
-
-# Get env values from cir extradata
-function getExtraVal(){
-    if [ ! -f "$EXTRAFILE" ] || [ "$(stat -c %s "$EXTRAFILE")" -lt 2 ] ; then
-        echo "$2"
-        return
-    fi
-    jq -r --arg default "$2" ".$1 // \$default" "$EXTRAFILE"
-}
 
 # For baremetal clusters ofcir has returned details about the hardware in the cluster
 # prepare those details into a format the devscripts understands
@@ -164,7 +297,6 @@ EOF
 
 # dev-scripts setup for baremetal clusters
 CIRFILE=$SHARED_DIR/cir
-EXTRAFILE=$SHARED_DIR/cir-extra
 NODESFILE=$SHARED_DIR/cir-nodes
 BMJSON=$SHARED_DIR/bm.json
 BMCUSER=$(cat "${CLUSTER_PROFILE_DIR}/bmcuser" || echo "NA")
@@ -210,7 +342,7 @@ fi
 SSH_TIMEOUT="$((${MAKE_TIMEOUT%m} + 45))m"
 
 # Use '/auths/ s/.*/' instead of 's/.*auths.*/' to avoid regex backtracking on long log lines
-timeout -s 9 "${SSH_TIMEOUT}" ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e '/auths/ s/.*/*** PULL_SECRET ***/'
+timeout "${ssh_timeout_options[@]}" "${SSH_TIMEOUT}" ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e '/auths/ s/.*/*** PULL_SECRET ***/'
 
 set -xeuo pipefail
 

@@ -12,7 +12,9 @@ export KUBEVIRT_CROSS_CLUSTER_DNS_HOOK="${SHARED_DIR}/cross-cluster-dns-hook.sh"
 
 test -s "${KUBECONFIG_SOURCE}"
 test -s "${KUBECONFIG_TARGET}"
-test -x "${KUBEVIRT_CROSS_CLUSTER_DNS_HOOK}"
+# ci-operator copies shared files between pods without their executable mode.
+test -s "${KUBEVIRT_CROSS_CLUSTER_DNS_HOOK}"
+chmod 700 "${KUBEVIRT_CROSS_CLUSTER_DNS_HOOK}"
 command -v oc >/dev/null
 command -v ssh >/dev/null
 source_platform="$(oc --kubeconfig="${KUBECONFIG_SOURCE}" get hostedcluster "${E2E_HOSTED_CLUSTER_NAME}" \

@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -euo pipefail
+shopt -s nullglob
 
 role="${OFCIR_CONTEXT_ROLE:?OFCIR_CONTEXT_ROLE is required}"
 action="${OFCIR_CONTEXT_ACTION:?OFCIR_CONTEXT_ACTION is required}"
@@ -25,12 +26,17 @@ files=(
 
 save_active() {
   local active="${1}"
+  local manifest
   # ci-operator only passes top-level files to subsequent steps.
   local prefix="${SHARED_DIR}/ofcir-${active}-"
   for file in "${files[@]}"; do
     if [[ -f "${SHARED_DIR}/${file}" ]]; then
       cp -p "${SHARED_DIR}/${file}" "${prefix}${file}"
     fi
+  done
+  rm -f -- "${prefix}"manifest_*.{yaml,yml}
+  for manifest in "${SHARED_DIR}"/manifest_*.{yaml,yml}; do
+    cp -p -- "${manifest}" "${prefix}${manifest##*/}"
   done
   if [[ -s "${prefix}kubeconfig" ]]; then
     cp -p "${prefix}kubeconfig" "${SHARED_DIR}/management_cluster_kubeconfig_${active}"
@@ -59,5 +65,10 @@ for file in "${files[@]}"; do
   if [[ -f "${SHARED_DIR}/ofcir-${role}-${file}" ]]; then
     cp -p "${SHARED_DIR}/ofcir-${role}-${file}" "${SHARED_DIR}/${file}"
   fi
+done
+prefix="${SHARED_DIR}/ofcir-${role}-"
+rm -f -- "${SHARED_DIR}"/manifest_*.{yaml,yml}
+for manifest in "${prefix}"manifest_*.{yaml,yml}; do
+  cp -p -- "${manifest}" "${SHARED_DIR}/${manifest#"${prefix}"}"
 done
 printf '%s' "${role}" > "${SHARED_DIR}/ofcir-role"
