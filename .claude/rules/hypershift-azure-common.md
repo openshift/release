@@ -42,7 +42,7 @@ These credentials are used by the `hypershift-azure-create` chain. The primary s
 
 | Variable | Purpose |
 |---|---|
-| `HYPERSHIFT_AZURE_LOCATION` | Azure region (default: eastus in create/destroy chains; overridden to centralus in self-managed workflow and ref) |
+| `HYPERSHIFT_AZURE_LOCATION` | Azure region (default: eastus in create/destroy chains; overridden to uksouth in HyperShift's root-backed self-managed workflows and the `*-azure-v2` refs; the self-managed Cucushift QE chains leave it empty) |
 | `HYPERSHIFT_EXTERNAL_DNS_DOMAIN` | External DNS domain |
 | `CI_TESTS_RUN` | Test regex filter for selecting which e2e tests to run |
 
