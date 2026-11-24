@@ -1428,10 +1428,11 @@ if present and selection is not None and not listed_scoped: # PRRT_kwDOBHvUUM65u
 if present and selection is not None:
     sel_catalog = selection.get("catalogSource")
     sel_catalog_ns = selection.get("catalogSourceNamespace")
-    # PRRT_kwDOBHvUUM65yNGf: accept consistent single-catalog when no subscription exists
     if sub_source is None:
-        # No subscription: accept if single catalog consistent with inventory
-        if len(inv) == 1 and sel_catalog == inv[0][1] and sel_catalog_ns == inv[0][2]:
+        # No subscription: the single-catalog acceptance is about the
+        # rhacs-operator rows, not every package the catalog lists.
+        rhacs_inv = [r for r in inv if r[0] == "rhacs-operator"]
+        if len(rhacs_inv) == 1 and sel_catalog == rhacs_inv[0][1] and sel_catalog_ns == rhacs_inv[0][2]:
             pass
         elif sel_catalog != sub_source or (sub_source_ns and sel_catalog_ns != sub_source_ns):
             print("ASSERTION FAILURE (20): packagemanifest disagreement: the "
