@@ -324,7 +324,6 @@ tests:
   capabilities:
   - arm64
   optional: true
-  pipeline_skip_if_only_changed: (^(\.tekton|\.github|\.claude|docs|examples|enhancements|contrib|hypershift-ci-python|\.cursor|test/envtest|\.chai-bot)/)|(\.md$)|((^|/)OWNERS(_ALIASES)?$)|(/overrides\.yaml$)|(^renovate\.json$)|(/\.testcoverage\.yml$)|(^\.gitlint$)|(^\.gitignore$)|(^\.coderabbit\.yaml$)|(^\.dockerignore$)|(^codecov\.yml$)|(^(?:[^t/][^/]*|t|t[^e/][^/]*|te|te[^s/][^/]*|tes|tes[^t/][^/]*|test[^/]+)/.*_test\.go$)|(^Makefile$)
   steps:
     cluster_profile: hypershift-aws
     env:
@@ -368,6 +367,26 @@ tests:
               variant: public
               labelFilter: hosted-cluster-health || control-plane-workloads
     workflow: hypershift-aws-e2e-v2-registry-overrides
+- always_run: false
+  as: e2e-v2-aws-deterministic-lb
+  capabilities:
+  - arm64
+  optional: true
+  steps:
+    cluster_profile: hypershift-aws
+    env:
+      TECH_PREVIEW_NO_UPGRADE: "true"
+      TEST_PLAN: |
+        name: deterministic-lb
+        platform: aws
+        testMatrix:
+          sequential:
+          - name: deterministic-lb
+            steps:
+            - name: deterministic-lb
+              variant: deterministic-lb
+              labelFilter: deterministic-lb-ip
+    workflow: hypershift-aws-e2e-v2-deterministic-lb
 - always_run: false
   as: e2e-v2-aws-backuprestore
   capabilities:
@@ -416,6 +435,33 @@ tests:
       REDHAT_OPERATORS_INDEX_TAG: v4.21
     workflow: hypershift-mce-kubevirt-baremetalds-backuprestore
 - always_run: false
+  as: e2e-agent-connected-ovn-dualstack-ipv6-metal-conformance
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-hcp
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+        WORKER_MEMORY=24576
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST=vda
+        VM_EXTRADISKS_SIZE=500G
+        NUM_EXTRA_WORKERS=3
+        NUM_WORKERS=4
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True
+      IP_STACK: v6
+      KONFLUX_DEPLOY_CATALOG_SOURCE: "true"
+      KONFLUX_DEPLOY_OPERATORS: "true"
+      LVM_OPERATOR_SUB_CHANNEL: stable-5.1
+      MCE_VERSION: "5.1"
+      METALLB_OPERATOR_SUB_SOURCE: metallb-konflux
+      SKIP_QE_APP_REGISTRY: "true"
+    workflow: hypershift-mce-agent-metal3-conformance
+- always_run: false
   as: e2e-agent-connected-ovn-ipv4-metal-backuprestore
   capabilities:
   - intranet
@@ -443,7 +489,6 @@ tests:
     cluster_profile: hypershift-azure
     env:
       ENABLE_HYPERSHIFT_CERT_ROTATION_SCALE: "true"
-      HYPERSHIFT_AZURE_LOCATION: centralus
       NODEPOOL_N1_VERSION: "5.0"
     workflow: hypershift-azure-e2e-v2-self-managed
 - always_run: false
@@ -814,6 +859,7 @@ tests:
     env:
       GKE_REGION: northamerica-northeast2
       GKE_RELEASE_CHANNEL: stable
+      HYPERSHIFT_ETCD_STORAGE_CLASS: premium-rwo
     workflow: hypershift-gcp-gke-e2e-v2
 - always_run: false
   as: e2e-aws-external-oidc-techpreview

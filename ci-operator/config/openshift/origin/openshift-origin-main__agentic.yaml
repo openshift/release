@@ -22,6 +22,7 @@ images:
       FROM origin-devcontainer
       USER root
       RUN dnf install -y podman fuse-overlayfs shadow-utils openssl python3-pip && dnf clean all
+      COPY --from=ai-helpers /usr/bin/claude /usr/bin/claude
       COPY --from=podman /entrypoint.sh /entrypoint.sh
       RUN setcap cap_setuid+ep /usr/bin/newuidmap && \
           setcap cap_setgid+ep /usr/bin/newgidmap && \
@@ -58,6 +59,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: periodic-origin-devcontainer-dependency-report
+  cron: 43 9 * * 1
+  steps:
+    env:
+      DEVCONTAINER_DEPENDENCY_REPOSITORY: openshift/origin
+    workflow: openshift-devcontainer-dependency-report
 - as: periodic-origin-jira-agent
   capabilities:
   - nested-podman
@@ -70,6 +77,18 @@ tests:
       SETUP_SCRIPT: hack/agentic_setup.sh
       UPSTREAM_REPO: openshift/origin
     workflow: openshift-agentic-trt-jira-solver
+- as: periodic-origin-jira-planner
+  capabilities:
+  - nested-podman
+  cron: '@yearly'
+  steps:
+    env:
+      ALLOWED_TOOLS: Bash Read Write Edit Grep Glob WebFetch WebSearch Agent LSP Skill
+        TaskCreate TaskGet TaskList TaskOutput TaskStop TaskUpdate TodoWrite ToolSearch
+      FORK_REPO: openshift-trt/origin
+      SETUP_SCRIPT: hack/agentic_setup.sh
+      UPSTREAM_REPO: openshift/origin
+    workflow: openshift-agentic-trt-jira-planner
 - as: periodic-origin-pr-followup-agent
   capabilities:
   - nested-podman

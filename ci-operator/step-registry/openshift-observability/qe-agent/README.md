@@ -2,7 +2,7 @@
 
 Agentic post-step for OpenShift Observability teams that autonomously triages e2e test failures using Claude Code CLI.
 
-When a test step reports failures, the agent reads the JUnit XML reports and a context file from `SHARED_DIR`, then runs Claude with a team-provided skill to diagnose the root cause and — depending on the skill — attempt remediation (re-run failing tests, propose a fix, write a bug report, etc.).
+When a test step reports failures, the agent reads a context file from `SHARED_DIR` and the JUnit XML reports from pod-local copies in `QE_JUNIT_DIR` — the wrapper relocates them out of `SHARED_DIR` before Claude starts, because `SHARED_DIR` is a 1 MiB Kubernetes Secret that must not grow while the agent runs — then runs Claude with a team-provided skill to diagnose the root cause and — depending on the skill — attempt remediation (re-run failing tests, propose a fix, write a bug report, etc.).
 
 The step is a **no-op** (exits immediately with no cost) when:
 - `AGENT_SKILL` is not set
@@ -141,40 +141,53 @@ RUN curl -fsSL https://downloads.claude.ai/keys/claude-code.asc \
 
 ### 3. Add the `notify_qe_agent` EXIT trap to your test step script
 
-`SHARED_DIR` only propagates **flat files** between steps — subdirectories created in one step's pod are not visible in subsequent post step pods. The trap below writes the context file and JUnit XMLs as flat files to `SHARED_DIR` on exit, regardless of whether the test step passed or failed.
+`SHARED_DIR` only propagates **flat files** between steps — subdirectories created in one step's pod are not visible in subsequent post step pods. The trap below writes the context file, and (when there are failures) JUnit XMLs, as flat files to `SHARED_DIR` on exit, regardless of whether the test step passed or failed.
 
-Add this function and trap near the top of your test step `*-commands.sh` script, before any test execution:
+The snippet below is a skeleton: the copy block is left empty on purpose. Add the function and trap near the top of your test step `*-commands.sh` script, before any test execution, and fill in the copy block for your suite's reports — the openshift-observability-logging-e2e-tests step is the reference implementation:
 
 ```bash
-# Write a flat context file and JUnit XMLs to SHARED_DIR for the qe-agent post-step.
-# SHARED_DIR only supports flat files (no subdirectories); subdirs are not propagated between steps.
+# Write a flat context file and JUnit XMLs to SHARED_DIR for the
+# qe-agent post-step. SHARED_DIR only supports flat files (no subdirectories);
+# subdirs are not propagated between steps.
 function notify_qe_agent() {
     local has_failures=false
     grep -rqE '<(failure|error)[ >]' "${ARTIFACT_DIR}" 2>/dev/null && has_failures=true
 
-    local i=0
-    while IFS= read -r xml; do
-        cp "${xml}" "${SHARED_DIR}/qe-agent-junit-${i}.xml" 2>/dev/null || true
-        i=$((i + 1))
-    done < <(find "${ARTIFACT_DIR}" -name "*.xml" 2>/dev/null)
+    # Copy the JUnit XMLs only when there are failures: the qe-agent step
+    # skips itself when has_test_failures is false. SHARED_DIR is a 1 MiB
+    # Kubernetes Secret shared with the files earlier steps wrote, and going
+    # over the limit fails this step after the tests already ran, so reduce
+    # the copies — at minimum strip <system-out>/<system-err> from passing
+    # testcases, the agent only reads failing ones — and drop the copies if
+    # they still do not fit a ~900 KB budget. The full reports stay in
+    # ARTIFACT_DIR, where Prow uploads them for humans.
+    local junit_copied=0
+    local junit_truncated=false
+    if [[ "${has_failures}" == "true" ]]; then
+        # Reduce and copy the XMLs here; the openshift-observability-logging-e2e-tests
+        # step has a reference implementation (xsltproc).
+        :
+    fi
 
     cat > "${SHARED_DIR}/qe-agent-context.json" <<EOF
 {
   "step_script_ref": "<org>/<repo>/path/to/your-commands.sh",
   "has_test_failures": ${has_failures},
+  "junit_truncated": ${junit_truncated},
+  "junit_full_report": "<ARTIFACT_DIR>/junit_your_report.xml",
   "env": {
     "EXAMPLE_VAR": "${EXAMPLE_VAR:-}"
   }
 }
 EOF
-    echo "QE agent context and ${i} JUnit XML(s) written to SHARED_DIR (has_test_failures=${has_failures})"
+    echo "QE agent context and ${junit_copied} JUnit XML(s) written to SHARED_DIR (has_test_failures=${has_failures})"
 }
 trap notify_qe_agent EXIT
 ```
 
-Replace `step_script_ref` with the path to your commands script relative to the repository root, and populate `env` with any variables the skill needs to re-run or reproduce the failure.
+Replace `step_script_ref` with the path to your commands script relative to the repository root, set `junit_full_report` to your JUnit report path under `ARTIFACT_DIR`, and populate `env` with any variables the skill needs to re-run or reproduce the failure.
 
-> **Note on JUnit XML size**: `SHARED_DIR` is backed by a Kubernetes Secret with a 1 MiB limit shared across all files. JUnit XMLs are safe to copy; do **not** copy binary artifacts such as Cypress screenshots.
+> **Note on JUnit XML size**: `SHARED_DIR` is backed by a Kubernetes Secret with a 1 MiB limit shared across all files, and the kubeconfig, proxy settings and other files that earlier steps wrote count against it. A Secret over the limit is rejected only when the step pod exits, so it fails the test step **after** the tests already ran. Copy JUnit XMLs only when there are failures (this step skips itself otherwise), reduce the copies to keep them small — at minimum strip `<system-out>`/`<system-err>` from passing testcases, the agent only reads failing ones (the openshift-observability-logging-e2e-tests step does this with xsltproc) — and drop them if they still do not fit a ~900 KB budget. Record any degradation in `qe-agent-context.json` (`junit_truncated`, `junit_full_report`) so the agent knows what it is missing and where humans find the full report. Do **not** copy binary artifacts such as Cypress screenshots.
 
 ### 4. Add the step and set `AGENT_SKILL` in your CI config
 
@@ -337,7 +350,7 @@ To mitigate this, all skills include a prompt-level constraint that prohibits th
 
 **ARTIFACT_DIR pollution** — Claude writes unexpected files to `ARTIFACT_DIR`, which are then uploaded to GCS. The skill scopes Claude to documented output paths, but this is a prompt-level control, not a technical one.
 
-**SHARED_DIR pollution** — Claude writes unexpected files to `SHARED_DIR`, which is shared with the other post steps, such as the deprovision chain when the config lists it (see the [warning in Setup](#4-add-the-step-and-set-agent_skill-in-your-ci-config)). The deprovision step ignores unexpected files in practice, but this is not formally enforced; in particular, the installer deprovision step skips destruction when `${SHARED_DIR}/metadata.json` is missing or empty, so an agent that removed or truncated that file would leave the cluster running.
+**SHARED_DIR pollution** — Claude writes unexpected files to `SHARED_DIR`, which is shared with the other post steps, such as the deprovision chain when the config lists it (see the [warning in Setup](#4-add-the-step-and-set-agent_skill-in-your-ci-config)). The wrapper reduces this risk for the JUnit inputs: it relocates every `qe-agent-junit-*` file out of `SHARED_DIR` into pod-local `QE_JUNIT_DIR` before Claude starts, so the observed failure mode — an agent running `gunzip` in place on a report copy and pushing the Secret over its 1 MiB limit at pod exit — can no longer happen through those files. The residual risk is not formally enforced; in particular, the installer deprovision step skips destruction when `${SHARED_DIR}/metadata.json` is missing or empty, so an agent that removed or truncated that file would leave the cluster running.
 
 ### Audit artifacts
 
@@ -434,7 +447,7 @@ trap notify_qe_agent EXIT
 
 ### Authorized actions
 
-- Read test artifacts (JUnit XMLs, context files) from `SHARED_DIR`
+- Read the test step context file from `SHARED_DIR` and the JUnit XMLs from `QE_JUNIT_DIR` (pod-local copies relocated by the wrapper)
 - Rerun specific failing tests using framework CLIs (chainsaw, cypress)
 - Read cluster state (pods, logs, events, CRDs, operator status)
 - Write analysis output to `ARTIFACT_DIR` (uploaded to GCS for human review)
@@ -689,7 +702,9 @@ CI Job Pod (ephemeral)
 │                                                          │
 │  Inputs:                                                 │
 │  ├── SHARED_DIR/qe-agent-context.json                   │
-│  ├── SHARED_DIR/qe-agent-junit-*.xml                    │
+│  ├── QE_JUNIT_DIR/qe-agent-junit-*.xml                  │
+│    (wrapper moved them out of SHARED_DIR                │
+│     before Claude started)                              │
 │  ├── Skill file (fetched from GitHub main branch)       │
 │  ├── Shared modules (GitHub main -> /tmp)               │
 │  └── JOB_SPEC env -> qe-agent-refs.json (refs only)     │
