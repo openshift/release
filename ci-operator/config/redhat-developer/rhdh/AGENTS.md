@@ -108,6 +108,14 @@ All RHDH CI clusters provisioned on AWS or Azure must carry cost-allocation tags
 - **OSD-GCP**: Clusters are created via the OCM CLI in the RHDH repo (`.ci/pipelines/cluster/osd-gcp/`), not in openshift/release. Tagging requires OCM API changes.
 - **GKE**: Not AWS/Azure — uses separate GCP billing.
 
+## Periodic Job Scheduling
+
+Do not schedule IPI-installed jobs (tests without `cluster_claim`, e.g. the `e2e-ocp-disconnected-*` jobs using `openshift-e2e-aws-disconnected`) to start between 00:00 and 01:00 UTC. Start them at 02:00 UTC or later.
+
+Every build cluster runs the image pruner at 00:00 UTC (`schedule: ""` in `clusters/build-clusters/*/openshift-image-registry/imagepruner-cluster.yaml` defaults to `0 0 * * *`). A job starting at midnight imports the OCP release payload into its `ci-op-*` namespace while the pruner is running, and the pruner can delete that payload before the job mirrors or installs it. The job then fails in `mirror-images-by-oc-adm-in-bastion` with `unknown blob` and `manifest unknown` errors ([RHDHBUGS-3954](https://redhat.atlassian.net/browse/RHDHBUGS-3954)).
+
+Jobs using `cluster_claim`, MAPT (AKS/EKS), GKE, or OSD-GCP do not consume the release payload and are not affected.
+
 ## New Release Branch Checklist
 
 When creating a new release branch (e.g., `release-1.11`):
