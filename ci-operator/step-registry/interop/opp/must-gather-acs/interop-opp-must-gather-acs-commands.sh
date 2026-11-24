@@ -1094,6 +1094,13 @@ subs_s, subs = as_list("03-subscription.json")
 # capture stays readable.
 if os.environ.get("ACS_SUB_REFRESH_FAILED") == "true":
     subs_s, subs = "query_failed", []
+# The snapshot comparison state travels the same way: same / changed /
+# unknown. Anything but same withholds readiness, and a failed re-read makes it
+# unknown even when the earlier file was readable.
+sub_snapshot = os.environ.get("ACS_SUB_SNAPSHOT", "same")
+if os.environ.get("ACS_SUB_REFRESH_FAILED") == "true":
+    sub_snapshot = "unknown"
+sub_snapshot_term = {"same": "true", "changed": "false"}.get(sub_snapshot, "unknown")
 csvs_s, csvs = as_list("05-csv.json")
 central_s, central = as_list("07-central-cr.json")
 acm_s, acm = as_list("11-acm-csv-addon-controller.json")
@@ -1338,6 +1345,10 @@ terms = {
     "addon_controller_image": (addon_images[0].get("image")
                                 if addon_images else "unknown"), # PRRT_kwDOBHvUUM65yNGZ: ACM version and controller image from same CSV
     "predicate_inputs_classified": str(inputs_classified).lower(),
+    # Stability across the run: the early capture and the post-capture re-read
+    # must describe the same Subscription, or this run did not observe a
+    # settled object.
+    "rhacs_subscription_unchanged": sub_snapshot_term,
 }
 # Per-run removal precondition: the OperatorPolicy owns the rhacs
 # subscription (its spec.subscription targets that subscription) with a
@@ -1367,6 +1378,7 @@ terms["removal_preconditions_met"] = str(
     and terms["rhacs_subscription_source"] != "unknown"
     and terms["csv_catalog_matches_subscription"] == "true"
     and terms["packagemanifest_resolves_current_csv"] == "true"
+    and terms["rhacs_subscription_unchanged"] == "true"
 ).lower()
 
 out = ev / "acs-central-status.properties"
@@ -1378,6 +1390,58 @@ print(f"wrote {out}")
 PYEOF
 }
 
+# _sub_snapshot_state <early-json> <refreshed-json>: compare the same
+# Subscription object (name, namespace) across the two captures and print
+# same | changed | unknown. A second Subscription in another namespace is a
+# different object, so it is not a change to this one. unknown means the pair
+# cannot be compared (unparsable capture, or no rhacs-operator Subscription in
+# the early one), which withholds readiness the same way a change does.
+_sub_snapshot_state() {
+  python3 - "$1" "$2" <<'PYEOF'
+import json, sys
+
+FIELDS = ("channel", "source", "sourceNamespace", "currentCSV", "generation")
+
+
+def load(path):
+    try:
+        data = json.loads(open(path, encoding="utf-8").read())
+    except Exception:
+        return None
+    return data if isinstance(data, list) else None
+
+
+def records(data):
+    return [s for s in data
+            if isinstance(s, dict) and s.get("name") == "rhacs-operator"]
+
+
+early, late = load(sys.argv[1]), load(sys.argv[2])
+if early is None or late is None:
+    print("unknown")
+    sys.exit(0)
+early_records = records(early)
+if len(early_records) != 1:
+    # No single early record to compare against, or an ambiguous one.
+    print("unknown")
+    sys.exit(0)
+early_obj = early_records[0]
+identity = (early_obj.get("name"), early_obj.get("namespace"))
+same_object = [r for r in records(late)
+               if (r.get("name"), r.get("namespace")) == identity]
+if not same_object:
+    # The object that was captured is gone from the cluster.
+    print("changed")
+    sys.exit(0)
+if len(same_object) > 1:
+    print("unknown")
+    sys.exit(0)
+late_obj = same_object[0]
+print("changed" if any(early_obj.get(f) != late_obj.get(f) for f in FIELDS)
+      else "same")
+PYEOF
+}
+
 # Refresh Subscription snapshot after the last capture so the removal
 # predicate does not evaluate readiness terms against a stale currentCSV
 # if OLM advanced it in the window between the early Subscription capture
@@ -1385,16 +1449,29 @@ PYEOF
 # the initial capture: a failed re-read writes probe_error so relevant
 # terms become unknown rather than silently keeping the earlier value.
 _sub_refresh_failed=false
+_sub_snapshot="same"
 if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" != "1" ]]; then
   _sub_refresh_ok=false
   _sub_refresh_out=""
   _sub_refresh_err=$(mktemp)
+  _sub_early=$(mktemp)
+  cp "${EVIDENCE_DIR}/03-subscription.json" "${_sub_early}" 2>/dev/null || : > "${_sub_early}"
+  _sub_refresh_deadline=$(( $(date +%s) + 120 ))
+  typeset -i _sub_refresh_try=0 _sub_refresh_remain=0 _sub_refresh_wait=0 _sub_refresh_sleep=0
   for _sub_refresh_try in 1 2 3; do
-    if _sub_refresh_out=$(oc get subscriptions.operators.coreos.com -A --request-timeout=30s -o json 2>"${_sub_refresh_err}"); then
+    _sub_refresh_remain=$(( _sub_refresh_deadline - $(date +%s) ))
+    if (( _sub_refresh_remain <= 5 )); then break; fi
+    _sub_refresh_wait=$(( _sub_refresh_remain < 45 ? _sub_refresh_remain : 45 ))
+    if _sub_refresh_out=$(timeout "${_sub_refresh_wait}s" oc get subscriptions.operators.coreos.com -A --request-timeout=30s -o json 2>"${_sub_refresh_err}"); then
       _sub_refresh_ok=true
       break
     fi
-    (( _sub_refresh_try < 3 )) && sleep $(( _sub_refresh_try * 2 ))
+    if (( _sub_refresh_try < 3 )); then
+      _sub_refresh_sleep=$(( _sub_refresh_try * 2 ))
+      _sub_refresh_remain=$(( _sub_refresh_deadline - $(date +%s) ))
+      (( _sub_refresh_sleep > _sub_refresh_remain )) && _sub_refresh_sleep=${_sub_refresh_remain}
+      (( _sub_refresh_sleep > 0 )) && sleep "${_sub_refresh_sleep}"
+    fi
   done
   rm -f "${_sub_refresh_err}"
   if [[ "${_sub_refresh_ok}" == "true" ]]; then
@@ -1424,6 +1501,13 @@ print(json.dumps(result, indent=2))
       rm -f "${EVIDENCE_DIR}/03-subscription.json.tmp"
     }
     if [[ -f "${EVIDENCE_DIR}/03-subscription.json.tmp" ]]; then
+      # A changed object means the install did not settle during this run: the
+      # refreshed values are still the ones recorded, but readiness is withheld
+      # rather than reporting a state the run never held in one snapshot.
+      _sub_snapshot="$(_sub_snapshot_state "${_sub_early}" "${EVIDENCE_DIR}/03-subscription.json.tmp")" || _sub_snapshot="unknown"
+      if [[ "${_sub_snapshot}" != "same" ]]; then
+        printf '%s\n' "Warning: the rhacs-operator Subscription snapshot state is ${_sub_snapshot}; removal readiness is withheld" >&2
+      fi
       if ! mv -f "${EVIDENCE_DIR}/03-subscription.json.tmp" "${EVIDENCE_DIR}/03-subscription.json"; then
         _sub_refresh_failed=true
         echo "probe_error: subscription refresh mv failed" > "${EVIDENCE_DIR}/03-subscription.json"
@@ -1435,7 +1519,9 @@ print(json.dumps(result, indent=2))
     _sub_refresh_failed=true
     echo "probe_error: subscription re-read failed after 3 attempts" > "${EVIDENCE_DIR}/03-subscription.json"
     echo "probe_error: subscription re-read failed after 3 attempts" > "${EVIDENCE_DIR}/03-subscription.refresh-failed"
+    _sub_snapshot="unknown"
   fi
+  rm -f "${_sub_early}"
 fi
 
 # PRRT_kwDOBHvUUM65ui2E: fixture mode writes these terms into its own temporary
@@ -1444,7 +1530,7 @@ _properties_rc=0
 if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" == "1" ]]; then
     :
 else
-    if ! EVIDENCE_DIR="${EVIDENCE_DIR}" ACS_SUB_REFRESH_FAILED="${_sub_refresh_failed}" write_status_properties; then
+    if ! EVIDENCE_DIR="${EVIDENCE_DIR}" ACS_SUB_REFRESH_FAILED="${_sub_refresh_failed}" ACS_SUB_SNAPSHOT="${_sub_snapshot}" write_status_properties; then
         echo "ASSERTION FAILURE (21): acs-central-status.properties could not be written, so the removal predicate terms are missing from the evidence" >&2
         _properties_rc=21
     fi
@@ -1693,6 +1779,19 @@ FIXTURE
   EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
   _expect removal_preconditions_met true
   _expect predicate_inputs_classified true
+  # ACM build identity: both values come from the one CSV record.
+  _expect acm_csv_version 2.17.4
+  _expect addon_controller_image registry.redhat.io/acm2/governance-policy-addon-controller-rhel9:v2.17.4
+
+  # Split-record fixture: one CSV carries only the version, another only the
+  # addon controller image. No single record supplies both, so neither value is
+  # reported rather than pairing a version with another build's image.
+  echo '[{"name": "advanced-cluster-management.v2.17.3", "namespace": "open-cluster-management", "phase": "Replacing", "version": "2.17.3", "governancePolicyAddonControllerImages": []},
+        {"name": "advanced-cluster-management.v2.17.4", "namespace": "open-cluster-management", "phase": "Succeeded", "version": null, "governancePolicyAddonControllerImages": [{"name": "governance-policy-addon-controller", "image": "registry.redhat.io/acm2/governance-policy-addon-controller-rhel9:v2.17.4"}]}]' > "${tmp}/11-acm-csv-addon-controller.json"
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect acm_csv_version unknown
+  _expect addon_controller_image unknown
+  echo '[{"name": "advanced-cluster-management.v2.17.4", "version": "2.17.4", "governancePolicyAddonControllerImages": [{"name": "governance-policy-addon-controller", "image": "registry.redhat.io/acm2/governance-policy-addon-controller-rhel9:v2.17.4"}]}]' > "${tmp}/11-acm-csv-addon-controller.json"
 
   # Failed-query classification (a): a failed Central query must not read as
   # absence: distinct report values for denied vs absent.
@@ -1921,6 +2020,83 @@ FIXTURE
   _expect operatorpolicy_recreates_subscription unknown
   _expect operatorpolicy_spec_channel unknown
 
+  # Inventory agreement: the selected package, catalog and catalog namespace
+  # must appear together in the inventory.
+  _st_assert_dir="${tmp}/inventory"
+  mkdir -p "${_st_assert_dir}"
+  cp "${tmp}/08-packagemanifest-rhacs.json" "${_st_assert_dir}/08-packagemanifest-rhacs.json"
+  echo '[{"name": "rhacs-operator", "namespace": "rhacs-operator", "apiVersion": "operators.coreos.com/v1alpha1", "currentCSV": "rhacs-operator.v4.11.6", "channel": "stable", "source": "redhat-operators", "generation": 3}]' > "${_st_assert_dir}/03-subscription.json"
+  printf '%s\n' 'rhacs-operator redhat-operators openshift-marketplace' > "${_st_assert_dir}/08-all-packagemanifests.txt"
+  _st_expect_assert() { # <label> <expected-rc>
+    local rc=0
+    EVIDENCE_DIR="${_st_assert_dir}" assert_packagemanifest_agreement >/dev/null 2>&1 || rc=$?
+    if [[ "${rc}" != "$2" ]]; then
+      echo "SELF-TEST FAILURE (22): inventory agreement [$1] returned ${rc}, expected $2"
+      _st_failed=1
+    fi
+  }
+  _st_expect_assert "tuple listed" 0
+
+  # Cross-namespace fixture: the inventory lists rhacs-operator in
+  # redhat-operators/openshift-marketplace and a DIFFERENT package in
+  # redhat-operators/other-ns. A capture selecting rhacs-operator from
+  # redhat-operators/other-ns must not pass on the catalog/namespace pair
+  # alone, and the Subscription omits sourceNamespace so nothing else in the
+  # check catches it.
+  printf '%s\n' 'rhacs-operator redhat-operators openshift-marketplace' 'other-package redhat-operators other-ns' > "${_st_assert_dir}/08-all-packagemanifests.txt"
+  echo '{"name": "rhacs-operator", "catalogSource": "redhat-operators", "catalogSourceNamespace": "other-ns", "channels": [{"name": "stable", "currentCSV": "rhacs-operator.v4.11.6"}]}' > "${_st_assert_dir}/08-packagemanifest-rhacs.json"
+  _st_expect_assert "cross-namespace selection" 20
+
+  # Same record present under the selection's namespace passes again.
+  printf '%s\n' 'rhacs-operator redhat-operators openshift-marketplace' 'rhacs-operator redhat-operators other-ns' > "${_st_assert_dir}/08-all-packagemanifests.txt"
+  _st_expect_assert "tuple listed in the selection namespace" 0
+  rm -rf "${_st_assert_dir}"
+
+  # Subscription snapshot stability: the early capture and the re-read must
+  # describe the same object with the same fields.
+  _st_early="${tmp}/sub-early.json"
+  _st_late="${tmp}/sub-late.json"
+  cp "${tmp}/03-subscription.json" "${_st_early}"
+  cp "${tmp}/03-subscription.json" "${_st_late}"
+  _st_expect_snapshot() { # <label> <expected>
+    local got
+    got=$(_sub_snapshot_state "$1" "$2")
+    if [[ "${got}" != "$3" ]]; then
+      echo "SELF-TEST FAILURE (22): snapshot state [$1] = ${got}, expected $3"
+      _st_failed=1
+    fi
+  }
+  _st_expect_snapshot "${_st_early}" "${_st_late}" same
+  # Mutations are derived from the early capture, so the fixture suite stays
+  # independent of which Subscription state the earlier fixtures left behind.
+  _st_mutate() { # <mode: channel|generation|extra-object>
+    python3 - "$1" "$2" "$3" <<'PYEOF'
+import json, sys
+
+early, late, mode = sys.argv[1], sys.argv[2], sys.argv[3]
+data = json.load(open(early, encoding="utf-8"))
+if mode == "channel":
+    data[0]["channel"] = "stable-4.12"
+elif mode == "generation":
+    data[0]["generation"] = 99
+elif mode == "extra-object":
+    extra = dict(data[0])
+    extra["namespace"] = "other-ns"
+    extra["currentCSV"] = "rhacs-operator.v9.9.9"
+    extra["generation"] = 9
+    data.append(extra)
+json.dump(data, open(late, "w", encoding="utf-8"))
+PYEOF
+  }
+  _st_mutate "${_st_early}" "${_st_late}" channel
+  _st_expect_snapshot "${_st_early}" "${_st_late}" changed
+  _st_mutate "${_st_early}" "${_st_late}" generation
+  _st_expect_snapshot "${_st_early}" "${_st_late}" changed
+  # A different Subscription object appearing is not a change to this one.
+  _st_mutate "${_st_early}" "${_st_late}" extra-object
+  _st_expect_snapshot "${_st_early}" "${_st_late}" same
+  rm -f "${_st_early}" "${_st_late}"
+
   # Error classification: only the API server's NotFound error shape counts
   # as absence, so a missing helper, a wrapper failure, or a denied request
   # can never be read as a confirmed absence.
@@ -1950,7 +2126,7 @@ FIXTURE
     rm -rf "${tmp}"
     return 22
   fi
-  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, target-mismatch, unset-target, no-OperatorPolicy, non-enforcing, removal-blocking, unspecified-enforcement, upgrade-pending, non-Succeeded-phase, ambiguous-OperatorPolicy, and FALSE fixtures all classified correctly, and only the API server NotFound error shape classifies as absence"
+  echo "SELF-TEST PASS: TRUE, query-failed, CRD-absent, catalog-mismatch, copied-CSV, target-mismatch, unset-target, no-OperatorPolicy, non-enforcing, removal-blocking, unspecified-enforcement, upgrade-pending, non-Succeeded-phase, ambiguous-OperatorPolicy, split-ACM-record, inventory-tuple, subscription-snapshot, and FALSE fixtures all classified correctly, and only the API server NotFound error shape classifies as absence"
   rm -rf "${tmp}"
   return 0
 }
