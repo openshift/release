@@ -59,6 +59,11 @@ def chart_source_sha():
     # the release commit, which is not in rosa-seaplane-api and makes Argo
     # CD 422. Resolve from JOB_SPEC the same way clonerefs does: the
     # openshift-online/rosa-seaplane-api ref (pull SHA, else base_sha).
+    #
+    # Rehearsals set REPO_NAME to "release", so the PULL_PULL_SHA fallback
+    # below does not run. JOB_SPEC.extra_refs must include this repo with
+    # pulls[0].sha or base_sha; otherwise this returns empty and provision
+    # exits before creating the environment.
     spec = {}
     raw = os.environ.get("JOB_SPEC") or ""
     if raw:
@@ -82,8 +87,24 @@ def chart_source_sha():
     return ""
 
 
+CHART_SOURCE_SHA_ERROR = (
+    "ERROR: PR_SOURCE_SHA needs a 40-character commit SHA of "
+    f"{CHART_SOURCE_ORG}/{CHART_SOURCE_REPO} in JOB_SPEC. Expected "
+    "refs or extra_refs[] with org="
+    f"{CHART_SOURCE_ORG} repo={CHART_SOURCE_REPO} and pulls[0].sha "
+    "(api presubmit) or base_sha (openshift/release rehearsal extra_ref)."
+)
+
+
 source_revision = chart_source_sha()
 components = yaml.safe_load(os.environ["ROSA_REGIONAL_COMPONENTS"]) or []
+needs_chart_sha = any(
+    "PR_SOURCE_SHA" in yaml.safe_dump(c.get("override") or {}, default_flow_style=False)
+    for c in components
+    if "target" in c and "override" in c
+)
+if needs_chart_sha and not re.fullmatch(r"[0-9a-fA-F]{40}", source_revision):
+    sys.exit(f"{CHART_SOURCE_SHA_ERROR} (got {source_revision!r})")
 for i, c in enumerate(components):
     repo = c.get("repo", "")
     if c.get("image") and repo not in pushed:
@@ -96,12 +117,6 @@ for i, c in enumerate(components):
     if repo in pushed:
         text = text.replace("IMAGE_TAG", pushed[repo])
     if "PR_SOURCE_SHA" in text:
-        if not re.fullmatch(r"[0-9a-fA-F]{40}", source_revision):
-            sys.exit(
-                "ERROR: PR_SOURCE_SHA needs a 40-character commit SHA of "
-                f"{CHART_SOURCE_ORG}/{CHART_SOURCE_REPO} from JOB_SPEC refs/extra_refs "
-                f"(got {source_revision!r})"
-            )
         text = text.replace("PR_SOURCE_SHA", source_revision)
     path = os.path.join(shared, f"component-override-{i}.yaml")
     with open(path, "w") as f:

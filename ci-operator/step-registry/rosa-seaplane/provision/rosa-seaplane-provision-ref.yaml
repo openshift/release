@@ -36,10 +36,13 @@ ref:
       repository). IMAGE_REPO is substituted from 'repo' and IMAGE_TAG
       from the per-image tag written by the image-push step to
       SHARED_DIR/component-images. PR_SOURCE_SHA is substituted from the
-      openshift-online/rosa-seaplane-api commit in JOB_SPEC (refs or
-      extra_refs: pull SHA when present, otherwise base_sha). On an api
-      presubmit that is the PR head; on an openshift/release rehearsal it
-      is the api extra_ref, so Argo CD is not pinned to a release SHA.
+      openshift-online/rosa-seaplane-api commit in JOB_SPEC. JOB_SPEC.refs
+      or JOB_SPEC.extra_refs must include org=openshift-online
+      repo=rosa-seaplane-api with pulls[0].sha (api presubmit) or
+      base_sha (openshift/release rehearsal extra_ref). Missing both
+      exits before provisioning. On an api presubmit that SHA is the PR
+      head; on a rehearsal it is the extra_ref, so Argo CD is not pinned
+      to a release SHA.
       Example:
         - image: CI_IMAGE_1
           repo: quay.io/rrp-dev-ci/platform-api
@@ -59,4 +62,5 @@ ref:
     own code; otherwise ROSA_REGIONAL_PLATFORM_REF is used. Components listed
     in ROSA_REGIONAL_COMPONENTS are deep-merged into their target files
     with IMAGE_REPO/IMAGE_TAG substitution. PR_SOURCE_SHA pins a child
-    chart to the rosa-seaplane-api commit from JOB_SPEC.
+    chart to the rosa-seaplane-api commit from JOB_SPEC (refs/extra_refs
+    pull SHA or base_sha; empty is a hard failure).

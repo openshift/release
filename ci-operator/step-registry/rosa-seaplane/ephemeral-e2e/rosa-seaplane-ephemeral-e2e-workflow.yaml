@@ -19,8 +19,11 @@ workflow:
     PR are picked up automatically (including from forks). A component can
     also set a child chart's source.targetRevision to PR_SOURCE_SHA in its
     override so Argo CD deploys the chart from the same rosa-seaplane-api
-    commit as the job (the PR head, or that repo's extra_refs SHA when
-    rehearsing this workflow from openshift/release). When triggered from
+    commit as the job. That SHA comes from JOB_SPEC: pulls[0].sha on an
+    api presubmit, or extra_refs[].base_sha for openshift-online/rosa-seaplane-api
+    when rehearsing this workflow from openshift/release. Rehearsal
+    extra_refs must include one of those fields; otherwise provision
+    exits before creating the environment. When triggered from
     rosa-seaplane itself, the environment is provisioned from the PR's
     head branch and every step runs the PR's code.
 
