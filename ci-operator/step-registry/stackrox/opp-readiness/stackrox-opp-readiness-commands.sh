@@ -105,6 +105,7 @@ for item in items if isinstance(items, list) else []:
     matched.append(mapping(item))
 
 if not matched:
+    print("resources=0")
     sys.exit(0)
 
 if resource_type == "subscription":
@@ -275,7 +276,7 @@ function CentralStatus () {
 function SecuredClusterStatus () {
     typeset output=""
     output="$(timeout 10 oc get securedclusters.platform.stackrox.io --all-namespaces -o json 2>/dev/null \
-        | FormatDiagnosticStatus securedcluster)" && [[ -n "${output}" ]] || return 1
+        | FormatDiagnosticStatus securedcluster)" || return 1
     echo "${output}"
 }
 
@@ -283,7 +284,7 @@ function SecuredClusterStatus () {
 function PolicyStatus () {
     typeset output=""
     output="$(timeout 10 oc get policies -n policies -o json 2>/dev/null \
-        | FormatDiagnosticStatus policy)" && [[ -n "${output}" ]] || return 1
+        | FormatDiagnosticStatus policy)" || return 1
     echo "${output}"
 }
 
@@ -291,7 +292,7 @@ function PolicyStatus () {
 function SensorPodStatus () {
     typeset output=""
     output="$(timeout 10 oc get pods -n "${centralNs}" -l app=sensor -o json 2>/dev/null \
-        | FormatDiagnosticStatus pod)" && [[ -n "${output}" ]] || return 1
+        | FormatDiagnosticStatus pod)" || return 1
     echo "${output}"
 }
 
@@ -371,9 +372,30 @@ PreFlightDiagnostics
 # Namespace discovery via CRs (never hardcode)
 # ---------------------------------------------------------------------------
 function DiscoverCentralNs () {
-    centralNs="$(oc get centrals.platform.stackrox.io --all-namespaces \
-        -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
-        || return 1
+    typeset centralJson=""
+    centralJson="$(oc get centrals.platform.stackrox.io --all-namespaces -o json 2>/dev/null)" || return 1
+    typeset distinctCentralNs=""
+    distinctCentralNs="$(printf '%s' "${centralJson}" | python3 -c '
+import json,sys
+try:
+    items=json.load(sys.stdin).get("items",[])
+except Exception:
+    sys.exit(1)
+ns=set()
+for it in items:
+    n=it.get("metadata",{}).get("namespace")
+    if isinstance(n,str) and n:
+        ns.add(n)
+print(len(ns))
+' 2>/dev/null)" || return 1
+    if [[ "${distinctCentralNs}" == "0" ]]; then
+        return 1
+    fi
+    if [[ "${distinctCentralNs}" -gt 1 ]]; then
+        echo "[readiness] ERROR: Central namespace discovery ambiguous: ${distinctCentralNs} namespaces contain Central CRs (expected 1)" >&2
+        return 1
+    fi
+    centralNs="$(printf '%s' "${centralJson}" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["items"][0]["metadata"]["namespace"])' 2>/dev/null)" || return 1
     [[ -n "${centralNs}" ]] || return 1
     true
 }
@@ -385,14 +407,43 @@ function DiscoverScNs () {
     # Both queries are bounded: WaitFor advances its budget by pollInterval
     # only, so a stalled call would suspend the 900s readiness budget instead
     # of consuming it, and the timeout would be reported late.
-    scNs="$(timeout 10 oc get securedclusters.platform.stackrox.io -n "${centralNs}" \
-        -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
-        || true
-    if [[ -z "${scNs}" ]]; then
-        scNs="$(timeout 10 oc get securedclusters.platform.stackrox.io --all-namespaces \
-            -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
-            || return 1
+    typeset scJson=""
+    scJson="$(timeout 10 oc get securedclusters.platform.stackrox.io -n "${centralNs}" -o json 2>/dev/null)" || true
+    if [[ -n "${scJson}" ]]; then
+        typeset scCount=""
+        scCount="$(printf '%s' "${scJson}" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d.get("items",[])))' 2>/dev/null)" || scCount=""
+        if [[ -n "${scCount}" && "${scCount}" != "0" ]]; then
+            scNs="$(printf '%s' "${scJson}" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["items"][0]["metadata"]["namespace"])' 2>/dev/null)" || true
+            if [[ -n "${scNs}" ]]; then
+                return 0
+            fi
+        fi
     fi
+    # Fall back to all namespaces with deterministic selection
+    typeset allScJson=""
+    allScJson="$(timeout 10 oc get securedclusters.platform.stackrox.io --all-namespaces -o json 2>/dev/null)" || return 1
+    typeset distinctScNs=""
+    distinctScNs="$(printf '%s' "${allScJson}" | python3 -c '
+import json,sys
+try:
+    items=json.load(sys.stdin).get("items",[])
+except Exception:
+    sys.exit(1)
+ns=set()
+for it in items:
+    n=it.get("metadata",{}).get("namespace")
+    if isinstance(n,str) and n:
+        ns.add(n)
+print(len(ns))
+' 2>/dev/null)" || return 1
+    if [[ "${distinctScNs}" == "0" ]]; then
+        return 1
+    fi
+    if [[ "${distinctScNs}" -gt 1 ]]; then
+        echo "[readiness] ERROR: SecuredCluster namespace discovery ambiguous: ${distinctScNs} namespaces contain SecuredCluster CRs (expected 1)" >&2
+        return 1
+    fi
+    scNs="$(printf '%s' "${allScJson}" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["items"][0]["metadata"]["namespace"])' 2>/dev/null)" || return 1
     [[ -n "${scNs}" ]] || return 1
     true
 }
@@ -410,8 +461,13 @@ function SecuredClusterDiscoveryFailureDiagnostics () {
     SecuredClusterStatus || echo "[readiness]   SecuredCluster list failed; resource state unknown" >&2
     echo "[readiness] --- OPP policy status (the policy set creates the SecuredCluster) ---"
     PolicyStatus || echo "[readiness]   policy list failed; resource state unknown" >&2
-    echo "[readiness] --- Sensor pods in ${centralNs} ---"
-    SensorPodStatus || echo "[readiness]   Sensor pod list failed in ${centralNs}; resource state unknown" >&2
+    {
+        [[ $- == *x* ]] && _wasTracing=true || _wasTracing=false
+        set +x
+        echo "[readiness] --- Sensor pods in the Central namespace ---"
+        SensorPodStatus || echo "[readiness]   Sensor pod query failed or timed out in the Central namespace; resource state unknown" >&2
+        $_wasTracing && set -x
+    }
     echo "[readiness] === End failure diagnostics ==="
 }
 
