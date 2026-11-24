@@ -11,24 +11,21 @@ ci-operator/config/openshift-eng/ocp-build-data/openshift-eng-ocp-build-data-<br
   -> uv run --locked --no-dev python -I -m validator.ci
 ```
 
-The required first pass covers every existing ACM and MCE release branch:
+The presubmits cover these ACM and MCE release branches:
 
 - ACM: `2.11`, `2.13`, `2.14`, `2.15`, `2.16`, `2.17`, `5.0`, `5.1`.
 - MCE: `2.6`, `2.8`, `2.9`, `2.10`, `2.11`, `2.17`, `5.0`, `5.1`.
 
 The other 45 release branches are also configured across cert-manager, COO, DVO,
 external-secrets, installer-ove-ui, Kueue, Logging, mirror-gui, MTA, MTC, OADP,
-oc-mirror, OMR, OSUS, Quay, RHOSDT and zero-trust. These jobs are required;
-validation failures block matching metadata changes from merging. Ensure metadata,
-source access and RPA mappings are ready for each stream.
+oc-mirror, OMR, OSUS, Quay, RHOSDT and zero-trust. Ensure metadata, source access
+and RPA mappings are ready for each stream.
 
-The job reports its required status for PRs targeting a configured branch.
-On `rhosdt-0.158`, PRs with no changes under `images/` run local schema and
-semantic validation against the PR's changed metadata. Changes under `images/`
-run full validation, including when an image file is moved out of the directory.
-The job runs full validation on other branches and when the PR base cannot be
-verified in the checkout. Each additional branch needs its own CI configuration
-referencing the same workflow. Tide merge policy and branch protection are separate.
+Prow triggers the job when a PR targets a configured branch and changes a path
+under `images/`. For renames, Prow matches only the destination path. Tide
+requires the job on matching PRs. GitHub branch protection
+derives its required status checks from jobs that run on every PR. Each
+additional branch needs its own CI configuration referencing the same workflow.
 
 ## Checks
 
