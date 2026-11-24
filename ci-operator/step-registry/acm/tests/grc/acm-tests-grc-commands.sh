@@ -494,6 +494,13 @@ print(json.dumps(result, indent=2))
                 rm -f "${_opp_tmp}"
             fi
         fi
+        if (( _opp_scrub_ok && _opp_expect_json )); then
+            if ! python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "${_opp_tmp}"; then
+                echo "ERROR: OPP evidence JSON validation failed for ${_opp_f}" >&2
+                _opp_scrub_ok=0
+                rm -f "${_opp_tmp}"
+            fi
+        fi
         if (( _opp_scrub_ok )); then
             if ! mv "${_opp_tmp}" "${_opp_dest}"; then
                 echo "ERROR: OPP evidence publish failed for ${_opp_dest}" >&2
@@ -1358,6 +1365,13 @@ print(json.dumps(result, indent=2))
             if (( _opp_scrub_ok )); then
                 if ! _scrub_leaktk_patterns -i "${_opp_tmp}"; then
                     echo "ERROR: OPP evidence pattern scrub failed for ${_opp_f}" >&2
+                    _opp_scrub_ok=0
+                    rm -f "${_opp_tmp}"
+                fi
+            fi
+            if (( _opp_scrub_ok )); then
+                if ! python3 -c 'import json, sys; json.load(open(sys.argv[1]))' "${_opp_tmp}"; then
+                    echo "ERROR: OPP evidence JSON validation failed for ${_opp_f}" >&2
                     _opp_scrub_ok=0
                     rm -f "${_opp_tmp}"
                 fi
