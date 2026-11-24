@@ -123,9 +123,16 @@ _write_shared_copy() {
         } > "${_tmp}" 2>/dev/null || return 1
         mv -f "${_tmp}" "${_dst}" 2>/dev/null || return 1
     else
-        typeset _cp_tmp="${_dst}.tmp"
-        cp "${_CARRIER}" "${_cp_tmp}" 2>/dev/null || return 1
-        mv -f "${_cp_tmp}" "${_dst}" 2>/dev/null || return 1
+        {
+            echo '<?xml version="1.0" encoding="UTF-8"?>'
+            echo "<testsuite name=\"${_SUITE}\" tests=\"${_N_TOTAL}\" failures=\"${_N_FAILURES}\" errors=\"0\" skipped=\"${_N_SKIPPED}\" time=\"$(( $(date +%s) - _junit_start ))\">"
+            typeset c=""
+            for c in "${_CASES[@]:-}"; do
+                [[ -n "${c}" ]] && echo "  ${c}"
+            done
+            echo '</testsuite>'
+        } > "${_tmp}" 2>/dev/null || return 1
+        mv -f "${_tmp}" "${_dst}" 2>/dev/null || return 1
     fi
 }
 
@@ -133,8 +140,8 @@ _finalize() {
     (( _FINALIZED )) && return 0
     _FINALIZED=1
     typeset -i _fin=0
-    _write_carrier || _fin=1
     _write_shared_copy || _fin=1
+    _write_carrier || _fin=1
     if (( _fin != 0 )); then
         if (( _N_FAILURES == 0 )); then
             _add_case "junit-publication" failed "Propagation" "failed to finalize JUnit carrier"
