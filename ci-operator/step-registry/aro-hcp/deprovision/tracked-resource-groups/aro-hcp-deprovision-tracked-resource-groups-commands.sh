@@ -22,18 +22,22 @@ esac
 
 export CLUSTER_PROFILE_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
 
-# Resolve the slot env first: it may select a different cluster profile dir.
+# The cleanup must use the customer subscription and the credentials that own
+# it, exactly as the test run did, so require the slot-manager runtime contract
+# instead of resolving either from the cluster profile.
 env_file="${SHARED_DIR:-}/aro-hcp-slot.env"
-if [[ -f "${env_file}" ]]; then
-  # shellcheck disable=SC1090
-  source "${env_file}"
+if [[ ! -f "${env_file}" ]]; then
+  printf 'ERROR: slot-manager runtime contract not found at %s\n' "${env_file}" >&2
+  exit 1
 fi
-# Cross-tenant gating: slot-manager acquire exports the profile dir that owns
-# the leased subscription. Use it so cleanup authenticates in the same tenant
-# as the test step.
-if [[ -n "${SELECTED_CLUSTER_PROFILE_DIR:-}" ]]; then
-  CLUSTER_PROFILE_DIR="${SELECTED_CLUSTER_PROFILE_DIR}"
-fi
+# shellcheck disable=SC1090
+source "${env_file}"
+: "${CUSTOMER_SUBSCRIPTION:?slot-manager did not export CUSTOMER_SUBSCRIPTION}"
+: "${CUSTOMER_SUBSCRIPTION_ID:?slot-manager did not export CUSTOMER_SUBSCRIPTION_ID}"
+: "${SELECTED_CLUSTER_PROFILE_DIR:?slot-manager did not export SELECTED_CLUSTER_PROFILE_DIR}"
+# Cross-tenant gating: the exported profile dir owns the leased subscription, so
+# cleanup authenticates in the same tenant as the test step.
+CLUSTER_PROFILE_DIR="${SELECTED_CLUSTER_PROFILE_DIR}"
 
 # Tracing is disabled while the client-secret is read, otherwise xtrace expands
 # it into the publicly readable build log. It is re-enabled after az login.
@@ -43,10 +47,10 @@ export AZURE_TENANT_ID; AZURE_TENANT_ID=$(cat "${CLUSTER_PROFILE_DIR}/tenant")
 export AZURE_CLIENT_SECRET; AZURE_CLIENT_SECRET=$(cat "${CLUSTER_PROFILE_DIR}/client-secret")
 export AZURE_TOKEN_CREDENTIALS=prod
 
-export CUSTOMER_SUBSCRIPTION="${CUSTOMER_SUBSCRIPTION:-$(cat "${CLUSTER_PROFILE_DIR}/subscription-name")}"
 export LOCATION="${SELECTED_LOCATION:-${LOCATION:-}}"
 
 az login --service-principal -u "${AZURE_CLIENT_ID}" -p "${AZURE_CLIENT_SECRET}" --tenant "${AZURE_TENANT_ID}" --output none
+az account set --subscription "${CUSTOMER_SUBSCRIPTION_ID}"
 set -o xtrace
 
 cmd=(./test/aro-hcp-tests cleanup resource-groups --tracked --shared-dir "${SHARED_DIR}" --job-id "${BUILD_ID}" --timeout "${CLEANUP_TIMEOUT}" --concurrency "${CLEANUP_CONCURRENCY}")
