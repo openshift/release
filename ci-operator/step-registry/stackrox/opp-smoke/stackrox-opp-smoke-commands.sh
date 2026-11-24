@@ -274,16 +274,35 @@ fi
 
 _add_classification "acs-present" passed
 
-# Terminal-state wait for SecuredCluster CR (L-1: oc wait --for=create outside polling loop)
-# Ensures the SecuredCluster discovery has a terminal creation wait before smoke proceeds;
-# 900s is the readiness-side timeout, mirrored here so smoke fails with same reason if
-# the CR never appears.
-if ! oc wait --for=create securedclusters.platform.stackrox.io --all --all-namespaces --timeout=900s 1>/dev/null 2>&1; then
-    if [[ "${ACS_EXPECTATION}" == "required" ]]; then
-        _add_case "securedcluster-discovery" failed "Timeout" "SecuredCluster discovery timeout after 900s: no SecuredCluster CR created within 900s"
-    else
-        _add_case "securedcluster-discovery" skipped "NoSecuredCluster" "no SecuredCluster CR created within 900s and ACS_EXPECTATION=${ACS_EXPECTATION}: not required in this lane"
+# Terminal-state wait for SecuredCluster CR: oc wait --for=create with --all never waits on kubectl v1.31 (empty list visits nothing). Use a bounded poll loop with wall-clock deadline instead.
+_smokeCheckScExists() {
+    typeset _out="" _cnt=""
+    _out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedclusters.platform.stackrox.io --all-namespaces -o json 2>/dev/null)" || return 1
+    _cnt="$(printf '%s' "${_out}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("items",[])))' 2>/dev/null)" || return 1
+    (( _cnt > 0 ))
+}
+typeset -i _smokeTermCap=900
+typeset -i _smokeDeadline=$(( $(date +%s) + _smokeTermCap ))
+typeset -i _smokeFound=0
+while true; do
+    if _smokeCheckScExists; then
+        _smokeFound=1
+        break
     fi
+    typeset -i _smokeNow
+    _smokeNow=$(date +%s)
+    if (( _smokeNow >= _smokeDeadline )); then
+        break
+    fi
+    typeset -i _smokeRemain _smokeSleep
+    _smokeRemain=$(( _smokeDeadline - _smokeNow ))
+    _smokeSleep=30
+    (( _smokeRemain < _smokeSleep )) && _smokeSleep=_smokeRemain
+    sleep "${_smokeSleep}"
+done
+typeset -i _termWaitTimedOut=0
+if (( _smokeFound == 0 )); then
+    _termWaitTimedOut=1
     echo "[smoke] SecuredCluster terminal wait: no SecuredCluster CR created within 900s" >&2
 fi
 
@@ -305,9 +324,16 @@ fi
 if [[ -z "${_scList}" ]]; then
     _add_case "scanner-v4-ready" skipped "NoSecuredCluster" "no SecuredCluster in lane: scanner not evaluated"
     if [[ "${ACS_EXPECTATION}" == "required" ]]; then
-        _add_case "securedcluster-discovery" failed "Discovery" "SecuredCluster list empty after the terminal wait (recorded failures ${_N_FAILURES}); workload is absent while ACS_EXPECTATION=required"
+        if (( _termWaitTimedOut )); then
+            _add_case "securedcluster-discovery" failed "Timeout" "SecuredCluster discovery timeout after 900s: no SecuredCluster CR created within 900s"
+        else
+            _add_case "securedcluster-discovery" failed "Discovery" "SecuredCluster list empty after the terminal wait (recorded failures ${_N_FAILURES}); workload is absent while ACS_EXPECTATION=required"
+        fi
         _add_case "stackrox-opp-smoke" failed "Discovery" "SecuredCluster discovery failed (recorded failures ${_N_FAILURES}); workload is absent while ACS_EXPECTATION=required"
         exit 1
+    fi
+    if (( _termWaitTimedOut )); then
+        _add_case "securedcluster-discovery" skipped "NoSecuredCluster" "no SecuredCluster CR created within 900s and ACS_EXPECTATION=${ACS_EXPECTATION}: not required in this lane"
     fi
     _add_case "stackrox-opp-smoke" skipped "NoSecuredCluster" "no SecuredCluster in lane: smoke not evaluated (ACS_EXPECTATION=${ACS_EXPECTATION})"
     exit 0

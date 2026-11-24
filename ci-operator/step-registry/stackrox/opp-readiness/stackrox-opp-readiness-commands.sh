@@ -693,22 +693,10 @@ if ! WaitFor "Central CR namespace discovery" DiscoverCentralNs PeriodicOperator
 fi
 echo "[readiness] Central namespace: ${centralNs}"
 
-# Terminal-state wait for SecuredCluster CR (L-1: oc wait --for=create outside polling loop, not wrapped)
-# The SecuredCluster CR may not exist yet on a required lane (provisional-hold race); wait for its
-# creation terminally before polling for namespace discovery. 900s is ACS_WAIT_TIMEOUT_S default,
-# capped by remaining budget.
-typeset -i _termCap
-_termCap=waitCap
-typeset -i _termRem
-_termRem=$(_budget_remaining)
-(( _termRem < _termCap )) && _termCap=_termRem
-if (( _termCap > 0 )); then
-    if ! oc wait --for=create securedclusters.platform.stackrox.io --all --all-namespaces --timeout=${_termCap}s 1>/dev/null 2>&1; then
-        echo "[readiness] SecuredCluster terminal wait: no SecuredCluster CR created within ${_termCap}s" >&2
-    fi
-else
-    echo "[readiness] BUDGET EXHAUSTED before SecuredCluster terminal wait; skipping" >&2
-fi
+# Terminal-state wait for SecuredCluster CR: the previous oc wait --for=create
+# with --all never waited on kubectl v1.31 (an empty list visits nothing), and a
+# separate existence poll would duplicate the namespace-discovery wait below;
+# the WaitFor DiscoverScNs call is the real bounded existence wait.
 if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs; then
     # DiscoverScNs fails both for a failed read and for a 0-exit read that
     # yields no namespace: only the second is an absent workload. Re-read once
