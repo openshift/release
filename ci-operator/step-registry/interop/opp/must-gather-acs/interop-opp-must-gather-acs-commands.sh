@@ -1028,6 +1028,10 @@ for i in data.get("items", []):
         "name": name,
         "namespace": i["metadata"].get("namespace", ""),
         "phase": i.get("status", {}).get("phase"),
+        # status.reason distinguishes an OLM copy from the CSV it copies: a
+        # copy repeats the version and the images, so a selector that cannot
+        # see the reason counts two records for one installation.
+        "reason": i.get("status", {}).get("reason"),
         "version": i.get("spec", {}).get("version"),
         "governancePolicyAddonControllerImages": images,
     })
@@ -1251,8 +1255,12 @@ addon_images = []
 # be told apart, both values report unknown: mixing a version from one record
 # with an image from another attributes the image of one build to another. The
 # full capture is retained in 11-acm-csv-addon-controller.json either way.
+# OLM copies are excluded the same way the rhacs CSV selector excludes them:
+# a copy in another namespace repeating the source version and images would
+# otherwise make every record ambiguous and report both values unknown.
 _acm_records = [a for a in acm
-                if a.get("version") and a.get("governancePolicyAddonControllerImages")]
+                if a.get("version") and a.get("governancePolicyAddonControllerImages")
+                and a.get("reason") != "Copied"]
 if len(_acm_records) == 1:
     acm_version = _acm_records[0]["version"]
     addon_images = _acm_records[0]["governancePolicyAddonControllerImages"] or []
@@ -1791,6 +1799,14 @@ FIXTURE
   EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
   _expect acm_csv_version unknown
   _expect addon_controller_image unknown
+  # OLM copy fixture: the copy repeats the source version and images in
+  # another namespace, so a selector that reads no reason sees two equally
+  # qualifying Succeeded records and reports both values unknown.
+  echo '[{"name": "advanced-cluster-management.v2.17.4", "namespace": "open-cluster-management", "phase": "Succeeded", "reason": null, "version": "2.17.4", "governancePolicyAddonControllerImages": [{"name": "governance-policy-addon-controller", "image": "registry.redhat.io/acm2/governance-policy-addon-controller-rhel9:v2.17.4"}]},
+        {"name": "advanced-cluster-management.v2.17.4", "namespace": "policies", "phase": "Succeeded", "reason": "Copied", "version": "2.17.4", "governancePolicyAddonControllerImages": [{"name": "governance-policy-addon-controller", "image": "registry.redhat.io/acm2/governance-policy-addon-controller-rhel9:v2.17.4"}]}]' > "${tmp}/11-acm-csv-addon-controller.json"
+  EVIDENCE_DIR="${tmp}" write_status_properties >/dev/null
+  _expect acm_csv_version 2.17.4
+  _expect addon_controller_image registry.redhat.io/acm2/governance-policy-addon-controller-rhel9:v2.17.4
   echo '[{"name": "advanced-cluster-management.v2.17.4", "version": "2.17.4", "governancePolicyAddonControllerImages": [{"name": "governance-policy-addon-controller", "image": "registry.redhat.io/acm2/governance-policy-addon-controller-rhel9:v2.17.4"}]}]' > "${tmp}/11-acm-csv-addon-controller.json"
 
   # Failed-query classification (a): a failed Central query must not read as
