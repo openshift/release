@@ -275,22 +275,6 @@ EOF
     return 1
 }
 
-wait_for_api_stability() {
-    # MCP rollout (IDMS changes) can cause brief API/DNS disruption;
-    # wait for the API to stabilize before handing off to the next step.
-    log "Waiting for API server to stabilize after MCP rollout..."
-    local api_retries=10
-    while (( api_retries > 0 )); do
-        if oc whoami &>/dev/null; then
-            log "API server is reachable"
-            break
-        fi
-        log "API not ready yet (retries left: ${api_retries})"
-        sleep 30
-        (( api_retries-- ))
-    done
-}
-
 main() {
     log "=== ACM/MCE Disconnected oc-mirror Setup ==="
     trap 'collect_artifacts' EXIT
@@ -328,7 +312,6 @@ main() {
     mirror_operators
     apply_idms
     create_catalogsources
-    wait_for_api_stability
 
     echo "acm-catalog-${ACM_VERSION}" > "${SHARED_DIR}/acm_catsrc_name"
     echo "mce-catalog-${MCE_VERSION}" > "${SHARED_DIR}/mce_catsrc_name"
