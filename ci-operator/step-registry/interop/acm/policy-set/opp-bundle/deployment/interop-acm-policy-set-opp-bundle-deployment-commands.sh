@@ -480,12 +480,14 @@ fi
 # as fixed strings (not regexes) so a name containing regex metacharacters
 # cannot widen the match to unrelated policies.
 FilterSkippedPolicies () {
-  typeset line='' p='' skip=false
+  typeset line='' p='' skip=false bare='' pbare=''
   while IFS= read -r line; do
     [[ -z "${line}" ]] && continue
+    bare="${line##*/}"
     skip=false
     for p in "${skipPoliciesArr[@]}"; do
-      [[ "${line}" == */"${p}" ]] && { skip=true; break; }
+      pbare="${p##*/}"
+      [[ "${bare}" == "${pbare}" ]] && { skip=true; break; }
     done
     [[ "${skip}" == false ]] && printf '%s\n' "${line}"
   done
