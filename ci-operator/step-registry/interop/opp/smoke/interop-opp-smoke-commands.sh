@@ -577,7 +577,17 @@ TestQuayPull() {
         qrJson2="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json 2>"${_opp_smoke_tmp}/qr2.err")" || qr2Rc=$?
         if (( qr2Rc != 0 )); then
             if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/qr2.err" 2>/dev/null; then
-                # CRD absent is a determinate "no QuayRegistry on this lane".
+                typeset _qrConfirmOut=""
+                typeset -i _qrConfirmRc=0
+                _qrConfirmOut="$(oc api-resources --api-group=quay.redhat.com -o name 2>&1)" || _qrConfirmRc=$?
+                if (( _qrConfirmRc != 0 )); then
+                    AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources: $(cat "${_opp_smoke_tmp}/qr2.err")"
+                    return
+                fi
+                if printf '%s' "${_qrConfirmOut}" | grep -qw "quayregistries"; then
+                    AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources: $(cat "${_opp_smoke_tmp}/qr2.err")"
+                    return
+                fi
                 qrJson2='{"items":[]}'
                 qrCount=0
             else
