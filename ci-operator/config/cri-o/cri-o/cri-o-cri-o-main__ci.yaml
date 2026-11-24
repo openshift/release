@@ -50,6 +50,28 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     workflow: cri-o-rhel-critest
+- always_run: false
+  as: gcp-pool-aws-sts-check
+  cluster: build07
+  optional: true
+  restrict_network_access: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    test:
+    - as: check-aws-sts-mounts
+      from: base
+      commands: |
+        set -euo pipefail
+        echo "Leased GCP profile: ${CLUSTER_PROFILE_NAME:?}"
+        if [[ ! -s /var/run/secrets/aws/config/config || ! -s /var/run/secrets/aws/sts-token/token ]]; then
+          echo "The leased GCP profile did not provide the AWS STS config and token needed by the AWS workflow." >&2
+          exit 1
+        fi
+        echo "The leased GCP profile provided both AWS STS mounts."
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: rhel-e2e
   steps:
     cluster_profile: openshift-org-gcp
