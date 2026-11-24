@@ -1316,7 +1316,7 @@ payload = {
         'username': os.environ['QUAY_REG_USER'],
         'password': os.environ['QUAY_REG_PASSWORD'],
         # PRRT_kwDOBHvUUM65MrnB: keep TLS verification enabled; Central's own
-        # configured trust (spec.central.tls.additionalCAs) is confirmed before
+        # configured trust (spec.tls.additionalCAs) is confirmed before
         # registration (PRRT_kwDOBHvUUM67E3SE), so no CA material rides the
         # payload and no insecure integration is created either way
         'insecure': False
@@ -1418,8 +1418,9 @@ if not items:
     sys.exit(4)
 
 spec = items[0].get('spec') or {}
-central = spec.get('central') or {}
-tls = central.get('tls') or {}
+# The Centrals CRD (platform.stackrox.io) nests additionalCAs under the
+# top-level spec.tls, not under spec.central.
+tls = spec.get('tls') or {}
 count = 0
 for ca in (tls.get('additionalCAs') or []):
     content = (ca or {}).get('content') or ''
@@ -1454,10 +1455,10 @@ for ca in (tls.get('additionalCAs') or []):
     rm -rf "${trustDir}"
 
     if [[ -n "${verifyingCa}" ]]; then
-        echo "INFO: Central's configured trust verifies the Quay endpoint at ${QUAY_HOST} (spec.central.tls.additionalCAs, Central CR in namespace stackrox)" >&2
+        echo "INFO: Central's configured trust verifies the Quay endpoint at ${QUAY_HOST} (spec.tls.additionalCAs, Central CR in namespace stackrox)" >&2
         return 0
     fi
-    centralTrustReason="Central's additionalCAs do not verify the Quay route certificate for ${QUAY_HOST}; a TLS-verified scan would fail on the certificate.  Add the Quay registry CA to the Central CR (spec.central.tls.additionalCAs) before the scan can rely on verification; no Quay integration was created"
+    centralTrustReason="Central's additionalCAs do not verify the Quay route certificate for ${QUAY_HOST}; a TLS-verified scan would fail on the certificate.  Add the Quay registry CA to the Central CR (spec.tls.additionalCAs) before the scan can rely on verification; no Quay integration was created"
     echo "ERROR: ${centralTrustReason}" >&2
     return 1
 }
@@ -1476,8 +1477,8 @@ CentralTrustSelfTest() {
     fi
     set +x
     export QUAY_HOST="quay-test.example.com"
-    typeset _centralWithCa='{"items":[{"metadata":{"name":"stackrox-central-services","namespace":"stackrox"},"spec":{"central":{"tls":{"additionalCAs":[{"name":"quay-ca","content":"-----BEGIN CERTIFICATE-----\nSTUB\n-----END CERTIFICATE-----"}]}}}}]}'
-    typeset _centralNoCa='{"items":[{"metadata":{"name":"stackrox-central-services","namespace":"stackrox"},"spec":{"central":{}}}]}'
+    typeset _centralWithCa='{"items":[{"metadata":{"name":"stackrox-central-services","namespace":"stackrox"},"spec":{"tls":{"additionalCAs":[{"name":"quay-ca","content":"-----BEGIN CERTIFICATE-----\nSTUB\n-----END CERTIFICATE-----"}]}}}]}'
+    typeset _centralNoCa='{"items":[{"metadata":{"name":"stackrox-central-services","namespace":"stackrox"},"spec":{}}]}'
     typeset -i _regCalls=0
     typeset -i _failures=0
 
