@@ -156,11 +156,41 @@ rhacs-operator-controller-7f6d8b9c-t9m4c      1/2     Running     3     20m"
         (( failures += 1 ))
     fi
 
+    # Selection case: the Subscription names the CSV OLM is converging to, so the
+    # superseded CSV that still reports Succeeded must not be selected.
+    typeset _tab=$'\t'
+    typeset _csvFixture='' _subFixture=''
+    _csvFixture="$(printf 'ocm\trhacs-operator.v4.9.0\tSucceeded\nocm\trhacs-operator.v4.10.0\tInstalling')"
+    _subFixture="$(printf 'ocm\trhacs-operator\trhacs-operator.v4.10.0\trhacs-operator.v4.9.0')"
+    expected="rhacs-operator.v4.10.0${_tab}Installing"
+    got="$(_select_target_csv 'rhacs-operator' "${_csvFixture}" "${_subFixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: subscription-selected CSV must win over superseded Succeeded; expected '${expected}' got '${got}'"
+        (( failures += 1 ))
+    fi
+
+    # Fallback case 1: no Subscription read (empty listing) keeps the prefix match.
+    expected="rhacs-operator.v4.9.0${_tab}Succeeded"
+    got="$(_select_target_csv 'rhacs-operator' "${_csvFixture}" '')"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: empty subscription list must fall back to prefix match; expected '${expected}' got '${got}'"
+        (( failures += 1 ))
+    fi
+
+    # Fallback case 2: the Subscription names a CSV that the listing does not hold.
+    _subFixture="$(printf 'ocm\trhacs-operator\trhacs-operator.v4.11.9\trhacs-operator.v4.11.9')"
+    expected="rhacs-operator.v4.9.0${_tab}Succeeded"
+    got="$(_select_target_csv 'rhacs-operator' "${_csvFixture}" "${_subFixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: named CSV absent must fall back to prefix match; expected '${expected}' got '${got}'"
+        (( failures += 1 ))
+    fi
+
     if (( failures > 0 )); then
         echo "FATAL: pod-readiness predicate self-test failed; step semantics are not the reviewed ones."
         return 1
     fi
-    echo ">>> selftest: pod-readiness predicate OK (installer/bootstrap excluded, real failures kept, partially ready Running pods kept)"
+    echo ">>> selftest: pod-readiness predicate OK (installer/bootstrap excluded, real failures kept, partially ready Running pods kept, subscription CSV selection OK)"
 }
 
 function DebugOnExit () {
@@ -498,6 +528,32 @@ function ValidatePlatformHealth () {
     true
 }
 
+# Print "<name>\t<phase>" for the CSV the operator's Subscription is converging
+# to. The Subscription status.currentCSV (installedCSV as a fallback) names that
+# CSV, so a superseded CSV that still reports Succeeded cannot stand in for a
+# target that is still Installing. When no Subscription names a matching CSV, or
+# the Subscription read failed, the first name-prefix match is used, which keeps
+# the previous behavior as a fallback.
+# shellcheck disable=SC2317  # invoked from SettleOppOperatorCsvs and ValidateOppOperators
+function _select_target_csv () {
+    typeset _selOp="${1}" _csvList="${2}" _subList="${3}"
+    typeset _want='' _hit=''
+    if [[ -n "${_subList}" ]]; then
+        _want="$(awk -F'\t' -v op="${_selOp}" '
+            $3 != "" && index($3, op) == 1 { print $3; exit }
+            $4 != "" && index($4, op) == 1 { print $4; exit }
+        ' <<< "${_subList}")"
+    fi
+    if [[ -n "${_want}" ]]; then
+        _hit="$(awk -F'\t' -v want="${_want}" '$2 == want { printf "%s\t%s", $2, $3; exit }' <<< "${_csvList}")"
+        if [[ -n "${_hit}" ]]; then
+            printf '%s' "${_hit}"
+            return 0
+        fi
+    fi
+    awk -F'\t' -v op="${_selOp}" 'index($2, op) == 1 { printf "%s\t%s", $2, $3; exit }' <<< "${_csvList}"
+}
+
 function SettleOppOperatorCsvs () {
     # Best-effort bounded settle for the operators this step validates.
     # The previous form slept a fixed 300s unconditionally: 5 minutes of wall
@@ -514,18 +570,19 @@ function SettleOppOperatorCsvs () {
     typeset -A settlePrevMap=()
     typeset -i stableCount=0
     typeset -i elapsed=0
-    typeset settleCsvs='' settleOp='' settlePhase='' settleObs=''
+    typeset settleCsvs='' settleSubs='' settleOp='' settlePhase='' settleObs=''
     while (( SECONDS < deadline )); do
         typeset -i _remaining=$(( deadline - SECONDS ))
         (( _remaining <= 0 )) && break
         settleCsvs="$(oc get csv -A --request-timeout="${_remaining}s" -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.phase}}{{end}}{{"\n"}}{{end}}' 2>/dev/null || true)"
+        settleSubs="$(oc get subscriptions.operators.coreos.com -A --request-timeout="${_remaining}s" -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.currentCSV}}{{"\t"}}{{.installedCSV}}{{end}}{{"\n"}}{{end}}' 2>/dev/null || true)"
         stableCount=0
         for settleOp in "${settleOpsArr[@]}"; do
             # PRRT_kwDOBHvUUM65RJot: require consecutive identical currentCSV
             # observations (2x). The observation is the CSV name and its phase,
             # so two different matching CSVs that both report Succeeded on
             # successive reads are a name change, not a stable CSV.
-            settleObs="$(awk -F'\t' -v op="${settleOp}" 'index($2, op) == 1 {printf "%s\t%s", $2, $3; exit}' <<< "${settleCsvs}")"
+            settleObs="$(_select_target_csv "${settleOp}" "${settleCsvs}" "${settleSubs}")"
             settlePhase="${settleObs#*$'\t'}"
             typeset _prevObs="${settlePrevMap[${settleOp}]:-}"
             if [[ "${_prevObs}" != "${settleObs}" ]]; then
@@ -588,15 +645,18 @@ function ValidateOppOperators () {
     SettleOppOperatorCsvs 300
 
     typeset allCsvsJson=""
+    typeset allSubsJson=""
     typeset -i failCount=0
-    allCsvsJson="$(oc get csv -A -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.phase}}{{end}}{{"\n"}}{{end}}')" || {
+    allCsvsJson="$(oc get csv -A --request-timeout=120s -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.phase}}{{end}}{{"\n"}}{{end}}' 2>/dev/null || true)" || {
         : "Failed to retrieve CSVs"
         return 1
     }
+    allSubsJson="$(oc get subscriptions.operators.coreos.com -A --request-timeout=120s -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.currentCSV}}{{"\t"}}{{.installedCSV}}{{end}}{{"\n"}}{{end}}' 2>/dev/null || true)"
 
-    typeset phase="" op=""
+    typeset phase="" op="" targetCsv=""
     for op in "${operatorsArr[@]}"; do
-        phase="$(awk -F'\t' -v op="${op}" 'index($2, op) == 1 {print $3; exit}' <<< "${allCsvsJson}")"
+        targetCsv="$(_select_target_csv "${op}" "${allCsvsJson}" "${allSubsJson}")"
+        phase="${targetCsv#*$'\t'}"
         if [[ -z "${phase}" ]]; then
             : "CSV not found for operator: ${op}"
             (( failCount += 1 ))
