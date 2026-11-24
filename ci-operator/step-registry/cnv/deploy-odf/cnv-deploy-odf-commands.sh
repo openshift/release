@@ -22,23 +22,22 @@ DEFAULT_STORAGE_CLASS=${DEFAULT_STORAGE_CLASS:-${ODF_DEFAULT_STORAGE_CLASS}}
 readonly ODF_CATALOG_IMAGE="quay.io/rhceph-dev/ocs-registry:latest-stable-${ODF_VERSION_MAJOR_MINOR}"
 readonly ODF_CATALOG_NAME=odf-catalogsource
 
-readonly CLUSTER_PULL_SECRETS_ORIGINAL=/tmp/ps1.json
-readonly CLUSTER_PULL_SECRETS_UPDATED=/tmp/ps.json
-readonly ODF_QUAY_CREDENTIALS_FILE=/tmp/secrets/odf-quay-credentials/rhceph-dev
-
-if [[ ! -f "${ODF_QUAY_CREDENTIALS_FILE}" ]]; then
-  echo_debug "ERROR: ODF Quay credentials file not found"
-  exit 1
-fi
-
-echo "🐶 Get pull secret from cluster"
-oc::getClusterPullSecret > "${CLUSTER_PULL_SECRETS_ORIGINAL}"
-
-echo "🍯 Merge pull secret with ODF Quay credentials"
-jq '. * input' "${CLUSTER_PULL_SECRETS_ORIGINAL}" "${ODF_QUAY_CREDENTIALS_FILE}" > "${CLUSTER_PULL_SECRETS_UPDATED}"
-
-echo "🌊 Update pull secret in cluster"
-oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${CLUSTER_PULL_SECRETS_UPDATED}"
+# readonly CLUSTER_PULL_SECRETS_ORIGINAL=/tmp/ps1.json
+# readonly CLUSTER_PULL_SECRETS_UPDATED=/tmp/ps.json
+# readonly ODF_QUAY_CREDENTIALS_FILE=/tmp/secrets/odf-quay-credentials/rhceph-dev
+#
+# if [[ -f "${ODF_QUAY_CREDENTIALS_FILE}" ]]; then
+#   echo_debug "DEBUG: ODF Quay credentials found, adding to cluster pull-secret"
+#
+#   echo "🐶 Get pull secret from cluster"
+#   oc::getClusterPullSecret > "${CLUSTER_PULL_SECRETS_ORIGINAL}"
+#
+#   echo "🍯 Merge pull secret with ODF Quay credentials"
+#   jq '. * input' "${CLUSTER_PULL_SECRETS_ORIGINAL}" "${ODF_QUAY_CREDENTIALS_FILE}" > "${CLUSTER_PULL_SECRETS_UPDATED}"
+#
+#   echo "🌊 Update pull secret in cluster"
+#   oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${CLUSTER_PULL_SECRETS_UPDATED}"
+# fi
 
 function gather_odf_debug_info() {
   if [[ -z "${ARTIFACT_DIR:-}" ]]; then
@@ -198,13 +197,17 @@ for _ in {1..60}; do
     sleep 10
 done
 
-echo "⏳ Wait for OCS Operator deployment to be ready"
-sleep 90
+# ocs_operator_available: true once OLM's install strategy for the ocs-operator
+# CSV has created the deployment and it reports Available.
+# `oc wait` cannot be used here: it treats NotFound as a fatal error, and the
+# deployment only appears after the whole ODF CSV dependency chain installs.
+function ocs_operator_available() {
+  [[ "$(oc -n "${ODF_INSTALL_NAMESPACE}" get deployment ocs-operator \
+       -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null)" == "True" ]]
+}
 
-oc wait deployment ocs-operator \
-  --namespace="${ODF_INSTALL_NAMESPACE}" \
-  --for=condition='Available' \
-  --timeout='5m'
+echo "⏳ Wait for OCS Operator deployment to be ready"
+wait_for "deployment ocs-operator to be Available" 60 10 ocs_operator_available
 
 echo "🏷️ Preparing Nodes"
 oc label nodes cluster.ocs.openshift.io/openshift-storage='' \
