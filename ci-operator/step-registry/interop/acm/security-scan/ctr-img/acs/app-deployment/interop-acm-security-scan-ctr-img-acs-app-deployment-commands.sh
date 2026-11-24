@@ -496,6 +496,12 @@ AcsListMatchingImages () {
             fetchRc=1
             break
         fi
+        # A page request can block for its whole --max-time, so stop before the
+        # shared budget is exhausted and let the caller read a failed listing.
+        if (( _acsDeadlineLocal > 0 )) && (( SECONDS + 60 >= _acsDeadlineLocal )); then
+            fetchRc=1
+            break
+        fi
         offset=$(( page * pageLimit ))
         # Each page runs in a command-substitution subshell with xtrace
         # disabled and curl reads the password from a process-substitution
@@ -749,7 +755,11 @@ def lastn($d): split("/") | .[-$d:] | join("/");
         fi
         if [[ "${httpdImageJson}" == '__QUERY_FAILED__' ]]; then
             echo "ACS query failed after ${_acsTry} attempts, treating as transient not empty" >&2
-            sleep "${retryInterval}"
+            typeset -i _acsFailSleep=${retryInterval}
+            typeset -i _acsFailRemain=$(( acsDeadline - SECONDS ))
+            (( _acsFailRemain > 0 )) || _acsFailRemain=0
+            (( _acsFailSleep > _acsFailRemain )) && _acsFailSleep=${_acsFailRemain}
+            (( _acsFailSleep > 0 )) && sleep "${_acsFailSleep}"
             continue
         fi
         # Read the record only out of a single-element answer.  Two or more
