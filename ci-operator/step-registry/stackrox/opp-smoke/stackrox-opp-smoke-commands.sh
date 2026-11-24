@@ -245,7 +245,7 @@ ACS_SCANNER_WAIT_S="${ACS_SCANNER_WAIT_S:-600}"
 ACS_SCANNER_POLL_S="${ACS_SCANNER_POLL_S:-30}"
 for _seam in ACS_SCANNER_WAIT_S ACS_SCANNER_POLL_S; do
     if ! [[ "${!_seam}" =~ ^[1-9][0-9]*$ ]]; then
-        _add_case "acs-env-invalid" failed "InvalidInput" \
+        _add_classification "acs-env-invalid" failed "InvalidInput" \
             "${_seam} must be a positive integer (got: '${!_seam}'); fail-closed"
         echo "[smoke] FATAL: invalid ${_seam}='${!_seam}'"
         exit 2

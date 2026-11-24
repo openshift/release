@@ -203,7 +203,7 @@ trap '_jrc=$?; set +e; set +x; rm -f "${_curlCfg:-}"; _ensure_assertion_rows; if
 # ---------------------------------------------------------------------------
 for _seam in ACS_POLL_INTERVAL_S ACS_WAIT_TIMEOUT_S ACS_BUDGET_S; do
     if ! [[ "${!_seam}" =~ ^[1-9][0-9]*$ ]]; then
-        _add_case "acs-env-invalid" failed "InvalidInput" \
+        _add_classification "acs-env-invalid" failed "InvalidInput" \
             "${_seam} must be a positive integer (got: '${!_seam}'); fail-closed"
         _ensure_assertion_rows
         echo "[readiness] FATAL: invalid ${_seam}='${!_seam}'"
