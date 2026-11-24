@@ -105,6 +105,13 @@ if [[ "${BASTION_HOST_AMI}" == "" ]]; then
     if [[ "${REGION}" == "eusc-de-east-1" ]]; then
       ami_id="ami-0e43802c8b4ad242e"
     fi
+  elif [[ "${REGION}" == "me-west-1" ]]; then
+    # TEMPORARY: me-west-1 region qualification.
+    # Fedora CoreOS stable publishes no AMI in me-west-1, so use a manual
+    # x86_64 copy of the us-east-1 stable image in the QE account. Drop this
+    # branch once FCOS publishes me-west-1 images or the qualification jobs
+    # are retired.
+    ami_id="ami-0e378c5cd6ddaef0f"
   else
     if [[ "${CLUSTER_TYPE}" == "aws-usgov" ]]; then
         bastion_image_list_url="https://raw.githubusercontent.com/openshift/installer/release-4.18/data/data/coreos/rhcos.json"

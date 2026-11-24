@@ -246,14 +246,24 @@ REGION="$(yq-go r "${CONFIG}" 'platform.aws.region')"
 echo Using region: ${REGION}
 test -n "${REGION}"
 
-curl -L -o /tmp/fcos-stable.json https://builds.coreos.fedoraproject.org/streams/stable.json
-AMI=$(jq -r .architectures.x86_64.images.aws.regions[\"${REGION}\"].image < /tmp/fcos-stable.json)
-if [ -z "${AMI}" ]; then
-  echo "Missing AMI in region: ${REGION}" 1>&2
-  exit 1
+if [[ "${REGION}" == "me-west-1" ]]; then
+  # TEMPORARY: me-west-1 region qualification.
+  # Fedora CoreOS stable publishes no AMI in me-west-1, so use a manual
+  # x86_64 copy of the us-east-1 stable image in the QE account. Drop this
+  # branch once FCOS publishes me-west-1 images or the qualification jobs
+  # are retired.
+  AMI="ami-0e378c5cd6ddaef0f"
+  echo "Using pinned FCOS AMI in ${REGION}: ${AMI}"
+else
+  curl -L -o /tmp/fcos-stable.json https://builds.coreos.fedoraproject.org/streams/stable.json
+  AMI=$(jq -r ".architectures.x86_64.images.aws.regions[\"${REGION}\"].image // \"\"" < /tmp/fcos-stable.json)
+  if [ -z "${AMI}" ]; then
+    echo "Missing AMI in region: ${REGION}" 1>&2
+    exit 1
+  fi
+  RELEASE=$(jq -r ".architectures.x86_64.images.aws.regions[\"${REGION}\"].release // \"unknown\"" < /tmp/fcos-stable.json)
+  echo "Using FCOS ${RELEASE} AMI: ${AMI}"
 fi
-RELEASE=$(jq -r .architectures.x86_64.images.aws.regions[\"${REGION}\"].release < /tmp/fcos-stable.json)
-echo "Using FCOS ${RELEASE} AMI: ${AMI}"
 
 ssh_pub_key=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 
