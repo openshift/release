@@ -49,6 +49,7 @@ images:
       COPY hack/e2e.sh hack/vegeta.targets hack/
       COPY dist/openshift/cincinnati-deployment.yaml \
            dist/openshift/cincinnati-e2e.yaml \
+           dist/openshift/cincinnati-olmv1-e2e.yaml \
            dist/openshift/observability.yaml \
            dist/openshift/load-testing.yaml \
            dist/openshift/
@@ -196,6 +197,35 @@ tests:
           memory: 200Mi
     - ref: tls-scanner-run
     workflow: ipi-aws
+- always_run: false
+  as: olmv1-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.22"
+  optional: true
+  steps:
+    test:
+    - ref: ipi-install-post-featureset
+    - as: openshift-e2e-test
+      commands: just run_e2e
+      dependencies:
+      - env: CINCINNATI_IMAGE
+        name: deploy
+      env:
+      - default: v1
+        name: OLM_VERSION
+      - default: quay.io/openshift-ota/openshift-cincinnati-test-public-manual
+        name: RELEASES
+      from: e2e-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 - as: osus-e2e
   cluster_claim:
     architecture: amd64
