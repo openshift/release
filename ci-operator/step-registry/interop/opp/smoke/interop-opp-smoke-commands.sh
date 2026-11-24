@@ -55,9 +55,10 @@ fi
 # TestGrid.
 # ---------------------------------------------------------------------------
 
-# NOTE: OPP_OPERATORS and SMOKE_SETTLE_SECONDS may be set via workflow env (naming deviates from OPP__ convention)
-OPP_OPERATORS="${OPP_OPERATORS:-advanced-cluster-management,rhacs-operator,odf-operator,quay-operator}"
-SMOKE_SETTLE_SECONDS="${SMOKE_SETTLE_SECONDS:-120}"
+# Step-config-declared variables (CIOP-4 double-underscore names). Values live
+# only in the step ref YAML (CIOP-5.3: no script-side defaults).
+: "${INTEROP__OPP__SMOKE__OPERATORS:?}"
+: "${INTEROP__OPP__SMOKE__SETTLE_SECONDS:?}"
 
 typeset junitFile="${ARTIFACT_DIR}/junit_opp_smoke.xml"
 # Scratch space for oc stderr captures (CRD-absence classification).
@@ -115,13 +116,11 @@ WriteJunit() {
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
         echo "<testsuite name=\"lp-interop--OPP--smoke\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
-        # Effective configuration in the JUnit carrier: the lane-level
-        # OPP_OPERATORS override has been observed not reaching this step
-        # (runs 2118373032635404288 / 2118380423871467520 checked operators
-        # outside the configured list); publish what actually ran.
+        # Effective configuration in the JUnit carrier: publish what actually ran.
+        # Re-verify in a rehearsal that lane-level overrides reach this step.
         echo "  <properties>"
-        echo "    <property name=\"opp_operators\" value=\"$(XmlEscape "${OPP_OPERATORS}")\"/>"
-        echo "    <property name=\"smoke_settle_seconds\" value=\"$(XmlEscape "${SMOKE_SETTLE_SECONDS}")\"/>"
+        echo "    <property name=\"opp_operators\" value=\"$(XmlEscape "${INTEROP__OPP__SMOKE__OPERATORS}")\"/>"
+        echo "    <property name=\"smoke_settle_seconds\" value=\"$(XmlEscape "${INTEROP__OPP__SMOKE__SETTLE_SECONDS}")\"/>"
         echo "  </properties>"
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
@@ -261,7 +260,7 @@ TestOppOperators() {
     typeset failMsg=""
 
     typeset -a operatorsArr=()
-    IFS=',' read -ra operatorsArr <<< "${OPP_OPERATORS}"
+    IFS=',' read -ra operatorsArr <<< "${INTEROP__OPP__SMOKE__OPERATORS}"
     for op in "${operatorsArr[@]}"; do
         op="$(echo "${op}" | xargs)"  # trim whitespace
         : "Checking operator: ${op}"
@@ -312,8 +311,8 @@ TestOppOperators() {
         fi
 
         # Check pods are Ready in the operator namespace (with settling window)
-        : "Waiting ${SMOKE_SETTLE_SECONDS}s settling window for pods in ${csvNs}..."
-        sleep "${SMOKE_SETTLE_SECONDS}"
+        : "Waiting ${INTEROP__OPP__SMOKE__SETTLE_SECONDS}s settling window for pods in ${csvNs}..."
+        sleep "${INTEROP__OPP__SMOKE__SETTLE_SECONDS}"
 
         typeset notReadyPods=""
         if ! notReadyPods="$(oc get pods -n "${csvNs}" -o json | jq -r '
@@ -622,8 +621,8 @@ Main() {
     fi
 
     echo ">>> PHASE: OPP Smoke Tests starting"
-    : "Operators: ${OPP_OPERATORS}"
-    : "Settle window: ${SMOKE_SETTLE_SECONDS}s"
+    : "Operators: ${INTEROP__OPP__SMOKE__OPERATORS}"
+    : "Settle window: ${INTEROP__OPP__SMOKE__SETTLE_SECONDS}s"
     : "Artifacts dir: ${ARTIFACT_DIR}"
 
     TestClusterHealth      || true
