@@ -1401,11 +1401,13 @@ typeset _wait2_err="" _wait2_rc=0
       # The phase wait can return nonzero on its final poll after the CSV
       # flipped. Re-read the Subscription's currentCSV so the acceptance binds
       # to the object the wait targeted; a failed read keeps the phase evidence.
-      _csv_now=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
-          -o jsonpath='{.status.currentCSV}' 2>/dev/null) || _csv_now="${csvName}"
-      if [[ "${_csv_now}" == "${csvName}" ]]; then
-        _csv_recovered=1
-        echo ">>> NOTE: CSV ${csvName} is Succeeded; the phase wait returned rc=${_wait2_rc} on its final poll, accepting the observed Succeeded phase"
+      _csv_now=""
+      if _csv_now=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
+          -o jsonpath='{.status.currentCSV}' 2>/dev/null); then
+        if [[ "${_csv_now}" == "${csvName}" ]]; then
+          _csv_recovered=1
+          echo ">>> NOTE: CSV ${csvName} is Succeeded; the phase wait returned rc=${_wait2_rc} on its final poll, accepting the observed Succeeded phase"
+        fi
       fi
     fi
     if [[ -n "${_cond_class}" ]]; then
