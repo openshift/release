@@ -1334,6 +1334,7 @@ typeset _wait2_err="" _wait2_rc=0
       fi
     fi
     rm -f "${_wait2_err}.phase"
+    typeset -i _csv_recovered=0
     typeset _deadline_exhausted=false
     if (( $(date +%s) >= install_deadline )); then
       _deadline_exhausted=true
@@ -1349,6 +1350,17 @@ typeset _wait2_err="" _wait2_rc=0
     # the named CSV, so reporting acs-csv-timeout there would attribute the
     # failure to the deadline instead of the InstallPlan.
     _cond_classify
+    if [[ "${_phase}" == "Succeeded" && -z "${_cond_class}" ]]; then
+      # The phase wait can return nonzero on its final poll after the CSV
+      # flipped. Re-read the Subscription's currentCSV so the acceptance binds
+      # to the object the wait targeted; a failed read keeps the phase evidence.
+      _csv_now=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
+          -o jsonpath='{.status.currentCSV}' 2>/dev/null) || _csv_now="${csvName}"
+      if [[ "${_csv_now}" == "${csvName}" ]]; then
+        _csv_recovered=1
+        echo ">>> NOTE: CSV ${csvName} is Succeeded; the phase wait returned rc=${_wait2_rc} on its final poll, accepting the observed Succeeded phase"
+      fi
+    fi
     if [[ -n "${_cond_class}" ]]; then
       _classify "${_cond_class}" "${_cond_detail} (CSV ${csvName}, phase ${_phase})"
     elif [[ "${_phase}" == "Failed" ]]; then
@@ -1364,9 +1376,11 @@ typeset _wait2_err="" _wait2_rc=0
     else
       _classify "acs-csv-unknown-phase" "CSV ${csvName} not Succeeded after ${ACS_INSTALL_TIMEOUT}s (phase: ${_phase}; deadline not exhausted)"
     fi
-    echo "ERROR: ${_class_detail}"
-    _dump_diagnostics
-    exit 1
+    if (( ! _csv_recovered )); then
+      echo "ERROR: ${_class_detail}"
+      _dump_diagnostics
+      exit 1
+    fi
 fi
 
 echo ">>> PHASE: ACS operator deployed successfully"
