@@ -193,6 +193,10 @@ _terminate() {
         _ACS_STATE="unknown"
         _add_classification "acs-state-indeterminate" failed "StepTerminated" "terminated by ${sig} before classification completed"
     else
+        if [[ -z "${_CLASSIFICATION_CASE}" ]]; then
+            _add_classification "acs-state-indeterminate" failed "StepTerminated" "terminated by ${sig} during provisional hold (state=${_ACS_STATE})"
+            _ACS_STATE="unknown"
+        fi
         _add_case "step-terminated" failed "StepTerminated" "terminated by ${sig} after classification (state=${_ACS_STATE})"
     fi
     exit 143
