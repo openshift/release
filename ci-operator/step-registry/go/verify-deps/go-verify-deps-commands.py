@@ -24,9 +24,11 @@ import argparse
 import contextlib
 import enum
 import fnmatch
+import inspect
 import io
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -51,9 +53,23 @@ DEFAULT_PROXY = "https://proxy.golang.org"
 OUTAGE_THRESHOLD = 3  # consecutive transport failures that trip the outage stop
 DEFAULT_PROBE_TIMEOUT = 15.0  # per-probe timeout (seconds) when no deadline bounds it
 
-# Optional injection hook: a callable(url) -> status-code string. When set (by the
-# self-test / unit tests) it overrides curl/wget and the GOPROXY_PROBE_CMD env.
-# This mirrors the shell GOPROXY_PROBE_CMD indirection.
+# Go module proxy availability-check tuning. These used to be consumer-facing env
+# knobs (GOPROXY_CHECK_RETRIES / _RETRY_DELAY_SECONDS / _DEADLINE_SECONDS) but are
+# now fixed internals: sensible defaults that need no per-repo configuration.
+GOPROXY_RETRIES = 5  # probe attempts per module version (absorb proxy propagation)
+GOPROXY_RETRY_DELAY_SECONDS = 10  # base backoff per attempt (attempt N waits N times this)
+GOPROXY_DEADLINE_SECONDS = 120  # overall wall-clock budget for the probe loop (0 disables)
+
+# Bounded jitter fraction applied to each backoff delay (+/-20%).
+JITTER_FRACTION = 0.2
+# Module-level RNG for backoff jitter. Seed it (``JITTER_RNG.seed(...)``) in tests to make
+# the jitter deterministic.
+JITTER_RNG = random.Random()
+
+# Optional injection hook: a callable(url) -> status (or (url, timeout)) returning a
+# status-code string, a (code, retry_after_seconds) tuple, or a ProbeResponse. When
+# set (by the self-test / unit tests) it overrides curl/wget and the GOPROXY_PROBE_CMD
+# env. This mirrors the shell GOPROXY_PROBE_CMD indirection.
 PROBE_OVERRIDE = None
 
 _GENERAL_REMEDIATION = """\
@@ -169,6 +185,17 @@ class Outcome(enum.Enum):
     AVAILABLE = "AVAILABLE"
     MISSING = "MISSING"
     INCONCLUSIVE = "INCONCLUSIVE"
+
+
+@dataclass(frozen=True)
+class ProbeResponse:
+    """Normalized result of a single probe call: the HTTP status code plus any
+    server-advertised Retry-After delay in seconds (0.0 when none was surfaced).
+    The curl/wget/external probes return a bare status string, so Retry-After is
+    only surfaced on the override/primary path; see _coerce_probe_response."""
+
+    code: str
+    retry_after: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -458,11 +485,16 @@ def enumerate_candidates() -> list[Candidate]:
     return candidates_from_json(data)
 
 
-def _resolve_proxy_base(explicit_url: str) -> str:
-    """Return the proxy base URL: an explicit override, else the first http(s)
-    entry of ``go env GOPROXY`` (skipping ``direct``/``off``), else the public
-    proxy. Any trailing slash is stripped."""
-    base = explicit_url
+def _resolve_proxy_base() -> str:
+    """Return the proxy base URL: the first http(s) entry of ``go env GOPROXY``
+    (skipping ``direct``/``off``), else the public proxy. Any trailing slash is
+    stripped.
+
+    GOPROXY_AVAILABILITY_URL is read here as an UNDECLARED, test-only override hook
+    (like GOPROXY_PROBE_CMD / GOPROXY_SELF_TEST): it lets the self-test and unit
+    tests point the probe at a fake proxy. It is intentionally NOT exposed as
+    consumer configuration in the step ref."""
+    base = os.environ.get("GOPROXY_AVAILABILITY_URL", "")  # test-only hook, not consumer config
     if not base:
         entries = re.split(r"[,|]", go_env("GOPROXY"))
         base = next((e for e in entries if e.startswith(("http://", "https://"))), DEFAULT_PROXY)
@@ -483,14 +515,25 @@ def probe_cmd(cmd: str, url: str, timeout: float) -> str:
     return result.stdout.strip() or "000"
 
 
+def _invoke_override(override, url: str, timeout: float):
+    """Call the PROBE_OVERRIDE hook, dispatching by arity: the common test form
+    accepts just ``(url)``; a two-parameter form additionally receives the
+    per-attempt ``timeout`` so tests can assert it is capped to the budget."""
+    try:
+        arity = len(inspect.signature(override).parameters)
+    except (TypeError, ValueError):
+        arity = 1
+    return override(url, timeout) if arity >= 2 else override(url)
+
+
 def _select_probe():
-    """Return a callable(url, timeout) -> status-code, or None if no probe is
-    available. Priority: the PROBE_OVERRIDE hook (a Python callable(url), wrapped so
-    the timeout is accepted and ignored), then a GOPROXY_PROBE_CMD external command,
-    then curl, then wget."""
+    """Return a callable(url, timeout) -> status-code / ProbeResponse, or None if no
+    probe is available. Priority: the PROBE_OVERRIDE hook (a Python callable(url) or
+    (url, timeout)), then a GOPROXY_PROBE_CMD external command, then curl, then
+    wget."""
     if PROBE_OVERRIDE is not None:
         override = PROBE_OVERRIDE
-        return lambda url, timeout: override(url)
+        return lambda url, timeout: _invoke_override(override, url, timeout)
     cmd = os.environ.get("GOPROXY_PROBE_CMD", "")
     if cmd:
         return lambda url, timeout: probe_cmd(cmd, url, timeout)
@@ -501,6 +544,39 @@ def _select_probe():
     return None
 
 
+def _coerce_probe_response(value) -> ProbeResponse:
+    """Normalize a probe's return value into a ProbeResponse. The curl/wget/external
+    probes return a bare status string (Retry-After is not surfaced from them — a
+    documented limitation), while the PROBE_OVERRIDE hook may return a ProbeResponse
+    or a (code, retry_after) tuple so tests can exercise Retry-After handling."""
+    if isinstance(value, ProbeResponse):
+        return value
+    if isinstance(value, tuple):
+        code, retry_after = value
+        return ProbeResponse(str(code), float(retry_after))
+    return ProbeResponse(str(value), 0.0)
+
+
+def _apply_jitter(delay: float) -> float:
+    """Apply bounded +/-JITTER_FRACTION jitter to a backoff delay using the
+    module-level RNG (seed ``JITTER_RNG`` in tests for determinism). A non-positive delay
+    stays zero."""
+    if delay <= 0:
+        return 0.0
+    return delay * (1.0 + JITTER_RNG.uniform(-JITTER_FRACTION, JITTER_FRACTION))
+
+
+def _next_backoff(retry_delay: int, attempt: int, code: str, retry_after: float) -> float:
+    """Compute the delay before the next probe attempt: the base backoff
+    (``retry_delay * attempt``) with bounded jitter, raised to at least the
+    server-advertised Retry-After on HTTP 429. The caller still caps the result to
+    the remaining deadline budget."""
+    base = _apply_jitter(retry_delay * attempt)
+    if code == "429" and retry_after > 0:
+        return max(base, retry_after)
+    return base
+
+
 def _probe_with_retries(probe, url: str, retries: int, retry_delay: int,
                         budget: _Budget) -> tuple[Outcome, str]:
     """Probe ``url`` up to ``retries`` times with increasing backoff, honoring the
@@ -509,21 +585,24 @@ def _probe_with_retries(probe, url: str, retries: int, retry_delay: int,
 
     Returns ``(outcome, last_code)`` where a ``200`` yields AVAILABLE immediately,
     a trailing ``404``/``410`` yields MISSING, and anything else (``000`` network /
-    5xx / 429 / timeout) yields INCONCLUSIVE."""
+    5xx / 429 / timeout) yields INCONCLUSIVE. Each attempt's timeout is capped to the
+    remaining budget; the inter-attempt backoff carries bounded jitter and honors a
+    429 Retry-After."""
     last = Outcome.INCONCLUSIVE
     code = "000"
     for attempt in range(1, retries + 1):
         if budget.exhausted():
             break
         try:
-            code = probe(url, budget.probe_timeout())
+            response = _coerce_probe_response(probe(url, budget.probe_timeout()))
         except Exception:  # pylint: disable=broad-exception-caught  # any prober error -> transport failure
-            code = "000"
+            response = ProbeResponse("000", 0.0)
+        code = response.code
         if code == "200":
             return Outcome.AVAILABLE, code
         last = Outcome.MISSING if code in ("404", "410") else Outcome.INCONCLUSIVE
         if attempt < retries:
-            delay = budget.cap_sleep(retry_delay * attempt)
+            delay = budget.cap_sleep(_next_backoff(retry_delay, attempt, code, response.retry_after))
             if delay > 0:
                 time.sleep(delay)
             if budget.exhausted():
@@ -531,9 +610,10 @@ def _probe_with_retries(probe, url: str, retries: int, retry_delay: int,
     return last, code
 
 
-def _report_goproxy_outcome(rproxy_base: str, results: _ProbeResults, strict: bool) -> None:
-    """Print the outcome summary and exit 1 on a hard failure (a missing module,
-    or an inconclusive result under strict mode). Budget/outage skips only warn."""
+def _report_goproxy_outcome(rproxy_base: str, results: _ProbeResults) -> None:
+    """Print the outcome summary and exit 1 only on a hard failure (a module the
+    proxy definitively does not have). Inconclusive (transient/non-404) results and
+    budget/outage skips are treated as warnings and never fail the check."""
     if results.missing:
         goproxy_report_missing(rproxy_base, results.missing)
         sys.exit(1)
@@ -550,15 +630,9 @@ def _report_goproxy_outcome(rproxy_base: str, results: _ProbeResults, strict: bo
         for skip in results.budget_skipped:
             print(f"  - {skip.spec} ({skip.reason})")
 
-    # Strict mode fails on genuinely inconclusive probe results, but never on
-    # budget/outage skips (an infrastructure/time limit, not a dependency issue).
-    if results.inconclusive and strict:
-        print("ERROR: GOPROXY_CHECK_STRICT=true; treating inconclusive results as a failure.")
-        sys.exit(1)
-
     if results.inconclusive or results.budget_skipped:
-        print("Continuing (set GOPROXY_CHECK_STRICT=true to fail on inconclusive results; "
-              "budget/outage skips never fail).")
+        print("Continuing (inconclusive results are treated as warnings and do not fail the check; "
+              "only modules the proxy definitively cannot resolve fail, and budget/outage skips never fail).")
         return
 
     print("All checked Go module versions are resolvable on the Go module proxy.")
@@ -567,23 +641,23 @@ def _report_goproxy_outcome(rproxy_base: str, results: _ProbeResults, strict: bo
 def check_goproxy_availability() -> None:
     """Verify pinned Go module pseudo-versions resolve on the Go module proxy
     before a build (ART-26147). Opt-in via CHECK_GOPROXY_AVAILABILITY. Raises
-    ``SystemExit(1)`` on a hard failure (a missing module, or an inconclusive
-    result under GOPROXY_CHECK_STRICT)."""
+    ``SystemExit(1)`` only on a hard failure (a module the proxy definitively does
+    not have); inconclusive/transient results are treated as warnings."""
     # Opt-in default-off: the ref default is "false", so an unset var must NOT
     # enable the check (ci-operator always sets it from the ref; this fallback
     # only guards bare/local invocations).
     if not Path("go.mod").is_file() or os.environ.get("CHECK_GOPROXY_AVAILABILITY", "false") != "true":
         return
 
-    retries = int(os.environ.get("GOPROXY_CHECK_RETRIES", "5"))
-    retry_delay = int(os.environ.get("GOPROXY_CHECK_RETRY_DELAY_SECONDS", "10"))
-    check_all = os.environ.get("GOPROXY_CHECK_ALL_VERSIONS", "false") == "true"
-    strict = os.environ.get("GOPROXY_CHECK_STRICT", "false") == "true"
-    deadline = int(os.environ.get("GOPROXY_CHECK_DEADLINE_SECONDS", "120"))
+    # Retry/backoff/deadline are fixed internals (module constants), no longer env
+    # tunables. Read via module globals so tests can monkeypatch them.
+    retries = GOPROXY_RETRIES
+    retry_delay = GOPROXY_RETRY_DELAY_SECONDS
+    deadline = GOPROXY_DEADLINE_SECONDS
 
     print("Checking that pinned Go module versions are resolvable on the Go module proxy (ART-26147).")
 
-    proxy_base = _resolve_proxy_base(os.environ.get("GOPROXY_AVAILABILITY_URL", ""))
+    proxy_base = _resolve_proxy_base()
     rproxy_base = goproxy_redact_url(proxy_base)  # never log embedded credentials
     print(f"Using Go module proxy base URL: {rproxy_base}")
 
@@ -608,7 +682,9 @@ def check_goproxy_availability() -> None:
     budget = _Budget(deadline, time.monotonic())
 
     for cand in candidates:
-        if not check_all and not PSEUDO_RE.search(cand.version):
+        # Only pseudo-versions are probed: a pinned commit with no nearby semver tag
+        # is what the proxy cannot serve. Tagged versions are left to the build.
+        if not PSEUDO_RE.search(cand.version):
             continue
         if priv_patterns and goproxy_path_is_private(cand.path, priv_patterns):
             private_skipped.append(cand.path)
@@ -644,7 +720,7 @@ def check_goproxy_availability() -> None:
         listed = "".join(f"{path} " for path in sorted(set(private_skipped)))
         print(f"Skipping private module(s) matched by GONOPROXY/GOPRIVATE: {listed}")
 
-    _report_goproxy_outcome(rproxy_base, results, strict)
+    _report_goproxy_outcome(rproxy_base, results)
 
 
 # --------------------------------------------------------------------------- #
@@ -696,25 +772,23 @@ def _capture_check() -> tuple[str, int]:
     return buf.getvalue(), rc
 
 
-def run_self_test() -> bool:
+def run_self_test() -> bool:  # pylint: disable=too-many-statements  # four self-test cases inline
     """Reproduce cases A-D from the original self-test. Returns True on pass."""
-    global PROBE_OVERRIDE  # pylint: disable=global-statement  # the probe hook is a module global
+    # pylint: disable=global-statement  # the probe hook / tuning are module globals
+    global PROBE_OVERRIDE, GOPROXY_RETRIES, GOPROXY_RETRY_DELAY_SECONDS
     failures: list[str] = []
     origdir = Path.cwd()
     tmpdir = Path(tempfile.mkdtemp())
 
     # Force the master switch ON for every case: the production default is "false"
     # (opt-in), but the self-test must exercise the check regardless.
-    os.environ.update({
-        "CHECK_GOPROXY_AVAILABILITY": "true",
-        "GOPROXY_CHECK_RETRIES": "2",
-        "GOPROXY_CHECK_RETRY_DELAY_SECONDS": "0",
-        "GOPROXY_CHECK_ALL_VERSIONS": "false",
-        "GOPROXY_CHECK_STRICT": "false",
-        "GOPROXY_CHECK_DEADLINE_SECONDS": "120",
-    })
+    os.environ["CHECK_GOPROXY_AVAILABILITY"] = "true"
     os.environ.pop("GONOPROXY", None)
     os.environ.pop("GOPRIVATE", None)
+
+    # Keep the self-test instant: a couple of attempts with no backoff sleeps.
+    orig_retries, orig_delay = GOPROXY_RETRIES, GOPROXY_RETRY_DELAY_SECONDS
+    GOPROXY_RETRIES, GOPROXY_RETRY_DELAY_SECONDS = 2, 0
 
     try:
         (tmpdir / "go.mod").write_text(_SELF_TEST_GOMOD, encoding="utf-8")
@@ -768,6 +842,7 @@ def run_self_test() -> bool:
         os.environ.pop("GONOPROXY", None)
     finally:
         PROBE_OVERRIDE = None
+        GOPROXY_RETRIES, GOPROXY_RETRY_DELAY_SECONDS = orig_retries, orig_delay
         os.chdir(origdir)
         shutil.rmtree(tmpdir, ignore_errors=True)
 

@@ -252,7 +252,7 @@ class PureFunctionTests(unittest.TestCase):
         self.assertIn("tag", out)
 
 
-class CheckAvailabilityTests(unittest.TestCase):
+class CheckAvailabilityTests(unittest.TestCase):  # pylint: disable=too-many-instance-attributes  # a test fixture saving/restoring several module globals
     """Exercise check_goproxy_availability() with an injected fake prober.
 
     enumerate_candidates and go_env are monkeypatched so the tests are hermetic
@@ -265,20 +265,25 @@ class CheckAvailabilityTests(unittest.TestCase):
         self._orig_goenv = mod.go_env
         self._orig_probe = mod.PROBE_OVERRIDE
         self._orig_time = mod.time
+        # Retry/backoff/deadline are module constants now (no longer env tunables);
+        # save and set small, instant values, and restore in tearDown.
+        self._orig_retries = mod.GOPROXY_RETRIES
+        self._orig_delay = mod.GOPROXY_RETRY_DELAY_SECONDS
+        self._orig_deadline = mod.GOPROXY_DEADLINE_SECONDS
+        self._orig_rng_state = mod.JITTER_RNG.getstate()
         self._tmp = tempfile.mkdtemp()
         os.chdir(self._tmp)
         # check_goproxy_availability() returns early unless go.mod exists.
         with open(os.path.join(self._tmp, "go.mod"), "w", encoding="utf-8") as fh:
             fh.write("module example.com/t\n\ngo 1.22.0\n")
         os.environ["CHECK_GOPROXY_AVAILABILITY"] = "true"
+        # Undeclared test-only hook: point the probe at a fake proxy base URL.
         os.environ["GOPROXY_AVAILABILITY_URL"] = "https://proxy.example.test"
-        os.environ["GOPROXY_CHECK_RETRIES"] = "1"
-        os.environ["GOPROXY_CHECK_RETRY_DELAY_SECONDS"] = "0"
-        os.environ["GOPROXY_CHECK_DEADLINE_SECONDS"] = "120"
-        os.environ["GOPROXY_CHECK_ALL_VERSIONS"] = "false"
-        os.environ["GOPROXY_CHECK_STRICT"] = "false"
         os.environ.pop("GONOPROXY", None)
         os.environ.pop("GOPRIVATE", None)
+        mod.GOPROXY_RETRIES = 1
+        mod.GOPROXY_RETRY_DELAY_SECONDS = 0
+        mod.GOPROXY_DEADLINE_SECONDS = 120
         # Hermetic: no real `go env` calls.
         mod.go_env = lambda name: ""
 
@@ -291,6 +296,10 @@ class CheckAvailabilityTests(unittest.TestCase):
         mod.go_env = self._orig_goenv
         mod.PROBE_OVERRIDE = self._orig_probe
         mod.time = self._orig_time
+        mod.GOPROXY_RETRIES = self._orig_retries
+        mod.GOPROXY_RETRY_DELAY_SECONDS = self._orig_delay
+        mod.GOPROXY_DEADLINE_SECONDS = self._orig_deadline
+        mod.JITTER_RNG.setstate(self._orig_rng_state)
 
     def _run_check(self):
         buf = io.StringIO()
@@ -345,7 +354,7 @@ class CheckAvailabilityTests(unittest.TestCase):
         mod.enumerate_candidates = lambda: [
             _cand("github.com/x/x@v0.0.0-20240101000000-abcdef123456")]
         mod.PROBE_OVERRIDE = prober
-        os.environ["GOPROXY_CHECK_RETRIES"] = "3"
+        mod.GOPROXY_RETRIES = 3
         out, rc = self._run_check()
         self.assertEqual(rc, 0, out)
         self.assertIn("OK           github.com/x/x@", out)
@@ -369,7 +378,7 @@ class CheckAvailabilityTests(unittest.TestCase):
         ]
         mod.enumerate_candidates = lambda: cands
         mod.PROBE_OVERRIDE = lambda _url: "000"  # transport failure
-        os.environ["GOPROXY_CHECK_RETRIES"] = "1"
+        mod.GOPROXY_RETRIES = 1
         out, rc = self._run_check()
         # Outage short-circuit never fails the check.
         self.assertEqual(rc, 0, out)
@@ -410,9 +419,10 @@ class CheckAvailabilityTests(unittest.TestCase):
             clock[0] += seconds
 
         mod.time = types.SimpleNamespace(monotonic=lambda: clock[0], sleep=fake_sleep)
-        os.environ["GOPROXY_CHECK_RETRIES"] = "5"
-        os.environ["GOPROXY_CHECK_RETRY_DELAY_SECONDS"] = "10"  # would overshoot without the cap
-        os.environ["GOPROXY_CHECK_DEADLINE_SECONDS"] = "5"
+        mod.JITTER_RNG.seed(0)  # deterministic jitter
+        mod.GOPROXY_RETRIES = 5
+        mod.GOPROXY_RETRY_DELAY_SECONDS = 10  # would overshoot without the cap
+        mod.GOPROXY_DEADLINE_SECONDS = 5
         mod.enumerate_candidates = lambda: [
             _cand("github.com/a/a@v0.0.0-20240101000000-a00000000000"),
             _cand("github.com/b/b@v0.0.0-20240101000000-b00000000000"),
@@ -424,6 +434,92 @@ class CheckAvailabilityTests(unittest.TestCase):
         self.assertTrue(all(s <= 5 for s in sleeps), sleeps)  # each sleep capped
         self.assertLessEqual(sum(sleeps), 5)  # total wait bounded by the deadline
         self.assertIn("INCONCLUSIVE", out)
+
+    def test_retry_after_429_honored(self):
+        # A 429 that advertises a Retry-After makes the next backoff wait AT LEAST
+        # that many seconds (the small base backoff would otherwise be far shorter).
+        # Capped only by the overall deadline, which here has ample headroom.
+        clock = [0.0]
+        sleeps = []
+
+        def fake_sleep(seconds):
+            sleeps.append(seconds)
+            clock[0] += seconds
+
+        mod.time = types.SimpleNamespace(monotonic=lambda: clock[0], sleep=fake_sleep)
+        mod.JITTER_RNG.seed(0)
+        mod.GOPROXY_RETRIES = 2
+        mod.GOPROXY_RETRY_DELAY_SECONDS = 1  # base backoff far below the advertised 30s
+        mod.GOPROXY_DEADLINE_SECONDS = 120  # headroom so the cap never clips below 30
+        mod.enumerate_candidates = lambda: [
+            _cand("github.com/x/x@v0.0.0-20240101000000-abcdef123456")]
+        # ProbeResponse carries the Retry-After the server would advertise on a 429.
+        mod.PROBE_OVERRIDE = lambda _url: mod.ProbeResponse("429", 30.0)
+        out, rc = self._run_check()
+        self.assertEqual(rc, 0, out)  # 429 is inconclusive, never a hard fail
+        self.assertEqual(len(sleeps), 1, sleeps)
+        self.assertGreaterEqual(sleeps[0], 30.0)  # waited at least the advertised delay
+        self.assertIn("INCONCLUSIVE", out)
+
+    def test_jitter_bounded_and_deterministic(self):
+        # Backoff jitter stays within +/-20% of the base delay and is reproducible
+        # under a seeded RNG. The deadline is disabled so nothing clips the jitter.
+        def run_once():
+            clock = [0.0]
+            sleeps = []
+
+            def fake_sleep(seconds):
+                sleeps.append(seconds)
+                clock[0] += seconds
+
+            mod.time = types.SimpleNamespace(monotonic=lambda: clock[0], sleep=fake_sleep)
+            mod.JITTER_RNG.seed(1234)
+            mod.GOPROXY_RETRIES = 2
+            mod.GOPROXY_RETRY_DELAY_SECONDS = 10
+            mod.GOPROXY_DEADLINE_SECONDS = 0  # disable the deadline (no capping)
+            mod.enumerate_candidates = lambda: [
+                _cand("github.com/x/x@v0.0.0-20240101000000-abcdef123456")]
+            mod.PROBE_OVERRIDE = lambda _url: "000"
+            out, rc = self._run_check()
+            self.assertEqual(rc, 0, out)
+            return sleeps
+
+        first = run_once()
+        second = run_once()
+        self.assertEqual(len(first), 1, first)
+        self.assertEqual(first, second)  # deterministic under the same seed
+        self.assertTrue(8.0 <= first[0] <= 12.0, first)  # base 10 with +/-20% jitter
+
+    def test_per_attempt_timeout_capped_to_budget(self):
+        # Each probe attempt's timeout is capped to min(DEFAULT_PROBE_TIMEOUT,
+        # remaining budget), so a single attempt cannot overrun the deadline.
+        clock = [0.0]
+        timeouts = []
+
+        def fake_sleep(seconds):
+            clock[0] += seconds
+
+        mod.time = types.SimpleNamespace(monotonic=lambda: clock[0], sleep=fake_sleep)
+        mod.JITTER_RNG.seed(0)
+        mod.GOPROXY_RETRIES = 5
+        mod.GOPROXY_RETRY_DELAY_SECONDS = 1
+        mod.GOPROXY_DEADLINE_SECONDS = 5  # smaller than DEFAULT_PROBE_TIMEOUT (15)
+        mod.enumerate_candidates = lambda: [
+            _cand("github.com/x/x@v0.0.0-20240101000000-abcdef123456")]
+
+        # Two-parameter override: receives and records the per-attempt timeout.
+        def prober(_url, timeout):
+            timeouts.append(timeout)
+            return "000"
+
+        mod.PROBE_OVERRIDE = prober
+        out, rc = self._run_check()
+        self.assertEqual(rc, 0, out)
+        self.assertTrue(timeouts, "expected at least one probe attempt")
+        # Never exceeds the remaining budget, nor the default per-probe ceiling.
+        self.assertTrue(all(t <= 5 for t in timeouts), timeouts)
+        self.assertTrue(all(t <= mod.DEFAULT_PROBE_TIMEOUT for t in timeouts), timeouts)
+        self.assertEqual(timeouts[0], 5.0)  # first attempt: full remaining budget (< default 15)
 
 
 class MainFlowTests(unittest.TestCase):
