@@ -321,6 +321,23 @@ _run_selftest() {
             echo "[selftest] FAIL: shortened cap 2s should appear in zero-result message, got: ${_zeroMsg}" >&2
             st_rc=1
         fi
+        # Probe the budget-limited path: a positive budget shorter than waitCap
+        # expires during the wait, so the message must report budget exhaustion
+        # rather than a discovery timeout.
+        waitCap=30
+        _budgetDeadline=$(( $(date +%s) + 2 ))
+        _waitCap=0; _waitReason=""
+        WaitFor "selftest budget-limited wait" _selftest_probe_fail >/dev/null 2>&1 || true
+        typeset _limitedMsg=""
+        _limitedMsg="$(_discovery_wait_message "no SecuredCluster CR found while ACS_EXPECTATION=required")"
+        if [[ "${_limitedMsg}" != *"budget exhausted"* ]]; then
+            echo "[selftest] FAIL: budget-limited wait should report budget exhausted, got: ${_limitedMsg}" >&2
+            st_rc=1
+        fi
+        if [[ "${_limitedMsg}" == *"discovery timeout"* ]]; then
+            echo "[selftest] FAIL: budget-limited wait should not report discovery timeout, got: ${_limitedMsg}" >&2
+            st_rc=1
+        fi
         # Restore original values
         waitCap="${_savedWaitCap}"
         pollInterval="${_savedPollInterval}"
@@ -416,6 +433,10 @@ function WaitFor () {
     (( rem < cap )) && cap=rem
     _waitCap="${cap}"
     _waitReason=""
+    # A cap below waitCap means the global budget, not the wait cap, bounds this
+    # wait: deadline expiry is then budget exhaustion, not a discovery timeout.
+    typeset _deadlineReason="timeout"
+    (( cap < waitCap )) && _deadlineReason="budget-exhausted-deadline"
     if (( cap == 0 )); then
         _waitReason="budget-exhausted-before"
         echo "[readiness] BUDGET EXHAUSTED before waiting for: ${description}"
@@ -427,14 +448,14 @@ function WaitFor () {
         typeset -i _now=0
         _now=$(date +%s)
         if (( _now >= _deadline )); then
-            _waitReason="timeout"
+            _waitReason="${_deadlineReason}"
             echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (budget remaining $(_budget_remaining)s)"
             return 1
         fi
         if "${checkFn}" "$@"; then
             _now=$(date +%s)
             if (( _now >= _deadline )); then
-                _waitReason="timeout"
+                _waitReason="${_deadlineReason}"
                 echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (post-deadline probe success not accepted, budget remaining $(_budget_remaining)s)"
                 return 1
             fi
@@ -443,7 +464,7 @@ function WaitFor () {
         fi
         _now=$(date +%s)
         if (( _now >= _deadline )); then
-            _waitReason="timeout"
+            _waitReason="${_deadlineReason}"
             echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (budget remaining $(_budget_remaining)s)"
             return 1
         fi
@@ -466,7 +487,7 @@ function WaitFor () {
             "${diagnosticsFn}" || true
             _now=$(date +%s)
             if (( _now >= _deadline )); then
-                _waitReason="timeout"
+                _waitReason="${_deadlineReason}"
                 echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (budget remaining $(_budget_remaining)s)"
                 return 1
             fi
