@@ -57,8 +57,8 @@ echo "==================================="
 echo "Retrieving CloudFormation Templates"
 echo "==================================="
 
-TEMPLATES_BASE=https://raw.githubusercontent.com/openshift-splat-team/installer-labs
-TEMPLATES_VERSION=main
+TEMPLATES_BASE=https://raw.githubusercontent.com/mtulio/installer-labs
+TEMPLATES_VERSION=SPLAT-3059-pext-disconnected
 TEMPLATES_PATH=installer-upi/aws/cloudformation/templates
 
 TEMPLATE_URL=${TEMPLATES_BASE}/${TEMPLATES_VERSION}/${TEMPLATES_PATH}
@@ -243,6 +243,7 @@ add_param_to_json HostedZoneName "${base_domain}" "${cf_params_infra}"
 add_param_to_json VpcId "${VPC_ID}" "${cf_params_infra}"
 add_param_to_json PrivateSubnets "$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g')" "${cf_params_infra}"
 add_param_to_json PublicSubnets "$(echo "${PUBLIC_SUBNETS}" | sed 's/"//g')" "${cf_params_infra}"
+add_param_to_json DisconnectedInstall "${DISCONNECTED_INSTALL:-no}" "${cf_params_infra}"
 
 cat "${cf_params_infra}"
 
@@ -267,9 +268,6 @@ INTERNAL_SERVICE_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.Out
 INGRESS_HTTP_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "IngressHTTPTargetGroupArn").OutputValue')"
 INGRESS_HTTPS_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "IngressHTTPSTargetGroupArn").OutputValue')"
 PRIVATE_HOSTED_ZONE="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "PrivateHostedZoneId").OutputValue')"
-
-# Ingress routing for disconnected is configured after workers are deployed
-# (see end of script) because target groups require worker IPs.
 
 echo "========================="
 echo "CREATING STACK: SECURITY"
@@ -338,6 +336,7 @@ add_param_to_json ExternalApiTargetGroupArn "${EXTERNAL_API_TARGET_GROUP}" "${cf
 add_param_to_json InternalApiTargetGroupArn "${INTERNAL_API_TARGET_GROUP}" "${cf_params_bootstrap}"
 add_param_to_json InternalServiceTargetGroupArn "${INTERNAL_SERVICE_TARGET_GROUP}" "${cf_params_bootstrap}"
 add_param_to_json BootstrapInstanceType "${BOOTSTRAP_INSTANCE_TYPE}" "${cf_params_bootstrap}"
+add_param_to_json DisconnectedInstall "${DISCONNECTED_INSTALL:-no}" "${cf_params_bootstrap}"
 
 cat "${cf_params_bootstrap}"
 
@@ -461,100 +460,3 @@ echo -e "control-plane: ${CONTROL_PLANE_0_IP} ${CONTROL_PLANE_1_IP} ${CONTROL_PL
 echo -e "compute: ${COMPUTE_0_IP} ${COMPUTE_1_IP} ${COMPUTE_2_IP}"
 
 echo "${GATHER_BOOTSTRAP_ARGS}" > "${SHARED_DIR}"/GATHER_BOOTSTRAP_ARGS
-
-if [[ "${DISCONNECTED_INSTALL:-no}" == "yes" ]]; then
-  # In disconnected mode, the CF template's private-zone *.apps record
-  # points to the external NLB (public subnets).  Nodes on private subnets
-  # without NAT cannot reach public NLB IPs, so ingress health checks fail.
-  # Fix: create new internal ingress target groups on the internal NLB,
-  # register worker IPs, add listeners, and update the *.apps DNS record
-  # in the private hosted zone. AWS NLB target groups can only belong to
-  # one load balancer, so we cannot reuse the external NLB's target groups.
-  INTERNAL_NLB_ARN="$(aws elbv2 describe-load-balancers \
-    --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].LoadBalancerArn" \
-    --output text)"
-  INTERNAL_NLB_HZ="$(aws elbv2 describe-load-balancers \
-    --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].CanonicalHostedZoneId" \
-    --output text)"
-  INTERNAL_NLB_DNS="$(aws elbv2 describe-load-balancers \
-    --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].DNSName" \
-    --output text)"
-
-  if [[ -n "${INTERNAL_NLB_ARN}" ]]; then
-    log "Creating internal ingress target groups and listeners"
-    INGRESS_SETUP_FAILED=""
-
-    INT_HTTP_TG_ARN="$(aws elbv2 create-target-group \
-      --name "${INFRA_ID:0:20}-int-http" \
-      --protocol TCP --port 80 \
-      --vpc-id "${VPC_ID}" \
-      --target-type ip \
-      --health-check-protocol TCP \
-      --health-check-port 80 \
-      --query 'TargetGroups[0].TargetGroupArn' --output text)" || INGRESS_SETUP_FAILED="http-tg"
-    # Track immediately so cleanup can delete on partial failure
-    if [[ -n "${INT_HTTP_TG_ARN}" ]] && [[ "${INT_HTTP_TG_ARN}" != "None" ]]; then
-      echo "${INT_HTTP_TG_ARN}" >> "${SHARED_DIR}/disconnected_tg_arns"
-    fi
-
-    INT_HTTPS_TG_ARN="$(aws elbv2 create-target-group \
-      --name "${INFRA_ID:0:20}-int-https" \
-      --protocol TCP --port 443 \
-      --vpc-id "${VPC_ID}" \
-      --target-type ip \
-      --health-check-protocol TCP \
-      --health-check-port 443 \
-      --query 'TargetGroups[0].TargetGroupArn' --output text)" || INGRESS_SETUP_FAILED="https-tg"
-    if [[ -n "${INT_HTTPS_TG_ARN}" ]] && [[ "${INT_HTTPS_TG_ARN}" != "None" ]]; then
-      echo "${INT_HTTPS_TG_ARN}" >> "${SHARED_DIR}/disconnected_tg_arns"
-    fi
-
-    if [[ -n "${INGRESS_SETUP_FAILED}" ]]; then
-      log "ERROR: Failed to create internal ingress target group (${INGRESS_SETUP_FAILED}); disconnected ingress will not work"
-    else
-      # Register worker IPs to internal target groups
-      # shellcheck disable=SC2153
-      for WORKER_IP in ${COMPUTE_0_IP} ${COMPUTE_1_IP} ${COMPUTE_2_IP}; do
-        aws elbv2 register-targets --target-group-arn "${INT_HTTP_TG_ARN}" \
-          --targets "Id=${WORKER_IP}" || INGRESS_SETUP_FAILED="register"
-        aws elbv2 register-targets --target-group-arn "${INT_HTTPS_TG_ARN}" \
-          --targets "Id=${WORKER_IP}" || INGRESS_SETUP_FAILED="register"
-      done
-
-      # Add listeners on internal NLB
-      aws elbv2 create-listener \
-        --load-balancer-arn "${INTERNAL_NLB_ARN}" \
-        --protocol TCP --port 80 \
-        --default-actions "Type=forward,TargetGroupArn=${INT_HTTP_TG_ARN}" || INGRESS_SETUP_FAILED="listener-80"
-      aws elbv2 create-listener \
-        --load-balancer-arn "${INTERNAL_NLB_ARN}" \
-        --protocol TCP --port 443 \
-        --default-actions "Type=forward,TargetGroupArn=${INT_HTTPS_TG_ARN}" || INGRESS_SETUP_FAILED="listener-443"
-
-      log "Updating *.apps in private hosted zone to internal NLB"
-      aws route53 change-resource-record-sets \
-        --hosted-zone-id "${PRIVATE_HOSTED_ZONE}" \
-        --change-batch "{
-          \"Changes\": [{
-            \"Action\": \"UPSERT\",
-            \"ResourceRecordSet\": {
-              \"Name\": \"*.apps.${CLUSTER_NAME}.${base_domain}\",
-              \"Type\": \"A\",
-              \"AliasTarget\": {
-                \"HostedZoneId\": \"${INTERNAL_NLB_HZ}\",
-                \"DNSName\": \"${INTERNAL_NLB_DNS}\",
-                \"EvaluateTargetHealth\": false
-              }
-            }
-          }]
-        }" || INGRESS_SETUP_FAILED="dns"
-      if [[ -n "${INGRESS_SETUP_FAILED}" ]]; then
-        log "ERROR: Disconnected ingress setup incomplete (failed at: ${INGRESS_SETUP_FAILED})"
-      else
-        log "Internal ingress routing configured for disconnected"
-      fi
-    fi  # end TG creation success
-  else
-    log "WARNING: Could not find internal NLB; *.apps may be unreachable from private subnets"
-  fi
-fi

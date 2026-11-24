@@ -75,10 +75,3 @@ fi
 
 delete_stacks
 
-# Clean up disconnected internal ingress target groups (not managed by CF)
-if [[ -f "${SHARED_DIR}/disconnected_tg_arns" ]]; then
-  log "Cleaning up disconnected internal ingress target groups"
-  while IFS= read -r tg_arn; do
-    aws --region "${REGION}" elbv2 delete-target-group --target-group-arn "${tg_arn}" 2>/dev/null || true
-  done < "${SHARED_DIR}/disconnected_tg_arns"
-fi
