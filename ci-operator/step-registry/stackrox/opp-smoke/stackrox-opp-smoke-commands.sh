@@ -119,9 +119,14 @@ _finalize() {
     (( _FINALIZED )) && return 0
     _FINALIZED=1
     typeset -i _fin=0
-    _write_shared_copy || _fin=1
-    _write_carrier || _fin=1
-    if (( _fin != 0 )); then
+    if ! _write_carrier; then
+        _fin=1
+        if (( _N_FAILURES == 0 )); then
+            _add_case "junit-publication" failed "Propagation" "failed to finalize JUnit carrier"
+        fi
+    fi
+    if ! _write_shared_copy; then
+        _fin=1
         if (( _N_FAILURES == 0 )); then
             _add_case "junit-publication" failed "Propagation" "failed to finalize JUnit carrier"
         fi
