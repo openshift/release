@@ -883,6 +883,13 @@ while :; do
     : "Policy set changed during the pass (${prevCount} -> ${policyCount} policies); re-running the compliance wait"
     continue
   fi
+  typeset -i passStableRc=0
+  ReadStablePolicySet "after the compliance pass" || passStableRc=$?
+  if (( passStableRc != 0 )); then
+    RecordResult "policies-compliant" "failed" "Could not observe a stable policy set after the compliance pass (rc=${passStableRc}): the set may still be growing, so compliance cannot be accepted${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
+    exit 1
+  fi
+
   # Swap detection: if wait set differs from stable set, replacement occurred without wait (PRRT_kwDOBHvUUM65TpMc)
   if [[ -n "${complianceWaitSet}" && -n "${complianceStableSet}" ]]; then
     typeset _waitSetSorted _stableSorted _prevFilteredForSwap
@@ -900,12 +907,7 @@ while :; do
       continue
     fi
   fi
-  typeset -i passStableRc=0
-  ReadStablePolicySet "after the compliance pass" || passStableRc=$?
-  if (( passStableRc != 0 )); then
-    RecordResult "policies-compliant" "failed" "Could not observe a stable policy set after the compliance pass (rc=${passStableRc}): the set may still be growing, so compliance cannot be accepted${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
-    exit 1
-  fi
+
   if [[ "${complianceStableSet}" != "${prevSet}" ]] || (( complianceStableCount != prevCount )); then
     : "Policy set changed while proving stability (${prevCount} -> ${complianceStableCount} policies, or the names differ from the set the pass covered); re-running the compliance wait"
     policyCount="${complianceStableCount}"
