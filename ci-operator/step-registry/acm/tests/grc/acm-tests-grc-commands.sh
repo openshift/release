@@ -18,6 +18,8 @@ if [ "${MAP_TESTS}" = "true" ]; then
         typeset -i _grc_restore_failed=0
         typeset -i _grc_exit_rc=0
         typeset -i _grc_helper_rc=0
+        typeset -i _grc_backup_ok=0
+        typeset -i _opp_backup_ok=0
         _grc_restore_carrier() {
             local _src="$1" _dst="$2" _tmp
             _tmp="${ARTIFACT_DIR}/.$(basename "${_dst}").restore.$$"
@@ -36,11 +38,11 @@ if [ "${MAP_TESTS}" = "true" ]; then
             # restore. Skip the helper in that case and propagate failure.
             _grc_helper_rc=0
             _grc_skip_helper=0
-            if [[ -f "${ARTIFACT_DIR}/junit_grc.xml" && ! -f "/tmp/junit_grc_backup.xml" ]]; then
+            if [[ -f "${ARTIFACT_DIR}/junit_grc.xml" && ${_grc_backup_ok:-0} -eq 0 ]]; then
                 echo "WARNING: GRC carrier backup missing; skipping ExitTrap helper to preserve ${ARTIFACT_DIR}/junit_grc.xml" >&2
                 _grc_skip_helper=1
             fi
-            if [[ -f "${ARTIFACT_DIR}/junit_grc_placement_restore.xml" && ! -f "/tmp/junit_grc_placement_restore_backup.xml" ]]; then
+            if [[ -f "${ARTIFACT_DIR}/junit_grc_placement_restore.xml" && ${_opp_backup_ok:-0} -eq 0 ]]; then
                 echo "WARNING: placement restore carrier backup missing; skipping ExitTrap helper to preserve ${ARTIFACT_DIR}/junit_grc_placement_restore.xml" >&2
                 _grc_skip_helper=1
             fi
@@ -57,10 +59,10 @@ if [ "${MAP_TESTS}" = "true" ]; then
                     _grc_exit_rc=1
                 fi
             fi
-            if [[ -f "/tmp/junit_grc_backup.xml" ]]; then
+            if (( ${_grc_backup_ok:-0} )); then
                 _grc_restore_carrier "/tmp/junit_grc_backup.xml" "${ARTIFACT_DIR}/junit_grc.xml"
             fi
-            if [[ -f "/tmp/junit_grc_placement_restore_backup.xml" ]]; then
+            if (( ${_opp_backup_ok:-0} )); then
                 _grc_restore_carrier "/tmp/junit_grc_placement_restore_backup.xml" "${ARTIFACT_DIR}/junit_grc_placement_restore.xml"
             fi
             if (( (_grc_restore_failed || _grc_helper_rc != 0) )) && (( _grc_exit_rc == 0 )); then
@@ -754,6 +756,8 @@ PYEOF_LEAKTK
                 if [[ "${_test_rc}" -eq 0 ]]; then
                     _test_rc=1
                 fi
+            else
+                _grc_backup_ok=1
             fi
         fi
         if [[ -f "/tmp/grc_synthetic_needed" ]]; then
@@ -1054,6 +1058,87 @@ except Exception:
                     fi
                 fi
             done
+            # Post-repair bulk verification (4676393992): single ManagedCluster
+            # fetch compared against all tracked labels. Catches drift where
+            # one label changes between another label's repair and its
+            # per-key final read. Retries the bulk fetch+compare and fails
+            # if retries are exhausted.
+            if (( _opp_restore_ok == 1 )); then
+                typeset -i _opp_bulk_ok=0
+                typeset -i _opp_bulk_mismatch=0
+                for _opp_bulk_try in 1 2 3; do
+                    _opp_bulk_json=""
+                    _opp_bulk_mismatch=0
+                    _mk_tmp _opp_bulk_json
+                    if [[ -n "${_opp_bulk_json}" ]] && oc get managedcluster "${_OPP_MC_NAME}" -o json >"${_opp_bulk_json}" 2>/dev/null && \
+                        python3 -c 'import json, sys; d=json.load(open(sys.argv[1])); assert isinstance(d.get("metadata",{}).get("labels",{}), dict)' "${_opp_bulk_json}" 2>/dev/null; then
+                        _opp_bulk_ok=1
+                        for _opp_key in "${_OPP_LABEL_KEYS[@]}"; do
+                            _opp_bulk_pre="$(python3 -c '
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    labels = d.get("labels", {})
+    if sys.argv[2] not in labels:
+        print("<absent>")
+    else:
+        v = labels.get(sys.argv[2])
+        print(v if v is not None else "")
+except Exception:
+    print("__OPP_READ_ERROR__")
+    raise SystemExit(1)
+' "${_opp_baseline_private}" "${_opp_key}" 2>/dev/null)" || _opp_bulk_pre="__OPP_READ_ERROR__"
+                            if [[ "${_opp_bulk_pre}" == "__OPP_READ_ERROR__" ]]; then
+                                _opp_bulk_ok=0
+                                break
+                            fi
+                            _opp_bulk_cur="$(python3 -c '
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    labels = d["metadata"].get("labels", {})
+    if sys.argv[2] not in labels:
+        print("<absent>")
+    else:
+        v = labels.get(sys.argv[2])
+        print(v if v is not None else "")
+except Exception:
+    print("__OPP_READ_ERROR__")
+    raise SystemExit(1)
+' "${_opp_bulk_json}" "${_opp_key}" 2>/dev/null)" || _opp_bulk_cur="__OPP_READ_ERROR__"
+                            if [[ "${_opp_bulk_cur}" == "__OPP_READ_ERROR__" ]]; then
+                                _opp_bulk_ok=0
+                                break
+                            fi
+                            if [[ "${_opp_bulk_pre}" != "${_opp_bulk_cur}" ]]; then
+                                _opp_bulk_ok=0
+                                _opp_bulk_mismatch=1
+                                break
+                            fi
+                        done
+                        if (( _opp_bulk_ok == 1 )); then
+                            rm -f "${_opp_bulk_json}"
+                            break
+                        fi
+                    else
+                        _opp_bulk_ok=0
+                    fi
+                    rm -f "${_opp_bulk_json:-}"
+                    sleep 2
+                done
+                if (( _opp_bulk_ok == 0 )); then
+                    # Keep a repeated read failure distinct from a label
+                    # mismatch in the evidence log, as the per-key checks do.
+                    if (( _opp_bulk_mismatch )); then
+                        echo "ERROR: post-repair bulk verification mismatch for ManagedCluster ${_OPP_MC_NAME}" >&2
+                        echo "verification bulk mismatch after repair" >> "${_OPP_EVIDENCE_DIR}/04-label-restore.log" 2>&1 || true
+                    else
+                        echo "ERROR: post-repair bulk verification read failed for ManagedCluster ${_OPP_MC_NAME}" >&2
+                        echo "verification bulk read error after repair" >> "${_OPP_EVIDENCE_DIR}/04-label-restore.log" 2>&1 || true
+                    fi
+                    _opp_restore_ok=0
+                fi
+            fi
             rm -f "${_opp_verify_json}"
         fi
         set -x
@@ -1267,6 +1352,8 @@ print(json.dumps(result, indent=2))
             if [[ "${_test_rc}" -eq 0 ]]; then
                 _test_rc=1
             fi
+        else
+            _opp_backup_ok=1
         fi
     fi
     if [[ "${_opp_failures}" -gt 0 ]]; then
