@@ -550,7 +550,13 @@ QuayInitRecoverySelfTest() {
     [[ -s "${_firstPassFile}" ]] && _firstExists=true
     typeset _firstPw=""
     [[ "${_firstExists}" == true ]] && _firstPw="$(cat "${_firstPassFile}")"
-    # Second invocation: simulate Quay now reports user exists, login succeeds with same password
+    # Second invocation: simulate Quay now reports user exists, and answer the
+    # signin only for the bootstrap credentials the first invocation persisted.
+    # The stub reads the request body because GetQuayAuth assigns QUAY_PASSWORD
+    # from its own variable, not from the request: a stub that answered success
+    # unconditionally could not catch a producer that sends a different
+    # password, and a failed recovery would still look like a pass.
+    typeset _firstBootstrapPw="${_firstPw}"
     curl() {
         if [[ "$*" == *"/api/v1/user/initialize"* ]]; then
             printf '{"message":"user already exists"}\n409'
@@ -561,13 +567,26 @@ QuayInitRecoverySelfTest() {
             return 0
         fi
         if [[ "$*" == *"/api/v1/signin"* ]]; then
-            printf '{"success": true}'
+            if _QUAY_SELFTEST_BOOT="${_firstBootstrapPw}" python3 -c "
+import json, os, sys
+try:
+    body = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+ok = body.get('username') == 'quayadmin' and body.get('password') == os.environ['_QUAY_SELFTEST_BOOT']
+sys.exit(0 if ok else 1)
+"; then
+                printf '{"success": true}'
+            else
+                printf '{"success": false}'
+            fi
             return 0
         fi
         return 1
     }
     export -f curl
-    GetQuayAuth || true
+    typeset -i _secondRc=0
+    GetQuayAuth || _secondRc=$?
     typeset _secondPw="${QUAY_PASSWORD:-}"
     # Restore
     SHARED_DIR="${_origShared}"
@@ -581,6 +600,10 @@ QuayInitRecoverySelfTest() {
     fi
     if [[ "${_firstPw}" != "${_secondPw}" ]]; then
         echo "SELF-TEST FAIL: second invocation did not reuse persisted password (first:${_firstPw:0:4}.. second:${_secondPw:0:4}..)" >&2
+        return 1
+    fi
+    if (( _secondRc != 0 )); then
+        echo "SELF-TEST FAIL: second invocation did not recover credentials (rc=${_secondRc}); the signin did not accept the persisted bootstrap credentials" >&2
         return 1
     fi
     echo "SELF-TEST PASS: credential recovered across two invocations via durable storage" >&2
