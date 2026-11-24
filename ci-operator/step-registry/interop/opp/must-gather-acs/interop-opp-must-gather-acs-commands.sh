@@ -1470,11 +1470,15 @@ PYEOF
 # and the later CSV/PackageManifest captures. Bounded and classified like
 # the initial capture: a failed re-read writes probe_error so relevant
 # terms become unknown rather than silently keeping the earlier value.
+# xtrace stays in force for this block (BASH-1), and a Subscription response
+# can hold literal credentials in spec.config.env, so the response goes to a
+# private temporary file and the parser reads that file as its input: neither
+# the redirect nor the stdin feed expands the JSON into a traced word.
 _sub_refresh_failed=false
 _sub_snapshot="same"
 if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" != "1" ]]; then
   _sub_refresh_ok=false
-  _sub_refresh_out=""
+  _sub_refresh_raw=$(mktemp)
   _sub_refresh_err=$(mktemp)
   _sub_early=$(mktemp)
   cp "${EVIDENCE_DIR}/03-subscription.json" "${_sub_early}" 2>/dev/null || : > "${_sub_early}"
@@ -1484,7 +1488,7 @@ if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" != "1" ]]; then
     _sub_refresh_remain=$(( _sub_refresh_deadline - $(date +%s) ))
     if (( _sub_refresh_remain <= 5 )); then break; fi
     _sub_refresh_wait=$(( _sub_refresh_remain < 45 ? _sub_refresh_remain : 45 ))
-    if _sub_refresh_out=$(timeout "${_sub_refresh_wait}s" oc get subscriptions.operators.coreos.com -A --request-timeout=30s -o json 2>"${_sub_refresh_err}"); then
+    if timeout "${_sub_refresh_wait}s" oc get subscriptions.operators.coreos.com -A --request-timeout=30s -o json >"${_sub_refresh_raw}" 2>"${_sub_refresh_err}"; then
       _sub_refresh_ok=true
       break
     fi
@@ -1497,7 +1501,7 @@ if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" != "1" ]]; then
   done
   rm -f "${_sub_refresh_err}"
   if [[ "${_sub_refresh_ok}" == "true" ]]; then
-    printf '%s' "${_sub_refresh_out}" | python3 -c '
+    python3 -c '
 import json, sys
 data = json.load(sys.stdin)
 result = []
@@ -1517,7 +1521,7 @@ for i in data.get("items", []):
         "generation": i.get("metadata", {}).get("generation")
     })
 print(json.dumps(result, indent=2))
-' > "${EVIDENCE_DIR}/03-subscription.json.tmp" || {
+' < "${_sub_refresh_raw}" > "${EVIDENCE_DIR}/03-subscription.json.tmp" || {
       _sub_refresh_failed=true
       echo "probe_error: subscription query failed" > "${EVIDENCE_DIR}/03-subscription.json"
       echo "probe_error: subscription query failed" > "${EVIDENCE_DIR}/03-subscription.refresh-failed"
@@ -1544,7 +1548,7 @@ print(json.dumps(result, indent=2))
     echo "probe_error: subscription re-read failed after 3 attempts" > "${EVIDENCE_DIR}/03-subscription.refresh-failed"
     _sub_snapshot="unknown"
   fi
-  rm -f "${_sub_early}"
+  rm -f "${_sub_early}" "${_sub_refresh_raw}"
 fi
 
 # PRRT_kwDOBHvUUM65ui2E: fixture mode writes these terms into its own temporary
