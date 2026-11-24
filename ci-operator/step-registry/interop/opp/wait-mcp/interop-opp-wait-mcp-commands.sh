@@ -28,9 +28,15 @@ shopt -s inherit_errexit
 #   phase 0 (predicate + trap self-test, before the wait): <= 270s
 #     (<= 90s to reach the child's poll loop, <= 180s child deadline when
 #     the TERM lands late enough that the child self-terminates)
-#   self-terminating path: settle 90 + max wait 5400 + collection <= 120
-#     + health gate <= 60  =>  <= 5670s
-#   both added: <= 5940s, leaving >= 360s headroom (>= the 300s grace)
+#   poll-deadline path (no health gate): settle <= 90 + wait <= 5400 +
+#     final state reads <= 55 (ocb get 10 + classification read 45) +
+#     collection <= 120  =>  <= 5665s
+#   converged path (no timeout classification): settle <= 90 + wait <= 5400
+#     + health gate <= 90 (two 45s bounded fetches) + gate-failure
+#     diagnostics <= 20 (two ocb gets) + collection <= 120  =>  <= 5720s
+#   the two paths are exclusive: phase 0 plus the larger one => <= 5990s,
+#   leaving >= 310s before the step timeout, so neither path reaches the
+#   SIGTERM/SIGKILL grace window.
 #   step-timeout path: only 300s remain between SIGTERM and SIGKILL, so the
 #     failure-path collector is watchdog-bounded (timeout 120) and the xtrace
 #     copy is truncated (tail -c 5M) before scrubbing.
@@ -309,10 +315,14 @@ function IsMcpProgressing () {
     typeset -i last=${updatedHistory[len - 1]}
     if (( last > first )); then
         for (( i = windowStart + 1; i < len; ++i )); do
-            # PRRT_kwDOBHvUUM65Mrk3: verify ready counts recover after updated dip
+            # PRRT_kwDOBHvUUM65Mrk3: a single-poll updated dip inside the
+            # concurrent-reboot bound is a healthy rolling update, not a state
+            # regression: tolerate a bounded dip and let the ready-recovery
+            # check below decide. A dip beyond the bound, or a dip whose ready
+            # count also falls, still rejects the window.
             if (( updatedHistory[i] < updatedHistory[i-1] )); then
+                (( updatedHistory[i-1] - updatedHistory[i] > _maxUnavail )) && return 1
                 (( readyHistory[i] < readyHistory[i-1] )) && return 1
-                (( readyHistory[i] < machineCountHistory[i] )) && return 1
             fi
         done
         (( _vetoStreakHit )) && return 1
@@ -832,26 +842,53 @@ REDACTEOF
       oc --request-timeout=10s get mcp -o yaml > "'"${ARTIFACT_DIR}"'/mcps.yaml" 2>/dev/null || true
       oc --request-timeout=10s get nodes -o json > "'"${ARTIFACT_DIR}"'/nodes.json" 2>/dev/null || true
     ' || true
-    if [[ -n "${_redact}" ]]; then rm -f "${_redact}"; fi
-    # PRRT_kwDOBHvUUM65on13: report which of 5 evidence queries failed with tokenized error
-    for _q in machines machinesets policies kubeletconfigs mcps nodes; do
+    # PRRT_kwDOBHvUUM65on13: every expected artifact is named, the redactor
+    # state is recorded, and an artifact with no output turns the closing line
+    # into a partial-collection report. The reported failure class is not
+    # touched here: collection never decides the class.
+    typeset _redactor_state="available"
+    typeset _missing=""
+    if [[ -n "${_redact}" ]]; then
+        rm -f "${_redact}"
+    else
+        _redactor_state="unavailable, policies/configurationpolicies not captured"
+    fi
+    for _q in machines machinesets policies configurationpolicies kubeletconfigs mcps nodes; do
         if [[ ! -s "${ARTIFACT_DIR}/${_q}.yaml" && ! -s "${ARTIFACT_DIR}/${_q}.json" ]]; then
-            echo ">>> evidence query ${_q} produced no output (check ${ARTIFACT_DIR}/${_q}.* for tokenized error)" >&2
+            _missing="${_missing} ${_q}"
+            echo ">>> evidence query ${_q} produced no output (failed or skipped: check ${ARTIFACT_DIR}/${_q}.*, tokenized error)" >&2
         fi
     done
-    echo ">>> failure bundle collected to ${ARTIFACT_DIR} (machines, machinesets, policies [secret-redacted], kubeletconfigs, mcps, nodes)"
+    if [[ -z "${_missing}" ]]; then
+        echo ">>> failure bundle collected to ${ARTIFACT_DIR} (machines, machinesets, policies [secret-redacted], configurationpolicies [secret-redacted], kubeletconfigs, mcps, nodes; redactor ${_redactor_state}); the reported failure class is unchanged"
+    else
+        echo ">>> failure bundle PARTIALLY collected to ${ARTIFACT_DIR}; queries with no output:${_missing} (redactor ${_redactor_state}); the reported failure class is unchanged" >&2
+    fi
     set -x 2>/dev/null || true
     return 0
 }
 
 function AssertClusterHealthy () {
     # Verify ClusterOperators and nodes are healthy before declaring MCP success.
+    # Both fetches are bounded by the remaining wait budget so the collection
+    # window is preserved: each timeout is capped at the time left before the
+    # deadline (minimum 1s when time remains, skipped when past deadline).
     typeset -i failures=0
 
     echo ""
     echo "=== ClusterOperator health gate ==="
     typeset coJson=""
-    if ! coJson="$(timeout 45s oc get clusteroperators -o json --request-timeout=30s 2>/dev/null)"; then
+    typeset -i _hg_remaining=$(( deadline - SECONDS ))
+    typeset -i _hg_timeout=45 _hg_req_timeout=30
+    if (( _hg_remaining <= 0 )); then
+        _hg_timeout=1; _hg_req_timeout=1
+    else
+        (( _hg_timeout > _hg_remaining )) && _hg_timeout=${_hg_remaining}
+        (( _hg_req_timeout > _hg_remaining )) && _hg_req_timeout=${_hg_remaining}
+        (( _hg_timeout < 1 )) && _hg_timeout=1
+        (( _hg_req_timeout < 1 )) && _hg_req_timeout=1
+    fi
+    if ! coJson="$(timeout "${_hg_timeout}s" oc get clusteroperators -o json --request-timeout="${_hg_req_timeout}s" 2>/dev/null)"; then
         echo "WARNING: Failed to fetch ClusterOperators"
         (( ++failures )) || true
     else
@@ -883,7 +920,17 @@ if issues:
     echo ""
     echo "=== Node readiness gate ==="
     typeset notReady=""
-    notReady="$(timeout 45s oc get nodes -o json --request-timeout=30s 2>/dev/null | python3 -c "
+    _hg_remaining=$(( deadline - SECONDS ))
+    _hg_timeout=45; _hg_req_timeout=30
+    if (( _hg_remaining <= 0 )); then
+        _hg_timeout=1; _hg_req_timeout=1
+    else
+        (( _hg_timeout > _hg_remaining )) && _hg_timeout=${_hg_remaining}
+        (( _hg_req_timeout > _hg_remaining )) && _hg_req_timeout=${_hg_remaining}
+        (( _hg_timeout < 1 )) && _hg_timeout=1
+        (( _hg_req_timeout < 1 )) && _hg_req_timeout=1
+    fi
+    notReady="$(timeout "${_hg_timeout}s" oc get nodes -o json --request-timeout="${_hg_req_timeout}s" 2>/dev/null | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 bad = []
@@ -948,7 +995,7 @@ typeset -i currentPollInterval=${pollInterval}
 _bounded_sleep() {
   typeset -i _want="${1:-0}" _left
   _left=$(( deadline - SECONDS ))
-  (( _left < 1 )) && _left=1
+  (( _left < 0 )) && _left=0
   (( _want > _left )) && _want=${_left}
   (( _want > 0 )) && sleep "${_want}"
   return 0
@@ -959,7 +1006,7 @@ echo "Progress-based extension: +${progressExtension}s per detection, max total 
 
 while (( SECONDS < deadline )); do
     typeset -i remaining=$(( deadline - SECONDS ))
-    (( remaining < 5 )) && remaining=5
+    (( remaining < 1 )) && remaining=1
     # Cap the in-loop call at 60s: a hung apiserver must be distinguishable
     # from a slow rollout instead of consuming the whole remaining deadline.
     (( remaining > 60 )) && remaining=60
@@ -1161,10 +1208,27 @@ PY
             fi
         fi
 
+        # Cycling veto is evaluated on every unstable poll, independent of
+        # the extension cadence: a rollout that never reaches the 5-poll
+        # extension check must still take the fail-fast path. IsMcpProgressing
+        # populates _vetoStreakHit, so evaluate it first, then decide on
+        # extension at its own cadence.
+        typeset -i _isProgressing=0
+        if IsMcpProgressing; then _isProgressing=1; fi
+        if (( _vetoStreakHit )); then
+            # Sustained-cycling fail-fast: the veto's purpose (the
+            # maxTimeout cap already bounds extensions; without this
+            # exit the cycling pool would poll to the deadline).
+            echo "FAILURE CLASS: mcp-rollout-not-converging"
+            echo "sustained cycling: ${pinnedUpdatedPolls} consecutive not-ready polls without Degraded (rollout re-rendering/re-rebooting, not progressing)"
+            _junit_class="mcp-rollout-not-converging"
+            CollectFailureBundle
+            exit 1
+        fi
         # Progress-based timeout extension: if MCPs are making progress,
         # extend the deadline to avoid timing out on slow-but-healthy rollouts.
         if (( pollsSinceLastExtension >= extensionCheckInterval )); then
-            if IsMcpProgressing; then
+            if (( _isProgressing )); then
                 typeset -i proposedDeadline=$(( deadline + progressExtension ))
                 typeset -i maxDeadline=$(( startSeconds + maxTimeout ))
                 if (( proposedDeadline > maxDeadline )); then
@@ -1180,15 +1244,6 @@ PY
                 else
                     echo "Progress detected but max timeout ${maxTimeout}s would be exceeded; no further extensions"
                 fi
-            elif (( _vetoStreakHit )); then
-                # Sustained-cycling fail-fast: the veto's purpose (the
-                # maxTimeout cap already bounds extensions; without this
-                # exit the cycling pool would poll to the deadline).
-                echo "FAILURE CLASS: mcp-rollout-not-converging"
-                echo "sustained cycling: ${pinnedUpdatedPolls} consecutive not-ready polls without Degraded (rollout re-rendering/re-rebooting, not progressing)"
-                _junit_class="mcp-rollout-not-converging"
-                CollectFailureBundle
-                exit 1
             fi
         fi
     fi
@@ -1208,7 +1263,17 @@ echo ""
 
 typeset classification="UNKNOWN"
 typeset finalJson=""
-if finalJson="$(timeout 45s oc get mcp -o json --request-timeout=30s 2>/dev/null)"; then
+typeset -i _cls_remaining=$(( deadline - SECONDS ))
+typeset -i _cls_timeout=45 _cls_req_timeout=30
+if (( _cls_remaining <= 0 )); then
+    _cls_timeout=1; _cls_req_timeout=1
+else
+    (( _cls_timeout > _cls_remaining )) && _cls_timeout=${_cls_remaining}
+    (( _cls_req_timeout > _cls_remaining )) && _cls_req_timeout=${_cls_remaining}
+    (( _cls_timeout < 1 )) && _cls_timeout=1
+    (( _cls_req_timeout < 1 )) && _cls_req_timeout=1
+fi
+if finalJson="$(timeout "${_cls_timeout}s" oc get mcp -o json --request-timeout="${_cls_req_timeout}s" 2>/dev/null)"; then
     classification="$(ClassifyMcpState "${finalJson}")"
 fi
 
