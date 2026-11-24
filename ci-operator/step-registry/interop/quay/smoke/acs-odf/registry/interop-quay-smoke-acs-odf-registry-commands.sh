@@ -1315,7 +1315,10 @@ payload = {
         'endpoint': os.environ['QUAY_HOST'],
         'username': os.environ['QUAY_REG_USER'],
         'password': os.environ['QUAY_REG_PASSWORD'],
-        # PRRT_kwDOBHvUUM65MrnB: keep TLS verification enabled, use cluster CA bundle
+        # PRRT_kwDOBHvUUM65MrnB: keep TLS verification enabled; Central's own
+        # configured trust (spec.central.tls.additionalCAs) is confirmed before
+        # registration (PRRT_kwDOBHvUUM67E3SE), so no CA material rides the
+        # payload and no insecure integration is created either way
         'insecure': False
     },
     'skipTestIntegration': True
@@ -1366,6 +1369,230 @@ print(json.dumps(payload))
 
       : "INFO: Requested ACS scan for pushed image"
     )
+}
+
+# Central's own trust configuration decides whether a TLS-verified scan can
+# reach the Quay registry: Central and Scanner fetch the image, this step does
+# not, so an anchor that only this step holds leaves the scan failing on the
+# certificate while registration succeeds.  The Central CR is the single read
+# of that configuration, and every additionalCA it carries is proved against
+# the Quay endpoint with the same probe semantics ResolveQuayTlsTrust uses
+# (any HTTP status other than 000 means the endpoint answered under that
+# anchor).  When none of them verifies the route the caller fails the scan
+# check before RegisterQuayInAcs runs, so no Quay credential is sent and no
+# image integration is created.  The caller declares centralTrustReason, which
+# the failure branches below fill in (dynamic scoping, as acsTlsOpts is).
+function ConfirmCentralTrustsQuay () {
+    typeset centralJson=''
+    typeset -i centralRc=0
+    centralJson="$(oc get central -n stackrox -o json 2>/dev/null)" || centralRc=$?
+
+    # Owner-only directory: the PEM payloads come from a cluster object and
+    # live only long enough to be used as curl trust anchors.
+    typeset trustDir=''
+    trustDir="$(mktemp -d)" || trustDir=''
+    if [[ -z "${trustDir}" ]]; then
+        centralTrustReason="Central's trust configuration could not be read from the Central CR in namespace stackrox (no writable temporary directory for the CA probe); no Quay integration was created"
+        echo "ERROR: ${centralTrustReason}" >&2
+        return 1
+    fi
+    chmod 0700 "${trustDir}" 2>/dev/null || true
+
+    # One file per configured CA.  A cluster object is data, never script: the
+    # payload is written to a file and handed to curl as a trust anchor, and
+    # the helper only reports how the read went.  Exit 3 is an unparseable
+    # response, exit 4 is no Central item: both are read failures, not "Central
+    # trusts nothing", so they must not read as an absent additionalCAs list.
+    typeset -i parseRc=0
+    if (( centralRc == 0 )) && [[ -n "${centralJson}" ]]; then
+        printf '%s' "${centralJson}" | CA_DIR="${trustDir}" python3 -c "
+import json, os, sys
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(3)
+
+items = data.get('items') or []
+if not items:
+    sys.exit(4)
+
+spec = items[0].get('spec') or {}
+central = spec.get('central') or {}
+tls = central.get('tls') or {}
+count = 0
+for ca in (tls.get('additionalCAs') or []):
+    content = (ca or {}).get('content') or ''
+    if not content.strip():
+        continue
+    count += 1
+    with open(os.path.join(os.environ['CA_DIR'], 'central-ca-%02d.pem' % count), 'w') as fh:
+        fh.write(content)
+        if not content.endswith('\n'):
+            fh.write('\n')
+" 2>/dev/null || parseRc=$?
+    fi
+
+    if (( centralRc != 0 )) || [[ -z "${centralJson}" ]] || (( parseRc != 0 )); then
+        rm -rf "${trustDir}"
+        centralTrustReason="Central's trust configuration could not be read from the Central CR in namespace stackrox (oc rc=${centralRc}, helper rc=${parseRc}); no Quay integration was created"
+        echo "ERROR: ${centralTrustReason}" >&2
+        return 1
+    fi
+
+    typeset caFile=''
+    typeset verifyingCa=''
+    typeset probe=''
+    for caFile in "${trustDir}"/*.pem; do
+        [[ -f "${caFile}" ]] || continue
+        probe="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 15 --max-time 30 --cacert "${caFile}" "https://${QUAY_HOST}/v2/")" || probe='000'
+        if [[ -n "${probe}" && "${probe}" != '000' ]]; then
+            verifyingCa="${caFile}"
+            break
+        fi
+    done
+    rm -rf "${trustDir}"
+
+    if [[ -n "${verifyingCa}" ]]; then
+        echo "INFO: Central's configured trust verifies the Quay endpoint at ${QUAY_HOST} (spec.central.tls.additionalCAs, Central CR in namespace stackrox)" >&2
+        return 0
+    fi
+    centralTrustReason="Central's additionalCAs do not verify the Quay route certificate for ${QUAY_HOST}; a TLS-verified scan would fail on the certificate.  Add the Quay registry CA to the Central CR (spec.central.tls.additionalCAs) before the scan can rely on verification; no Quay integration was created"
+    echo "ERROR: ${centralTrustReason}" >&2
+    return 1
+}
+
+# Self-test for the Central trust guard: proves that an additionalCA which
+# verifies the Quay endpoint lets the flow reach registration, and that a CA
+# which does not verify it, an empty additionalCAs list, or an unreadable
+# Central CR fails before any registration call is made.  oc and curl are
+# function stubs, so the paths need no cluster and no network, and each path
+# runs the same order the scan runs (guard, then registration).
+CentralTrustSelfTest() {
+    typeset _origQuayHost="${QUAY_HOST:-}"
+    typeset _xtraceOn=false
+    if [[ "${-}" == *x* ]]; then
+        _xtraceOn=true
+    fi
+    set +x
+    export QUAY_HOST="quay-test.example.com"
+    typeset _centralWithCa='{"items":[{"metadata":{"name":"stackrox-central-services","namespace":"stackrox"},"spec":{"central":{"tls":{"additionalCAs":[{"name":"quay-ca","content":"-----BEGIN CERTIFICATE-----\nSTUB\n-----END CERTIFICATE-----"}]}}}}]}'
+    typeset _centralNoCa='{"items":[{"metadata":{"name":"stackrox-central-services","namespace":"stackrox"},"spec":{"central":{}}}]}'
+    typeset -i _regCalls=0
+    typeset -i _failures=0
+
+    # Stub registration: records that the guarded sequence reached it.  The
+    # real function is captured and restored, so running this self-test in the
+    # script's own shell leaves RegisterQuayInAcs intact afterwards.
+    typeset _origRegisterDef=''
+    _origRegisterDef="$(declare -f RegisterQuayInAcs)"
+    RegisterQuayInAcs() { _regCalls=$(( _regCalls + 1 )); return 0; }
+    # The order RunAcsScan uses: the guard gates the registration call.
+    _centralTrustSequence() {
+        typeset centralTrustReason=''
+        if ! ConfirmCentralTrustsQuay; then
+            return 1
+        fi
+        RegisterQuayInAcs "acs.test"
+        return 0
+    }
+
+    # Path 1: a configured CA verifies the Quay endpoint, registration runs.
+    oc() { printf '%s' "${_centralWithCa}"; }
+    curl() { printf '200'; }
+    export -f oc curl
+    _regCalls=0
+    typeset _path1Reached=false
+    if _centralTrustSequence; then
+        if (( _regCalls == 1 )); then
+            _path1Reached=true
+        fi
+    fi
+    if [[ "${_path1Reached}" == true ]]; then
+        echo "SELF-TEST PASS: a verified Central additionalCA lets the scan reach registration" >&2
+    else
+        echo "SELF-TEST FAIL: a verified Central additionalCA did not reach registration (registration calls: ${_regCalls})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+
+    # Path 2: the configured CA does not verify the endpoint, no registration.
+    curl() { printf '000'; }
+    export -f curl
+    _regCalls=0
+    typeset _path2Blocked=false
+    if _centralTrustSequence; then
+        : "guard passed unexpectedly"
+    else
+        if (( _regCalls == 0 )); then
+            _path2Blocked=true
+        fi
+    fi
+    if [[ "${_path2Blocked}" == true ]]; then
+        echo "SELF-TEST PASS: an additionalCA that fails the probe blocks registration" >&2
+    else
+        echo "SELF-TEST FAIL: an additionalCA that fails the probe did not block registration (registration calls: ${_regCalls})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+
+    # Path 3: no additionalCAs configured, no registration (the probe answers,
+    # so the failure is the empty trust list, not an unreachable endpoint).
+    oc() { printf '%s' "${_centralNoCa}"; }
+    curl() { printf '200'; }
+    export -f oc curl
+    _regCalls=0
+    typeset _path3Blocked=false
+    if _centralTrustSequence; then
+        : "guard passed unexpectedly"
+    else
+        if (( _regCalls == 0 )); then
+            _path3Blocked=true
+        fi
+    fi
+    if [[ "${_path3Blocked}" == true ]]; then
+        echo "SELF-TEST PASS: an empty additionalCAs list blocks registration" >&2
+    else
+        echo "SELF-TEST FAIL: an empty additionalCAs list did not block registration (registration calls: ${_regCalls})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+
+    # Path 4: the Central CR cannot be read, no registration.
+    oc() { return 1; }
+    curl() { printf '200'; }
+    export -f oc curl
+    _regCalls=0
+    typeset _path4Blocked=false
+    if _centralTrustSequence; then
+        : "guard passed unexpectedly"
+    else
+        if (( _regCalls == 0 )); then
+            _path4Blocked=true
+        fi
+    fi
+    if [[ "${_path4Blocked}" == true ]]; then
+        echo "SELF-TEST PASS: an unreadable Central CR blocks registration" >&2
+    else
+        echo "SELF-TEST FAIL: an unreadable Central CR did not block registration (registration calls: ${_regCalls})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+
+    # Restore the shell the self-test borrowed: no stubs (the real
+    # RegisterQuayInAcs definition comes back from its captured body), the
+    # original host, and tracing as it was found.
+    unset -f oc curl RegisterQuayInAcs _centralTrustSequence
+    if [[ -n "${_origRegisterDef}" ]]; then
+        eval "${_origRegisterDef}"
+    fi
+    QUAY_HOST="${_origQuayHost}"
+    if [[ "${_xtraceOn}" == true ]]; then
+        set -x
+    fi
+
+    if (( _failures > 0 )); then
+        echo "SELF-TEST FAIL: ${_failures} Central trust guard path(s) did not behave as specified" >&2
+        return 1
+    fi
+    echo "SELF-TEST PASS: Central trust guard gates registration on Central's own configured trust" >&2
+    return 0
 }
 
 function RunAcsScan () {
@@ -1467,6 +1694,22 @@ function RunAcsScan () {
         return 1
     fi
     typeset -a acsTlsOpts=( --cacert "${acsCaFile}" )
+
+    # Central and Scanner fetch the image, this step does not, so this step's
+    # own anchor does not make the scan work: Central's configured trust is
+    # confirmed before the Quay credential reaches an image integration
+    # (PRRT_kwDOBHvUUM67E3SE).  A guard failure records the scan check failed
+    # and returns here, so no integration is created for a scan that would
+    # fail on the certificate.  The reason is taken from the guard, which
+    # fills centralTrustReason in on every failure path.
+    typeset centralTrustReason=''
+    if ! ConfirmCentralTrustsQuay; then
+        elapsed=$(( $(date +%s) - start ))
+        typeset blockedReason="${centralTrustReason:-Central trust could not be confirmed}"
+        RecordResult "${testName}" "failed" "ACS scan blocked: ${blockedReason}" "${elapsed}"
+        rm -f "${acsPassFile}" /tmp/acs-ingress-ca.crt /tmp/acs-central-ca.crt
+        return 1
+    fi
 
     if ! RegisterQuayInAcs "${acsHost}"; then
         elapsed=$(( $(date +%s) - start ))
