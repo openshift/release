@@ -481,9 +481,12 @@ TestAcsSensors() {
     else
         # No SecuredCluster CR; check if ACS operator is even installed
         typeset acsCsv=""
-        acsCsv="$(oc get csv --all-namespaces -o json | jq -r '
+        if ! acsCsv="$(oc get csv --all-namespaces -o json | jq -r '
             [ .items[] | select(.metadata.name | startswith("rhacs-operator")) | .metadata.name ] | first // empty
-        ')" || true
+        ')"; then
+            AddResult "acs-sensors" "fail" "Failed to query CSVs for ACS operator"
+            return
+        fi
 
         if [[ -z "${acsCsv}" ]]; then
             : "SKIP: ACS operator not installed"
