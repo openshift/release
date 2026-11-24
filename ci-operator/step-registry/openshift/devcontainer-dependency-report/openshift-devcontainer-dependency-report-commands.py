@@ -12,12 +12,15 @@ import http.client
 import json
 import os
 import re
+import signal
 import subprocess
 import sys
 import tempfile
 import urllib.error
 import urllib.parse
 import urllib.request
+from email.errors import MessageError
+from importlib import metadata
 from pathlib import Path
 from typing import Any, Optional, Union
 
@@ -30,8 +33,16 @@ REPOSITORY_NAME = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 NPM_PACKAGE = re.compile(r"^(?:[A-Za-z0-9_.~-]+|@[A-Za-z0-9_.~-]+/[A-Za-z0-9_.~-]+)$")
 PYPI_PACKAGE = re.compile(r"^[A-Za-z0-9_.-]+$")
 CLASSIFICATIONS = {"pinned", "floating", "repo-coupled", "manual"}
+AGENTIC_CI_METADATA_LIMIT: int = 2 * 1024 * 1024
+AGENTIC_CI_LOOKUP_TIMEOUT: int = 30
+AGENTIC_CI_SERIES: tuple[int, int] = (0, 5)
+PYTHON_BOUND: str = r"[0-9]{1,3}(?:\.[0-9]{1,3}){0,2}"
+PYTHON_RANGE: re.Pattern[str] = re.compile(
+    rf">=\s*({PYTHON_BOUND})(?:\s*,\s*<\s*({PYTHON_BOUND}))?"
+)
 
 SOURCES: dict[str, dict[str, str]] = {
+    "agentic-ci": {"kind": "pypi", "package": "agentic-ci"},
     "apm-cli": {"kind": "pypi", "package": "apm-cli"},
     "delve": {
         "kind": "git_tags",
@@ -499,11 +510,25 @@ class FixedEndpointRedirectHandler(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
+def safe_error_detail(exc: Exception) -> str:
+    """Summarize a failure without exposing paths, URLs, or response data."""
+    name = type(exc).__name__
+    if isinstance(exc, urllib.error.HTTPError):
+        return f"HTTP {exc.code}"
+    if isinstance(exc, urllib.error.URLError):
+        return f"{name} ({type(exc.reason).__name__})"
+    if isinstance(exc, OSError) and exc.errno is not None:
+        return f"{name} (errno {exc.errno})"
+    return name
+
+
 class Fetcher:
     def __init__(self) -> None:
         self.cache: dict[str, Any] = {}
 
-    def get_package_json(self, source: dict[str, str]) -> dict[str, Any]:
+    def get_package_json(
+        self, source: dict[str, str], *, max_bytes: Optional[int] = None
+    ) -> dict[str, Any]:
         url = source_url(source)
         if url in self.cache:
             return self.cache[url]
@@ -524,21 +549,39 @@ class Fetcher:
         try:
             with opener.open(request, timeout=30) as response:
                 validate_fixed_endpoint(response.geturl(), url)
-                body = response.read().decode("utf-8")
+                body = (
+                    response.read()
+                    if max_bytes is None
+                    else response.read(max_bytes + 1)
+                )
+                if max_bytes is not None and len(body) > max_bytes:
+                    raise CheckError(
+                        f"package metadata for {source['package']} exceeds the "
+                        f"{max_bytes}-byte response size limit"
+                    )
+                text = body.decode("utf-8")
         except (
             OSError,
             UnicodeError,
             urllib.error.HTTPError,
             http.client.HTTPException,
         ) as exc:
+            detail = str(exc) if max_bytes is None else safe_error_detail(exc)
             raise CheckError(
-                f"package lookup failed for {source_description(source)}: {exc}"
+                f"package lookup failed for {source_description(source)}: {detail}"
             ) from exc
         try:
-            payload = json.loads(body)
+            payload = json.loads(text)
         except json.JSONDecodeError as exc:
             raise CheckError(
                 f"package lookup returned invalid JSON for {source_description(source)}: {exc}"
+            ) from exc
+        except (ValueError, RecursionError) as exc:
+            if max_bytes is None:
+                raise
+            raise CheckError(
+                f"package lookup could not parse JSON for {source_description(source)} "
+                f"({safe_error_detail(exc)})"
             ) from exc
         if not isinstance(payload, dict):
             raise CheckError(
@@ -1022,6 +1065,192 @@ def check(
     return results
 
 
+def non_yanked_pypi_files(version: str, files: Any) -> list[dict[str, Any]]:
+    if not isinstance(files, list) or any(
+        not isinstance(file, dict) or not isinstance(file.get("yanked"), bool)
+        for file in files
+    ):
+        raise CheckError(f"release {version} has invalid file or yanked metadata")
+    return [file for file in files if not file["yanked"]]
+
+
+def agentic_ci_wheel(
+    version: str, files: list[dict[str, Any]], python: tuple[int, ...]
+) -> Optional[dict[str, str]]:
+    filename = f"agentic_ci-{version}-py3-none-any.whl"
+    for file in files:
+        if file.get("filename") != filename or file.get("packagetype") != "bdist_wheel":
+            continue
+        requirement = file.get("requires_python")
+        if not isinstance(requirement, str):
+            continue
+        bounds = PYTHON_RANGE.fullmatch(requirement.strip())
+        if not bounds:
+            continue
+        lower, upper = (
+            tuple(int(part) for part in value.split(".")) if value else ()
+            for value in bounds.groups()
+        )
+        if python < lower or (upper and python >= upper):
+            continue
+        digests = file.get("digests")
+        sha256 = digests.get("sha256") if isinstance(digests, dict) else None
+        if isinstance(sha256, str) and re.fullmatch(r"[a-f0-9]{64}", sha256):
+            return {
+                "filename": filename,
+                "requires_python": requirement,
+                "sha256": sha256,
+            }
+    return None
+
+
+def fetch_agentic_ci_metadata(
+    fetcher: Fetcher, source: dict[str, str]
+) -> dict[str, Any]:
+    if not hasattr(signal, "SIGALRM"):
+        raise CheckError("bounded PyPI advisory lookup requires POSIX timing support")
+
+    def timed_out(_signum: int, _frame: Any) -> None:
+        raise CheckError("public PyPI advisory lookup exceeded its deadline")
+
+    previous = signal.signal(signal.SIGALRM, timed_out)
+    signal.alarm(AGENTIC_CI_LOOKUP_TIMEOUT)
+    try:
+        return fetcher.get_package_json(source, max_bytes=AGENTIC_CI_METADATA_LIMIT)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
+
+
+def check_agentic_ci(repository: str, fetcher: Fetcher) -> dict[str, Any]:
+    """Compare one runtime observation with PyPI without inferring a config pin."""
+    source = SOURCES["agentic-ci"]
+    package = source["package"]
+    series_display = ".".join(map(str, AGENTIC_CI_SERIES)) + ".x"
+    python = tuple(sys.version_info[:3])
+    owner, name = repository.split("/")
+    advisory: dict[str, Any] = {
+        "schema_version": 1,
+        "advisory_only": True,
+        "package": package,
+        "job_repository": repository,
+        "observation_source": "running interpreter importlib.metadata",
+        "observed_version": None,
+        "python_version": ".".join(map(str, python)),
+        "python_release_level": sys.version_info.releaselevel,
+        "release_config": {
+            "repository": "openshift/release",
+            "path": f"ci-operator/config/{repository}/{owner}-{name}-main__agentic.yaml",
+            "revision": None,
+            "pin": None,
+        },
+        "version_source": source_description(source),
+        "status": "unverified",
+        "candidate": None,
+        "newer_series": [],
+        "newer_patches_without_verified_wheel": [],
+    }
+    try:
+        distributions = list(metadata.distributions(name=package))
+        if len(distributions) != 1:
+            raise CheckError(
+                f"expected one {package} distribution, found {len(distributions)}"
+            )
+        installed = distributions[0].metadata
+        names = installed.get_all("Name") or []
+        versions = installed.get_all("Version") or []
+        if (
+            len(names) != 1
+            or not isinstance(names[0], str)
+            or re.sub(r"[-_.]+", "-", names[0].lower()) != package
+            or len(versions) != 1
+            or not isinstance(versions[0], str)
+        ):
+            raise CheckError("requires one matching Name and one version")
+        observed = versions[0]
+        if (
+            len(observed) > 80
+            or not observed.isascii()
+            or not STABLE_VERSION.fullmatch(observed)
+        ):
+            raise CheckError("version is not a stable three-part version")
+        current = parse_version(observed)
+        advisory["observed_version"] = observed
+        if current[:2] != AGENTIC_CI_SERIES:
+            raise CheckError(
+                f"version is outside the maintained {series_display} series"
+            )
+        if sys.version_info.releaselevel != "final":
+            raise CheckError("wheel compatibility requires a final Python interpreter")
+    except CheckError as exc:
+        advisory["reason"] = f"Installed {package} metadata: {exc}"
+        return advisory
+    except (OSError, UnicodeError, MessageError) as exc:
+        advisory["reason"] = (
+            f"Could not read installed {package} metadata ({safe_error_detail(exc)})"
+        )
+        return advisory
+
+    try:
+        payload = fetch_agentic_ci_metadata(fetcher, source)
+        info, releases = payload.get("info"), payload.get("releases")
+        if not isinstance(info, dict) or info.get("name") != package:
+            raise CheckError(f"project metadata does not identify {package}")
+        if not isinstance(releases, dict) or observed not in releases:
+            raise CheckError(f"release metadata is missing observed version {observed}")
+        observed_files = non_yanked_pypi_files(observed, releases[observed])
+        if not agentic_ci_wheel(observed, observed_files, python):
+            raise CheckError(
+                f"observed version {observed} has no verified non-yanked wheel "
+                "for this interpreter"
+            )
+
+        patches: dict[tuple[int, int, int], list[dict[str, Any]]] = {}
+        later_series: dict[tuple[int, ...], tuple[int, int, int]] = {}
+        for version, files in releases.items():
+            try:
+                parsed = parse_version(version)
+            except CheckError:
+                continue
+            if parsed <= current or version != ".".join(map(str, parsed)):
+                continue
+            published = non_yanked_pypi_files(version, files)
+            if not published:
+                continue
+            if parsed[:2] == AGENTIC_CI_SERIES:
+                patches[parsed] = published
+            else:
+                series = parsed[:2]
+                later_series[series] = max(parsed, later_series.get(series, parsed))
+        advisory["newer_series"] = [
+            ".".join(map(str, version))
+            for version in sorted(later_series.values(), reverse=True)
+        ]
+        if not patches:
+            advisory.update(
+                status="no_newer_patch",
+                reason=f"PyPI has no newer final {series_display} patch with non-yanked files",
+            )
+            return advisory
+        for parsed in sorted(patches, reverse=True):
+            version = ".".join(map(str, parsed))
+            wheel = agentic_ci_wheel(version, patches[parsed], python)
+            if wheel:
+                advisory.update(
+                    status="candidate_available",
+                    candidate={"version": version, **wheel},
+                    reason="PyPI wheel metadata matches this interpreter",
+                )
+                return advisory
+            advisory["newer_patches_without_verified_wheel"].append(version)
+        raise CheckError(
+            f"no newer final {series_display} patch has a verified wheel for this interpreter"
+        )
+    except CheckError as exc:
+        advisory["reason"] = f"PyPI {package} advisory: {exc}"
+    return advisory
+
+
 def write_reports(
     results: list[dict[str, Any]],
     output_dir: Path,
@@ -1030,7 +1259,7 @@ def write_reports(
     repository_revision: str,
     inventory_source: str,
     checkout_identity: str,
-) -> None:
+) -> str:
     output_dir.mkdir(parents=True, exist_ok=True)
     generated_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat()
     document = {
@@ -1107,9 +1336,48 @@ def write_reports(
             )
             + " |"
         )
-    atomic_write_text(
-        output_dir / "devcontainer-dependency-report.md", "\n".join(lines) + "\n"
-    )
+    markdown = "\n".join(lines) + "\n"
+    atomic_write_text(output_dir / "devcontainer-dependency-report.md", markdown)
+    return markdown
+
+
+def write_agentic_ci_advisory(
+    output_dir: Path, inventory_markdown: str, agentic_ci: dict[str, Any]
+) -> None:
+    detail = "- Details and later series: [agentic-ci-advisory.json](agentic-ci-advisory.json)."
+    try:
+        atomic_write_text(
+            output_dir / "agentic-ci-advisory.json",
+            json.dumps(agentic_ci, indent=2, sort_keys=True) + "\n",
+        )
+    except OSError as exc:
+        print(
+            f"could not write agentic-ci advisory artifact ({safe_error_detail(exc)})",
+            file=sys.stderr,
+        )
+        detail = "- The separate advisory artifact could not be written."
+    candidate = agentic_ci["candidate"]
+    lines = [
+        "",
+        "## openshift/release advisory",
+        "",
+        f"- agentic-ci observed in this runtime: `{agentic_ci['observed_version'] or 'unknown'}`",
+        f"- Python: `{agentic_ci['python_version']}` ({agentic_ci['python_release_level']})",
+        f"- Status: `{agentic_ci['status']}`. {agentic_ci['reason']}.",
+        f"- Candidate for this interpreter: `{candidate['version'] if candidate else 'none'}`",
+        "- The configured pin and release config revision are unverified.",
+        detail,
+    ]
+    try:
+        atomic_write_text(
+            output_dir / "devcontainer-dependency-report.md",
+            inventory_markdown + "\n".join(lines) + "\n",
+        )
+    except OSError as exc:
+        print(
+            f"could not append agentic-ci advisory to Markdown ({safe_error_detail(exc)})",
+            file=sys.stderr,
+        )
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -1162,16 +1430,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
         ensure_output_outside_repository(args.output_dir, args.repository_root)
         phase = "checking dependency versions"
+        fetcher = Fetcher()
         results = check(
             args.repository,
             dependencies,
             patterns,
-            Fetcher(),
+            fetcher,
             captured_files,
             revision,
         )
         phase = "writing report artifacts"
-        write_reports(
+        inventory_markdown = write_reports(
             results,
             args.output_dir,
             repository=args.repository,
@@ -1185,6 +1454,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             file=sys.stderr,
         )
         return 2
+    agentic_ci = check_agentic_ci(args.repository, fetcher)
+    write_agentic_ci_advisory(args.output_dir, inventory_markdown, agentic_ci)
     for row in results:
         suffix = f": {row['error']}" if row["error"] else ""
         print(

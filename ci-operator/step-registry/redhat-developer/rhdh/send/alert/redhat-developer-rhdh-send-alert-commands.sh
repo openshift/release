@@ -98,13 +98,6 @@ get_slack_alert_text() {
   # Build base notification
   notification_text="${status_icon} \`${JOB_NAME}\`, 📜 <$URL_CI_RESULTS|logs>"
 
-  # Add ReportPortal URL or Data Router failure note
-  if [[ -n "${STATUS_URL_REPORTPORTAL}" ]]; then
-    notification_text="${notification_text}, :reportportal: <${STATUS_URL_REPORTPORTAL}|ReportPortal>"
-  elif [[ "${STATUS_DATA_ROUTER_FAILED}" == "true" ]]; then
-    notification_text="${notification_text}, :warning: Data Router failed"
-  fi
-
   # Add mention for failures
   if [[ "$needs_mention" == "true" ]]; then
     notification_text="${notification_text}, <@U08UP0REWG1>"
@@ -152,24 +145,6 @@ main() {
       echo "Notice: $SHARED_DIR/$file_name not found." >&2
     fi
   done
-
-  # Read STATUS_URL_REPORTPORTAL as a single value
-  if [[ -f "$SHARED_DIR/STATUS_URL_REPORTPORTAL.txt" ]]; then
-    echo "Reading $SHARED_DIR/STATUS_URL_REPORTPORTAL.txt"
-    STATUS_URL_REPORTPORTAL=$(<"$SHARED_DIR/STATUS_URL_REPORTPORTAL.txt")
-  else
-    echo "Notice: $SHARED_DIR/STATUS_URL_REPORTPORTAL.txt not found." >&2
-    STATUS_URL_REPORTPORTAL=""
-  fi
-
-  # Read STATUS_DATA_ROUTER_FAILED as a single value
-  if [[ -f "$SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt" ]]; then
-    echo "Reading $SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt"
-    STATUS_DATA_ROUTER_FAILED=$(<"$SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt")
-  else
-    echo "Notice: $SHARED_DIR/STATUS_DATA_ROUTER_FAILED.txt not found." >&2
-    STATUS_DATA_ROUTER_FAILED="false"
-  fi
 
   if [[ -f "$SHARED_DIR/OVERALL_RESULT.txt" ]]; then
     echo "Reading $SHARED_DIR/OVERALL_RESULT.txt"

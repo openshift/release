@@ -6,8 +6,8 @@ set -o errexit
 set -o pipefail
 
 # Global constants
-readonly POWERVC_TOOL_VERSION="v2.4.12"
-readonly YQ_VERSION="v4.53.6"
+readonly POWERVC_TOOL_VERSION="v2.4.14"
+readonly YQ_VERSION="v4.54.3"
 
 # Global variables for cleanup
 BASTION_CREATED=false
@@ -235,7 +235,7 @@ function download_tool_w_sha() {
 # the EXIT trap when the subshell returns.
 #
 # Arguments:
-#   $1 - yq release version tag (required, e.g. v4.53.6).
+#   $1 - yq release version tag (required, e.g. v4.54.3).
 #   $2 - (optional) release asset name. Defaults to yq_linux_amd64.
 #   $3 - (optional) destination path for the installed binary. Defaults to yq.
 # Returns:
@@ -685,7 +685,7 @@ function get_subnet_id() {
 #######################################
 function create_ssh_keypair() {
 	log_info "Creating SSH keypair: ${CLUSTER_NAME}-key"
-	local ssh_public_key="${SECRETS_DIR}/ssh-publickey"
+	local ssh_public_key="${SECRETS_DIR}/bastion-ssh-publickey"
 
 	# Delete existing keypair if present
 	if openstack --os-cloud="${CLOUD}" keypair show "${CLUSTER_NAME}-key" &>/dev/null; then
@@ -729,6 +729,7 @@ function create_bastion() {
 	log_info "  Image: ${BASTION_IMAGE_NAME}"
 	log_info "  Network: ${NETWORK_NAME}"
 	log_info "  Cloud: ${CLOUD}"
+	log_info "  Key: ${CLUSTER_NAME}-key"
 
 	# Note: an empty --bastionRsa is for remote creation
 	cd ${HOME} || {
