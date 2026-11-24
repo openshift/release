@@ -108,11 +108,16 @@ function GetCurrentCsv () {
         -o jsonpath='{.status.currentCSV}' || true
 }
 
-function GetInstalledCsv () {
-    # Return the installed CSV that last reached Succeeded (not pending currentCSV)
+function GetInstalledCsvAndRv () {
+    # Return the installed CSV and the Subscription resourceVersion from the
+    # SAME response. The patch precondition is only a valid baseline when both
+    # values come from one read: two reads let OLM advance installedCSV in
+    # between and pair the old version with a fresh resourceVersion, so the
+    # guard would test a stale baseline. Output is "<installedCSV>|<resourceVersion>",
+    # split on the first pipe (CodeRabbit 4622731173).
     oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
         -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.status.installedCSV}' || true
+        -o jsonpath='{.status.installedCSV}|{.metadata.resourceVersion}' || true
 }
 
 function GetCsvPhase () {
@@ -471,7 +476,11 @@ function Main () {
     fi
 
     typeset installedCsv
-    installedCsv="$(GetInstalledCsv)"
+    # One response for both baseline values (installedCSV and resourceVersion).
+    typeset _sub_rv="" _instBaseline=""
+    _instBaseline="$(GetInstalledCsvAndRv)"
+    installedCsv="${_instBaseline%%|*}"
+    [[ "${_instBaseline}" == *"|"* ]] && _sub_rv="${_instBaseline#*|}"
     if [[ -n "${installedCsv}" ]]; then
         currentVersion="$(oc get csv "${installedCsv}" -n "${ACS_SUBSCRIPTION_NAMESPACE}" -o jsonpath='{.spec.version}' 2>/dev/null || true)"
         if [[ -z "${currentVersion}" ]]; then
@@ -484,7 +493,10 @@ function Main () {
         typeset -i _instRetries=3 _instAttempt=0
         currentVersion=""
         for (( _instAttempt=1; _instAttempt<=_instRetries; _instAttempt++ )); do
-            installedCsv="$(GetInstalledCsv)"
+            _instBaseline="$(GetInstalledCsvAndRv)"
+            installedCsv="${_instBaseline%%|*}"
+            _sub_rv=""
+            [[ "${_instBaseline}" == *"|"* ]] && _sub_rv="${_instBaseline#*|}"
             if [[ -n "${installedCsv}" ]]; then
                 currentVersion="$(oc get csv "${installedCsv}" -n "${ACS_SUBSCRIPTION_NAMESPACE}" -o jsonpath='{.spec.version}' 2>/dev/null || true)"
                 if [[ -n "${currentVersion}" ]]; then
@@ -514,10 +526,8 @@ function Main () {
     # advancing status.installedCSV without changing spec; the patch
     # precondition then rejects the change. Fail closed when the read fails:
     # an empty value must never become a passing precondition.
-    typeset _sub_rv=""
-    _sub_rv="$(oc get subscription "${ACS_SUBSCRIPTION_NAME}" \
-        -n "${ACS_SUBSCRIPTION_NAMESPACE}" \
-        -o jsonpath='{.metadata.resourceVersion}' 2>/dev/null || true)"
+    # _sub_rv came from the same response as installedCsv (the baseline
+    # snapshot), so the two values cannot straddle an OLM advance.
     if [[ -z "${_sub_rv}" ]]; then
         _junit_reason="acs-upgrade rejected: cannot read subscription resourceVersion for patch precondition (${ACS_SUBSCRIPTION_NAME} in ${ACS_SUBSCRIPTION_NAMESPACE})"
         echo >&2 "ERROR: ${_junit_reason}"
