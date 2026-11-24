@@ -255,7 +255,9 @@ tests:
         FEATURE_SET=CustomNoUpgrade
         FEATURE_GATES=UnifiedClusterManagedDNSAndLB=true
         SNO_BIP_SKIP_DNSMASQ=true
-    workflow: baremetalds-sno
+      DEVSCRIPTS_TARGET: sno_bip
+    workflow: baremetalds-sno-unified-dns
+  timeout: 5h0m0s
 - as: e2e-metal-ovn-single-node-customnoupgrade-unified-dns-v4v6
   capabilities:
   - intranet
@@ -2430,6 +2432,23 @@ tests:
         AGENT_CLEANUP_ISO_BUILDER_CACHE_LOCAL_DEV=true
         AGENT_PLATFORM_TYPE=none
     workflow: agent-e2e-generic-conformance-iso-no-registry
+- as: e2e-agent-sno-ipv4-customnoupgrade-unified-dns
+  capabilities:
+  - intranet
+  interval: 168h
+  steps:
+    cluster_profile: equinix-edge-enablement
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV4
+        AGENT_PLATFORM_TYPE=none
+        FEATURE_SET=CustomNoUpgrade
+        FEATURE_GATES=UnifiedClusterManagedDNSAndLB=true
+      DEVSCRIPTS_TARGET: agent
+    post:
+    - chain: agent-post
+    workflow: baremetalds-sno-unified-dns
+  timeout: 5h0m0s
 - as: e2e-agent-single-node-ipv6-conformance
   capabilities:
   - intranet
