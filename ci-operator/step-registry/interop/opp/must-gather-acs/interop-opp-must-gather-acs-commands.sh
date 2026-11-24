@@ -2114,6 +2114,7 @@ echo ""
 SUBSCRIPTION_COUNT=$(oc get subscriptions.operators.coreos.com -A --no-headers 2>/dev/null | grep -ci "rhacs" 2>/dev/null || true)
 SUBSCRIPTION_COUNT="${SUBSCRIPTION_COUNT:-0}"
 
+set +x
 CRD_CHECK=$(oc get crd centrals.platform.stackrox.io --no-headers 2>&1)
 CRD_RC=$?
 if [[ ${CRD_RC} -eq 0 ]]; then
@@ -2138,6 +2139,7 @@ else
     CENTRAL_EXISTS="ERROR"
   fi
 fi
+set -x
 echo "VERDICT: RHACS subscriptions=${SUBSCRIPTION_COUNT} CRD=${CRD_EXISTS} Central=${CENTRAL_EXISTS} workload-ns=${WORKLOAD_NS:-unknown} bundle=${BUNDLE_STATUS:-not-attempted} tls=${TLS_MODE:-not-attempted}"
 _cat_rc=0
 if ! cat "${EVIDENCE_DIR}/acs-central-status.properties"; then
