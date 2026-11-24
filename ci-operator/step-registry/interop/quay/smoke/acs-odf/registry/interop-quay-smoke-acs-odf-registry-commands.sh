@@ -415,7 +415,7 @@ print(json.dumps({'username': 'quayadmin', 'password': sys.stdin.read().strip(),
                 initResult="${initBody}"
                 break
             fi
-            if printf '%s' "${initBody}" | grep -qi "already exists\|user exists"; then
+            if printf '%s' "${initBody}" | grep -qi "already exists\|user exists\|non-empty database\|Cannot initialize user"; then
                 _alreadyExists=true
                 initResult="${initBody}"
                 break
