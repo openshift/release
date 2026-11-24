@@ -332,7 +332,19 @@ fi
 # out of the pipeline under pipefail and separates a failed read (recorded
 # failed row, fail-closed) from a 0-exit read that lists nothing (skip row).
 typeset _scList=""
-if ! _scList="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedclusters.platform.stackrox.io --all-namespaces -o name 2>/dev/null)"; then
+typeset -i _sc_rc=0 _sc_attempt=0
+for _sc_attempt in 1 2 3; do
+    if _scList="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedclusters.platform.stackrox.io --all-namespaces -o name 2>/dev/null)"; then
+        _sc_rc=0
+        break
+    else
+        _sc_rc=$?
+        if (( _sc_attempt < 3 )); then
+            sleep $(( _sc_attempt * 2 ))
+        fi
+    fi
+done
+if (( _sc_rc != 0 )); then
     _add_case "stackrox-opp-smoke" failed "Assertion" "SecuredCluster read failed after the terminal wait; absence not established"
     exit 1
 fi
@@ -387,8 +399,18 @@ fi
 # 0-exit read that lists no matcher deployment records the skip row; and a
 # 0-exit read that lists the matcher enters the bounded wait loop.
 typeset _deps=""
-typeset -i _deps_rc=0
-_deps="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get deployment -n "${_centralNs}" -o name 2>/dev/null)" || _deps_rc=$?
+typeset -i _deps_rc=0 _deps_attempt=0
+for _deps_attempt in 1 2 3; do
+    if _deps="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get deployment -n "${_centralNs}" -o name 2>/dev/null)"; then
+        _deps_rc=0
+        break
+    else
+        _deps_rc=$?
+        if (( _deps_attempt < 3 )); then
+            sleep $(( _deps_attempt * 2 ))
+        fi
+    fi
+done
 if (( _deps_rc != 0 )); then
     echo "[smoke] Deployment read failed in ${_centralNs} (status ${_deps_rc}); scanner readiness gate not evaluated"
     _add_case "scanner-v4-ready" failed "Environment" "deployment read failed in ${_centralNs} (oc get deployment status ${_deps_rc}); the scanner readiness gate was not evaluated"
