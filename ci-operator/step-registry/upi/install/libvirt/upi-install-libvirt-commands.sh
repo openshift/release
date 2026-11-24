@@ -20,6 +20,47 @@ function leaseLookup () {
   echo "$lookup"
 }
 
+# Convert capacity strings like 120G / 120Gi / 60g to an integer GiB value.
+function capacity_to_gib () {
+  local raw="${1:-}"
+  local num
+  num="$(echo "${raw}" | tr -d '[:space:]' | sed -E 's/([0-9]+).*/\1/')"
+  if [[ -z "${num}" || ! "${num}" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: could not parse disk capacity '${raw}' as GiB" >&2
+    return 1
+  fi
+  echo "${num}"
+}
+
+# Agent TNA floors (OCP docs: 2 vCPU / 8 GiB RAM / 50 GB disk for arbiter).
+# Assisted-service has-min-valid-disks applies the control-plane disk floor to
+# arbiter hosts in practice (60G failed validation; 120G passed on IBM Z agent).
+readonly ARBITER_MIN_MEMORY_MIB=8192
+readonly ARBITER_MIN_VCPUS=2
+readonly ARBITER_MIN_DISK_GIB=120
+
+function validate_arbiter_resources () {
+  local memory_mib="${1}"
+  local vcpus="${2}"
+  local disk_capacity="${3}"
+  local disk_gib
+  disk_gib="$(capacity_to_gib "${disk_capacity}")"
+
+  if [[ "${memory_mib}" -lt "${ARBITER_MIN_MEMORY_MIB}" ]]; then
+    echo "ERROR: ARBITER_MEMORY=${memory_mib} MiB is below the TNA minimum of ${ARBITER_MIN_MEMORY_MIB} MiB" >&2
+    exit 1
+  fi
+  if [[ "${vcpus}" -lt "${ARBITER_MIN_VCPUS}" ]]; then
+    echo "ERROR: ARBITER_VCPUS=${vcpus} is below the TNA minimum of ${ARBITER_MIN_VCPUS}" >&2
+    exit 1
+  fi
+  if [[ "${disk_gib}" -lt "${ARBITER_MIN_DISK_GIB}" ]]; then
+    echo "ERROR: ARBITER_VOLUME_CAPACITY=${disk_capacity} (${disk_gib} GiB) is below the agent has-min-valid-disks floor of ${ARBITER_MIN_DISK_GIB} GiB (docs list 50G, but assisted-service rejected 60G; 120G is confirmed)" >&2
+    exit 1
+  fi
+  echo "Arbiter resources OK: memory=${memory_mib} MiB (>=${ARBITER_MIN_MEMORY_MIB}), vcpus=${vcpus} (>=${ARBITER_MIN_VCPUS}), disk=${disk_capacity} (>=${ARBITER_MIN_DISK_GIB} GiB)"
+}
+
 # ensure hostname can be found
 HOSTNAME="$(leaseLookup 'hostname')"
 if [[ -z "${HOSTNAME}" ]]; then
@@ -706,9 +747,12 @@ if [[ "${ARBITER_COUNT}" -gt 0 ]]; then
   SAVED_DOMAIN_MEMORY="${DOMAIN_MEMORY}"
   SAVED_DOMAIN_VCPUS="${DOMAIN_VCPUS}"
   SAVED_VOLUME_CAPACITY="${VOLUME_CAPACITY}"
+  # Prefer explicit ARBITER_VOLUME_CAPACITY; otherwise reuse master VOLUME_CAPACITY
+  # so agent jobs that set 120G for masters do not silently under-size the arbiter.
   DOMAIN_MEMORY="${ARBITER_MEMORY:-8192}"
   DOMAIN_VCPUS="${ARBITER_VCPUS:-2}"
-  VOLUME_CAPACITY="${ARBITER_VOLUME_CAPACITY:-60G}"
+  VOLUME_CAPACITY="${ARBITER_VOLUME_CAPACITY:-${SAVED_VOLUME_CAPACITY:-120G}}"
+  validate_arbiter_resources "${DOMAIN_MEMORY}" "${DOMAIN_VCPUS}" "${VOLUME_CAPACITY}"
   for (( i=0; i<ARBITER_COUNT; i++ )); do
     lease_idx=$((CONTROL_COUNT + i))
     NODE="${LEASED_RESOURCE}-arbiter-${i}"
