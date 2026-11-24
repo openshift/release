@@ -9,8 +9,19 @@ set -o pipefail
 # /var/run/secrets/aws/config/config. Running under a cluster_profile means this
 # pod executes as a trusted ci-op-* identity (which the ci-step-runner roles
 # trust), unlike a raw pod in the "ci" namespace.
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
+#
+# Do not also export AWS_SHARED_CREDENTIALS_FILE when STS config is present:
+# openshift-install cannot resolve credentials when STS and static .awscred
+# are dual-set (DPTP-4756 / #80755).
+STS_CONFIG="/var/run/secrets/aws/config/config"
+if [[ -f "${STS_CONFIG}" ]]; then
+	export AWS_CONFIG_FILE="${STS_CONFIG}"
+	export AWS_SDK_LOAD_CONFIG=1
+	unset AWS_SHARED_CREDENTIALS_FILE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN || true
+else
+	export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+	unset AWS_CONFIG_FILE || true
+fi
 
 function finish {
 	CHILDREN=$(jobs -p)
@@ -170,6 +181,56 @@ function delete_vpc_load_balancers() {
 	return "${failed}"
 }
 
+# openshift-install destroy does not recognize egress-only internet gateways
+# (created for IPv6 / ci-nat-replace), so delete them before destroy or the VPC
+# remains stuck with DependencyViolation.
+function delete_vpc_egress_only_igws() {
+	local region="${1}" vpc_id="${2}"
+	local eigw_id rtb_id dest err failed=0
+	local eigw_json eigw_ids
+
+	# Capture discovery explicitly: a failed describe/jq must not look like an empty
+	# inventory (which would queue destroy and leave DependencyViolation intact).
+	if ! eigw_json="$(aws ec2 describe-egress-only-internet-gateways --region "${region}" --output json 2>&1)"; then
+		echo "ERROR: describe-egress-only-internet-gateways failed in ${region}: ${eigw_json}"
+		return 1
+	fi
+	if ! eigw_ids="$(jq -r --arg vpc "${vpc_id}" '
+			.EgressOnlyInternetGateways[]? |
+			select([.Attachments[]?.VpcId] | index($vpc)) |
+			.EgressOnlyInternetGatewayId' <<<"${eigw_json}")"; then
+		echo "ERROR: failed to parse egress-only internet gateway inventory for VPC ${vpc_id} in ${region}"
+		return 1
+	fi
+
+	while read -r eigw_id; do
+		[[ -z "${eigw_id}" ]] && continue
+
+		# Drop IPv6 default routes that still target this gateway so delete can succeed.
+		while read -r rtb_id dest; do
+			[[ -z "${rtb_id}" || -z "${dest}" ]] && continue
+			echo "deleting route ${dest} via ${eigw_id} from route table ${rtb_id} in ${region}"
+			aws ec2 delete-route --region "${region}" --route-table-id "${rtb_id}" --destination-ipv6-cidr-block "${dest}" 2>/dev/null || true
+		done < <(aws ec2 describe-route-tables --region "${region}" --filters "Name=vpc-id,Values=${vpc_id}" --output json \
+			| jq -r --arg eigw "${eigw_id}" '
+				.RouteTables[] | . as $rt |
+				.Routes[]? | select(.EgressOnlyInternetGatewayId == $eigw and .DestinationIpv6CidrBlock != null) |
+				"\($rt.RouteTableId) \(.DestinationIpv6CidrBlock)"')
+
+		echo "deleting egress-only internet gateway ${eigw_id} in ${region}"
+		if ! err="$(aws ec2 delete-egress-only-internet-gateway --region "${region}" --egress-only-internet-gateway-id "${eigw_id}" 2>&1)"; then
+			if grep -qiE 'InvalidEgressOnlyInternetGatewayId.NotFound|does not exist' <<<"${err}"; then
+				echo "egress-only internet gateway ${eigw_id} already gone"
+			else
+				echo "ERROR: failed to delete egress-only internet gateway ${eigw_id}: ${err}"
+				failed=1
+			fi
+		fi
+	done <<<"${eigw_ids}"
+
+	return "${failed}"
+}
+
 logdir="${ARTIFACT_DIR}/deprovision"
 mkdir -p "${logdir}"
 inventory_dir="$(mktemp -d)"
@@ -213,6 +274,11 @@ else
 			fi
 			if ! delete_vpc_load_balancers "${region}" "${vpc_id}" "${elbv2_json}" "${classic_json}"; then
 				echo "ERROR: load balancer cleanup failed for VPC ${vpc_id} in ${region}; deferring destroy for ${cluster}"
+				lb_cleanup_failed=1
+				continue
+			fi
+			if ! delete_vpc_egress_only_igws "${region}" "${vpc_id}"; then
+				echo "ERROR: egress-only internet gateway cleanup failed for VPC ${vpc_id} in ${region}; deferring destroy for ${cluster}"
 				lb_cleanup_failed=1
 				continue
 			fi

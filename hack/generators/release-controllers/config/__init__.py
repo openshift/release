@@ -38,9 +38,10 @@ class RCPaths:
 
         # The updated configuration and deployment files, to app.ci, are located here:
         self.path_rc_deployments = self.path_base.joinpath('clusters/app.ci/release-controller')
+        # RPM mirror resources are applied from the shared build-cluster path.
+        # The legacy vsphere02 path is no longer covered by an ApplicationSet.
         self.path_rc_rpms = [
             self.path_base.joinpath('clusters/build-clusters/build-shared/release-controller'),
-            self.path_base.joinpath('clusters/build-clusters/vsphere02/release-controller'),
         ]
 
         # CRT Resources
@@ -90,6 +91,7 @@ class Config:
         releases.add('4.23')
         releases.add('5.0')
         releases.add('5.1')
+        releases.add('5.2')
 
         return sorted(releases)  # Glob does not provide any guarantees on ordering, so force an order by sorting.
 

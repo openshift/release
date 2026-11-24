@@ -41,12 +41,12 @@ cleanup() {
 trap cleanup EXIT
 
 # Azure configuration
-AZURE_LOCATION="${HYPERSHIFT_AZURE_LOCATION:-centralus}"
+AZURE_LOCATION="${HYPERSHIFT_AZURE_LOCATION:-uksouth}"
 BASE_DOMAIN="${HYPERSHIFT_BASE_DOMAIN:-hcp-sm-azure.azure.devcluster.openshift.com}"
 AZURE_CREDS_FILE="/etc/hypershift-ci-jobs-self-managed-azure/credentials.json"
 AZURE_WORKLOAD_IDENTITIES_FILE="/etc/hypershift-ci-jobs-self-managed-azure-e2e/workload-identities.json"
-AZURE_OIDC_ISSUER_URL="https://smazure.blob.core.windows.net/smazure"
-AZURE_SA_TOKEN_KEY_PATH="/etc/hypershift-ci-jobs-self-managed-azure/serviceaccount-signer.private"
+AZURE_OIDC_ISSUER_URL="$(cat /etc/hypershift-ci-jobs-self-managed-azure-oidc/oidc-issuer-url)"
+AZURE_SA_TOKEN_KEY_PATH="/etc/hypershift-ci-jobs-self-managed-azure-signer/serviceaccount-signer.private"
 PULL_SECRET_FILE="/etc/ci-pull-credentials/.dockerconfigjson"
 
 # Performance test configuration

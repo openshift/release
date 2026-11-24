@@ -3,7 +3,9 @@ build_root:
   from_repository: true
 images:
   items:
-  - dockerfile_path: Dockerfile
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile
     to: lightspeed-hub
 resources:
   '*':
@@ -26,9 +28,15 @@ tests:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
 - as: unit
-  commands: GOFLAGS="-mod=readonly" GOMODCACHE=/tmp/gomodcache make test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    GOFLAGS="-mod=readonly" GOMODCACHE=/tmp/gomodcache make test && make codecov
   container:
     from: src
+  secret:
+    collection: openshift-lightspeed-service-creds
+    group: ols-codecov-token-lightspeed-hub
+    mount_path: /tmp/secret
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
 - as: unit-arm64
   capabilities:

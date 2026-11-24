@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.22"
+    name: "5.1"
     namespace: ocp
     tag: cli
 binary_build_commands: make openshift-toolchain
@@ -20,11 +20,17 @@ images:
         - destination_dir: .
           source_path: /usr/bin/oc
     to: bin-oc-kubectl-helm
+promotion:
+  to:
+  - excluded_images:
+    - '*'
+    name: "5.1"
+    namespace: ocp
 releases:
   latest:
     integration:
       include_built_images: true
-      name: "4.22"
+      name: "5.1"
       namespace: ocp
 resources:
   '*':
@@ -48,7 +54,7 @@ tests:
 - always_run: false
   as: e2e-kwok
   cron: 0 5 * * 1
-  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  pipeline_skip_if_only_changed: ^docs/|^\.github|\.md$|^(?:.*/)?(?:\.gitignore|\.coderabbit\.yaml|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   presubmit: true
   steps:
     cluster_profile: openshift-org-aws

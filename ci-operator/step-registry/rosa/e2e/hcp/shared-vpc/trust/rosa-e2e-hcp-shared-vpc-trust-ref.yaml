@@ -1,0 +1,28 @@
+ref:
+  as: rosa-e2e-hcp-shared-vpc-trust
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: rosa-e2e-hcp-shared-vpc-trust-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: REGION
+    default: ""
+    documentation: Cloud region for the shared-account resources. Falls back to LEASED_RESOURCE if empty.
+  documentation: |-
+    Completes the cross-account trust wiring for HCP shared VPC clusters
+    (ROSAENG-63353); runs after the rosa-sts-oidc-config-create chain and
+    before rosa-cluster-provision. rosa-e2e-hcp-shared-vpc-prepare creates
+    the shared route53 and VPC endpoint roles before the chain (so
+    rosa-sts-operator-roles-create can pass --shared-vpc-role-arn to rosa
+    create operator-roles) with a placeholder trust; this step replaces that
+    trust with the cluster account's installer, ingress-operator and
+    control-plane-operator role principals (installer and control-plane-
+    operator for the VPC endpoint role), and attaches the cluster-account
+    <shared-role>-assume-role permission policies to those roles. Requires
+    the second AWS account credentials ${CLUSTER_PROFILE_DIR}/.awscred_shared_account
+    and the shared and cluster-account role ARNs in ${SHARED_DIR}; fails if
+    rosa-e2e-hcp-shared-vpc-prepare or the rosa-sts-oidc-config-create chain
+    has not run yet.

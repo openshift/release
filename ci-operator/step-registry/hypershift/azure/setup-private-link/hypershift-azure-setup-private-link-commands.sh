@@ -36,7 +36,7 @@ az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIEN
 set -x
 
 # Dedicated private link credential for HO install
-AZURE_PRIVATE_LINK_CREDS="/etc/hypershift-ci-jobs-self-managed-azure/private-credentials.json"
+AZURE_PRIVATE_LINK_CREDS="${AZURE_PRIVATE_CREDS_FILE:-/etc/hypershift-ci-jobs-self-managed-azure/private-credentials.json}"
 
 # Use the nested management cluster's kubeconfig
 export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig"
@@ -89,19 +89,30 @@ NAT_SUBNET_ID=$(az network vnet subnet show \
 
 echo "NAT subnet ID: ${NAT_SUBNET_ID}"
 
-# Grant the private link service principal "Network Contributor" on the NAT subnet.
-# Creating a PLS requires Microsoft.Network/virtualNetworks/subnets/join/action on
-# the NAT subnet. The private link SP already has PLS write permissions on the infra
-# RG, but the NAT subnet lives in the VNet RG — Azure's LinkedAuthorization check
-# requires explicit permission on the linked subnet scope.
-PRIVATE_SP_CLIENT_ID="$(<"${AZURE_PRIVATE_LINK_CREDS}" jq -r '.clientId')"
-PRIVATE_SP_OBJECT_ID=$(az ad sp show --id "${PRIVATE_SP_CLIENT_ID}" --query id -o tsv)
-echo "Granting Network Contributor on NAT subnet to private link SP (${PRIVATE_SP_CLIENT_ID})"
-az role assignment create \
-  --assignee-object-id "${PRIVATE_SP_OBJECT_ID}" \
-  --assignee-principal-type ServicePrincipal \
-  --role "Network Contributor" \
-  --scope "${NAT_SUBNET_ID}"
+if [[ "${AZURE_PRIVATE_LINK_ASSIGN_ROLES:-false}" == "true" ]]; then
+  PRIVATE_SP_OBJECT_ID=$(jq -er '.objectId' "${AZURE_PRIVATE_LINK_CREDS}")
+  PRIVATE_SUBSCRIPTION_ID=$(jq -er '.subscriptionId' "${AZURE_PRIVATE_LINK_CREDS}")
+  # The dedicated principal manages PLS resources and endpoint connections in the
+  # management RG, and joins or creates NAT subnets in the VNet RG.
+  for private_rg in "${MGMT_INFRA_RG}" "${VNET_RG}"; do
+    az role assignment create \
+      --assignee-object-id "${PRIVATE_SP_OBJECT_ID}" \
+      --assignee-principal-type ServicePrincipal \
+      --role "Network Contributor" \
+      --scope "/subscriptions/${PRIVATE_SUBSCRIPTION_ID}/resourceGroups/${private_rg}"
+  done
+else
+  # Legacy credentials already have PLS access in the management RG. The NAT
+  # subnet lives in the VNet RG and needs a separate subnet join permission.
+  PRIVATE_SP_CLIENT_ID="$(<"${AZURE_PRIVATE_LINK_CREDS}" jq -r '.clientId')"
+  PRIVATE_SP_OBJECT_ID=$(az ad sp show --id "${PRIVATE_SP_CLIENT_ID}" --query id -o tsv)
+  echo "Granting Network Contributor on NAT subnet to private link SP (${PRIVATE_SP_CLIENT_ID})"
+  az role assignment create \
+    --assignee-object-id "${PRIVATE_SP_OBJECT_ID}" \
+    --assignee-principal-type ServicePrincipal \
+    --role "Network Contributor" \
+    --scope "${NAT_SUBNET_ID}"
+fi
 
 # Save for downstream steps (hypershift-install and e2e test runner)
 echo "${MGMT_INFRA_RG}" > "${SHARED_DIR}/azure_pls_resource_group"

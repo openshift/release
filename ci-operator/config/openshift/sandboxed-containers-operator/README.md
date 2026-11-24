@@ -13,7 +13,7 @@ usual changes to those files are::
         release:
           # Use channel: stable/candidate
           channel: stable
-          # Use version: "4.18", "4.19", ...
+          # Use version: "4.20", "4.21", ...
           version: "4.18"
     tests:
     - as: azure-ipi-kata
@@ -22,7 +22,7 @@ usual changes to those files are::
           # Set RPM version and checksum
           # An test case will use that to check the expected operator
           # version is installed
-          KATA_RPM_VERSION: 3.31.0-2.rhaos4.19.el9
+          KATA_RPM_VERSION: 4.2.0-2.rhaos4.20.el9
           # Add sleep here if you need to do manual testing
           # connect to cluster and delete the sandboxed-containers-operator-post-wait pod when done
           SLEEP_DURATION: "0"

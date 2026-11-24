@@ -99,6 +99,21 @@ else
 fi
 printf '%s' "${redhat_auth_password}" | skopeo login registry.redhat.io -u "${redhat_auth_user}" --password-stdin
 
+# Peer-pod workloads pull images inside the pod VM (guest pull), which only
+# receives credentials through the pod's imagePullSecrets: the cluster-wide
+# pull secret used by the nodes does not apply there. Publish the mirror
+# credentials as a dockerconfigjson Secret in the default namespace and link
+# it to the default ServiceAccount, so workloads running with that
+# ServiceAccount can pull mirrored images inside their pod VMs. Harnesses
+# that create their own namespaces must deliver the secret there too (the
+# osc e2e suite does; see the testsuites/osc step).
+oc create secret docker-registry osc-mirror-pull-secret \
+    --docker-server="${MIRROR_REGISTRY_HOST}" \
+    --docker-username="${mirror_registry_user}" \
+    --docker-password="${mirror_registry_password}" \
+    -n default --dry-run=client -o yaml | oc apply -f -
+oc secrets link default osc-mirror-pull-secret --for=pull -n default
+
 OPERATORS_TO_MIRROR="${OPERATORS_TO_MIRROR:-sandboxed-containers-operator}"
 
 cat > "${work_dir}/imageset-config.yaml" <<EOF

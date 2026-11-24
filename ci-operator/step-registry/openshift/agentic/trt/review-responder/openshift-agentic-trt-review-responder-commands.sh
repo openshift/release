@@ -65,9 +65,6 @@ if [[ "${EVAL_MODE:-}" != "true" ]]; then
     # shellcheck source=/dev/null
     source "${WORKDIR}/${SETUP_SCRIPT}"
 
-    echo "Installing Claude Code..."
-    curl -fsSL --retry 3 --retry-delay 5 https://claude.ai/install.sh | sh
-    export PATH="${HOME}/.local/bin:${PATH}"
 fi
 
 mkdir -p "${WORKDIR}/artifacts"
@@ -429,7 +426,7 @@ checkout_pr_head() {
     local worktree_status
 
     if [[ ! "${FORK_REPO}" =~ ^[^/]+/[^/]+$ ]] || \
-       [[ "${PR_HEAD_OWNER}/${PR_HEAD_REPO}" != "${FORK_REPO}" ]]; then
+       [[ "${PR_HEAD_OWNER,,}/${PR_HEAD_REPO,,}" != "${FORK_REPO,,}" ]]; then
         echo "ERROR: PR head repository does not match the configured fork"
         return 1
     fi
@@ -477,7 +474,7 @@ verify_push_target() {
     local -a fork_push_urls
 
     if [[ ! "${FORK_REPO}" =~ ^[^/]+/[^/]+$ ]] || \
-       [[ "${PR_HEAD_OWNER}/${PR_HEAD_REPO}" != "${FORK_REPO}" ]]; then
+       [[ "${PR_HEAD_OWNER,,}/${PR_HEAD_REPO,,}" != "${FORK_REPO,,}" ]]; then
         echo "ERROR: PR head repository does not match the configured fork"
         return 1
     fi
