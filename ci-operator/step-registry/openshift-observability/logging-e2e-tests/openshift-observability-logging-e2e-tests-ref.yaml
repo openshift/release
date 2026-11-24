@@ -13,8 +13,13 @@ ref:
   - name: LOGGING_TEST_VERSION
     default: ""
     documentation: |-
-      The version of logging which is being tested, for example "6.6". The test suites fail
-      immediately if it is not set. It is a required value.
+      The version of logging which is being tested, in the form "6.6" (major.minor). The test
+      binary turns it into the OLM channel "stable-6.6" and panics at start-up if the value has any
+      other form. It is needed when a test must subscribe cluster-logging or loki-operator itself,
+      because that test fails without a channel. It is optional when both operators are installed
+      before the step runs, for example with install-operators or operator-sdk run bundle: the tests
+      then use the existing subscriptions, the upgrade tests are skipped, and tests that are limited
+      to newer logging versions are not skipped.
   - name: LOGGING_UPGRADE_FROM_VERSION
     default: ""
     documentation: |-
