@@ -314,11 +314,21 @@ function WaitFor () {
     typeset -i _deadline=$(( $(date +%s) + cap ))
     echo "[readiness] Waiting for: ${description} (cap ${cap}s, budget remaining $(_budget_remaining)s)"
     while true; do
+        typeset -i _now=0
+        _now=$(date +%s)
+        if (( _now >= _deadline )); then
+            echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (budget remaining $(_budget_remaining)s)"
+            return 1
+        fi
         if "${checkFn}" "$@"; then
+            _now=$(date +%s)
+            if (( _now >= _deadline )); then
+                echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (post-deadline probe success not accepted, budget remaining $(_budget_remaining)s)"
+                return 1
+            fi
             echo "[readiness] OK: ${description}"
             return 0
         fi
-        typeset -i _now=0
         _now=$(date +%s)
         if (( _now >= _deadline )); then
             echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (budget remaining $(_budget_remaining)s)"
