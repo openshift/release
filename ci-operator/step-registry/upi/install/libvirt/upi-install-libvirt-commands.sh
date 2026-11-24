@@ -256,6 +256,23 @@ else
   ${VIRSH} pool-start ${POOL_NAME}
 fi
 
+# Align LIBVIRT_IMAGE_PATH with the pool's real target. Existing pools on OZ hosts
+# often use /home/libvirt/openshift-images while the step default is
+# /var/lib/libvirt/openshift-images. Domain templates reference file paths under
+# LIBVIRT_IMAGE_PATH, so a mismatch causes "Path ... is not accessible".
+POOL_TARGET="$(${VIRSH} pool-dumpxml "${POOL_NAME}" | sed -n 's|.*<path>\([^<]*\)</path>.*|\1|p' | head -n1)"
+if [[ -z "${POOL_TARGET}" ]]; then
+  echo "ERROR: Could not resolve target path for libvirt pool ${POOL_NAME}" >&2
+  ${VIRSH} pool-dumpxml "${POOL_NAME}" || true
+  exit 1
+fi
+if [[ "${LIBVIRT_IMAGE_PATH}" != "${POOL_TARGET}" ]]; then
+  echo "Updating LIBVIRT_IMAGE_PATH from '${LIBVIRT_IMAGE_PATH}' to pool target '${POOL_TARGET}'"
+  LIBVIRT_IMAGE_PATH="${POOL_TARGET}"
+else
+  echo "LIBVIRT_IMAGE_PATH matches pool target: ${LIBVIRT_IMAGE_PATH}"
+fi
+
 # Move the install config to the install directory
 echo "Move the install config to the install directory..."
 cp ${SHARED_DIR}/install-config.yaml ${INSTALL_DIR}
@@ -577,6 +594,31 @@ create_node () {
      --pool ${POOL_NAME} \
      --format qcow2 \
      --capacity ${VOLUME_CAPACITY}
+
+    # Resolve the real volume path (pool target may differ from LIBVIRT_IMAGE_PATH default)
+    # and regenerate domain XML so <disk>/<kernel>/<initrd> paths exist on the hypervisor.
+    ACTUAL_QCOW_PATH="$(${VIRSH} vol-path --pool "${POOL_NAME}" "${QCOW_NAME}")"
+    if [[ -z "${ACTUAL_QCOW_PATH}" ]]; then
+      echo "ERROR: Failed to resolve path for volume ${QCOW_NAME} in pool ${POOL_NAME}" >&2
+      ${VIRSH} vol-list --pool "${POOL_NAME}" || true
+      exit 1
+    fi
+    export QCOW_PATH="$(dirname "${ACTUAL_QCOW_PATH}")"
+    export QCOW_NAME="$(basename "${ACTUAL_QCOW_PATH}")"
+    # Boot artifacts live in the same pool/dir on agent installs.
+    if [[ -n "${KERNEL_NAME:-}" ]]; then
+      ACTUAL_KERNEL_PATH="$(${VIRSH} vol-path --pool "${POOL_NAME}" "${KERNEL_NAME}" || true)"
+      if [[ -n "${ACTUAL_KERNEL_PATH}" ]]; then
+        export BOOT_ARTIFACTS_PATH="$(dirname "${ACTUAL_KERNEL_PATH}")"
+      else
+        export BOOT_ARTIFACTS_PATH="${QCOW_PATH}"
+      fi
+    else
+      export BOOT_ARTIFACTS_PATH="${QCOW_PATH}"
+    fi
+    echo "Using hypervisor disk path ${ACTUAL_QCOW_PATH} (BOOT_ARTIFACTS_PATH=${BOOT_ARTIFACTS_PATH})"
+    envsubst < ${CLUSTER_PROFILE_DIR}/domain-install-template.xml > ${INSTALL_DIR}/"${NAME}-install.xml"
+    envsubst < ${CLUSTER_PROFILE_DIR}/domain-template.xml > ${INSTALL_DIR}/"${NAME}.xml"
 
     # Start the domain
     ${VIRSH} define ${INSTALL_DIR}/"${NAME}-install.xml"
