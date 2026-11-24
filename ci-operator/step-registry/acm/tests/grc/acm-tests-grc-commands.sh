@@ -17,6 +17,7 @@ if [ "${MAP_TESTS}" = "true" ]; then
         # canonical name; a failed restore fails the step (see the trap below).
         typeset -i _grc_restore_failed=0
         typeset -i _grc_exit_rc=0
+        typeset -i _grc_helper_rc=0
         _grc_restore_carrier() {
             local _src="$1" _dst="$2" _tmp
             _tmp="${ARTIFACT_DIR}/.$(basename "${_dst}").restore.$$"
@@ -30,15 +31,19 @@ if [ "${MAP_TESTS}" = "true" ]; then
         }
         trap '
             _grc_exit_rc=$?
-            LP_IO__ET_PPP__NEW_TS_NAME="${LP_QE__CR__TS_NAME__PFX__ACM:+${LP_QE__CR__TS_NAME__PFX__ACM}--}%s" \
+            # Call the helper as a plain command, never on the left of `||`:
+            # bash suppresses its own errexit in that position, so an internal
+            # archive/remap/copy failure would return success.
+            LP_IO__ET_PPP__NEW_TS_NAME="%s" \
                 ExitTrap--PostProcessPrep
+            _grc_helper_rc=$?
             if [[ -f "/tmp/junit_grc_backup.xml" ]]; then
                 _grc_restore_carrier "/tmp/junit_grc_backup.xml" "${ARTIFACT_DIR}/junit_grc.xml"
             fi
             if [[ -f "/tmp/junit_grc_placement_restore_backup.xml" ]]; then
                 _grc_restore_carrier "/tmp/junit_grc_placement_restore_backup.xml" "${ARTIFACT_DIR}/junit_grc_placement_restore.xml"
             fi
-            if (( _grc_restore_failed )) && (( _grc_exit_rc == 0 )); then
+            if (( (_grc_restore_failed || _grc_helper_rc != 0) )) && (( _grc_exit_rc == 0 )); then
                 _grc_exit_rc=1
             fi
             exit "${_grc_exit_rc}"
@@ -300,7 +305,10 @@ try:
 except Exception:
     print(-1)
 ' "${_OPP_RAW_STAGING}/01-operatorpolicy.json")"
-    echo "${_OPP_POLICY_COUNT}" > "${_OPP_RAW_STAGING}/00-operatorpolicy-count.txt"
+    if ! echo "${_OPP_POLICY_COUNT}" > "${_OPP_RAW_STAGING}/00-operatorpolicy-count.txt"; then
+        echo "ERROR: failed to write OperatorPolicy count artifact" >&2
+        _OPP_SNAPSHOT_FAILED=1
+    fi
     # 2. local-cluster labels: the same baseline the restore uses, copied from
     #    the private capture so the published snapshot cannot diverge from the
     #    restore source.
@@ -314,6 +322,7 @@ except Exception:
     # 3. Placement status (pre-suite state) and the authoritative
     #    PlacementDecision resources (the placement controller writes
     #    selected cluster names there, not into Placement.status).
+    _opp_cap_rc=0
     oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | \
         python3 -c '
 import json, sys
@@ -832,12 +841,33 @@ except Exception:
         fi
         set -x
     fi
-    # Verify label restoration independently of placement
+    # Verify label restoration independently of placement: single
+    # ManagedCluster read compared against all tracked keys (7534), with
+    # bounded retry of read-compare-write so an API recovery can repair a
+    # mismatch left by a failed restore read (7530). Failed reads stay
+    # distinct from absent labels and never trigger deletion.
     typeset -i _opp_restore_ok=1
     if [[ "${_OPP_BASELINE_OK}" -eq 1 ]]; then
         set +x
-        for _opp_key in "${_OPP_LABEL_KEYS[@]}"; do
-            _opp_verify_pre="$(python3 -c '
+        _opp_verify_json=""
+        _mk_tmp _opp_verify_json
+        typeset -i _opp_verify_fetch_ok=0
+        for _opp_vrtry in 1 2 3; do
+            if oc get managedcluster "${_OPP_MC_NAME}" -o json >"${_opp_verify_json}" 2>/dev/null && \
+                python3 -c 'import json, sys; d=json.load(open(sys.argv[1])); assert isinstance(d.get("metadata",{}).get("labels",{}), dict)' "${_opp_verify_json}" 2>/dev/null; then
+                _opp_verify_fetch_ok=1
+                break
+            fi
+            sleep 2
+        done
+        if (( _opp_verify_fetch_ok == 0 )); then
+            echo "ERROR: verification read failed for ManagedCluster ${_OPP_MC_NAME} after retry" >&2
+            echo "verification current read error (bulk fetch)" >> "${_OPP_EVIDENCE_DIR}/04-label-restore.log" 2>&1 || true
+            _opp_restore_ok=0
+            rm -f "${_opp_verify_json}"
+        else
+            for _opp_key in "${_OPP_LABEL_KEYS[@]}"; do
+                _opp_verify_pre="$(python3 -c '
 import json, sys
 try:
     d = json.load(open(sys.argv[1]))
@@ -851,15 +881,83 @@ except Exception:
     print("__OPP_READ_ERROR__")
     raise SystemExit(1)
 ' "${_opp_baseline_private}" "${_opp_key}" 2>/dev/null)" || _opp_verify_pre="__OPP_READ_ERROR__"
-            if [[ "${_opp_verify_pre}" == "__OPP_READ_ERROR__" ]]; then
-                echo "ERROR: baseline verification read failed for ${_opp_key}" >&2
-                echo "verification baseline read error for ${_opp_key}" >> "${_OPP_EVIDENCE_DIR}/04-label-restore.log" 2>&1 || true
-                _opp_restore_ok=0
-                continue
-            fi
-            _opp_verify_cur="__OPP_READ_ERROR__"
-            for _opp_rtry in 1 2 3; do
-                if _opp_verify_cur="$(oc get managedcluster "${_OPP_MC_NAME}" -o json 2>/dev/null | python3 -c '
+                if [[ "${_opp_verify_pre}" == "__OPP_READ_ERROR__" ]]; then
+                    echo "ERROR: baseline verification read failed for ${_opp_key}" >&2
+                    echo "verification baseline read error for ${_opp_key}" >> "${_OPP_EVIDENCE_DIR}/04-label-restore.log" 2>&1 || true
+                    _opp_restore_ok=0
+                    continue
+                fi
+                _opp_verify_cur="$(python3 -c '
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    labels = d["metadata"].get("labels", {})
+    if sys.argv[2] not in labels:
+        print("<absent>")
+    else:
+        v = labels.get(sys.argv[2])
+        print(v if v is not None else "")
+except Exception:
+    print("__OPP_READ_ERROR__")
+    raise SystemExit(1)
+' "${_opp_verify_json}" "${_opp_key}" 2>/dev/null)" || _opp_verify_cur="__OPP_READ_ERROR__"
+                if [[ "${_opp_verify_cur}" == "__OPP_READ_ERROR__" ]]; then
+                    echo "ERROR: verification parse failed for ${_opp_key}" >&2
+                    echo "verification parse error for ${_opp_key}" >> "${_OPP_EVIDENCE_DIR}/04-label-restore.log" 2>&1 || true
+                    _opp_restore_ok=0
+                    continue
+                fi
+                if [[ "${_opp_verify_pre}" != "${_opp_verify_cur}" ]]; then
+                    echo "verification mismatch for ${_opp_key}: attempting repair" >&2
+                    for _opp_vrtry in 1 2 3; do
+                        _opp_verify_retry_json=""
+                        _mk_tmp _opp_verify_retry_json
+                        typeset -i _opp_verify_retry_ok=0
+                        if oc get managedcluster "${_OPP_MC_NAME}" -o json >"${_opp_verify_retry_json}" 2>/dev/null && \
+                            python3 -c 'import json, sys; d=json.load(open(sys.argv[1])); assert isinstance(d.get("metadata",{}).get("labels",{}), dict)' "${_opp_verify_retry_json}" 2>/dev/null; then
+                            _opp_verify_retry_ok=1
+                            _opp_verify_retry_cur="$(python3 -c '
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+    labels = d["metadata"].get("labels", {})
+    if sys.argv[2] not in labels:
+        print("<absent>")
+    else:
+        v = labels.get(sys.argv[2])
+        print(v if v is not None else "")
+except Exception:
+    print("__OPP_READ_ERROR__")
+    raise SystemExit(1)
+' "${_opp_verify_retry_json}" "${_opp_key}" 2>/dev/null)" || _opp_verify_retry_cur="__OPP_READ_ERROR__"
+                            if [[ "${_opp_verify_retry_cur}" == "__OPP_READ_ERROR__" ]]; then
+                                _opp_verify_retry_ok=0
+                            elif [[ "${_opp_verify_pre}" != "${_opp_verify_retry_cur}" ]]; then
+                                if [[ "${_opp_verify_pre}" == "<absent>" ]]; then
+                                    if [[ "${_opp_verify_retry_cur}" != "<absent>" ]]; then
+                                        oc label managedclusters "${_OPP_MC_NAME}" "${_opp_key}-" --overwrite 2>&1 || true
+                                    fi
+                                else
+                                    if [[ -z "${_opp_verify_pre}" ]]; then
+                                        oc label managedclusters "${_OPP_MC_NAME}" "${_opp_key}=" --overwrite 2>&1 || true
+                                    else
+                                        oc label managedclusters "${_OPP_MC_NAME}" "${_opp_key}=${_opp_verify_pre}" --overwrite 2>&1 || true
+                                    fi
+                                fi
+                                sleep 2
+                            else
+                                rm -f "${_opp_verify_retry_json}"
+                                break
+                            fi
+                        fi
+                        rm -f "${_opp_verify_retry_json}"
+                        if (( _opp_verify_retry_ok == 0 )); then
+                            sleep 2
+                        fi
+                    done
+                    _opp_verify_cur="__OPP_READ_ERROR__"
+                    for _opp_rtry in 1 2 3; do
+                        if _opp_verify_cur="$(oc get managedcluster "${_OPP_MC_NAME}" -o json 2>/dev/null | python3 -c '
 import json, sys
 try:
     d = json.load(sys.stdin)
@@ -873,23 +971,26 @@ except Exception:
     print("__OPP_READ_ERROR__")
     raise SystemExit(1)
 ' "${_opp_key}" 2>/dev/null)" && [[ "${_opp_verify_cur}" != "__OPP_READ_ERROR__" ]]; then
-                    break
+                            break
+                        fi
+                        _opp_verify_cur="__OPP_READ_ERROR__"
+                        sleep 2
+                    done
+                    if [[ "${_opp_verify_cur}" == "__OPP_READ_ERROR__" ]]; then
+                        echo "ERROR: post-repair verification read failed for ${_opp_key}" >&2
+                        echo "verification post-repair read error for ${_opp_key}" >> "${_OPP_EVIDENCE_DIR}/04-label-restore.log" 2>&1 || true
+                        _opp_restore_ok=0
+                        continue
+                    fi
+                    if [[ "${_opp_verify_pre}" != "${_opp_verify_cur}" ]]; then
+                        echo "ERROR: label ${_opp_key} restore verification failed" >&2
+                        echo "label ${_opp_key} mismatch" >> "${_OPP_EVIDENCE_DIR}/04-label-restore.log" 2>&1 || true
+                        _opp_restore_ok=0
+                    fi
                 fi
-                _opp_verify_cur="__OPP_READ_ERROR__"
-                sleep 2
             done
-            if [[ "${_opp_verify_cur}" == "__OPP_READ_ERROR__" ]]; then
-                echo "ERROR: current verification read failed for ${_opp_key}" >&2
-                echo "verification current read error for ${_opp_key}" >> "${_OPP_EVIDENCE_DIR}/04-label-restore.log" 2>&1 || true
-                _opp_restore_ok=0
-                continue
-            fi
-            if [[ "${_opp_verify_pre}" != "${_opp_verify_cur}" ]]; then
-                echo "ERROR: label ${_opp_key} restore verification failed" >&2
-                echo "label ${_opp_key} mismatch" >> "${_OPP_EVIDENCE_DIR}/04-label-restore.log" 2>&1 || true
-                _opp_restore_ok=0
-            fi
-        done
+            rm -f "${_opp_verify_json}"
+        fi
         set -x
         if (( _opp_restore_ok == 0 )); then
             echo "OPP label restore verification FAILED" >&2
@@ -975,47 +1076,77 @@ print(json.dumps(result, indent=2))
     typeset -i _opp_base_ok="${_OPP_BASELINE_OK}"
     typeset -i _opp_failures=$(( (1 - _opp_inv_ok) + (1 - _opp_sel) + (1 - _opp_base_ok) + (1 - _opp_restore_ok) ))
     _opp_junit="${ARTIFACT_DIR}/junit_grc_placement_restore.xml"
+    _opp_junit_tmp=""
+    _mk_tmp _opp_junit_tmp
+    typeset -i _opp_junit_write_ok=0
     set +x
-    {
-        echo '<?xml version="1.0" encoding="UTF-8"?>'
-        echo "<testsuite name=\"lp-interop--ACM--OPP--grc-placement-restore\" tests=\"4\" failures=\"${_opp_failures}\">"
-        echo "  <testcase classname=\"grc-placement-restore\" name=\"operatorpolicy-inventory-nonempty\">"
-        if [[ "${_opp_inv_ok}" -ne 1 ]]; then
-            if [[ "${_OPP_QUERY_FAILED}" -eq 1 ]]; then
-                echo "    <failure message=\"$(_opp_xesc "pre-GRC capture never ran: the OPP placement query failed (rc=${_OPP_QUERY_RC}); see 00-placement-query-error.log")\"></failure>"
-            else
-                echo "    <failure message=\"$(_opp_xesc "operatorpolicy inventory at pre-GRC capture: ${_OPP_POLICY_COUNT} objects")\"></failure>"
+    if [[ -n "${_opp_junit_tmp}" ]]; then
+        if {
+            echo '<?xml version="1.0" encoding="UTF-8"?>'
+            echo "<testsuite name=\"lp-interop--ACM--OPP--grc-placement-restore\" tests=\"4\" failures=\"${_opp_failures}\">"
+            echo "  <testcase classname=\"grc-placement-restore\" name=\"operatorpolicy-inventory-nonempty\">"
+            if [[ "${_opp_inv_ok}" -ne 1 ]]; then
+                if [[ "${_OPP_QUERY_FAILED}" -eq 1 ]]; then
+                    echo "    <failure message=\"$(_opp_xesc "pre-GRC capture never ran: the OPP placement query failed (rc=${_OPP_QUERY_RC}); see 00-placement-query-error.log")\"></failure>"
+                else
+                    echo "    <failure message=\"$(_opp_xesc "operatorpolicy inventory at pre-GRC capture: ${_OPP_POLICY_COUNT} objects")\"></failure>"
+                fi
             fi
+            echo "  </testcase>"
+            echo "  <testcase classname=\"grc-placement-restore\" name=\"label-baseline-readable\">"
+            if [[ "${_opp_base_ok}" -ne 1 ]]; then
+                echo "    <failure message=\"$(_opp_xesc "pre-suite local-cluster label snapshot unreadable; the label restore was skipped")\"></failure>"
+            fi
+            echo "  </testcase>"
+            echo "  <testcase classname=\"grc-placement-restore\" name=\"placement-selects-local-cluster\">"
+            if [[ "${_opp_sel}" -ne 1 ]]; then
+                echo "    <failure message=\"$(_opp_xesc "placement ${_OPP_PLACEMENT_NAME} does not select ${_OPP_MC_NAME} after the GRC suite; see 04-label-restore.log, 05-placement-status-post.json and 06-placementdecisions-post.json in this step artifacts")\"></failure>"
+            fi
+            echo "  </testcase>"
+            echo "  <testcase classname=\"grc-placement-restore\" name=\"label-restore-verified\">"
+            if [[ "${_opp_restore_ok}" -ne 1 ]]; then
+                echo "    <failure message=\"$(_opp_xesc "label restore verification failed; see 04-label-restore.log")\"></failure>"
+            fi
+            echo "  </testcase>"
+            echo "</testsuite>"
+        } > "${_opp_junit_tmp}" 2>&1; then
+            if python3 -c 'import xml.etree.ElementTree as ET, sys; ET.parse(sys.argv[1])' "${_opp_junit_tmp}" 2>&1; then
+                if mv "${_opp_junit_tmp}" "${_opp_junit}" 2>&1; then
+                    _opp_junit_write_ok=1
+                else
+                    echo "ERROR: placement carrier publish failed for ${_opp_junit}" >&2
+                    rm -f "${_opp_junit}" "${_opp_junit_tmp}"
+                fi
+            else
+                echo "ERROR: placement carrier XML validation failed" >&2
+                rm -f "${_opp_junit}" "${_opp_junit_tmp}"
+            fi
+        else
+            echo "ERROR: placement carrier write failed" >&2
+            rm -f "${_opp_junit}" "${_opp_junit_tmp}"
         fi
-        echo "  </testcase>"
-        echo "  <testcase classname=\"grc-placement-restore\" name=\"label-baseline-readable\">"
-        if [[ "${_opp_base_ok}" -ne 1 ]]; then
-            echo "    <failure message=\"$(_opp_xesc "pre-suite local-cluster label snapshot unreadable; the label restore was skipped")\"></failure>"
-        fi
-        echo "  </testcase>"
-        echo "  <testcase classname=\"grc-placement-restore\" name=\"placement-selects-local-cluster\">"
-        if [[ "${_opp_sel}" -ne 1 ]]; then
-            echo "    <failure message=\"$(_opp_xesc "placement ${_OPP_PLACEMENT_NAME} does not select ${_OPP_MC_NAME} after the GRC suite; see 04-label-restore.log, 05-placement-status-post.json and 06-placementdecisions-post.json in this step artifacts")\"></failure>"
-        fi
-        echo "  </testcase>"
-        echo "  <testcase classname=\"grc-placement-restore\" name=\"label-restore-verified\">"
-        if [[ "${_opp_restore_ok}" -ne 1 ]]; then
-            echo "    <failure message=\"$(_opp_xesc "label restore verification failed; see 04-label-restore.log")\"></failure>"
-        fi
-        echo "  </testcase>"
-        echo "</testsuite>"
-    } > "${_opp_junit}"
-    set -x
-    # Backup atomically: a partial copy must never leave a truncated file at
-    # the path the EXIT trap restores from.
-    _opp_backup_tmp=""
-    if ! _opp_backup_tmp="$(mktemp /tmp/junit_grc_placement_restore_backup.XXXXXX 2>/dev/null)" ||
-        ! cp "${_opp_junit}" "${_opp_backup_tmp}" ||
-        ! mv "${_opp_backup_tmp}" "/tmp/junit_grc_placement_restore_backup.xml"; then
-        echo "ERROR: placement restore JUnit backup failed for ${_opp_junit}" >&2
-        rm -f "${_opp_backup_tmp:-}"
+    else
+        echo "ERROR: placement carrier temp allocation failed" >&2
+        rm -f "${_opp_junit}"
+    fi
+    if (( _opp_junit_write_ok == 0 )); then
         if [[ "${_test_rc}" -eq 0 ]]; then
             _test_rc=1
+        fi
+    fi
+    set -x
+    # Backup atomically: a partial copy must never leave a truncated file at
+    # the path the EXIT trap restores from. Only backup a validated carrier.
+    if (( _opp_junit_write_ok )); then
+        _opp_backup_tmp=""
+        if ! _opp_backup_tmp="$(mktemp /tmp/junit_grc_placement_restore_backup.XXXXXX 2>/dev/null)" ||
+            ! cp "${_opp_junit}" "${_opp_backup_tmp}" ||
+            ! mv "${_opp_backup_tmp}" "/tmp/junit_grc_placement_restore_backup.xml"; then
+            echo "ERROR: placement restore JUnit backup failed for ${_opp_junit}" >&2
+            rm -f "${_opp_backup_tmp:-}"
+            if [[ "${_test_rc}" -eq 0 ]]; then
+                _test_rc=1
+            fi
         fi
     fi
     if [[ "${_opp_failures}" -gt 0 ]]; then
