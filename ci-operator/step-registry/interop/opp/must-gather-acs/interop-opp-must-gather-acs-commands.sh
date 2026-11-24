@@ -11,16 +11,17 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 # prevent the OLM evidence capture section from running.  This is critical
 # because OLM evidence is most valuable when the operator fails to install.
 
-# _central_backend_target <namespace> <service>
+# _central_backend_target <namespace> <service> [<route-target-port>]
 # Prints "<address> <port>" for one ready backend of the service, taken from
-# the EndpointSlices the endpoint controller maintains for it.
+# the EndpointSlices the endpoint controller maintains for it. When a Route
+# target port is given, the port is the one OpenShift resolves for it.
 # Exit status: 0 with output for a ready backend; 0 with no output when the
 # EndpointSlices were read and list no ready backend; 2 when the read fails;
 # 3 when the read returns a body that cannot be parsed. The two error states
 # stay distinct from "no ready backend" so a caller cannot record a read
 # failure as a definite negative.
 _central_backend_target() {
-    local _slice_json _backend_target
+    local _slice_json _backend_target _rt_port="${3:-}"
     _slice_json="$(oc get endpointslices -n "$1" \
       -l "kubernetes.io/service-name=$2" -o json 2>/dev/null)" || return 2
     _backend_target="$(printf '%s\n' "${_slice_json}" | \
@@ -32,13 +33,22 @@ try:
 except ValueError:
     sys.exit(3)
 
+routeTargetPort = (sys.argv[1] if len(sys.argv) > 1 else "").strip()
 for item in data.get("items", []):
     ports = [p for p in item.get("ports", []) or [] if p.get("port")]
     if not ports:
         continue
-    # A single-port service has one entry; prefer an explicitly named https
-    # port when the service exposes more than one.
-    ports.sort(key=lambda p: 0 if p.get("name") == "https" else 1)
+    if routeTargetPort:
+        if routeTargetPort.isdigit():
+            matched = [p for p in ports if str(p.get("port")) == routeTargetPort]
+        else:
+            matched = [p for p in ports if str(p.get("name")) == routeTargetPort]
+        if matched:
+            ports = matched
+    if len(ports) > 1:
+        # A single-port service has one entry; prefer an explicitly named https
+        # port when several remain.
+        ports.sort(key=lambda p: 0 if p.get("name") == "https" else 1)
     for endpoint in item.get("endpoints", []) or []:
         if (endpoint.get("conditions") or {}).get("ready") is False:
             continue
@@ -46,7 +56,7 @@ for item in data.get("items", []):
         if addresses:
             print(addresses[0], ports[0]["port"])
             sys.exit(0)
-')" || return 3
+' "${_rt_port}")" || return 3
     printf '%s\n' "${_backend_target}"
 }
 
@@ -158,13 +168,18 @@ collect_acs_diagnostics() {
             # Central's own CA. Routes with a custom certificate that includes
             # the route host pass the direct preflight above and never reach
             # this retry.
-            _central_svc="$(oc get route central -n "${WORKLOAD_NS}" \
-              -o jsonpath='{.spec.to.name}' 2>/dev/null || true)"
+            _route_svc_tp="$(oc get route central -n "${WORKLOAD_NS}" \
+              -o jsonpath='{.spec.to.name}{"|"}{.spec.port.targetPort}' 2>/dev/null || true)"
+            _central_svc="${_route_svc_tp%%|*}"
+            _central_route_tp=""
+            if [[ "${_route_svc_tp}" == *'|'* ]]; then
+                _central_route_tp="${_route_svc_tp#*|}"
+            fi
             _central_backend=""
             _central_backend_rc=0
             if [[ -n "${_central_svc}" ]]; then
                 _central_backend="$(
-                  _central_backend_target "${WORKLOAD_NS}" "${_central_svc}"
+                  _central_backend_target "${WORKLOAD_NS}" "${_central_svc}" "${_central_route_tp}"
                 )" || _central_backend_rc=$?
             fi
             if [[ "${_central_backend_rc}" -eq 0 &&
