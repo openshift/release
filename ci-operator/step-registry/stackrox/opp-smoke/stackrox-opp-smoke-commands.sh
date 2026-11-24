@@ -563,9 +563,11 @@ if [[ -d build/reports/tests/testSMOKE ]]; then
 fi
 
 echo "[smoke] Test run finished with exit code: ${testExit}"
-# Terminal-state result: emit step-named testcase with 900s SecuredCluster discovery timeout reason on failure
-if (( testExit != 0 || _N_FAILURES > 0 )); then
+if (( testExit != 0 )); then
     _add_case "stackrox-opp-smoke" failed "TestFailure" "smoke test failure (Gradle exit ${testExit}, recorded failures ${_N_FAILURES})"
+    exit 1
+elif (( _N_FAILURES > 0 )); then
+    _add_case "stackrox-opp-smoke" failed "Environment" "environment failure without test failure (Gradle exit ${testExit}, recorded failures ${_N_FAILURES})"
     exit 1
 fi
 _add_case "stackrox-opp-smoke" passed
