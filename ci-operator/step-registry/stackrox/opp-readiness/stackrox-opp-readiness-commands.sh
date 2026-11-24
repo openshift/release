@@ -589,14 +589,27 @@ function PeriodicOperatorDiagnostics () {
 # ACS_WAIT_TIMEOUT_S and the global budget, and finalizes it only when that
 # hold expires.
 # ---------------------------------------------------------------------------
+typeset -i _centralPresentHadSuccess=0
 function CheckCentralPresent () {
-    typeset out="" items=""
+    typeset out="" items="" crdlist=""
     typeset _traceWasOff=0
     [[ $- == *x* ]] || _traceWasOff=1
     set +x
-    oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1 || { (( _traceWasOff == 0 )) && set -x; return 1; }
-    out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json 2>/dev/null)" || { (( _traceWasOff == 0 )) && set -x; return 1; }
-    items="$(printf '%s' "${out}" | JsonLength items)" || { (( _traceWasOff == 0 )) && set -x; return 1; }
+    if ! crdlist="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd -o name 2>/dev/null)"; then
+        (( _traceWasOff == 0 )) && set -x
+        return 2
+    fi
+    if ! grep -q '^customresourcedefinition\.apiextensions\.k8s\.io/centrals\.platform\.stackrox\.io$' <<< "${crdlist}"; then
+        _centralPresentHadSuccess=1
+        (( _traceWasOff == 0 )) && set -x
+        return 1
+    fi
+    if ! out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json 2>/dev/null)"; then
+        (( _traceWasOff == 0 )) && set -x
+        return 2
+    fi
+    _centralPresentHadSuccess=1
+    items="$(printf '%s' "${out}" | JsonLength items)" || { (( _traceWasOff == 0 )) && set -x; return 2; }
     (( _traceWasOff == 0 )) && set -x
     (( items > 0 ))
 }
@@ -638,10 +651,17 @@ echo "[readiness] ACS state classified: ${_ACS_STATE}"
 # unknown (a failed read) is never held and stays exit 3 below.
 if [[ "${_ACS_STATE}" == "absent" && "${ACS_EXPECTATION}" == "required" ]]; then
     echo "[readiness] absent read on a required lane: holding provisionally (cap ${waitCap}s, budget remaining $(_budget_remaining)s)"
+    _centralPresentHadSuccess=0
     if WaitFor "Central CR present (ACS_EXPECTATION=required)" CheckCentralPresent PeriodicOperatorDiagnostics; then
         _ACS_STATE="present"
         echo "[readiness] ACS state re-classified after provisional hold: ${_ACS_STATE}"
     else
+        if (( _centralPresentHadSuccess == 0 )); then
+            echo "[readiness] provisional hold: no successful read, failing indeterminate" >&2
+            _ACS_STATE="unknown"
+            _add_classification "acs-state-indeterminate" failed "Classification" "acs-unclassified:central-query/read failed during provisional hold; never classified as absent without a successful read"
+            exit 3
+        fi
         echo "[readiness] provisional hold expired: finalizing absent"
     fi
 fi
