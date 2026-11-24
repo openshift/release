@@ -366,8 +366,6 @@ CONFIG = {
     'aro-hcp-stg-shard1-slot': {},
     'aro-hcp-dev-infrastructure-identities': {},
     # END ARO-HCP E2E SLOT TYPES
-    'aro-hcp-msi-mock-cs-sp-dev': {},
-    'aro-hcp-arm-helper-sp-dev': {},
     'equinix-ocp-metal-quota-slice': {
         'default': 140,
     },
@@ -954,10 +952,6 @@ for i in range(1):
 for i in range(112):
     CONFIG['aro-hcp-dev-infrastructure-identities']['aro-hcp-dev-infrastructure-identities-{i:0>2}'.format(i=i)] = 1
 # END ARO-HCP E2E SLOT RESOURCES
-for i in range(50):
-    CONFIG['aro-hcp-msi-mock-cs-sp-dev']['aro-hcp-msi-mock-cs-sp-dev-{}'.format(i)] = 1
-for i in range(100):
-    CONFIG['aro-hcp-arm-helper-sp-dev']['aro-hcp-arm-helper-sp-dev-{}'.format(i)] = 1
 
 CLUSTER_PROFILE_SETS_CONFIG = {
     'openshift-org-aws': {
