@@ -437,7 +437,27 @@ jq -n --arg name "$gateway_name" --arg image "$image_uuid" --arg subnet "$SUBNET
       cluster_reference:{kind:"cluster",uuid:$pe}},metadata:{kind:"vm"},api_version:"3.1.0"}' \
   > "$work_dir/vm.json"
 update_state stage vm-create-requested
-vm_response=$(prism_post vms "$work_dir/vm.json")
+if ! vm_http_status=$(curl --silent --show-error --insecure --max-time 90 \
+  --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
+  -H 'Content-Type: application/json' -X POST \
+  -o "$work_dir/vm-response.json" -w '%{http_code}' \
+  "$NUTANIX_PC_URL/api/nutanix/v3/vms" --data-binary "@$work_dir/vm.json"); then
+  echo "The gateway VM creation response was lost; retaining state for cautious cleanup."
+  exit 1
+fi
+case "$vm_http_status" in
+  200|201|202) ;;
+  400|422)
+    update_state stage vm-create-rejected
+    echo "Prism explicitly rejected gateway VM creation with HTTP $vm_http_status."
+    exit 1
+    ;;
+  *)
+    echo "Gateway VM creation returned HTTP $vm_http_status; its outcome is uncertain."
+    exit 1
+    ;;
+esac
+vm_response=$(<"$work_dir/vm-response.json")
 gateway_uuid=$(jq -er '.metadata.uuid' <<< "$vm_response")
 update_state gatewayUUID "$gateway_uuid"
 vm_task=$(jq -r '.status.execution_context.task_uuid // empty' <<< "$vm_response")

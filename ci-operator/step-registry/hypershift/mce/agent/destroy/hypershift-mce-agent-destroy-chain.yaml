@@ -3,6 +3,10 @@ chain:
   steps:
     - as: destroy
       cli: latest
+      env:
+      - name: HYPERSHIFT_DESTROY_STRICT_WAIT
+        default: "false"
+        documentation: Wait for HostedCluster and NodePool removal before completing teardown.
       commands: |-
         set -exuo pipefail
         
@@ -31,30 +35,36 @@ chain:
           local resource=$1 display_name=$2 current
           echo "$(date) Waiting for ${display_name} ${CLUSTER_NAME} to be removed"
           while :; do
-            if ! current=$(oc get "${resource}" "${CLUSTER_NAME}" -n local-cluster \
+            if current=$(oc get "${resource}" "${CLUSTER_NAME}" -n local-cluster \
               --ignore-not-found -o name --request-timeout=20s); then
-              echo "Could not verify removal of ${display_name} ${CLUSTER_NAME}"
-              return 1
-            fi
-            if [[ -z "${current}" ]]; then
-              return 0
+              if [[ -z "${current}" ]]; then
+                return 0
+              fi
+            else
+              echo "Could not check ${display_name} ${CLUSTER_NAME}; retrying"
             fi
             if (( SECONDS >= deletion_deadline )); then
-              echo "Timed out waiting for ${display_name} ${CLUSTER_NAME} to be removed"
+              echo "Timed out verifying removal of ${display_name} ${CLUSTER_NAME}"
               return 1
             fi
             sleep 15
           done
         }
 
-        deletion_deadline=$((SECONDS + 1200))
-        wait_for_removal hostedcluster HostedCluster
-        wait_for_removal nodepool NodePool
+        wait_failed=false
+        if [[ "${HYPERSHIFT_DESTROY_STRICT_WAIT:-false}" == "true" ]]; then
+          deletion_deadline=$((SECONDS + 1200))
+          wait_for_removal hostedcluster HostedCluster || wait_failed=true
+          wait_for_removal nodepool NodePool || wait_failed=true
+        fi
 
         echo "$(date) Finished deleting cluster"
         
         oc delete managedcluster ${CLUSTER_NAME} --ignore-not-found
         echo "$(date) Finished destroying hypershift managed cluster"
+        if [[ "$wait_failed" == "true" ]]; then
+          exit 1
+        fi
       from_image:
         namespace: ocp
         name: "4.16"

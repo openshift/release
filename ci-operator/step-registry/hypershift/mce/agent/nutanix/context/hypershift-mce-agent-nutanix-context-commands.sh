@@ -121,6 +121,8 @@ printf 'export NUTANIX_PC_URL=%q\n' "${pc_url}" >> "${context_tmp}"
 chmod 600 "${context_tmp}"
 mv "${context_tmp}" "${SHARED_DIR}/nutanix_context.sh"
 printf '%s\n' "${subnet_cidr}" > "${SHARED_DIR}/nutanix_subnet_cidr"
+printf '%s\n' "${ingress_vip}" > "${SHARED_DIR}/nutanix_ingress_vip.tmp"
+mv "${SHARED_DIR}/nutanix_ingress_vip.tmp" "${SHARED_DIR}/nutanix_ingress_vip"
 
 unset prism_central_password prism_element_password
 if [[ "$tracing_enabled" == true ]]; then set -x; fi

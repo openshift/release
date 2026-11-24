@@ -3,9 +3,12 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set +x
 
 
 source "${SHARED_DIR}/packet-conf.sh" && scp "${SSHOPTS[@]}" "${SHARED_DIR}/nested_kubeconfig" "root@${IP}:nested_kubeconfig"
+# The sourced host configuration may enable tracing again.
+set +x
 
 # Collect all hosted cluster service NodePorts to add to squid's allowed_ssl_ports.
 # These files are written by the hypershift-mce-agent-create-hostedcluster step.
@@ -21,7 +24,13 @@ done
 echo "Extra hosted cluster service ports for squid: ${EXTRA_PORTS}"
 
 NUTANIX_PROXY=false
-if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
+# The quota-slice lease identifies the Nutanix Agent workflow. Its context step
+# must have recorded the ingress VIP before this shared proxy step runs.
+if [[ -n "${NUTANIX_QUOTA_SLICE:-}" ]]; then
+  if [[ ! -s "${SHARED_DIR}/nutanix_ingress_vip" ]]; then
+    echo "The Nutanix ingress VIP file is missing."
+    exit 1
+  fi
   export KUBECONFIG="${SHARED_DIR}/kubeconfig"
   if [[ ! -s "${SHARED_DIR}/cluster-name" ]]; then
     echo "The Nutanix HostedCluster name is missing."
@@ -57,7 +66,8 @@ fi
 
 # shellcheck disable=SC2087
 ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${NUTANIX_PROXY}" ${EXTRA_PORTS} << 'EOF' |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
-set -x
+# Route names and Squid destinations are internal; keep them out of the job log.
+set +x
 
 # Collect extra ports passed as arguments
 NUTANIX_PROXY=$1
@@ -112,8 +122,6 @@ if [[ "${NUTANIX_PROXY}" == "true" ]]; then
       "$HOME/squid.conf"
   fi
 fi
-cat $HOME/squid.conf
-
 sudo setenforce 0
 sudo podman stop -t 120 external-squid
 sudo podman run -d --rm \

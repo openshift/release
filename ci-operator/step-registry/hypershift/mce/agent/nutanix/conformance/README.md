@@ -49,12 +49,10 @@ for the guest ingress Service; the ingress router then selects the Route
 backend. Squid does not terminate HTTPS; TLS termination follows the Route's
 configuration.
 
-Worker DNS is a separate path. Each worker's NMStateConfig points DNS at the
-gateway's subnet IP. The gateway forwards port 53 over WireGuard to a dedicated
-dnsmasq on the baremetal host. That resolver returns the management cluster IP
-for `api` and `api-int`, and the Nutanix ingress VIP for `*.apps`. A proxied
-Route request uses Squid's DNS lookup on the baremetal host; it does not depend
-on the worker resolving the Route hostname first.
+Worker DNS is a separate path. Nutanix workers use the resolver provided by
+their subnet's DHCP settings. Run-owned Route53 records resolve the hosted API
+and apps names to the private API addresses and Nutanix ingress VIP. A proxied
+Route request uses Squid's DNS lookup on the baremetal host.
 
 ## Accessing Prism Central UI
 

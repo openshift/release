@@ -10,6 +10,11 @@ echo "************ baremetalds devscripts proxy command ************"
 # shellcheck disable=SC1090
 source "${SHARED_DIR}/packet-conf.sh"
 
+STAGING_REGISTRY_HOST=
+if [[ "${PROXY_ALLOW_STAGE_REGISTRY:-false}" == "true" ]]; then
+    STAGING_REGISTRY_HOST=registry.stage.redhat.io
+fi
+
 # Setup a squid proxy for accessing the cluster
 # shellcheck disable=SC2087 # We need $CLUSTERTYPE in the here doc to expand locally
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
@@ -34,7 +39,7 @@ sudo systemctl restart sshd
 
 # Setup squid proxy for accessing cluster
 cat <<SQUID>\$HOME/squid.conf
-acl cluster dstdomain .metalkube.org .test-infra-cluster.redhat.com .ocpci.eng.rdu2.redhat.com .p1.openshiftapps.com sso.redhat.com registry.stage.redhat.io
+acl cluster dstdomain .metalkube.org .test-infra-cluster.redhat.com .ocpci.eng.rdu2.redhat.com .p1.openshiftapps.com sso.redhat.com ${STAGING_REGISTRY_HOST}
 
 acl allowed_ssl_ports port 443 5000 6443
 acl CONNECT method CONNECT

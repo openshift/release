@@ -95,7 +95,3 @@ EOF
     fi
   fi
 fi
-
-if [[ -s "$SHARED_DIR/nutanix_squid_allowed_hosts" ]]; then
-  cp "$SHARED_DIR/nutanix_squid_allowed_hosts" "$ARTIFACT_DIR/nutanix-squid-allowed-hosts.txt"
-fi

@@ -7,7 +7,7 @@ if [[ $- == *x* ]]; then tracing_enabled=true; fi
 set +x
 
 context_file="$SHARED_DIR/nutanix_context.sh"
-trap 'status=$?; if (( status == 0 )) && [[ ! -e "$SHARED_DIR/nutanix_ingress_tunnel_state.json" ]]; then rm -f "$context_file"; fi' EXIT
+trap 'status=$?; if (( status == 0 )) && [[ ! -e "$SHARED_DIR/nutanix_ingress_tunnel_state.json" ]]; then rm -f "$context_file" "$SHARED_DIR/nutanix_ingress_vip"; fi' EXIT
 
 if [[ -z "${NUTANIX_QUOTA_SLICE:-}" ]]; then
   echo "NUTANIX_QUOTA_SLICE is required from the workflow lease."
@@ -159,42 +159,59 @@ fi
 [[ -f "$SHARED_DIR/vm_uuids.txt" ]] || : > "$SHARED_DIR/vm_uuids.txt"
 [[ -f "$SHARED_DIR/image_uuid.txt" ]] || : > "$SHARED_DIR/image_uuid.txt"
 
+# Prism v3 list responses are paginated. Check every page before deciding that
+# a run-owned resource was never created after a lost provisioning response.
+find_prism_uuid_by_name() {
+  local endpoint=$1 kind=$2 name=$3 offset=0 page_size=500 response total count page_matches uuid
+  local -a matches=()
+  while :; do
+    response=$(curl --silent --show-error --fail --insecure --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
+      -H 'Content-Type: application/json' -X POST "$NUTANIX_PC_URL/api/nutanix/v3/$endpoint/list" \
+      --data "$(jq -nc --arg kind "$kind" --argjson offset "$offset" --argjson length "$page_size" \
+        '{kind:$kind,offset:$offset,length:$length}')") || return 1
+    total=$(jq -er '.metadata.total_matches | select(type == "number" and . >= 0)' <<<"$response") || return 1
+    count=$(jq -er '.entities | if type == "array" then length else error("Missing Prism entities") end' <<<"$response") || return 1
+    if (( offset + count > total || (count == 0 && offset < total) )); then
+      echo "Prism returned an incomplete $endpoint page; cleanup cannot be verified." >&2
+      return 1
+    fi
+    page_matches=$(jq -r --arg name "$name" '.entities[] | select(.spec.name == $name) | .metadata.uuid' <<<"$response") || return 1
+    while IFS= read -r uuid; do
+      [[ -n "$uuid" ]] && matches+=("$uuid")
+    done <<<"$page_matches"
+    offset=$((offset + count))
+    (( offset >= total )) && break
+  done
+  if (( ${#matches[@]} > 1 )); then
+    echo "More than one Prism $kind has the exact run-owned name $name; refusing broad cleanup." >&2
+    return 1
+  fi
+  if (( ${#matches[@]} == 1 )); then
+    [[ "${matches[0]}" =~ ^[0-9a-fA-F-]{36}$ ]] || return 1
+    printf '%s\n' "${matches[0]}"
+  fi
+}
+
 recorded_vm_count=$(awk '/^[0-9a-fA-F-]{36}$/ { count++ } END { print count + 0 }' "$SHARED_DIR/vm_uuids.txt")
 expected_vm_count=0
 if [[ -s "$SHARED_DIR/nutanix_worker_names" ]]; then
   expected_vm_count=$(awk 'NF { count++ } END { print count + 0 }' "$SHARED_DIR/nutanix_worker_names")
 fi
 if (( recorded_vm_count < expected_vm_count )); then
-  response=$(curl --silent --show-error --fail --insecure --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
-    -H 'Content-Type: application/json' -X POST "$NUTANIX_PC_URL/api/nutanix/v3/vms/list" \
-    --data '{"kind":"vm","length":500}')
   while IFS= read -r vm_name; do
     [[ -n "$vm_name" ]] || continue
-    matches=$(jq -r --arg name "$vm_name" '[.entities[] | select(.spec.name == $name) | .metadata.uuid] | unique | .[]' <<<"$response")
-    match_count=$(awk 'NF { count++ } END { print count + 0 }' <<<"$matches")
-    if (( match_count > 1 )); then
-      echo "More than one Nutanix VM has this run's exact worker name $vm_name; refusing broad cleanup."
-      exit 1
-    fi
-    if (( match_count == 1 )) && ! grep -Fxq "$matches" "$SHARED_DIR/vm_uuids.txt"; then
-      printf '%s\n' "$matches" >> "$SHARED_DIR/vm_uuids.txt"
+    uuid=$(find_prism_uuid_by_name vms vm "$vm_name") || exit 1
+    if [[ -n "$uuid" ]] && ! grep -Fxq "$uuid" "$SHARED_DIR/vm_uuids.txt"; then
+      printf '%s\n' "$uuid" >> "$SHARED_DIR/vm_uuids.txt"
     fi
   done < "$SHARED_DIR/nutanix_worker_names"
 fi
 
 if [[ -s "$SHARED_DIR/nutanix_image_name" && ! "$(cat "$SHARED_DIR/image_uuid.txt")" =~ ^[0-9a-fA-F-]{36}$ ]]; then
   image_name=$(cat "$SHARED_DIR/nutanix_image_name")
-  response=$(curl --silent --show-error --fail --insecure --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
-    -H 'Content-Type: application/json' -X POST "$NUTANIX_PC_URL/api/nutanix/v3/images/list" \
-    --data '{"kind":"image","length":500}')
-  matches=$(jq -r --arg name "$image_name" '[.entities[] | select(.spec.name == $name) | .metadata.uuid] | unique | .[]' <<<"$response")
-  match_count=$(awk 'NF { count++ } END { print count + 0 }' <<<"$matches")
-  if (( match_count > 1 )); then
-    echo "More than one Nutanix image has this run's exact image name $image_name; refusing broad cleanup."
-    exit 1
-  fi
-  if (( match_count == 1 )); then
-    printf '%s\n' "$matches" > "$SHARED_DIR/image_uuid.txt"
+  uuid=$(find_prism_uuid_by_name images image "$image_name") || exit 1
+  if [[ -n "$uuid" ]]; then
+    printf '%s\n' "$uuid" > "$SHARED_DIR/image_uuid.txt"
   fi
 fi
 
@@ -294,7 +311,7 @@ rm -rf /tmp/hcp-agent-nutanix
 if [[ -e "$SHARED_DIR/nutanix_ingress_tunnel_state.json" ]]; then
   touch "$SHARED_DIR/nutanix_destroy_complete"
 else
-  rm -f "$SHARED_DIR/nutanix_context.sh"
+  rm -f "$SHARED_DIR/nutanix_context.sh" "$SHARED_DIR/nutanix_ingress_vip"
 fi
 printf "Deleted this run's Nutanix resources for lease %s; CI-operator releases the lease after the workflow.\n" "$lease_resource"
 if [[ "$tracing_enabled" == true ]]; then set -x; fi

@@ -13,8 +13,8 @@ fi
 
 credentials=/etc/hypershift-pool-aws-credentials/credentials
 if [[ ! -s "$credentials" || ! -s "$SHARED_DIR/cluster-name" ||
-      ! -s "$SHARED_DIR/nutanix_context.sh" || ! -s "$SHARED_DIR/kubeconfig" ]]; then
-  echo "AWS credentials, HostedCluster name, Nutanix context, or management kubeconfig is missing."
+      ! -s "$SHARED_DIR/nutanix_ingress_vip" || ! -s "$SHARED_DIR/kubeconfig" ]]; then
+  echo "AWS credentials, HostedCluster name, Nutanix ingress VIP, or management kubeconfig is missing."
   exit 1
 fi
 export AWS_SHARED_CREDENTIALS_FILE="$credentials"
@@ -31,8 +31,7 @@ if [[ "$cluster" != "$expected_cluster" || ! "$domain" =~ ^[a-z0-9][a-z0-9.-]*[a
   exit 1
 fi
 
-# shellcheck source=/dev/null
-source "$SHARED_DIR/nutanix_context.sh"
+INGRESS_VIP=$(<"$SHARED_DIR/nutanix_ingress_vip")
 if [[ ! "$INGRESS_VIP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
   echo "The Nutanix ingress VIP is not an IPv4 address."
   exit 1

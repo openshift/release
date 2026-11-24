@@ -91,9 +91,18 @@ EOF
 
 echo "Configure IPAddressPool in different network environments separately."
 if [[ $IP_STACK == "v4" ]]; then
-  if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
+  # The Nutanix workflow has a quota-slice lease; require its context step's VIP.
+  if [[ -n "${NUTANIX_QUOTA_SLICE:-}" ]]; then
     set +x
-    METALLB_INGRESS_VIP=$(source "${SHARED_DIR}/nutanix_context.sh" && printf '%s' "${INGRESS_VIP:?}")
+    if [[ ! -s "${SHARED_DIR}/nutanix_ingress_vip" ]]; then
+      echo "The Nutanix ingress VIP file is missing."
+      exit 1
+    fi
+    METALLB_INGRESS_VIP=$(<"${SHARED_DIR}/nutanix_ingress_vip")
+    if [[ ! "$METALLB_INGRESS_VIP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+      echo "The Nutanix ingress VIP is invalid."
+      exit 1
+    fi
     set -x
   else
     METALLB_INGRESS_VIP=192.168.111.30

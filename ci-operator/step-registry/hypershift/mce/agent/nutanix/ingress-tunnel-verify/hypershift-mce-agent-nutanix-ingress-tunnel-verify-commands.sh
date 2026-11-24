@@ -3,11 +3,14 @@
 set -euo pipefail
 tracing_enabled=false
 if [[ $- == *x* ]]; then tracing_enabled=true; fi
-# The sourced context and later cluster responses include credentials or URLs.
+# The host configuration and later cluster responses include URLs.
 set +x
 
-# shellcheck source=/dev/null
-source "$SHARED_DIR/nutanix_context.sh"
+if [[ ! -s "$SHARED_DIR/nutanix_ingress_vip" ]]; then
+  echo "The Nutanix ingress VIP file is missing."
+  exit 1
+fi
+INGRESS_VIP=$(<"$SHARED_DIR/nutanix_ingress_vip")
 # shellcheck source=/dev/null
 source "$SHARED_DIR/packet-conf.sh"
 if [[ -f "$SHARED_DIR/proxy-conf.sh" ]]; then

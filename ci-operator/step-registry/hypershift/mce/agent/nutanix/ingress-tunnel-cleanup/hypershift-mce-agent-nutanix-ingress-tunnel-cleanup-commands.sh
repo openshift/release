@@ -11,7 +11,7 @@ ssh_config="$SHARED_DIR/nutanix_ingress_tunnel_ssh_config"
 cleanup_context_if_complete() {
   if [[ -e "$SHARED_DIR/nutanix_destroy_complete" && ! -e "$state_file" &&
         ! -e "$identity_file" ]]; then
-    rm -f "$SHARED_DIR/nutanix_context.sh" "$SHARED_DIR/nutanix_destroy_complete"
+    rm -f "$SHARED_DIR/nutanix_context.sh" "$SHARED_DIR/nutanix_ingress_vip" "$SHARED_DIR/nutanix_destroy_complete"
   fi
 }
 if [[ ! -e "$state_file" ]]; then
@@ -78,9 +78,10 @@ if [[ "$job_id" != "$PROW_JOB_ID" ||
   exit 1
 fi
 
-# Leave the Prism resources and state intact if host cleanup cannot be verified.
-# A later cleanup retry can then recover rather than leaving a blackhole route.
-ssh "${SSHOPTS[@]}" "root@$IP" bash -s -- \
+# Prism cleanup must still run if the leased proxy host is unreachable. Keep
+# the state and report failure so a later retry can remove the host route.
+host_cleanup_failed=false
+if ! ssh "${SSHOPTS[@]}" "root@$IP" bash -s -- \
   "$lease" "$vip" "$iface" "$port" "$firewall_zone" <<'REMOTE'
 set -euo pipefail
 lease=$1 vip=$2 iface=$3 port=$4 expected_zone=${5:-}
@@ -140,6 +141,10 @@ rm -f "$config" "$key" "$unit_file" "$marker"
 systemctl daemon-reload
 rmdir "$state_dir" 2>/dev/null || true
 REMOTE
+then
+  echo "Could not verify proxy-host tunnel cleanup; continuing with Prism cleanup."
+  host_cleanup_failed=true
+fi
 
 if [[ ! -s "$SHARED_DIR/nutanix_context.sh" ]]; then
   echo "The Nutanix context is unavailable; retaining tunnel state for VM cleanup."
@@ -154,14 +159,6 @@ if [[ "$vip" != "$INGRESS_VIP" || "$subnet_uuid" != "$SUBNET_UUID" ]]; then
   exit 1
 fi
 
-prism_list() {
-  curl --silent --show-error --fail --insecure --max-time 60 \
-    --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
-    -H 'Content-Type: application/json' -X POST \
-    "$NUTANIX_PC_URL/api/nutanix/v3/$1/list" \
-    --data "{\"kind\":\"$2\",\"length\":1000}"
-}
-
 prism_get_with_code() {
   local kind=$1 uuid=$2 body=$3
   curl --silent --show-error --insecure --max-time 45 \
@@ -170,14 +167,47 @@ prism_get_with_code() {
     "$NUTANIX_PC_URL/api/nutanix/v3/$kind/$uuid"
 }
 
+find_prism_uuid_by_name() {
+  local endpoint=$1 kind=$2 name=$3 offset=0 page_size=500 response total count page_matches uuid
+  local -a matches=()
+  while :; do
+    response=$(curl --silent --show-error --fail --insecure --max-time 60 \
+      --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" \
+      -H 'Content-Type: application/json' -X POST \
+      "$NUTANIX_PC_URL/api/nutanix/v3/$endpoint/list" \
+      --data "$(jq -nc --arg kind "$kind" --argjson offset "$offset" --argjson length "$page_size" \
+        '{kind:$kind,offset:$offset,length:$length}')") || return 1
+    total=$(jq -er '.metadata.total_matches | select(type == "number" and . >= 0)' <<<"$response") || return 1
+    count=$(jq -er '.entities | if type == "array" then length else error("Missing Prism entities") end' <<<"$response") || return 1
+    if (( offset + count > total || (count == 0 && offset < total) )); then
+      echo "Prism returned an incomplete $endpoint page; cleanup cannot be verified." >&2
+      return 1
+    fi
+    page_matches=$(jq -r --arg name "$name" '.entities[] | select(.spec.name == $name) | .metadata.uuid' <<<"$response") || return 1
+    while IFS= read -r uuid; do
+      [[ -n "$uuid" ]] && matches+=("$uuid")
+    done <<<"$page_matches"
+    offset=$((offset + count))
+    (( offset >= total )) && break
+  done
+  if (( ${#matches[@]} > 1 )); then
+    echo "More than one Prism $kind has the run-owned name $name." >&2
+    return 1
+  fi
+  if (( ${#matches[@]} == 1 )); then
+    [[ "${matches[0]}" =~ ^[0-9a-fA-F-]{36}$ ]] || return 1
+    printf '%s\n' "${matches[0]}"
+  fi
+}
+
 recover_uuid() {
-  local endpoint=$1 kind=$2 name=$3 response found
+  local endpoint=$1 kind=$2 name=$3 found
   for ((attempt = 1; attempt <= 12; attempt++)); do
-    response=$(prism_list "$endpoint" "$kind")
-    found=$(jq -r --arg name "$name" '[.entities[]? | select(.spec.name == $name) |
-      .metadata.uuid] | unique | if length == 0 then "" elif length == 1 then .[0]
-      else error("Ambiguous run-owned Prism resource name") end' <<< "$response")
+    found=$(find_prism_uuid_by_name "$endpoint" "$kind" "$name") || return 1
     if [[ -n "$found" ]]; then printf '%s\n' "$found"; return 0; fi
+    # An explicit HTTP validation rejection means Prism did not accept VM
+    # creation. A complete list search confirms absence before image deletion.
+    if [[ "$endpoint:$stage" == vms:vm-create-rejected ]]; then return 0; fi
     sleep 10
   done
   return 1
@@ -186,7 +216,7 @@ recover_uuid() {
 wait_absent() {
   local endpoint=$1 uuid=$2 code
   for ((attempt = 1; attempt <= 40; attempt++)); do
-    code=$(prism_get_with_code "$endpoint" "$uuid" /dev/null)
+    code=$(prism_get_with_code "$endpoint" "$uuid" /dev/null) || return 1
     if [[ "$code" == 404 ]]; then return 0; fi
     if [[ "$code" != 200 ]]; then
       echo "Unexpected Prism status $code for $endpoint/$uuid."
@@ -199,11 +229,11 @@ wait_absent() {
 
 wait_create_task() {
   local task=$1 body code status
-  body=$(mktemp)
+  body=$(mktemp) || return 1
   for ((attempt = 1; attempt <= 36; attempt++)); do
-    code=$(prism_get_with_code tasks "$task" "$body")
+    code=$(prism_get_with_code tasks "$task" "$body") || { rm -f "$body"; return 1; }
     if [[ "$code" == 200 ]]; then
-      status=$(jq -r '.status // empty' "$body")
+      status=$(jq -r '.status // empty' "$body") || { rm -f "$body"; return 1; }
       case "$status" in
         SUCCEEDED|FAILED|ABORTED|CANCELLED) rm -f "$body"; return 0 ;;
       esac
@@ -217,10 +247,10 @@ wait_create_task() {
 
 delete_recorded() {
   local endpoint=$1 kind=$2 name=$3 uuid=$4 create_task=$5 code body
-  if [[ -n "$create_task" ]]; then wait_create_task "$create_task"; fi
+  if [[ -n "$create_task" ]] && ! wait_create_task "$create_task"; then return 1; fi
   if [[ -z "$uuid" ]]; then
     case "$endpoint:$stage" in
-      vms:vm-create-requested|vms:vm-created|vms:host-route-active|vms:ready|\
+      vms:vm-create-requested|vms:vm-create-rejected|vms:vm-created|vms:host-route-active|vms:ready|\
       images:image-create-requested|images:image-created|images:vm-create-requested|\
       images:vm-created|images:host-route-active|images:ready) ;;
       *) return 0 ;;
@@ -229,9 +259,10 @@ delete_recorded() {
       echo "Prism did not prove that the requested $name is absent; retaining tunnel state for a cleanup retry."
       return 1
     fi
+    [[ -n "$uuid" ]] || return 0
   fi
-  body=$(mktemp)
-  code=$(prism_get_with_code "$endpoint" "$uuid" "$body")
+  body=$(mktemp) || return 1
+  code=$(prism_get_with_code "$endpoint" "$uuid" "$body") || { rm -f "$body"; return 1; }
   if [[ "$code" == 404 ]]; then
     rm -f "$body"
     return 0
@@ -245,7 +276,7 @@ delete_recorded() {
   code=$(curl --silent --show-error --insecure --max-time 60 \
     --user "$NUTANIX_USERNAME:$NUTANIX_PASSWORD" -X DELETE \
     -o /dev/null -w '%{http_code}' \
-    "$NUTANIX_PC_URL/api/nutanix/v3/$endpoint/$uuid")
+    "$NUTANIX_PC_URL/api/nutanix/v3/$endpoint/$uuid") || return 1
   if [[ "$code" != 200 && "$code" != 202 && "$code" != 204 && "$code" != 404 ]]; then
     echo "Prism rejected deletion of $endpoint/$uuid with HTTP $code."
     return 1
@@ -256,8 +287,17 @@ delete_recorded() {
   fi
 }
 
-delete_recorded vms vm "$gateway_name" "$gateway_uuid" "$gateway_task_uuid"
-delete_recorded images image "$image_name" "$image_uuid" "$image_task_uuid"
+vm_cleanup_failed=false
+if ! delete_recorded vms vm "$gateway_name" "$gateway_uuid" "$gateway_task_uuid"; then
+  vm_cleanup_failed=true
+fi
+if [[ "$vm_cleanup_failed" == false ]]; then
+  delete_recorded images image "$image_name" "$image_uuid" "$image_task_uuid"
+fi
+if [[ "$vm_cleanup_failed" == true || "$host_cleanup_failed" == true ]]; then
+  echo "Tunnel cleanup remains incomplete; retaining state for a retry."
+  exit 1
+fi
 rm -f "$ssh_config" "$state_file" "$identity_file"
 cleanup_context_if_complete
 printf 'Removed the lease-owned proxy-host tunnel, Nutanix gateway VM, and image for %s.\n' "$lease"
