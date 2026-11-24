@@ -841,7 +841,7 @@ tests:
       COMPUTE_NODE_TYPE: m6a.4xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
       EXTERNAL_WEBSERVER_IP: 172.27.187.82
-      EXTRA_FLAGS: --local-indexing
+      EXTRA_FLAGS: --local-indexing --set=jobs.1.skipIndexing=false --set=jobs.2.skipIndexing=false
       ITERATIONS: "72"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
     post:
@@ -866,17 +866,19 @@ tests:
       COMPUTE_NODE_REPLICAS: "3"
       COMPUTE_NODE_TYPE: m6a.4xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6a.4xlarge
-      EXTRA_FLAGS: --local-indexing
-      NAMESPACES_PER_CUDN: "1"
+      EXTERNAL_WEBSERVER_IP: 172.27.187.82
+      EXTRA_FLAGS: --local-indexing --set=jobs.1.skipIndexing=false --set=jobs.2.iterations=0
+      ITERATIONS: "72"
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r5.4xlarge
-      OVERRIDE_ITERATIONS: "72"
     post:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
+    - ref: ipi-install-post-featureset
     - chain: create-infra-move-ingress-monitoring-registry
     test:
-    - ref: openshift-qe-cudn-density
+    - ref: openshift-qe-evpn
+    workflow: openshift-qe-installer-aws
   timeout: 14h0m0s
 zz_generated_metadata:
   branch: main
