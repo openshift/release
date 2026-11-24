@@ -161,7 +161,8 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'ibmcloud' ]]; then
         sleep 10
     done
     if [[ "${cos_destroy_rc}" -ne 0 ]]; then
-        echo "WARNING: IBM Cloud COS terraform destroy failed after 3 attempts (rc=${cos_destroy_rc}). Resources may be leaked." >&2
+        echo "ERROR: IBM Cloud COS terraform destroy failed after 3 attempts (rc=${cos_destroy_rc}). Resources may be leaked." >&2
+        exit "${cos_destroy_rc}"
     fi
     fi
 fi

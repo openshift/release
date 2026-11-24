@@ -75,8 +75,9 @@ function save_cos_terraform_state() {
     fi
     local archive_tmp
     archive_tmp="$(mktemp "${SHARED_DIR}/terraform.tgz.XXXXXX")" || exit 1
+    # Include the provider lock file so cleanup uses the same provider version.
     # Publish only a complete archive, preserving the previous copy on failure.
-    if tar -czf "${archive_tmp}" --exclude=".terraform" --exclude="terraform.tgz" -- * &&
+    if tar -czf "${archive_tmp}" --exclude=".terraform" --exclude="terraform.tgz" -- . &&
       mv -f "${archive_tmp}" "${SHARED_DIR}/terraform.tgz"; then
       exit 0
     fi
