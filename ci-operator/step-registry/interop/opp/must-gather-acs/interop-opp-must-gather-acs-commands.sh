@@ -201,6 +201,10 @@ collect_acs_diagnostics() {
     # which only applies when the router terminates (edge/reencrypt) and can
     # never verify a passthrough route. Verify against Central's own CA, and
     # exchange the admin password only after that verification succeeds.
+    # Initialize retry-path variables so the download retry branch works when
+    # the direct TLS preflight succeeded and no backend was selected.
+    typeset _central_svc="" _central_route_tp="" _central_svc_dns="" _central_connect_to="" _central_backend="" _central_addr="" _central_port=""
+    typeset -i _central_backend_rc=0 _central_direct_rc=0
     TLS_MODE="unverified"
     CURL_TLS_OPTS=""
     CENTRAL_URL_HOST="${CENTRAL_HOST}"
@@ -385,6 +389,11 @@ collect_acs_diagnostics() {
         if [[ "${HTTP_CODE}" == "200" ]] && [[ -s "${ARTIFACT_DIR}/acs-must-gather/acs-diagnostic-bundle.zip" ]]; then
             break
         fi
+        # On transport failure or non-200, remove any partial file so a
+        # truncated ZIP is never treated as publishable.
+        if [[ "${HTTP_CODE}" != "200" ]]; then
+            rm -f "${ARTIFACT_DIR}/acs-must-gather/acs-diagnostic-bundle.zip"
+        fi
         if (( _dl_attempt < _dl_max )); then
             echo "Retrying diagnostic bundle download (attempt $((_dl_attempt + 1))/${_dl_max}) after refreshing backend candidates..." >&2
             # Refresh backend candidates before retrying, so a newly-ready
@@ -415,8 +424,10 @@ collect_acs_diagnostics() {
         fi
     done
     # Transport failures after retries still need the FAILED marker that the
-    # single-shot path created in its curl fallback.
-    if [[ "${HTTP_CODE}" == "000" ]] && [[ ! -s "${ARTIFACT_DIR}/acs-must-gather/acs-diagnostic-bundle.zip" ]]; then
+    # single-shot path created in its curl fallback. Remove any partial
+    # file from a timed-out curl so it is never treated as publishable.
+    if [[ "${HTTP_CODE}" == "000" ]]; then
+        rm -f "${ARTIFACT_DIR}/acs-must-gather/acs-diagnostic-bundle.zip"
         echo "WARNING: curl failed to connect to Central after ${_dl_max} attempts." >&2
         echo "FAILED: curl transport error" > "${ARTIFACT_DIR}/acs-must-gather/FAILED"
         BUNDLE_STATUS="failed:transport"
@@ -427,12 +438,11 @@ collect_acs_diagnostics() {
         BUNDLE_STATUS="downloaded"
         cd "${ARTIFACT_DIR}/acs-must-gather"
         unzip -qo acs-diagnostic-bundle.zip -d diagnostic-bundle 2>/dev/null || true
-    else
+    elif [[ "${HTTP_CODE}" != "000" ]]; then
+        rm -f "${ARTIFACT_DIR}/acs-must-gather/acs-diagnostic-bundle.zip"
         echo "WARNING: Diagnostic download failed (HTTP ${HTTP_CODE})."
         BUNDLE_STATUS="failed:http-${HTTP_CODE}"
-        if [[ "${HTTP_CODE}" != "000" ]]; then
-            echo "FAILED: HTTP ${HTTP_CODE}" > "${ARTIFACT_DIR}/acs-must-gather/FAILED"
-        fi
+        echo "FAILED: HTTP ${HTTP_CODE}" > "${ARTIFACT_DIR}/acs-must-gather/FAILED"
     fi
 
     # Clean up credentials file immediately - the EXIT trap only fires at
@@ -1347,13 +1357,15 @@ PYEOF
 if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" != "1" ]]; then
   _sub_refresh_ok=false
   _sub_refresh_out=""
+  _sub_refresh_err=$(mktemp)
   for _sub_refresh_try in 1 2 3; do
-    if _sub_refresh_out=$(oc get subscriptions.operators.coreos.com -A -o json 2>&1); then
+    if _sub_refresh_out=$(oc get subscriptions.operators.coreos.com -A -o json 2>"${_sub_refresh_err}"); then
       _sub_refresh_ok=true
       break
     fi
     (( _sub_refresh_try < 3 )) && sleep $(( _sub_refresh_try * 2 ))
   done
+  rm -f "${_sub_refresh_err}"
   if [[ "${_sub_refresh_ok}" == "true" ]]; then
     printf '%s' "${_sub_refresh_out}" | python3 -c '
 import json, sys
@@ -1374,9 +1386,21 @@ for i in data.get("items", []):
         "generation": i.get("metadata", {}).get("generation")
     })
 print(json.dumps(result, indent=2))
-' > "${EVIDENCE_DIR}/03-subscription.json" 2>&1 || echo "probe_error: subscription query failed" > "${EVIDENCE_DIR}/03-subscription.json"
+' > "${EVIDENCE_DIR}/03-subscription.json.tmp" || {
+      echo "probe_error: subscription query failed" > "${EVIDENCE_DIR}/03-subscription.json"
+      echo "probe_error: subscription query failed" > "${EVIDENCE_DIR}/03-subscription.refresh-failed"
+      rm -f "${EVIDENCE_DIR}/03-subscription.json.tmp"
+    }
+    if [[ -f "${EVIDENCE_DIR}/03-subscription.json.tmp" ]]; then
+      if ! mv -f "${EVIDENCE_DIR}/03-subscription.json.tmp" "${EVIDENCE_DIR}/03-subscription.json"; then
+        echo "probe_error: subscription refresh mv failed" > "${EVIDENCE_DIR}/03-subscription.json"
+        echo "probe_error: subscription refresh mv failed" > "${EVIDENCE_DIR}/03-subscription.refresh-failed"
+      fi
+      rm -f "${EVIDENCE_DIR}/03-subscription.json.tmp"
+    fi
   else
     echo "probe_error: subscription re-read failed after 3 attempts" > "${EVIDENCE_DIR}/03-subscription.json"
+    echo "probe_error: subscription re-read failed after 3 attempts" > "${EVIDENCE_DIR}/03-subscription.refresh-failed"
   fi
 fi
 
