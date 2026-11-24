@@ -314,6 +314,7 @@ function IsMcpProgressing () {
     typeset -i first=${updatedHistory[windowStart]}
     typeset -i last=${updatedHistory[len - 1]}
     if (( last > first )); then
+        typeset -i _hasDip=0 _lastDip=-1
         for (( i = windowStart + 1; i < len; ++i )); do
             # PRRT_kwDOBHvUUM65Mrk3: a single-poll updated dip inside the
             # concurrent-reboot bound is a healthy rolling update, not a state
@@ -321,10 +322,25 @@ function IsMcpProgressing () {
             # check below decide. A dip beyond the bound, or a dip whose ready
             # count also falls, still rejects the window.
             if (( updatedHistory[i] < updatedHistory[i-1] )); then
+                _hasDip=1
+                _lastDip=i
                 (( updatedHistory[i-1] - updatedHistory[i] > _maxUnavail )) && return 1
                 (( readyHistory[i] < readyHistory[i-1] )) && return 1
             fi
         done
+        if (( _hasDip )); then
+            # When the updated trend has a dip, require ready to recover
+            # (not fall) at or after the dip; a dip with a ready fall or
+            # no ready recovery resets the streak.
+            typeset -i _recovered=0
+            for (( i = _lastDip + 1; i < len; ++i )); do
+                if (( readyHistory[i] > readyHistory[_lastDip] )); then
+                    _recovered=1
+                    break
+                fi
+            done
+            (( _recovered )) || return 1
+        fi
         (( _vetoStreakHit )) && return 1
         return 0
     fi
