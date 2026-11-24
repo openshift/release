@@ -27,6 +27,7 @@ az account set --subscription ${AZURE_AUTH_SUBSCRIPTION_ID}
 
 # create resource group prior to installation
 az group create -l "${azure_region}" -n "${existing_rg}"
+echo "${existing_rg}" > "${SHARED_DIR}/resourcegroup_cluster"
 
 # create a patch with existing resource group configuration
 cat > "${PATCH}" << EOF
