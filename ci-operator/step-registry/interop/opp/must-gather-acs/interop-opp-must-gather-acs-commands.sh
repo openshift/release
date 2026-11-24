@@ -71,7 +71,9 @@ _central_backend_target() {
     if (( _oc_rc != 0 )); then return 2; fi
     # _errfile is temporary, not artifact; raw error text never leaves as artifact
     if [[ -s "${_errfile}" ]]; then
+        set +x
         printf 'EndpointSlice query failed: %s\n' "$(head -c 200 "${_errfile}")" >&2
+        set -x
     fi
     _backend_target="$(printf '%s\n' "${_slice_json}" | \
       python3 -c '
