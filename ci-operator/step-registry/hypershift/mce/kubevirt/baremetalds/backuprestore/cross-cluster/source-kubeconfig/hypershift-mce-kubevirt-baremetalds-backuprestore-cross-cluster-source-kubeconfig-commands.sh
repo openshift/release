@@ -1,1 +1,0 @@
-../target-kubeconfig/hypershift-mce-kubevirt-baremetalds-backuprestore-cross-cluster-target-kubeconfig-commands.sh

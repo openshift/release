@@ -1,0 +1,1 @@
+../hypershift-kubevirt-health-check-commands.sh

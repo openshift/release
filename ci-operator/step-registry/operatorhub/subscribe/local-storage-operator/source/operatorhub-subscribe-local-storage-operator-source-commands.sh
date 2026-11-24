@@ -1,0 +1,1 @@
+../operatorhub-subscribe-local-storage-operator-commands.sh

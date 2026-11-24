@@ -1,0 +1,1 @@
+../enable-qe-catalogsource-commands.sh

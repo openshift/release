@@ -44,7 +44,7 @@ trap 'exit_with_failure' ERR
 cd
 
 # A job can hold a source and target host at the same time. Keep the original
-# requester name for existing callers that do not select a role.
+# requester name for existing callers without a role.
 OFCIR_REQUESTER="${JOB_NAME}/${BUILD_ID}"
 OFCIR_ROLE="${OFCIR_ROLE:-}"
 if [[ -z "${OFCIR_ROLE}" && -f "${SHARED_DIR}/ofcir-role" ]]; then
@@ -55,6 +55,9 @@ if [[ -n "${OFCIR_ROLE}" ]]; then
         exit_with_failure "Invalid OFCIR role"
     fi
     OFCIR_REQUESTER="${OFCIR_REQUESTER}-${OFCIR_ROLE}"
+    printf '%s' "${OFCIR_ROLE}" > "${SHARED_DIR}/ofcir-role"
+    # ci-operator only passes top-level files to subsequent steps.
+    CONTEXT_PREFIX="${SHARED_DIR}/ofcir-${OFCIR_ROLE}-"
 fi
 
 echo "Setting up packet-conf.sh"
@@ -114,9 +117,8 @@ function getCIR(){
     echo "Got CIR $NAME"
     # A lease may already exist if provisioning or the SSH check fails later.
     if [[ -n "${OFCIR_ROLE}" ]]; then
-        CONTEXT_DIR="${SHARED_DIR}/ofcir-contexts/${OFCIR_ROLE}"
-        mkdir -p "${CONTEXT_DIR}"
-        cp "${CIRFILE}" "${SHARED_DIR}/packet-conf.sh" "${CONTEXT_DIR}/"
+        cp "${CIRFILE}" "${CONTEXT_PREFIX}cir"
+        cp "${SHARED_DIR}/packet-conf.sh" "${CONTEXT_PREFIX}packet-conf.sh"
     fi
 
     # If the node is being provisioned on demand it may take some time to be provisioned
@@ -144,9 +146,9 @@ function getCIR(){
     # Preserve enough state for cleanup even if a later setup step fails before
     # the workflow has a chance to save the rest of this cluster's files.
     if [[ -n "${OFCIR_ROLE}" ]]; then
-        CONTEXT_DIR="${SHARED_DIR}/ofcir-contexts/${OFCIR_ROLE}"
-        mkdir -p "${CONTEXT_DIR}"
-        cp "${CIRFILE}" "${IPFILE}" "${PORTFILE}" "${SHARED_DIR}/packet-conf.sh" "${CONTEXT_DIR}/"
+        cp "${CIRFILE}" "${CONTEXT_PREFIX}cir"
+        cp "${IPFILE}" "${CONTEXT_PREFIX}server-ip"
+        cp "${PORTFILE}" "${CONTEXT_PREFIX}server-sshport"
     fi
 }
 

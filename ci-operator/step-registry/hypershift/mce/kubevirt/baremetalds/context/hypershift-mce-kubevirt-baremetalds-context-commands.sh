@@ -9,12 +9,10 @@ case "${role}" in
   *) echo "Unsupported OFCIR context role" >&2; exit 1 ;;
 esac
 case "${action}" in
-  select|save|activate) ;;
+  save|activate) ;;
   *) echo "Unsupported OFCIR context action" >&2; exit 1 ;;
 esac
 
-context_root="${SHARED_DIR}/ofcir-contexts"
-mkdir -p "${context_root}"
 files=(
   cir server-ip server-sshport packet-conf.sh kubeconfig kubeadmin-password
   install-status.txt ds-vars.conf console.url proxy-conf.sh
@@ -27,25 +25,17 @@ files=(
 
 save_active() {
   local active="${1}"
-  local directory="${context_root}/${active}"
-  mkdir -p "${directory}"
+  # ci-operator only passes top-level files to subsequent steps.
+  local prefix="${SHARED_DIR}/ofcir-${active}-"
   for file in "${files[@]}"; do
     if [[ -f "${SHARED_DIR}/${file}" ]]; then
-      cp -p "${SHARED_DIR}/${file}" "${directory}/${file}"
+      cp -p "${SHARED_DIR}/${file}" "${prefix}${file}"
     fi
   done
-  if [[ -s "${directory}/kubeconfig" ]]; then
-    cp -p "${directory}/kubeconfig" "${SHARED_DIR}/management_cluster_kubeconfig_${active}"
-  fi
-  if [[ -s "${directory}/server-ip" ]]; then
-    cp -p "${directory}/server-ip" "${SHARED_DIR}/ofcir-server-ip_${active}"
+  if [[ -s "${prefix}kubeconfig" ]]; then
+    cp -p "${prefix}kubeconfig" "${SHARED_DIR}/management_cluster_kubeconfig_${active}"
   fi
 }
-
-if [[ "${action}" == select ]]; then
-  printf '%s' "${role}" > "${SHARED_DIR}/ofcir-role"
-  exit 0
-fi
 
 active=""
 if [[ -f "${SHARED_DIR}/ofcir-role" ]]; then
@@ -66,8 +56,8 @@ fi
 
 for file in "${files[@]}"; do
   rm -f "${SHARED_DIR}/${file}"
-  if [[ -f "${context_root}/${role}/${file}" ]]; then
-    cp -p "${context_root}/${role}/${file}" "${SHARED_DIR}/${file}"
+  if [[ -f "${SHARED_DIR}/ofcir-${role}-${file}" ]]; then
+    cp -p "${SHARED_DIR}/ofcir-${role}-${file}" "${SHARED_DIR}/${file}"
   fi
 done
 printf '%s' "${role}" > "${SHARED_DIR}/ofcir-role"

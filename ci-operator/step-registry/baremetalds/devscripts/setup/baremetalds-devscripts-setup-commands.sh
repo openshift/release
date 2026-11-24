@@ -31,6 +31,16 @@ finished()
   echo "Adding proxy-url in kubeconfig"
   sed -i "/- cluster/ a\    proxy-url: http://$IP:$PROXYPORT/" "${SHARED_DIR}"/kubeconfig
 
+  if [[ -s "${SHARED_DIR}/kubeconfig" && -f "${SHARED_DIR}/ofcir-role" ]]; then
+    local role
+    role="$(<"${SHARED_DIR}/ofcir-role")"
+    case "${role}" in
+      source|target)
+        cp "${SHARED_DIR}/kubeconfig" "${SHARED_DIR}/management_cluster_kubeconfig_${role}"
+        ;;
+    esac
+  fi
+
   # Get dev-scripts logs
   echo "dev-scripts setup completed, fetching logs"
   ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /root/dev-scripts/logs | tar -C "${ARTIFACT_DIR}" -xzf -

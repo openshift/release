@@ -1,0 +1,1 @@
+../baremetalds-devscripts-setup-commands.sh

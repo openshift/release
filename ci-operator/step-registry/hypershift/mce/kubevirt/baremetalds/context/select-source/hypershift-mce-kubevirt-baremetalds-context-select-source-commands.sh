@@ -1,1 +1,0 @@
-../hypershift-mce-kubevirt-baremetalds-context-commands.sh

@@ -1,0 +1,1 @@
+../rhcos-conf-osstream-commands.sh
