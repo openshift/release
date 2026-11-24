@@ -589,28 +589,42 @@ TestQuayPull() {
             return
         fi
 
-        if (( qrCount == 0 )); then
-            # Check if Quay operator is even installed
-            typeset quayCsv=""
-            if ! quayCsv="$(oc get csv --all-namespaces -o json | jq -r '
+        # Re-extract endpoint from the same snapshot to keep endpoint and presence consistent (PRRT 4622731202)
+        typeset freshEndpoint=""
+        freshEndpoint="$(printf '%s' "${qrJson2}" | jq -r '.items[0].status.registryEndpoint // empty' 2>/dev/null | sed 's|^https://||')" || freshEndpoint=""
+        if [[ -n "${freshEndpoint}" ]]; then
+            quayRoute="${freshEndpoint}"
+        else
+            if (( qrCount == 0 )); then
+                # Check if Quay operator is even installed
+                typeset quayCsv=""
+                if ! quayCsv="$(oc get csv --all-namespaces -o json | jq -r '
                 [ .items[] | select(.metadata.name | startswith("quay-operator")) | .metadata.name ] | first // empty
             ')"; then
-                AddResult "quay-pull" "fail" "Failed to query CSVs for Quay operator"
+                    AddResult "quay-pull" "fail" "Failed to query CSVs for Quay operator"
+                    return
+                fi
+
+                if [[ -z "${quayCsv}" ]]; then
+                    : "SKIP: Quay operator not installed"
+                    AddResult "quay-pull" "skip" "Quay operator not installed"
+                    return
+                fi
+
+                failMsg="Quay operator installed but no QuayRegistry CR deployed on this lane"
+                : "SKIP: ${failMsg}"
+                AddResult "quay-pull" "skip" "${failMsg}"
                 return
             fi
 
-            if [[ -z "${quayCsv}" ]]; then
-                : "SKIP: Quay operator not installed"
-                AddResult "quay-pull" "skip" "Quay operator not installed"
-                return
-            fi
-
-            failMsg="Quay operator installed but no QuayRegistry CR deployed on this lane"
-            : "SKIP: ${failMsg}"
-            AddResult "quay-pull" "skip" "${failMsg}"
+            failMsg="QuayRegistry present but no registry route found"
+            : "FAIL: ${failMsg}"
+            AddResult "quay-pull" "fail" "${failMsg}"
             return
         fi
+    fi
 
+    if [[ -z "${quayRoute}" ]]; then
         failMsg="QuayRegistry present but no registry route found"
         : "FAIL: ${failMsg}"
         AddResult "quay-pull" "fail" "${failMsg}"
