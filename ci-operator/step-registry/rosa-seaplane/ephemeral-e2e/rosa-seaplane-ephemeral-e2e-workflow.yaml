@@ -16,7 +16,9 @@ workflow:
 
     When triggered from rosa-seaplane-api, the e2e step auto-detects
     the PR's fork repo and branch via the GitHub API, so test changes in the
-    PR are picked up automatically (including from forks). When triggered
+    PR are picked up automatically (including from forks). A component can
+    also set a child chart's source.targetRevision to PR_SOURCE_SHA in its
+    override so Argo CD deploys the chart from the same PR. When triggered
     from rosa-seaplane itself, the environment is provisioned from the PR's
     head branch and every step runs the PR's code.
 
@@ -34,6 +36,9 @@ workflow:
                 target: argocd/config/regional-cluster/<component>/values.yaml
                 override:
                   <yaml-fragment-with-IMAGE_REPO-and-IMAGE_TAG-placeholders>
+
+    For chart changes in the component PR, include
+    `seaplane.source.targetRevision: PR_SOURCE_SHA` in the override.
 
     Set OCP_RELEASE_STREAM (e.g. "5.1.0-0.nightly-multi") to run against the
     latest accepted OCP payload of a release controller stream instead of the
