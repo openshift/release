@@ -607,10 +607,12 @@ TestQuayPull() {
         # Re-extract endpoint from the same snapshot to keep endpoint and presence consistent (PRRT 4622731202)
         typeset freshEndpoint=""
         freshEndpoint="$(printf '%s' "${qrJson2}" | jq -r '.items[0].status.registryEndpoint // empty' 2>/dev/null | sed 's|^https://||')" || freshEndpoint=""
-        set -x
+        set +x  # suppress xtrace: the registry hostname is sensitive
         if [[ -n "${freshEndpoint}" ]]; then
             quayRoute="${freshEndpoint}"
-        else
+        fi
+        set -x
+        if [[ -z "${quayRoute}" ]]; then
             if (( qrCount == 0 )); then
                 # Check if Quay operator is even installed
                 typeset quayCsv=""
@@ -647,7 +649,7 @@ TestQuayPull() {
         return
     fi
 
-    : "Found Quay route: ${quayRoute}"
+    : "Found Quay registry route"
 
     # Attempt to pull the Quay health endpoint (API check instead of image pull
     # since we may not have registry credentials configured)
@@ -659,9 +661,9 @@ TestQuayPull() {
     set -x
 
     if [[ "${httpCode}" =~ ^(200|401|403)$ ]]; then
-        : "PASS: Quay registry responding (HTTP ${httpCode}) at ${quayRoute}"
+        : "PASS: Quay registry responding (HTTP ${httpCode})"
     else
-        failMsg="Quay registry unreachable at ${quayRoute} (HTTP ${httpCode:-timeout})"
+        failMsg="Quay registry unreachable (HTTP ${httpCode:-timeout})"
         : "FAIL: ${failMsg}"
     fi
 
