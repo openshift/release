@@ -568,7 +568,7 @@ if counts['20-owned'] == 0 and counts['25-ssl'] == 0:
             fallback_used = True
     if fallback_used:
         print('WARNING: no owned Quay TLS secret found for %s (uid %s); falling back to label app=quay secrets' % (owner, owner_uid), file=sys.stderr)
-" || true
+" || { _rc=$?; echo "WARNING: Quay TLS trust candidate extraction failed (python rc=${_rc})" >&2; }
 
     # The ingress CA signs route certificates that no operator issued.
     typeset ingressCa=''
