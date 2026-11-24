@@ -4,6 +4,17 @@ set -euo pipefail
 
 role="$(<"${SHARED_DIR}/ofcir-role")"
 [[ "${role}" == source || "${role}" == target ]] || { echo "Invalid OFCIR role" >&2; exit 1; }
+manager_domain_file="${SHARED_DIR}/cross-cluster-manager-domain"
+guest_domain_file="${SHARED_DIR}/cross-cluster-guest-domain"
+if [[ "${role}" == target ]]; then
+  for domain_file in "${manager_domain_file}" "${guest_domain_file}"; do
+    if [[ ! -s "${domain_file}" ]]; then
+      echo "Missing or empty ${domain_file}. The source DNS step must save both base domains before the target DNS hook runs." >&2
+      exit 1
+    fi
+  done
+fi
+
 cluster_name="$(<"${SHARED_DIR}/cluster-name")"
 cluster_namespace="${E2E_HOSTED_CLUSTER_NAMESPACE:-local-cluster}"
 control_plane_namespace="${cluster_namespace}-${cluster_name}"
@@ -27,13 +38,13 @@ done
   exit 1
 }
 if [[ "${role}" == source ]]; then
-  printf '%s\n' "${manager_domain}" > "${SHARED_DIR}/cross-cluster-manager-domain"
-  printf '%s\n' "${guest_domain}" > "${SHARED_DIR}/cross-cluster-guest-domain"
+  printf '%s\n' "${manager_domain}" > "${manager_domain_file}"
+  printf '%s\n' "${guest_domain}" > "${guest_domain_file}"
   cp "$0" "${SHARED_DIR}/cross-cluster-dns-hook.sh"
   chmod 700 "${SHARED_DIR}/cross-cluster-dns-hook.sh"
 else
-  [[ "${manager_domain}" == "$(<"${SHARED_DIR}/cross-cluster-manager-domain")" ]] || { echo "Management base domains differ" >&2; exit 1; }
-  [[ "${guest_domain}" == "$(<"${SHARED_DIR}/cross-cluster-guest-domain")" ]] || { echo "Restored guest base domain changed" >&2; exit 1; }
+  [[ "${manager_domain}" == "$(<"${manager_domain_file}")" ]] || { echo "Management base domains differ" >&2; exit 1; }
+  [[ "${guest_domain}" == "$(<"${guest_domain_file}")" ]] || { echo "Restored guest base domain changed" >&2; exit 1; }
 fi
 
 # KubeVirt's default API publishing strategy is a LoadBalancer, unlike the

@@ -13,9 +13,10 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 cluster_name="$(<"${SHARED_DIR}/cluster-name")"
+cluster_namespace="${E2E_HOSTED_CLUSTER_NAMESPACE:-local-cluster}"
 hcp_cli=/usr/bin/hcp
 
-oc wait --timeout=30m --for=condition=Available --namespace=local-cluster \
+oc wait --timeout=30m --for=condition=Available --namespace="${cluster_namespace}" \
   "hostedcluster/${cluster_name}"
 
 if [[ -n "${MCE_VERSION:-}" && "$(arch)" == x86_64 ]]; then
@@ -31,6 +32,6 @@ if [[ ! -x "${hcp_cli}" ]]; then
   hcp_cli=/usr/bin/hypershift
 fi
 
-"${hcp_cli}" create kubeconfig --namespace=local-cluster --name="${cluster_name}" \
+"${hcp_cli}" create kubeconfig --namespace="${cluster_namespace}" --name="${cluster_name}" \
   > "${SHARED_DIR}/nested_kubeconfig"
 cp "${SHARED_DIR}/nested_kubeconfig" "${SHARED_DIR}/nested_kubeconfig_${role}"

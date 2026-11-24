@@ -10,6 +10,8 @@ CIRFILE=$SHARED_DIR/cir
 if [ -e "$CIRFILE" ] ; then
     NAME=$(jq -r .name < "$CIRFILE")
     echo "Releasing CIR $NAME"
+    # Keep requester construction and role validation in sync with
+    # ../acquire/ofcir-acquire-commands.sh so this step can release the lease.
     OFCIR_REQUESTER="${JOB_NAME}/${BUILD_ID}"
     OFCIR_ROLE="${OFCIR_ROLE:-}"
     if [[ -z "${OFCIR_ROLE}" && -f "${SHARED_DIR}/ofcir-role" ]]; then

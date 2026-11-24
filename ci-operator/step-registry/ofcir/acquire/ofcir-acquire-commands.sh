@@ -45,6 +45,8 @@ cd
 
 # A job can hold a source and target host at the same time. Keep the original
 # requester name for existing callers without a role.
+# Keep requester construction and role validation in sync with
+# ../release/ofcir-release-commands.sh so teardown finds the lease.
 OFCIR_REQUESTER="${JOB_NAME}/${BUILD_ID}"
 OFCIR_ROLE="${OFCIR_ROLE:-}"
 if [[ -z "${OFCIR_ROLE}" && -f "${SHARED_DIR}/ofcir-role" ]]; then
