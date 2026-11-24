@@ -186,7 +186,7 @@ _ensure_assertion_rows() {
 # leaves a failing artifact on disk (never green; D6 / 9525 contract).
 _ACS_STATE="unknown"
 _add_classification "acs-state-indeterminate" failed "PreSeed" "carrier pre-seed: step exited before classification completed (SIGKILL guard)"
-_write_carrier
+_write_carrier || { echo "[readiness] WARN: carrier pre-seed write failed" >&2; true; }
 _CASES=()
 _N_FAILURES=0 _N_SKIPPED=0 _N_TOTAL=0
 _CLASSIFICATION_CASE=""
