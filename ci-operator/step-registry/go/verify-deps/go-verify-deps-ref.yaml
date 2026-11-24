@@ -1,7 +1,8 @@
 ref:
   as: go-verify-deps
   from: src
-  commands: go-verify-deps-commands.sh
+  commands: go-verify-deps-commands.py
+  run_as_script: true
   env:
   - name: COMPAT
     default: ""
@@ -15,6 +16,60 @@ ref:
     default: ""
     documentation: |-
       Set to 'off' if go.work exists, but go mod vendor should be used instead.
+  - name: CHECK_GOPROXY_AVAILABILITY
+    default: "false"
+    documentation: |-
+      Master switch for the Go module proxy availability check (ART-26147).
+      This check is OPT-IN: the default is "false", so it is OFF for all
+      consumers of this shared step. ART-relevant repositories enable it
+      explicitly by setting CHECK_GOPROXY_AVAILABILITY=true on their verify-deps
+      test. When "true", before building, the step verifies that pinned Go module
+      pseudo-versions in go.mod are actually resolvable on the Go module proxy.
+      This catches unavailable commits early with an actionable error instead of
+      an opaque 404 later inside the ART/Konflux hermeto prefetch.
+  - name: GOPROXY_AVAILABILITY_URL
+    default: ""
+    documentation: |-
+      Explicit Go module proxy base URL to probe for availability. When empty
+      (the default) the URL is auto-detected: the first entry of
+      'go env GOPROXY' that starts with http:// or https:// is used (the
+      'direct'/'off' keywords are skipped), falling back to
+      https://proxy.golang.org.
+  - name: GOPROXY_CHECK_RETRIES
+    default: "5"
+    documentation: |-
+      Number of probe attempts per module version for the Go module proxy
+      availability check. Retries absorb proxy propagation delay for a freshly
+      pushed commit.
+  - name: GOPROXY_CHECK_RETRY_DELAY_SECONDS
+    default: "10"
+    documentation: |-
+      Base backoff delay, in seconds, between probe attempts for the Go module
+      proxy availability check. The delay increases per attempt (attempt N waits
+      N times this value).
+  - name: GOPROXY_CHECK_ALL_VERSIONS
+    default: "false"
+    documentation: |-
+      When "false" (the default) the Go module proxy availability check probes
+      only pseudo-versions. Set to "true" to probe every required and replaced
+      module version.
+  - name: GOPROXY_CHECK_STRICT
+    default: "false"
+    documentation: |-
+      Controls how inconclusive (non-404 transient, e.g. network error, 5xx or
+      429) probe results are treated. When "false" (the default) they only emit
+      a warning and the check continues. When "true" they also fail the check.
+      Modules that are definitively missing (404/410) always fail regardless of
+      this setting.
+  - name: GOPROXY_CHECK_DEADLINE_SECONDS
+    default: "120"
+    documentation: |-
+      Overall wall-clock budget, in seconds, for the Go module proxy availability
+      probe loop. Once exceeded, the remaining candidates are not probed and are
+      reported as inconclusive without failing the check (budget/outage skips
+      never fail, even when GOPROXY_CHECK_STRICT=true). A proxy-wide outage
+      (repeated transport failures) is likewise short-circuited. Set to 0 to
+      disable the deadline.
   resources:
     requests:
       cpu: 10m
