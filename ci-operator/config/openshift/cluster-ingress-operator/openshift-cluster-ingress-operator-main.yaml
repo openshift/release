@@ -71,6 +71,23 @@ tests:
     cluster_profile: openshift-org-aws
     workflow: openshift-e2e-aws
 - always_run: false
+  as: e2e-aws-ovn-haproxy34-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      HAPROXY_VERSION: "3.4"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: ingress-verify-haproxy-version-preflight
+    - ref: ingress-conf-haproxy-version
+    - ref: ingress-verify-haproxy-version
+    test:
+    - ref: openshift-e2e-test
+    - ref: ingress-verify-haproxy-version-after
+    workflow: openshift-e2e-aws
+- always_run: false
   as: e2e-azure-ovn
   optional: true
   steps:
@@ -96,6 +113,31 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-operator-haproxy34-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      HAPROXY_VERSION: "3.4"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: cucushift-installer-reportportal-marker
+    - ref: ingress-verify-haproxy-version-preflight
+    - ref: ingress-conf-haproxy-version
+    - ref: ingress-verify-haproxy-version
+    test:
+    - ref: merge-stage-registry-credentials
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: ingress-verify-haproxy-version-after
     workflow: ipi-aws
 - always_run: false
   as: e2e-gcp-ovn
@@ -175,11 +217,48 @@ tests:
     cluster_profile: openshift-org-aws
     workflow: openshift-upgrade-aws
 - always_run: false
+  as: e2e-aws-ovn-upgrade-haproxy34-techpreview
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      HAPROXY_VERIFY_UPGRADE: "true"
+      HAPROXY_VERSION: "3.4"
+    pre:
+    - chain: ipi-aws-pre-stableinitial
+    - ref: openshift-upgrade-aws-patch-master-iam
+    - ref: ingress-verify-haproxy-version-preflight
+    - ref: ingress-conf-haproxy-version
+    - ref: ingress-verify-haproxy-version
+    test:
+    - ref: openshift-e2e-test
+    - ref: ingress-verify-haproxy-version-after
+    workflow: openshift-upgrade-aws
+- always_run: false
   as: e2e-aws-ovn-serial
   pipeline_skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   shard_count: 2
   steps:
     cluster_profile: openshift-org-aws
+    workflow: openshift-e2e-aws-serial
+- always_run: false
+  as: e2e-aws-ovn-serial-haproxy34-techpreview
+  optional: true
+  shard_count: 2
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      HAPROXY_VERSION: "3.4"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: ingress-verify-haproxy-version-preflight
+    - ref: ingress-conf-haproxy-version
+    - ref: ingress-verify-haproxy-version
+    test:
+    - ref: openshift-e2e-test
+    - ref: ingress-verify-haproxy-version-after
     workflow: openshift-e2e-aws-serial
 - always_run: false
   as: e2e-aws-ovn-single-node

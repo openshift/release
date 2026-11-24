@@ -1,0 +1,29 @@
+ref:
+  as: ingress-verify-haproxy-version
+  from: cli
+  commands: ingress-verify-haproxy-version-commands.sh
+  timeout: 20m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: HAPROXY_VERSION
+    default: ""
+    documentation: The expected HAProxy minor version on the default IngressController.
+  - name: HAPROXY_VERIFY_UPGRADE
+    default: "false"
+    documentation: Verify both 5.1 payloads and use the initial payload before an upgrade.
+  - name: HAPROXY_VERIFY_STAGE
+    default: before
+    documentation: Verification phase, selecting preflight, initial or latest payload checks.
+  dependencies:
+  - name: release:initial
+    env: RELEASE_IMAGE_INITIAL
+  - name: release:latest
+    env: RELEASE_IMAGE_LATEST
+  documentation: |-
+    Verify HAProxy opt-in payload prerequisites and, outside preflight, the
+    effective version, completed router rollout, payload and runtime image
+    digests, and running HAProxy binary. Before an upgrade the initial image
+    is the baseline; afterwards the latest payload includes PR-built images.
