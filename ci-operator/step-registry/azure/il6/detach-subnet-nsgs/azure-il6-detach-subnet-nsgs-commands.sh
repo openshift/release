@@ -50,36 +50,78 @@ echo "azure-deprovision-resourcegroup takes the VM, NIC and NSGs, then"
 echo "azure-il6-deprovision-resources deletes the now-unreferenced subnets."
 
 # ------------------------------------------------------------- detach
+#
+# How the association is cleared matters, and the obvious spelling is wrong.
+#
+# '--network-security-group ""' does NOT detach. That argument runs through az's name-or-ID
+# resolver, which treats anything that is not already a resource ID as a NAME and prepends the
+# subscription and group scaffolding. An empty name yields the malformed ID
+# '.../providers/Microsoft.Network/networkSecurityGroups/', which Azure rejects with
+# InvalidResourceReference -- az is trying to ATTACH that, not to clear the field. The subnet is
+# left exactly as it was. 'az network vnet subnet update --help' documents the sentinel as the
+# literal 'null' rather than an empty string.
+#
+# '--remove networkSecurityGroup' is used in preference to that sentinel: it is a generic update
+# argument that drops the key from the payload before the PUT, so it never goes near the
+# name-or-ID resolver at all. The documented '--nsg null' is kept as a fallback in case --remove
+# rejects a payload shape, and the loop below verifies the outcome either way rather than
+# trusting an exit status.
 echo
 echo "--- this run's subnets"
-# Every prefixed subnet, not only the ones that currently show an NSG. Clearing an association
-# that is already clear is a no-op, so an unconditional pass is both simpler and safer than
-# filtering on networkSecurityGroup in JMESPath, where a bare 'null' parses as a field name
-# rather than a literal.
-mapfile -t subnets < <(az network vnet subnet list \
+# Read the NSG id alongside the name. --remove errors if the key is absent, so subnets that
+# already have no NSG are skipped rather than detached redundantly.
+mapfile -t rows < <(az network vnet subnet list \
     -g "${RG}" --vnet-name "${AZURE_IL6_VNET_NAME}" \
-    --query "[?starts_with(name, '${RESOURCE_PREFIX}')].name" -o tsv)
+    --query "[?starts_with(name, '${RESOURCE_PREFIX}')].[name, networkSecurityGroup.id]" -o tsv)
 
-if [[ "${#subnets[@]}" -eq 0 ]]; then
+if [[ "${#rows[@]}" -eq 0 ]]; then
     echo "No subnets matching '${RESOURCE_PREFIX}' found. Nothing to detach."
 fi
 
-for subnet in "${subnets[@]}"; do
+for row in "${rows[@]}"; do
+    [[ -z "${row}" ]] && continue
+    IFS=$'\t' read -r subnet nsg_id <<< "${row}"
     [[ -z "${subnet}" ]] && continue
-    echo "Detaching NSG from subnet '${subnet}'..."
-    # An empty --network-security-group is how az clears the association; there is no
-    # dedicated 'disassociate' verb.
+    if [[ -z "${nsg_id}" ]]; then
+        echo "Subnet '${subnet}' carries no NSG; nothing to detach."
+        continue
+    fi
+    echo "Detaching '${nsg_id##*/}' from subnet '${subnet}'..."
     az network vnet subnet update \
         -g "${RG}" --vnet-name "${AZURE_IL6_VNET_NAME}" -n "${subnet}" \
-        --network-security-group "" -o none \
-        || echo "WARNING: failed to detach the NSG from subnet '${subnet}'"
+        --remove networkSecurityGroup -o none \
+        || {
+            echo "NOTE: --remove networkSecurityGroup failed; retrying with the --nsg null sentinel."
+            az network vnet subnet update \
+                -g "${RG}" --vnet-name "${AZURE_IL6_VNET_NAME}" -n "${subnet}" \
+                --network-security-group null -o none \
+                || echo "WARNING: failed to detach the NSG from subnet '${subnet}'"
+        }
 done
 
-# ------------------------------------------------------------- report
+# ------------------------------------------------------------- verify
+#
+# Assert the outcome, not the exit status. The first version of this step logged three warnings,
+# left every NSG attached and still exited 0, so the group delete hit
+# InUseNetworkSecurityGroupCannotBeDeleted nine minutes later with no hint as to why. If the
+# associations are still in place, that delete cannot succeed, so fail here where the cause is
+# visible. Later post steps still run -- ci-operator does not short-circuit the post phase.
 echo
 echo "This run's subnets and their NSG associations (nsg should be empty for all of them):"
 az network vnet subnet list -g "${RG}" --vnet-name "${AZURE_IL6_VNET_NAME}" \
     --query "[?starts_with(name, '${RESOURCE_PREFIX}')].{name:name,nsg:networkSecurityGroup.id}" -o table || true
+
+still_attached="$(az network vnet subnet list -g "${RG}" --vnet-name "${AZURE_IL6_VNET_NAME}" \
+    --query "[?starts_with(name, '${RESOURCE_PREFIX}')] | [?networkSecurityGroup].name" -o tsv | tr -d '\r')"
+
+if [[ -n "${still_attached}" ]]; then
+    echo
+    echo "ERROR: these subnets still reference an NSG in the per-run group:"
+    echo "${still_attached}" | sed 's/^/  /'
+    echo "azure-deprovision-resourcegroup will fail with InUseNetworkSecurityGroupCannotBeDeleted"
+    echo "and the per-run group will leak. Clear these associations before re-running."
+    exit 1
+fi
 
 echo
 echo "Detach complete. No subnet, NSG, resource group or VNet was deleted by this step."

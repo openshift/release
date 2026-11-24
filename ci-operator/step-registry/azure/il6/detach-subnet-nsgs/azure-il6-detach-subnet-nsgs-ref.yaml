@@ -47,5 +47,16 @@ ref:
     and only on subnets whose name carries this run's prefix, so it cannot disturb a concurrent
     run or the emulator's own public-subnet and GatewaySubnet.
 
-    Best-effort: a failure to detach is logged and does not abort teardown, so a partial cleanup
-    cannot mask the real failure that a job is being torn down for.
+    The association is cleared with the generic update argument '--remove networkSecurityGroup',
+    not with '--network-security-group ""'. The latter does not detach: that argument runs
+    through az's name-or-ID resolver, which reads an empty value as a NAME and builds the
+    malformed id '.../networkSecurityGroups/', so Azure rejects the request with
+    InvalidResourceReference and the subnet is left untouched. '--remove' drops the key from the
+    payload before the PUT and never reaches that resolver. The documented '--nsg null' sentinel
+    is retained only as a fallback.
+
+    The step asserts its own outcome and exits non-zero if any prefixed subnet still references
+    an NSG, because azure-deprovision-resourcegroup cannot succeed in that state. Individual az
+    failures are tolerated on the way through, so the cause is reported here rather than
+    surfacing nine minutes later as InUseNetworkSecurityGroupCannotBeDeleted. ci-operator runs
+    the remaining post steps regardless, so failing here costs no cleanup.
