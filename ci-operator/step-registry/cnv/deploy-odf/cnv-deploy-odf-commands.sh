@@ -26,19 +26,18 @@ readonly CLUSTER_PULL_SECRETS_ORIGINAL=/tmp/ps1.json
 readonly CLUSTER_PULL_SECRETS_UPDATED=/tmp/ps.json
 readonly ODF_QUAY_CREDENTIALS_FILE=/tmp/secrets/odf-quay-credentials/rhceph-dev
 
-if [[ ! -f "${ODF_QUAY_CREDENTIALS_FILE}" ]]; then
-  echo_debug "ERROR: ODF Quay credentials file not found"
-  exit 1
+if [[ -f "${ODF_QUAY_CREDENTIALS_FILE}" ]]; then
+  echo_debug "DEBUG: ODF Quay credentials found, adding to cluster pull-secret"
+
+  echo "🐶 Get pull secret from cluster"
+  oc::getClusterPullSecret > "${CLUSTER_PULL_SECRETS_ORIGINAL}"
+
+  echo "🍯 Merge pull secret with ODF Quay credentials"
+  jq '. * input' "${CLUSTER_PULL_SECRETS_ORIGINAL}" "${ODF_QUAY_CREDENTIALS_FILE}" > "${CLUSTER_PULL_SECRETS_UPDATED}"
+
+  echo "🌊 Update pull secret in cluster"
+  oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${CLUSTER_PULL_SECRETS_UPDATED}"
 fi
-
-echo "🐶 Get pull secret from cluster"
-oc::getClusterPullSecret > "${CLUSTER_PULL_SECRETS_ORIGINAL}"
-
-echo "🍯 Merge pull secret with ODF Quay credentials"
-jq '. * input' "${CLUSTER_PULL_SECRETS_ORIGINAL}" "${ODF_QUAY_CREDENTIALS_FILE}" > "${CLUSTER_PULL_SECRETS_UPDATED}"
-
-echo "🌊 Update pull secret in cluster"
-oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson="${CLUSTER_PULL_SECRETS_UPDATED}"
 
 function gather_odf_debug_info() {
   if [[ -z "${ARTIFACT_DIR:-}" ]]; then
