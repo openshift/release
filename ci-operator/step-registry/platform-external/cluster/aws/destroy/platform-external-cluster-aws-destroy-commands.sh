@@ -74,4 +74,3 @@ if [[ ! -f "${stacks_file}" ]]; then
 fi
 
 delete_stacks
-
