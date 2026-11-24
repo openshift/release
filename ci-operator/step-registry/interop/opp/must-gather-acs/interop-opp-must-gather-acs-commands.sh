@@ -1380,12 +1380,13 @@ fi
 
 # PRRT_kwDOBHvUUM65ui2E: fixture mode writes these terms into its own temporary
 # evidence directory, so the live call must not run without a captured bundle.
+_properties_rc=0
 if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" == "1" ]]; then
     :
 else
     if ! write_status_properties; then
         echo "ASSERTION FAILURE (21): acs-central-status.properties could not be written, so the removal predicate terms are missing from the evidence" >&2
-        exit 21
+        _properties_rc=21
     fi
 fi
 
@@ -2090,12 +2091,25 @@ else
   fi
 fi
 echo "VERDICT: RHACS subscriptions=${SUBSCRIPTION_COUNT} CRD=${CRD_EXISTS} Central=${CENTRAL_EXISTS} workload-ns=${WORKLOAD_NS:-unknown} bundle=${BUNDLE_STATUS:-not-attempted} tls=${TLS_MODE:-not-attempted}"
-cat "${EVIDENCE_DIR}/acs-central-status.properties" || true
+_cat_rc=0
+if ! cat "${EVIDENCE_DIR}/acs-central-status.properties"; then
+  echo "ASSERTION FAILURE (21): acs-central-status.properties could not be read, so the removal predicate terms are missing from the evidence" >&2
+  _cat_rc=21
+fi
 
 # Assertions run last so every capture is already on disk; a failure here
 # fails the step (best_effort keeps the job green; finished.json carries it).
+# _properties_rc and _cat_rc are carried through aggregation so a failed write/read
+# cannot be masked by later passing assertions, while still running those
+# checks for diagnostics.
 run_assertions
 ASSERT_RC=$?
+if (( _properties_rc != 0 )); then
+  ASSERT_RC=$(( ASSERT_RC > _properties_rc ? ASSERT_RC : _properties_rc ))
+fi
+if (( _cat_rc != 0 )); then
+  ASSERT_RC=$(( ASSERT_RC > _cat_rc ? ASSERT_RC : _cat_rc ))
+fi
 if [[ ${ASSERT_RC} -ne 0 ]]; then
   echo "EVIDENCE ASSERTIONS FAILED (rc=${ASSERT_RC}): see messages above"
   exit ${ASSERT_RC}
