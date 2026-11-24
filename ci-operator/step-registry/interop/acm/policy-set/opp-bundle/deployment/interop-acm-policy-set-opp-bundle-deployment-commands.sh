@@ -154,12 +154,15 @@ typeset _etHelperScript=""
 typeset -i _etHelperRc=0
 typeset -a _fURL=()
 type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-_etHelperScript="$("${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh 2>&1)" || _etHelperRc=$?
+typeset _etHelperStderr=""
+_etHelperStderr=$(mktemp)
+_etHelperScript="$("${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh 2>"${_etHelperStderr}")" || _etHelperRc=$?
 if (( _etHelperRc == 0 )) && [[ -n "${_etHelperScript}" ]]; then
     eval "${_etHelperScript}"
 else
     echo "WARNING: ExitTrap helper download failed (rc=${_etHelperRc}); JUnit will be raw only" >&2
 fi
+rm -f "${_etHelperStderr}"
 # Validate helper download completeness: truncated download exits via set -e but minimal trap already installed
 if ! type -t ExitTrap--PostProcessPrep 1>/dev/null; then
     echo "WARNING: ExitTrap helper download incomplete; JUnit will be raw only" >&2
@@ -264,13 +267,42 @@ typeset -i policyGateStart=0
 policyGateStart=$(date +%s)
 typeset policyCountJson=''
 typeset -i policyCountRc=0
-until policyCountJson="$(_oc_get_bounded get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || policyCountRc=$?; (( policyCountRc != 0 )) && { printf '%s\n' "Error: failed to query policies (rc=${policyCountRc})" >&2; RecordResult "openshift-plus-policy-set-deployed" "failed" "failed to query policies in namespace policies (rc=${policyCountRc})" "$(( $(date +%s) - policyGateStart ))"; exit 1; }; (( policyCountJson >= expectedMinPolicies )); do
-  ((SECONDS > pollDeadline)) && {
+while true; do
+  typeset -i _pollRemain=$(( pollDeadline - SECONDS ))
+  typeset -i _stepRemain=$(( stepDeadline - $(date +%s) - 120 ))
+  (( _pollRemain < 10 )) && _pollRemain=10
+  (( _stepRemain < 10 )) && _stepRemain=10
+  typeset -i _queryTimeout=${_pollRemain}
+  (( _queryTimeout > _stepRemain )) && _queryTimeout=${_stepRemain}
+  policyCountRc=0
+  policyCountJson="$(timeout "${_queryTimeout}s" oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || policyCountRc=$?
+  if (( policyCountRc != 0 )); then
+    printf '%s\n' "Error: failed to query policies (rc=${policyCountRc})" >&2
+    RecordResult "openshift-plus-policy-set-deployed" "failed" "failed to query policies in namespace policies (rc=${policyCountRc})" "$(( $(date +%s) - policyGateStart ))"
+    exit 1
+  fi
+  if (( SECONDS > pollDeadline )); then
     printf '%s\n' "Error: fewer than ${expectedMinPolicies} policies after 10 minutes" >&2
     RecordResult "openshift-plus-policy-set-deployed" "failed" "Fewer than ${expectedMinPolicies} policies in namespace policies after 10 minutes" "$(( $(date +%s) - policyGateStart ))"
     exit 1
-  }
-  sleep 5
+  fi
+  if (( policyCountJson >= expectedMinPolicies )); then
+    break
+  fi
+  if (( SECONDS > pollDeadline )); then
+    printf '%s\n' "Error: fewer than ${expectedMinPolicies} policies after 10 minutes" >&2
+    RecordResult "openshift-plus-policy-set-deployed" "failed" "Fewer than ${expectedMinPolicies} policies in namespace policies after 10 minutes" "$(( $(date +%s) - policyGateStart ))"
+    exit 1
+  fi
+  typeset -i _gateSleepRemain=$(( stepDeadline - $(date +%s) - 30 ))
+  if (( _gateSleepRemain <= 0 )); then
+    printf '%s\n' "Error: step budget exhausted during policy gate" >&2
+    RecordResult "openshift-plus-policy-set-deployed" "failed" "step budget exhausted during policy gate" "$(( $(date +%s) - policyGateStart ))"
+    exit 1
+  fi
+  typeset -i _gateSleep=5
+  (( _gateSleep > _gateSleepRemain )) && _gateSleep=${_gateSleepRemain}
+  sleep "${_gateSleep}"
 done
 RecordResult "openshift-plus-policy-set-deployed" "passed" "" "$(( $(date +%s) - policyGateStart ))"
 
@@ -602,7 +634,13 @@ ExpectedPolicyNamesRetry () {
     if (( try < 3 )); then
       printf '[%s] WARNING: could not read PolicySet membership %s (attempt %d/3), retrying\n' \
         "$(date -u +%FT%TZ)" "${phase}" "${try}" >&2
-      sleep 10
+      typeset -i _retryNow=0
+      _retryNow=$(date +%s)
+      if (( _retryNow + 10 > stepDeadline - 30 )); then
+        printf '[%s] WARNING: not enough time for retry sleep before step deadline, skipping sleep\n' "$(date -u +%FT%TZ)" >&2
+      else
+        sleep 10
+      fi
     fi
   done
   printf '[%s] ERROR: could not read PolicySet membership %s (rc=%d)\n' \
@@ -670,8 +708,9 @@ while :; do
   typeset -i passNow=0
   passNow=$(date +%s)
   typeset -i _remainingBudget=$(( stepDeadline - passNow - 120 ))
-  # Allow a bounded final verification pass when enough budget remains for one wait plus diagnostics (120s reserve already subtracted)
-  if (( _remainingBudget < 150 )); then
+  typeset -i _minPassBudget=$(( (compliancePollTarget - 1) * compliancePollIntervalSeconds ))
+  (( _minPassBudget < 60 )) && _minPassBudget=60
+  if (( _remainingBudget < _minPassBudget )); then
     printf '[%s] ERROR: no time left in the step budget for another compliance pass (remaining %ds)\n' \
       "$(date -u +%FT%TZ)" "${_remainingBudget}" >&2
     RecordResult "policies-compliant" "failed" "Compliance wait stopped after $(( (passNow - complianceStart) / 60 )) minutes: the step time budget was exhausted before the policy set stabilized${missingExpectedNote}${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
@@ -726,9 +765,22 @@ while :; do
         --timeout="${_waitTimeout}s" "${applyPoliciesArr[@]}"; then
         printf '%s\n' "Non-skipped policies failed to become compliant:" >&2
         RecordResult "policies-compliant" "failed" "Non-skipped policies failed to become compliant within 40 minutes${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
-        timeout 30s oc get policies -n policies --ignore-not-found | FilterSkippedPolicies || true
-        timeout 60s oc get policies -n policies --ignore-not-found -o yaml || true
-        timeout 60s oc describe policies -n policies || true
+        typeset -i _diagDeadline=$(( stepDeadline - 30 ))
+        typeset -i _diagRemain=$(( _diagDeadline - $(date +%s) ))
+        if (( _diagRemain > 0 )); then
+          typeset -i _t=$(( _diagRemain < 30 ? _diagRemain : 30 ))
+          timeout "${_t}s" oc get policies -n policies --ignore-not-found | FilterSkippedPolicies || true
+          _diagRemain=$(( _diagDeadline - $(date +%s) ))
+          if (( _diagRemain > 0 )); then
+            _t=$(( _diagRemain < 60 ? _diagRemain : 60 ))
+            timeout "${_t}s" oc get policies -n policies --ignore-not-found -o yaml || true
+          fi
+          _diagRemain=$(( _diagDeadline - $(date +%s) ))
+          if (( _diagRemain > 0 )); then
+            _t=$(( _diagRemain < 60 ? _diagRemain : 60 ))
+            timeout "${_t}s" oc describe policies -n policies || true
+          fi
+        fi
         exit 1
       fi
     else
@@ -748,9 +800,22 @@ while :; do
       --timeout="${_waitTimeout}s"; then
       printf '%s\n' "Policies failed to become compliant:" >&2
       RecordResult "policies-compliant" "failed" "Policies failed to become compliant within 40 minutes" "$(( $(date +%s) - complianceStart ))"
-      timeout 30s oc get policies -n policies --ignore-not-found || true
-      timeout 60s oc get policies -n policies --ignore-not-found -o yaml || true
-      timeout 60s oc describe policies -n policies || true
+      typeset -i _diagDeadline=$(( stepDeadline - 30 ))
+      typeset -i _diagRemain=$(( _diagDeadline - $(date +%s) ))
+      if (( _diagRemain > 0 )); then
+        typeset -i _t=$(( _diagRemain < 30 ? _diagRemain : 30 ))
+        timeout "${_t}s" oc get policies -n policies --ignore-not-found || true
+        _diagRemain=$(( _diagDeadline - $(date +%s) ))
+        if (( _diagRemain > 0 )); then
+          _t=$(( _diagRemain < 60 ? _diagRemain : 60 ))
+          timeout "${_t}s" oc get policies -n policies --ignore-not-found -o yaml || true
+        fi
+        _diagRemain=$(( _diagDeadline - $(date +%s) ))
+        if (( _diagRemain > 0 )); then
+          _t=$(( _diagRemain < 60 ? _diagRemain : 60 ))
+          timeout "${_t}s" oc describe policies -n policies || true
+        fi
+      fi
       exit 1
     fi
   fi
@@ -790,10 +855,16 @@ while :; do
   fi
   # Swap detection: if wait set differs from stable set, replacement occurred without wait (PRRT_kwDOBHvUUM65TpMc)
   if [[ -n "${complianceWaitSet}" && -n "${complianceStableSet}" ]]; then
-    typeset _waitSetSorted _stableSorted
+    typeset _waitSetSorted _stableSorted _prevFilteredForSwap
     _waitSetSorted="$(printf '%s\n' "${complianceWaitSet}" | LC_ALL=C sort)"
-    _stableSorted="$(printf '%s\n' "${complianceStableSet}" | LC_ALL=C sort)"
-    if [[ "${_waitSetSorted}" != "${_stableSorted}" ]] && [[ "${complianceWaitSet}" != "${prevSet}" ]]; then
+    if (( ${#skipPoliciesArr[@]} > 0 )); then
+      _stableSorted="$(printf '%s\n' "${complianceStableSet}" | FilterSkippedPolicies | LC_ALL=C sort)"
+      _prevFilteredForSwap="$(printf '%s\n' "${prevSet}" | FilterSkippedPolicies | LC_ALL=C sort)"
+    else
+      _stableSorted="$(printf '%s\n' "${complianceStableSet}" | LC_ALL=C sort)"
+      _prevFilteredForSwap="${prevSet}"
+    fi
+    if [[ "${_waitSetSorted}" != "${_stableSorted}" ]] && [[ "${_waitSetSorted}" != "${_prevFilteredForSwap}" ]]; then
       : "Wait set differs from stable set after pass (swap detected); re-running wait"
       policyCount="${complianceStableCount}"
       continue
@@ -811,6 +882,14 @@ while :; do
     continue
   fi
   policyCount="${complianceStableCount}"
+  if [[ "${complianceAllSkipped}" == "true" ]]; then
+    typeset _filteredStableForSkipped=""
+    _filteredStableForSkipped="$(printf '%s\n' "${complianceStableSet}" | FilterSkippedPolicies)"
+    if [[ -n "${_filteredStableForSkipped}" ]]; then
+      : "Stability window shows non-skipped policy present; re-running wait"
+      continue
+    fi
+  fi
   # The membership the coverage check uses was read before the pass, so a
   # PolicySet applied during the pass is not in it: its policies could stay
   # absent through the stability window and the row would be accepted with them
