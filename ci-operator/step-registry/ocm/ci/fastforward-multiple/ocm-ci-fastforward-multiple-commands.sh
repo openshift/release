@@ -191,7 +191,13 @@ tekton_file_version_compare() {
   compare_versions "${file_major}.${file_minor}" "${target_version}"
 }
 
-# Remove Tekton files whose embedded version is <= max_version (X.Y format).
+# Remove Tekton files at or below max_version ("inclusive", the historical
+# <= LAST_RELEASE_VERSION behavior) or strictly older than max_version
+# ("exclusive"). Exclusive mode is used when the version being kept/created
+# (minimum destination version or transform destination version) is at or
+# older than LAST_RELEASE_VERSION, so files at that version are preserved
+# while genuinely older ones are still removed. Files newer than
+# max_version are never touched.
 # Must be called with cwd inside the target git working tree, on the branch
 # already checked out. Stages removals with `git rm`. All log output goes to
 # stderr; only the result is written to stdout as "<removed> <failed>", so
@@ -200,7 +206,8 @@ tekton_file_version_compare() {
 cleanup_stale_tekton_files() {
   local product_prefix=$1
   local branch_prefix=$2
-  local max_version=$3  # e.g. "5.0" - files at or below this are removed
+  local max_version=$3  # e.g. "5.0"
+  local compare_mode=${4:-inclusive}  # "inclusive" (<=) or "exclusive" (<)
 
   local removed=0
   local failed=0
@@ -227,8 +234,19 @@ cleanup_stale_tekton_files() {
     local cmp
     cmp=$(tekton_file_version_compare "$old_file" "${branch_prefix}" "${old_ver_compact}" "${max_version}")
 
-    if [[ "$cmp" == "-1" || "$cmp" == "0" ]]; then
-      echo "INFO: Removing stale Tekton file: ${old_filename} (<= ${max_version})" >&2
+    local should_remove=false
+    if [[ "$cmp" == "-1" ]]; then
+      should_remove=true
+    elif [[ "$cmp" == "0" && "${compare_mode}" == "inclusive" ]]; then
+      should_remove=true
+    fi
+
+    if [[ "${should_remove}" == "true" ]]; then
+      local compare_operator="<"
+      if [[ "${compare_mode}" == "inclusive" ]]; then
+        compare_operator="<="
+      fi
+      echo "INFO: Removing stale Tekton file: ${old_filename} (${compare_operator} ${max_version})" >&2
       if git rm -q "$old_file" >/dev/null 2>&1; then
         removed=$((removed + 1))
       else
@@ -369,33 +387,47 @@ transform_tekton_files() {
       files_transformed=$((files_transformed + 1))
     done
 
-    # Remove any remaining Tekton files older than or equal to
-    # LAST_RELEASE_VERSION. The exact source_version files (if any) were
-    # already renamed above via `git mv`; this sweeps up stragglers from
-    # earlier release cycles that rode along via fast-forward (e.g. an
-    # acm-50- template that was never cleaned up on this branch).
+    # Remove any remaining Tekton files at or below LAST_RELEASE_VERSION.
+    # The exact source_version files (if any) were already renamed above via
+    # `git mv`; this sweeps up stragglers from earlier release cycles that
+    # rode along via fast-forward (e.g. an acm-50- template that was never
+    # cleaned up on this branch). On non-main default branches dest_version
+    # can be at or older than LAST_RELEASE_VERSION, so use dest_version as an
+    # exclusive boundary there; otherwise files newer than
+    # LAST_RELEASE_VERSION must be preserved.
     local removed_stale=0
     local failed_cleanup=0
     if [[ -n "${last_release_version:-}" ]]; then
+      local cleanup_version="${last_release_version}"
+      local cleanup_mode="inclusive"
+      if [[ "$(compare_versions "${dest_version}" "${last_release_version}")" != "1" ]]; then
+        cleanup_version="${dest_version}"
+        cleanup_mode="exclusive"
+      fi
+      local cleanup_operator="<="
+      if [[ "${cleanup_mode}" == "exclusive" ]]; then
+        cleanup_operator="<"
+      fi
+
       local cleanup_result
-      cleanup_result=$(cleanup_stale_tekton_files "${product_prefix}" "${branch_prefix}" "${last_release_version}")
+      cleanup_result=$(cleanup_stale_tekton_files "${product_prefix}" "${branch_prefix}" "${cleanup_version}" "${cleanup_mode}")
       removed_stale="${cleanup_result%% *}"
       failed_cleanup="${cleanup_result##* }"
-    fi
 
-    if [[ "${failed_cleanup}" -gt 0 ]]; then
-      echo "ERROR: Failed to remove ${failed_cleanup} stale Tekton file(s) <= ${last_release_version}, aborting"
-      exit 1
-    fi
+      if [[ "${failed_cleanup}" -gt 0 ]]; then
+        echo "ERROR: Failed to remove ${failed_cleanup} stale Tekton file(s) ${cleanup_operator} ${cleanup_version}, aborting"
+        exit 1
+      fi
 
-    if [[ "$files_found" == "false" ]] && [[ "${removed_stale}" -eq 0 ]]; then
-      echo "INFO: No ${source_pattern}*.yaml files found to transform, nothing stale to clean up"
-      exit 0
-    fi
+      if [[ "$files_found" == "false" ]] && [[ "${removed_stale}" -eq 0 ]]; then
+        echo "INFO: No ${source_pattern}*.yaml files found to transform, nothing stale to clean up"
+        exit 0
+      fi
 
-    echo "INFO: Transformed ${files_transformed} files"
-    if [[ "${removed_stale}" -gt 0 ]]; then
-      echo "INFO: Removed ${removed_stale} stale Tekton file(s) <= ${last_release_version}"
+      echo "INFO: Transformed ${files_transformed} files"
+      if [[ "${removed_stale}" -gt 0 ]]; then
+        echo "INFO: Removed ${removed_stale} stale Tekton file(s) ${cleanup_operator} ${cleanup_version}"
+      fi
     fi
 
     # Commit transformation
@@ -406,7 +438,7 @@ transform_tekton_files() {
     if [[ "${removed_stale}" -gt 0 ]]; then
       commit_message="${commit_message}
 
-Remove ${removed_stale} stale Tekton file(s) <= ${last_release_version}"
+Remove ${removed_stale} stale Tekton file(s) ${cleanup_operator} ${cleanup_version}"
     fi
 
     git commit -m "${commit_message}
@@ -889,22 +921,46 @@ create_tekton_files() {
       fi
     done
 
-    # Remove Tekton files for versions <= LAST_RELEASE_VERSION.
-    # LAST_RELEASE_VERSION was only kept around as a template for creating
-    # the versions above; now that those new versions have been created on
-    # ${default_branch}, the old template is stale and should not persist.
+    # Remove Tekton files at or below LAST_RELEASE_VERSION. The
+    # LAST_RELEASE_VERSION templates were used to create the versions above;
+    # anything older than the versions we are keeping/creating is stale, but
+    # files newer than LAST_RELEASE_VERSION must be preserved.
+    # On non-main default branches the destination/default version can be at
+    # or older than LAST_RELEASE_VERSION; use the minimum destination version
+    # as an exclusive boundary there instead of an inclusive
+    # <= LAST_RELEASE_VERSION sweep that would delete the current files.
     local removed_stale=0
     local failed_cleanup=0
-    if [[ -n "${LAST_RELEASE_VERSION:-}" ]]; then
-      log "INFO Cleaning up Tekton files <= LAST_RELEASE_VERSION (${LAST_RELEASE_VERSION})"
+    local cleanup_threshold=""
+    local dest_version
+    for dest_version in ${dest_versions}; do
+      if [[ -z "${cleanup_threshold}" ]]; then
+        cleanup_threshold="${dest_version}"
+      elif [[ "$(compare_versions "${dest_version}" "${cleanup_threshold}")" == "-1" ]]; then
+        cleanup_threshold="${dest_version}"
+      fi
+    done
+
+    local cleanup_version="${LAST_RELEASE_VERSION:-}"
+    local cleanup_mode="inclusive"
+    local cleanup_operator="<="
+    if [[ -n "${cleanup_version}" ]] && [[ -n "${cleanup_threshold}" ]] \
+      && [[ "$(compare_versions "${cleanup_threshold}" "${cleanup_version}")" != "1" ]]; then
+      cleanup_version="${cleanup_threshold}"
+      cleanup_mode="exclusive"
+      cleanup_operator="<"
+    fi
+
+    if [[ -n "${cleanup_version}" ]]; then
+      log "INFO Cleaning up Tekton files ${cleanup_operator} ${cleanup_version} (minimum destination version=${cleanup_threshold:-none})"
       local cleanup_result
-      cleanup_result=$(cleanup_stale_tekton_files "${product_prefix}" "${branch_prefix}" "${LAST_RELEASE_VERSION}")
+      cleanup_result=$(cleanup_stale_tekton_files "${product_prefix}" "${branch_prefix}" "${cleanup_version}" "${cleanup_mode}")
       removed_stale="${cleanup_result%% *}"
       failed_cleanup="${cleanup_result##* }"
       log "INFO Removed ${removed_stale} stale Tekton file(s)"
 
       if [[ "${failed_cleanup}" -gt 0 ]]; then
-        log "ERROR Failed to remove ${failed_cleanup} stale Tekton file(s) <= LAST_RELEASE_VERSION, aborting"
+        log "ERROR Failed to remove ${failed_cleanup} stale Tekton file(s) ${cleanup_operator} ${cleanup_version}, aborting"
         exit 1
       fi
     fi
@@ -920,7 +976,7 @@ Generated from existing ${product_prefix}-${highest_version} templates."
     if [[ "${removed_stale}" -gt 0 ]]; then
       pr_body="${pr_body}
 
-Also removes ${removed_stale} stale Tekton file(s) for version <= ${LAST_RELEASE_VERSION}, which are no longer needed now that the versions above exist."
+Also removes ${removed_stale} stale Tekton file(s) ${cleanup_operator} ${cleanup_version}, which are no longer needed now that the versions above exist."
     fi
 
     local pr_exists=false
@@ -1000,7 +1056,7 @@ Also removes ${removed_stale} stale Tekton file(s) for version <= ${LAST_RELEASE
     if [[ "${removed_stale}" -gt 0 ]]; then
       commit_message="${commit_message}
 
-Remove ${removed_stale} stale Tekton file(s) for version <= ${LAST_RELEASE_VERSION}"
+Remove ${removed_stale} stale Tekton file(s) ${cleanup_operator} ${cleanup_version}"
     fi
 
     log "INFO Committing: ${commit_message}"

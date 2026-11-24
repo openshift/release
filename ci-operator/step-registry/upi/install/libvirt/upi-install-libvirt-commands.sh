@@ -34,6 +34,7 @@ fi
 #   - the master mcp yaml config
 #   - the worker mcp yaml config
 #   - the etcd on ramdisk yaml config
+#   - the PSI karg yaml configs for the master and worker nodes
 #   - the static pod controller degraded yaml config
 #   - the kdump worker yaml config
 function apply_machineconfigs () {
@@ -45,6 +46,8 @@ function apply_machineconfigs () {
     "${SHARED_DIR}/manifest_master.machineconfigpool.yaml"
     "${SHARED_DIR}/manifest_worker.machineconfigpool.yaml"
     "${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml"
+    "${SHARED_DIR}/manifest_psi-karg-master-mc.yml"
+    "${SHARED_DIR}/manifest_psi-karg-worker-mc.yml"
     "${SHARED_DIR}/manifest_static-pod-check-workaround-master-mc.yml"
     "${SHARED_DIR}/manifest_99_worker_kdump.yml"
   )

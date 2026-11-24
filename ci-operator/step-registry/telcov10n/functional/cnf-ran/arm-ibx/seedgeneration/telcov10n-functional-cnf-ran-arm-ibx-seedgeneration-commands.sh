@@ -5,6 +5,9 @@ if [[ -f "${SHARED_DIR}/skip.txt" ]]; then
   exit 0
 fi
 
+# Never retain a success marker from a previous invocation.
+rm -f "${SHARED_DIR}/arm-ibx-seed-image"
+
 cd /eco-ci-cd
 mkdir -p inventories/cnf/{group_vars,host_vars}
 cp "${SHARED_DIR}/all" inventories/cnf/group_vars/all.yaml
@@ -50,6 +53,7 @@ ansible-playbook playbooks/collect-eco-gotests-artifacts.yaml \
   || echo "Warning: seed-generation artifact collection failed"
 
 if [[ "$seed_rc" -eq 0 ]]; then
+  printf '%s\n' "${SEED_IMAGE}" > "${SHARED_DIR}/arm-ibx-seed-image"
   echo "Seed image: ${SEED_IMAGE}"
 fi
 exit "$seed_rc"

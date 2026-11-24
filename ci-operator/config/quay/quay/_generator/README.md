@@ -178,6 +178,7 @@ Per job, `quay[].jobs[]`:
 | `always_run`, `optional`, `run_if_changed`, `skip_if_only_changed` | Presubmit only, copied onto the test. `run_if_changed` and `skip_if_only_changed` exclude each other; `always_run: true` excludes both. |
 | `fips` | Periodic only. FIPS cluster, `fips-check-fips-or-die` first, `FEATURE_FIPS: true`, Mailpit off (so `@feature:MAILING` specs skip). Adds `-fips` to the name. Not with `upgrade` or `e2e-chainsaw`. |
 | `sts` | Default `true`, `aws` and `aws-metal` cells only. Installs with CCO Manual mode and STS (`ipi-aws-pre-manual-oidc-sts` / `ipi-aws-post-manual-oidc-sts`). Quay's own S3 storage still uses static keys. |
+| `dualstack` | Periodic, `clouds: [aws]` only. IPv6-primary dual-stack cluster (`IP_FAMILY: DualStackIPv6Primary`), `FEATURE_LISTEN_IP_VERSION: dual-stack`, and `quay-check-dualstack` after the deploy to fail unless Quay answers over IPv6. Adds `-dualstack` to the name. Not with `upgrade`, `e2e-chainsaw` or `standalone-ha`. |
 | `database` | `true` provisions a managed Postgres (`DATABASE_BY_CLOUD` in `model.py`: AWS RDS, Azure Postgres) and removes it in `post`. Not on `aws-metal`, `gcp`, or `libvirt`. Adds the DB kind to the name (`aws-s3-rds-nightly`). |
 | `storage` | Override the cloud's default storage. Besides that default, only `odf`, only on `aws`. `e2e-chainsaw` always uses `odf`. |
 | `upgrade_from` | Required for `upgrade`, invalid elsewhere: the previous Quay `X.Y`. Derives both channels, both branches and the name `from-<XY>`. |
@@ -233,7 +234,7 @@ fields (`test`, `source`, `arch`, `layout`, `storage`, `fips`, `sts`,
   behind an internal NLB; smoke with a Clair scan, node and scanner failover,
   then the full Playwright suite) under an 8h timeout. Builds only
   `quay-playwright-runner`; `ocp` picks the step images, and the deploy step
-  resolves the ART nightly Quay and Clair images. Takes no `source`, `storage`, `fips`, `database`, `sts` or `arches`.
+  resolves the ART nightly Quay and Clair images. Takes no `source`, `storage`, `fips`, `dualstack`, `database`, `sts` or `arches`.
 - **`storage: odf`**: inserts `quay-install-odf-operator` and deploys with
   `quay-deploy-odf`; the operator manages object storage, and
   `quay-deprovision` skips bucket teardown.

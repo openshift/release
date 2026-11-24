@@ -48,6 +48,7 @@ def test_standalone_ha_renders_the_weekly_periodic() -> None:
         (_matrix(kind="presubmit", cron=None), "only valid for kind: periodic"),
         (_matrix(clouds=["gcp"]), "supports only clouds: \\[aws\\]"),
         (_matrix(storage="s3"), "does not support storage"),
+        (_matrix(dualstack=True), "does not support dualstack"),
         (_matrix(arches=["arm64"]), "does not support arches"),
         (_matrix(source="nightly"), "does not support source"),
         (_matrix(layout="base"), "requires layout: variant"),

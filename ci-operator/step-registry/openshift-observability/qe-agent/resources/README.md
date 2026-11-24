@@ -75,7 +75,7 @@ JUnit parsing and the **high-failure triage** rule (more than 5 failures: look f
 ```markdown
 ## Step 1 — Parse JUnit XMLs and Identify Failures
 
-Mandatory. Read `/tmp/qe-agent-modules/junit-triage.md` and follow it. Typical shared root causes here: <causes for your suite>. If missing: read `${SHARED_DIR}/qe-agent-junit-*.xml`, extract each suite name and failed `<testcase>` (`<failure>`/`<error>` message and full text), group by suite, and exit with a clear message if there are no files. If more than 5 tests fail, look for one shared root cause and diagnose the simplest failing test as the representative (Steps 2–5); with no pattern, diagnose individually, capped at 3. Write any pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.md`.
+Mandatory. Read `/tmp/qe-agent-modules/junit-triage.md` and follow it. Typical shared root causes here: <causes for your suite>. If missing: read `${QE_JUNIT_DIR}/qe-agent-junit-*.xml`, extract each suite name and failed `<testcase>` (`<failure>`/`<error>` message and full text), group by suite, and exit with a clear message if there are no files. If more than 5 tests fail, look for one shared root cause and diagnose the simplest failing test as the representative (Steps 2–5); with no pattern, diagnose individually, capped at 3. Write any pattern conclusion near the top of `${ARTIFACT_DIR}/qe-agent-analysis.md`.
 ```
 
 ### Step 2 — Locate Test Source Files
@@ -173,7 +173,7 @@ Must state:
 - The cluster is already provisioned and the operator is already installed
 - The test repo is set up by Step 0b from the fetched step script
 - `$KUBECONFIG` is set; list available CLI tools (oc, kubectl, chainsaw/npx/etc.)
-- All output goes to `$ARTIFACT_DIR` or `$SHARED_DIR`
+- All output goes to `$ARTIFACT_DIR`; never write into `$SHARED_DIR` (1 MiB Kubernetes Secret synced when the pod exits)
 - The step runs `best_effort: true` — always exit 0
 - The agent must not call external APIs (Jira, GitHub API, Slack, etc.) — external integrations are handled by the wrapper script after the agent exits
 - **Namespace restriction**: The agent MUST NOT access, read, list, or modify any resources in the `kube-system` namespace — this namespace contains cloud provider credentials. All skills must include this constraint in their Notes section

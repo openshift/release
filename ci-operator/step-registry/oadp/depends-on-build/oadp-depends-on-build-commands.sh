@@ -106,6 +106,65 @@ fetch_pr_json() {
         curl -sf --connect-timeout 10 --max-time 120 "${CURL_HEADERS[@]}" "${PR_API_URL}" > "${TMP_PR_JSON}" 2>"${TMP_CURL_ERR}"
 }
 
+# Best-effort GitHub API GET for the optional guards below (the dep-PR
+# branch check, the cherry-pick original lookup): direct curl first, then
+# one attempt through the TEST cluster's own egress -- the same two-path
+# shape and reasoning as the description fetch above, because the build
+# farm's shared egress IP is routinely over GitHub's anonymous rate limit
+# while the test cluster's NAT is not. Echoes the response body on
+# success, returns 1 silently on failure; every caller treats a failed
+# metadata fetch as "guard inconclusive, proceed as before" rather than
+# failing the job -- an optional safety check must never be the reason a
+# job goes red.
+gh_api_get() {
+    # $1: full https://api.github.com/... URL
+    local URL="${1}" OUT
+    OUT=$(mktemp)
+    # No --retry here: the pod fallback below is the retry, and it uses a
+    # different egress. Retrying a rate-limited direct call only stacks up
+    # to three 60s attempts before that fallback even starts.
+    if curl -sf --connect-timeout 10 --max-time 60 "${CURL_HEADERS[@]}" "${URL}" -o "${OUT}" 2>/dev/null; then
+        cat "${OUT}"
+        rm -f "${OUT}"
+        return 0
+    fi
+    if [[ -n "${OO_INSTALL_NAMESPACE:-}" ]]; then
+        local POD
+        POD="depends-on-api-$(date +%s)"
+        if timeout 150 oc run --rm -i --restart=Never --image=curlimages/curl "${POD}" -n "${OO_INSTALL_NAMESPACE}" -- \
+            curl -sf --connect-timeout 10 --max-time 120 "${CURL_HEADERS[@]}" "${URL}" > "${OUT}" 2>/dev/null; then
+            cat "${OUT}"
+            rm -f "${OUT}"
+            return 0
+        fi
+    fi
+    rm -f "${OUT}"
+    return 1
+}
+
+# Which channel a branch name denotes. The OADP repos do NOT all name their
+# development branch `oadp-dev` -- migtools/kubevirt-velero-plugin and
+# openshift/hypershift-oadp-plugin use `main`, and some repos still carry a
+# `master` -- so the development-channel names are normalized to one token
+# before a dep PR's base branch is compared with this job's PULL_BASE_REF.
+# Without this, a dep PR on one of those repos' development branch is
+# wrongly classified as unshippable in an `oadp-dev` job and silently
+# skipped. Release branches (oadp-1.x, release-4.x) have no aliases and
+# still compare by name.
+branch_channel() {
+    case "${1}" in
+        oadp-dev|main|master) printf 'dev' ;;
+        *) printf '%s' "${1}" ;;
+    esac
+}
+
+# JSON "body" value of a PR API response, still JSON-escaped. Only the body
+# field is ever scanned: the raw response also contains the title, where a
+# literal "Depends-On: <url>" example could false-match.
+extract_pr_body() {
+    printf '%s' "${1}" | grep -Po '"body": *"(\\.|[^"\\])*"' | head -1 | sed -E 's/^"body": *"//; s/"$//' || true
+}
+
 PR_JSON=""
 for MODE in direct via-test-cluster; do
     for ATTEMPT in 1 2 3; do
@@ -143,22 +202,66 @@ fi
 # grep -P instead of pulling in a full JSON parser for one field -- this
 # image already assumes GNU coreutils (the `date --utc` calls throughout
 # this script are GNU-only too), and GNU grep's PCRE support is standard on
-# the RHEL/UBI base this image is built from.
-# GitHub's API returns pretty-printed JSON ("body": "..." with a space
-# after the colon), so the key match must tolerate that whitespace: a
-# '"body":"' pattern never matched the real payload, leaving the extraction
-# empty (and, under errexit+pipefail, failing the step via the grep no-match
-# exit code) even on a successful fetch.
-PR_BODY_ESCAPED=$(printf '%s' "${PR_JSON}" | grep -Po '"body": *"(\\.|[^"\\])*"' | head -1 || true)
-# sed, not a bash glob strip: the glob's ' *' means one literal space plus
-# wildcard, so it would miss a zero-space compact payload that the regex
-# above does match -- same regex semantics on both sides.
-PR_BODY_ESCAPED=$(printf '%s' "${PR_BODY_ESCAPED}" | sed -E 's/^"body": *"//')
-PR_BODY_ESCAPED="${PR_BODY_ESCAPED%\"}"
+# the RHEL/UBI base this image is built from. extract_pr_body (above) also
+# tolerates GitHub's pretty-printed '"body": "..."' whitespace and its sed
+# mirrors the regex, so a zero-space compact payload is handled the same
+# way; it is deliberately `|| true`-terminal because under errexit+pipefail
+# a grep no-match (e.g. a null body) would otherwise fail the step.
+PR_BODY_ESCAPED=$(extract_pr_body "${PR_JSON}")
 DEPENDS_ON_LINES=$(printf '%s' "${PR_BODY_ESCAPED}" | grep -oiE 'depends-on:[^"\\]*https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+' || true)
 
 if [[ -z "${DEPENDS_ON_LINES}" ]]; then
     echo "[$(date --utc +%FT%T.%3NZ)] No Depends-On lines found in PR description -- nothing to resolve"
+
+    # Cherry-pick enrichment: automated cherry-pick PRs (the openshift
+    # cherry-pick robot, GitHub's backport bot) open with a fresh body and
+    # do NOT copy the original PR's description, so any Depends-On lines
+    # the original declared are silently lost -- this step no-ops and the
+    # cherry-pick gets tested alone, which is exactly how a tested-together
+    # pair ships broken. When this body carries standard cherry-pick/backport
+    # wording, fetch the ORIGINAL PR's description once and surface the
+    # Depends-On lines it declares in the log and an artifact: a pointer
+    # for the author/reviewer to re-add the lines to THIS PR's description
+    # (a quick body edit + /test re-runs them). Deliberately NOT acted on
+    # -- only this PR's own description is ever resolved, so the trigger
+    # semantics above are unchanged. Matches both the robot's same-repo
+    # form ("This is an automated cherry-pick of #N") and the cross-repo
+    # backport convention ("Cherry-pick of <org>/<repo>#N"); prose forms
+    # like "cherry-pick of the resolved backport ..." do not match, by
+    # design (the ref must directly follow the wording).
+    CHERRY_REF=$(printf '%s' "${PR_BODY_ESCAPED}" | grep -oiE '(cherry-pick|backport) of (pull request |pr )?[A-Za-z0-9_./-]*#[0-9]+' | grep -oE '([A-Za-z0-9_.-]+/)?[A-Za-z0-9_.-]*#[0-9]+' | head -1 || true)
+    CHERRY_ORIG_REPO="${REPO_OWNER}/${REPO_NAME}"
+    CHERRY_ORIG_PR=""
+    if [[ "${CHERRY_REF}" == */* ]]; then
+        CHERRY_ORIG_REPO="${CHERRY_REF%#*}"
+        CHERRY_ORIG_PR="${CHERRY_REF##*#}"
+    elif [[ -n "${CHERRY_REF}" ]]; then
+        CHERRY_ORIG_PR="${CHERRY_REF##*#}"
+    fi
+    if [[ -n "${CHERRY_ORIG_PR}" ]]; then
+        echo "[$(date --utc +%FT%T.%3NZ)] Body looks like an automated cherry-pick of ${CHERRY_ORIG_REPO}#${CHERRY_ORIG_PR} -- checking whether the original PR declared Depends-On lines this body no longer carries"
+        if ORIG_PR_JSON=$(gh_api_get "https://api.github.com/repos/${CHERRY_ORIG_REPO}/pulls/${CHERRY_ORIG_PR}"); then
+            # Same escaped-body extraction as above (the title-vs-body
+            # false-match avoidance applies to the original PR's response
+            # too).
+            ORIG_BODY_ESCAPED=$(extract_pr_body "${ORIG_PR_JSON}")
+            ORIG_DEPENDS_ON=$(printf '%s' "${ORIG_BODY_ESCAPED}" | grep -oiE 'depends-on:[^"\\]*https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/[0-9]+' || true)
+            if [[ -n "${ORIG_DEPENDS_ON}" ]]; then
+                echo "[$(date --utc +%FT%T.%3NZ)] WARNING: this cherry-pick carries no Depends-On lines, but the original ${CHERRY_ORIG_REPO}#${CHERRY_ORIG_PR} declares:" >&2
+                printf '%s\n' "${ORIG_DEPENDS_ON}" | sed 's/^/  /' >&2
+                echo "[$(date --utc +%FT%T.%3NZ)] Re-add the line(s) to THIS PR's description and /test <job-name> to have them resolved here -- they are not resolved automatically" >&2
+                # Diagnostic only: a failed artifact write must never fail the
+                # job (same "an optional check never turns the job red"
+                # contract as the rest of this step).
+                { echo "cherry-pick-of ${CHERRY_ORIG_REPO}#${CHERRY_ORIG_PR} declares Depends-On lines missing from this PR's body $(date --utc +%FT%T.%3NZ)"; printf '%s\n' "${ORIG_DEPENDS_ON}"; } >> "${ARTIFACT_DIR}/depends-on-cherrypick-original.txt" \
+                    || echo "[$(date --utc +%FT%T.%3NZ)] WARNING: could not write ${ARTIFACT_DIR}/depends-on-cherrypick-original.txt" >&2
+            else
+                echo "[$(date --utc +%FT%T.%3NZ)] Original ${CHERRY_ORIG_REPO}#${CHERRY_ORIG_PR} declares no Depends-On lines either -- nothing was lost in the cherry-pick"
+            fi
+        else
+            echo "[$(date --utc +%FT%T.%3NZ)] WARNING: could not fetch the original ${CHERRY_ORIG_REPO}#${CHERRY_ORIG_PR} description -- cherry-pick Depends-On check inconclusive" >&2
+        fi
+    fi
     exit 0
 fi
 
@@ -166,6 +269,7 @@ echo "[$(date --utc +%FT%T.%3NZ)] Found Depends-On line(s):"
 echo "${DEPENDS_ON_LINES}"
 
 RESOLVED_ANY=false
+MISMATCH_SKIPPED=false
 SEEN_URLS=""
 
 while IFS= read -r line; do
@@ -203,11 +307,101 @@ while IFS= read -r line; do
         continue
     fi
 
+    # Branch-mismatch guard: never build a dependency whose PR is based on
+    # a different branch than the one this job tests. All OADP-ecosystem
+    # repos use the same DEVELOPMENT-channel names modulo aliases (most:
+    # oadp-dev; migtools/kubevirt-velero-plugin and
+    # openshift/hypershift-oadp-plugin: main; some: master) and their
+    # release branches are the same oadp-1.x names, so the two base refs are
+    # comparable after branch_channel() normalizes the development aliases:
+    # an oadp-dev-based dep PR pulled into an oadp-1.6 job would build a
+    # combination that can never ship (dev code inside a release bundle),
+    # and the resulting verdict -- pass OR fail -- says nothing about
+    # either branch. On mismatch the dep is SKIPPED: this job proceeds
+    # against the released, pre-built dependency, i.e. the combination
+    # that actually ships, with a loud warning and a marker artifact
+    # naming the dep and both branches. Best-effort like the description
+    # fetch: if the dep PR's metadata cannot be fetched (or its base
+    # branch cannot be extracted), the guard is inconclusive and the dep
+    # is built as before -- a safety check must never be the reason a job
+    # goes red. This also catches the common cherry-pick foot-gun: a
+    # Depends-On line still pointing at the ORIGINAL (dev-branch) PR after
+    # its change was cherry-picked to the release branch this job tests.
+    # NOT applied in pj-rehearse runs, detected as: the triggering PR
+    # lives in openshift/release itself (no real release-repo job wires
+    # this step) -- a rehearsal's PULL_BASE_REF names the RELEASE repo's
+    # branch, a namespace with no counterpart in the OADP repos' branch
+    # scheme, so every dep would "mismatch" and the positive path could
+    # never be rehearsed.
+    DEP_BASE_REF=""
+    # The dep PR's head commit, extracted from the same metadata fetch:
+    # pins the source URL below to an immutable revision so a push to
+    # the dep PR between this step's fetch and the e2e step's own
+    # tarball fetch can never mix revisions (manager image from the old
+    # head, test code from the new one). Initialized outside the guard
+    # below so a skipped guard (rehearsal) never sees a stale value from
+    # an earlier dependency in this loop.
+    DEP_HEAD_SHA=""
+    if [[ -n "${PULL_BASE_REF:-}" && "${REPO_OWNER}/${REPO_NAME}" != "openshift/release" ]]; then
+        # Progress line before the fetch: the direct API path can fall back
+        # to a one-shot pod, so this call is not always fast.
+        echo "[$(date --utc +%FT%T.%3NZ)] Checking the base branch of ${DEP_REPO}#${DEP_PR} before fetching its source"
+        if DEP_PR_JSON=$(gh_api_get "https://api.github.com/repos/${DEP_REPO}/pulls/${DEP_PR}"); then
+            # The "base" object's "ref" field sits before its nested
+            # user/repo objects in GitHub's payload, so grep -P over the
+            # newline-flattened JSON picks it out (no jq in this image,
+            # same as the body extraction above).
+            DEP_BASE_REF=$(printf '%s' "${DEP_PR_JSON}" | tr -d '\n' \
+                | grep -Po '"base": *\{[^{]*"ref": *"[^"]*"' \
+                | grep -Po '"ref": *"[^"]*"$' \
+                | sed -E 's/^"ref": *"//; s/"$//' || true)
+            # Same first-field shape for the head object's "sha".
+            DEP_HEAD_SHA=$(printf '%s' "${DEP_PR_JSON}" | tr -d '\n' \
+                | grep -Po '"head": *\{[^{]*"sha": *"[^"]*"' \
+                | grep -Po '"sha": *"[^"]*"$' \
+                | sed -E 's/^"sha": *"//; s/"$//' || true)
+        fi
+        if [[ -z "${DEP_BASE_REF}" ]]; then
+            echo "[$(date --utc +%FT%T.%3NZ)] WARNING: could not determine the base branch of ${DEP_REPO}#${DEP_PR} -- branch-mismatch guard inconclusive, building this dependency as requested" >&2
+        elif [[ "$(branch_channel "${DEP_BASE_REF}")" != "$(branch_channel "${PULL_BASE_REF}")" ]]; then
+            echo "[$(date --utc +%FT%T.%3NZ)] WARNING: ${DEP_REPO}#${DEP_PR} is based on branch '${DEP_BASE_REF}' but this job tests branch '${PULL_BASE_REF}' of ${REPO_OWNER}/${REPO_NAME} -- building it would test a combination that can never ship, so this dependency is SKIPPED and the job runs against the released ${DEP_REPO} instead; to actually test this dep here, point the Depends-On line at a PR based on '${PULL_BASE_REF}' (e.g. this change's cherry-pick)" >&2
+            # Diagnostic only: a failed artifact write must never fail the job.
+            echo "branch-mismatch ${DEP_REPO}#${DEP_PR} dep-base=${DEP_BASE_REF} job=${REPO_OWNER}/${REPO_NAME}@${PULL_BASE_REF} $(date --utc +%FT%T.%3NZ)" >> "${ARTIFACT_DIR}/depends-on-branch-mismatch.txt" \
+                || echo "[$(date --utc +%FT%T.%3NZ)] WARNING: could not write ${ARTIFACT_DIR}/depends-on-branch-mismatch.txt" >&2
+            MISMATCH_SKIPPED=true
+            continue
+        fi
+    fi
+
     echo "[$(date --utc +%FT%T.%3NZ)] Fetching ${DEP_REPO}#${DEP_PR} once for $(printf '%s' "${MATCHED_CANDIDATES}" | grep -c .) matching candidate(s)"
     SRC_DIR=$(mktemp -d)
     TARBALL_FILE=$(mktemp)
+    # Immutable SHA archive when the head commit is known (guard metadata
+    # fetch), mutable PR-head URL otherwise (rehearsals skip the guard; a
+    # metadata-fetch failure falls back here too, accepting the small
+    # revision-mix race rather than failing the job over an optional pin).
     TARBALL_URL="https://github.com/${DEP_REPO}/archive/refs/pull/${DEP_PR}/head.tar.gz"
-    curl -sfL "${TARBALL_URL}" -o "${TARBALL_FILE}"
+    if [[ -n "${DEP_HEAD_SHA:-}" ]]; then
+        TARBALL_URL="https://github.com/${DEP_REPO}/archive/${DEP_HEAD_SHA}.tar.gz"
+        echo "[$(date --utc +%FT%T.%3NZ)] Pinning ${DEP_REPO}#${DEP_PR} source to its current head commit ${DEP_HEAD_SHA} (immutable archive) -- both the image build and the e2e step's TESTS_SOURCE fetch use exactly this revision even if the PR is pushed to mid-run"
+    fi
+    # A Depends-On line explicitly requested this PR's source, so a failed
+    # fetch fails the job LOUDLY (named repo/PR, retest hint, temp cleanup)
+    # rather than degrading to this job's default pre-built images/tests:
+    # silently running stale code after the author asked for the sibling
+    # PR's code would surface as a confusing test failure a full cluster
+    # run later, not as a fetch failure (the exact scenario TESTS_SOURCE
+    # exists to fix). --retry absorbs transient CDN hiccups first,
+    # mirroring the description fetch's retry pattern above; archive
+    # downloads are CDN-backed and not subject to the anonymous
+    # api.github.com rate limit that motivates that fetch's no-op
+    # fallback, which does NOT apply here.
+    if ! curl -sfL --retry 3 --retry-delay 5 "${TARBALL_URL}" -o "${TARBALL_FILE}"; then
+        echo "[$(date --utc +%FT%T.%3NZ)] ERROR: could not fetch ${DEP_REPO}#${DEP_PR} source from ${TARBALL_URL} after retries -- a Depends-On line requested it, so refusing to continue with this job's default (pre-built) code; /retest once GitHub is reachable" >&2
+        rm -rf "${SRC_DIR}"
+        rm -f "${TARBALL_FILE}"
+        exit 1
+    fi
     tar xzf "${TARBALL_FILE}" -C "${SRC_DIR}" --strip-components=1
     rm -f "${TARBALL_FILE}"
 
@@ -224,6 +418,39 @@ while IFS= read -r line; do
         # is then relative to that directory, as in ci-operator. Defaults to
         # the repo root when omitted.
         read -r _ RELATED_ENV CAND_DOCKERFILE CAND_CONTEXT <<< "${CAND_LINE}"
+
+        # TESTS_SOURCE sentinel: hand the depended-on PR's SOURCE to this
+        # job's own e2e test step instead of building a container image from
+        # it. For jobs whose e2e test container ships oadp-operator's test
+        # code PRE-BUILT from a release branch (the KDM and velero-family
+        # e2e configs run konveyor/oadp-operator-e2e-tests, whose
+        # build/ci-Dockerfile bakes the branch's source -- Go toolchain and
+        # all -- into the image): a Depends-On oadp-operator PR's TEST-CODE
+        # changes would otherwise never execute in that job, since
+        # MANAGER_IMAGE only swaps the operator's manager image, not the
+        # tests. A one-line POINTER file (the PR's archive URL) is written
+        # into ${SHARED_DIR} for the e2e step to read; the e2e step fetches
+        # the tarball itself. The tarball itself must NOT go through
+        # ${SHARED_DIR}: it is a ~1 MiB Kubernetes Secret (see the qe-agent/
+        # quay/stackrox step docs) while this repo's source archives are
+        # 10+ MB compressed. No Build, no ImageStream, and nothing is
+        # appended to depends-on-images.txt -- the image-apply consumers
+        # (oadp-apply-depends-on-images, the inline set-related-image steps)
+        # must never see this sentinel. Dockerfile/context fields are
+        # meaningless here and ignored.
+        if [[ "${RELATED_ENV}" == "TESTS_SOURCE" ]]; then
+            TESTS_PTR_DEST="${SHARED_DIR}/depends-on-tests-source-$(printf '%s' "${DEP_REPO}" | tr '/' '-').txt"
+            if ! printf '%s\n' "${TARBALL_URL}" > "${TESTS_PTR_DEST}"; then
+                echo "[$(date --utc +%FT%T.%3NZ)] Failed to write ${TESTS_PTR_DEST} -- is ${SHARED_DIR} writable and non-full?" >&2
+                rm -rf "${SRC_DIR}"
+                rm -f "${TARBALL_FILE}"
+                exit 1
+            fi
+            echo "[$(date --utc +%FT%T.%3NZ)] ${DEP_REPO}#${DEP_PR} test-source pointer saved for this job's e2e step via TESTS_SOURCE -> ${TESTS_PTR_DEST} (archive URL; the e2e step fetches the tarball itself, since it is far too large for SHARED_DIR)"
+            RESOLVED_ANY=true
+            continue
+        fi
+
         CAND_DOCKERFILE="${CAND_DOCKERFILE:-Dockerfile}"
         CAND_CONTEXT="${CAND_CONTEXT:-.}"
         if [[ "${CAND_CONTEXT}" == /* || "${CAND_CONTEXT}" == *..* ]]; then
@@ -285,5 +512,9 @@ while IFS= read -r line; do
 done <<< "${DEPENDS_ON_LINES}"
 
 if [[ "${RESOLVED_ANY}" != "true" ]]; then
-    echo "[$(date --utc +%FT%T.%3NZ)] Depends-On line(s) found, but none matched a configured candidate for this job -- nothing to resolve"
+    if [[ "${MISMATCH_SKIPPED}" == "true" ]]; then
+        echo "[$(date --utc +%FT%T.%3NZ)] Depends-On line(s) found and matched, but every matched dependency was skipped by the branch-mismatch guard (see the WARNINGs above and depends-on-branch-mismatch.txt) -- this job tested against the released dependencies"
+    else
+        echo "[$(date --utc +%FT%T.%3NZ)] Depends-On line(s) found, but none matched a configured candidate for this job -- nothing to resolve"
+    fi
 fi

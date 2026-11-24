@@ -340,6 +340,64 @@ function upgrade() {
     set +x
 }
 
+# mco_upgrade runs MCO upgrade TCs as explicit pre-upgrade and post-upgrade
+# phases around the standard cluster upgrade driver. The phase labels only
+# select tests; this function owns the ordering and verifies the upgrade
+# completed to a different release image before starting post-upgrade tests.
+function mco_upgrade() {
+    local target_release initial_image upgrade_state upgraded_image desired_image
+    local mco_upgrade_suite="openshift/machine-config-operator/upgrade"
+
+    target_release="${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}"
+    if [[ -f "${SHARED_DIR}/override-upgrade" ]]; then
+        target_release="$(<"${SHARED_DIR}/override-upgrade")"
+        echo "Overriding upgrade target to ${target_release}"
+    fi
+    if [[ -z "${target_release}" ]]; then
+        echo >&2 "No upgrade target was provided"
+        return 1
+    fi
+
+    initial_image="$(oc get clusterversion/version -o jsonpath='{.status.history[0].image}')"
+    if [[ -z "${initial_image}" ]]; then
+        echo >&2 "Could not determine the installed release image before the MCO pre-upgrade phase"
+        return 1
+    fi
+
+    echo "MCO upgrade phase 1/3: run pre-upgrade tests on ${initial_image}"
+    openshift-tests run "${mco_upgrade_suite}" ${TEST_ARGS:-} \
+        --run "MCOUpgrade:Pre" \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/mco-upgrade-pre.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit"
+
+    echo "MCO upgrade phase 2/3: upgrade to ${target_release}"
+    openshift-tests run-upgrade all ${TEST_ARGS:-} \
+        --run "Cluster should remain functional during upgrade" \
+        --to-image "${target_release}" \
+        --options "${TEST_UPGRADE_OPTIONS-}" \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/mco-upgrade-driver.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit"
+
+    upgrade_state="$(oc get clusterversion/version -o jsonpath='{.status.history[0].state}')"
+    upgraded_image="$(oc get clusterversion/version -o jsonpath='{.status.history[0].image}')"
+    desired_image="$(oc get clusterversion/version -o jsonpath='{.status.desired.image}')"
+    if [[ "${upgrade_state}" != "Completed" || -z "${upgraded_image}" || \
+        "${upgraded_image}" == "${initial_image}" || "${upgraded_image}" != "${desired_image}" ]]; then
+        echo >&2 "MCO post-upgrade tests will not run: ClusterVersion did not complete an upgrade from ${initial_image}"
+        oc get clusterversion/version -o yaml
+        return 1
+    fi
+
+    echo "MCO upgrade phase 3/3: run post-upgrade tests on ${upgraded_image}"
+    openshift-tests run "${mco_upgrade_suite}" ${TEST_ARGS:-} \
+        --run "MCOUpgrade:Post" \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/mco-upgrade-post.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit"
+}
+
 # upgrade_conformance runs the upgrade and the parallel tests, and exits with an error if either fails.
 function upgrade_conformance() {
     local exit_code=0 &&
@@ -651,6 +709,9 @@ done
 echo "[$(date)] All imagestreams are imported."
 
 case "${TEST_TYPE}" in
+mco-upgrade)
+    mco_upgrade
+    ;;
 upgrade-conformance)
     upgrade_conformance
     ;;

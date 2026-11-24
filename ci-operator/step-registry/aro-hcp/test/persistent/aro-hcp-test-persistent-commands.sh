@@ -51,8 +51,11 @@ if [[ -n "${ARO_HCP_DEPLOY_ENV:-}" ]]; then
 fi
 
 export ARO_HCP_CONFIG_FILE="${PWD}/config/config.yaml"
-export ARO_HCP_CLOUD="dev"
-export DEPLOY_ENV="${VAULT_SECRET_PROFILE}"
+export ARO_HCP_CLOUD="${ARO_HCP_CLOUD:-public}"
+export DEPLOY_ENV="${ARO_HCP_DEPLOY_ENV:?ARO_HCP_DEPLOY_ENV must name a configuration environment}"
+if [[ "${ARO_HCP_CLOUD}" == "public" ]]; then
+  export ARO_HCP_CONFIG_FILE_OVERRIDE="${ARO_HCP_CONFIG_FILE_OVERRIDE:-${PWD}/config/config.msft.clouds-overlay.yaml}"
+fi
 export REGION="${LOCATION}"
 
 ./test/aro-hcp-tests run-suite "${ARO_HCP_SUITE_NAME}" --junit-path="${ARTIFACT_DIR}/junit.xml" --html-path="${ARTIFACT_DIR}/extension-test-result-summary.html" --max-concurrency "${ARO_HCP_MAX_CONCURRENCY}"

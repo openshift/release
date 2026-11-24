@@ -207,6 +207,18 @@ tests:
       TEST_SUITE: ovn-kubernetes/conformance/parallel
     workflow: baremetalds-e2e-core-networking-dualstack-ote
 - always_run: false
+  as: e2e-metal-ipi-core-networking-dualstack-ote-noflood
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DISABLE_UDN_ARP_NDP_FLOOD: "true"
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/parallel
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
+- always_run: false
   as: e2e-metal-ipi-core-networking-dualstack-serial-ote
   capabilities:
   - intranet
@@ -228,6 +240,18 @@ tests:
         IP_STACK=v4v6
         NUM_WORKERS=3
         FEATURE_SET=TechPreviewNoUpgrade
+      EXTRA_MG_ARGS: --host-network
+      TEST_SUITE: ovn-kubernetes/conformance/serial
+    workflow: baremetalds-e2e-core-networking-dualstack-ote
+- always_run: false
+  as: e2e-metal-ipi-core-networking-dualstack-serial-ote-noflood
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DISABLE_UDN_ARP_NDP_FLOOD: "true"
       EXTRA_MG_ARGS: --host-network
       TEST_SUITE: ovn-kubernetes/conformance/serial
     workflow: baremetalds-e2e-core-networking-dualstack-ote
@@ -601,6 +625,10 @@ tests:
     cd ../openshift
     go mod vendor
     make test || status=$?
+    cd ../test/crd-integration
+    go mod vendor
+    cd ../
+    make test-crd || status=$?
     exit $status
   container:
     from: src
@@ -827,12 +855,12 @@ tests:
       ADDITIONAL_WORKER_NODES: "117"
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.4xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m7a.16xlarge
-      EXTRA_FLAGS: --log-level=debug --qps=5 --burst=5 --incremental-step-size=100
+      CONTROL_PLANE_INSTANCE_TYPE: m7a.8xlarge
+      EXTRA_FLAGS: --log-level=debug --qps=20 --burst=20 --incremental-step-size=200
         --incremental-step-delay=20m --incremental-pattern=linear --timeout=10h --set=jobs.0.incrementalLoad.scrapeMetricsPerStep=true
         --set=jobs.0.objects.10.replicas=0
       NAMESPACES_PER_CUDN: "1"
-      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r7a.16xlarge
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: r7a.8xlarge
       OVERRIDE_ITERATIONS: "1000"
       SET_ENV_BY_PLATFORM: custom
       ZONES_COUNT: "1"
@@ -966,16 +994,6 @@ tests:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-vsphere
 - always_run: false
-  as: e2e-metal-ipi-ovn-bgp-virt-dualstack
-  capabilities:
-  - intranet
-  optional: true
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      CNV_PRERELEASE_LATEST_CHANNEL: "true"
-    workflow: baremetalds-e2e-ovn-bgp-virt-dualstack
-- always_run: false
   as: e2e-metal-core-networking-virt-nmstate-dual-serial-ote-tp
   capabilities:
   - intranet
@@ -985,6 +1003,17 @@ tests:
     env:
       CNV_PRERELEASE_LATEST_CHANNEL: "true"
       FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SUITE: ovn-kubernetes/conformance/serial/virtualization
+    workflow: baremetalds-e2e-ovn-bgp-virt-dualstack
+- always_run: false
+  as: e2e-metal-core-networking-virt-nmstate-dual-serial-ote
+  capabilities:
+  - intranet
+  pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CNV_PRERELEASE_LATEST_CHANNEL: "true"
       TEST_SUITE: ovn-kubernetes/conformance/serial/virtualization
     workflow: baremetalds-e2e-ovn-bgp-virt-dualstack
 - always_run: false

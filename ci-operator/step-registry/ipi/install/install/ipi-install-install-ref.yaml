@@ -76,12 +76,57 @@ ref:
   - name: STRIP_VSPHERE_FAILURE_DOMAINS
     default: ""
     documentation: >-
-      vSphere only. When set to "true", deletes spec.platformSpec.vsphere.vcenters
-      and spec.platformSpec.vsphere.failureDomains from the generated Infrastructure
-      manifest before ignition configs/cluster creation, simulating a cluster
-      installed without vSphere failure domain information (e.g. pre-4.13 or UPI
-      installs that never populate it, a state the installer never backfills on
-      upgrade; SPLAT-3028).
+      vSphere only. When set to "true", deletes
+      spec.platformSpec.vsphere.vcenters and
+      spec.platformSpec.vsphere.failureDomains from the generated
+      Infrastructure manifest right after `create manifests`, and rewrites
+      the generated openshift-config/cloud-provider-config ConfigMap from
+      YAML into the legacy INI format (using the server/datacenter/
+      datastore/folder values the installer resolved for the sole failure
+      domain) inside bootstrap.ign, once the bootstrap host's own render of
+      that ConfigMap has already consumed the installer's native YAML (a
+      byte-for-byte mismatch between that render and the in-cluster one
+      otherwise permanently degrades the machine-config ClusterOperator).
+      Also removes the generated ControlPlaneMachineSet manifest, which is
+      built straight from install-config.yaml's named failure domain
+      independently of the Infrastructure manifest: left in place, it keeps
+      referencing a failure domain name the now-empty Infrastructure list no
+      longer defines, which permanently fails the control-plane-machine-set
+      controller's reconcile and keeps that ClusterOperator from ever
+      reporting Available (removing the manifest entirely avoids the
+      ControlPlaneMachineSet ever being created, which that operator treats
+      as a healthy, available state) -- the same manifest
+      upi-conf-vsphere-commands.sh already removes for its own, unrelated
+      reason.
+      This simulates a cluster installed without vSphere failure domain
+      information (e.g. pre-4.13 or UPI installs that never populate it, a
+      state the installer never backfills on upgrade; SPLAT-3028) in a form
+      that can actually occur on a real cluster: no installer version in
+      active use renders cloud-provider-config as INI anymore, so without
+      the rewrite, stripping alone leaves no source of datastore/topology
+      data anywhere, which keeps storage permanently Degraded and the
+      install from ever completing.
+  - name: VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER
+    default: post-bootstrap
+    documentation: >-
+      vSphere only, and only meaningful with STRIP_VSPHERE_FAILURE_DOMAINS.
+      Selects when the legacy-INI openshift-config/cloud-provider-config
+      substitution is applied on the bootstrap host, which must match how the
+      target payload renders that ConfigMap in-cluster. The in-cluster
+      ControllerConfig value comes from
+      openshift-config-managed/kube-cloud-config, and who writes that copy is
+      gated on the VSphereMultiVCenterDay2 feature gate:
+      "post-bootstrap" (the default) waits for bootkube's config-bootstrap
+      stage, correct from 4.22/5.x on, where CCMO owns the managed copy and
+      always normalizes it to YAML; "pre-bootstrap" orders the swap
+      Before=bootkube.service and is correct while the gate is off (4.19,
+      4.20, 4.21), where cluster-config-operator copies the ConfigMap
+      verbatim, so the in-cluster render follows the live ConfigMap's format.
+      Choosing wrongly makes the bootstrap-rendered and in-cluster rendered
+      master MachineConfigs hash differently, which permanently degrades the
+      machine-config ClusterOperator mid-install. Set per-test in the release
+      config; it cannot be derived from install-config or the generated
+      manifests.
   dependencies:
   - name: "release:latest"
     env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE

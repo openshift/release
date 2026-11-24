@@ -18,34 +18,40 @@ check_pods_running() {
   local namespace=$1
 
   echo "$(date -u --rfc-3339=seconds) - Checking pod health in namespace ${namespace}..."
-  local pods_json
-  if ! pods_json=$(oc get pods -n "${namespace}" -o json 2>&1); then
+  # One line per pod: "<name> <phase> <ready>,<ready>,..." -- parsed with
+  # plain bash below. Deliberately no jq: this step runs from the cli image,
+  # which does not ship it (a rehearsal failed with "jq: command not found",
+  # exit 127). jsonpath is served by oc itself, so it is always present.
+  local pods
+  if ! pods=$(oc get pods -n "${namespace}" -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.status.phase}{" "}{range .status.containerStatuses[*]}{.ready}{","}{end}{"\n"}{end}' 2>&1); then
     echo "$(date -u --rfc-3339=seconds) - ERROR: failed to list pods in ${namespace}"
-    echo "${pods_json}"
+    echo "${pods}"
     VALIDATION_FAILED=1
     return
   fi
 
-  local pod_count
-  pod_count=$(jq -r '.items | length' <<< "${pods_json}")
-  if [[ "${pod_count}" -eq 0 ]]; then
+  if [[ -z "${pods//[[:space:]]/}" ]]; then
     echo "$(date -u --rfc-3339=seconds) - ERROR: no pods found in ${namespace}"
     VALIDATION_FAILED=1
     return
   fi
 
-  local not_ready
-  # A pod with no containerStatuses (e.g. still initializing) is treated as
-  # not ready too, rather than vacuously passing because no container was
-  # found to be explicitly not-ready.
-  not_ready=$(jq -r '
-    .items[] |
-    select(
-      .status.phase != "Running" or
-      ((.status.containerStatuses // []) | length == 0) or
-      ((.status.containerStatuses // []) | any(.ready == false))
-    ) |
-    .metadata.name' <<< "${pods_json}")
+  local not_ready=""
+  local name phase readies
+  while IFS= read -r line; do
+    [[ -z "${line//[[:space:]]/}" ]] && continue
+    name=""
+    phase=""
+    readies=""
+    read -r name phase readies <<< "${line}"
+    # A pod with no containerStatuses (e.g. still initializing) arrives with
+    # an empty readies list and is treated as not ready too, rather than
+    # vacuously passing because no container was found to be explicitly
+    # not-ready.
+    if [[ "${phase}" != "Running" || -z "${readies//,/}" || "${readies}" == *false* ]]; then
+      not_ready+="${name}"$'\n'
+    fi
+  done <<< "${pods}"
 
   if [[ -n "${not_ready}" ]]; then
     echo "$(date -u --rfc-3339=seconds) - ERROR: unhealthy pod(s) in ${namespace}:"
@@ -87,6 +93,114 @@ elif [[ -n "${VCENTERS}" || -n "${FAILURE_DOMAINS}" ]]; then
   VALIDATION_FAILED=1
 else
   echo "$(date -u --rfc-3339=seconds) - confirmed: vcenters and failureDomains are both empty"
+fi
+
+SWAP_ORDER="${VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER:-post-bootstrap}"
+
+echo "$(date -u --rfc-3339=seconds) - Checking the VSphereMultiVCenterDay2 feature gate state..."
+# This is the authoritative signal for whether the install step picked the
+# right swap ordering: the gate decides who owns
+# openshift-config-managed/kube-cloud-config (verbatim CCO copy while off,
+# CCMO-normalized YAML once on), and that decides the format of the in-cluster
+# render the bootstrap render has to match.
+#
+# status.featureGates is only populated in-cluster (cluster-config-operator's
+# featuregate controller), one entry per payload version, each with explicit
+# enabled[]/disabled[] lists -- so this cannot be consulted during bootstrap,
+# only afterwards, which is why the install step still selects the mode from
+# its pin and this step verifies it.
+FG_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' 2>&1) || FG_VERSION=""
+FG_DUMP=$(oc get featuregate cluster -o jsonpath='{range .status.featureGates[*]}{.version}{"|"}{range .enabled[*]}{.name}{","}{end}{"|"}{range .disabled[*]}{.name}{","}{end}{"\n"}{end}' 2>&1) || FG_DUMP=""
+
+FG_GATE_STATE="unknown"
+FG_MATCHED_VERSION=""
+if [[ -z "${FG_DUMP//[[:space:]]/}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - WARNING: could not read status.featureGates from featuregate/cluster; skipping the gate-state check"
+else
+  while IFS='|' read -r fg_ver fg_enabled fg_disabled; do
+    [[ -z "${fg_ver//[[:space:]]/}" ]] && continue
+    # Prefer the entry for the version the cluster is actually running; fall
+    # back to the last entry (the controller appends per payload version) when
+    # none matches, which happens while a version change is in flight.
+    if [[ "${fg_ver}" == "${FG_VERSION}" || -z "${FG_MATCHED_VERSION}" || "${FG_MATCHED_VERSION}" != "${FG_VERSION}" ]]; then
+      FG_MATCHED_VERSION="${fg_ver}"
+      case ",${fg_enabled}," in
+        *",VSphereMultiVCenterDay2,"*) FG_GATE_STATE="enabled" ;;
+        *)
+          case ",${fg_disabled}," in
+            *",VSphereMultiVCenterDay2,"*) FG_GATE_STATE="disabled" ;;
+            *) FG_GATE_STATE="not-listed" ;;
+          esac ;;
+      esac
+    fi
+  done <<< "${FG_DUMP}"
+  echo "  VSphereMultiVCenterDay2 (payload ${FG_MATCHED_VERSION}, cluster ${FG_VERSION:-unknown}) : ${FG_GATE_STATE}"
+fi
+
+# Expected: gate disabled => cluster-config-operator owns the managed copy and
+# copies it verbatim, so the manifest must have been INI at render time
+# (pre-bootstrap). Gate enabled => CCMO normalizes it to YAML, so the manifest
+# had to stay the installer's YAML (post-bootstrap). A contradiction here is a
+# warning, not a failure: the job's purpose is the cluster's health, and when
+# the ordering is genuinely wrong the install dies before this step runs.
+case "${SWAP_ORDER}:${FG_GATE_STATE}" in
+  pre-bootstrap:enabled)
+    echo "$(date -u --rfc-3339=seconds) - WARNING: swap order is pre-bootstrap (assumes VSphereMultiVCenterDay2 disabled) but the gate is ENABLED on this payload; set VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER=post-bootstrap for this release line"
+    ;;
+  post-bootstrap:disabled)
+    echo "$(date -u --rfc-3339=seconds) - WARNING: swap order is post-bootstrap (assumes VSphereMultiVCenterDay2 enabled) but the gate is DISABLED on this payload; set VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER=pre-bootstrap for this release line"
+    ;;
+  *:not-listed)
+    echo "$(date -u --rfc-3339=seconds) - WARNING: VSphereMultiVCenterDay2 is not listed in the enabled/disabled sets for payload ${FG_MATCHED_VERSION}; this payload may predate the gate, so the swap order cannot be verified"
+    ;;
+esac
+
+echo "$(date -u --rfc-3339=seconds) - Checking the cloud-provider-config carrier formats..."
+# The simulation is only meaningful if openshift-config holds the legacy INI,
+# and the *in-cluster* consumer reads openshift-config-managed/kube-cloud-config
+# (MCO's syncCloudConfig). The gate check above is the authoritative statement
+# of which format that copy should have; this table corroborates it and shows
+# the ControllerConfig MCO actually derived. A mismatch between managed and the
+# expected format is reported as a warning rather than a failure: when the
+# ordering is genuinely wrong the bootstrap/in-cluster MachineConfig hashes
+# diverge and the install itself dies first. The exception is the unmanaged
+# ConfigMap, which the job exists to produce and which is therefore a hard
+# failure.
+UNMANAGED_CC=$(oc get configmap cloud-provider-config -n openshift-config -o jsonpath='{.data.config}' 2>&1) || UNMANAGED_CC=""
+MANAGED_CC=$(oc get configmap kube-cloud-config -n openshift-config-managed -o jsonpath='{.data.cloud\.conf}' 2>&1) || MANAGED_CC=""
+CONTROLLER_CC=$(oc get controllerconfig machine-config-controller -o jsonpath='{.spec.cloudProviderConfig}' 2>&1) || CONTROLLER_CC=""
+
+describe_cc_format() {
+  local value=$1
+  if [[ -z "${value}" ]]; then echo "absent"; return; fi
+  if [[ "${value}" =~ ^[[:space:]]*\[ ]]; then echo "INI"; return; fi
+  if grep -qE '^[[:space:]]*(global|vcenter):' <<< "${value}"; then echo "YAML"; return; fi
+  echo "unknown"
+}
+
+UNMANAGED_FORMAT=$(describe_cc_format "${UNMANAGED_CC}")
+MANAGED_FORMAT=$(describe_cc_format "${MANAGED_CC}")
+CONTROLLER_FORMAT=$(describe_cc_format "${CONTROLLER_CC}")
+echo "  openshift-config/cloud-provider-config          : ${UNMANAGED_FORMAT}"
+echo "  openshift-config-managed/kube-cloud-config     : ${MANAGED_FORMAT}"
+echo "  ControllerConfig.spec.cloudProviderConfig      : ${CONTROLLER_FORMAT}"
+echo "  VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER         : ${SWAP_ORDER}"
+
+if [[ "${UNMANAGED_FORMAT}" != "INI" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - ERROR: expected openshift-config/cloud-provider-config to be the legacy INI (found ${UNMANAGED_FORMAT}); the legacy cloud-provider-config simulation did not take effect"
+  VALIDATION_FAILED=1
+fi
+
+# Gate off (pre-bootstrap) => managed mirrors the unmanaged ConfigMap exactly.
+# Gate on (post-bootstrap) => managed is CCMO-normalized YAML.
+if [[ "${SWAP_ORDER}" == "pre-bootstrap" && "${MANAGED_FORMAT}" == "YAML" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - WARNING: swap order is pre-bootstrap (expects VSphereMultiVCenterDay2 OFF, so a verbatim INI copy) but managed/kube-cloud-config is YAML; the gate ownership may have flipped on this payload"
+elif [[ "${SWAP_ORDER}" != "pre-bootstrap" && "${MANAGED_FORMAT}" == "INI" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - WARNING: swap order is ${SWAP_ORDER} (expects VSphereMultiVCenterDay2 ON, so a CCMO-normalized YAML copy) but managed/kube-cloud-config is INI; the gate ownership may have flipped on this payload"
+fi
+
+if [[ "${CONTROLLER_FORMAT}" != "${MANAGED_FORMAT}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - WARNING: ControllerConfig.spec.cloudProviderConfig is ${CONTROLLER_FORMAT} but managed/kube-cloud-config is ${MANAGED_FORMAT}; MCO may not have picked up the managed copy yet"
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Checking ClusterOperator health..."

@@ -121,3 +121,107 @@ ref:
       alternative to OCM_FVT_USE_BACKPLANE when only credentials are needed.
   documentation: |-
     Run ocmtest in nested podman using the rosa-backend-tests image.
+
+    Publication writes ocm-fvt-artifact-audit.json next to ocm-fvt-results.
+    It records only what this step did with each artifact before handing it
+    over: published, with the byte count copied; excluded, with a reason;
+    directory; whether the merged junit-ocm-fvt-report.xml reached
+    ARTIFACT_DIR and how many report.xml copies were published; and an
+    inventory of ARTIFACT_DIR as the step hands it to the Prow sidecar, with a
+    byte count per file. Both lists are sorted and then capped, and the cap
+    and the number of records dropped by it are reported alongside them.
+
+    Exclusion reasons are a fixed set. unreadable and irregular name the entry
+    concerned, because the name is the diagnostic. private-state does not:
+    .datainfo, cluster.ini, kubeconfig and *.kubeconfig are held back exactly
+    because they are named after cluster state, and they are the one group
+    that never becomes a published object, so they are recorded as a count per
+    directory, carrying the rule that matched - datainfo, cluster-ini,
+    kubeconfig or kubeconfig-named - in its own rule field, and never their
+    own names.
+
+    When publication refuses an entry it records that entry with disposition
+    failed and the same fixed reason the run reports, so the manifest names
+    which artifact stopped it rather than only that something did. Those
+    records are kept outside the entry cap, since they are the ones a reader
+    needs most when publication did not finish. A refused entry that is itself
+    private-state carries its directory and the matching rule instead of its
+    name, so refusing one never discloses what excluding it withholds.
+
+    Before publication the step also writes ocm-fvt-failure-summary.json from
+    the per-phase Ginkgo JSON reports in the private output tree. The verbose
+    reports and the merged junit are the only record of which cases failed,
+    and a whole one of them can be replaced after upload, so the summary keeps
+    that one question answerable. It is a projection, not a copy: for each
+    known phase it reports a fixed state - parsed, partial,
+    unavailable, unreadable, oversized, malformed or ambiguous - how many
+    reports were seen, read and dropped by a cap, a spec count per Ginkgo
+    state, and one record per failed, aborted, panicked, interrupted or timed
+    out spec carrying the phase, that state, and the numeric case id when the
+    spec names exactly one case - identified as tag, none, conflicting or
+    truncated. The case tag is the @id_<number> convention these suites use;
+    public artifacts put it in the spec's own name rather than in a Ginkgo
+    label, so both are read, the tag has to stand alone as a whole token, and
+    only the number is kept. Two different tags are reported as conflicting
+    and a scan that hit its budget as truncated, because in neither case can
+    the summary say which case failed. The tag is matched on a bounded slice
+    of the text composed to NFC, so the two spellings of one character cannot
+    be read differently, and a tag written against a word character, a
+    combining mark or a second @ is not a token. Phases are read in run order
+    and every report limit is applied per phase, and the single failure-record
+    budget is handed out to the phases in run order once the whole tree has
+    been read rather than as each result directory is read, so a teardown that
+    fails every spec cannot push the test phases out of the summary; what a
+    limit did drop is counted on the phase that lost it, and a phase that lost
+    a report to a cap is reported as partial rather than parsed.
+
+    A report is named <phase>_<HHMMSS>.<xml|json> inside
+    test-result-<job>-<timestamp>/, and the phase part is chosen by the run:
+    some jobs put their own job name there. The helper matches that name by
+    shape and maps it onto a list of phase names fixed in its source -
+    pre-env-validation, pre-vpc-cleaner, pre-cluster-creation, Day1Post,
+    Day1PostE2E, CPUpgrade, Day2Pre, Day2CH, Day2E2E, Destructive,
+    post-alerts and post-clean, in the order the public artifacts show them
+    running. Anything else with the shape of a report, including a job-named
+    one, is counted under the fixed phase "other" and its own name is never
+    emitted, so a job added later is still summarised and still cannot put
+    text of its own into the artifact. The list comes from public Prow
+    artifacts alone: a sample of 988 per-phase reports across six
+    openshift-online/rosa-e2e ocm-fvt job families in
+    test-platform-results-public. The artifact metadata collector classifies
+    report names the same way, so its labels cover the same phases.
+
+    Every field is a member of a vocabulary fixed in the helper or a bounded
+    integer. No spec text, label, author tag, failure message, stack trace,
+    resource identifier, file name, timestamp or URL is emitted, and no source
+    location: a report's file name comes from the private test repository and
+    no public vocabulary says which basenames are legitimate, so the summary
+    omits the location rather than copying arbitrary text out of an object
+    that censoring may have removed. Reading is bounded and fails closed -
+    symlinks are not followed, only the per-phase JSON names are opened, and
+    an oversized, malformed - including a report the run never finished
+    writing - or unexpectedly shaped report is reported as that state rather
+    than parsed. Summarising is best effort and
+    runs after the test container has exited, so it cannot change the suite's
+    exit status, its teardown or its reports.
+
+    The summary is an uploaded artifact like the others and is scanned like
+    the others. Holding no content from the reports is what makes it unlikely
+    to match, and this step claims no more than that: what the scanner does
+    with any object is decided after upload, outside this repository.
+
+    Uploaded artifacts are pattern-scanned after upload as well, and a whole
+    matching object is then replaced with a short notice, which makes a report
+    that was never produced indistinguishable from one that was published and
+    replaced. Comparing a byte count in the manifest with the object actually
+    served tells those two apart. It does not explain a removal: why an object
+    was replaced is decided after upload, outside this repository, and the
+    manifest claims nothing about it.
+
+    The manifest holds names, byte counts, errno integers and fixed reason
+    categories only. No file is read for it, no artifact content, secret
+    value, fragment or hash is emitted, and no exception text is copied, so it
+    cannot reproduce anything either censoring layer removed. The names it
+    does carry are rendered over a restricted character set with token-shaped
+    runs reduced to their length, so that the manifest does not become the
+    artifact the scanner replaces.

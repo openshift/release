@@ -7,7 +7,8 @@ metadata:
   namespace: openshift-gitops
 spec:
   goTemplate: true
-  goTemplateOptions: ["missingkey=error"]
+  goTemplateOptions:
+  - missingkey=error
   generators:
   - list:
       elements:
@@ -39,19 +40,26 @@ spec:
         name: build13
   template:
     metadata:
-      name: 'app-cluster-{{.cluster}}'
+      name: app-cluster-{{.cluster}}
       namespace: openshift-gitops
     spec:
       destination:
         name: '{{.name}}'
         namespace: openshift-gitops
       project: build-clusters
+      ignoreDifferences:
+      - group: machine.openshift.io
+        kind: MachineSet
+        namespace: openshift-machine-api
+        jqPathExpressions:
+        - .spec.template.spec.providerSpec.value.ami
+        - .spec.template.spec.providerSpec.value.disks[]? | select(.boot == true) | .image
       sources:
       - directory:
           exclude: '{OWNERS,*.md}'
           include: '{*.yaml,*.yml}'
           recurse: true
-        path: 'clusters/build-clusters/{{.cluster}}/'
+        path: clusters/build-clusters/{{.cluster}}/
         repoURL: https://github.com/openshift/release.git
         targetRevision: main
       syncPolicy:
@@ -64,3 +72,4 @@ spec:
         - CreateNamespace=true
         - PruneLast=true
         - ServerSideApply=true
+        - RespectIgnoreDifferences=true

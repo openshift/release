@@ -2,6 +2,12 @@
 # This file defines how secrets from Google Secret Manager are bundled and consumed in our CI.
 # See docs for further info: https://docs.ci.openshift.org/how-tos/adding-a-new-secret-to-ci-gsm/
 
+blocked_collections:
+  prucek:
+    reason: "testing blocked_collections field"
+  psalajova-first-secret:
+    reason: "Testing blocked collection enforcement with psalajova/test jobs."
+
 cluster_groups:
   build_farm:
     - app.ci
@@ -3165,6 +3171,90 @@ bundles:
       - name: ssh-privatekey
       - name: ssh-publickey
       group: openshift-ci-aws-credentials
+    - collection: libvirt-amd64-vpn
+      group: cluster-profile
+    - collection: libvirt-amd64-vpn
+      group: leases
+    name: cluster-secrets-libvirt-amd64-vpn
+    sync_to_cluster: true
+    targets:
+    - cluster_groups:
+      - non_app_ci
+      namespace: ci
+
+  - dockerconfig:
+      as: pull-secret
+      registries:
+      - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: token_image-puller_build01_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.build01.ci.openshift.org
+      - auth_field: token_image-puller_build02_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.build02.ci.openshift.org
+      - auth_field: token_image-puller_build03_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.build03.ci.openshift.org
+      - auth_field: token_image-puller_build04_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.build04.ci.openshift.org
+      - auth_field: token_image-puller_build05_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.build05.ci.openshift.org
+      - auth_field: token_image-puller_build06_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.build06.ci.openshift.org
+      - auth_field: token_image-puller_build07_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.build07.ci.openshift.org
+      - auth_field: token_image-puller_build08_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.build08.ci.openshift.org
+      - auth_field: token_image-puller_build09_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.build09.ci.openshift.org
+      - auth_field: token_image-puller_build10_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.build10.ci.openshift.org
+      - auth_field: token_image-puller_build11_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.build11.ci.openshift.org
+      - auth_field: token_image-puller_build12_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.build12.ci.openshift.org
+      - auth_field: token_image-puller_build13_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.build13.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        group: cloud--dot--openshift--dot--com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        group: quay--dot--io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        group: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        group: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        group: registry--dot--connect--dot--redhat--dot--com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        group: registry--dot--redhat--dot--io-pull-secret
+        registry_url: registry.redhat.io
+    gsm_secrets:
+    - collection: test-platform-infra
+      fields:
+      - name: ssh-privatekey
+      - name: ssh-publickey
+      group: openshift-ci-aws-credentials
     - collection: libvirt-s390x-vpn-hcp
       group: cluster-profile
     - collection: libvirt-s390x-vpn-hcp
@@ -3919,6 +4009,47 @@ bundles:
     - collection: aws-devfile
       group: cluster-secrets-aws-devfile
     name: cluster-secrets-aws-devfile
+    sync_to_cluster: true
+    targets:
+    - cluster_groups:
+      - non_app_ci
+      namespace: ci
+
+  - dockerconfig:
+      as: pull-secret
+      registries:
+      - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
+        group: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        group: cloud--dot--openshift--dot--com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        group: quay--dot--io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        group: quay--dot--io/multi-arch
+        registry_url: quay.io/multi-arch
+      - auth_field: auth
+        group: quayio-ci-read-only-robot
+        registry_url: quay-proxy.ci.openshift.org
+      - auth_field: auth
+        group: quayio-ci-read-only-robot
+        registry_url: quay.io/openshift/ci
+      - auth_field: auth
+        email_field: email
+        group: registry--dot--connect--dot--redhat--dot--com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        group: registry--dot--redhat--dot--io-pull-secret
+        registry_url: registry.redhat.io
+    gsm_secrets:
+    - collection: ecoeng-nvidia
+      group: cluster-secrets-aws-ecoeng-nvidia
+    name: cluster-secrets-aws-ecoeng-nvidia
     sync_to_cluster: true
     targets:
     - cluster_groups:
@@ -7500,13 +7631,31 @@ bundles:
       - as: insights-live.yaml
         name: insights-live--dot--yaml
       group: insights-ci-account
-    - collection: test-platform-infra
+    - collection: shiftstack-secrets
       fields:
       - as: .awscred
         name: --dot--awscred
+      group: aws
+    - collection: shiftstack-secrets
+      fields:
+      - as: clouds.yaml
+        name: clouds--dot--yaml
+      group: cloud-credentials-hwoffload
+    - collection: shiftstack-secrets
+      fields:
+      - as: osp-ca.crt
+        name: osp-ca--dot--crt
+      group: cloud-credentials-hwoffload
+    - collection: shiftstack-secrets
+      fields:
+      - as: squid-credentials.txt
+        name: squid-credentials--dot--txt
+      group: cloud-credentials-hwoffload
+    - collection: shiftstack-secrets
+      fields:
       - name: ssh-privatekey
       - name: ssh-publickey
-      group: openstack
+      group: ci-job-ssh-key
     name: cluster-secrets-openstack-hwoffload
     sync_to_cluster: true
     targets:
@@ -7548,61 +7697,31 @@ bundles:
       - as: insights-live.yaml
         name: insights-live--dot--yaml
       group: insights-ci-account
-    - collection: test-platform-infra
+    - collection: shiftstack-secrets
       fields:
       - as: .awscred
         name: --dot--awscred
+      group: aws
+    - collection: shiftstack-secrets
+      fields:
+      - as: clouds.yaml
+        name: clouds--dot--yaml
+      group: cloud-credentials-nfv
+    - collection: shiftstack-secrets
+      fields:
+      - as: osp-ca.crt
+        name: osp-ca--dot--crt
+      group: cloud-credentials-nfv
+    - collection: shiftstack-secrets
+      fields:
+      - as: squid-credentials.txt
+        name: squid-credentials--dot--txt
+      group: cloud-credentials-nfv
+    - collection: shiftstack-secrets
+      fields:
       - name: ssh-privatekey
       - name: ssh-publickey
-      group: openstack
-    name: cluster-secrets-openstack-nerc-dev
-    sync_to_cluster: true
-    targets:
-    - cluster_groups:
-      - non_app_ci
-      namespace: ci
-
-  - dockerconfig:
-      as: pull-secret
-      registries:
-      - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
-        group: build_farm
-        registry_url: registry.ci.openshift.org
-      - auth_field: auth
-        email_field: email
-        group: cloud--dot--openshift--dot--com-pull-secret
-        registry_url: cloud.openshift.com
-      - auth_field: auth
-        email_field: email
-        group: quay--dot--io-pull-secret
-        registry_url: quay.io
-      - auth_field: auth
-        group: quayio-ci-read-only-robot
-        registry_url: quay-proxy.ci.openshift.org
-      - auth_field: auth
-        group: quayio-ci-read-only-robot
-        registry_url: quay.io/openshift/ci
-      - auth_field: auth
-        email_field: email
-        group: registry--dot--connect--dot--redhat--dot--com-pull-secret
-        registry_url: registry.connect.redhat.com
-      - auth_field: auth
-        email_field: email
-        group: registry--dot--redhat--dot--io-pull-secret
-        registry_url: registry.redhat.io
-    gsm_secrets:
-    - collection: test-platform-infra
-      fields:
-      - as: insights-live.yaml
-        name: insights-live--dot--yaml
-      group: insights-ci-account
-    - collection: test-platform-infra
-      fields:
-      - as: .awscred
-        name: --dot--awscred
-      - name: ssh-privatekey
-      - name: ssh-publickey
-      group: openstack
+      group: ci-job-ssh-key
     name: cluster-secrets-openstack-nfv
     sync_to_cluster: true
     targets:
@@ -7644,109 +7763,21 @@ bundles:
       - as: insights-live.yaml
         name: insights-live--dot--yaml
       group: insights-ci-account
-    - collection: test-platform-infra
+    - collection: shiftstack-secrets
       fields:
       - as: .awscred
         name: --dot--awscred
+      group: aws
+    - collection: shiftstack-secrets
+      fields:
+      - as: clouds.yaml
+        name: clouds--dot--yaml
+      group: cloud-credentials-vexxhost
+    - collection: shiftstack-secrets
+      fields:
       - name: ssh-privatekey
       - name: ssh-publickey
-      group: openstack
-    name: cluster-secrets-openstack-rhos-ci
-    sync_to_cluster: true
-    targets:
-    - cluster_groups:
-      - non_app_ci
-      namespace: ci
-
-  - dockerconfig:
-      as: pull-secret
-      registries:
-      - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
-        group: build_farm
-        registry_url: registry.ci.openshift.org
-      - auth_field: auth
-        email_field: email
-        group: cloud--dot--openshift--dot--com-pull-secret
-        registry_url: cloud.openshift.com
-      - auth_field: auth
-        email_field: email
-        group: quay--dot--io-pull-secret
-        registry_url: quay.io
-      - auth_field: auth
-        group: quayio-ci-read-only-robot
-        registry_url: quay-proxy.ci.openshift.org
-      - auth_field: auth
-        group: quayio-ci-read-only-robot
-        registry_url: quay.io/openshift/ci
-      - auth_field: auth
-        email_field: email
-        group: registry--dot--connect--dot--redhat--dot--com-pull-secret
-        registry_url: registry.connect.redhat.com
-      - auth_field: auth
-        email_field: email
-        group: registry--dot--redhat--dot--io-pull-secret
-        registry_url: registry.redhat.io
-    gsm_secrets:
-    - collection: test-platform-infra
-      fields:
-      - as: insights-live.yaml
-        name: insights-live--dot--yaml
-      group: insights-ci-account
-    - collection: test-platform-infra
-      fields:
-      - as: .awscred
-        name: --dot--awscred
-      - name: ssh-privatekey
-      - name: ssh-publickey
-      group: openstack
-    name: cluster-secrets-openstack-rhoso
-    sync_to_cluster: true
-    targets:
-    - cluster_groups:
-      - non_app_ci
-      namespace: ci
-
-  - dockerconfig:
-      as: pull-secret
-      registries:
-      - auth_field: token_image-puller_app--dot--ci_reg_auth_value--dot--txt
-        group: build_farm
-        registry_url: registry.ci.openshift.org
-      - auth_field: auth
-        email_field: email
-        group: cloud--dot--openshift--dot--com-pull-secret
-        registry_url: cloud.openshift.com
-      - auth_field: auth
-        email_field: email
-        group: quay--dot--io-pull-secret
-        registry_url: quay.io
-      - auth_field: auth
-        group: quayio-ci-read-only-robot
-        registry_url: quay-proxy.ci.openshift.org
-      - auth_field: auth
-        group: quayio-ci-read-only-robot
-        registry_url: quay.io/openshift/ci
-      - auth_field: auth
-        email_field: email
-        group: registry--dot--connect--dot--redhat--dot--com-pull-secret
-        registry_url: registry.connect.redhat.com
-      - auth_field: auth
-        email_field: email
-        group: registry--dot--redhat--dot--io-pull-secret
-        registry_url: registry.redhat.io
-    gsm_secrets:
-    - collection: test-platform-infra
-      fields:
-      - as: insights-live.yaml
-        name: insights-live--dot--yaml
-      group: insights-ci-account
-    - collection: test-platform-infra
-      fields:
-      - as: .awscred
-        name: --dot--awscred
-      - name: ssh-privatekey
-      - name: ssh-publickey
-      group: openstack
+      group: ci-job-ssh-key
     name: cluster-secrets-openstack-vexxhost
     sync_to_cluster: true
     targets:
@@ -7836,13 +7867,31 @@ bundles:
       - as: insights-live.yaml
         name: insights-live--dot--yaml
       group: insights-ci-account
-    - collection: test-platform-infra
+    - collection: shiftstack-secrets
       fields:
       - as: .awscred
         name: --dot--awscred
+      group: aws
+    - collection: shiftstack-secrets
+      fields:
+      - as: clouds.yaml
+        name: clouds--dot--yaml
+      group: cloud-credentials-vh-mecha-central
+    - collection: shiftstack-secrets
+      fields:
+      - as: osp-ca.crt
+        name: osp-ca--dot--crt
+      group: cloud-credentials-vh-mecha-central
+    - collection: shiftstack-secrets
+      fields:
+      - as: squid-credentials.txt
+        name: squid-credentials--dot--txt
+      group: cloud-credentials-vh-mecha-central
+    - collection: shiftstack-secrets
+      fields:
       - name: ssh-privatekey
       - name: ssh-publickey
-      group: openstack
+      group: ci-job-ssh-key
     name: cluster-secrets-openstack-vh-mecha-central
     sync_to_cluster: true
     targets:
@@ -9152,9 +9201,6 @@ bundles:
         email_field: email
         group: registry--dot--redhat--dot--io-pull-secret
         registry_url: registry.redhat.io
-      - auth_field: auth
-        group: brew--dot--registry--dot--redhat--dot--io-pull-secret
-        registry_url: brew.registry.redhat.io
     gsm_secrets:
     - collection: packet-metal
       group: metal-assisted
@@ -9193,9 +9239,6 @@ bundles:
         email_field: email
         group: registry--dot--redhat--dot--io-pull-secret
         registry_url: registry.redhat.io
-      - auth_field: auth
-        group: brew--dot--registry--dot--redhat--dot--io-pull-secret
-        registry_url: brew.registry.redhat.io
     gsm_secrets:
     - collection: osac
       group: packet-osac
@@ -12832,9 +12875,6 @@ bundles:
         - auth_field: token_image-pusher_app--dot--ci_reg_auth_value--dot--txt
           group: build_farm
           registry_url: registry.ci.openshift.org
-        - auth_field: auth
-          group: brew--dot--registry--dot--redhat--dot--io-pull-secret
-          registry_url: brew.registry.redhat.io
         - auth_field: auth
           group: registry--dot--redhat--dot--io-pull-secret
           registry_url: registry.redhat.io
