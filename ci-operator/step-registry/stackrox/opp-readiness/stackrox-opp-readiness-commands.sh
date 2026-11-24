@@ -447,7 +447,82 @@ print(len(ns))
         echo "[readiness] ERROR: SecuredCluster namespace discovery ambiguous: ${distinctScNs} namespaces contain SecuredCluster CRs (expected 1)" >&2
         return 1
     fi
-    scNs="$(printf '%s' "${allScJson}" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["items"][0]["metadata"]["namespace"])' 2>/dev/null)" || return 1
+    # Single foreign namespace found: validate linkage to Central before accepting.
+    # Accepted link fields: ownerReference with kind Central, label or annotation
+    # with known key central-namespace or centralNamespace or rhacs.redhat.com/central-namespace
+    # or stackrox.io/central-namespace where value equals centralNs exactly, spec
+    # centralName or centralNamespace equals centralNs exactly, spec centralEndpoint
+    # namespace segment equals centralNs exactly. Metadata name and namespace are
+    # not considered links. If no link is found, fail and keep waiting instead of
+    # selecting items[0].
+    typeset candidateScNs=""
+    candidateScNs="$(printf '%s' "${allScJson}" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["items"][0]["metadata"]["namespace"])' 2>/dev/null)" || return 1
+    [[ -n "${candidateScNs}" ]] || return 1
+    typeset scLinked=""
+    scLinked="$(printf '%s' "${allScJson}" | python3 -c '
+import json,sys
+central_ns=sys.argv[1]
+try:
+    items=json.load(sys.stdin).get("items",[])
+except Exception:
+    sys.exit(1)
+def endpoint_ns(ep):
+    if not isinstance(ep, str) or not ep:
+        return ""
+    if "://" in ep:
+        ep=ep.split("://", 1)[1]
+    ep=ep.split("/", 1)[0]
+    ep=ep.split(":", 1)[0]
+    parts=ep.split(".")
+    if len(parts) >= 2:
+        return parts[1]
+    return ""
+linked=False
+known_keys={"central-namespace", "centralNamespace", "rhacs.redhat.com/central-namespace", "stackrox.io/central-namespace"}
+for it in items:
+    md=it.get("metadata",{}) or {}
+    if not isinstance(md, dict):
+        md={}
+    spec=it.get("spec",{}) or {}
+    if not isinstance(spec, dict):
+        spec={}
+    for ref in md.get("ownerReferences",[]) or []:
+        if isinstance(ref, dict) and ref.get("kind") == "Central":
+            linked=True
+            break
+    if linked:
+        break
+    for d in (md.get("labels",{}), md.get("annotations",{})):
+        if isinstance(d, dict):
+            for k, v in d.items():
+                if k in known_keys and str(v) == central_ns:
+                    linked=True
+                    break
+            if linked:
+                break
+    if linked:
+        break
+    for key in ("centralName", "centralNamespace"):
+        val=spec.get(key)
+        if isinstance(val, str) and val == central_ns:
+            linked=True
+            break
+        if val is not None and str(val) == central_ns:
+            linked=True
+            break
+    if linked:
+        break
+    ep=spec.get("centralEndpoint")
+    if isinstance(ep, str) and endpoint_ns(ep) == central_ns:
+        linked=True
+        break
+print("1" if linked else "0")
+' "${centralNs}" 2>/dev/null)" || scLinked=""
+    if [[ "${scLinked}" != "1" ]]; then
+        echo "[readiness] ERROR: SecuredCluster in namespace ${candidateScNs} has no link to Central in namespace ${centralNs} (expected ownerReference kind Central, label or annotation central-namespace or centralNamespace or rhacs.redhat.com/central-namespace or stackrox.io/central-namespace == centralNs, spec centralName or centralNamespace == centralNs, or centralEndpoint namespace == centralNs)" >&2
+        return 1
+    fi
+    scNs="${candidateScNs}"
     [[ -n "${scNs}" ]] || return 1
     true
 }
