@@ -353,6 +353,19 @@ function WaitFor () {
         if [[ -n "${diagnosticsFn}" ]] && (( iteration % 5 == 0 )); then
             echo "[readiness]   --- periodic diagnostics (iteration ${iteration}, $(( _now - (_deadline - cap) ))/${cap}s) ---"
             "${diagnosticsFn}" || true
+            _now=$(date +%s)
+            if (( _now >= _deadline )); then
+                echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (budget remaining $(_budget_remaining)s)"
+                return 1
+            fi
+            rem="$(_budget_remaining)"
+            if (( rem <= 0 )); then
+                echo "[readiness] BUDGET EXHAUSTED while waiting for: ${description}"
+                return 1
+            fi
+            _remain=$(( _deadline - _now ))
+            (( _remain > rem )) && _remain=rem
+            _sleepFor=$(( _remain < pollInterval ? _remain : pollInterval ))
         fi
         echo "[readiness]   ...retrying in ${_sleepFor}s ($(( _now - (_deadline - cap) ))/${cap}s, budget remaining ${rem}s)"
         sleep "${_sleepFor}"
