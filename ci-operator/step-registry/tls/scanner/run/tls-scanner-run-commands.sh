@@ -22,6 +22,11 @@ run_tls_scan() {
     true|false) ;;
     *) echo "Invalid PQC_REPORT_ONLY: expected true or false" >&2; exit 1 ;;
   esac
+  local export_csv="${TLS_SCANNER_EXPORT_CSV:-false}"
+  case "${export_csv}" in
+    true|false) ;;
+    *) echo "Invalid TLS_SCANNER_EXPORT_CSV: expected true or false" >&2; exit 1 ;;
+  esac
   if [[ "${scanner_pod_mode}" == "true" && ( -n "${SCANNER_NAMESPACE:-}" || -n "${TLS_SCANNER_CLUSTER_LABEL:-}" ) ]]; then
       echo "SCANNER_POD_MODE requires the scanner-owned namespace and no cluster label" >&2
       exit 1
@@ -340,6 +345,15 @@ EOF
 
   echo "Copying artifacts..."
   oc cp "${NAMESPACE}/tls-scanner:/results/." "${SCANNER_ARTIFACT_DIR}/" || echo "Warning: Failed to copy some artifacts"
+
+  if [[ "${export_csv}" == "true" ]]; then
+      if [[ ! -f "${SCANNER_ARTIFACT_DIR}/results.csv" ]]; then
+          echo "TLS_SCANNER_EXPORT_CSV is set but results.csv was not collected"
+          exit 1
+      fi
+      cp "${SCANNER_ARTIFACT_DIR}/results.csv" "${SHARED_DIR}/tls-scanner-results.csv"
+      echo "Copied results.csv to ${SHARED_DIR}/tls-scanner-results.csv"
+  fi
 
   if [[ -f "${SCANNER_ARTIFACT_DIR}/junit_tls_scan.xml" ]]; then
       if [[ "${PQC_CHECK:-false}" == "true" && -n "${TLS_SCANNER_CLUSTER_LABEL:-}" ]]; then

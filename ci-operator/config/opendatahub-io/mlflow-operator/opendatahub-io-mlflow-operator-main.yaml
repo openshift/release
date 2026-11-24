@@ -43,6 +43,7 @@ tests:
       PQC_CHECK: "true"
       SCAN_NAMESPACE: mlflow-tls-scan
       SCANNER_POD_MODE: "true"
+      TLS_SCANNER_EXPORT_CSV: "true"
     pre:
     - ref: ipi-install-rbac
     test:
@@ -97,6 +98,26 @@ tests:
         # that wait can return before any tracking pod exists.
         oc -n "${NS}" wait --for=create --timeout=10m deployment/mlflow
         oc -n "${NS}" wait --for=jsonpath='{.status.availableReplicas}'=1 --timeout=20m deployment/mlflow
+
+        # odh-stable moves. Record the pod that was scanned so the digest can be
+        # matched to a Konflux build afterwards.
+        tracking_pod="$(oc -n "${NS}" get pods -l app=mlflow --field-selector=status.phase=Running -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -E '^mlflow-[0-9a-f]+-' | head -n 1)"
+        if [[ -z "${tracking_pod}" ]]; then
+          echo "No running tracking pod found"
+          exit 1
+        fi
+        tracking_image="$(oc -n "${NS}" get pod "${tracking_pod}" -o jsonpath='{.spec.containers[?(@.name=="mlflow")].image}')"
+        tracking_image_id="$(oc -n "${NS}" get pod "${tracking_pod}" -o jsonpath='{.status.containerStatuses[?(@.name=="mlflow")].imageID}')"
+        if [[ -z "${tracking_image}" || -z "${tracking_image_id}" ]]; then
+          echo "Tracking pod ${tracking_pod} is missing its image or imageID"
+          exit 1
+        fi
+        cat > "${ARTIFACT_DIR}/tracking-image.txt" <<EOF
+        pod=${tracking_pod}
+        image=${tracking_image}
+        imageID=${tracking_image_id}
+        EOF
+        cat "${ARTIFACT_DIR}/tracking-image.txt"
       dependencies:
       - env: MLFLOW_OPERATOR_IMAGE
         name: mlflow-operator
@@ -107,6 +128,59 @@ tests:
           memory: 200Mi
       timeout: 45m0s
     - ref: tls-scanner-run
+    - as: verify-tls-coverage
+      cli: latest
+      commands: |
+        set -euo pipefail
+        csv="${SHARED_DIR}/tls-scanner-results.csv"
+        if [[ ! -f "${csv}" ]]; then
+          echo "Missing ${csv}. tls-scanner-run did not export results.csv."
+          exit 1
+        fi
+        echo "Checking TLS 1.3 and ML-KEM on port 8443 for mlflow and mlflow-operator"
+        awk '
+          BEGIN { FPAT = "([^,]*)|(\"[^\"]*\")" }
+          NR == 1 {
+            for (i = 1; i <= NF; i++) {
+              gsub(/^"|"$/, "", $i)
+              col[$i] = i
+            }
+            split("Namespace,Port,Component Name,Status,TLS Version,ML-KEM Supported", required, ",")
+            for (i = 1; i <= 6; i++) {
+              name = required[i]
+              if (!(name in col)) {
+                printf "results.csv is missing column %s\n", name > "/dev/stderr"
+                exit 2
+              }
+            }
+            next
+          }
+          {
+            for (i = 1; i <= NF; i++) gsub(/^"|"$/, "", $i)
+            port = $(col["Port"])
+            if (port != "8443") next
+            namespace = $(col["Namespace"])
+            component = $(col["Component Name"])
+            status = $(col["Status"])
+            tls_version = $(col["TLS Version"])
+            mlkem = $(col["ML-KEM Supported"])
+            printf "8443 %s %s status=%s tls=%s mlkem=%s\n", namespace, component, status, tls_version, mlkem
+            if (namespace == "mlflow-tls-scan" && status == "OK" && mlkem == "Yes" && tls_version ~ /TLSv1\.3/) {
+              if (component == "mlflow" || component == "mlflow-operator") seen[component] = 1
+            }
+          }
+          END {
+            if (seen["mlflow"] && seen["mlflow-operator"]) exit 0
+            print "Need an OK TLS 1.3 ML-KEM row on port 8443 for both mlflow and mlflow-operator in mlflow-tls-scan" > "/dev/stderr"
+            exit 1
+          }
+        ' "${csv}"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 10m0s
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
