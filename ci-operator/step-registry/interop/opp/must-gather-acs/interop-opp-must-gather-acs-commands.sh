@@ -1456,36 +1456,14 @@ fi
 # failure code is reported: a later failing check never overwrites an
 # earlier one, and an unexpected python exit is normalized to 21 so it
 # cannot masquerade as a disagreement (20).
-run_assertions() {
-  local failed=0 rc
-  # (a) No classified evidence file may carry a probe_error or QUERY FAILED
-  #     marker: a failed query must never read as a clean pass.
-  #     The storage-axis captures (11-placementdecisions, 12 through 17)
-  #     write no marker, so this check does not cover them.
-  for f in "${EVIDENCE_DIR}/01-operatorpolicy.json" "${EVIDENCE_DIR}/02-catalogsource.json" "${EVIDENCE_DIR}/03-subscription.json" "${EVIDENCE_DIR}/05-csv.json" "${EVIDENCE_DIR}/07-central-cr.json" "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json" "${EVIDENCE_DIR}/08-all-packagemanifests.txt" "${EVIDENCE_DIR}/11-acm-csv-addon-controller.json"; do
-    if [[ ! -r "${f}" ]]; then
-      echo "ASSERTION FAILURE (21): ${f} is missing or unreadable, evidence incomplete"
-      failed=21
-    fi
-  # PRRT_kwDOBHvUUM65ui18: evidence file readability -r check
-  done
-  for f in "${EVIDENCE_DIR}"/*.json "${EVIDENCE_DIR}"/*.txt; do
-    if grep -qE "^(probe_error:|QUERY FAILED)" "${f}" 2>/dev/null; then
-      echo "ASSERTION FAILURE (21): ${f} carries a probe_error/QUERY FAILED marker, evidence incomplete"
-      failed=21
-    fi
-  done
-  if [[ "${_sub_refresh_failed}" == "true" ]]; then
-    echo "ASSERTION FAILURE (21): the Subscription refresh failed, so the subscription terms are unknown"
-    failed=21
-  fi
-  # (b) Packagemanifest agreement: the per-package capture is selected from
-  #     the catalog the subscription subscribes to, so the inventory must
-  #     list rhacs-operator in that catalog exactly when the capture reports
-  #     it present. A package listed only in other catalogs is consistent
-  #     with a catalog-scoped absence: reported, not failed (the removal
-  #     decision needs to see it, but the artifacts agree).
-  python3 - "${EVIDENCE_DIR}" <<'PYEOF' || { rc=$?; [[ ${rc} -eq 20 ]] || rc=21; failed=$(( failed > rc ? failed : rc )); }
+# Packagemanifest/inventory agreement: a per-package capture and the cluster
+# inventory that describe the same package must agree on the package, its
+# catalog and that catalog namespace. The evidence directory comes from
+# EVIDENCE_DIR; returns 0 (agree), 20 (disagreement), 21 (evidence
+# unusable) so the self-test can drive it with fixture files instead of a
+# cluster.
+assert_packagemanifest_agreement() {
+  python3 - "${EVIDENCE_DIR}" <<'PYEOF'
 import json, sys
 from pathlib import Path
 
@@ -1567,11 +1545,15 @@ if present and selection is None and not listed_anywhere:
 # check is independent of listed_scoped: the subscription-scoped match below
 # decides whether the subscription agrees, not whether the tuple exists.
 if present and selection is not None and selection.get("catalogSource") is not None:
-    _sel_tuple = (selection.get("catalogSource"), selection.get("catalogSourceNamespace"))
-    if _sel_tuple not in {(c, ns) for _, c, ns in inv}:
-        print("ASSERTION FAILURE (20): selected package and catalog %s/%s are "
-              "not listed together in the inventory (listed: %s)"
-              % (_sel_tuple[0], _sel_tuple[1], ", ".join(listed_anywhere) or "none"))
+    # The package name belongs to the identity: a catalog/namespace pair that
+    # lists a different package says nothing about where rhacs-operator lives.
+    _sel_tuple = ("rhacs-operator", selection.get("catalogSource"),
+                  selection.get("catalogSourceNamespace"))
+    if _sel_tuple not in set(inv):
+        print("ASSERTION FAILURE (20): selected package, catalog and namespace "
+              "%s/%s/%s are not listed together in the inventory (listed: %s)"
+              % (_sel_tuple[0], _sel_tuple[1], _sel_tuple[2],
+                 ", ".join(listed_anywhere) or "none"))
         sys.exit(20)
 if present and selection is not None and not listed_scoped:
     print("ASSERTION FAILURE (20): packagemanifest disagreement: the "
@@ -1615,6 +1597,38 @@ if present is False and listed_anywhere:
           "what the removal decision reads"
           % (scoped_label, ", ".join(listed_anywhere)))
 PYEOF
+}
+
+run_assertions() {
+  local failed=0 rc
+  # (a) No classified evidence file may carry a probe_error or QUERY FAILED
+  #     marker: a failed query must never read as a clean pass.
+  #     The storage-axis captures (11-placementdecisions, 12 through 17)
+  #     write no marker, so this check does not cover them.
+  for f in "${EVIDENCE_DIR}/01-operatorpolicy.json" "${EVIDENCE_DIR}/02-catalogsource.json" "${EVIDENCE_DIR}/03-subscription.json" "${EVIDENCE_DIR}/05-csv.json" "${EVIDENCE_DIR}/07-central-cr.json" "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json" "${EVIDENCE_DIR}/08-all-packagemanifests.txt" "${EVIDENCE_DIR}/11-acm-csv-addon-controller.json"; do
+    if [[ ! -r "${f}" ]]; then
+      echo "ASSERTION FAILURE (21): ${f} is missing or unreadable, evidence incomplete"
+      failed=21
+    fi
+  # PRRT_kwDOBHvUUM65ui18: evidence file readability -r check
+  done
+  for f in "${EVIDENCE_DIR}"/*.json "${EVIDENCE_DIR}"/*.txt; do
+    if grep -qE "^(probe_error:|QUERY FAILED)" "${f}" 2>/dev/null; then
+      echo "ASSERTION FAILURE (21): ${f} carries a probe_error/QUERY FAILED marker, evidence incomplete"
+      failed=21
+    fi
+  done
+  if [[ "${_sub_refresh_failed}" == "true" ]]; then
+    echo "ASSERTION FAILURE (21): the Subscription refresh failed, so the subscription terms are unknown"
+    failed=21
+  fi
+  # (b) Packagemanifest agreement: the per-package capture is selected from
+  #     the catalog the subscription subscribes to, so the inventory must
+  #     list rhacs-operator in that catalog exactly when the capture reports
+  #     it present. A package listed only in other catalogs is consistent
+  #     with a catalog-scoped absence: reported, not failed (the removal
+  #     decision needs to see it, but the artifacts agree).
+  assert_packagemanifest_agreement || { rc=$?; [[ ${rc} -eq 20 ]] || rc=21; failed=$(( failed > rc ? failed : rc )); }
   # (c) Subscription capture must be OLM objects, not ACM's CRD.
   python3 - "${EVIDENCE_DIR}" <<'PYEOF' || { rc=$?; [[ ${rc} -eq 20 ]] || rc=21; failed=$(( failed > rc ? failed : rc )); }
 import json, sys
