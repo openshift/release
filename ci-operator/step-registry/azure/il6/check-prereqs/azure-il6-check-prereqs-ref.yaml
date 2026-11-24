@@ -26,10 +26,27 @@ ref:
       The commercial-plane Azure region that AZURE_IL6_RESOURCE_GROUP lives in. This is NOT the
       emulated IL6 region (see AZURE_IL6_CLUSTER_REGION in ipi-conf-azureil6).
   - name: AZURE_IL6_REQUIRED_FREE_SUBNETS
-    default: "2"
+    default: "3"
     documentation: |-
       How many free /24s the job needs inside the VNet. Used only to produce a clear error message
       before anything is provisioned.
+
+      Three, not two. azure-il6-provision-subnets takes one /24 for the control plane and one for
+      compute, and azure-provision-bastionhost then carves out a third for the bastion subnet.
+      With a threshold of two this check passed when exactly two were left, the job consumed both,
+      and the bastion helper -- finding nothing free -- fell back to ADDING an address prefix to
+      the shared, permanent VNet. Teardown deletes subnets but never removes an address prefix, so
+      that growth is silent and cumulative on a fixture CI cannot recreate.
+  - name: AZURE_IL6_CONTROL_PLANE_SUBNET_CIDR
+    default: "10.10.2.0/24"
+    documentation: |-
+      Must match the value azure-il6-provision-subnets will use. Declared here so preflight can
+      confirm this exact block is free, rather than only counting how many /24s are free.
+  - name: AZURE_IL6_COMPUTE_SUBNET_CIDR
+    default: "10.10.3.0/24"
+    documentation: |-
+      Must match the value azure-il6-provision-subnets will use. See
+      AZURE_IL6_CONTROL_PLANE_SUBNET_CIDR.
   documentation: |-
     Fail-fast preflight for the Azure IL6 emulated-environment job.
 

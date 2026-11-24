@@ -111,8 +111,21 @@ echo "This run's subnets and their NSG associations (nsg should be empty for all
 az network vnet subnet list -g "${RG}" --vnet-name "${AZURE_IL6_VNET_NAME}" \
     --query "[?starts_with(name, '${RESOURCE_PREFIX}')].{name:name,nsg:networkSecurityGroup.id}" -o table || true
 
-still_attached="$(az network vnet subnet list -g "${RG}" --vnet-name "${AZURE_IL6_VNET_NAME}" \
-    --query "[?starts_with(name, '${RESOURCE_PREFIX}')] | [?networkSecurityGroup].name" -o tsv | tr -d '\r')"
+# The query's own exit status is load-bearing. If Azure rejects or times out this request the
+# output is empty, and an empty result is exactly what success looks like -- the step would
+# report a verified detach having verified nothing. Check the status before reading the value.
+# No pipeline here: piping to tr would make $? tr's status, and tr on an empty result emits a
+# newline, which reads as "still attached".
+if ! still_attached="$(az network vnet subnet list -g "${RG}" --vnet-name "${AZURE_IL6_VNET_NAME}" \
+        --query "[?starts_with(name, '${RESOURCE_PREFIX}')] | [?networkSecurityGroup].name" -o tsv)"; then
+    echo
+    echo "ERROR: could not re-read the subnets to verify the detach."
+    echo "An unverified detach is indistinguishable from one that silently did nothing, and"
+    echo "azure-deprovision-resourcegroup would then fail with"
+    echo "InUseNetworkSecurityGroupCannotBeDeleted. Failing here instead."
+    exit 1
+fi
+still_attached="${still_attached//$'\r'/}"
 
 if [[ -n "${still_attached}" ]]; then
     echo

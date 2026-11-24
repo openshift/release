@@ -87,6 +87,27 @@ if (( free_count < AZURE_IL6_REQUIRED_FREE_SUBNETS )); then
     fail "need ${AZURE_IL6_REQUIRED_FREE_SUBNETS} free /24s, found ${free_count}. Stale subnets from a previous run may need cleaning up."
 fi
 
+# A count is not sufficient on its own. The two CIDRs this job creates are fixed, so subnets
+# leaked by an earlier run can occupy exactly those blocks while leaving plenty of other /24s
+# free in a /16. The count above would pass and azure-il6-provision-subnets would then fail on an
+# overlap, which is the fail-fast this step exists to prevent. Check the blocks actually used.
+for cidr in "${AZURE_IL6_CONTROL_PLANE_SUBNET_CIDR}" "${AZURE_IL6_COMPUTE_SUBNET_CIDR}"; do
+    # shellcheck disable=SC2086  # used_prefixes is a space-separated list and must word-split
+    if python3 - "${cidr}" ${used_prefixes} <<'PY'
+import ipaddress, sys
+want = ipaddress.ip_network(sys.argv[1])
+clash = [p for p in sys.argv[2:] if want.overlaps(ipaddress.ip_network(p))]
+if clash:
+    print("overlaps " + ", ".join(clash))
+    sys.exit(1)
+PY
+    then
+        echo "OK   ${cidr} is free"
+    else
+        fail "subnet CIDR ${cidr} is already in use in '${AZURE_IL6_VNET_NAME}'. A previous run most likely leaked its subnets; delete them before re-running."
+    fi
+done
+
 # ---------------------------------------------------------------- tunnels
 # NB: 'az network vpn-connection list' does NOT populate connectionStatus -- it comes back null for
 # every entry. The status is only returned by a per-connection 'show'. Listing and filtering on the

@@ -95,6 +95,22 @@ on_bastion 'chmod 0600 /tmp/azil6.env'
 login_ok=0
 if on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} sh -c 'az login --service-principal -u \"\$AZURE_IL6_APP_ID\" -p \"\$AZURE_IL6_SECRET\" --tenant \"\$AZURE_IL6_TENANT\" --output none && echo logged-in'"; then
     login_ok=1
+    # az login leaves the principal's own default subscription active, which is not necessarily
+    # the one the cluster profile names. Where the principal can see more than one, every typed
+    # query below would describe the wrong subscription and report this run's resources as
+    # missing. azure-il6-check-prereqs already does this on the commercial side; do the same here.
+    #
+    # The selection is allowed to fail: what matters is which subscription is actually active, so
+    # that is read back and asserted rather than assumed.
+    on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az account set --subscription ${subscription_id}" \
+        || echo "NOTE: 'az account set' failed; checking which subscription is active anyway."
+    active_sub="$(on_bastion "${az_run} ${az_env} ${AZURE_CLI_IMAGE} az account show --query id -o tsv" | tr -d '\r')"
+    if [[ "${active_sub}" == "${subscription_id}" ]]; then
+        echo "OK: active subscription is ${subscription_id}."
+    else
+        fail "active subscription is '${active_sub:-<unknown>}', not ${subscription_id}."
+        echo "  Every typed query below would describe a different subscription."
+    fi
 else
     fail "az login failed with the azure-qe principal."
     echo "  If the emulator runs its own directory, this job needs a dedicated IL6"
@@ -115,7 +131,12 @@ if [[ "${login_ok}" -eq 1 ]]; then
 fi
 
 on_emulated_plane=0
-if [[ "${active_arm}" == "${AZURE_IL6_ARM_ENDPOINT}"* ]]; then
+# Compare the complete endpoint. A trailing glob would also accept a different host that merely
+# starts with the expected one, such as https://management.azure.microsoft.scloud.example.com,
+# and a stale cloud registration can reach this guard because 'az cloud register' failures are
+# tolerated above. Only an optional trailing slash legitimately differs, so normalise that on
+# both sides and compare exactly.
+if [[ "${active_arm%/}" == "${AZURE_IL6_ARM_ENDPOINT%/}" ]]; then
     on_emulated_plane=1
     echo "OK: the azure-qe principal authenticates against the EMULATED plane."
 elif [[ "${login_ok}" -eq 1 ]]; then
