@@ -107,8 +107,11 @@ typeset junitFile="${ARTIFACT_DIR}/junit_interop-quay-smoke-acs-odf-registry.xml
 # replacing the file (no XML found, or a failing yq copy), which would leave the
 # earlier report to be harvested as this run's result. Removing it during
 # initialization means a run that publishes nothing reports nothing, instead of
-# the previous run's verdict.
+# the previous run's verdict. A removal that fails is not survivable either: the
+# check after the test table below fails the run closed, so the EXIT trap can
+# never accept a stale report this run could not clear.
 rm -f "${SHARED_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml" 2>/dev/null || true
+typeset _staleMergedReport="${SHARED_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml"
 
 # Suite naming for the JUnit post-processing library: compose its suite-name
 # template from the component-suffixed prefix variable the consuming job sets.
@@ -168,6 +171,18 @@ function RecordResult () {
     testFailureMsg["${name}"]="${msg}"
     true
 }
+
+# Fail closed on an uncleared stale report: the removal above ran before the
+# test table existed, so its outcome is verified here, where a failure can be
+# recorded on every row. A readable earlier report that survives the removal
+# would otherwise be accepted by the EXIT trap as this run's result.
+if [[ -e "${_staleMergedReport}" ]]; then
+    echo "FATAL: the merged report from an earlier run is still present at ${_staleMergedReport} and could not be removed; refusing to let the EXIT trap route it as this run's result" >&2
+    for t in "${allTests[@]}"; do
+        RecordResult "${t}" "failed" "stale merged report from an earlier run could not be removed from ${SHARED_DIR:-/tmp}; this run's result cannot be published safely"
+    done
+    exit 1
+fi
 
 # shellcheck disable=SC2317,SC2329
 function GenerateJunit () {
