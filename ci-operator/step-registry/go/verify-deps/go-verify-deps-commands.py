@@ -19,8 +19,6 @@ the shell original.
 """
 # pylint: disable=too-many-lines  # single-file step command (run_as_script) kept self-contained
 
-from __future__ import annotations
-
 import argparse
 import contextlib
 import enum
@@ -36,8 +34,8 @@ import subprocess
 import sys
 import tempfile
 import time
-from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Dict, List, NamedTuple, Optional, Set, Tuple
 from urllib.parse import urlsplit, urlunsplit
 
 # --------------------------------------------------------------------------- #
@@ -188,8 +186,7 @@ class Outcome(enum.Enum):
     INCONCLUSIVE = "INCONCLUSIVE"
 
 
-@dataclass(frozen=True)
-class ProbeResponse:
+class ProbeResponse(NamedTuple):
     """Normalized result of a single probe call: the HTTP status code plus any
     server-advertised Retry-After delay in seconds (0.0 when none was surfaced).
     The curl and wget backends parse Retry-After from the response headers; the
@@ -200,8 +197,7 @@ class ProbeResponse:
     retry_after: float = 0.0
 
 
-@dataclass(frozen=True)
-class Candidate:
+class Candidate(NamedTuple):
     """A module path pinned to a version, enumerated from go.mod."""
 
     path: str
@@ -213,8 +209,7 @@ class Candidate:
         return f"{self.path}@{self.version}"
 
 
-@dataclass(frozen=True)
-class ProbeRecord:
+class ProbeRecord(NamedTuple):
     """A probed module version and its (redacted) proxy URL + HTTP status."""
 
     path: str
@@ -229,8 +224,7 @@ class ProbeRecord:
         return f"{self.path}@{self.version}"
 
 
-@dataclass(frozen=True)
-class SkippedCandidate:
+class SkippedCandidate(NamedTuple):
     """A candidate not probed because a deadline/outage stopped the loop."""
 
     path: str
@@ -243,25 +237,24 @@ class SkippedCandidate:
         return f"{self.path}@{self.version}"
 
 
-@dataclass
-class _ProbeResults:
+class _ProbeResults:  # pylint: disable=too-few-public-methods  # a mutable aggregation record (lists appended to); 3.6 has no dataclass
     """Accumulated probe outcomes used to render the final summary."""
 
-    missing: list[ProbeRecord] = field(default_factory=list)
-    inconclusive: list[ProbeRecord] = field(default_factory=list)
-    budget_skipped: list[SkippedCandidate] = field(default_factory=list)
-    budget_stop: str = ""  # "deadline" or "outage" once we stop probing early
+    def __init__(self) -> None:
+        self.missing = []  # type: List[ProbeRecord]
+        self.inconclusive = []  # type: List[ProbeRecord]
+        self.budget_skipped = []  # type: List[SkippedCandidate]
+        self.budget_stop = ""  # "deadline" or "outage" once we stop probing early
 
 
-@dataclass
-class _Budget:
+class _Budget(NamedTuple):
     """Overall wall-clock budget for the probe loop. ``deadline`` <= 0 disables it,
     in which case nothing is ever capped or exhausted."""
 
     deadline: float
     start: float
 
-    def remaining(self) -> float | None:
+    def remaining(self) -> Optional[float]:
         """Seconds left, or None when the deadline is disabled."""
         if self.deadline <= 0:
             return None
@@ -304,7 +297,7 @@ def die_modlist() -> None:
     sys.exit(1)
 
 
-def goproxy_report_missing(rbase: str, records: list[ProbeRecord]) -> None:
+def goproxy_report_missing(rbase: str, records: List[ProbeRecord]) -> None:
     """Print the remediation for modules whose pinned pseudo-version is not
     resolvable on the Go module proxy. ``rbase`` is the redacted proxy base URL."""
     print(_MISSING_HEADER)
@@ -354,7 +347,7 @@ def _go_class_to_fnmatch(pattern: str) -> str:
     negation marker differs, so every other construct (ranges, literals, ``*`` and
     ``?``) is passed through unchanged. Scanning for the ``[`` that opens a class
     keeps a ``^`` elsewhere (a literal, or a range member) untouched."""
-    result: list[str] = []
+    result = []  # type: List[str]
     index, length = 0, len(pattern)
     while index < length:
         char = pattern[index]
@@ -381,7 +374,7 @@ def _path_match(pattern: str, candidate: str) -> bool:
                for pat, part in zip(pat_parts, cand_parts))
 
 
-def goproxy_path_is_private(path: str, patterns: list[str]) -> bool:
+def goproxy_path_is_private(path: str, patterns: List[str]) -> bool:
     """Return whether ``path`` matches any GONOPROXY/GOPRIVATE pattern using Go's
     module-matching semantics: a pattern matches if it matches the whole path or a
     leading prefix at a path-element boundary, where each element is matched with
@@ -421,7 +414,8 @@ def goproxy_probe_curl(url: str, timeout: float = DEFAULT_PROBE_TIMEOUT) -> Prob
             ["curl", "-sS", "-o", "/dev/null", "-I", "-L", "--max-redirs", "5",
              "-D", "-", "-w", "\n_HTTP_CODE:%{http_code}\n",
              "--max-time", f"{timeout:.3f}", url],
-            capture_output=True, text=True, check=False, timeout=timeout + 5,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            universal_newlines=True, check=False, timeout=timeout + 5,
         )
     except subprocess.TimeoutExpired:
         return ProbeResponse("000", 0.0)
@@ -450,7 +444,8 @@ def goproxy_probe_wget(url: str, timeout: float = DEFAULT_PROBE_TIMEOUT) -> Prob
         result = subprocess.run(
             ["wget", "--server-response", "--spider",
              f"--timeout={max(1, int(timeout))}", "-t", "1", url],
-            capture_output=True, text=True, check=False, timeout=timeout + 5,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            universal_newlines=True, check=False, timeout=timeout + 5,
         )
     except subprocess.TimeoutExpired:
         return ProbeResponse("000", 0.0)
@@ -474,13 +469,14 @@ def go_env(name: str) -> str:
     """Return ``go env <name>`` (empty string if go is unavailable or fails)."""
     try:
         result = subprocess.run(["go", "env", name],
-                                capture_output=True, text=True, check=False)
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                universal_newlines=True, check=False)
     except FileNotFoundError:
         return ""
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
-def candidates_from_json(data: dict) -> list[Candidate]:
+def candidates_from_json(data: dict) -> List[Candidate]:
     """Enumerate candidates from parsed ``go mod edit -json`` output.
 
     Replace-aware: emit a Replace's remote target (``New.Version`` non-empty,
@@ -493,7 +489,7 @@ def candidates_from_json(data: dict) -> list[Candidate]:
     target is emitted via its New entry; a local replace emits nothing, so the
     requirement is simply dropped. Returned sorted and de-duplicated by ``spec``
     (matches the original ``sort -u``)."""
-    by_spec: dict[str, Candidate] = {}
+    by_spec = {}  # type: Dict[str, Candidate]
 
     # The module+version pairs the main module directly requires. 'go mod edit -json'
     # exposes only the main module's own require/replace directives, not the fully
@@ -505,8 +501,8 @@ def candidates_from_json(data: dict) -> list[Candidate]:
         if req.get("Path")
     }
 
-    wildcard_replaced: set[str] = set()      # Old.Path with no version -> all versions
-    versioned_replaced: set[tuple[str, str]] = set()  # (Old.Path, Old.Version)
+    wildcard_replaced = set()  # type: Set[str]  # Old.Path with no version -> all versions
+    versioned_replaced = set()  # type: Set[Tuple[str, str]]  # (Old.Path, Old.Version)
     for replace in data.get("Replace") or []:
         old = replace.get("Old") or {}
         old_path = old.get("Path") or ""
@@ -548,11 +544,12 @@ def candidates_from_json(data: dict) -> list[Candidate]:
     return [by_spec[spec] for spec in sorted(by_spec)]
 
 
-def enumerate_candidates() -> list[Candidate]:
+def enumerate_candidates() -> List[Candidate]:
     """Run ``go mod edit -json`` (offline) and return the candidate list."""
     try:
         result = subprocess.run(["go", "mod", "edit", "-json"],
-                                capture_output=True, text=True, check=False)
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                universal_newlines=True, check=False)
     except FileNotFoundError:
         return []
     if result.returncode != 0 or not result.stdout.strip():
@@ -585,7 +582,8 @@ def probe_cmd(cmd: str, url: str, timeout: float) -> str:
     ``000`` on error/timeout — a stalled custom probe is killed and counts as a
     transport failure)."""
     try:
-        result = subprocess.run([cmd, url], capture_output=True, text=True,
+        result = subprocess.run([cmd, url], stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, universal_newlines=True,
                                 check=False, timeout=timeout)
     except subprocess.TimeoutExpired:
         return "000"
@@ -659,7 +657,7 @@ def _next_backoff(retry_delay: int, attempt: int, code: str, retry_after: float)
 
 
 def _probe_with_retries(probe, url: str, retries: int, retry_delay: int,
-                        budget: _Budget) -> tuple[Outcome, str]:
+                        budget: _Budget) -> Tuple[Outcome, str]:
     """Probe ``url`` up to ``retries`` times with increasing backoff, honoring the
     overall ``budget``: each probe timeout and each retry sleep are capped to the
     remaining budget, and retries stop once it is exhausted.
@@ -731,7 +729,7 @@ _REQUIRED_PROXY_SUFFIXES = (".info", ".zip")
 
 
 def _probe_candidate_endpoints(probe, proxy_base: str, cand: Candidate,
-                               budget: _Budget) -> tuple[Outcome, str, str]:
+                               budget: _Budget) -> Tuple[Outcome, str, str]:
     """Probe the required proxy endpoints for ``cand`` in order (``.info`` then
     ``.zip``), short-circuiting on the first non-AVAILABLE outcome. Returns
     ``(outcome, last_code, redacted_url)`` for the endpoint that determined the
@@ -793,7 +791,7 @@ def check_goproxy_availability() -> None:
     priv_patterns = nopriv.split(",") if nopriv else []
 
     results = _ProbeResults()
-    private_skipped: list[str] = []
+    private_skipped = []  # type: List[str]
     consecutive_000 = 0
     budget = _Budget(deadline, time.monotonic())
 
@@ -813,7 +811,9 @@ def check_goproxy_availability() -> None:
             results.budget_skipped.append(SkippedCandidate(cand.path, cand.version, results.budget_stop))
             continue
 
-        commit = cand.version.rsplit("-", 1)[-1].removesuffix("+incompatible")
+        last_segment = cand.version.rsplit("-", 1)[-1]
+        commit = (last_segment[:-len("+incompatible")]
+                  if last_segment.endswith("+incompatible") else last_segment)
 
         outcome, code, rurl = _probe_candidate_endpoints(
             probe, proxy_base, cand, budget)
@@ -875,7 +875,7 @@ def _self_test_probe_200(_url: str) -> str:
     return "200"
 
 
-def _capture_check() -> tuple[str, int]:
+def _capture_check() -> Tuple[str, int]:
     """Run check_goproxy_availability() capturing combined output and exit code."""
     buf = io.StringIO()
     rc = 0
@@ -891,7 +891,7 @@ def run_self_test() -> bool:  # pylint: disable=too-many-statements  # four self
     """Reproduce cases A-D from the original self-test. Returns True on pass."""
     # pylint: disable=global-statement  # the probe hook / tuning are module globals
     global PROBE_OVERRIDE, GOPROXY_RETRIES, GOPROXY_RETRY_DELAY_SECONDS
-    failures: list[str] = []
+    failures = []  # type: List[str]
     origdir = Path.cwd()
     tmpdir = Path(tempfile.mkdtemp())
 
@@ -1004,7 +1004,7 @@ def _go_directive_needs_patch(gomod_text: str) -> bool:
     return False
 
 
-def _run(cmd: list[str]) -> int:
+def _run(cmd: List[str]) -> int:
     """Run ``cmd`` inheriting stdio and return its exit code."""
     return subprocess.run(cmd, check=False).returncode
 
@@ -1054,7 +1054,8 @@ def _verify_vendor() -> int:  # pylint: disable=too-many-return-statements  # fa
 
     # "--ignored" ensures .gitignore is NOT honored during the comparison.
     status = subprocess.run(["git", "status", "--porcelain", "--ignored"],
-                            capture_output=True, text=True, check=False)
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            universal_newlines=True, check=False)
     if status.returncode != 0:
         # Match the shell `set -o errexit`: a failing git status fails the step
         # rather than being treated as "no changes".
@@ -1070,7 +1071,7 @@ def _verify_vendor() -> int:  # pylint: disable=too-many-return-statements  # fa
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     """Entry point: run the embedded self-test or the full verify-deps flow."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--self-test", action="store_true",

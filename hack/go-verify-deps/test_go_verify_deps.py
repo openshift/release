@@ -33,8 +33,8 @@ def _load_module():
     name = "go_verify_deps_commands"
     spec = importlib.util.spec_from_file_location(name, _MOD_PATH)
     module = importlib.util.module_from_spec(spec)
-    # Register before exec so the module's `from __future__ import annotations`
-    # dataclasses can resolve their string annotations via sys.modules.
+    # Register in sys.modules before exec so the module can be resolved by name
+    # during its own import if needed.
     sys.modules[name] = module
     spec.loader.exec_module(module)
     return module
