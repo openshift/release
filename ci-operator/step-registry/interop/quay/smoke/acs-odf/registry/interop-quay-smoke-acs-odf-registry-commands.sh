@@ -40,50 +40,51 @@ _opp_trap_handler() {
   typeset exitCode=$?
   set +e
   _opp_cleanup "${exitCode}"
-  # PRRT_kwDOBHvUUM65LZ3D: JUnit generation failure on success path should exit 1
   typeset _genRc=0
   type -t GenerateJunit >/dev/null && GenerateJunit || _genRc=$?
   type -t _propagate_junit >/dev/null && _propagate_junit
   type -t PostProcessJunit >/dev/null && PostProcessJunit
-  # Once the merge produced the routed report, the raw copy must leave
-  # SHARED_DIR: the downstream reporter reads "${SHARED_DIR}/*.xml", so a run
-  # that leaves both copies reports every test twice. The deletion is applied
-  # only after the merged report passes the validation below, so an invalid
-  # merge keeps the raw copy that can still report the run.
+  # Validate the report the routing mode actually consumes, on every exit path.
+  typeset _sharedMerged="${SHARED_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml"
+  typeset _localMerged="${ARTIFACT_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml"
   typeset _rawJunitToRemove=''
-  if [[ -n "${SHARED_DIR:-}" && -n "${junitFile:-}" && -s "${SHARED_DIR}/junit--interop-quay-smoke-acs-odf-registry.xml" ]]; then
-      _rawJunitToRemove="${SHARED_DIR}/$(basename "${junitFile}")"
+  typeset -i _mergedValid=0
+  if [[ -n "${SHARED_DIR:-}" && -s "${_sharedMerged}" ]] \
+      && python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${_sharedMerged}" 2>/dev/null; then
+      _mergedValid=1
+      if [[ -n "${LP_QE__CR__TS_NAME__PFX__QUAY:-}" ]] \
+          && ! python3 -c "
+import sys, xml.etree.ElementTree as ET
+root = ET.parse(sys.argv[1]).getroot()
+names = [ts.get('name', '') for ts in root.iter('testsuite')]
+sys.exit(0 if names and all(n.startswith(sys.argv[2]) for n in names) else 1)
+" "${_sharedMerged}" "${LP_QE__CR__TS_NAME__PFX__QUAY}--" 2>/dev/null; then
+          _mergedValid=0
+      fi
   fi
-  # If report generation failed and original exit was success, fail the step
+  # A merge that did not validate must not sit in the reporter glob.
+  if (( _mergedValid == 0 )) && [[ -e "${_sharedMerged}" ]]; then
+      rm -f "${_sharedMerged}"
+  fi
   if (( _genRc != 0 && exitCode == 0 )); then
       echo "ERROR: JUnit report generation failed for otherwise successful run" >&2
       exit 1
   fi
-  # Verify that the report the configured routing mode consumes is valid: with
-  # a component prefix set, only the merged report whose suite names carry that
-  # prefix is read by Component Readiness, so a valid raw report must not stand
-  # in for a merge that did not happen.
   if (( exitCode == 0 )); then
-      typeset _sharedMerged="${SHARED_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml"
-      typeset _localMerged="${ARTIFACT_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml"
       if [[ -n "${LP_QE__CR__TS_NAME__PFX__QUAY:-}" ]]; then
-          if ! python3 -c "
-import sys, xml.etree.ElementTree as ET
-path, pfx = sys.argv[1], sys.argv[2]
-try:
-    root = ET.parse(path).getroot()
-except Exception:
-    sys.exit(1)
-names = [ts.get('name', '') for ts in root.iter('testsuite')]
-sys.exit(0 if names and all(n.startswith(pfx) for n in names) else 1)
-" "${_sharedMerged}" "${LP_QE__CR__TS_NAME__PFX__QUAY}--" 2>/dev/null; then
+          if (( _mergedValid == 0 )); then
               echo "ERROR: LP_QE__CR__TS_NAME__PFX__QUAY is set but ${_sharedMerged} is missing, invalid, or does not carry the component prefix; the run would report green with no routable JUnit" >&2
               exit 1
           fi
-      elif ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${junitFile}')" 2>/dev/null && ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${_sharedMerged}')" 2>/dev/null && ! python3 -c "import xml.etree.ElementTree as ET; ET.parse('${_localMerged}')" 2>/dev/null; then
+      elif (( _mergedValid == 0 )) \
+          && ! python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${junitFile}" 2>/dev/null \
+          && ! python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${_localMerged}" 2>/dev/null; then
           echo "ERROR: no valid JUnit report in ${junitFile}, ${_sharedMerged} or ${_localMerged} for successful run" >&2
           exit 1
       fi
+  fi
+  if (( _mergedValid == 1 )); then
+      _rawJunitToRemove="${SHARED_DIR}/$(basename "${junitFile}")"
   fi
   if [[ -n "${_rawJunitToRemove}" ]]; then
       rm -f "${_rawJunitToRemove}"
