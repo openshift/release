@@ -637,8 +637,8 @@ function CheckCentralPresent () {
         (( _traceWasOff == 0 )) && set -x
         return 2
     fi
-    _centralPresentHadSuccess=1
     items="$(printf '%s' "${out}" | JsonLength items)" || { (( _traceWasOff == 0 )) && set -x; return 2; }
+    _centralPresentHadSuccess=1
     (( _traceWasOff == 0 )) && set -x
     (( items > 0 ))
 }
