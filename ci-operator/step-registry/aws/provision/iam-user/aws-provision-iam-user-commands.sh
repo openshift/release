@@ -12,8 +12,19 @@ set -o pipefail
 EXIT_CODE=100
 trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; rm -f /tmp/aws_cred_output' EXIT TERM INT
 
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
+# Prefer ci-operator STS credentials when present. Dual-setting .awscred and
+# AWS_CONFIG_FILE breaks credential resolution for AWS API calls (DPTP-4756).
+STS_CONFIG="/var/run/secrets/aws/config/config"
+if [[ -f "${STS_CONFIG}" ]]; then
+	export AWS_CONFIG_FILE="${STS_CONFIG}"
+	export AWS_SDK_LOAD_CONFIG=1
+	unset AWS_SHARED_CREDENTIALS_FILE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN || true
+	echo "Using STS credentials from ${AWS_CONFIG_FILE}"
+else
+	export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+	unset AWS_CONFIG_FILE || true
+	echo "Using static credentials from ${AWS_SHARED_CREDENTIALS_FILE}"
+fi
 REGION="${LEASED_RESOURCE}"
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 

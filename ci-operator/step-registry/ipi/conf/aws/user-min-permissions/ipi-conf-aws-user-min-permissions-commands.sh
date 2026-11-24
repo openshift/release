@@ -76,8 +76,21 @@ fi
 
 if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 
-	export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-	export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
+	# Prefer ci-operator STS credentials when present. Setting both
+	# AWS_SHARED_CREDENTIALS_FILE (.awscred) and AWS_CONFIG_FILE (STS role
+	# chain) makes openshift-install fail to resolve credentials (interactive
+	# "AWS Access Key ID" prompt / EC2 client EOF). See DPTP-4756 / #80755.
+	STS_CONFIG="/var/run/secrets/aws/config/config"
+	if [[ -f "${STS_CONFIG}" ]]; then
+		export AWS_CONFIG_FILE="${STS_CONFIG}"
+		export AWS_SDK_LOAD_CONFIG=1
+		unset AWS_SHARED_CREDENTIALS_FILE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN || true
+		echo "Using STS credentials from ${AWS_CONFIG_FILE}"
+	else
+		export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+		unset AWS_CONFIG_FILE || true
+		echo "Using static credentials from ${AWS_SHARED_CREDENTIALS_FILE}"
+	fi
 
 	RELEASE_IMAGE_INSTALL="${RELEASE_IMAGE_INITIAL:-}"
 	if [[ -z "${RELEASE_IMAGE_INSTALL}" ]]; then

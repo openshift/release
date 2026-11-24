@@ -6,8 +6,18 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
+# Prefer ci-operator STS credentials when present (same rule as provision).
+STS_CONFIG="/var/run/secrets/aws/config/config"
+if [[ -f "${STS_CONFIG}" ]]; then
+	export AWS_CONFIG_FILE="${STS_CONFIG}"
+	export AWS_SDK_LOAD_CONFIG=1
+	unset AWS_SHARED_CREDENTIALS_FILE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN || true
+	echo "Using STS credentials from ${AWS_CONFIG_FILE}"
+else
+	export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+	unset AWS_CONFIG_FILE || true
+	echo "Using static credentials from ${AWS_SHARED_CREDENTIALS_FILE}"
+fi
 REGION="${LEASED_RESOURCE}"
 
 function run_command() {
