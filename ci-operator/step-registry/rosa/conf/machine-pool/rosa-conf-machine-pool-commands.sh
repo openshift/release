@@ -104,18 +104,23 @@ if [[ ! -z "$MP_TAINTS" ]]; then
 fi
 
 SUPPORT_SECURITY_GROUP="false"
+function versionAtLeast(){
+  local currentVersion=$1
+  local minimumVersion=$2
+  [[ "$(printf '%s\n%s\n' "${minimumVersion}" "${currentVersion}" | sort -V | head -1)" == "${minimumVersion}" ]]
+}
+
 function securityGroupSupported(){
-  throttleMinor=$(echo 4.11|cut -d '.' -f2)
+  throttleVersion="4.11"
   if [[ $HOSTED_CP = "true" ]]; then
-    throttleMinor=$(echo 4.15|cut -d '.' -f2)
+    throttleVersion="4.15"
   fi
-  clusterMinorVersion=$(rosa describe cluster -c ${CLUSTER_ID} -o json|jq -r .version.raw_id|cut -d '.' -f2) 
-  if [[  $clusterMinorVersion -ge $throttleMinor ]]; then
+  clusterVersion=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.version.raw_id // empty')
+  if versionAtLeast "${clusterVersion}" "${throttleVersion}"; then
     if [[ -z ${MP_OPENSHIFT_VERSION} ]];then
       SUPPORT_SECURITY_GROUP="true"
     else
-      mpMinorVersion=$(echo ${MP_OPENSHIFT_VERSION}|cut -d '.' -f2)
-      if [[ $mpMinorVersion -ge $throttleMinor ]];then
+      if versionAtLeast "${MP_OPENSHIFT_VERSION}" "${throttleVersion}"; then
         SUPPORT_SECURITY_GROUP="true"
       fi
     fi
