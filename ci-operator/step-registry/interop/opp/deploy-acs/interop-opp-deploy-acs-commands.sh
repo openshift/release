@@ -132,6 +132,7 @@ _props="${ARTIFACT_DIR:-/tmp}/acs-deploy-properties.txt"
 _work_budget=1650
 _diag_reserve=120
 _oc_overrun_reserve=25
+_junit_emit_reserve=15
 _work_deadline=$(( _junit_start + _work_budget ))
 
 # _classify <type> <detail>: record the failure classification (first
@@ -275,7 +276,12 @@ _junit_emit() {
   </testcase>
 </testsuite>
 JUNITEOF
-  mv -f "${_tmp}" "${_jfile}"
+  if ! mv -f "${_tmp}" "${_jfile}"; then
+    echo "ERROR: failed to move JUnit report from ${_tmp} to ${_jfile}" >&2
+    rm -f "${_tmp}" "${_jfile}" 2>/dev/null || true
+    return 1
+  fi
+  rm -f "${_tmp}" 2>/dev/null || true
   if [[ -n "${SHARED_DIR:-}" ]]; then
     mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
     cp "${_jfile}" "${SHARED_DIR}/junit/" 2>/dev/null || true
@@ -336,30 +342,61 @@ _clamp_deadline() {
 # Only classification-shaped fields are printed. Status bodies and event
 # messages are API-controlled text: they stay out of the step log and so out
 # of the trace copied into artifacts. Sizes are capped as before.
-_dump_diagnostics() {
-  typeset -i _remaining=$(( _work_deadline - $(date +%s) ))
-  if (( _remaining < _diag_reserve + _oc_overrun_reserve )); then
-    echo ">>> DIAG: skipped, remaining budget ${_remaining}s < reserve $(( _diag_reserve + _oc_overrun_reserve ))s" >&2
-    _api_loud
-    return 0
-  fi
+_dump_diagnostics_inner() {
   _api_quiet
   echo ">>> DIAG: Subscription rhacs-operator in ${ACS_NAMESPACE} (allowlisted fields):"
-  _diag_get oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
+  _diag_get command oc --request-timeout=20s get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
     -o jsonpath='{.metadata.name} channel={.spec.channel} currentCSV={.status.currentCSV} installedCSV={.status.installedCSV}{"\n"}' | head -c 262144 || true
   echo ">>> DIAG: Subscription conditions (type/status/reason only):"
-  _diag_get oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
+  _diag_get command oc --request-timeout=20s get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
     -o jsonpath='{range .status.conditions[*]}  {.type}={.status} reason={.reason}{"\n"}{end}' | head -50 || true
   echo ">>> DIAG: events in ${ACS_NAMESPACE} (last 50, no messages):"
-  _diag_get oc get events -n "${ACS_NAMESPACE}" --sort-by='.lastTimestamp' \
+  _diag_get command oc --request-timeout=20s get events -n "${ACS_NAMESPACE}" --sort-by='.lastTimestamp' \
     -o jsonpath='{range .items[*]}{.lastTimestamp} {.type} {.reason} {.involvedObject.kind}/{.involvedObject.name} x{.count}{"\n"}{end}' | tail -50 || true
   echo ">>> DIAG: events in openshift-marketplace (last 50, no messages):"
-  _diag_get oc get events -n openshift-marketplace --sort-by='.lastTimestamp' \
+  _diag_get command oc --request-timeout=20s get events -n openshift-marketplace --sort-by='.lastTimestamp' \
     -o jsonpath='{range .items[*]}{.lastTimestamp} {.type} {.reason} {.involvedObject.kind}/{.involvedObject.name} x{.count}{"\n"}{end}' | tail -50 || true
   echo ">>> DIAG: CSVs in ${ACS_NAMESPACE} (name/phase only):"
-  _diag_get oc get csv -n "${ACS_NAMESPACE}" \
+  _diag_get command oc --request-timeout=20s get csv -n "${ACS_NAMESPACE}" \
     -o jsonpath='{range .items[*]}  {.metadata.name} {.status.phase}{"\n"}{end}' | head -50 || true
   _api_loud
+}
+
+_dump_diagnostics() {
+  typeset -i _remaining=$(( _work_deadline - $(date +%s) ))
+  typeset -i _junit_guard=${_junit_emit_reserve:-15}
+  if (( _remaining < _diag_reserve + _oc_overrun_reserve )); then
+    echo ">>> DIAG: skipped, remaining budget ${_remaining}s < reserve $(( _diag_reserve + _oc_overrun_reserve ))s" >&2
+    _api_loud 2>/dev/null || true
+    return 0
+  fi
+  typeset -i _budget=$(( _remaining - _junit_guard ))
+  if (( _budget <= 0 )); then
+    echo ">>> DIAG: skipped, remaining budget ${_remaining}s insufficient for diagnostics with JUnit guard ${_junit_guard}s, preserving JUnit emission" >&2
+    _api_loud 2>/dev/null || true
+    return 0
+  fi
+  if command -v timeout >/dev/null 2>&1; then
+    export ACS_NAMESPACE
+    export -f _diag_get _api_quiet _api_loud _api_err_class 2>/dev/null || true
+    export -f _dump_diagnostics_inner 2>/dev/null || true
+    if ! timeout "${_budget}s" bash -c '_dump_diagnostics_inner'; then
+      typeset _t_rc=$?
+      if (( _t_rc == 124 )); then
+        echo ">>> DIAG: timeout after ${_budget}s, remaining budget exhausted, JUnit preserved (best-effort)" >&2
+      else
+        echo ">>> DIAG: diagnostics exited ${_t_rc} after ${_budget}s budget, JUnit preserved (best-effort)" >&2
+      fi
+      _api_loud 2>/dev/null || true
+      return 0
+    fi
+  else
+    _dump_diagnostics_inner
+    typeset -i _after=$(( _work_deadline - $(date +%s) ))
+    if (( _after < _junit_guard )); then
+      echo ">>> DIAG: completed but remaining budget ${_after}s < JUnit guard ${_junit_guard}s, JUnit emission is next" >&2
+    fi
+  fi
 }
 
 echo ">>> PHASE: initialization"
