@@ -1108,6 +1108,19 @@ _api_loud
 _prop "channel_requested" "${ACS_CHANNEL}"
 if oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" >/dev/null 2>&1; then
   _existing_ch=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null) || _existing_ch="unknown"
+  typeset -i _existing_pkg_rc=0
+  _existing_pkg=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.name}' 2>/dev/null) || _existing_pkg_rc=$?
+  if (( _existing_pkg_rc != 0 )); then
+    _classify "acs-subscription-query-failed" "existing Subscription rhacs-operator package query failed; adoption undecidable"
+    echo "ERROR: ${_class_detail}"
+    _dump_diagnostics
+    exit 1
+  elif [[ "${_existing_pkg}" != "rhacs-operator" ]]; then
+    _classify "acs-subscription-foreign-package" "existing Subscription rhacs-operator selects a package other than rhacs-operator; adopting it would report a different operator as deployed"
+    echo "ERROR: ${_class_detail}"
+    _dump_diagnostics
+    exit 1
+  fi
   _prop "acs_subscription" "adopted"
   _prop "channel_observed" "${_existing_ch}"
   if [[ "${_existing_ch}" != "${ACS_CHANNEL}" ]]; then
@@ -1147,6 +1160,13 @@ else
     fi
     rm -f "${_sub_create_err}"
     if oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" >/dev/null 2>&1; then
+      typeset -i _race_pkg_rc=0
+      _race_pkg=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.name}' 2>/dev/null) || _race_pkg_rc=$?
+      if (( _race_pkg_rc != 0 )) || [[ "${_race_pkg}" != "rhacs-operator" ]]; then
+        _classify "acs-subscription-create-error" "Subscription rhacs-operator appeared concurrently but does not select rhacs-operator ($(_api_err_class "${_sub_create_err_text}"))"
+        _dump_diagnostics
+        exit 1
+      fi
       _prop "acs_subscription" "race-tolerated"
       _prop "channel_observed" "$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null || echo unknown)"
       echo ">>> NOTE: Subscription created concurrently by another writer: adopting"
