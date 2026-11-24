@@ -17,6 +17,7 @@ Run ``--self-test`` (or set ``GOPROXY_SELF_TEST=1``) to execute the embedded
 self-test instead of the real flow. All user-facing message text is identical to
 the shell original.
 """
+# pylint: disable=too-many-lines  # single-file step command (run_as_script) kept self-contained
 
 from __future__ import annotations
 
@@ -191,8 +192,9 @@ class Outcome(enum.Enum):
 class ProbeResponse:
     """Normalized result of a single probe call: the HTTP status code plus any
     server-advertised Retry-After delay in seconds (0.0 when none was surfaced).
-    The curl/wget/external probes return a bare status string, so Retry-After is
-    only surfaced on the override/primary path; see _coerce_probe_response."""
+    The curl and wget backends parse Retry-After from the response headers; the
+    external GOPROXY_PROBE_CMD still returns a bare status string (0.0 Retry-After).
+    See _coerce_probe_response for how each form is normalized."""
 
     code: str
     retry_after: float = 0.0
@@ -345,14 +347,38 @@ def goproxy_redact_url(url: str) -> str:
     return urlunsplit((parts.scheme, netloc, parts.path, "", ""))
 
 
+def _go_class_to_fnmatch(pattern: str) -> str:
+    """Translate Go ``path.Match`` bracket-class syntax into the form
+    ``fnmatch.fnmatchcase`` expects. Go negates a character class with ``^``
+    (``[^abc]``) while fnmatch uses ``!`` (``[!abc]``); only the class-leading
+    negation marker differs, so every other construct (ranges, literals, ``*`` and
+    ``?``) is passed through unchanged. Scanning for the ``[`` that opens a class
+    keeps a ``^`` elsewhere (a literal, or a range member) untouched."""
+    result: list[str] = []
+    index, length = 0, len(pattern)
+    while index < length:
+        char = pattern[index]
+        result.append(char)
+        # A '^' immediately after a class-opening '[' is Go's negation marker.
+        if char == "[" and index + 1 < length and pattern[index + 1] == "^":
+            result.append("!")
+            index += 2
+            continue
+        index += 1
+    return "".join(result)
+
+
 def _path_match(pattern: str, candidate: str) -> bool:
     """Go ``path.Match`` equivalent: match ``candidate`` against ``pattern``
-    element-by-element (``*``, ``?`` and ``[...]`` classes never cross ``/``)."""
+    element-by-element (``*``, ``?`` and ``[...]`` classes never cross ``/``). Each
+    element is translated from Go class syntax (``[^...]``) to fnmatch syntax
+    (``[!...]``) before matching so negated classes behave as Go does."""
     pat_parts = pattern.split("/")
     cand_parts = candidate.split("/")
     if len(pat_parts) != len(cand_parts):
         return False
-    return all(fnmatch.fnmatchcase(part, pat) for pat, part in zip(pat_parts, cand_parts))
+    return all(fnmatch.fnmatchcase(part, _go_class_to_fnmatch(pat))
+               for pat, part in zip(pat_parts, cand_parts))
 
 
 def goproxy_path_is_private(path: str, patterns: list[str]) -> bool:
@@ -360,57 +386,88 @@ def goproxy_path_is_private(path: str, patterns: list[str]) -> bool:
     module-matching semantics: a pattern matches if it matches the whole path or a
     leading prefix at a path-element boundary, where each element is matched with
     ``path.Match`` (supporting ``*``, ``?`` and ``[...]`` without crossing ``/``).
-    Plain literal patterns reduce to the previous exact/prefix behavior."""
+    Plain literal patterns reduce to the previous exact/prefix behavior. A trailing
+    slash on a non-empty pattern is stripped first so ``github.com/corp/`` matches
+    descendant module paths like ``github.com/corp/foo``."""
     elements = path.split("/")
     prefixes = ["/".join(elements[:i]) for i in range(1, len(elements) + 1)]
+    stripped = [pattern.rstrip("/") for pattern in patterns if pattern]
     return any(
         _path_match(pattern, prefix)
-        for pattern in patterns if pattern
+        for pattern in stripped if pattern
         for prefix in prefixes
     )
 
 
-def goproxy_probe_curl(url: str, timeout: float = DEFAULT_PROBE_TIMEOUT) -> str:
-    """HEAD-probe ``url`` with curl, returning the HTTP status code (``000`` on a
-    transport error or timeout). No ``-f`` (so a 404 still prints its code); follows
-    redirects so the terminal status is classified rather than a 3xx. ``timeout``
-    bounds both curl's own ``--max-time`` and the subprocess as a hard backstop."""
+def _parse_retry_after(value: str) -> float:
+    """Parse an HTTP ``Retry-After`` header value. Only the integer delay-seconds
+    form is honored (returned as a float); the HTTP-date form (and anything else
+    unparseable) is treated as absent and returns ``0.0``."""
+    text = value.strip()
+    return float(text) if text.isdigit() else 0.0
+
+
+def goproxy_probe_curl(url: str, timeout: float = DEFAULT_PROBE_TIMEOUT) -> ProbeResponse:
+    """HEAD-probe ``url`` with curl, returning a ProbeResponse (HTTP status code plus
+    any server-advertised Retry-After in seconds; ``000``/0.0 on a transport error or
+    timeout). ``-I`` sends a HEAD so no body is downloaded; ``-D -`` dumps the
+    response headers to stdout so Retry-After can be read while ``-o /dev/null``
+    discards the (empty) body stream. No ``-f`` (so a 404 still reports its code);
+    ``-L`` follows redirects so the terminal status is classified rather than a 3xx;
+    the ``%{http_code}`` marker carries the final status. ``timeout`` bounds both
+    curl's own ``--max-time`` and the subprocess as a hard backstop."""
     try:
         result = subprocess.run(
             ["curl", "-sS", "-o", "/dev/null", "-I", "-L", "--max-redirs", "5",
-             "-w", "%{http_code}", "--max-time", f"{timeout:.3f}", url],
+             "-D", "-", "-w", "\n_HTTP_CODE:%{http_code}\n",
+             "--max-time", f"{timeout:.3f}", url],
             capture_output=True, text=True, check=False, timeout=timeout + 5,
         )
     except subprocess.TimeoutExpired:
-        return "000"
+        return ProbeResponse("000", 0.0)
     except (OSError, subprocess.SubprocessError):
-        return "000"
+        return ProbeResponse("000", 0.0)
     if result.returncode != 0:
-        return "000"
-    return result.stdout.strip() or "000"
+        return ProbeResponse("000", 0.0)
+    code = "000"
+    retry_after = 0.0
+    for line in result.stdout.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("_HTTP_CODE:"):
+            code = stripped.split(":", 1)[1].strip() or "000"
+        elif stripped.lower().startswith("retry-after:"):
+            # Keep the last Retry-After seen: the final (post-redirect) response.
+            retry_after = _parse_retry_after(stripped.split(":", 1)[1])
+    return ProbeResponse(code, retry_after)
 
 
-def goproxy_probe_wget(url: str, timeout: float = DEFAULT_PROBE_TIMEOUT) -> str:
-    """Fallback HEAD-probe using wget, returning the HTTP status code (``000`` on
-    error or timeout)."""
+def goproxy_probe_wget(url: str, timeout: float = DEFAULT_PROBE_TIMEOUT) -> ProbeResponse:
+    """Fallback HEAD-probe using wget, returning a ProbeResponse (HTTP status code
+    plus any Retry-After in seconds; ``000``/0.0 on error or timeout).
+    ``--server-response --spider`` reads the response headers from stderr without
+    downloading a body."""
     try:
         result = subprocess.run(
-            ["wget", "-S", "--spider", f"--timeout={max(1, int(timeout))}", "-t", "1", url],
+            ["wget", "--server-response", "--spider",
+             f"--timeout={max(1, int(timeout))}", "-t", "1", url],
             capture_output=True, text=True, check=False, timeout=timeout + 5,
         )
     except subprocess.TimeoutExpired:
-        return "000"
+        return ProbeResponse("000", 0.0)
     except (OSError, subprocess.SubprocessError):
-        return "000"
+        return ProbeResponse("000", 0.0)
     output = (result.stdout or "") + (result.stderr or "")
     code = "000"
+    retry_after = 0.0
     for line in output.splitlines():
         stripped = line.strip()
         if stripped.startswith("HTTP/"):
             parts = stripped.split()
             if len(parts) >= 2:
                 code = parts[1]  # keep the last HTTP status line
-    return code
+        elif stripped.lower().startswith("retry-after:"):
+            retry_after = _parse_retry_after(stripped.split(":", 1)[1])
+    return ProbeResponse(code, retry_after)
 
 
 def go_env(name: str) -> str:
@@ -426,15 +483,27 @@ def go_env(name: str) -> str:
 def candidates_from_json(data: dict) -> list[Candidate]:
     """Enumerate candidates from parsed ``go mod edit -json`` output.
 
-    Replace-aware: emit every Replace whose ``New.Version`` is non-empty and whose
-    ``New.Path`` is a remote module (does not start with ``.`` or ``/``), plus
-    every Require whose version is NOT replaced. A replace with no ``Old.Version``
-    (wildcard) suppresses the requirement for all versions; a replace with an
-    explicit ``Old.Version`` only suppresses that exact version. A remote replace's
+    Replace-aware: emit a Replace's remote target (``New.Version`` non-empty,
+    ``New.Path`` not starting with ``.`` or ``/``) only when that replacement is
+    active, plus every Require whose version is NOT replaced. A replace with no
+    ``Old.Version`` (wildcard) always applies and suppresses the requirement for all
+    versions. A replace with an explicit ``Old.Version`` only applies -- and only
+    suppresses that exact version -- when Go actually selects that old module+version;
+    an inactive versioned replacement is neither probed nor failed. A remote replace's
     target is emitted via its New entry; a local replace emits nothing, so the
     requirement is simply dropped. Returned sorted and de-duplicated by ``spec``
     (matches the original ``sort -u``)."""
     by_spec: dict[str, Candidate] = {}
+
+    # The module+version pairs the main module directly requires. 'go mod edit -json'
+    # exposes only the main module's own require/replace directives, not the fully
+    # resolved build graph, so this is the best available signal for whether a
+    # version-specific replace is active (see the activity rule below).
+    required = {
+        (req.get("Path") or "", req.get("Version") or "")
+        for req in data.get("Require") or []
+        if req.get("Path")
+    }
 
     wildcard_replaced: set[str] = set()      # Old.Path with no version -> all versions
     versioned_replaced: set[tuple[str, str]] = set()  # (Old.Path, Old.Version)
@@ -446,9 +515,19 @@ def candidates_from_json(data: dict) -> list[Candidate]:
         old_version = old.get("Version") or ""
         if old_version:
             versioned_replaced.add((old_path, old_version))
+            # Activity rule: a version-specific replacement is inert unless Go
+            # actually selects that exact old module+version. We approximate "Go
+            # selects it" by its presence in the main module's require set. This
+            # cannot prove the full module graph -- a version pulled in only
+            # transitively will look inactive -- so we accept that false negative
+            # rather than probe (and possibly fail on) a replace Go never applies.
+            active = (old_path, old_version) in required
         else:
             wildcard_replaced.add(old_path)
+            active = True  # wildcard/versionless replacements always apply
 
+        if not active:
+            continue
         new = replace.get("New") or {}
         new_path = new.get("Path") or ""
         new_version = new.get("Version") or ""
@@ -545,10 +624,12 @@ def _select_probe():
 
 
 def _coerce_probe_response(value) -> ProbeResponse:
-    """Normalize a probe's return value into a ProbeResponse. The curl/wget/external
-    probes return a bare status string (Retry-After is not surfaced from them — a
-    documented limitation), while the PROBE_OVERRIDE hook may return a ProbeResponse
-    or a (code, retry_after) tuple so tests can exercise Retry-After handling."""
+    """Normalize a probe's return value into a ProbeResponse. The curl and wget
+    backends already return a ProbeResponse (status code plus any Retry-After parsed
+    from the response headers); the external GOPROXY_PROBE_CMD returns a bare status
+    string (no Retry-After); and the PROBE_OVERRIDE hook may return a ProbeResponse,
+    a (code, retry_after) tuple, or a bare status string so tests can exercise
+    Retry-After handling through the injected path."""
     if isinstance(value, ProbeResponse):
         return value
     if isinstance(value, tuple):
@@ -638,6 +719,41 @@ def _report_goproxy_outcome(rproxy_base: str, results: _ProbeResults) -> None:
     print("All checked Go module versions are resolvable on the Go module proxy.")
 
 
+# The proxy endpoints a candidate must resolve, probed in order. The ART/Konflux
+# hermeto prefetch fetches BOTH the ``.info`` (metadata) and the ``.zip`` (module
+# source): a 200 on ``.info`` alone does NOT prove the ``.zip`` is served, so we
+# confirm the ``.zip`` too and only report OK when every required endpoint resolves.
+# This is the "probe the .zip endpoint" remediation (preferred over merely narrowing
+# the docstring): it actually prevents the opaque prefetch 404 the message promises
+# to catch. A 404/410 on ``.zip`` fails like a missing module; a transient failure
+# on ``.zip`` is lenient like everywhere else; both share the retry/deadline budget.
+_REQUIRED_PROXY_SUFFIXES = (".info", ".zip")
+
+
+def _probe_candidate_endpoints(probe, proxy_base: str, cand: Candidate,
+                               budget: _Budget) -> tuple[Outcome, str, str]:
+    """Probe the required proxy endpoints for ``cand`` in order (``.info`` then
+    ``.zip``), short-circuiting on the first non-AVAILABLE outcome. Returns
+    ``(outcome, last_code, redacted_url)`` for the endpoint that determined the
+    result: AVAILABLE only when every required endpoint resolves, MISSING on the
+    first 404/410, INCONCLUSIVE on the first transient failure. Per-endpoint retries
+    and backoff come from the module tuning constants (``GOPROXY_RETRIES`` /
+    ``GOPROXY_RETRY_DELAY_SECONDS``, read live so tests can monkeypatch them); the
+    overall deadline ``budget`` is shared across the endpoints."""
+    base = f"{proxy_base}/{goproxy_escape(cand.path)}/@v/{goproxy_escape(cand.version)}"
+    outcome = Outcome.AVAILABLE
+    code = "000"
+    rurl = ""
+    for suffix in _REQUIRED_PROXY_SUFFIXES:
+        url = base + suffix
+        rurl = goproxy_redact_url(url)
+        outcome, code = _probe_with_retries(
+            probe, url, GOPROXY_RETRIES, GOPROXY_RETRY_DELAY_SECONDS, budget)
+        if outcome is not Outcome.AVAILABLE:
+            break
+    return outcome, code, rurl
+
+
 def check_goproxy_availability() -> None:
     """Verify pinned Go module pseudo-versions resolve on the Go module proxy
     before a build (ART-26147). Opt-in via CHECK_GOPROXY_AVAILABILITY. Raises
@@ -650,9 +766,9 @@ def check_goproxy_availability() -> None:
         return
 
     # Retry/backoff/deadline are fixed internals (module constants), no longer env
-    # tunables. Read via module globals so tests can monkeypatch them.
-    retries = GOPROXY_RETRIES
-    retry_delay = GOPROXY_RETRY_DELAY_SECONDS
+    # tunables. The deadline bounds the whole probe loop here; the per-endpoint
+    # retries/backoff are read live inside _probe_candidate_endpoints. All are read
+    # via module globals so tests can monkeypatch them.
     deadline = GOPROXY_DEADLINE_SECONDS
 
     print("Checking that pinned Go module versions are resolvable on the Go module proxy (ART-26147).")
@@ -697,11 +813,10 @@ def check_goproxy_availability() -> None:
             results.budget_skipped.append(SkippedCandidate(cand.path, cand.version, results.budget_stop))
             continue
 
-        url = f"{proxy_base}/{goproxy_escape(cand.path)}/@v/{goproxy_escape(cand.version)}.info"
-        rurl = goproxy_redact_url(url)
         commit = cand.version.rsplit("-", 1)[-1].removesuffix("+incompatible")
 
-        outcome, code = _probe_with_retries(probe, url, retries, retry_delay, budget)
+        outcome, code, rurl = _probe_candidate_endpoints(
+            probe, proxy_base, cand, budget)
         consecutive_000 = consecutive_000 + 1 if code == "000" else 0
 
         if outcome is Outcome.AVAILABLE:
@@ -790,8 +905,18 @@ def run_self_test() -> bool:  # pylint: disable=too-many-statements  # four self
     orig_retries, orig_delay = GOPROXY_RETRIES, GOPROXY_RETRY_DELAY_SECONDS
     GOPROXY_RETRIES, GOPROXY_RETRY_DELAY_SECONDS = 2, 0
 
+    # Isolate the self-test's `go env` reads from the developer's persisted Go env
+    # file: a saved `go env -w GOPRIVATE=...`/`GONOPROXY=...` would otherwise make
+    # Case A treat its fixture pins as private and skip them, masking the failure.
+    # Point GOENV at an empty file so only explicit env vars (e.g. Case D's
+    # GONOPROXY) take effect. The caller's GOENV is restored in the finally block.
+    orig_goenv = os.environ.get("GOENV")
+
     try:
         (tmpdir / "go.mod").write_text(_SELF_TEST_GOMOD, encoding="utf-8")
+        empty_goenv = tmpdir / "goenv.empty"
+        empty_goenv.write_text("", encoding="utf-8")
+        os.environ["GOENV"] = str(empty_goenv)
         os.chdir(tmpdir)
 
         print("=== Self-test case A: a missing pseudo-version must fail with remediation ===")
@@ -843,6 +968,10 @@ def run_self_test() -> bool:  # pylint: disable=too-many-statements  # four self
     finally:
         PROBE_OVERRIDE = None
         GOPROXY_RETRIES, GOPROXY_RETRY_DELAY_SECONDS = orig_retries, orig_delay
+        if orig_goenv is None:
+            os.environ.pop("GOENV", None)
+        else:
+            os.environ["GOENV"] = orig_goenv
         os.chdir(origdir)
         shutil.rmtree(tmpdir, ignore_errors=True)
 

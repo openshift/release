@@ -119,6 +119,25 @@ class PureFunctionTests(unittest.TestCase):
         self.assertFalse(mod.goproxy_path_is_private(
             "github.com/corp", ["github.com/corp/*"]))
 
+    def test_private_pathmatch_negated_class(self):
+        # Go path.Match '[^...]' negation must be honored (fnmatch spells it
+        # '[!...]'); a naive pass-through would match the literal '^'/'x' instead.
+        self.assertTrue(mod.goproxy_path_is_private(
+            "github.com/corp/internal", ["github.com/corp/[^x]*"]))
+        # The negation still excludes the listed character.
+        self.assertFalse(mod.goproxy_path_is_private(
+            "github.com/corp/xenon", ["github.com/corp/[^x]*"]))
+
+    def test_private_trailing_slash_pattern(self):
+        # A trailing slash on a non-empty pattern is stripped so it still matches
+        # descendant module paths.
+        self.assertTrue(mod.goproxy_path_is_private(
+            "github.com/corp/foo", ["github.com/corp/"]))
+        self.assertTrue(mod.goproxy_path_is_private(
+            "github.com/corp/foo/bar", ["github.com/corp/"]))
+        self.assertFalse(mod.goproxy_path_is_private(
+            "github.com/other/foo", ["github.com/corp/"]))
+
     def test_pseudo_version_regex(self):
         match = [
             "v0.0.0-20261110024958-4608138db381",
@@ -166,9 +185,10 @@ class PureFunctionTests(unittest.TestCase):
         # sorted + unique by spec (matches `sort -u`)
         self.assertEqual(specs, sorted(set(specs)))
 
-    def test_candidates_version_specific_replace(self):
-        # A replace with an explicit Old.Version only suppresses THAT version; a
-        # differently-versioned required pin survives.
+    def test_candidates_inactive_versioned_replace_not_probed(self):
+        # A version-specific replace whose Old.Version is NOT selected by the require
+        # set is inert: Go would never apply it, so its target must not be emitted as
+        # a probe candidate. The differently-versioned required pin survives.
         data = {
             "Require": [
                 {"Path": "github.com/foo/foo",
@@ -183,6 +203,27 @@ class PureFunctionTests(unittest.TestCase):
         }
         specs = [c.spec for c in mod.candidates_from_json(data)]
         self.assertIn("github.com/foo/foo@v0.0.0-20240101000000-222222222222", specs)
+        # inactive versioned replacement target NOT probed
+        self.assertNotIn("github.com/bar/bar@v0.0.0-20240101000000-bbbbbbbbbbbb", specs)
+
+    def test_candidates_active_versioned_replace_probed(self):
+        # When the require set selects exactly the replaced old module+version, the
+        # replacement is active: the require is suppressed and the remote target is
+        # emitted for probing.
+        data = {
+            "Require": [
+                {"Path": "github.com/foo/foo",
+                 "Version": "v0.0.0-20240101000000-111111111111"},  # matches Old
+            ],
+            "Replace": [
+                {"Old": {"Path": "github.com/foo/foo",
+                         "Version": "v0.0.0-20240101000000-111111111111"},
+                 "New": {"Path": "github.com/bar/bar",
+                         "Version": "v0.0.0-20240101000000-bbbbbbbbbbbb"}},
+            ],
+        }
+        specs = [c.spec for c in mod.candidates_from_json(data)]
+        self.assertNotIn("github.com/foo/foo@v0.0.0-20240101000000-111111111111", specs)
         self.assertIn("github.com/bar/bar@v0.0.0-20240101000000-bbbbbbbbbbbb", specs)
 
     def test_candidates_wildcard_vs_versioned_vs_local(self):
@@ -223,10 +264,19 @@ class PureFunctionTests(unittest.TestCase):
 
     def test_external_probe_cmd_timeout(self):
         # A stalled GOPROXY_PROBE_CMD is killed by the subprocess timeout and
-        # treated as a transport failure (000).
-        start = time.monotonic()
-        code = mod.probe_cmd("/bin/sleep", "30", timeout=0.5)
-        elapsed = time.monotonic() - start
+        # treated as a transport failure (000). Launch a real, always-present
+        # process via the current Python interpreter so this verifies a genuine
+        # timeout rather than a command-not-found launch failure. ('time' is a
+        # built-in module, so no file planted on sys.path can shadow it.)
+        fd, script = tempfile.mkstemp(suffix=".py")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write("import time; time.sleep(5)\n")
+            start = time.monotonic()
+            code = mod.probe_cmd(sys.executable, script, timeout=0.5)
+            elapsed = time.monotonic() - start
+        finally:
+            os.unlink(script)
         self.assertEqual(code, "000")
         self.assertLess(elapsed, 5)
 
@@ -250,6 +300,66 @@ class PureFunctionTests(unittest.TestCase):
         self.assertIn("Go module proxy base URL (redacted): https://proxy.example.test", out)
         self.assertIn("go get", out)
         self.assertIn("tag", out)
+
+
+class ProbeBackendParsingTests(unittest.TestCase):
+    """Exercise the curl/wget probe backends' real header parsing (subprocess
+    stubbed), confirming Retry-After flows out of the PRODUCTION path -- not only an
+    injected ProbeResponse."""
+
+    def setUp(self):
+        self._orig_sub = mod.subprocess.run
+
+    def tearDown(self):
+        mod.subprocess.run = self._orig_sub
+
+    def test_curl_backend_parses_retry_after(self):
+        # curl writes the dumped headers (-D -) plus the _HTTP_CODE marker (-w) to
+        # stdout; goproxy_probe_curl parses the status code AND a numeric Retry-After.
+        fake_stdout = (
+            "HTTP/1.1 429 Too Many Requests\r\n"
+            "Retry-After: 30\r\n"
+            "Content-Length: 0\r\n"
+            "\r\n"
+            "\n_HTTP_CODE:429\n"
+        )
+        mod.subprocess.run = lambda *a, **k: types.SimpleNamespace(
+            returncode=0, stdout=fake_stdout, stderr="")
+        resp = mod.goproxy_probe_curl(
+            "https://proxy.test/github.com/x/@v/v.info", timeout=1.0)
+        self.assertEqual(resp.code, "429")
+        self.assertEqual(resp.retry_after, 30.0)
+
+    def test_curl_backend_http_date_retry_after_absent(self):
+        # An HTTP-date Retry-After (non-integer) is treated as absent (0.0).
+        fake_stdout = (
+            "HTTP/1.1 503 Service Unavailable\r\n"
+            "Retry-After: Wed, 21 Oct 2026 07:28:00 GMT\r\n"
+            "\r\n"
+            "\n_HTTP_CODE:503\n"
+        )
+        mod.subprocess.run = lambda *a, **k: types.SimpleNamespace(
+            returncode=0, stdout=fake_stdout, stderr="")
+        resp = mod.goproxy_probe_curl(
+            "https://proxy.test/github.com/x/@v/v.info", timeout=1.0)
+        self.assertEqual(resp.code, "503")
+        self.assertEqual(resp.retry_after, 0.0)
+
+    def test_wget_backend_parses_retry_after(self):
+        # wget --server-response prints the response headers (indented) to stderr;
+        # goproxy_probe_wget parses the status and Retry-After from them.
+        fake_stderr = (
+            "Spider mode enabled.\n"
+            "  HTTP/1.1 429 Too Many Requests\r\n"
+            "  Retry-After: 42\r\n"
+            "  Content-Length: 0\r\n"
+        )
+        mod.subprocess.run = lambda *a, **k: types.SimpleNamespace(
+            returncode=8, stdout="", stderr=fake_stderr)
+        resp = mod.goproxy_probe_wget(
+            "https://proxy.test/github.com/x/@v/v.info", timeout=1.0)
+        self.assertEqual(resp.code, "429")
+        self.assertEqual(resp.retry_after, 42.0)
 
 
 class CheckAvailabilityTests(unittest.TestCase):  # pylint: disable=too-many-instance-attributes  # a test fixture saving/restoring several module globals
@@ -358,7 +468,9 @@ class CheckAvailabilityTests(unittest.TestCase):  # pylint: disable=too-many-ins
         out, rc = self._run_check()
         self.assertEqual(rc, 0, out)
         self.assertIn("OK           github.com/x/x@", out)
-        self.assertEqual(calls["n"], 2)  # retried once, succeeded on 2nd
+        # .info retried once then succeeded (2 calls), then the .zip endpoint is
+        # confirmed (1 more call) -> 3 total.
+        self.assertEqual(calls["n"], 3)
 
     def test_missing_pin_fails_with_remediation(self):
         mod.enumerate_candidates = lambda: [
@@ -461,6 +573,44 @@ class CheckAvailabilityTests(unittest.TestCase):  # pylint: disable=too-many-ins
         self.assertGreaterEqual(sleeps[0], 30.0)  # waited at least the advertised delay
         self.assertIn("INCONCLUSIVE", out)
 
+    def test_retry_after_from_curl_backend_honored(self):
+        # End-to-end production path: the REAL curl backend parses a 429+Retry-After
+        # from header output (subprocess stubbed, no network) and that advertised
+        # delay drives the backoff via the production ProbeResponse path -- not an
+        # injected ProbeResponse. A 429 stays inconclusive and never hard-fails.
+        clock = [0.0]
+        sleeps = []
+
+        def fake_sleep(seconds):
+            sleeps.append(seconds)
+            clock[0] += seconds
+
+        mod.time = types.SimpleNamespace(monotonic=lambda: clock[0], sleep=fake_sleep)
+        mod.JITTER_RNG.seed(0)
+        mod.GOPROXY_RETRIES = 2
+        mod.GOPROXY_RETRY_DELAY_SECONDS = 1  # base backoff far below the advertised 30s
+        mod.GOPROXY_DEADLINE_SECONDS = 120
+        mod.enumerate_candidates = lambda: [
+            _cand("github.com/x/x@v0.0.0-20240101000000-abcdef123456")]
+        fake_stdout = (
+            "HTTP/1.1 429 Too Many Requests\r\n"
+            "Retry-After: 30\r\n\r\n"
+            "\n_HTTP_CODE:429\n"
+        )
+        orig_sub = mod.subprocess.run
+        mod.subprocess.run = lambda *a, **k: types.SimpleNamespace(
+            returncode=0, stdout=fake_stdout, stderr="")
+        # Route the probe selector through the real curl backend.
+        mod.PROBE_OVERRIDE = mod.goproxy_probe_curl
+        try:
+            out, rc = self._run_check()
+        finally:
+            mod.subprocess.run = orig_sub
+        self.assertEqual(rc, 0, out)
+        self.assertTrue(sleeps, sleeps)
+        self.assertGreaterEqual(max(sleeps), 30.0)  # production-parsed Retry-After honored
+        self.assertIn("INCONCLUSIVE", out)
+
     def test_jitter_bounded_and_deterministic(self):
         # Backoff jitter stays within +/-20% of the base delay and is reproducible
         # under a seeded RNG. The deadline is disabled so nothing clips the jitter.
@@ -540,6 +690,10 @@ class MainFlowTests(unittest.TestCase):
         os.environ["CHECK_MOD_LIST"] = "false"
         os.environ.pop("COMPAT", None)
         os.environ.pop("GOWORK", None)
+        # A developer's exported GOPROXY_SELF_TEST=1 would make main([]) run the
+        # embedded self-test instead of the vendor flow; drop it so these tests
+        # reach the vendor path. tearDown restores the original environment.
+        os.environ.pop("GOPROXY_SELF_TEST", None)
 
     def tearDown(self):
         os.environ.clear()
