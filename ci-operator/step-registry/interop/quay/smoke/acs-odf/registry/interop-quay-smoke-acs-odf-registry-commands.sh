@@ -16,7 +16,7 @@ _opp_cleanup() {
   set +x
   # Credential hygiene: these files must not survive the step, on the
   # success and the failure path alike.
-  rm -f /tmp/quay-auth.json /tmp/quay-cookies.txt "${acsPassFile:-/tmp/acs-admin-password}" /tmp/acs-ingress-ca.crt /tmp/acs-central-ca.crt /tmp/quay-init-password /tmp/quay-push.digest
+  rm -f /tmp/quay-auth.json /tmp/quay-cookies.txt "${acsPassFile:-/tmp/acs-admin-password}" /tmp/acs-ingress-ca.crt /tmp/acs-central-ca.crt /tmp/quay-push.digest
   rm -rf /tmp/quay-ca-candidates
   # Scrub credentials before copying
   sed -i -E \
@@ -380,10 +380,16 @@ function GetQuayAuth () {
 
     if [[ "${authOk}" == false ]]; then
         typeset initPassword=''
-        initPassword="$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(20)))")"
         typeset quayInitPassFile='/tmp/quay-init-password'
-        printf '%s' "${initPassword}" > "${quayInitPassFile}"
-        chmod 600 "${quayInitPassFile}"
+        if [[ -s "${quayInitPassFile}" ]]; then
+            initPassword="$(cat "${quayInitPassFile}")"
+            chmod 600 "${quayInitPassFile}" || true
+            echo "INFO: reusing persisted Quay init password from prior attempt" >&2
+        else
+            initPassword="$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(20)))")"
+            printf '%s' "${initPassword}" > "${quayInitPassFile}"
+            chmod 600 "${quayInitPassFile}"
+        fi
         typeset initResult=''
         typeset initBody=''
         typeset initHttp=''
@@ -424,10 +430,10 @@ print(json.dumps({'username': 'quayadmin', 'password': sys.stdin.read().strip(),
             _loginCsrf="$(curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/csrf_token" -c /tmp/quay-cookies.txt 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('csrf_token',''))")" || _loginCsrf=""
             if [[ -n "${_loginCsrf}" ]]; then
                 typeset _loginResult=''
-                _loginResult="$(python3 -c "
+                _loginResult="$(QUAY_USER_FALLBACK="quayadmin" QUAY_PASS_FILE="${quayInitPassFile}" python3 -c "
 import json, os
 print(json.dumps({'username': os.environ['QUAY_USER_FALLBACK'], 'password': open(os.environ['QUAY_PASS_FILE']).read().strip()}))
-" | QUAY_USER_FALLBACK="quayadmin" QUAY_PASS_FILE="${quayInitPassFile}" curl -sS "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/signin" \
+" | curl -sS "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/signin" \
                     -H "Content-Type: application/json" \
                     -H "X-CSRF-Token: ${_loginCsrf}" \
                     -b /tmp/quay-cookies.txt -c /tmp/quay-cookies.txt \
@@ -452,6 +458,15 @@ print(json.dumps({'username': os.environ['QUAY_USER_FALLBACK'], 'password': open
                 authOk=true
                 echo "INFO: Quay admin user initialized via /api/v1/user/initialize" >&2
             fi
+        fi
+    fi
+
+    if [[ "${authOk}" == true ]]; then
+        rm -f "${quayInitPassFile:-/tmp/quay-init-password}" || true
+    else
+        if [[ -f "${quayInitPassFile:-/tmp/quay-init-password}" ]]; then
+            echo "INFO: removing persisted Quay init password after definitive auth failure; a new invocation will generate a fresh password" >&2
+            rm -f "${quayInitPassFile}" || true
         fi
     fi
 
