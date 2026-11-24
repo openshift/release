@@ -19,7 +19,9 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 # rosa-e2e-hcp-zero-egress-vpc-cleanup, which must run before the VPC stack is
 # deleted (endpoints block VPC deletion).
 
-CLOUD_PROVIDER_REGION="${LEASED_RESOURCE}"
+# Match the producer's region selection (aws-provision-vpc-shared): REGION
+# wins when set, LEASED_RESOURCE (the lease region) is the fallback.
+CLOUD_PROVIDER_REGION="${REGION:-${LEASED_RESOURCE}}"
 
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
@@ -35,7 +37,9 @@ if [[ ! -s "${SHARED_DIR}/vpc_id" || ! -s "${SHARED_DIR}/private_subnet_ids" ]];
   exit 1
 fi
 VPC_ID=$(cat "${SHARED_DIR}/vpc_id")
-mapfile -t PRIVATE_SUBNETS < <(grep -v '^$' "${SHARED_DIR}/private_subnet_ids" | tr -d "[']," )
+# private_subnet_ids holds a compact list like ['subnet-a','subnet-b']; pick
+# the IDs out one per line so multi-subnet VPCs keep separate array elements.
+mapfile -t PRIVATE_SUBNETS < <(grep -oE 'subnet-[0-9A-Za-z]+' "${SHARED_DIR}/private_subnet_ids")
 
 echo "Preparing zero-egress networking for VPC ${VPC_ID} (${#PRIVATE_SUBNETS[@]} private subnets)"
 
@@ -65,20 +69,30 @@ for service in ecr.api ecr.dkr; do
   ENDPOINT_IDS+=("${endpoint_id}")
 done
 
-# Gateway endpoint for S3 (backing store for ECR image layers), attached to
-# every route table in the VPC. Gateway endpoints are free and route-table
-# scoped, so attach to all of them.
+# Gateway endpoint for S3 (backing store for ECR image layers). The VPC
+# CloudFormation stack already creates one covering the public and private
+# route tables, and AWS rejects a second route for the same service in a
+# route table, so reuse the stack-owned endpoint instead of creating a
+# duplicate. Only an endpoint created here is recorded for cleanup.
 mapfile -t ROUTE_TABLES < <(aws ec2 describe-route-tables \
   --filters "Name=vpc-id,Values=${VPC_ID}" \
-  --query 'RouteTables[].RouteTableId' --output text)
-S3_ENDPOINT_ID=$(aws ec2 create-vpc-endpoint \
-  --vpc-id "${VPC_ID}" \
-  --vpc-endpoint-type Gateway \
-  --service-name "com.amazonaws.${CLOUD_PROVIDER_REGION}.s3" \
-  --route-table-ids "${ROUTE_TABLES[@]}" \
-  --query 'VpcEndpoint.VpcEndpointId' --output text)
-echo "Created s3 gateway endpoint ${S3_ENDPOINT_ID}"
-ENDPOINT_IDS+=("${S3_ENDPOINT_ID}")
+  --query 'RouteTables[].[RouteTableId]' --output text)
+S3_SERVICE_NAME="com.amazonaws.${CLOUD_PROVIDER_REGION}.s3"
+S3_ENDPOINT_ID=$(aws ec2 describe-vpc-endpoints \
+  --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=${S3_SERVICE_NAME}" \
+  --query 'VpcEndpoints[0].VpcEndpointId' --output text)
+if [[ "${S3_ENDPOINT_ID}" != "None" ]]; then
+  echo "Reusing stack-owned s3 gateway endpoint ${S3_ENDPOINT_ID}"
+else
+  S3_ENDPOINT_ID=$(aws ec2 create-vpc-endpoint \
+    --vpc-id "${VPC_ID}" \
+    --vpc-endpoint-type Gateway \
+    --service-name "${S3_SERVICE_NAME}" \
+    --route-table-ids "${ROUTE_TABLES[@]}" \
+    --query 'VpcEndpoint.VpcEndpointId' --output text)
+  echo "Created s3 gateway endpoint ${S3_ENDPOINT_ID}"
+  ENDPOINT_IDS+=("${S3_ENDPOINT_ID}")
+fi
 
 printf '%s\n' "${ENDPOINT_IDS[@]}" > "${SHARED_DIR}/zero_egress_endpoint_ids"
 
@@ -89,9 +103,13 @@ printf '%s\n' "${ENDPOINT_IDS[@]}" > "${SHARED_DIR}/zero_egress_endpoint_ids"
 # teardown (CloudFormation proceeds when a resource is already gone), while
 # the NAT gateways themselves stay intact for the stack's own lifecycle.
 for route_table in "${ROUTE_TABLES[@]}"; do
-  mapfile -t NAT_ROUTES < <(aws ec2 describe-route-tables --route-table-ids "${route_table}" \
-    --query 'RouteTables[0].Routes[?NatGatewayId != null].DestinationCidrBlock' \
-    --output text || true)
+  # Command substitution (not process substitution) so a failed lookup
+  # propagates through errexit; the [DestinationCidrBlock] projection keeps
+  # one CIDR per line in text output.
+  NAT_ROUTES_RAW=$(aws ec2 describe-route-tables --route-table-ids "${route_table}" \
+    --query 'RouteTables[0].Routes[?NatGatewayId != null].[DestinationCidrBlock]' \
+    --output text)
+  mapfile -t NAT_ROUTES <<< "${NAT_ROUTES_RAW}"
   for cidr in "${NAT_ROUTES[@]:-}"; do
     [[ -z "${cidr}" ]] && continue
     echo "Removing NAT route ${cidr} from ${route_table}"

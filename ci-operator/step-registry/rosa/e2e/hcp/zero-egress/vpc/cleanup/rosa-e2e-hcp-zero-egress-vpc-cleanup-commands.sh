@@ -11,7 +11,9 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 # block VPC deletion, so this must run before rosa-e2e-cleanup-vpc /
 # aws-deprovision-stacks tear down the VPC stack.
 
-CLOUD_PROVIDER_REGION="${LEASED_RESOURCE}"
+# Match the producer's region selection (aws-provision-vpc-shared): REGION
+# wins when set, LEASED_RESOURCE (the lease region) is the fallback.
+CLOUD_PROVIDER_REGION="${REGION:-${LEASED_RESOURCE}}"
 
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
@@ -30,6 +32,19 @@ if [[ -s "${SHARED_DIR}/zero_egress_endpoint_ids" ]]; then
       aws ec2 delete-vpc-endpoints --vpc-endpoint-ids "${endpoint_id}" || true
     fi
   done
+  # Endpoint deletion is asynchronous: interface endpoints leave network
+  # interfaces that hold the endpoint security group. Wait for the endpoints
+  # to disappear before deleting the group — a DependencyViolation there
+  # would strand the group and block VPC deletion at stack teardown.
+  for endpoint_id in "${ENDPOINT_IDS[@]}"; do
+    [[ -n "${endpoint_id}" ]] || continue
+    for _ in $(seq 1 60); do
+      state=$(aws ec2 describe-vpc-endpoints --vpc-endpoint-ids "${endpoint_id}" \
+        --query 'VpcEndpoints[0].VpcEndpointId' --output text 2>/dev/null) || state="None"
+      [[ "${state}" == "None" ]] && break
+      sleep 10
+    done
+  done
 else
   echo "No zero-egress VPC endpoints to delete"
 fi
@@ -37,7 +52,21 @@ fi
 if [[ -s "${SHARED_DIR}/zero_egress_endpoint_sg_id" ]]; then
   ENDPOINT_SG_ID=$(cat "${SHARED_DIR}/zero_egress_endpoint_sg_id")
   echo "Deleting endpoint security group ${ENDPOINT_SG_ID}"
-  aws ec2 delete-security-group --group-id "${ENDPOINT_SG_ID}" || true
+  # Retry to absorb residual ENI release after endpoint deletion; fail the
+  # step if the group survives so the leftover is visible instead of
+  # silently blocking VPC deletion later.
+  deleted=false
+  for _ in $(seq 1 12); do
+    if aws ec2 delete-security-group --group-id "${ENDPOINT_SG_ID}" 2>/dev/null; then
+      deleted=true
+      break
+    fi
+    sleep 10
+  done
+  if [[ "${deleted}" == false ]]; then
+    echo "ERROR: endpoint security group ${ENDPOINT_SG_ID} could not be deleted (still in use?)"
+    exit 1
+  fi
 fi
 
 echo "Zero-egress VPC cleanup done"
