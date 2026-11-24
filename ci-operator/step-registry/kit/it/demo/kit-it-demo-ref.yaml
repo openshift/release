@@ -1,0 +1,71 @@
+ref:
+  as: kit-it-demo
+  from_image:
+    namespace: ocp
+    name: "4.22"
+    tag: upi-installer
+  grace_period: 10m
+  commands: kit-it-demo-commands.sh
+  cli: latest
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  timeout: 40m0s
+  env:
+  - name: KIT_IT_DEMO_FEATURE_SET
+    default: ""
+    documentation: |-
+      Feature set passed to kit cluster create (--feature-set) when
+      deploying operators, for example TechPreviewNoUpgrade.
+  - name: KIT_IT_DEMO_CREATE_TIMEOUT
+    default: 20m
+    documentation: Time bound passed to kit cluster create (--timeout).
+  credentials:
+  - namespace: test-credentials
+    bundle: registry-pull-credentials
+    mount_path: /var/run/registry-pull-credentials
+  documentation: |-
+    Run the kit README quickstart on the kit host provisioned by
+    kit-infra-aws-ec2: start the daemon, create a cluster, get its
+    kubeconfig, inspect it with kubectl, assert its health when operators
+    are deployed, destroy the cluster and stop the daemon. Cluster create
+    and destroy timings are printed.
+
+    When the ci-operator run provides a release image (RELEASE_IMAGE_LATEST,
+    exposed to test steps when the consuming config defines a "latest"
+    release), the demo follows the README "Deploying operators" flow: the
+    cluster is created in one shot with the pull secret (the CI registry
+    credentials mounted by this step, needed to pull RELEASE_IMAGE_LATEST
+    from the build farm registry of the job namespace, merged with
+    ${CLUSTER_PROFILE_DIR}/pull-secret when the cluster_profile provides
+    one), the release image, the feature set and the MCO
+    deployment plan from the README, and the demo waits for the
+    machine-config ClusterOperator to report Available, not Progressing
+    and not Degraded.
+
+    The Kubernetes version of the release payload is resolved in the step
+    container from the io.openshift.build.versions annotation of the
+    payload image references, read with "oc adm release info -o json"
+    (for example kubernetes=1.36.5 for
+    quay.io/openshift-release-dev/ocp-release:5.0.0-x86_64), and passed
+    to kit cluster create as "--kube-version v<version>", so the kwok
+    control plane runs the same Kubernetes version as the payload. The
+    displayVersions metadata is not used because in-development payloads
+    only report the Kubernetes major.minor there, and without the
+    concrete patch version kwok runs its latest available Kubernetes,
+    whose stricter CEL validation rejects the payload manifests and the
+    operators never deploy. The step fails when the release image cannot
+    be read or its Kubernetes version cannot be resolved.
+
+    Without a release image the demo follows the README "Creating a
+    cluster" flow with the default kwok provider.
+
+    On failure the kit daemon log and host Podman diagnostics are
+    collected into the ARTIFACT_DIR.
+
+    Expects in SHARED_DIR:
+      ${SHARED_DIR}/public_address
+      ${SHARED_DIR}/ssh_user
+    Expects in cluster_profile:
+      ${CLUSTER_PROFILE_DIR}/ssh-privatekey

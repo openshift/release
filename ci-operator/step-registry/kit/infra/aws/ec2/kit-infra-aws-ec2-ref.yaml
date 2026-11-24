@@ -1,0 +1,90 @@
+ref:
+  as: kit-infra-aws-ec2
+  from_image:
+    namespace: ocp
+    name: "4.22"
+    tag: upi-installer
+  grace_period: 10m
+  commands: kit-infra-aws-ec2-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  timeout: 30m0s
+  env:
+  - name: REGION
+    default: ""
+    documentation: |-
+      Use a specific AWS region, overriding the LEASED_RESOURCE environment
+      variable provided by the cluster_profile. Leave it empty unless the
+      workflow also pins the region of the aws-deprovision-stacks post step.
+  - name: EC2_INSTANCE_TYPE
+    default: m6i.xlarge
+    documentation: EC2 instance type for the kit host.
+  - name: EC2_ARCH
+    default: x86_64
+    documentation: |-
+      Architecture of the kit host: x86_64 or arm64. It selects the Ubuntu
+      AMI, the kit release asset and the kubectl binary. EC2_INSTANCE_TYPE
+      must offer this architecture.
+  - name: EC2_AMI
+    default: ""
+    documentation: |-
+      Optional explicit AMI ID. When empty, the newest Ubuntu 24.04 LTS
+      server AMI for EC2_ARCH published by Canonical (owner 099720109477)
+      is discovered in REGION through the EC2 describe-images API.
+  - name: EC2_ROOT_VOLUME_SIZE
+    default: "100"
+    documentation: Size in GiB of the gp3 root volume of the kit host.
+  - name: KIT_VERSION
+    default: latest
+    documentation: |-
+      Tag of the kit release to install, see
+      https://github.com/openshift-eng/kubernetes-integration-testing/releases.
+      The default, latest, tracks the tip of the kit repository.
+  - name: KIT_SHA256
+    default: ""
+    documentation: |-
+      Optional expected sha256 of the kit-linux-<EC2_ARCH> asset. When empty,
+      the digest published in the GitHub release metadata is used.
+  - name: KUBECTL_VERSION
+    default: stable
+    documentation: |-
+      kubectl release to install on the host, "stable" or an explicit
+      vX.Y.Z, see https://dl.k8s.io.
+  documentation: |-
+    Provision a standalone EC2 instance through CloudFormation and prepare it
+    for running kit (https://github.com/openshift-eng/kubernetes-integration-testing)
+    clusters and tests:
+
+    - Ubuntu 24.04 LTS host with rootless Podman for the "ubuntu" user,
+      including subordinate UID/GID ranges and lingering enabled.
+    - The rootless Podman API socket active at
+      /run/user/1000/podman/podman.sock (the path is printed by the step and
+      can also be resolved as /run/user/$(id -u ubuntu)/podman/podman.sock).
+    - The kit CLI installed in /usr/local/bin/kit from the GitHub release
+      selected by KIT_VERSION, verified against its published sha256 digest.
+    - kubectl installed in /usr/local/bin/kubectl.
+
+    The step does not start the kit daemon; the kit CLI and client library
+    start it on demand on first use.
+
+    Requires a cluster_profile providing:
+      ${CLUSTER_PROFILE_DIR}/.awscred
+      ${CLUSTER_PROFILE_DIR}/ssh-publickey
+      ${CLUSTER_PROFILE_DIR}/ssh-privatekey
+
+    The CloudFormation stack is registered in
+    ${SHARED_DIR}/to_be_removed_cf_stack_list, so it must be torn down with
+    `- ref: aws-deprovision-stacks` in the post phase of the workflow.
+
+    Output stored in the SHARED_DIR:
+      ${SHARED_DIR}/public_address  public IP of the kit host
+      ${SHARED_DIR}/ssh_user        SSH user for the kit host ("ubuntu")
+
+    Later steps connect to the host with the cluster_profile SSH key, for
+    example:
+
+      ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -i "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
+        "$(cat "${SHARED_DIR}/ssh_user")@$(cat "${SHARED_DIR}/public_address")"
