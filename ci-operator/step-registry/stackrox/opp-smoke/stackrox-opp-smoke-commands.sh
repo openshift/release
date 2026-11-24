@@ -63,6 +63,7 @@ _add_classification() {
 }
 
 _write_carrier() {
+    typeset _tmp="${_CARRIER}.tmp"
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
         echo "<testsuite name=\"${_SUITE}\" tests=\"${_N_TOTAL}\" failures=\"${_N_FAILURES}\" errors=\"0\" skipped=\"${_N_SKIPPED}\" time=\"$(( $(date +%s) - _junit_start ))\">"
@@ -71,7 +72,8 @@ _write_carrier() {
             [[ -n "${c}" ]] && echo "  ${c}"
         done
         echo '</testsuite>'
-    } > "${_CARRIER}" 2>/dev/null || return 1
+    } > "${_tmp}" 2>/dev/null || return 1
+    mv -f "${_tmp}" "${_CARRIER}" 2>/dev/null || return 1
 }
 
 _write_shared_copy() {
@@ -81,6 +83,8 @@ _write_shared_copy() {
     # the reporter copy must carry the honest <failure> element.
     [[ -n "${SHARED_DIR:-}" ]] || return 0
     mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || return 1
+    typeset _dst="${SHARED_DIR}/junit/junit_${_SUITE}.xml"
+    typeset _tmp="${_dst}.tmp"
     if [[ "${_ACS_STATE}" == "absent" && "${ACS_EXPECTATION}" == "absent-by-design" ]]; then
         {
             echo '<?xml version="1.0" encoding="UTF-8"?>'
@@ -95,9 +99,12 @@ _write_shared_copy() {
                 fi
             done
             echo '</testsuite>'
-        } > "${SHARED_DIR}/junit/junit_${_SUITE}.xml" 2>/dev/null || return 1
+        } > "${_tmp}" 2>/dev/null || return 1
+        mv -f "${_tmp}" "${_dst}" 2>/dev/null || return 1
     else
-        cp "${_CARRIER}" "${SHARED_DIR}/junit/" 2>/dev/null || return 1
+        typeset _cp_tmp="${_dst}.tmp"
+        cp "${_CARRIER}" "${_cp_tmp}" 2>/dev/null || return 1
+        mv -f "${_cp_tmp}" "${_dst}" 2>/dev/null || return 1
     fi
 }
 
