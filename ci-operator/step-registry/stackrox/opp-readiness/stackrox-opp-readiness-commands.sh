@@ -870,11 +870,12 @@ function CheckCentralRoute () {
 
 if WaitFor "Central route" CheckCentralRoute; then
     _add_case "central-route" passed
+    echo "[readiness] Central route discovered: ${centralUrl}"
 else
     _add_case "central-route" failed "Assertion" "Central route not found in ${centralNs} (budget remaining $(_budget_remaining)s)"
     _assert_rc=1
+    echo "[readiness] Central route not found in ${centralNs} (budget remaining $(_budget_remaining)s)"
 fi
-echo "[readiness] Central route discovered"
 
 # ---------------------------------------------------------------------------
 # Credential region (D7): set +x bracket spans every credential
@@ -922,11 +923,16 @@ function CheckCentralApi () {
     true
 }
 
-if WaitFor "Central API health (v1/metadata)" CheckCentralApi; then
-    _add_case "central-api-insecure-tls" passed
+if [[ -z "${centralUrl}" ]]; then
+    echo "[readiness] Skipping Central API health check due to missing route"
+    _add_case "central-api-insecure-tls" skipped "StateAbsent" "central route not found, API check skipped (budget remaining $(_budget_remaining)s)"
 else
-    _add_case "central-api-insecure-tls" failed "Assertion" "Central API v1/metadata not healthy (budget remaining $(_budget_remaining)s)"
-    _assert_rc=1
+    if WaitFor "Central API health (v1/metadata)" CheckCentralApi; then
+        _add_case "central-api-insecure-tls" passed
+    else
+        _add_case "central-api-insecure-tls" failed "Assertion" "Central API v1/metadata not healthy (budget remaining $(_budget_remaining)s)"
+        _assert_rc=1
+    fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -969,11 +975,16 @@ else:
     return 1
 }
 
-if WaitFor "secured cluster connected (v1/clusters)" CheckClustersConnected; then
-    _add_case "clusters-connected" passed
+if [[ -z "${centralUrl}" ]]; then
+    echo "[readiness] Skipping clusters-connected check due to missing route"
+    _add_case "clusters-connected" skipped "StateAbsent" "central route not found, clusters check skipped"
 else
-    _add_case "clusters-connected" failed "Assertion" "no secured cluster with a connected sensor (v1/clusters) (budget remaining $(_budget_remaining)s)"
-    _assert_rc=1
+    if WaitFor "secured cluster connected (v1/clusters)" CheckClustersConnected; then
+        _add_case "clusters-connected" passed
+    else
+        _add_case "clusters-connected" failed "Assertion" "no secured cluster with a connected sensor (v1/clusters) (budget remaining $(_budget_remaining)s)"
+        _assert_rc=1
+    fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -1067,19 +1078,28 @@ function CheckPoliciesLoaded () {
     true
 }
 
-if WaitFor "default policies loaded (>80)" CheckPoliciesLoaded; then
-    _add_case "policies-loaded" passed
+if [[ -z "${centralUrl}" ]]; then
+    echo "[readiness] Skipping policies-loaded check due to missing route"
+    _add_case "policies-loaded" skipped "StateAbsent" "central route not found, policies check skipped"
 else
-    _add_case "policies-loaded" failed "Assertion" "default policies not loaded (>80 expected; budget remaining $(_budget_remaining)s)"
-    _assert_rc=1
+    if WaitFor "default policies loaded (>80)" CheckPoliciesLoaded; then
+        _add_case "policies-loaded" passed
+    else
+        _add_case "policies-loaded" failed "Assertion" "default policies not loaded (>80 expected; budget remaining $(_budget_remaining)s)"
+        _assert_rc=1
+    fi
 fi
 
 echo "[readiness] Writing connection details to SHARED_DIR..."
 
 echo "${roxAdminPassword}" > "${SHARED_DIR}/ROX_ADMIN_PASSWORD"
-echo "${centralUrl}"       > "${SHARED_DIR}/CENTRAL_URL"
-echo "${centralNs}"  > "${SHARED_DIR}/CENTRAL_NS"
-echo "${scNs}"       > "${SHARED_DIR}/SC_NS"
+if [[ -n "${centralUrl}" ]]; then
+    echo "${centralUrl}" > "${SHARED_DIR}/CENTRAL_URL"
+else
+    echo "[readiness] Skipping CENTRAL_URL write due to missing route (failure marker not published)"
+fi
+echo "${centralNs}" > "${SHARED_DIR}/CENTRAL_NS"
+echo "${scNs}" > "${SHARED_DIR}/SC_NS"
 
 # End of credential region (D7)
 set -x
