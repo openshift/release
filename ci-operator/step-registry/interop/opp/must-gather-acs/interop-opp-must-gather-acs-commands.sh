@@ -526,8 +526,10 @@ echo "[1/10] OperatorPolicy..."
 # Three-way CRD guard (capture contract): the CRD exists → capture;
 # lookup fails NotFound → CRD_ABSENT; fails for any other reason →
 # probe_error: a permission or API error must never render as absence.
+set +x
 OP_CRD_OUTPUT=$(oc get crd operatorpolicies.policy.open-cluster-management.io 2>&1)
 OP_CRD_RC=$?
+set -x
 if [[ ${OP_CRD_RC} -eq 0 ]]; then
   oc get operatorpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null | \
     python3 -c '
@@ -552,13 +554,13 @@ for i in data.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/01-operatorpolicy.json" 2>&1 || \
     echo "probe_error: operatorpolicy query failed" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
-elif oc_notfound "${OP_CRD_RC}" "${OP_CRD_OUTPUT}"; then
-  echo "CRD_ABSENT: operatorpolicies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
 else
   set +x
-  _diag_token="unknown"
-  case "${OP_CRD_OUTPUT}" in *Forbidden*|*forbidden*) _diag_token="forbidden";; *NotFound*|*notFound*) _diag_token="not-found";; *) _diag_token="error";; esac
-  echo "probe_error: operatorpolicy CRD lookup failed (rc=${OP_CRD_RC} token=${_diag_token})" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
+  if oc_notfound "${OP_CRD_RC}" "${OP_CRD_OUTPUT}"; then
+    echo "CRD_ABSENT: operatorpolicies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
+  else
+    echo "probe_error: operatorpolicy CRD lookup failed (rc=${OP_CRD_RC} token=$(_api_err_class "${OP_CRD_OUTPUT}"))" > "${EVIDENCE_DIR}/01-operatorpolicy.json"
+  fi
   set -x
 fi
 
@@ -658,9 +660,11 @@ print(json.dumps(result, indent=2))
 echo "[6/10] Central CRD..."
 CRD_TMP="$(mktemp)"
 CRD_ERR_TMP="$(mktemp)"
+set +x
 oc get crd centrals.platform.stackrox.io -o json > "${CRD_TMP}" 2> "${CRD_ERR_TMP}"
 CRD_RC=$?
 CRD_ERR="$(cat "${CRD_ERR_TMP}")"
+set -x
 rm -f "${CRD_ERR_TMP}"
 if [[ ${CRD_RC} -eq 0 ]]; then
   python3 -c '
@@ -674,11 +678,13 @@ print(json.dumps({
 ' < "${CRD_TMP}" > "${EVIDENCE_DIR}/06-central-crd.json" 2>&1 || \
     echo "probe_error: central crd parse failed" > "${EVIDENCE_DIR}/06-central-crd.json"
 else
+  set +x
   if oc_notfound "${CRD_RC}" "${CRD_ERR}"; then
     echo "CRD centrals.platform.stackrox.io NOT FOUND" > "${EVIDENCE_DIR}/06-central-crd.json"
   else
-    echo "QUERY FAILED (rc=${CRD_RC}): ${CRD_ERR}" > "${EVIDENCE_DIR}/06-central-crd.json"
+    echo "probe_error: central crd query failed (rc=${CRD_RC} token=$(_api_err_class "${CRD_ERR}"))" > "${EVIDENCE_DIR}/06-central-crd.json"
   fi
+  set -x
 fi
 rm -f "${CRD_TMP}"
 
@@ -688,9 +694,11 @@ echo "[7/10] Central CR..."
 # Stdout to the parser, stderr to the classifier (see [6/10]).
 CR_TMP="$(mktemp)"
 CR_ERR_TMP="$(mktemp)"
+set +x
 oc get centrals.platform.stackrox.io -A -o json > "${CR_TMP}" 2> "${CR_ERR_TMP}"
 CR_RC=$?
 CR_ERR="$(cat "${CR_ERR_TMP}")"
+set -x
 rm -f "${CR_ERR_TMP}"
 if [[ ${CR_RC} -eq 0 ]]; then
   python3 -c '
@@ -711,13 +719,15 @@ print(json.dumps(result, indent=2))
 ' < "${CR_TMP}" > "${EVIDENCE_DIR}/07-central-cr.json" 2>&1 || \
     echo "probe_error: central cr parse failed" > "${EVIDENCE_DIR}/07-central-cr.json"
 else
+  set +x
   if oc_notfound "${CR_RC}" "${CR_ERR}"; then
     echo "No Central CR found (CRD may not exist)" > "${EVIDENCE_DIR}/07-central-cr.json"
   elif grep -qi "doesn't have a resource type" <<< "${CR_ERR}"; then
     echo "CRD_ABSENT: centrals.platform.stackrox.io not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/07-central-cr.json"
   else
-    echo "QUERY FAILED (rc=${CR_RC}): ${CR_ERR}" > "${EVIDENCE_DIR}/07-central-cr.json"
+    echo "probe_error: central cr query failed (rc=${CR_RC} token=$(_api_err_class "${CR_ERR}"))" > "${EVIDENCE_DIR}/07-central-cr.json"
   fi
+  set -x
 fi
 rm -f "${CR_TMP}"
 
@@ -728,9 +738,11 @@ echo "[7b/10] SecuredCluster CR..."
 # Stdout to the parser, stderr to the classifier (see [6/10]).
 SC_TMP="$(mktemp)"
 SC_ERR_TMP="$(mktemp)"
+set +x
 oc get securedclusters.platform.stackrox.io -A -o json > "${SC_TMP}" 2> "${SC_ERR_TMP}"
 SC_RC=$?
 SC_ERR="$(cat "${SC_ERR_TMP}")"
+set -x
 rm -f "${SC_ERR_TMP}"
 if [[ ${SC_RC} -eq 0 ]]; then
   python3 -c '
@@ -747,13 +759,15 @@ print(json.dumps(result, indent=2))
 ' < "${SC_TMP}" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json" 2>&1 || \
     echo "probe_error: securedcluster parse failed" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
 else
+  set +x
   if oc_notfound "${SC_RC}" "${SC_ERR}"; then
     echo "No SecuredCluster CR found (CRD may not exist)" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
   elif grep -qi "doesn't have a resource type" <<< "${SC_ERR}"; then
     echo "CRD_ABSENT: securedclusters.platform.stackrox.io not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
   else
-    echo "QUERY FAILED (rc=${SC_RC}): ${SC_ERR}" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
+    echo "probe_error: securedcluster cr query failed (rc=${SC_RC} token=$(_api_err_class "${SC_ERR}"))" > "${EVIDENCE_DIR}/07b-securedcluster-cr.json"
   fi
+  set -x
 fi
 rm -f "${SC_TMP}"
 
@@ -779,9 +793,11 @@ echo "[8/10] PackageManifest..."
 # (see [6/10]).
 PM_LIST_TMP="$(mktemp)"
 PM_LIST_ERR_TMP="$(mktemp)"
+set +x
 oc get packagemanifest -A -o json > "${PM_LIST_TMP}" 2> "${PM_LIST_ERR_TMP}"
 PM_LIST_RC=$?
 PM_LIST_ERR="$(cat "${PM_LIST_ERR_TMP}")"
+set -x
 rm -f "${PM_LIST_ERR_TMP}"
 if [[ ${PM_LIST_RC} -eq 0 ]]; then
   PM_PARSE_RC=0
@@ -896,14 +912,16 @@ PYEOF
   fi
 else
   # One query drives both artifacts, so both take the same classification.
+  set +x
   if oc_notfound "${PM_LIST_RC}" "${PM_LIST_ERR}" || \
      grep -qi "doesn't have a resource type" <<< "${PM_LIST_ERR}"; then
     echo "CRD_ABSENT: packagemanifests.packages.operators.coreos.com not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json"
     echo "CRD_ABSENT: packagemanifests.packages.operators.coreos.com not registered on this cluster (successful query, resource type absent)" > "${EVIDENCE_DIR}/08-all-packagemanifests.txt"
   else
-    echo "QUERY FAILED (rc=${PM_LIST_RC}): ${PM_LIST_ERR}" > "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json"
-    echo "QUERY FAILED (rc=${PM_LIST_RC}): ${PM_LIST_ERR}" > "${EVIDENCE_DIR}/08-all-packagemanifests.txt"
+    echo "probe_error: packagemanifest list query failed (rc=${PM_LIST_RC} token=$(_api_err_class "${PM_LIST_ERR}"))" > "${EVIDENCE_DIR}/08-packagemanifest-rhacs.json"
+    echo "probe_error: packagemanifest list query failed (rc=${PM_LIST_RC} token=$(_api_err_class "${PM_LIST_ERR}"))" > "${EVIDENCE_DIR}/08-all-packagemanifests.txt"
   fi
+  set -x
 fi
 rm -f "${PM_LIST_TMP}"
 
@@ -921,8 +939,10 @@ rm -f "${PM_LIST_TMP}"
 echo "[9/10] ACM policies..."
 # Three-way CRD guard (capture contract): exists → capture; NotFound →
 # CRD_ABSENT; any other failure → probe_error (never render as absence).
+set +x
 POLICY_CRD_OUTPUT=$(oc get crd policies.policy.open-cluster-management.io 2>&1)
 POLICY_CRD_RC=$?
+set -x
 if [[ ${POLICY_CRD_RC} -eq 0 ]]; then
   oc get policies.policy.open-cluster-management.io -A -o json 2>/dev/null | \
     python3 -c '
@@ -944,19 +964,19 @@ for i in data.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/09-policies.json" 2>&1 || \
     echo "probe_error: policy query failed" > "${EVIDENCE_DIR}/09-policies.json"
-elif oc_notfound "${POLICY_CRD_RC}" "${POLICY_CRD_OUTPUT}"; then
-  echo "CRD_ABSENT: policies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/09-policies.json"
 else
   set +x
-  _diag_token="unknown"
-  case "${POLICY_CRD_OUTPUT}" in *Forbidden*|*forbidden*) _diag_token="forbidden";; *NotFound*|*notFound*) _diag_token="not-found";; *) _diag_token="error";; esac
-  # Classification only: the server's own error text is API-controlled and does
-  # not belong in an artifact. (PRRT_kwDOBHvUUM65ui1w)
-  echo "probe_error: policy CRD lookup failed (rc=${POLICY_CRD_RC} token=${_diag_token})" > "${EVIDENCE_DIR}/09-policies.json"
+  if oc_notfound "${POLICY_CRD_RC}" "${POLICY_CRD_OUTPUT}"; then
+    echo "CRD_ABSENT: policies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/09-policies.json"
+  else
+    echo "probe_error: policy CRD lookup failed (rc=${POLICY_CRD_RC} token=$(_api_err_class "${POLICY_CRD_OUTPUT}"))" > "${EVIDENCE_DIR}/09-policies.json"
+  fi
   set -x
 fi
+set +x
 CONFIGPOLICY_CRD_OUTPUT=$(oc get crd configurationpolicies.policy.open-cluster-management.io 2>&1)
 CONFIGPOLICY_CRD_RC=$?
+set -x
 if [[ ${CONFIGPOLICY_CRD_RC} -eq 0 ]]; then
   oc get configurationpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null | \
     python3 -c '
@@ -974,13 +994,13 @@ for i in data.get("items", []):
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/10-configpolicies.json" 2>&1 || \
     echo "probe_error: configurationpolicy query failed" > "${EVIDENCE_DIR}/10-configpolicies.json"
-elif oc_notfound "${CONFIGPOLICY_CRD_RC}" "${CONFIGPOLICY_CRD_OUTPUT}"; then
-  echo "CRD_ABSENT: configurationpolicies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/10-configpolicies.json"
 else
   set +x
-  _diag_token="unknown"
-  case "${CONFIGPOLICY_CRD_OUTPUT}" in *Forbidden*|*forbidden*) _diag_token="forbidden";; *NotFound*|*notFound*) _diag_token="not-found";; *) _diag_token="error";; esac
-  echo "probe_error: configurationpolicy CRD lookup failed (rc=${CONFIGPOLICY_CRD_RC} token=${_diag_token})" > "${EVIDENCE_DIR}/10-configpolicies.json"
+  if oc_notfound "${CONFIGPOLICY_CRD_RC}" "${CONFIGPOLICY_CRD_OUTPUT}"; then
+    echo "CRD_ABSENT: configurationpolicies.policy.open-cluster-management.io not registered on this cluster" > "${EVIDENCE_DIR}/10-configpolicies.json"
+  else
+    echo "probe_error: configurationpolicy CRD lookup failed (rc=${CONFIGPOLICY_CRD_RC} token=$(_api_err_class "${CONFIGPOLICY_CRD_OUTPUT}"))" > "${EVIDENCE_DIR}/10-configpolicies.json"
+  fi
   set -x
 fi
 
