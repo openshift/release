@@ -382,9 +382,9 @@ elif ! grep -q 'scanner-v4-matcher' <<< "${_deps}"; then
     _add_case "scanner-v4-ready" skipped "ScannerGate" "no scanner-v4-matcher deployment in ${_centralNs}; scan-dependent results follow suite behavior"
 else
     echo "[smoke] Waiting for a Ready scanner-v4-matcher pod (cap ${ACS_SCANNER_WAIT_S}s)..."
-    typeset -i _scan_elapsed=0
+    typeset -i _scan_deadline=$(( $(date +%s) + ACS_SCANNER_WAIT_S ))
     typeset _scan_ready=""
-    while (( _scan_elapsed < ACS_SCANNER_WAIT_S )); do
+    while true; do
         _scan_ready="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${_centralNs}" -l app=scanner-v4-matcher -o json 2>/dev/null | python3 -c '
 import json, sys
 
@@ -402,8 +402,15 @@ for pod in d.get("items", []):
         if [[ -n "${_scan_ready}" ]]; then
             break
         fi
-        sleep "${ACS_SCANNER_POLL_S}"
-        _scan_elapsed=$(( _scan_elapsed + ACS_SCANNER_POLL_S ))
+        typeset -i _scan_now
+        _scan_now=$(date +%s)
+        if (( _scan_now >= _scan_deadline )); then
+            break
+        fi
+        typeset -i _scan_remain _scan_sleepFor
+        _scan_remain=$(( _scan_deadline - _scan_now ))
+        _scan_sleepFor=$(( _scan_remain < ACS_SCANNER_POLL_S ? _scan_remain : ACS_SCANNER_POLL_S ))
+        sleep "${_scan_sleepFor}"
     done
     if [[ -n "${_scan_ready}" ]]; then
         echo "[smoke] Scanner V4 matcher ready: ${_scan_ready}"
