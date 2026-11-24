@@ -313,6 +313,7 @@ print(len(json.load(sys.stdin).get('items',[])))
     QUAY_NS="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['namespace'])")"
     QUAY_REGISTRY="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['name'])")"
     QUAY_UID="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['uid'])")"
+    QUAY_CONFIG_BUNDLE="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print((json.load(sys.stdin)['items'][0].get('spec') or {}).get('configBundleSecret') or '')")"
 
     QUAY_HOST="$(oc get quayregistry -n "${QUAY_NS}" "${QUAY_REGISTRY}" -o jsonpath='{.status.registryEndpoint}')"
     QUAY_HOST="${QUAY_HOST#https://}"
@@ -322,7 +323,7 @@ print(len(json.load(sys.stdin).get('items',[])))
         # not deployed), so the caller fails instead of reporting a skip.
         return 2
     fi
-    export QUAY_NS QUAY_REGISTRY QUAY_HOST QUAY_UID
+    export QUAY_NS QUAY_REGISTRY QUAY_HOST QUAY_UID QUAY_CONFIG_BUNDLE
     true
 }
 
@@ -333,6 +334,7 @@ print(len(json.load(sys.stdin).get('items',[])))
 # anchor for every credential-bearing request; see ResolveQuayTlsTrust.  The
 # pushed image is still verified by pulling it back.
 typeset QUAY_USER='' QUAY_PASSWORD='' QUAY_TOKEN=''
+typeset QUAY_CONFIG_BUNDLE=''
 function GetQuayAuth () {
     # Quay credentials are exported for downstream use in the current
     # shell (Best Practices exception for variables needed downstream);
@@ -456,7 +458,7 @@ for r in items:
     # verify it; each candidate is proved against the endpoint below, so
     # widening the sources cannot admit an anchor that does not fit.
     oc get secrets -n "${QUAY_NS}" -o json | \
-        QUAY_OWNER="${QUAY_REGISTRY}" CA_DIR="${quayCaDir}" python3 -c "
+        QUAY_OWNER="${QUAY_REGISTRY}" QUAY_BUNDLE_SECRET="${QUAY_CONFIG_BUNDLE:-}" CA_DIR="${quayCaDir}" python3 -c "
 import base64, json, os, sys
 
 try:
@@ -476,14 +478,20 @@ def write(prefix, payload):
         fh.write(payload)
 
 
+    bundle = os.environ.get('QUAY_BUNDLE_SECRET') or ''
 for s in items:
-    refs = (s.get('metadata') or {}).get('ownerReferences') or []
+    meta = s.get('metadata') or {}
+    refs = meta.get('ownerReferences') or []
     owned = any((r.get('name') or '') == owner for r in refs)
     data = s.get('data') or {}
+    from_bundle = bool(bundle) and meta.get('name') == bundle
     if not owned:
-        if data.get('ssl.cert') and s.get('metadata',{}).get('labels',{}).get('app') == 'quay':
-            # PRRT_kwDOBHvUUM65MrmC: trust candidates restrict to label selector and ns allowlist
+        if from_bundle and data.get('ssl.cert'):
             write('25-ssl', base64.b64decode(data['ssl.cert']))
+        elif data.get('ssl.cert') and (meta.get('labels') or {}).get('app') == 'quay':
+            write('25-ssl', base64.b64decode(data['ssl.cert']))
+        if from_bundle and data.get('ca.crt'):
+            write('20-owned', base64.b64decode(data['ca.crt']))
         continue
     for key in ('ca.crt', 'tls.crt'):
         if data.get(key):
