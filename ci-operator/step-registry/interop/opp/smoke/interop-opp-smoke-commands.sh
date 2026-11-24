@@ -573,15 +573,20 @@ TestQuayPull() {
         typeset qrJson2=""
         # PRRT_kwDOBHvUUM65RJop: use second read for reconciled endpoint after status propagation
         sleep 1
-        qrJson2="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json 2>"${_opp_smoke_tmp}/qr2.err" || echo '{"items":[]}')"
-        qrCount="$(printf '%s' "${qrJson2}" | jq '.items | length' 2>/dev/null || echo 0)"
-        if ! qrCount="$(printf '%s' "${qrJson2}" | jq '.items | length')"; then
-            # PRRT_kwDOBHvUUM65RJop: align error file with second read (qr2.err holds second query's stderr)
-            if ! grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/qr2.err"; then
+        typeset -i qr2Rc=0
+        qrJson2="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json 2>"${_opp_smoke_tmp}/qr2.err")" || qr2Rc=$?
+        if (( qr2Rc != 0 )); then
+            if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/qr2.err" 2>/dev/null; then
+                # CRD absent is a determinate "no QuayRegistry on this lane".
+                qrJson2='{"items":[]}'
+                qrCount=0
+            else
                 AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources"
                 return
             fi
-            qrCount=0
+        elif ! qrCount="$(printf '%s' "${qrJson2}" | jq '.items | length')"; then
+            AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources"
+            return
         fi
 
         if (( qrCount == 0 )); then
