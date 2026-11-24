@@ -221,8 +221,10 @@ function SubscriptionStatus () {
     typeset output=""
     if output="$(oc get sub -A -l 'operators.coreos.com/rhacs-operator.rhacs-operator' -o json 2>/dev/null \
         | FormatDiagnosticStatus subscription)" && [[ -n "${output}" ]]; then
-        echo "${output}"
-        return 0
+        if [[ "${output}" != "resources=0" ]]; then
+            echo "${output}"
+            return 0
+        fi
     fi
     if output="$(oc get sub -A -o json 2>/dev/null \
         | FormatDiagnosticStatus subscription 'stackrox,rhacs')" && [[ -n "${output}" ]]; then
@@ -245,8 +247,10 @@ function OperatorPodStatus () {
     typeset output=""
     if output="$(oc get pods -A -l app=rhacs-operator -o json 2>/dev/null \
         | FormatDiagnosticStatus pod)" && [[ -n "${output}" ]]; then
-        echo "${output}"
-        return 0
+        if [[ "${output}" != "resources=0" ]]; then
+            echo "${output}"
+            return 0
+        fi
     fi
     if output="$(oc get pods -A -o json 2>/dev/null \
         | FormatDiagnosticStatus pod rhacs)" && [[ -n "${output}" ]]; then
