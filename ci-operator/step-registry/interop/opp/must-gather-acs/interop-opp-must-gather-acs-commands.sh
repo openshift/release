@@ -1549,12 +1549,18 @@ if present and selection is None and not listed_anywhere:
           "reports an unattributed rhacs-operator PackageManifest but the "
           "inventory lists none")
     sys.exit(20)
-if present and selection is not None and not listed_scoped: # PRRT_kwDOBHvUUM65ui2A: catalog inventory compare for selected catalog
-    # Verify selected catalog is in observed inventory before failing
-    _sel_in_inv = any(selection.get("catalogSource") == c and selection.get("catalogSourceNamespace") == ns for _, c, ns in inv)
-    if not _sel_in_inv and selection.get("catalogSource") is not None:
-        print("ASSERTION FAILURE (20): selected catalog %s/%s not in inventory %s" % (selection.get("catalogSource"), selection.get("catalogSourceNamespace"), ", ".join(listed_anywhere) or "none"))
+# The selected package, catalog and namespace must appear together in the
+# inventory. A catalog match alone hides a namespace disagreement, so this
+# check is independent of listed_scoped: the subscription-scoped match below
+# decides whether the subscription agrees, not whether the tuple exists.
+if present and selection is not None and selection.get("catalogSource") is not None:
+    _sel_tuple = (selection.get("catalogSource"), selection.get("catalogSourceNamespace"))
+    if _sel_tuple not in {(c, ns) for _, c, ns in inv}:
+        print("ASSERTION FAILURE (20): selected package and catalog %s/%s are "
+              "not listed together in the inventory (listed: %s)"
+              % (_sel_tuple[0], _sel_tuple[1], ", ".join(listed_anywhere) or "none"))
         sys.exit(20)
+if present and selection is not None and not listed_scoped:
     print("ASSERTION FAILURE (20): packagemanifest disagreement: the "
           "per-package capture reports rhacs-operator present in %s/%s but "
           "the inventory does not list it in the subscribed catalog %s "
