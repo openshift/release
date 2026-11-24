@@ -668,22 +668,27 @@ typeset centralNs=""
 typeset scNs=""
 
 typeset -i _assert_rc=0
-
+typeset -i _centralCrdInitiallyOk=0 _scCrdInitiallyOk=0
 if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
-    _add_case "central-crd" passed
-else
-    _add_case "central-crd" failed "Assertion" "Central CRD not registered"
-    _assert_rc=1
+    _centralCrdInitiallyOk=1
 fi
-
 if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
-    _add_case "securedcluster-crd" passed
-else
-    _add_case "securedcluster-crd" failed "Assertion" "SecuredCluster CRD not registered"
-    _assert_rc=1
+    _scCrdInitiallyOk=1
 fi
 
 if ! WaitFor "Central CR namespace discovery" DiscoverCentralNs PeriodicOperatorDiagnostics; then
+    if (( _centralCrdInitiallyOk )); then
+        _add_case "central-crd" passed
+    else
+        _add_case "central-crd" failed "Assertion" "Central CRD not registered"
+        _assert_rc=1
+    fi
+    if (( _scCrdInitiallyOk )); then
+        _add_case "securedcluster-crd" passed
+    else
+        _add_case "securedcluster-crd" failed "Assertion" "SecuredCluster CRD not registered"
+        _assert_rc=1
+    fi
     _add_case "central-route" failed "Assertion" "central namespace discovery failed (budget remaining $(_budget_remaining)s)"
     _add_case "central-api-insecure-tls" failed "Assertion" "central namespace discovery failed"
     _add_case "clusters-connected" failed "Assertion" "central namespace discovery failed"
@@ -698,6 +703,27 @@ echo "[readiness] Central namespace: ${centralNs}"
 # separate existence poll would duplicate the namespace-discovery wait below;
 # the WaitFor DiscoverScNs call is the real bounded existence wait.
 if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs; then
+    # Emit deferred CRD cases before handling discovery failure
+    if (( _centralCrdInitiallyOk )); then
+        _add_case "central-crd" passed
+    else
+        if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
+            _add_case "central-crd" passed
+        else
+            _add_case "central-crd" failed "Assertion" "Central CRD not registered"
+            _assert_rc=1
+        fi
+    fi
+    if (( _scCrdInitiallyOk )); then
+        _add_case "securedcluster-crd" passed
+    else
+        if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
+            _add_case "securedcluster-crd" passed
+        else
+            _add_case "securedcluster-crd" failed "Assertion" "SecuredCluster CRD not registered"
+            _assert_rc=1
+        fi
+    fi
     # DiscoverScNs fails both for a failed read and for a 0-exit read that
     # yields no namespace: only the second is an absent workload. Re-read once
     # to separate them, so an API error or an authorization denial stays a
@@ -724,6 +750,27 @@ if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs; then
     exit 1
 fi
 echo "[readiness] SecuredCluster namespace: ${scNs}"
+# Emit deferred CRD assertions after successful discovery, re-checking late registration
+if (( _centralCrdInitiallyOk )); then
+    _add_case "central-crd" passed
+else
+    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
+        _add_case "central-crd" passed
+    else
+        _add_case "central-crd" failed "Assertion" "Central CRD not registered"
+        _assert_rc=1
+    fi
+fi
+if (( _scCrdInitiallyOk )); then
+    _add_case "securedcluster-crd" passed
+else
+    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
+        _add_case "securedcluster-crd" passed
+    else
+        _add_case "securedcluster-crd" failed "Assertion" "SecuredCluster CRD not registered"
+        _assert_rc=1
+    fi
+fi
 
 # ---------------------------------------------------------------------------
 # Check: Central route exists
