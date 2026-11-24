@@ -67,13 +67,10 @@ _central_backend_target() {
     set +x
     _slice_json="$(oc get endpointslices -n "$1" \
       -l "kubernetes.io/service-name=$2" -o json 2>"${_errfile}")" || _oc_rc=$?
-    set -x
-    if (( _oc_rc != 0 )); then return 2; fi
+    if (( _oc_rc != 0 )); then set -x; return 2; fi
     # _errfile is temporary, not artifact; raw error text never leaves as artifact
     if [[ -s "${_errfile}" ]]; then
-        set +x
         printf 'EndpointSlice query failed: %s\n' "$(head -c 200 "${_errfile}")" >&2
-        set -x
     fi
     _backend_target="$(printf '%s\n' "${_slice_json}" | \
       python3 -c '
@@ -116,8 +113,9 @@ for item in data.get("items", []):
 # address the download could use.
 print("\n".join(candidates))
 sys.exit(0)
-' "${_rt_port}")" || return 3
+' "${_rt_port}")" || { set -x; return 3; }
     printf '%s\n' "${_backend_target}"
+    set -x
 }
 
 # ─── ACS Diagnostic Collection ──────────────────────────────────────────────
@@ -267,7 +265,9 @@ collect_acs_diagnostics() {
                     "${_backend_errfile}" "${_central_route_tp}"
                 )" || _central_backend_rc=$?
                 if [[ -s "${_backend_errfile}" ]]; then
+                    set +x
                     printf "EndpointSlice query failed: %s\n" "$(_api_err_class "$(head -c 200 "${_backend_errfile}")")" >&2
+                    set -x
                 fi
                 rm -f "${_backend_errfile}"
             fi
@@ -292,6 +292,7 @@ collect_acs_diagnostics() {
                     if [[ "${_central_addr}" == *:* ]]; then
                         _central_addr="[${_central_addr}]"
                     fi
+                    set +x
                     _central_connect_to="${_central_svc_dns}:443:${_central_addr}:${_central_port}"
                     if curl -sS -o /dev/null --cacert "${CENTRAL_CA_FILE}" \
                           --connect-to "${_central_connect_to}" \
@@ -313,6 +314,7 @@ collect_acs_diagnostics() {
                         _central_failed_tries=$(( _central_failed_tries + 1 ))
                         echo "Backend-direct TLS preflight against a ready backend endpoint failed (curl exit ${_central_direct_rc}); trying the next ready backend." >&2
                     fi
+                    set -x
                 done <<<"${_central_backend}"
                 if [[ "${TLS_MODE}" != "verified" ]] && (( _central_failed_tries > 0 )); then
                     echo "backend-direct preflight failed on ${_central_failed_tries} ready backend(s): last curl exit ${_central_direct_rc}" >>"${TLS_PREFLIGHT_ERR}"

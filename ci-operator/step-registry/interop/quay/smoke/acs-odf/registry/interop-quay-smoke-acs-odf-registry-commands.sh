@@ -381,7 +381,14 @@ function GetQuayAuth () {
 
     if [[ "${authOk}" == false ]]; then
         typeset initPassword=''
-        typeset quayInitPassFile='/tmp/quay-init-password'
+        # Durable restricted storage: SHARED_DIR survives a new CI pod while /tmp does not;
+        # fallback to /tmp only when SHARED_DIR is absent (e.g. local runs). Directory is
+        # 0700 and file is 0600 (umask 077 plus explicit chmod).
+        typeset quayInitPassFile="${SHARED_DIR:-/tmp}/quay-init-password"
+        if [[ -n "${SHARED_DIR:-}" ]]; then
+            mkdir -p "${SHARED_DIR}" 2>/dev/null || true
+            chmod 0700 "${SHARED_DIR}" 2>/dev/null || true
+        fi
         if [[ -s "${quayInitPassFile}" ]]; then
             initPassword="$(cat "${quayInitPassFile}")"
             chmod 600 "${quayInitPassFile}" || true
@@ -463,11 +470,27 @@ print(json.dumps({'username': os.environ['QUAY_USER_FALLBACK'], 'password': open
     fi
 
     if [[ "${authOk}" == true ]]; then
-        rm -f "${quayInitPassFile:-/tmp/quay-init-password}" || true
+        rm -f "${quayInitPassFile}" || true
     else
-        if [[ -f "${quayInitPassFile:-/tmp/quay-init-password}" ]]; then
-            echo "INFO: removing persisted Quay init password after definitive auth failure; a new invocation will generate a fresh password" >&2
-            rm -f "${quayInitPassFile}" || true
+        # Retain the credential when the outcome is uncertain (lost response): /tmp does
+        # not survive a new CI pod and the previous code deleted the file when authOk
+        # stayed false after timeouts. Only a definitive failure (init returned an error
+        # body that is not a timeout/transport loss) removes the persisted password.
+        typeset _quayOutcomeUncertain=false
+        if [[ "${_alreadyExists:-false}" == false ]]; then
+            # No definitive server response: empty body/http or transport error means the
+            # account may have been created but the response was lost.
+            if [[ -z "${initBody:-}" && -z "${initHttp:-}" ]] || [[ "${initHttp:-}" == "000" ]] || [[ "${initHttp:-}" == "" ]]; then
+                _quayOutcomeUncertain=true
+            fi
+        fi
+        if [[ "${_quayOutcomeUncertain}" == true ]]; then
+            echo "INFO: retaining persisted Quay init password for recovery on next invocation (outcome uncertain)" >&2
+        else
+            if [[ -f "${quayInitPassFile}" ]]; then
+                echo "INFO: removing persisted Quay init password after definitive auth failure; a new invocation will generate a fresh password" >&2
+                rm -f "${quayInitPassFile}" || true
+            fi
         fi
     fi
 
@@ -479,6 +502,81 @@ print(json.dumps({'username': os.environ['QUAY_USER_FALLBACK'], 'password': open
     fi
     echo "ERROR: Could not obtain Quay credentials from any source" >&2
     return 1
+}
+
+# Self-test for credential recovery across two invocations: the first invocation
+# loses the initialize response (transport timeout, empty http), the persisted
+# password must survive in restricted durable storage and be reused on the
+# second invocation to recover via login; validates that /tmp is not used and
+# that the file is retained when the outcome is uncertain.
+QuayInitRecoverySelfTest() {
+    typeset _testTmp="${SHARED_DIR:-/tmp}/quay-selftest-$$"
+    mkdir -p "${_testTmp}" 2>/dev/null || true
+    chmod 0700 "${_testTmp}" 2>/dev/null || true
+    typeset _origShared="${SHARED_DIR:-}"
+    export SHARED_DIR="${_testTmp}"
+    typeset _origQuayHost="${QUAY_HOST:-}"
+    export QUAY_HOST="quay-test.example.com"
+    typeset _origNs="${QUAY_NS:-}"
+    export QUAY_NS="test-ns"
+    # Mock oc to report no existing secrets (so GetQuayAuth enters init path)
+    oc() { return 1; }
+    export -f oc
+    # First invocation: curl for initialize returns empty (lost response)
+    curl() {
+        if [[ "$*" == *"/api/v1/user/initialize"* ]]; then
+            printf ''
+            return 0
+        fi
+        return 1
+    }
+    export -f curl
+    typeset _firstPassFile="${SHARED_DIR}/quay-init-password"
+    rm -f "${_firstPassFile}" || true
+    # Stub QUAY_HOST and quayTlsOpts for the test
+    quayTlsOpts=()
+    # Disable tracing for the test
+    set +x
+    GetQuayAuth || true
+    typeset _firstExists=false
+    [[ -s "${_firstPassFile}" ]] && _firstExists=true
+    typeset _firstPw=""
+    [[ "${_firstExists}" == true ]] && _firstPw="$(cat "${_firstPassFile}")"
+    # Second invocation: simulate Quay now reports user exists, login succeeds with same password
+    curl() {
+        if [[ "$*" == *"/api/v1/user/initialize"* ]]; then
+            printf '{"message":"user already exists"}\n409'
+            return 0
+        fi
+        if [[ "$*" == *"/csrf_token"* ]]; then
+            printf '{"csrf_token":"test-csrf"}'
+            return 0
+        fi
+        if [[ "$*" == *"/api/v1/signin"* ]]; then
+            printf '{"success": true}'
+            return 0
+        fi
+        return 1
+    }
+    export -f curl
+    GetQuayAuth || true
+    typeset _secondPw="${QUAY_PASSWORD:-}"
+    # Restore
+    SHARED_DIR="${_origShared}"
+    QUAY_HOST="${_origQuayHost}"
+    QUAY_NS="${_origNs}"
+    unset -f oc curl
+    rm -rf "${_testTmp}" || true
+    if [[ "${_firstExists}" != true ]]; then
+        echo "SELF-TEST FAIL: first invocation did not retain password file in durable storage" >&2
+        return 1
+    fi
+    if [[ "${_firstPw}" != "${_secondPw}" ]]; then
+        echo "SELF-TEST FAIL: second invocation did not reuse persisted password (first:${_firstPw:0:4}.. second:${_secondPw:0:4}..)" >&2
+        return 1
+    fi
+    echo "SELF-TEST PASS: credential recovered across two invocations via durable storage" >&2
+    return 0
 }
 
 # Quay route TLS trust.  Every credential-bearing request in this step runs

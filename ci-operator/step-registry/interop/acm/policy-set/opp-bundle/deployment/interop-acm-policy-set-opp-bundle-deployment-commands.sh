@@ -373,12 +373,14 @@ typeset ns=''
 typeset -i quayOutOfScopeTotal=0
 # Poll for QuayRegistry with bounded deadline: policy-install-quay depends on odf-status, so registry may appear after initial scan
 typeset _quayPollInterval=10
-while (( $(date +%s) < quayDeadline )) && [[ "${quayFound}" == "false" ]]; do
+while (( $(date +%s) < quayDeadline )) && (( $(date +%s) < stepDeadline - 120 )) && [[ "${quayFound}" == "false" ]]; do
   # Check only the intended namespace for success; other namespaces are out of scope
   ns="${quayPrimaryNs}"
   typeset quayJson="" quayQueryErr=""
   typeset -i quayQueryRc=0
-  typeset -i _quayRemain=$(( stepDeadline - $(date +%s) - 120 ))
+  typeset -i _quayRemainDiscovery=$(( quayDeadline - $(date +%s) ))
+  typeset -i _quayRemainStep=$(( stepDeadline - $(date +%s) - 120 ))
+  typeset -i _quayRemain=$(( _quayRemainDiscovery < _quayRemainStep ? _quayRemainDiscovery : _quayRemainStep ))
   (( _quayRemain < 10 )) && _quayRemain=10
   quayJson="$(timeout "${_quayRemain}s" oc get quayregistry -n "${ns}" --request-timeout="${_quayRemain}s" -o json 2>&1)" || quayQueryRc=$?
   if (( quayQueryRc != 0 )); then
@@ -395,7 +397,7 @@ while (( $(date +%s) < quayDeadline )) && [[ "${quayFound}" == "false" ]]; do
     elif (( quayItemCount > 0 )); then
       : "Found Quay Operator deployment in namespace ${ns}, waiting for ready condition"
       typeset quayName=""
-      quayName="$(printf '%s' "${quayJson}" | jq -r '.items[0].metadata.name // empty')" || quayName=""
+      quayName="$(printf '%s' "${quayJson}" | jq -r '[.items[] | select(.metadata.name=="registry")][0].metadata.name // empty')" || quayName=""
       if [[ -z "${quayName}" ]]; then
         printf '%s\n' "Warning: could not determine QuayRegistry name in namespace ${ns}; skipping it" >&2
       elif ! oc wait "quayregistry/${quayName}" -n "${ns}" \
@@ -416,7 +418,11 @@ while (( $(date +%s) < quayDeadline )) && [[ "${quayFound}" == "false" ]]; do
     typeset -i quayOutOfScopeInPass=0
     for ns in "${quayOtherNamespacesArr[@]}"; do
       typeset outJson="" outRc=0 outCount=0
-      outJson="$(oc get quayregistry -n "${ns}" -o json 2>&1)" || outRc=$?
+      typeset -i _quayRemainDiscovery=$(( quayDeadline - $(date +%s) ))
+      typeset -i _quayRemainStep=$(( stepDeadline - $(date +%s) - 120 ))
+      typeset -i _quayRemain=$(( _quayRemainDiscovery < _quayRemainStep ? _quayRemainDiscovery : _quayRemainStep ))
+      (( _quayRemain < 10 )) && _quayRemain=10
+      outJson="$(timeout "${_quayRemain}s" oc get quayregistry -n "${ns}" --request-timeout="${_quayRemain}s" -o json 2>&1)" || outRc=$?
       if (( outRc != 0 )); then
         continue
       fi
@@ -432,8 +438,8 @@ while (( $(date +%s) < quayDeadline )) && [[ "${quayFound}" == "false" ]]; do
       printf '%s\n' "Note: found ${quayOutOfScopeInPass} out-of-scope QuayRegistry object(s) in other namespaces (not satisfying check in ${quayPrimaryNs})" >&2
     fi
   fi
-  # Poll interval if no registry found in this pass and deadline not yet reached
-  if [[ "${quayFound}" == "false" ]] && (( $(date +%s) < quayDeadline )); then
+  # Poll interval if no registry found in this pass and neither budget is exhausted
+  if [[ "${quayFound}" == "false" ]] && (( $(date +%s) < quayDeadline )) && (( $(date +%s) < stepDeadline - 120 )); then
     sleep "${_quayPollInterval}"
   fi
 done
