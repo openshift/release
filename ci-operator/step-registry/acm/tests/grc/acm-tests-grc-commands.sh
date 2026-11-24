@@ -31,12 +31,32 @@ if [ "${MAP_TESTS}" = "true" ]; then
         }
         trap '
             _grc_exit_rc=$?
-            # Call the helper as a plain command, never on the left of `||`:
-            # bash suppresses its own errexit in that position, so an internal
-            # archive/remap/copy failure would return success.
-            LP_IO__ET_PPP__NEW_TS_NAME="%s" \
-                ExitTrap--PostProcessPrep
-            _grc_helper_rc=$?
+            # Guard the helper: if a published carrier has no confirmed
+            # backup, the helper would archive the original with nothing to
+            # restore. Skip the helper in that case and propagate failure.
+            _grc_helper_rc=0
+            _grc_skip_helper=0
+            if [[ -f "${ARTIFACT_DIR}/junit_grc.xml" && ! -f "/tmp/junit_grc_backup.xml" ]]; then
+                echo "WARNING: GRC carrier backup missing; skipping ExitTrap helper to preserve ${ARTIFACT_DIR}/junit_grc.xml" >&2
+                _grc_skip_helper=1
+            fi
+            if [[ -f "${ARTIFACT_DIR}/junit_grc_placement_restore.xml" && ! -f "/tmp/junit_grc_placement_restore_backup.xml" ]]; then
+                echo "WARNING: placement restore carrier backup missing; skipping ExitTrap helper to preserve ${ARTIFACT_DIR}/junit_grc_placement_restore.xml" >&2
+                _grc_skip_helper=1
+            fi
+            if (( _grc_skip_helper == 0 )); then
+                # Call the helper as a plain command, never on the left of `||`:
+                # bash suppresses its own errexit in that position, so an internal
+                # archive/remap/copy failure would return success.
+                LP_IO__ET_PPP__NEW_TS_NAME="%s" \
+                    ExitTrap--PostProcessPrep
+                _grc_helper_rc=$?
+            else
+                _grc_helper_rc=1
+                if (( _grc_exit_rc == 0 )); then
+                    _grc_exit_rc=1
+                fi
+            fi
             if [[ -f "/tmp/junit_grc_backup.xml" ]]; then
                 _grc_restore_carrier "/tmp/junit_grc_backup.xml" "${ARTIFACT_DIR}/junit_grc.xml"
             fi
@@ -411,10 +431,55 @@ else
     else
         _OPP_QUERY_FAILED=1
         mkdir -p "${_OPP_EVIDENCE_DIR}"
-        {
-            echo "oc get placement -n${_OPP_PLACEMENT_NS} ${_OPP_PLACEMENT_NAME} failed with rc=${_OPP_QUERY_RC}"
-            sed 's/^/  /' "${_OPP_QUERY_LOG}"
-        } > "${_OPP_EVIDENCE_DIR}/00-placement-query-error.log" 2>&1 || true
+        _opp_query_raw=""
+        _mk_tmp _opp_query_raw
+        if [[ -n "${_opp_query_raw}" ]]; then
+            {
+                echo "oc get placement -n${_OPP_PLACEMENT_NS} ${_OPP_PLACEMENT_NAME} failed with rc=${_OPP_QUERY_RC}"
+                sed 's/^/  /' "${_OPP_QUERY_LOG}"
+            } > "${_opp_query_raw}" 2>&1 || true
+            _opp_query_tmp=""
+            _mk_tmp _opp_query_tmp
+            _opp_query_dest="${_OPP_EVIDENCE_DIR}/00-placement-query-error.log"
+            typeset -i _opp_query_scrub_ok=1
+            if [[ -n "${_secrets_pattern}" ]]; then
+                if ! sed -E "s/${_secrets_pattern}/[REDACTED]/g" "${_opp_query_raw}" > "${_opp_query_tmp}"; then
+                    echo "ERROR: OPP placement query error value scrub failed" >&2
+                    _opp_query_scrub_ok=0
+                    rm -f "${_opp_query_tmp}"
+                fi
+            else
+                if ! cp "${_opp_query_raw}" "${_opp_query_tmp}"; then
+                    echo "ERROR: OPP placement query error staging copy failed" >&2
+                    _opp_query_scrub_ok=0
+                    rm -f "${_opp_query_tmp}"
+                fi
+            fi
+            if (( _opp_query_scrub_ok )); then
+                if ! _scrub_leaktk_patterns -i "${_opp_query_tmp}"; then
+                    echo "ERROR: OPP placement query error pattern scrub failed" >&2
+                    _opp_query_scrub_ok=0
+                    rm -f "${_opp_query_tmp}"
+                fi
+            fi
+            if (( _opp_query_scrub_ok )); then
+                if ! mv "${_opp_query_tmp}" "${_opp_query_dest}"; then
+                    echo "ERROR: OPP placement query error publish failed for ${_opp_query_dest}" >&2
+                    _opp_query_scrub_ok=0
+                fi
+            fi
+            if (( _opp_query_scrub_ok )); then
+                :
+            else
+                rm -f "${_opp_query_tmp}" "${_opp_query_dest}"
+                echo "WARNING: ${_opp_query_raw} was not published to ${_opp_query_dest}" >&2
+                _OPP_SNAPSHOT_FAILED=1
+            fi
+            rm -f "${_opp_query_raw}"
+        else
+            echo "ERROR: cannot allocate temp for OPP placement query error" >&2
+            _OPP_SNAPSHOT_FAILED=1
+        fi
         echo "ERROR: OPP placement query failed (rc=${_OPP_QUERY_RC}); a failed query is not a lane without OPP, so the OPP checks will run and report this as a failure. See co-located 00-placement-query-error.log" >&2
     fi
 fi
@@ -1045,8 +1110,20 @@ except Exception:
     done
 
     # Post-suite placement state and decisions as evidence.
-    oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | \
-        python3 -c '
+    # Raw snapshots are staged outside ARTIFACT_DIR; publish only after
+    # both scrub passes succeed (same discipline as the pre-suite block).
+    # Tracing off: the scrub below expands ${_secrets_pattern}, and traced
+    # expansions of it write the collected secret values into build-log.txt.
+    set +x
+    _OPP_POST_RAW_STAGING=""
+    _mk_tmpdir _OPP_POST_RAW_STAGING
+    if [[ -z "${_OPP_POST_RAW_STAGING}" ]]; then
+        echo "ERROR: cannot allocate OPP post-suite staging directory" >&2
+        _OPP_SNAPSHOT_FAILED=1
+    else
+        mkdir -p "${_OPP_POST_RAW_STAGING}" "${_OPP_EVIDENCE_DIR}"
+        oc get placement "-n${_OPP_PLACEMENT_NS}" "${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | \
+            python3 -c '
 import json, sys
 d = json.load(sys.stdin)
 print(json.dumps({
@@ -1054,9 +1131,9 @@ print(json.dumps({
     "namespace": d["metadata"]["namespace"],
     "status": d.get("status", {})
 }, indent=2))
-' > "${_OPP_EVIDENCE_DIR}/05-placement-status-post.json" 2>&1
-    oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | \
-        python3 -c '
+' > "${_OPP_POST_RAW_STAGING}/05-placement-status-post.json" 2>&1
+        oc get placementdecision "-n${_OPP_PLACEMENT_NS}" -l "cluster.open-cluster-management.io/placement=${_OPP_PLACEMENT_NAME}" -o json 2>/dev/null | \
+            python3 -c '
 import json, sys
 d = json.load(sys.stdin)
 result = []
@@ -1066,7 +1143,50 @@ for item in d.get("items", []):
         "decisions": item.get("status", {}).get("decisions")
     })
 print(json.dumps(result, indent=2))
-' > "${_OPP_EVIDENCE_DIR}/06-placementdecisions-post.json" 2>&1
+' > "${_OPP_POST_RAW_STAGING}/06-placementdecisions-post.json" 2>&1
+        for _opp_f in "${_OPP_POST_RAW_STAGING}"/*.json; do
+            [[ -f "${_opp_f}" ]] || continue
+            _opp_tmp=""
+            _mk_tmp _opp_tmp
+            _opp_dest="${_OPP_EVIDENCE_DIR}/$(basename "${_opp_f}")"
+            typeset -i _opp_scrub_ok=1
+            if [[ -n "${_secrets_pattern}" ]]; then
+                if ! sed -E "s/${_secrets_pattern}/[REDACTED]/g" "${_opp_f}" > "${_opp_tmp}"; then
+                    echo "ERROR: OPP evidence value scrub failed for ${_opp_f}" >&2
+                    _opp_scrub_ok=0
+                    rm -f "${_opp_tmp}"
+                fi
+            else
+                if ! cp "${_opp_f}" "${_opp_tmp}"; then
+                    echo "ERROR: OPP evidence staging copy failed for ${_opp_f}" >&2
+                    _opp_scrub_ok=0
+                    rm -f "${_opp_tmp}"
+                fi
+            fi
+            if (( _opp_scrub_ok )); then
+                if ! _scrub_leaktk_patterns -i "${_opp_tmp}"; then
+                    echo "ERROR: OPP evidence pattern scrub failed for ${_opp_f}" >&2
+                    _opp_scrub_ok=0
+                    rm -f "${_opp_tmp}"
+                fi
+            fi
+            if (( _opp_scrub_ok )); then
+                if ! mv "${_opp_tmp}" "${_opp_dest}"; then
+                    echo "ERROR: OPP evidence publish failed for ${_opp_dest}" >&2
+                    _opp_scrub_ok=0
+                fi
+            fi
+            if (( _opp_scrub_ok )); then
+                :
+            else
+                rm -f "${_opp_tmp}" "${_opp_dest}"
+                echo "WARNING: ${_opp_f} was not published to ${_opp_dest}" >&2
+                _OPP_SNAPSHOT_FAILED=1
+            fi
+        done
+        rm -rf "${_OPP_POST_RAW_STAGING}"
+    fi
+    set -x
 
     # JUnit rows for the checks (INTEROP-9711 done-when evidence).
     typeset -i _opp_inv_ok=0
