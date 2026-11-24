@@ -842,6 +842,16 @@ function RunOdfStorageCheck () {
 import sys, json, os, traceback
 try:
     registry = os.environ.get('QUAY_REGISTRY', '')
+    uid = os.environ.get('QUAY_UID', '')
+
+    def owned_by_this(r):
+        # Name alone matches a deleted and recreated registry; the uid pins the
+        # owner when both sides carry one.
+        if not registry or (r.get('name') or '') != registry:
+            return False
+        ref_uid = r.get('uid') or ''
+        return not (uid and ref_uid) or ref_uid == uid
+
     data = json.load(sys.stdin)
     owned = []
     hinted = []
@@ -850,13 +860,12 @@ try:
         name = meta.get('name') or ''
         if not name:
             continue
-        refs = [r for r in (meta.get('ownerReferences') or [])
-                if r.get('kind') == 'QuayRegistry']
+        refs = [r for r in (meta.get('ownerReferences') or []) if r.get('kind') == 'QuayRegistry']
         bound = ((item.get('status') or {}).get('phase') == 'Bound')
-        if any(r.get('name') == registry for r in refs if registry):
+        if any(owned_by_this(r) for r in refs):
             owned.append((0 if bound else 1, name))
         elif registry and (name == registry or name.startswith(registry + '-')):
-            if not any(r.get('name') != registry and r.get('kind') == 'QuayRegistry' for r in (meta.get('ownerReferences') or [])):
+            if not any(r.get('kind') == 'QuayRegistry' and not owned_by_this(r) for r in (meta.get('ownerReferences') or [])):
                 hinted.append((0 if bound else 1, name))
     pick = sorted(owned) or sorted(hinted)
     if pick:
@@ -882,6 +891,16 @@ except Exception:
 import sys, json, os, traceback
 try:
     registry = os.environ.get('QUAY_REGISTRY', '')
+    uid = os.environ.get('QUAY_UID', '')
+
+    def owned_by_this(r):
+        # Name alone matches a deleted and recreated registry; the uid pins the
+        # owner when both sides carry one.
+        if not registry or (r.get('name') or '') != registry:
+            return False
+        ref_uid = r.get('uid') or ''
+        return not (uid and ref_uid) or ref_uid == uid
+
     data = json.load(sys.stdin)
     owned = []
     hinted = []
@@ -892,11 +911,10 @@ try:
             continue
         refs = [r for r in (meta.get('ownerReferences') or []) if r.get('kind') == 'QuayRegistry']
         bound = ((item.get('status') or {}).get('phase') == 'Bound')
-        if any(r.get('name') == registry for r in refs if registry):
+        if any(owned_by_this(r) for r in refs):
             owned.append((0 if bound else 1, name))
         elif registry and (name == registry or name.startswith(registry + '-')):
-            # Only hint if not owned by a different QuayRegistry
-            if not any(r.get('name') != registry and r.get('kind') == 'QuayRegistry' for r in (meta.get('ownerReferences') or [])):
+            if not any(r.get('kind') == 'QuayRegistry' and not owned_by_this(r) for r in (meta.get('ownerReferences') or [])):
                 hinted.append((0 if bound else 1, name))
     pick = sorted(owned) or sorted(hinted)
     if pick:
