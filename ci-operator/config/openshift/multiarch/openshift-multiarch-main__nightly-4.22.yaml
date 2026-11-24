@@ -900,6 +900,48 @@ tests:
           cpu: 100m
           memory: 100Mi
     workflow: openshift-e2e-libvirt-vpn
+- as: e2e-agent-ibmz-tna
+  capabilities:
+  - intranet
+  cron: 0 18 * * 0
+  steps:
+    cluster_profile: libvirt-s390x-vpn-oz
+    dependencies:
+      OPENSHIFT_INSTALL_TARGET: release:s390x-latest
+    env:
+      ARBITER_COUNT: "1"
+      ARBITER_MEMORY: "8192"
+      ARBITER_VCPUS: "2"
+      ARBITER_VOLUME_CAPACITY: 60G
+      ARCH: s390x
+      BRANCH: "4.22"
+      COMPUTE_COUNT: "0"
+      CONTROL_COUNT: "2"
+      ETCD_DISK_SPEED: slow
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: vsphere-csi-driver-operator
+      INSTALLER_TYPE: agent
+      NODE_TUNING: "true"
+      USE_EXTERNAL_DNS: "true"
+      VOLUME_CAPACITY: 120G
+    test:
+    - as: verify-tna-cluster
+      commands: |
+        set -euo pipefail
+        oc wait node --all --for=condition=Ready=true --timeout=30m
+        oc wait --all=true clusteroperator --for=condition=Available=True --timeout=30m
+        master_count="$(oc get nodes -l node-role.kubernetes.io/master --no-headers | wc -l | tr -d ' ')"
+        arbiter_count="$(oc get nodes -l node-role.kubernetes.io/arbiter --no-headers | wc -l | tr -d ' ')"
+        if [[ "${master_count}" != "2" || "${arbiter_count}" != "1" ]]; then
+          echo "ERROR: expected TNA topology 2 masters + 1 arbiter, got masters=${master_count} arbiters=${arbiter_count}"
+          oc get nodes -o wide
+          exit 1
+        fi
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    workflow: openshift-e2e-libvirt-vpn
 zz_generated_metadata:
   branch: main
   org: openshift

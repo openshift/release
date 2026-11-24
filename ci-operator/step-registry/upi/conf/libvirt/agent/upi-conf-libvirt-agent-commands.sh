@@ -44,9 +44,63 @@ else
 fi
 BASE_URL="${CLUSTER_NAME}.${BASE_DOMAIN}"
 
+CONTROL_COUNT="${CONTROL_COUNT:-3}"
+COMPUTE_COUNT="${COMPUTE_COUNT:-2}"
+ARBITER_COUNT="${ARBITER_COUNT:-0}"
+
 echo "Creating the agent-config.yaml file..."
-# SNO: CONTROL_COUNT=1 COMPUTE_COUNT=0. Existing HA agent jobs leave these unset and keep 3+2.
-if [ "${CONTROL_COUNT:-3}" = "1" ] && [ "${COMPUTE_COUNT:-2}" = "0" ]; then
+# TNA: CONTROL_COUNT=2 ARBITER_COUNT=1 (optional COMPUTE_COUNT workers).
+# SNO: CONTROL_COUNT=1 COMPUTE_COUNT=0 ARBITER_COUNT=0.
+# Existing HA agent jobs leave counts unset and keep 3+2.
+if [[ "${ARBITER_COUNT}" -gt 0 ]]; then
+  if [[ "${CONTROL_COUNT}" -lt 2 ]]; then
+    echo "ERROR: ARBITER_COUNT=${ARBITER_COUNT} requires CONTROL_COUNT>=2 (got ${CONTROL_COUNT})" >&2
+    exit 1
+  fi
+  if [[ "${ARBITER_COUNT}" -gt 1 ]]; then
+    echo "ERROR: ARBITER_COUNT must be 0 or 1 (got ${ARBITER_COUNT})" >&2
+    exit 1
+  fi
+
+  {
+    cat << EOF
+apiVersion: v1alpha1
+kind: AgentConfig
+metadata:
+  name: ${CLUSTER_NAME}
+rendezvousIP: 192.168.$(leaseLookup "subnet").10
+hosts:
+EOF
+    for (( i=0; i<CONTROL_COUNT; i++ )); do
+      cat << EOF
+  - hostname: control-${i}.${BASE_URL}
+    role: master
+    interfaces:
+      - name: enc1
+        macAddress: $(leaseLookup "\"control-plane\"[${i}].mac")
+EOF
+    done
+    for (( i=0; i<ARBITER_COUNT; i++ )); do
+      lease_idx=$((CONTROL_COUNT + i))
+      cat << EOF
+  - hostname: arbiter-${i}.${BASE_URL}
+    role: arbiter
+    interfaces:
+      - name: enc1
+        macAddress: $(leaseLookup "\"control-plane\"[${lease_idx}].mac")
+EOF
+    done
+    for (( i=0; i<COMPUTE_COUNT; i++ )); do
+      cat << EOF
+  - hostname: compute-${i}.${BASE_URL}
+    role: worker
+    interfaces:
+      - name: enc1
+        macAddress: $(leaseLookup "compute[${i}].mac")
+EOF
+    done
+  } >> "${SHARED_DIR}/agent-config.yaml"
+elif [ "${CONTROL_COUNT}" = "1" ] && [ "${COMPUTE_COUNT}" = "0" ]; then
   cat >> "${SHARED_DIR}/agent-config.yaml" << EOF
 apiVersion: v1alpha1
 kind: AgentConfig

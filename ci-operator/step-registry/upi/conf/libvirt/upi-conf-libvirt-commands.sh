@@ -60,6 +60,25 @@ else
   none: {}"
 fi
 
+ARBITER_COUNT="${ARBITER_COUNT:-0}"
+if [[ "${ARBITER_COUNT}" -gt 0 ]]; then
+  if [[ "${CONTROL_COUNT}" -lt 2 ]]; then
+    echo "ERROR: ARBITER_COUNT=${ARBITER_COUNT} requires CONTROL_COUNT>=2 (got ${CONTROL_COUNT})" >&2
+    exit 1
+  fi
+  if [[ "${ARBITER_COUNT}" -gt 1 ]]; then
+    echo "ERROR: ARBITER_COUNT must be 0 or 1 (got ${ARBITER_COUNT})" >&2
+    exit 1
+  fi
+  ARBITER_BLOCK="arbiter:
+  architecture: \"${ARCH}\"
+  hyperthreading: Enabled
+  name: arbiter
+  replicas: ${ARBITER_COUNT}"
+else
+  ARBITER_BLOCK=""
+fi
+
 # Default UPI installation
 echo "Create the install-config.yaml file..."
 cat >> "${SHARED_DIR}/install-config.yaml" << EOF
@@ -72,6 +91,7 @@ controlPlane:
   hyperthreading: Enabled
   name: master
   replicas: ${CONTROL_COUNT}
+${ARBITER_BLOCK}
 networking:
   clusterNetwork:
   - cidr: 10.8.0.0/14

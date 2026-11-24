@@ -460,7 +460,11 @@ if [ "${INSTALLER_TYPE}" == "default" ]; then
   ${OCPINSTALL} create ignition-configs --dir ${INSTALL_DIR}
 
   # Create ignition volumes and upload the ignition configs
-  for IGNITION_TYPE in bootstrap master worker; do
+  IGNITION_TYPES=(bootstrap master worker)
+  if [[ "${ARBITER_COUNT:-0}" -gt 0 ]] && [[ -f "${INSTALL_DIR}/arbiter.ign" ]]; then
+    IGNITION_TYPES+=(arbiter)
+  fi
+  for IGNITION_TYPE in "${IGNITION_TYPES[@]}"; do
     NAME=${LEASED_RESOURCE}-${IGNITION_TYPE}-ignition-volume
 
     echo "Creating ${IGNITION_TYPE} ignition volume..."
@@ -487,7 +491,7 @@ save_credentials
 restart_nodes () {
   echo "Starting node monitor to restart nodes post-install."
   GUESTS_RESTARTED=0
-  TOTAL_GUESTS=$((${CONTROL_COUNT:-0} + ${COMPUTE_COUNT:-0}))
+  TOTAL_GUESTS=$((${CONTROL_COUNT:-0} + ${COMPUTE_COUNT:-0} + ${ARBITER_COUNT:-0}))
   while [ $GUESTS_RESTARTED -lt $TOTAL_GUESTS ]
   do
      INSTALLED=$(${VIRSH} list --all | grep "${LEASED_RESOURCE}" | grep "shut off" | awk -F' ' '{print $2}' || true)
@@ -652,6 +656,29 @@ for (( i=0; i<=${CONTROL_COUNT}-1; i++ )); do
   MAC_ADDRESS=$(leaseLookup "control-plane[$i].mac")
   create_node ${NODE} ${MAC_ADDRESS} master
 done
+
+# Create arbiter nodes for Two-Node with Arbiter (TNA).
+# Reuse control-plane lease slots after the masters (control-plane[CONTROL_COUNT + i]).
+ARBITER_COUNT="${ARBITER_COUNT:-0}"
+if [[ "${ARBITER_COUNT}" -gt 0 ]]; then
+  SAVED_DOMAIN_MEMORY="${DOMAIN_MEMORY}"
+  SAVED_DOMAIN_VCPUS="${DOMAIN_VCPUS}"
+  SAVED_VOLUME_CAPACITY="${VOLUME_CAPACITY}"
+  DOMAIN_MEMORY="${ARBITER_MEMORY:-8192}"
+  DOMAIN_VCPUS="${ARBITER_VCPUS:-2}"
+  VOLUME_CAPACITY="${ARBITER_VOLUME_CAPACITY:-60G}"
+  for (( i=0; i<ARBITER_COUNT; i++ )); do
+    lease_idx=$((CONTROL_COUNT + i))
+    NODE="${LEASED_RESOURCE}-arbiter-${i}"
+    echo "Creating ${NODE} node (arbiter)..."
+    MAC_ADDRESS=$(leaseLookup "control-plane[${lease_idx}].mac")
+    # Agent installs ignore ignition type; default UPI uses arbiter.ign when present.
+    create_node ${NODE} ${MAC_ADDRESS} arbiter
+  done
+  DOMAIN_MEMORY="${SAVED_DOMAIN_MEMORY}"
+  DOMAIN_VCPUS="${SAVED_DOMAIN_VCPUS}"
+  VOLUME_CAPACITY="${SAVED_VOLUME_CAPACITY}"
+fi
 
 # Create the compute nodes.
 for (( i=0; i<=${COMPUTE_COUNT}-1; i++ )); do
