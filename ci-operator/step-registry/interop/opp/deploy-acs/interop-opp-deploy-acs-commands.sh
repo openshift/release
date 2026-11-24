@@ -160,11 +160,16 @@ _cond_classify() {
       -o jsonpath='{range .status.conditions[*]}{.type}={.status} {end}' 2>/dev/null) || _cond=""
   _cond_class=""
   _cond_detail=""
-  case "${_cond}" in
-    *CatalogSourcesUnhealthy=True*) _cond_class="acs-catalog-missing"; _cond_detail="Subscription condition CatalogSourcesUnhealthy=True" ;;
-    *ConstraintsNotSatisfiable=True*)    _cond_class="acs-subscription-unsatisfiable"; _cond_detail="Subscription condition ConstraintsNotSatisfiable" ;;
-    *InstallPlanMissing=True*)           _cond_class="acs-installplan-missing"; _cond_detail="Subscription condition InstallPlanMissing" ;;
-    *InstallPlanFailed=True*)            _cond_class="acs-installplan-failed"; _cond_detail="Subscription condition InstallPlanFailed" ;;
+  # Pad once and anchor every arm on a whole "Type=Status" token: an unanchored
+  # substring also selects on a different type that ends with the matched name,
+  # so a NotInstallPlanMissing=True condition would read as
+  # InstallPlanMissing=True and classify a blocker that is not active. The arm
+  # order keeps the previous precedence (CodeRabbit 4635432972).
+  case " ${_cond} " in
+    *" CatalogSourcesUnhealthy=True "*)    _cond_class="acs-catalog-missing"; _cond_detail="Subscription condition CatalogSourcesUnhealthy=True" ;;
+    *" ConstraintsNotSatisfiable=True "*) _cond_class="acs-subscription-unsatisfiable"; _cond_detail="Subscription condition ConstraintsNotSatisfiable" ;;
+    *" InstallPlanMissing=True "*)         _cond_class="acs-installplan-missing"; _cond_detail="Subscription condition InstallPlanMissing" ;;
+    *" InstallPlanFailed=True "*)          _cond_class="acs-installplan-failed"; _cond_detail="Subscription condition InstallPlanFailed" ;;
   esac
   _api_loud
 }
@@ -575,11 +580,20 @@ try:
     # would miss a policy that omits the field and install a second
     # Subscription for an operator that policy already owns. Compare against
     # the effective target.
+    # The namespace alone is not sufficient: bind the match to
+    # spec.subscription.name as well, the Subscription this step creates
+    # (rhacs-operator). A policy naming another Subscription in the same
+    # namespace does not own this install, and an omitted name proves nothing
+    # (CodeRabbit 4635432984).
     def effective_ns(item):
         sub = item.get("spec", {}).get("subscription", {}) or {}
         return sub.get("namespace")
+    def effective_name(item):
+        sub = item.get("spec", {}).get("subscription", {}) or {}
+        return sub.get("name")
     matches = [i for i in items
                if i.get("metadata", {}).get("name") == "operatorpolicy-rhacs-operator"
+               and effective_name(i) == "rhacs-operator"
                and effective_ns(i) == target_ns]
     if not matches:
         # No policy owns this namespace: the install path runs.
@@ -661,8 +675,13 @@ try:
     def eff_ns(item):
         sub = item.get("spec", {}).get("subscription", {}) or {}
         return sub.get("namespace")
+    def eff_name(item):
+        sub = item.get("spec", {}).get("subscription", {}) or {}
+        return sub.get("name")
     for i in items:
-        if i.get("metadata", {}).get("name") == "operatorpolicy-rhacs-operator" and eff_ns(i) == target_ns:
+        if (i.get("metadata", {}).get("name") == "operatorpolicy-rhacs-operator"
+                and eff_name(i) == "rhacs-operator"
+                and eff_ns(i) == target_ns):
             for c in i.get("status", {}).get("conditions", []):
                 if c.get("type") == "Compliant" and c.get("status") == "True":
                     print(c.get("lastTransitionTime", "") or c.get("lastUpdateTime", "") or "")
@@ -689,8 +708,13 @@ try:
     def eff_ns(item):
         sub = item.get("spec", {}).get("subscription", {}) or {}
         return sub.get("namespace")
+    def eff_name(item):
+        sub = item.get("spec", {}).get("subscription", {}) or {}
+        return sub.get("name")
     for i in items:
-        if i.get("metadata", {}).get("name") == "operatorpolicy-rhacs-operator" and eff_ns(i) == target_ns:
+        if (i.get("metadata", {}).get("name") == "operatorpolicy-rhacs-operator"
+                and eff_name(i) == "rhacs-operator"
+                and eff_ns(i) == target_ns):
             gen = i.get("metadata", {}).get("generation", 0) or 0
             obs = i.get("status", {}).get("observedGeneration", 0) or 0
             ct = i.get("metadata", {}).get("creationTimestamp", "")
@@ -706,7 +730,15 @@ except Exception:
           fi
         fi
       fi
-      if [[ "${_existing_csv}" == "Succeeded" ]] && [[ "${_ns_created_recent}" == "true" ]] && [[ "${_creator_evidence}" == "true" ]]; then
+      # CodeRabbit 4637035644: _ns_created_recent / _creator_evidence is an
+      # ordering check (Compliant transition or observedGeneration after
+      # namespace creation), not creator proof; a manual actor could create
+      # the namespace and still trip the signal. No creator-proof signal is
+      # available in-cluster, so retain the install path unconditionally.
+      # Keep this detection block for documentation and re-enable the skip
+      # only after a fresh-cluster rehearsal proves an independent creator
+      # signal (the install path runs when the signal is false).
+      if false && [[ "${_existing_csv}" == "Succeeded" ]] && [[ "${_ns_created_recent}" == "true" ]] && [[ "${_creator_evidence}" == "true" ]]; then
         echo ">>> workaround_removal_ready=true (OperatorPolicy Compliant, current CSV ${_sd_csv} Succeeded, namespace creation verified) - not installing"
         _prop "workaround_removal_ready" "true"
         _prop "acs_subscription" "adopted"
@@ -951,8 +983,9 @@ else
   else
     _api_quiet
     _ns_err_text=$(cat "${_ns_err}" 2>/dev/null || echo unknown)
+    _ns_err_class=$(_api_err_class "${_ns_err_text}")
     _api_loud
-    _classify "acs-namespace-error" "failed to create namespace ${ACS_NAMESPACE} ($(_api_err_class "${_ns_err_text}"))"
+    _classify "acs-namespace-error" "failed to create namespace ${ACS_NAMESPACE} (${_ns_err_class})"
     echo "ERROR: ${_class_detail}" >&2
     rm -f "${_ns_err}"
     _dump_diagnostics
@@ -1067,7 +1100,13 @@ else
         fi
       fi
     else
-      _prop "acs_operatorgroup_reconcile" "query-failed"
+      _api_quiet
+      _og_after_class=$(_api_err_class "${_og_after}")
+      _api_loud
+      _classify "acs-operatorgroup-error" "operatorgroups re-list failed in ${ACS_NAMESPACE} after 3 attempts following OperatorGroup creation (${_og_after_class})"
+      echo "ERROR: ${_class_detail}"
+      _dump_diagnostics
+      exit 3
     fi
   else
     # Re-list on create failure: a live OperatorPolicy (or any other writer)
@@ -1154,16 +1193,18 @@ else
     _api_quiet
     typeset _sub_create_err_text=""
     _sub_create_err_text=$(cat "${_sub_create_err}" 2>/dev/null || echo unknown)
+    typeset _sub_create_err_class=""
+    _sub_create_err_class=$(_api_err_class "${_sub_create_err_text}")
     _api_loud
     if [[ -s "${_sub_create_err}" ]]; then
-      printf '  (subscription create failed: %s)\n' "$(_api_err_class "${_sub_create_err_text}")" >&2
+      printf '  (subscription create failed: %s)\n' "${_sub_create_err_class}" >&2
     fi
     rm -f "${_sub_create_err}"
     if oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" >/dev/null 2>&1; then
       typeset -i _race_pkg_rc=0
       _race_pkg=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.name}' 2>/dev/null) || _race_pkg_rc=$?
       if (( _race_pkg_rc != 0 )) || [[ "${_race_pkg}" != "rhacs-operator" ]]; then
-        _classify "acs-subscription-create-error" "Subscription rhacs-operator appeared concurrently but does not select rhacs-operator ($(_api_err_class "${_sub_create_err_text}"))"
+        _classify "acs-subscription-create-error" "Subscription rhacs-operator appeared concurrently but does not select rhacs-operator (${_sub_create_err_class})"
         _dump_diagnostics
         exit 1
       fi
@@ -1171,7 +1212,7 @@ else
       _prop "channel_observed" "$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null || echo unknown)"
       echo ">>> NOTE: Subscription created concurrently by another writer: adopting"
     else
-      _classify "acs-subscription-create-error" "failed to create Subscription rhacs-operator ($(_api_err_class "${_sub_create_err_text}"))"
+      _classify "acs-subscription-create-error" "failed to create Subscription rhacs-operator (${_sub_create_err_class})"
       _dump_diagnostics
       exit 1
     fi
@@ -1327,11 +1368,17 @@ typeset _wait2_err="" _wait2_rc=0
     if (( _phase_rc != 0 )); then
       typeset _phase_err=""
       _phase_err=$(cat "${_wait2_err}.phase" 2>/dev/null || echo unknown)
-      if [[ "${_phase_err}" == *"Forbidden"* || "${_phase_err}" == *"forbidden"* ]]; then
-        _phase="query-failed"
-      else
+      typeset _phase_err_class=""
+      _phase_err_class=$(_api_err_class "${_phase_err}")
+      # Only NotFound keeps the phase unknown (the probe below classifies it
+      # as missing); every other read error is a query failure (CodeRabbit 4637035653).
+      if [[ "${_phase_err}" == *"NotFound"* || "${_phase_err}" == *"not found"* ]]; then
         _phase="unknown"
+      else
+        _phase="query-failed"
       fi
+      # Persist for the post-quiet classification below
+      typeset _phase_query_class="${_phase_err_class}"
     fi
     rm -f "${_wait2_err}.phase"
     typeset -i _csv_recovered=0
@@ -1366,7 +1413,7 @@ typeset _wait2_err="" _wait2_rc=0
     elif [[ "${_phase}" == "Failed" ]]; then
       _classify "acs-csv-failed" "CSV ${csvName} reached phase Failed"
     elif [[ "${_phase}" == "query-failed" ]]; then
-      _classify "acs-csv-query-failed" "CSV ${csvName} query failed (rc=${_phase_rc}: $(_api_err_class "${_phase_err}"))"
+      _classify "acs-csv-query-failed" "CSV ${csvName} query failed (rc=${_phase_rc}: ${_phase_query_class:-$(_api_err_class "${_phase_err:-unknown}")})"
     elif (( _probe_notfound )); then
       _classify "acs-csv-missing" "CSV object ${csvName} never created (currentCSV published, object absent; phase query: ${_phase})"
     elif [[ "${_phase}" == "unknown" ]]; then
