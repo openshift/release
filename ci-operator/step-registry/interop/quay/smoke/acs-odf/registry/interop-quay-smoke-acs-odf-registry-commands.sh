@@ -47,11 +47,12 @@ _opp_trap_handler() {
   type -t PostProcessJunit >/dev/null && PostProcessJunit
   # Once the merge produced the routed report, the raw copy must leave
   # SHARED_DIR: the downstream reporter reads "${SHARED_DIR}/*.xml", so a run
-  # that leaves both copies reports every test twice. The raw copy stays when
-  # the merge did not produce a file, so the failure path still carries a
-  # report.
+  # that leaves both copies reports every test twice. The deletion is applied
+  # only after the merged report passes the validation below, so an invalid
+  # merge keeps the raw copy that can still report the run.
+  typeset _rawJunitToRemove=''
   if [[ -n "${SHARED_DIR:-}" && -n "${junitFile:-}" && -s "${SHARED_DIR}/junit--interop-quay-smoke-acs-odf-registry.xml" ]]; then
-      rm -f "${SHARED_DIR}/$(basename "${junitFile}")"
+      _rawJunitToRemove="${SHARED_DIR}/$(basename "${junitFile}")"
   fi
   # If report generation failed and original exit was success, fail the step
   if (( _genRc != 0 && exitCode == 0 )); then
@@ -85,6 +86,9 @@ sys.exit(0 if names and all(n.startswith(pfx) for n in names) else 1)
           echo "ERROR: no valid JUnit report in ${junitFile} or ${_mergedFile} for successful run" >&2
           exit 1
       fi
+  fi
+  if [[ -n "${_rawJunitToRemove}" ]]; then
+      rm -f "${_rawJunitToRemove}"
   fi
   true
 }
