@@ -1336,6 +1336,48 @@ print(f"wrote {out}")
 PYEOF
 }
 
+# Refresh Subscription snapshot after the last capture so the removal
+# predicate does not evaluate readiness terms against a stale currentCSV
+# if OLM advanced it in the window between the early Subscription capture
+# and the later CSV/PackageManifest captures. Bounded and classified like
+# the initial capture: a failed re-read writes probe_error so relevant
+# terms become unknown rather than silently keeping the earlier value.
+if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" != "1" ]]; then
+  _sub_refresh_ok=false
+  _sub_refresh_out=""
+  for _sub_refresh_try in 1 2 3; do
+    if _sub_refresh_out=$(oc get subscriptions.operators.coreos.com -A -o json 2>&1); then
+      _sub_refresh_ok=true
+      break
+    fi
+    (( _sub_refresh_try < 3 )) && sleep $(( _sub_refresh_try * 2 ))
+  done
+  if [[ "${_sub_refresh_ok}" == "true" ]]; then
+    printf '%s' "${_sub_refresh_out}" | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+result = []
+for i in data.get("items", []):
+    result.append({
+        "name": i["metadata"]["name"],
+        "namespace": i["metadata"].get("namespace", ""),
+        "apiVersion": i.get("apiVersion"),
+        "currentCSV": i.get("status", {}).get("currentCSV"),
+        "state": i.get("status", {}).get("state"),
+        "installPlanRef": (i.get("status", {}).get("installPlanRef") or {}).get("name"),
+        "conditions": i.get("status", {}).get("conditions"),
+        "channel": i.get("spec", {}).get("channel"),
+        "source": i.get("spec", {}).get("source"),
+        "sourceNamespace": i.get("spec", {}).get("sourceNamespace"),
+        "generation": i.get("metadata", {}).get("generation")
+    })
+print(json.dumps(result, indent=2))
+' > "${EVIDENCE_DIR}/03-subscription.json" 2>&1 || echo "probe_error: subscription query failed" > "${EVIDENCE_DIR}/03-subscription.json"
+  else
+    echo "probe_error: subscription re-read failed after 3 attempts" > "${EVIDENCE_DIR}/03-subscription.json"
+  fi
+fi
+
 # PRRT_kwDOBHvUUM65ui2E: fixture mode writes these terms into its own temporary
 # evidence directory, so the live call must not run without a captured bundle.
 if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" == "1" ]]; then
