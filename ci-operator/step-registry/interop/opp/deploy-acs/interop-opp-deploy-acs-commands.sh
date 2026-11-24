@@ -1479,8 +1479,20 @@ typeset _wait2_err="" _wait2_rc=0
           elif [[ -n "${_cond_class}" ]]; then
             _classify "${_cond_class}" "${_cond_detail} (CSV ${csvName}, phase ${_phase})"
           else
-            _csv_recovered=1
-            echo ">>> NOTE: CSV ${csvName} is Succeeded; the phase wait returned rc=${_wait2_rc} on its final poll, accepting the observed Succeeded phase"
+            # The recheck above is the last read this acceptance rests on, so
+            # the target is confirmed once more after it: a Subscription that
+            # advanced to a newer CSV in that window would otherwise report
+            # the superseded Succeeded CSV as the deployed one. A failed read
+            # is classified; a changed target falls through to the chain
+            # below, as a mismatch on the first read already does.
+            typeset _csv_final=""
+            if ! _csv_final=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
+                -o jsonpath='{.status.currentCSV}' 2>/dev/null); then
+              _classify "acs-subscription-query-failed" "Subscription currentCSV read failed after the condition recheck; the waited CSV cannot be confirmed as current (CSV ${csvName}, phase ${_phase})"
+            elif [[ "${_csv_final}" == "${csvName}" ]]; then
+              _csv_recovered=1
+              echo ">>> NOTE: CSV ${csvName} is Succeeded; the phase wait returned rc=${_wait2_rc} on its final poll, accepting the observed Succeeded phase"
+            fi
           fi
         fi
       else
