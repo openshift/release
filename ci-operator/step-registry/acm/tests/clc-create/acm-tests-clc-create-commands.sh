@@ -106,7 +106,7 @@ else
     if ! command -v aws >/dev/null 2>&1; then
         if command -v curl >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1; then
             echo "aws CLI not found, bootstrapping AWS CLI v2 bundle (INTEROP-9517 precedent)..." >&2
-            if curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip 2>&1; then
+            if curl -fsSL --connect-timeout 15 --max-time 300 "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip 2>&1; then
                 if cd /tmp && unzip -q awscliv2.zip 2>&1 && ./aws/install --bin-dir /tmp/aws-bin --install-dir /tmp/aws-cli 2>/dev/null; then
                     export PATH="/tmp/aws-bin:${PATH}"
                     aws --version 2>&1 || true
