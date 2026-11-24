@@ -573,6 +573,7 @@ TestQuayPull() {
         typeset qrJson2=""
         # PRRT_kwDOBHvUUM65RJop: use second read for reconciled endpoint after status propagation
         sleep 1
+        set +x
         typeset -i qr2Rc=0
         qrJson2="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json 2>"${_opp_smoke_tmp}/qr2.err")" || qr2Rc=$?
         if (( qr2Rc != 0 )); then
@@ -581,20 +582,24 @@ TestQuayPull() {
                 typeset -i _qrConfirmRc=0
                 _qrConfirmOut="$(oc api-resources --api-group=quay.redhat.com -o name 2>&1)" || _qrConfirmRc=$?
                 if (( _qrConfirmRc != 0 )); then
+                    set -x
                     AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources: $(cat "${_opp_smoke_tmp}/qr2.err")"
                     return
                 fi
                 if printf '%s' "${_qrConfirmOut}" | grep -qw "quayregistries"; then
+                    set -x
                     AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources: $(cat "${_opp_smoke_tmp}/qr2.err")"
                     return
                 fi
                 qrJson2='{"items":[]}'
                 qrCount=0
             else
+                set -x
                 AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources"
                 return
             fi
         elif ! qrCount="$(printf '%s' "${qrJson2}" | jq '.items | length')"; then
+            set -x
             AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources"
             return
         fi
@@ -602,6 +607,7 @@ TestQuayPull() {
         # Re-extract endpoint from the same snapshot to keep endpoint and presence consistent (PRRT 4622731202)
         typeset freshEndpoint=""
         freshEndpoint="$(printf '%s' "${qrJson2}" | jq -r '.items[0].status.registryEndpoint // empty' 2>/dev/null | sed 's|^https://||')" || freshEndpoint=""
+        set -x
         if [[ -n "${freshEndpoint}" ]]; then
             quayRoute="${freshEndpoint}"
         else
