@@ -230,10 +230,27 @@ pollInterval="${ACS_POLL_INTERVAL_S}"
 waitCap="${ACS_WAIT_TIMEOUT_S}"
 budget="${ACS_BUDGET_S}"
 typeset -i _budgetDeadline=$(( $(date +%s) + budget ))
+# Wait outcome exported by WaitFor for JUnit messages (cap=min(waitCap, budget remaining))
+typeset -i _waitCap=0
+typeset _waitReason=""
 
 # ---------------------------------------------------------------------------
 # Self-test (D6 named executor): machinery validation, always on
 # ---------------------------------------------------------------------------
+_discovery_wait_message() {
+    # Build JUnit message for SecuredCluster discovery failure, distinguishing
+    # budget exhaustion from an expired discovery wait and reporting the
+    # effective wait cap actually used.
+    typeset suffix="$1"
+    typeset msg=""
+    if [[ "${_waitReason}" == budget-exhausted* ]]; then
+        msg="SecuredCluster discovery budget exhausted (cap ${_waitCap}s): ${suffix} (budget remaining $(_budget_remaining)s)"
+    else
+        msg="SecuredCluster discovery timeout after ${_waitCap}s: ${suffix} (budget remaining $(_budget_remaining)s)"
+    fi
+    printf '%s' "${msg}"
+}
+
 _run_selftest() {
     typeset -i st_rc=0
     [[ -w "${ARTIFACT_DIR}" ]] || { echo "[selftest] FAIL: ARTIFACT_DIR not writable"; st_rc=1; }
@@ -243,6 +260,74 @@ _run_selftest() {
     [[ "${pollInterval}" -gt 0 ]] || { echo "[selftest] FAIL: ACS_POLL_INTERVAL_S must be > 0"; st_rc=1; }
     [[ "${waitCap}" -gt 0 ]] || { echo "[selftest] FAIL: ACS_WAIT_TIMEOUT_S must be > 0"; st_rc=1; }
     [[ "${budget}" -gt 0 ]] || { echo "[selftest] FAIL: ACS_BUDGET_S must be > 0"; st_rc=1; }
+    # Discovery wait message selftest: verify both budget-exhausted and timeout
+    # paths and a shortened effective cap are reported in JUnit messages.
+    if (( st_rc == 0 )); then
+        typeset -i _savedWaitCap="${waitCap}"
+        typeset -i _savedPollInterval="${pollInterval}"
+        typeset -i _savedBudgetDeadline="${_budgetDeadline}"
+        # Use a shortened cap and fast poll for the selftest probes
+        pollInterval=1
+        waitCap=3
+        _budgetDeadline=$(( $(date +%s) + 60 ))
+        # Probe that always fails, to exercise the timeout path
+        _selftest_probe_fail() { return 1; }
+        _waitCap=0; _waitReason=""
+        WaitFor "selftest discovery timeout" _selftest_probe_fail >/dev/null 2>&1 || true
+        typeset _msg=""
+        _msg="$(_discovery_wait_message "no SecuredCluster CR found while ACS_EXPECTATION=required")"
+        if [[ "${_msg}" != *"timeout after 3s"* ]]; then
+            echo "[selftest] FAIL: discovery timeout message should report effective cap 3s, got: ${_msg}" >&2
+            st_rc=1
+        fi
+        if [[ "${_msg}" == *"budget exhausted"* ]]; then
+            echo "[selftest] FAIL: timeout path should not report budget exhausted, got: ${_msg}" >&2
+            st_rc=1
+        fi
+        if [[ "${_msg}" == *"900s"* ]]; then
+            echo "[selftest] FAIL: discovery message should not hardcode 900s, got: ${_msg}" >&2
+            st_rc=1
+        fi
+        # Probe the budget-exhausted path by setting budget deadline in the past
+        _budgetDeadline=$(( $(date +%s) - 1 ))
+        _waitCap=0; _waitReason=""
+        WaitFor "selftest budget exhausted" _selftest_probe_fail >/dev/null 2>&1 || true
+        _msg="$(_discovery_wait_message "securedcluster namespace discovery failed")"
+        if [[ "${_msg}" != *"budget exhausted"* ]]; then
+            echo "[selftest] FAIL: budget exhausted path should report budget exhausted, got: ${_msg}" >&2
+            st_rc=1
+        fi
+        if [[ "${_msg}" == *"900s"* ]]; then
+            echo "[selftest] FAIL: budget exhausted message should not hardcode 900s, got: ${_msg}" >&2
+            st_rc=1
+        fi
+        # Verify both list outcomes produce distinguishable JUnit messages
+        _budgetDeadline=$(( $(date +%s) + 60 ))
+        waitCap=2
+        _waitCap=0; _waitReason=""
+        WaitFor "selftest zero-result path" _selftest_probe_fail >/dev/null 2>&1 || true
+        typeset _zeroMsg=""
+        _zeroMsg="$(_discovery_wait_message "no SecuredCluster CR found while ACS_EXPECTATION=required")"
+        _budgetDeadline=$(( $(date +%s) - 1 ))
+        _waitCap=0; _waitReason=""
+        WaitFor "selftest failed-read path" _selftest_probe_fail >/dev/null 2>&1 || true
+        typeset _failMsg=""
+        _failMsg="$(_discovery_wait_message "securedcluster namespace discovery failed")"
+        if [[ "${_zeroMsg}" == "${_failMsg}" ]]; then
+            echo "[selftest] FAIL: zero-result and failed-read messages should be distinct" >&2
+            st_rc=1
+        fi
+        if [[ "${_zeroMsg}" != *"2s"* && "${_zeroMsg}" != *"cap 2s"* ]]; then
+            echo "[selftest] FAIL: shortened cap 2s should appear in zero-result message, got: ${_zeroMsg}" >&2
+            st_rc=1
+        fi
+        # Restore original values
+        waitCap="${_savedWaitCap}"
+        pollInterval="${_savedPollInterval}"
+        _budgetDeadline="${_savedBudgetDeadline}"
+        _waitCap=0; _waitReason=""
+        unset -f _selftest_probe_fail 2>/dev/null || true
+    fi
     if (( st_rc == 0 )); then
         _add_case "acs-preflight-selftest" passed
     else
@@ -329,7 +414,10 @@ function WaitFor () {
     typeset -i rem
     rem="$(_budget_remaining)"
     (( rem < cap )) && cap=rem
+    _waitCap="${cap}"
+    _waitReason=""
     if (( cap == 0 )); then
+        _waitReason="budget-exhausted-before"
         echo "[readiness] BUDGET EXHAUSTED before waiting for: ${description}"
         return 1
     fi
@@ -339,12 +427,14 @@ function WaitFor () {
         typeset -i _now=0
         _now=$(date +%s)
         if (( _now >= _deadline )); then
+            _waitReason="timeout"
             echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (budget remaining $(_budget_remaining)s)"
             return 1
         fi
         if "${checkFn}" "$@"; then
             _now=$(date +%s)
             if (( _now >= _deadline )); then
+                _waitReason="timeout"
                 echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (post-deadline probe success not accepted, budget remaining $(_budget_remaining)s)"
                 return 1
             fi
@@ -353,11 +443,13 @@ function WaitFor () {
         fi
         _now=$(date +%s)
         if (( _now >= _deadline )); then
+            _waitReason="timeout"
             echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (budget remaining $(_budget_remaining)s)"
             return 1
         fi
         rem="$(_budget_remaining)"
         if (( rem <= 0 )); then
+            _waitReason="budget-exhausted-while"
             echo "[readiness] BUDGET EXHAUSTED while waiting for: ${description}"
             return 1
         fi
@@ -374,11 +466,13 @@ function WaitFor () {
             "${diagnosticsFn}" || true
             _now=$(date +%s)
             if (( _now >= _deadline )); then
+                _waitReason="timeout"
                 echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (budget remaining $(_budget_remaining)s)"
                 return 1
             fi
             rem="$(_budget_remaining)"
             if (( rem <= 0 )); then
+                _waitReason="budget-exhausted-while"
                 echo "[readiness] BUDGET EXHAUSTED while waiting for: ${description}"
                 return 1
             fi
@@ -858,7 +952,7 @@ if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs; then
         _add_case "clusters-connected" skipped "NoSecuredCluster" "no SecuredCluster in lane: clusters-connected not evaluated"
         _add_case "policies-loaded" skipped "NoSecuredCluster" "no SecuredCluster in lane: policies-loaded not evaluated"
         _add_case "sensor-ready" skipped "NoSecuredCluster" "no SecuredCluster in lane: sensor-ready not evaluated (budget remaining $(_budget_remaining)s)"
-        if [[ "${ACS_EXPECTATION}" == "required" ]]; then _add_case "securedcluster-discovery" failed "Discovery" "SecuredCluster discovery timeout after 900s: no SecuredCluster CR found while ACS_EXPECTATION=required (budget remaining $(_budget_remaining)s)"; _add_case "stackrox-opp-readiness" failed "Discovery" "SecuredCluster discovery failed while ACS_EXPECTATION=required (budget remaining $(_budget_remaining)s)"; exit 1; fi
+        if [[ "${ACS_EXPECTATION}" == "required" ]]; then _add_case "securedcluster-discovery" failed "Discovery" "$(_discovery_wait_message "no SecuredCluster CR found while ACS_EXPECTATION=required")"; _add_case "stackrox-opp-readiness" failed "Discovery" "SecuredCluster discovery failed while ACS_EXPECTATION=required (budget remaining $(_budget_remaining)s)"; exit 1; fi
         if (( _assert_rc != 0 )); then _add_case "stackrox-opp-readiness" failed "Assertion" "earlier assertion failed and SecuredCluster workload is absent (budget remaining $(_budget_remaining)s)"; exit 1; fi
         _add_case "stackrox-opp-readiness" skipped "NoSecuredCluster" "no SecuredCluster in lane: readiness assertions not evaluated (budget remaining $(_budget_remaining)s)"
         exit 0
@@ -868,7 +962,7 @@ if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs; then
     _add_case "clusters-connected" skipped "StateAbsent" "securedcluster namespace discovery failed"
     _add_case "policies-loaded" skipped "StateAbsent" "securedcluster namespace discovery failed"
     _add_case "sensor-ready" failed "Assertion" "securedcluster namespace discovery failed (budget remaining $(_budget_remaining)s)"
-    _add_case "stackrox-opp-readiness" failed "Timeout" "SecuredCluster discovery timeout after 900s: securedcluster namespace discovery failed (budget remaining $(_budget_remaining)s)"
+    _add_case "stackrox-opp-readiness" failed "Timeout" "$(_discovery_wait_message "securedcluster namespace discovery failed")"
     exit 1
 fi
 echo "[readiness] SecuredCluster namespace: ${scNs}"
