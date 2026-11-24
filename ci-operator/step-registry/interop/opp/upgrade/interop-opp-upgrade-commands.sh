@@ -177,12 +177,37 @@ rhacs-operator-controller-7f6d8b9c-t9m4c      1/2     Running     3     20m"
         (( failures += 1 ))
     fi
 
-    # Fallback case 2: the Subscription names a CSV that the listing does not hold.
+    # Named-but-absent case: the Subscription names a CSV that a successful CSV
+    # listing does not hold. That is not the same as an unreadable Subscription:
+    # the named CSV must be reported as TargetAbsent instead of its superseded
+    # predecessor standing in for it, or the settle and the final validation
+    # both accept a target OLM has not published yet.
     _subFixture="$(printf 'ocm\trhacs-operator\trhacs-operator.v4.11.9\trhacs-operator.v4.11.9')"
+    expected="rhacs-operator.v4.11.9${_tab}TargetAbsent"
+    got="$(_select_target_csv 'rhacs-operator' "${_csvFixture}" "${_subFixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: a named CSV absent from the listing must report TargetAbsent, not the superseded CSV; expected '${expected}' got '${got}'"
+        (( failures += 1 ))
+    fi
+
+    # Fallback case 3: the CSV listing was not read (empty), so the named CSV
+    # cannot be called absent: nothing is reported and both callers classify
+    # the operator as unsettled.
+    expected=""
+    got="$(_select_target_csv 'rhacs-operator' '' "${_subFixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: an unreadable CSV listing must report nothing; expected '' got '${got}'"
+        (( failures += 1 ))
+    fi
+
+    # Fallback case 4: the Subscription listing was read but holds no row for
+    # this operator, so nothing names a target and the prefix match still
+    # applies.
+    _subFixture="$(printf 'ocm\tquay-operator\tquay-operator.v3.8.7\tquay-operator.v3.8.7')"
     expected="rhacs-operator.v4.9.0${_tab}Succeeded"
     got="$(_select_target_csv 'rhacs-operator' "${_csvFixture}" "${_subFixture}")"
     if [[ "${got}" != "${expected}" ]]; then
-        echo "selftest FAIL: named CSV absent must fall back to prefix match; expected '${expected}' got '${got}'"
+        echo "selftest FAIL: a Subscription naming another operator must keep the prefix match; expected '${expected}' got '${got}'"
         (( failures += 1 ))
     fi
 
@@ -190,7 +215,7 @@ rhacs-operator-controller-7f6d8b9c-t9m4c      1/2     Running     3     20m"
         echo "FATAL: pod-readiness predicate self-test failed; step semantics are not the reviewed ones."
         return 1
     fi
-    echo ">>> selftest: pod-readiness predicate OK (installer/bootstrap excluded, real failures kept, partially ready Running pods kept, subscription CSV selection OK)"
+    echo ">>> selftest: pod-readiness predicate OK (installer/bootstrap excluded, real failures kept, partially ready Running pods kept, subscription CSV selection OK (target present, named-but-absent TargetAbsent, unreadable listing, foreign Subscription))"
 }
 
 function DebugOnExit () {
@@ -531,9 +556,15 @@ function ValidatePlatformHealth () {
 # Print "<name>\t<phase>" for the CSV the operator's Subscription is converging
 # to. The Subscription status.currentCSV (installedCSV as a fallback) names that
 # CSV, so a superseded CSV that still reports Succeeded cannot stand in for a
-# target that is still Installing. When no Subscription names a matching CSV, or
-# the Subscription read failed, the first name-prefix match is used, which keeps
-# the previous behavior as a fallback.
+# target that is still Installing. When no Subscription names a CSV, or the
+# Subscription listing came back empty (the read failed), the first name-prefix
+# match is used, which keeps the previous behavior as a fallback. When the
+# listing was read and a naming Subscription's CSV is not in the CSV listing,
+# the named CSV is reported with the pseudo-phase TargetAbsent: OLM has not
+# published that CSV yet, so its predecessor's Succeeded phase must not stand in
+# for it. TargetAbsent is not a phase a CSV can report, so both callers treat
+# the operator as unsettled. Exit status stays 0: the output is read in an
+# assignment under `set -e`, where a non-zero status would abort the caller.
 # shellcheck disable=SC2317  # invoked from SettleOppOperatorCsvs and ValidateOppOperators
 function _select_target_csv () {
     typeset _selOp="${1}" _csvList="${2}" _subList="${3}"
@@ -548,6 +579,10 @@ function _select_target_csv () {
         _hit="$(awk -F'\t' -v want="${_want}" '$2 == want { printf "%s\t%s", $2, $3; exit }' <<< "${_csvList}")"
         if [[ -n "${_hit}" ]]; then
             printf '%s' "${_hit}"
+            return 0
+        fi
+        if [[ -n "${_csvList}" ]]; then
+            printf '%s\t%s' "${_want}" 'TargetAbsent'
             return 0
         fi
     fi
@@ -588,6 +623,8 @@ function SettleOppOperatorCsvs () {
             if [[ "${_prevObs}" != "${settleObs}" ]]; then
                 echo "CSV observation changed ${_prevObs:-none} -> ${settleObs:-none}, resetting consecutive" >&2
             fi
+            # TargetAbsent (the Subscription names a CSV the listing does not
+            # hold yet) is not terminal, so the window keeps running.
             # Only a terminal phase counts as settled: a CSV stuck in
             # Replacing/InstallReady must keep the full window (that is the
             # convergence tolerance the fixed sleep provided), while a CSV
@@ -659,6 +696,11 @@ function ValidateOppOperators () {
         phase="${targetCsv#*$'\t'}"
         if [[ -z "${phase}" ]]; then
             : "CSV not found for operator: ${op}"
+            (( failCount += 1 ))
+            continue
+        fi
+        if [[ "${phase}" == 'TargetAbsent' ]]; then
+            : "Operator ${op}: Subscription names ${targetCsv%%$'\t'*} which the CSV listing does not hold; not settled"
             (( failCount += 1 ))
             continue
         fi
