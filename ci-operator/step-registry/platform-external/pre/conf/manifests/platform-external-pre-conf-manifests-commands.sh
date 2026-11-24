@@ -21,18 +21,6 @@ source "${SHARED_DIR}/init-fn.sh" || true
 log "Copying to install dir"
 cp -vp "${SHARED_DIR}"/install-config.yaml "${INSTALL_DIR}"/install-config.yaml
 
-if [[ "${DISCONNECTED_INSTALL:-no}" == "yes" ]]; then
-  log "Generating ephemeral SSH keypair for bootstrap gather (disconnected)"
-  ssh-keygen -t ed25519 -N '' -C 'pext-gather' -f "${SHARED_DIR}/gather-sshkey" -q
-  chmod 0600 "${SHARED_DIR}/gather-sshkey"
-  gather_pub=$(<"${SHARED_DIR}/gather-sshkey.pub")
-  log "Appending ephemeral gather pubkey to install-config sshKey"
-  install_yq4
-  existing_key=$(yq4 '.sshKey' "${INSTALL_DIR}/install-config.yaml")
-  yq4 -i ".sshKey = \"${existing_key}
-${gather_pub}\"" "${INSTALL_DIR}/install-config.yaml"
-fi
-
 # Extracting openshift-install from the release image.
 # This is necessary to avoid using the upi-installer binary, which is not available in the release image,
 # and to ensure manifests will be created with the installed binary instead
