@@ -65,6 +65,21 @@ images:
           && rm -f openshift-client-linux.tar.gz
       USER 1001
     to: acs-smoke-runner
+  - dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9/go-toolset:1.24 AS builder
+      USER root
+      RUN git clone https://github.com/stolostron/policy-collection.git /src/policy-collection \
+          && cd /src/policy-collection \
+          && git checkout 6d80aff5dda558516fced50640d028bce8dd2341 \
+          && git rev-parse HEAD \
+          && cd openshift-tests-ext \
+          && mkdir -p /out \
+          && CGO_ENABLED=0 GOFLAGS=-mod=mod go build -trimpath -ldflags='-s -w' -o /out/acm-policy-tests ./cmd/acm-policy-tests/... \
+          && gzip -9 -c /out/acm-policy-tests > /out/acm-policy-tests.gz
+
+      FROM registry.ci.openshift.org/ocp/4.22:tests
+      COPY --from=builder /out/acm-policy-tests.gz /usr/bin/acm-policy-tests.gz
+    to: acm-policy-tests-composite
 releases:
   latest:
     candidate:
