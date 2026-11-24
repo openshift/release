@@ -103,19 +103,25 @@ else
     #   cd /tmp && unzip -q awscliv2.zip && ./aws/install --bin-dir /tmp/aws-bin --install-dir /tmp/aws-cli
     #   export PATH="/tmp/aws-bin:${PATH}"; aws --version
     # Layered, guarded, fail-soft: try v2 bundle if curl+unzip exist, else pip3, else loud-skip.
+    typeset awsArchive=""
     if ! command -v aws >/dev/null 2>&1; then
         if command -v curl >/dev/null 2>&1 && command -v unzip >/dev/null 2>&1; then
             echo "aws CLI not found, bootstrapping AWS CLI v2 bundle (INTEROP-9517 precedent)..." >&2
-            if curl -fsSL --connect-timeout 15 --max-time 300 "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip 2>&1; then
-                if cd /tmp && unzip -q awscliv2.zip 2>&1 && ./aws/install --bin-dir /tmp/aws-bin --install-dir /tmp/aws-cli 2>/dev/null; then
+            awsArchive="$(mktemp /tmp/awscliv2-XXXXXX.zip)"
+            trap 'rm -f "${awsArchive:-}" 2>/dev/null || true' RETURN
+            if curl -fsSL --connect-timeout 15 --max-time 300 "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "${awsArchive}" 2>&1; then
+                if unzip -q "${awsArchive}" -d /tmp 2>&1 && /tmp/aws/install --bin-dir /tmp/aws-bin --install-dir /tmp/aws-cli 2>/dev/null; then
                     export PATH="/tmp/aws-bin:${PATH}"
                     aws --version 2>&1 || true
                 else
                     echo "WARNING: AWS CLI v2 bundle install failed" >&2 || true
                 fi
-                cd - >/dev/null 2>&1 || true
+                rm -f "${awsArchive}" 2>/dev/null || true
+                trap - RETURN 2>/dev/null || true
             else
                 echo "WARNING: failed to download AWS CLI v2 bundle" >&2 || true
+                rm -f "${awsArchive}" 2>/dev/null || true
+                trap - RETURN 2>/dev/null || true
             fi
         fi
         if ! command -v aws >/dev/null 2>&1 && command -v pip3 >/dev/null 2>&1; then
@@ -146,6 +152,12 @@ else
         echo "No CLC-created opp-aws-* clusters discovered, skipping VPC tagging" 
     else
         typeset taggedCount=0
+        # Bound the tagging phase with a deadline derived from the step budget
+        typeset -i taggingStartSec=0
+        taggingStartSec=$(date +%s)
+        typeset -i taggingTimeoutSec=300
+        typeset -i taggingDeadlineSec=$(( taggingStartSec + taggingTimeoutSec ))
+        typeset taggingTimedOut=false
         # Region: active account regions (leaked inventory was all us-east-2); scan 3 to cover rotation.
         typeset regions="us-east-2 us-east-1 us-west-2"
         # Allow optionFile to override if it carries a region (not proven to exist, best-effort).
@@ -157,6 +169,11 @@ else
             fi
         fi
         for clusterName in ${clusterNames}; do
+            if (( $(date +%s) > taggingDeadlineSec )); then
+                echo "ERROR: VPC tagging exceeded deadline (${taggingTimeoutSec}s); stopping tagging (deadline derived from step budget)" >&2
+                taggingTimedOut=true
+                break
+            fi
             [[ -z "${clusterName:-}" ]] && continue
             echo "Processing CLC cluster ${clusterName}..." 
             for region in ${regions}; do
@@ -192,7 +209,11 @@ else
                 done
             done
         done
-        echo "VPC tagging complete: ${taggedCount} VPC(s) tagged with expirationDate=${expirationDate}" 
+        if [[ "${taggingTimedOut}" == "true" ]]; then
+            echo "ERROR: VPC tagging timed out after ${taggingTimeoutSec}s (deadline derived from step budget); tagged ${taggedCount} VPC(s) before timeout" >&2
+        else
+            echo "VPC tagging complete: ${taggedCount} VPC(s) tagged with expirationDate=${expirationDate}" 
+        fi
     fi
     fi
 fi
