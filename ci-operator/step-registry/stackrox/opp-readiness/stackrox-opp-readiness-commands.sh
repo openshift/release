@@ -138,6 +138,32 @@ _finalize() {
     return "${_fin}"
 }
 
+_ensure_assertion_rows() {
+    typeset _a="" _c="" _found=0
+    typeset _need_selftest=1
+    for _c in "${_CASES[@]:-}"; do
+        if [[ "${_c}" == *"<testcase name=\"acs-preflight-selftest\""* ]]; then
+            _need_selftest=0
+            break
+        fi
+    done
+    if (( _need_selftest )); then
+        _add_case "acs-preflight-selftest" skipped "NotEvaluated" "selftest not evaluated (early exit)"
+    fi
+    for _a in central-crd securedcluster-crd central-route central-api-insecure-tls clusters-connected policies-loaded sensor-ready; do
+        _found=0
+        for _c in "${_CASES[@]:-}"; do
+            if [[ "${_c}" == *"<testcase name=\"${_a}\""* ]]; then
+                _found=1
+                break
+            fi
+        done
+        if (( _found == 0 )); then
+            _add_case "${_a}" skipped "NotEvaluated" "assertion not evaluated (early exit, state=${_ACS_STATE:-unclassified})"
+        fi
+    done
+}
+
 # Pre-seed a default-failing carrier: a hard SIGKILL before classification
 # leaves a failing artifact on disk (never green; D6 / 9525 contract).
 _ACS_STATE="unknown"
@@ -161,7 +187,7 @@ _terminate() {
 trap '_terminate TERM' TERM
 trap '_terminate INT' INT
 _jrc=0
-trap '_jrc=$?; set +e; set +x; rm -f "${_curlCfg:-}"; if (( _jrc != 0 && _N_FAILURES == 0 )); then _add_case "step-exited-nonzero" failed "StepExit" "step exited ${_jrc} without a recorded failure (state=${_ACS_STATE:-unclassified})"; fi; typeset -i _fin_rc=0; _finalize || _fin_rc=1; if (( _fin_rc != 0 && _jrc == 0 )); then _jrc=1; fi; exit "${_jrc}"' EXIT
+trap '_jrc=$?; set +e; set +x; rm -f "${_curlCfg:-}"; _ensure_assertion_rows; if (( _jrc != 0 && _N_FAILURES == 0 )); then _add_case "step-exited-nonzero" failed "StepExit" "step exited ${_jrc} without a recorded failure (state=${_ACS_STATE:-unclassified})"; fi; typeset -i _fin_rc=0; _finalize || _fin_rc=1; if (( _fin_rc != 0 && _jrc == 0 )); then _jrc=1; fi; exit "${_jrc}"' EXIT
 
 # ---------------------------------------------------------------------------
 # Env-seam validation (fail-closed, unconditional - runs even when
@@ -173,6 +199,7 @@ for _seam in ACS_POLL_INTERVAL_S ACS_WAIT_TIMEOUT_S ACS_BUDGET_S; do
     if ! [[ "${!_seam}" =~ ^[1-9][0-9]*$ ]]; then
         _add_case "acs-env-invalid" failed "InvalidInput" \
             "${_seam} must be a positive integer (got: '${!_seam}'); fail-closed"
+        _ensure_assertion_rows
         echo "[readiness] FATAL: invalid ${_seam}='${!_seam}'"
         exit 2
     fi
@@ -587,6 +614,7 @@ case "${ACS_EXPECTATION}" in
         _ACS_STATE="unknown"
         _add_classification "acs-expectation-invalid" failed "InvalidInput" \
             "ACS_EXPECTATION must be 'required' or 'absent-by-design' (got: '${ACS_EXPECTATION:-unset}'); fail-closed"
+        _ensure_assertion_rows
         echo "[readiness] FATAL: invalid ACS_EXPECTATION '${ACS_EXPECTATION:-unset}'"
         exit 2
         ;;
@@ -594,6 +622,7 @@ esac
 
 if [[ "${ACS_SELFTEST}" != "false" ]]; then
     if ! _run_selftest; then
+        _ensure_assertion_rows
         exit 2
     fi
 fi
@@ -620,6 +649,7 @@ fi
 if [[ "${_ACS_STATE}" == "unknown" ]]; then
     _add_classification "acs-state-indeterminate" failed "Classification" \
         "acs-unclassified:central-query/read failed after 3 attempts; never classified as absent without a successful read"
+    _ensure_assertion_rows
     exit 3
 fi
 
