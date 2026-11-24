@@ -426,7 +426,7 @@ done
 if (( _deps_rc != 0 )); then
     echo "[smoke] Deployment read failed in ${_centralNs} (status ${_deps_rc}); scanner readiness gate not evaluated"
     _add_case "scanner-v4-ready" failed "Environment" "deployment read failed in ${_centralNs} (oc get deployment status ${_deps_rc}); the scanner readiness gate was not evaluated"
-elif ! grep -q 'scanner-v4-matcher' <<< "${_deps}"; then
+elif ! grep -qx 'deployment.apps/scanner-v4-matcher' <<< "${_deps}"; then
     echo "[smoke] Scanner V4 matcher not deployed in ${_centralNs}; skipping scanner readiness gate"
     _add_case "scanner-v4-ready" skipped "ScannerGate" "no scanner-v4-matcher deployment in ${_centralNs}; scan-dependent results follow suite behavior"
 else
