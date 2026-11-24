@@ -670,6 +670,9 @@ esac
 
 if [[ "${ACS_SELFTEST}" != "false" ]]; then
     if ! _run_selftest; then
+        if [[ -z "${_CLASSIFICATION_CASE}" ]]; then
+            _add_classification "acs-selftest-failed" failed "SelfTest" "acs-preflight-selftest failed: machinery validation"
+        fi
         _ensure_assertion_rows
         exit 2
     fi
