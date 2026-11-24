@@ -1050,7 +1050,7 @@ fi
 # aggregation is a ticket-level rule, NOT computed here.
 write_status_properties() {
   python3 - "$EVIDENCE_DIR" <<'PYEOF'
-import json, sys
+import json, os, sys
 from pathlib import Path
 
 ev = Path(sys.argv[1])
@@ -1089,6 +1089,11 @@ def as_list(name):
 
 ops_s, ops = as_list("01-operatorpolicy.json")
 subs_s, subs = as_list("03-subscription.json")
+# A failed refresh is recorded in a shell flag, so it holds even when the
+# probe_error write to 03-subscription.json is refused and an earlier
+# capture stays readable.
+if os.environ.get("ACS_SUB_REFRESH_FAILED") == "true":
+    subs_s, subs = "query_failed", []
 csvs_s, csvs = as_list("05-csv.json")
 central_s, central = as_list("07-central-cr.json")
 acm_s, acm = as_list("11-acm-csv-addon-controller.json")
@@ -1377,6 +1382,7 @@ PYEOF
 # and the later CSV/PackageManifest captures. Bounded and classified like
 # the initial capture: a failed re-read writes probe_error so relevant
 # terms become unknown rather than silently keeping the earlier value.
+_sub_refresh_failed=false
 if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" != "1" ]]; then
   _sub_refresh_ok=false
   _sub_refresh_out=""
@@ -1410,18 +1416,21 @@ for i in data.get("items", []):
     })
 print(json.dumps(result, indent=2))
 ' > "${EVIDENCE_DIR}/03-subscription.json.tmp" || {
+      _sub_refresh_failed=true
       echo "probe_error: subscription query failed" > "${EVIDENCE_DIR}/03-subscription.json"
       echo "probe_error: subscription query failed" > "${EVIDENCE_DIR}/03-subscription.refresh-failed"
       rm -f "${EVIDENCE_DIR}/03-subscription.json.tmp"
     }
     if [[ -f "${EVIDENCE_DIR}/03-subscription.json.tmp" ]]; then
       if ! mv -f "${EVIDENCE_DIR}/03-subscription.json.tmp" "${EVIDENCE_DIR}/03-subscription.json"; then
+        _sub_refresh_failed=true
         echo "probe_error: subscription refresh mv failed" > "${EVIDENCE_DIR}/03-subscription.json"
         echo "probe_error: subscription refresh mv failed" > "${EVIDENCE_DIR}/03-subscription.refresh-failed"
       fi
       rm -f "${EVIDENCE_DIR}/03-subscription.json.tmp"
     fi
   else
+    _sub_refresh_failed=true
     echo "probe_error: subscription re-read failed after 3 attempts" > "${EVIDENCE_DIR}/03-subscription.json"
     echo "probe_error: subscription re-read failed after 3 attempts" > "${EVIDENCE_DIR}/03-subscription.refresh-failed"
   fi
@@ -1433,7 +1442,7 @@ _properties_rc=0
 if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" == "1" ]]; then
     :
 else
-    if ! write_status_properties; then
+    if ! EVIDENCE_DIR="${EVIDENCE_DIR}" ACS_SUB_REFRESH_FAILED="${_sub_refresh_failed}" write_status_properties; then
         echo "ASSERTION FAILURE (21): acs-central-status.properties could not be written, so the removal predicate terms are missing from the evidence" >&2
         _properties_rc=21
     fi
@@ -1466,6 +1475,10 @@ run_assertions() {
       failed=21
     fi
   done
+  if [[ "${_sub_refresh_failed}" == "true" ]]; then
+    echo "ASSERTION FAILURE (21): the Subscription refresh failed, so the subscription terms are unknown"
+    failed=21
+  fi
   # (b) Packagemanifest agreement: the per-package capture is selected from
   #     the catalog the subscription subscribes to, so the inventory must
   #     list rhacs-operator in that catalog exactly when the capture reports
