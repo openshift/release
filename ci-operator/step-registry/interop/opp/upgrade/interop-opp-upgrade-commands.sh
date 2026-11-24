@@ -514,29 +514,33 @@ function SettleOppOperatorCsvs () {
     typeset -A settlePrevMap=()
     typeset -i stableCount=0
     typeset -i elapsed=0
-    typeset settleCsvs='' settleOp='' settlePhase=''
+    typeset settleCsvs='' settleOp='' settlePhase='' settleObs=''
     while (( SECONDS < deadline )); do
         typeset -i _remaining=$(( deadline - SECONDS ))
         (( _remaining <= 0 )) && break
         settleCsvs="$(oc get csv -A --request-timeout="${_remaining}s" -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.phase}}{{end}}{{"\n"}}{{end}}' 2>/dev/null || true)"
         stableCount=0
         for settleOp in "${settleOpsArr[@]}"; do
-            # PRRT_kwDOBHvUUM65RJot: require consecutive identical currentCSV observations (2x) to avoid race
-            typeset _prevPhase="${settlePrevMap[${settleOp}]:-}"
-            settlePhase="$(awk -F'\t' -v op="${settleOp}" 'index($2, op) == 1 {print $3; exit}' <<< "${settleCsvs}")"
-            if [[ "${_prevPhase}" != "${settlePhase}" ]]; then
-                echo "CSV phase changed ${_prevPhase} -> ${settlePhase}, resetting consecutive" >&2
+            # PRRT_kwDOBHvUUM65RJot: require consecutive identical currentCSV
+            # observations (2x). The observation is the CSV name and its phase,
+            # so two different matching CSVs that both report Succeeded on
+            # successive reads are a name change, not a stable CSV.
+            settleObs="$(awk -F'\t' -v op="${settleOp}" 'index($2, op) == 1 {printf "%s\t%s", $2, $3; exit}' <<< "${settleCsvs}")"
+            settlePhase="${settleObs#*$'\t'}"
+            typeset _prevObs="${settlePrevMap[${settleOp}]:-}"
+            if [[ "${_prevObs}" != "${settleObs}" ]]; then
+                echo "CSV observation changed ${_prevObs:-none} -> ${settleObs:-none}, resetting consecutive" >&2
             fi
             # Only a terminal phase counts as settled: a CSV stuck in
             # Replacing/InstallReady must keep the full window (that is the
             # convergence tolerance the fixed sleep provided), while a CSV
             # already reporting Succeeded/Failed shortens the settle.
             if [[ "${settlePhase}" == "Succeeded" || "${settlePhase}" == "Failed" ]]; then
-                if [[ "${settlePrevMap[${settleOp}]:-}" == "${settlePhase}" ]]; then
+                if [[ "${_prevObs}" == "${settleObs}" ]]; then
                     (( stableCount += 1 ))
                 fi
             fi
-            settlePrevMap["${settleOp}"]="${settlePhase}"
+            settlePrevMap["${settleOp}"]="${settleObs}"
         done
         if (( stableCount == ${#settleOpsArr[@]} )); then
             elapsed=$(( window - (deadline - SECONDS) ))
