@@ -18,14 +18,14 @@ _oc_get_bounded() {
   _now=$(date +%s)
   typeset -i _remain=$(( stepDeadline - _now - 120 ))
   (( _remain < 10 )) && _remain=10
-  timeout "${_remain}s" oc "$@" 2>&1
+  timeout "${_remain}s" oc "$@"
 }
 _oc_get_json_bounded() {
   typeset -i _now
   _now=$(date +%s)
   typeset -i _remain=$(( stepDeadline - _now - 120 ))
   (( _remain < 10 )) && _remain=10
-  timeout "${_remain}s" oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' 2>&1
+  timeout "${_remain}s" oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}'
 }
 
 # --- JUnit carrier ---------------------------------------------------
@@ -565,7 +565,7 @@ ExpectedPolicyNames () {
   _ep_now=$(date +%s)
   typeset -i _ep_remain=$(( stepDeadline - _ep_now - 120 ))
   (( _ep_remain < 10 )) && _ep_remain=10
-  setsJson="$(timeout "${_ep_remain}s" oc get policysets.policy.open-cluster-management.io -n policies -o json 2>&1)" || return 1
+  setsJson="$(timeout "${_ep_remain}s" oc get policysets.policy.open-cluster-management.io -n policies -o json)" || return 1
   if [[ -z "${setsJson}" ]]; then
     return 1
   fi
