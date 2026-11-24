@@ -62,9 +62,29 @@ sys.exit(0 if names and all(n.startswith(sys.argv[2]) for n in names) else 1)
           _mergedValid=0
       fi
   fi
+  # A merged report that survived this run's initialization removal is the
+  # earlier run's file unless this run's merge replaced it: the survivor only
+  # counts when it was written after this run started.
+  if [[ "${_staleMergedSurvived:-false}" == "true" ]] \
+      && (( _mergedValid == 1 )) \
+      && [[ -e "${_sharedMerged}" ]]; then
+      typeset -i _mergedMtime=0
+      _mergedMtime="$(stat -c %Y "${_sharedMerged}" 2>/dev/null || echo 0)"
+      if (( _mergedMtime <= ${suiteStart:-0} )); then
+          _mergedValid=0
+      fi
+  fi
   # A merge that did not validate must not sit in the reporter glob.
   if (( _mergedValid == 0 )) && [[ -e "${_sharedMerged}" ]]; then
       rm -f "${_sharedMerged}"
+      # A read-only SHARED_DIR can keep both the removal and this run's merge
+      # from replacing the earlier report; overwriting the file itself needs
+      # only file write permission, not directory write, and leaves the
+      # reporter this run's raw report instead of the earlier verdict.
+      if [[ "${_staleMergedSurvived:-false}" == "true" ]] \
+          && [[ -e "${_sharedMerged}" ]] && [[ -s "${junitFile:-}" ]]; then
+          cp -f "${junitFile}" "${_sharedMerged}" 2>/dev/null || true
+      fi
   fi
   if (( _genRc != 0 && exitCode == 0 )); then
       echo "ERROR: JUnit report generation failed for otherwise successful run" >&2
@@ -112,6 +132,10 @@ typeset junitFile="${ARTIFACT_DIR}/junit_interop-quay-smoke-acs-odf-registry.xml
 # never accept a stale report this run could not clear.
 rm -f "${SHARED_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml" 2>/dev/null || true
 typeset _staleMergedReport="${SHARED_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml"
+# The survivor flag is what the EXIT trap keys on: a report the removal could
+# not clear is only routable when this run's merge replaced it afterwards.
+typeset _staleMergedSurvived=false
+[[ -e "${_staleMergedReport}" ]] && _staleMergedSurvived=true
 
 # Suite naming for the JUnit post-processing library: compose its suite-name
 # template from the component-suffixed prefix variable the consuming job sets.
@@ -171,18 +195,6 @@ function RecordResult () {
     testFailureMsg["${name}"]="${msg}"
     true
 }
-
-# Fail closed on an uncleared stale report: the removal above ran before the
-# test table existed, so its outcome is verified here, where a failure can be
-# recorded on every row. A readable earlier report that survives the removal
-# would otherwise be accepted by the EXIT trap as this run's result.
-if [[ -e "${_staleMergedReport}" ]]; then
-    echo "FATAL: the merged report from an earlier run is still present at ${_staleMergedReport} and could not be removed; refusing to let the EXIT trap route it as this run's result" >&2
-    for t in "${allTests[@]}"; do
-        RecordResult "${t}" "failed" "stale merged report from an earlier run could not be removed from ${SHARED_DIR:-/tmp}; this run's result cannot be published safely"
-    done
-    exit 1
-fi
 
 # shellcheck disable=SC2317,SC2329
 function GenerateJunit () {
@@ -1932,6 +1944,18 @@ function Main () {
 
     exit "${status}"
 }
+
+# Fail closed on an uncleared stale report, after every reporting function is
+# defined: the failure rows are recorded here, the EXIT trap writes them to the
+# raw report in ARTIFACT_DIR, and the trap's stale-survivor rule keeps the
+# earlier report out of the reporter glob even when it cannot be removed.
+if [[ "${_staleMergedSurvived}" == "true" ]]; then
+    echo "FATAL: the merged report from an earlier run is still present at ${_staleMergedReport} and could not be removed; refusing to let the EXIT trap route it as this run's result" >&2
+    for t in "${allTests[@]}"; do
+        RecordResult "${t}" "failed" "stale merged report from an earlier run could not be removed from ${SHARED_DIR:-/tmp}; this run's result cannot be published safely"
+    done
+    exit 1
+fi
 
 Main "$@"
 
