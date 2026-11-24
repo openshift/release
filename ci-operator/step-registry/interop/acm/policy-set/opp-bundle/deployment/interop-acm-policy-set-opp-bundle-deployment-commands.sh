@@ -400,16 +400,37 @@ while (( $(date +%s) < quayDeadline )) && (( $(date +%s) < stepDeadline - 120 ))
       quayName="$(printf '%s' "${quayJson}" | jq -r '[.items[] | select(.metadata.name=="registry")][0].metadata.name // empty')" || quayName=""
       if [[ -z "${quayName}" ]]; then
         printf '%s\n' "Warning: could not determine QuayRegistry name in namespace ${ns}; skipping it" >&2
-      elif ! oc wait "quayregistry/${quayName}" -n "${ns}" \
-        --for condition=Available=True \
-        --timeout=$(( _quayRemain < 600 ? _quayRemain : 600 ))s; then
-        RecordResult "quay-registry-available" "failed" "QuayRegistry in namespace ${ns} did not become Available within 10 minutes" "$(( $(date +%s) - quayStart ))"
-        oc get quayregistry -n "${ns}" --ignore-not-found -o yaml || true
-        oc describe quayregistry -n "${ns}" || true
-        exit 1
       else
-        RecordResult "quay-registry-available" "passed" "" "$(( $(date +%s) - quayStart ))"
-        quayFound=true
+        # Recompute the remaining budget here: the read above spent part of it,
+        # so the wait must not reuse the pre-read figure.
+        typeset -i _quayWaitDiscovery=$(( quayDeadline - $(date +%s) ))
+        typeset -i _quayWaitStep=$(( stepDeadline - $(date +%s) - 120 ))
+        typeset -i _quayWaitRemain=$(( _quayWaitDiscovery < _quayWaitStep ? _quayWaitDiscovery : _quayWaitStep ))
+        if (( _quayWaitRemain <= 0 )); then
+          printf '%s\n' "Warning: no remaining budget to wait for QuayRegistry/${quayName} in ${ns}" >&2
+          break
+        fi
+        typeset -i _quayWaitTimeout=$(( _quayWaitRemain < 600 ? _quayWaitRemain : 600 ))
+        if ! oc wait "quayregistry/${quayName}" -n "${ns}" \
+          --for condition=Available=True \
+          --timeout="${_quayWaitTimeout}s"; then
+          RecordResult "quay-registry-available" "failed" "QuayRegistry/${quayName} in namespace ${ns} did not become Available within ${_quayWaitTimeout}s" "$(( $(date +%s) - quayStart ))"
+          typeset -i _quayDiagDeadline=$(( stepDeadline - 30 ))
+          typeset -i _quayDiagRemain=$(( _quayDiagDeadline - $(date +%s) ))
+          if (( _quayDiagRemain > 0 )); then
+            typeset -i _quayDiagTimeout=$(( _quayDiagRemain < 60 ? _quayDiagRemain : 60 ))
+            timeout "${_quayDiagTimeout}s" oc get quayregistry -n "${ns}" --ignore-not-found -o yaml || true
+            _quayDiagRemain=$(( _quayDiagDeadline - $(date +%s) ))
+            if (( _quayDiagRemain > 0 )); then
+              _quayDiagTimeout=$(( _quayDiagRemain < 60 ? _quayDiagRemain : 60 ))
+              timeout "${_quayDiagTimeout}s" oc describe quayregistry -n "${ns}" || true
+            fi
+          fi
+          exit 1
+        else
+          RecordResult "quay-registry-available" "passed" "" "$(( $(date +%s) - quayStart ))"
+          quayFound=true
+        fi
       fi
     fi
   fi
@@ -455,7 +476,6 @@ if [[ "${quayFound}" == "false" ]]; then
   fi
   RecordResult "quay-registry-available" "skipped" "No QuayRegistry found in namespace ${quayPrimaryNs}" "$(( $(date +%s) - quayStart ))"
 fi
-
 # ── LPC_LP_OPP__ACM_PS__SKIP_POLICIES handling ──────────────────────────────────────────
 # LPC_LP_OPP__ACM_PS__SKIP_POLICIES: comma-separated policy names to exclude
 # from the compliance wait.  Empty (default) means wait for ALL policies.
