@@ -381,7 +381,7 @@ while (( $(date +%s) < quayDeadline )) && (( $(date +%s) < stepDeadline - 120 ))
   typeset -i _quayRemainDiscovery=$(( quayDeadline - $(date +%s) ))
   typeset -i _quayRemainStep=$(( stepDeadline - $(date +%s) - 120 ))
   typeset -i _quayRemain=$(( _quayRemainDiscovery < _quayRemainStep ? _quayRemainDiscovery : _quayRemainStep ))
-  (( _quayRemain < 10 )) && _quayRemain=10
+  if (( _quayRemain <= 0 )); then break; fi
   quayJson="$(timeout "${_quayRemain}s" oc get quayregistry -n "${ns}" --request-timeout="${_quayRemain}s" -o json 2>&1)" || quayQueryRc=$?
   if (( quayQueryRc != 0 )); then
     quayQueryErr="${quayJson}"
@@ -402,7 +402,7 @@ while (( $(date +%s) < quayDeadline )) && (( $(date +%s) < stepDeadline - 120 ))
         printf '%s\n' "Warning: could not determine QuayRegistry name in namespace ${ns}; skipping it" >&2
       elif ! oc wait "quayregistry/${quayName}" -n "${ns}" \
         --for condition=Available=True \
-        --timeout=10m; then
+        --timeout=$(( _quayRemain < 600 ? _quayRemain : 600 ))s; then
         RecordResult "quay-registry-available" "failed" "QuayRegistry in namespace ${ns} did not become Available within 10 minutes" "$(( $(date +%s) - quayStart ))"
         oc get quayregistry -n "${ns}" --ignore-not-found -o yaml || true
         oc describe quayregistry -n "${ns}" || true
@@ -421,7 +421,7 @@ while (( $(date +%s) < quayDeadline )) && (( $(date +%s) < stepDeadline - 120 ))
       typeset -i _quayRemainDiscovery=$(( quayDeadline - $(date +%s) ))
       typeset -i _quayRemainStep=$(( stepDeadline - $(date +%s) - 120 ))
       typeset -i _quayRemain=$(( _quayRemainDiscovery < _quayRemainStep ? _quayRemainDiscovery : _quayRemainStep ))
-      (( _quayRemain < 10 )) && _quayRemain=10
+      if (( _quayRemain <= 0 )); then break; fi
       outJson="$(timeout "${_quayRemain}s" oc get quayregistry -n "${ns}" --request-timeout="${_quayRemain}s" -o json 2>&1)" || outRc=$?
       if (( outRc != 0 )); then
         continue
@@ -440,7 +440,11 @@ while (( $(date +%s) < quayDeadline )) && (( $(date +%s) < stepDeadline - 120 ))
   fi
   # Poll interval if no registry found in this pass and neither budget is exhausted
   if [[ "${quayFound}" == "false" ]] && (( $(date +%s) < quayDeadline )) && (( $(date +%s) < stepDeadline - 120 )); then
-    sleep "${_quayPollInterval}"
+    typeset -i _quaySleep=$(( quayDeadline - $(date +%s) ))
+    typeset -i _quaySleepStep=$(( stepDeadline - $(date +%s) - 120 ))
+    (( _quaySleepStep < _quaySleep )) && _quaySleep=${_quaySleepStep}
+    (( _quayPollInterval < _quaySleep )) && _quaySleep=${_quayPollInterval}
+    if (( _quaySleep > 0 )); then sleep "${_quaySleep}"; fi
   fi
 done
 if [[ "${quayFound}" == "false" ]]; then
