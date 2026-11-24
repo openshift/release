@@ -169,6 +169,29 @@ rhacs-operator-controller-7f6d8b9c-t9m4c      1/2     Running     3     20m"
         (( failures += 1 ))
     fi
 
+    # Cross-namespace case: the CSV listing is cluster-wide and holds a
+    # same-named CSV in another namespace that reports the wrong phase. Only
+    # the CSV in the Subscription's namespace may supply the phase.
+    typeset _csvCross=""
+    _csvCross="$(printf 'other\trhacs-operator.v4.10.0\tSucceeded\nocm\trhacs-operator.v4.10.0\tInstalling')"
+    _subFixture="$(printf 'ocm\trhacs-operator\trhacs-operator.v4.10.0\trhacs-operator.v4.9.0')"
+    expected="rhacs-operator.v4.10.0${_tab}Installing"
+    got="$(_select_target_csv 'rhacs-operator' "${_csvCross}" "${_subFixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: a same-named CSV in another namespace must not supply the phase; expected '${expected}' got '${got}'"
+        (( failures += 1 ))
+    fi
+
+    # Cross-namespace absence: the Subscription's namespace holds no such CSV,
+    # so the name match elsewhere must not stand in for it.
+    _csvCross="$(printf 'other\trhacs-operator.v4.10.0\tSucceeded')"
+    expected="rhacs-operator.v4.10.0${_tab}TargetAbsent"
+    got="$(_select_target_csv 'rhacs-operator' "${_csvCross}" "${_subFixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: a missing namespaced target must report TargetAbsent; expected '${expected}' got '${got}'"
+        (( failures += 1 ))
+    fi
+
     # Fallback case 1: no Subscription read (empty listing) keeps the prefix match.
     expected="rhacs-operator.v4.9.0${_tab}Succeeded"
     got="$(_select_target_csv 'rhacs-operator' "${_csvFixture}" '')"
@@ -215,7 +238,7 @@ rhacs-operator-controller-7f6d8b9c-t9m4c      1/2     Running     3     20m"
         echo "FATAL: pod-readiness predicate self-test failed; step semantics are not the reviewed ones."
         return 1
     fi
-    echo ">>> selftest: pod-readiness predicate OK (installer/bootstrap excluded, real failures kept, partially ready Running pods kept, subscription CSV selection OK (target present, named-but-absent TargetAbsent, unreadable listing, foreign Subscription))"
+    echo ">>> selftest: pod-readiness predicate OK (installer/bootstrap excluded, real failures kept, partially ready Running pods kept, subscription CSV selection OK (target present, named-but-absent TargetAbsent, cross-namespace name collision, unreadable listing, foreign Subscription))"
 }
 
 function DebugOnExit () {
@@ -555,8 +578,11 @@ function ValidatePlatformHealth () {
 
 # Print "<name>\t<phase>" for the CSV the operator's Subscription is converging
 # to. The Subscription status.currentCSV (installedCSV as a fallback) names that
-# CSV, so a superseded CSV that still reports Succeeded cannot stand in for a
-# target that is still Installing. When no Subscription names a CSV, or the
+# CSV, and the Subscription's namespace names where to look for it: the CSV
+# listing is cluster-wide, so the matched CSV must sit in that namespace or a
+# same-named CSV elsewhere supplies the phase. A superseded CSV that still
+# reports Succeeded cannot stand in for a target that is still Installing.
+# When no Subscription names a CSV, or the
 # Subscription listing came back empty (the read failed), the first name-prefix
 # match is used, which keeps the previous behavior as a fallback. When the
 # listing was read and a naming Subscription's CSV is not in the CSV listing,
@@ -568,15 +594,21 @@ function ValidatePlatformHealth () {
 # shellcheck disable=SC2317  # invoked from SettleOppOperatorCsvs and ValidateOppOperators
 function _select_target_csv () {
     typeset _selOp="${1}" _csvList="${2}" _subList="${3}"
-    typeset _want='' _hit=''
+    typeset _want='' _wantNs='' _hit=''
     if [[ -n "${_subList}" ]]; then
+        # Namespace and CSV name travel together: the CSV listing is
+        # cluster-wide, so a name-only match can select a same-named CSV from
+        # another namespace and adopt its phase for this operator.
         _want="$(awk -F'\t' -v op="${_selOp}" '
-            $3 != "" && index($3, op) == 1 { print $3; exit }
-            $4 != "" && index($4, op) == 1 { print $4; exit }
+            $3 != "" && index($3, op) == 1 { printf "%s\t%s", $1, $3; exit }
+            $4 != "" && index($4, op) == 1 { printf "%s\t%s", $1, $4; exit }
         ' <<< "${_subList}")"
     fi
     if [[ -n "${_want}" ]]; then
-        _hit="$(awk -F'\t' -v want="${_want}" '$2 == want { printf "%s\t%s", $2, $3; exit }' <<< "${_csvList}")"
+        _wantNs="${_want%%$'\t'*}"
+        _want="${_want#*$'\t'}"
+        _hit="$(awk -F'\t' -v want="${_want}" -v wantNs="${_wantNs}" \
+            '$1 == wantNs && $2 == want { printf "%s\t%s", $2, $3; exit }' <<< "${_csvList}")"
         if [[ -n "${_hit}" ]]; then
             printf '%s' "${_hit}"
             return 0
