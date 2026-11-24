@@ -1359,7 +1359,7 @@ if [[ "${ACS_EVIDENCE_SELF_TEST:-0}" != "1" ]]; then
   _sub_refresh_out=""
   _sub_refresh_err=$(mktemp)
   for _sub_refresh_try in 1 2 3; do
-    if _sub_refresh_out=$(oc get subscriptions.operators.coreos.com -A -o json 2>"${_sub_refresh_err}"); then
+    if _sub_refresh_out=$(oc get subscriptions.operators.coreos.com -A --request-timeout=30s -o json 2>"${_sub_refresh_err}"); then
       _sub_refresh_ok=true
       break
     fi
