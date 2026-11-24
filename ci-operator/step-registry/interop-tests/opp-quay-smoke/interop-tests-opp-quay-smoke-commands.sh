@@ -202,42 +202,45 @@ function GetQuayAuthOnce () {
     return 1
 }
 
+function _quay_cred_present () {
+    # Any usable credential ends the wait: quayadmin token, quayadmin password
+    # or the quaydevel password. Each read is bounded, so a stalled API call
+    # cannot outlive the budget.
+    if oc get secret quayadmin -n "${QUAY_NS}" --ignore-not-found \
+         --request-timeout=5s -o jsonpath='{.data.token}{.data.password}' 2>/dev/null | grep -q .; then
+        return 0
+    fi
+    if oc get secret quaydevel -n "${QUAY_NS}" --ignore-not-found \
+         --request-timeout=5s -o jsonpath='{.data.password}' 2>/dev/null | grep -q .; then
+        return 0
+    fi
+    return 1
+}
+
 function GetQuayAuth () {
-    # The quayadmin secret is provisioned by the create-admin-user Job from
-    # the policy-config-quay policy, which can still be running when the
-    # smoke starts. Wait for the object instead of polling the credential
-    # sources with a fixed sleep: --for=create covers the not-yet-created
-    # case, and the jsonpath wait covers the window where the secret exists
-    # but the Job has not written its token yet. Both stages share one
-    # bounded budget. A miss is not fatal here: GetQuayAuthOnce still tries
-    # the quaydevel secret and the user-initialize endpoint.
     typeset -i authBudgetSeconds=600
     typeset -i authDeadline=0
-    typeset -i authWait=0
-    # Check existing credential before waiting for quayadmin (avoid 600s wait when quaydevel already present)
-    if oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.token}' 2>/dev/null | grep -q .; then
-        : "existing quayadmin token present, skipping wait"
-    elif oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.password}' 2>/dev/null | grep -q .; then
-        : "existing quayadmin password present, skipping wait"
-    elif oc get secret quaydevel -n "${QUAY_NS}" -o jsonpath='{.data.password}' 2>/dev/null | grep -q .; then
-        : "existing quaydevel credential present, skipping quayadmin wait"
+    typeset -i authPollInterval=5
+    typeset -i authRemain=0 authSleep=0
+    if _quay_cred_present; then
+        : "existing Quay credential present, skipping wait"
     else
         authDeadline=$(( $(date +%s) + authBudgetSeconds ))
-        authWait=$(( authDeadline - $(date +%s) ))
-        if ! oc wait secret/quayadmin -n "${QUAY_NS}" --for=create --timeout="${authWait}s"; then
-        echo "WARN: quayadmin secret was not created within $(( authBudgetSeconds / 60 ))m; falling back to the other credential sources" >&2
-    else
-        authWait=$(( authDeadline - $(date +%s) ))
-        if (( authWait > 0 )) && ! oc wait secret/quayadmin -n "${QUAY_NS}" \
-            --for=jsonpath='{.data.token}' --timeout="${authWait}s" 2>/dev/null; then
-            # Token wait failed; password may already be usable (GetQuayAuthOnce accepts either).
-            if oc get secret quayadmin -n "${QUAY_NS}" -o jsonpath='{.data.password}' 2>/dev/null | grep -q .; then
-                : "quayadmin password present despite token wait failure; proceeding"
-            else
-                echo "WARN: quayadmin token was not written within $(( authBudgetSeconds / 60 ))m; falling back to the other credential sources" >&2
+        while (( $(date +%s) < authDeadline )); do
+            if _quay_cred_present; then
+                echo "INFO: a Quay credential appeared while waiting"
+                break
             fi
+            authRemain=$(( authDeadline - $(date +%s) ))
+            if (( authRemain <= 0 )); then
+                break
+            fi
+            authSleep=$(( authPollInterval < authRemain ? authPollInterval : authRemain ))
+            sleep "${authSleep}"
+        done
+        if (( $(date +%s) >= authDeadline )); then
+            echo "WARN: no Quay credential appeared within $(( authBudgetSeconds / 60 ))m; falling back to the other credential sources" >&2
         fi
-    fi
     fi
     GetQuayAuthOnce
 }
