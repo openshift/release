@@ -1238,20 +1238,22 @@ else:
 
 acm_version = None
 addon_images = []
-# PRRT_kwDOBHvUUM65yNGZ: fetch ACM version and controller image from same CSV for consistency
-for a in acm:
-    if a.get("version") and a.get("governancePolicyAddonControllerImages"):
-        acm_version = a["version"]
-        addon_images = a.get("governancePolicyAddonControllerImages") or []
-        break
-if acm_version is None:
-    for a in acm:
-        if a.get("version"):
-            acm_version = a["version"]
-            break
-if not addon_images:
-    for a in acm:
-        addon_images += a.get("governancePolicyAddonControllerImages") or []
+# The ACM version and the addon controller image describe one build, so both
+# are read from one CSV record. Exactly one record supplying both is
+# authoritative. When the capture holds no such record, or several that cannot
+# be told apart, both values report unknown: mixing a version from one record
+# with an image from another attributes the image of one build to another. The
+# full capture is retained in 11-acm-csv-addon-controller.json either way.
+_acm_records = [a for a in acm
+                if a.get("version") and a.get("governancePolicyAddonControllerImages")]
+if len(_acm_records) == 1:
+    acm_version = _acm_records[0]["version"]
+    addon_images = _acm_records[0]["governancePolicyAddonControllerImages"] or []
+elif len(_acm_records) > 1:
+    _acm_succeeded = [a for a in _acm_records if a.get("phase") == "Succeeded"]
+    if len(_acm_succeeded) == 1:
+        acm_version = _acm_succeeded[0]["version"]
+        addon_images = _acm_succeeded[0]["governancePolicyAddonControllerImages"] or []
 # Generation is a per-object counter: a Subscription generation and a CSV
 # generation are not comparable, so membership is carried by the currentCSV,
 # phase, channel and catalog terms below.
