@@ -378,7 +378,9 @@ while (( $(date +%s) < quayDeadline )) && [[ "${quayFound}" == "false" ]]; do
   ns="${quayPrimaryNs}"
   typeset quayJson="" quayQueryErr=""
   typeset -i quayQueryRc=0
-  quayJson="$(oc get quayregistry -n "${ns}" -o json 2>&1)" || quayQueryRc=$?
+  typeset -i _quayRemain=$(( stepDeadline - $(date +%s) - 120 ))
+  (( _quayRemain < 10 )) && _quayRemain=10
+  quayJson="$(timeout "${_quayRemain}s" oc get quayregistry -n "${ns}" --request-timeout="${_quayRemain}s" -o json 2>&1)" || quayQueryRc=$?
   if (( quayQueryRc != 0 )); then
     quayQueryErr="${quayJson}"
     if [[ "${quayQueryErr}" == *"doesn't have a resource type"* || "${quayQueryErr}" == *"No resources found"* ]]; then
@@ -392,16 +394,21 @@ while (( $(date +%s) < quayDeadline )) && [[ "${quayFound}" == "false" ]]; do
       printf '%s\n' "Warning: could not count QuayRegistry objects in namespace ${ns}; skipping it" >&2
     elif (( quayItemCount > 0 )); then
       : "Found Quay Operator deployment in namespace ${ns}, waiting for ready condition"
-      if ! oc wait quayregistry --all -n "${ns}" \
+      typeset quayName=""
+      quayName="$(printf '%s' "${quayJson}" | jq -r '.items[0].metadata.name // empty')" || quayName=""
+      if [[ -z "${quayName}" ]]; then
+        printf '%s\n' "Warning: could not determine QuayRegistry name in namespace ${ns}; skipping it" >&2
+      elif ! oc wait "quayregistry/${quayName}" -n "${ns}" \
         --for condition=Available=True \
         --timeout=10m; then
         RecordResult "quay-registry-available" "failed" "QuayRegistry in namespace ${ns} did not become Available within 10 minutes" "$(( $(date +%s) - quayStart ))"
-      oc get quayregistry -n "${ns}" --ignore-not-found -o yaml || true
-      oc describe quayregistry -n "${ns}" || true
-      exit 1
-    fi
-    RecordResult "quay-registry-available" "passed" "" "$(( $(date +%s) - quayStart ))"
-    quayFound=true
+        oc get quayregistry -n "${ns}" --ignore-not-found -o yaml || true
+        oc describe quayregistry -n "${ns}" || true
+        exit 1
+      else
+        RecordResult "quay-registry-available" "passed" "" "$(( $(date +%s) - quayStart ))"
+        quayFound=true
+      fi
     fi
   fi
   # Out-of-scope check: count registries in other namespaces for diagnostic only, without raw identifiers
