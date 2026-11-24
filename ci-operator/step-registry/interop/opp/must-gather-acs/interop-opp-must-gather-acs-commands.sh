@@ -601,6 +601,10 @@ for i in data.get("items", []):
     result.append({
         "name": i["metadata"]["name"],
         "namespace": i["metadata"].get("namespace", ""),
+        # metadata.uid names the object, not its state: a Subscription deleted
+        # and recreated under the same name and namespace keeps the name,
+        # namespace and generation but gets a new uid.
+        "uid": i["metadata"].get("uid"),
         "apiVersion": i.get("apiVersion"),
         "currentCSV": i.get("status", {}).get("currentCSV"),
         "state": i.get("status", {}).get("state"),
@@ -1445,8 +1449,18 @@ if len(same_object) > 1:
     print("unknown")
     sys.exit(0)
 late_obj = same_object[0]
-print("changed" if any(early_obj.get(f) != late_obj.get(f) for f in FIELDS)
-      else "same")
+early_uid, late_uid = early_obj.get("uid"), late_obj.get("uid")
+if not early_uid or not late_uid:
+    # A capture that does not carry the uid cannot prove the object is the
+    # same one, which withholds readiness the same way a change does.
+    print("unknown")
+elif early_uid != late_uid:
+    # Same name and namespace, different object: the original was deleted and
+    # a replacement resolved the same CSV.
+    print("changed")
+else:
+    print("changed" if any(early_obj.get(f) != late_obj.get(f) for f in FIELDS)
+          else "same")
 PYEOF
 }
 
@@ -1491,6 +1505,7 @@ for i in data.get("items", []):
     result.append({
         "name": i["metadata"]["name"],
         "namespace": i["metadata"].get("namespace", ""),
+        "uid": i["metadata"].get("uid"),
         "apiVersion": i.get("apiVersion"),
         "currentCSV": i.get("status", {}).get("currentCSV"),
         "state": i.get("status", {}).get("state"),
@@ -2007,7 +2022,7 @@ FIXTURE
 [{"name": "operatorpolicy-rhacs-operator", "namespace": "policies", "spec": {"subscriptionName": "rhacs-operator", "subscriptionNamespace": "rhacs-operator", "channel": "stable", "remediationAction": "enforce", "complianceType": "musthave"}, "conditions": [{"type": "Compliant", "status": "True"}]}, {"name": "operatorpolicy-rhacs-operator", "namespace": "policies2", "spec": {"subscriptionName": "rhacs-operator", "subscriptionNamespace": "rhacs-operator", "channel": "stable", "remediationAction": "enforce", "complianceType": "musthave"}, "conditions": [{"type": "Compliant", "status": "True"}]}]
 FIXTURE
   cat > "${tmp}/03-subscription.json" <<'FIXTURE'
-[{"name": "rhacs-operator", "namespace": "rhacs-operator", "apiVersion": "operators.coreos.com/v1alpha1", "currentCSV": "rhacs-operator.v4.11.6", "state": "AtLatestKnown", "conditions": [], "channel": "stable", "source": "redhat-operators", "generation": 1}]
+[{"name": "rhacs-operator", "namespace": "rhacs-operator", "apiVersion": "operators.coreos.com/v1alpha1", "uid": "3f1c9e42-0000-4a1a-8a11-000000000001", "currentCSV": "rhacs-operator.v4.11.6", "state": "AtLatestKnown", "conditions": [], "channel": "stable", "source": "redhat-operators", "generation": 1}]
 FIXTURE
   echo '[{"name": "rhacs-operator.v4.11.6", "namespace": "rhacs-operator", "phase": "Succeeded", "reason": "Succeeded", "generation": 1}]' > "${tmp}/05-csv.json"
   echo '[{"name": "central", "namespace": "stackrox", "available": {"type": "Available", "status": "True"}}]' > "${tmp}/07-central-cr.json"
@@ -2085,7 +2100,7 @@ FIXTURE
   _st_expect_snapshot "${_st_early}" "${_st_late}" same
   # Mutations are derived from the early capture, so the fixture suite stays
   # independent of which Subscription state the earlier fixtures left behind.
-  _st_mutate() { # <mode: channel|generation|extra-object>
+  _st_mutate() { # <mode: channel|generation|uid|missing-uid|extra-object>
     python3 - "$1" "$2" "$3" <<'PYEOF'
 import json, sys
 
@@ -2095,6 +2110,10 @@ if mode == "channel":
     data[0]["channel"] = "stable-4.12"
 elif mode == "generation":
     data[0]["generation"] = 99
+elif mode == "uid":
+    data[0]["uid"] = "3f1c9e42-0000-4a1a-8a11-000000000002"
+elif mode == "missing-uid":
+    data[0].pop("uid", None)
 elif mode == "extra-object":
     extra = dict(data[0])
     extra["namespace"] = "other-ns"
@@ -2108,6 +2127,14 @@ PYEOF
   _st_expect_snapshot "${_st_early}" "${_st_late}" changed
   _st_mutate "${_st_early}" "${_st_late}" generation
   _st_expect_snapshot "${_st_early}" "${_st_late}" changed
+  # A replacement object can resolve the same currentCSV with the same
+  # generation: only the uid tells it from the object the run captured first.
+  _st_mutate "${_st_early}" "${_st_late}" uid
+  _st_expect_snapshot "${_st_early}" "${_st_late}" changed
+  # A capture without a uid cannot prove object identity, so it is unknown
+  # rather than same.
+  _st_mutate "${_st_early}" "${_st_late}" missing-uid
+  _st_expect_snapshot "${_st_early}" "${_st_late}" unknown
   # A different Subscription object appearing is not a change to this one.
   _st_mutate "${_st_early}" "${_st_late}" extra-object
   _st_expect_snapshot "${_st_early}" "${_st_late}" same
