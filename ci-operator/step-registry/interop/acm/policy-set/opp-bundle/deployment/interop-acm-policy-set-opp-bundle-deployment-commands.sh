@@ -411,7 +411,13 @@ while (( $(date +%s) < quayDeadline )) && (( $(date +%s) < stepDeadline - 120 ))
           break
         fi
         typeset -i _quayWaitTimeout=$(( _quayWaitRemain < 600 ? _quayWaitRemain : 600 ))
-        if ! oc wait "quayregistry/${quayName}" -n "${ns}" \
+        # Bound the whole call, not only the condition poll: kubectl wait
+        # applies --timeout to condition evaluation while the initial resource
+        # lookup runs outside it, so a stalled lookup can outlast the budget
+        # and push the failure row and the JUnit report past the step timeout.
+        # The wrapper's own exit is non-zero, which is the signal the failure
+        # path below keys on, and it caps the call short of the reserve.
+        if ! timeout "${_quayWaitRemain}s" oc wait "quayregistry/${quayName}" -n "${ns}" \
           --for condition=Available=True \
           --timeout="${_quayWaitTimeout}s"; then
           RecordResult "quay-registry-available" "failed" "QuayRegistry/${quayName} in namespace ${ns} did not become Available within ${_quayWaitTimeout}s" "$(( $(date +%s) - quayStart ))"
