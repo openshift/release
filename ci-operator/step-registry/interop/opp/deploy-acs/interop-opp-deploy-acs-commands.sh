@@ -154,11 +154,22 @@ _classify() {
 # site keeps its own default detail. The query runs under the quiet scope: set
 # -x would trace the expanded condition text into the artifact log.
 typeset _cond_class="" _cond_detail=""
+typeset -i _cond_read_ok=1
 _cond_classify() {
   local _cond
+  typeset -i _cond_rc=0
   _api_quiet
   _cond=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
-      -o jsonpath='{range .status.conditions[*]}{.type}={.status} {end}' 2>/dev/null) || _cond=""
+      -o jsonpath='{range .status.conditions[*]}{.type}={.status} {end}' 2>/dev/null) || _cond_rc=$?
+  # A read that failed is not "no blocking condition". Callers that decide
+  # acceptance from _cond_class also read _cond_read_ok, so a recovery cannot
+  # rest on a condition list that was never read (CodeRabbit 4672263564).
+  if (( _cond_rc != 0 )); then
+    _cond_read_ok=0
+    _cond=""
+  else
+    _cond_read_ok=1
+  fi
   _cond_class=""
   _cond_detail=""
   # Pad once and anchor every arm on a whole "Type=Status" token: an unanchored
@@ -1436,15 +1447,21 @@ typeset _wait2_err="" _wait2_rc=0
     _cond_classify
     if [[ "${_phase}" == "Succeeded" && -z "${_cond_class}" ]]; then
       # The phase wait can return nonzero on its final poll after the CSV
-      # flipped. Re-read the Subscription's currentCSV so the acceptance binds
-      # to the object the wait targeted; a failed read keeps the phase evidence.
+      # flipped. Recovery is accepted only on two successful reads: the
+      # condition list (no active blocker) and the Subscription's currentCSV
+      # (the object the wait targeted). A failed read is not absent evidence,
+      # so it is classified instead of read as "nothing to see".
       _csv_now=""
-      if _csv_now=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
+      if (( ! _cond_read_ok )); then
+        _classify "acs-subscription-query-failed" "Subscription condition read failed during CSV recovery; no blocker can be ruled out (CSV ${csvName}, phase ${_phase})"
+      elif _csv_now=$(oc get subscription.operators.coreos.com rhacs-operator -n "${ACS_NAMESPACE}" \
           -o jsonpath='{.status.currentCSV}' 2>/dev/null); then
         if [[ "${_csv_now}" == "${csvName}" ]]; then
           _csv_recovered=1
           echo ">>> NOTE: CSV ${csvName} is Succeeded; the phase wait returned rc=${_wait2_rc} on its final poll, accepting the observed Succeeded phase"
         fi
+      else
+        _classify "acs-subscription-query-failed" "Subscription currentCSV read failed during CSV recovery; the waited CSV cannot be confirmed as current (CSV ${csvName}, phase ${_phase})"
       fi
     fi
     if [[ -n "${_cond_class}" ]]; then
