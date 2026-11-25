@@ -1,0 +1,26 @@
+chain:
+  as: kueue-operator-test-e2e-downstream-dra-cc-art
+  steps:
+  - ref: cert-manager-install-operator
+  - ref: merge-stage-registry-credentials
+  - ref: kueue-operator-enable-catalogsource-art
+  - ref: kueue-operator-subscription-install
+  - as: e2e-kueue-dra-cc
+    cli: latest
+    commands: |
+      if test -f "${SHARED_DIR}/env"; then source "${SHARED_DIR}/env"; fi
+      make e2e-ci-test-dra-cc
+    from: kueue-operator-src
+    resources:
+      requests:
+        cpu: "4"
+        memory: 4Gi
+  documentation: |-
+    This chain runs the downstream DRA consumable-capacity e2e test suite for the
+    Kueue operator against the ART pre-release FBC: the operator is installed by
+    OLM from an ART-built FBC CatalogSource with pre-release digests mirrored from
+    registry.stage.redhat.io, instead of the Konflux-built images used by the
+    ci-build DRA consumable-capacity jobs. The dra-example-driver (which provides
+    simulated devices, so no GPU hardware is needed) is installed by the job before
+    this chain, and jobset/LWS are not installed because the
+    dra-consumable-capacity suite does not exercise them.
