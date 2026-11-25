@@ -33,7 +33,6 @@ workflow:
         # disconnected cluster can pull them.
         OPCT_IMAGES=(
           "quay.io/opct/sonobuoy:latest"
-          "quay.io/opct/plugin-openshift-tests:latest"
           "quay.io/opct/plugin-artifacts-collector:latest"
           "quay.io/opct/must-gather-monitoring:latest"
         )
@@ -44,6 +43,15 @@ workflow:
             --registry-config="${new_pull_secret}" \
             --insecure=true || echo "WARN: failed to mirror ${img}"
         done
+
+        # Mirror custom plugin image (pr-102 build) to the opct/ path
+        # so --image-repository picks it up at the expected location.
+        PLUGIN_SRC="${OPCT_PLUGIN_IMAGE}"
+        PLUGIN_DST="${MIRROR_REGISTRY_HOST}/opct/plugin-openshift-tests:v0.0.4-opct512"
+        echo "Mirroring custom plugin ${PLUGIN_SRC} -> ${PLUGIN_DST}"
+        oc image mirror "${PLUGIN_SRC}" "${PLUGIN_DST}" \
+          --registry-config="${new_pull_secret}" \
+          --insecure=true
 
         # Inject proxy-conf and mirror registry into the OPCT env script
         cat >> "${SHARED_DIR}/env" <<'ENVEOF'
@@ -86,6 +94,7 @@ workflow:
             --watch \
             --workflow=disconnected \
             --image-repository="${MIRROR_REPO}" \
+            --plugins-image="${MIRROR_REPO}/plugin-openshift-tests:v0.0.4-opct512" \
             --validation-timeout=900 \
             --validation-retry-interval=30
       timeout: 6h
@@ -108,7 +117,8 @@ workflow:
       MIRROR_IN_BASTION: "yes"
       QE_IMAGES: "false"
       ZONES_COUNT: "2"
-      OPCT_CLI_IMAGE: "quay.io/opct/opct:latest"
+      OPCT_CLI_IMAGE: "quay.io/rhn-support-bshaw/opct:v0.0.1-opct512"
+      OPCT_PLUGIN_IMAGE: "quay.io/rhn-support-bshaw/plugin-openshift-tests:v0.0.4-opct512"
   documentation: |-
     The OPCT Conformance External AWS Disconnected workflow provisions a
     disconnected AWS cluster with platform type External (using the
