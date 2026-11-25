@@ -724,15 +724,22 @@ def is_owned(refs):
 
 def is_associated(refs):
     # Association for the label fallback below: an owner of kind
-    # QuayRegistry whose NAME is the selected registry.  Name, not uid: a
-    # uid match with this kind is ownership and lands in the primary set
-    # above, so the fallback exists for the shapes ownership cannot cover,
-    # a registry recreated after its secret was stamped (same name, new
-    # uid) or an ownerReference recorded without a uid.  Any other owner
-    # kind, a different registry name and a missing ownerReferences list
-    # all mean unassociated.
+    # QuayRegistry that names the selected registry, matched by uid when
+    # the caller has one (a name match with a different uid can refer to a
+    # previous registry recreated under the same name, and a successful
+    # TLS probe does not establish authorization for the current one), and
+    # by name only when no uid is available to verify against.  With a uid
+    # available this is the same evidence ownership requires, so the
+    # fallback only serves the uid-unavailable corner; any other owner
+    # kind, a different name and a missing ownerReferences list all mean
+    # unassociated.
     for r in refs:
-        if r.get('kind') == 'QuayRegistry' and r.get('name') == owner:
+        if r.get('kind') != 'QuayRegistry':
+            continue
+        if owner_uid:
+            if r.get('uid') == owner_uid:
+                return True
+        elif r.get('name') == owner:
             return True
     return False
 
@@ -759,7 +766,8 @@ for s in items:
 
 # Fallback: only when no owned candidate exists, and only for a secret that
 # is both labelled app=quay and associated with the selected QuayRegistry by
-# an ownerReference of kind QuayRegistry carrying the registry's name.  The
+# an ownerReference of kind QuayRegistry that matches the registry by uid
+# when one is available (name only in the uid-unavailable corner).  The
 # label says which product wrote the secret; the ownerReference says which
 # registry it belongs to, so a labelled secret with no such owner is not
 # admitted.  When nothing remains the caller's
@@ -780,7 +788,7 @@ if counts['20-owned'] == 0 and counts['25-ssl'] == 0:
         write('25-ssl', base64.b64decode(data['ssl.cert']))
         fallback_used = True
     if fallback_used:
-        print('WARNING: no owned Quay TLS secret found for %s (uid %s); falling back to app=quay labelled secrets whose ownerReference names that QuayRegistry (kind QuayRegistry, matching name; label-only secrets are not admitted)' % (owner, owner_uid), file=sys.stderr)
+        print('WARNING: no owned Quay TLS secret found for %s (uid %s); falling back to app=quay labelled secrets owner-referenced to that QuayRegistry (kind QuayRegistry, uid match when available; label-only and name-only secrets are not admitted)' % (owner, owner_uid), file=sys.stderr)
 " || { _rc=$?; echo "WARNING: Quay TLS trust candidate extraction failed (python rc=${_rc})" >&2; }
 
     # The ingress CA signs route certificates that no operator issued.
@@ -877,25 +885,11 @@ QuayTlsFallbackSelfTest() {
     }
     export -f oc curl
 
-    # Path 1: the actual fallback path.  The secret is associated by an
-    # ownerReference of kind QuayRegistry carrying the registry NAME but a
-    # different uid (a registry recreated after the secret was stamped), so
-    # ownership does not hold and only the association rule can admit it.
-    _selftestAdmit='25-ssl-'
-    _selftestSecrets="$(printf '{"items":[{"metadata":{"name":"quay-registry-ssl","labels":{"app":"quay"},"ownerReferences":[{"kind":"QuayRegistry","name":"quay-registry","uid":"99999999-8888-7777-6666-555555555555"}]},"data":{"ssl.cert":"%s"}}]}' "${_b64}")"
-    quayCaFile=''
-    typeset -i _path1Rc=0
-    ResolveQuayTlsTrust || _path1Rc=$?
-    typeset -i _path1Ssl=0
-    typeset -i _path1Owned=0
-    _path1Ssl="$(find "${quayCaDir}" -maxdepth 1 -name '25-ssl-*.pem' 2>/dev/null | wc -l)"
-    _path1Owned="$(find "${quayCaDir}" -maxdepth 1 -name '20-owned-*.pem' 2>/dev/null | wc -l)"
-    if (( _path1Rc == 0 )) && (( _path1Ssl == 1 )) && (( _path1Owned == 0 )) && [[ "${quayCaFile}" == *"/25-ssl-"* ]]; then
-        echo "SELF-TEST PASS: the fallback (not the primary path) admits an app=quay secret associated by kind QuayRegistry and registry name" >&2
-    else
-        echo "SELF-TEST FAIL: the associated-by-name secret did not take the fallback path (rc=${_path1Rc}, ssl=${_path1Ssl}, owned=${_path1Owned}, anchor=${quayCaFile})" >&2
-        _failures=$(( _failures + 1 ))
-    fi
+    # With a uid available there is no positive fallback case to pin: a
+    # kind QuayRegistry ownerReference matching the uid is ownership, the
+    # primary loop already reads such a secret's payloads, and everything
+    # short of that evidence is refused. The refusal cases below and the
+    # uid-unavailable corner at the end are the fallback's whole behavior.
 
     # Path 2: the same secret with no ownerReference at all, and with an
     # ownerReference to a different registry uid; both must be refused.
@@ -912,7 +906,10 @@ QuayTlsFallbackSelfTest() {
         echo "SELF-TEST FAIL: a label-only app=quay secret was admitted (rc=${_path2Rc}, ssl candidates=${_path2Ssl}, anchor=${quayCaFile})" >&2
         _failures=$(( _failures + 1 ))
     fi
-    _labelOnly="$(printf '{"items":[{"metadata":{"name":"quay-registry-ssl","labels":{"app":"quay"},"ownerReferences":[{"kind":"QuayRegistry","name":"other-registry","uid":"99999999-8888-7777-6666-555555555555"}]},"data":{"ssl.cert":"%s"}}]}' "${_b64}")"
+    # Name match with a different uid: the owner may refer to a previous
+    # registry recreated under the same name, and a successful probe does
+    # not establish authorization for the current one, so it is refused.
+    _labelOnly="$(printf '{"items":[{"metadata":{"name":"quay-registry-ssl","labels":{"app":"quay"},"ownerReferences":[{"kind":"QuayRegistry","name":"quay-registry","uid":"99999999-8888-7777-6666-555555555555"}]},"data":{"ssl.cert":"%s"}}]}' "${_b64}")"
     # A wrong-kind ownerReference carrying the SELECTED registry uid must not
     # enter the primary candidate set either: kind and uid are checked
     # together (it carries ca.crt so only the primary path could admit it).
@@ -937,7 +934,7 @@ QuayTlsFallbackSelfTest() {
     typeset -i _path2bSsl=0
     _path2bSsl="$(find "${quayCaDir}" -maxdepth 1 -name '25-ssl-*.pem' 2>/dev/null | wc -l)"
     if (( _path2bRc != 0 )) && (( _path2bSsl == 0 )); then
-        echo "SELF-TEST PASS: a QuayRegistry ownerReference with a different uid is refused" >&2
+        echo "SELF-TEST PASS: a QuayRegistry ownerReference with the registry name but a different uid is refused" >&2
     else
         echo "SELF-TEST FAIL: a QuayRegistry ownerReference with a different uid was admitted (rc=${_path2bRc}, ssl candidates=${_path2bSsl})" >&2
         _failures=$(( _failures + 1 ))
@@ -959,6 +956,25 @@ QuayTlsFallbackSelfTest() {
         echo "SELF-TEST FAIL: owned-candidate preference changed (rc=${_path3Rc}, anchor=${quayCaFile}, owned candidates=${_path3Owned})" >&2
         _failures=$(( _failures + 1 ))
     fi
+
+    # Path 4: the uid-unavailable corner.  No uid to verify against, so a
+    # kind QuayRegistry ownerReference naming the registry is the only
+    # association evidence there is, and the fallback admits it.
+    _selftestAdmit='25-ssl-'
+    _selftestSecrets="$(printf '{"items":[{"metadata":{"name":"quay-registry-ssl","labels":{"app":"quay"},"ownerReferences":[{"kind":"QuayRegistry","name":"quay-registry"}]},"data":{"ssl.cert":"%s"}}]}' "${_b64}")"
+    QUAY_UID=""
+    quayCaFile=''
+    typeset -i _path4Rc=0
+    ResolveQuayTlsTrust || _path4Rc=$?
+    typeset -i _path4Ssl=0
+    _path4Ssl="$(find "${quayCaDir}" -maxdepth 1 -name '25-ssl-*.pem' 2>/dev/null | wc -l)"
+    if (( _path4Rc == 0 )) && (( _path4Ssl == 1 )) && [[ "${quayCaFile}" == *"/25-ssl-"* ]]; then
+        echo "SELF-TEST PASS: with no uid available the fallback admits the kind-and-name associated secret" >&2
+    else
+        echo "SELF-TEST FAIL: the uid-unavailable corner did not admit the associated secret (rc=${_path4Rc}, ssl=${_path4Ssl}, anchor=${quayCaFile})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+    QUAY_UID="${_origUid}"
 
     # Restore.
     unset -f oc curl
