@@ -845,40 +845,77 @@ def redact(o):
 json.dump(redact(json.load(sys.stdin)), sys.stdout, indent=1)
 REDACTEOF
     fi
+    # Every query records its own exit status next to the artifacts: pipefail
+    # makes a failing fetch or a failing redactor visible, and the status file
+    # is what the report below reads. A nonempty artifact alone does not prove
+    # the query completed, so the status is reported even when the file has
+    # content.
     timeout 120s bash -c '
-      oc --request-timeout=10s get machines -A -o yaml > "'"${ARTIFACT_DIR}"'/machines.yaml" 2>/dev/null || true
-      oc --request-timeout=10s get machinesets -A -o yaml > "'"${ARTIFACT_DIR}"'/machinesets.yaml" 2>/dev/null || true
+      set -o pipefail
+      _status="'"${ARTIFACT_DIR}"'/query-status.txt"
+      : > "${_status}" || true
+      _rc=0
+      oc --request-timeout=10s get machines -A -o yaml > "'"${ARTIFACT_DIR}"'/machines.yaml" 2>/dev/null || _rc=$?
+      printf "machines %s\n" "${_rc}" >> "${_status}" || true
+      _rc=0
+      oc --request-timeout=10s get machinesets -A -o yaml > "'"${ARTIFACT_DIR}"'/machinesets.yaml" 2>/dev/null || _rc=$?
+      printf "machinesets %s\n" "${_rc}" >> "${_status}" || true
       if [ -n "'"${_redact}"'" ]; then
-        oc --request-timeout=10s get configurationpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null | python3 "'"${_redact}"'" > "'"${ARTIFACT_DIR}"'/configurationpolicies.yaml" || true
-        oc --request-timeout=10s get policies.policy.open-cluster-management.io -A -o json 2>/dev/null | python3 "'"${_redact}"'" > "'"${ARTIFACT_DIR}"'/policies.yaml" || true
+        _rc=0
+        oc --request-timeout=10s get configurationpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null | python3 "'"${_redact}"'" > "'"${ARTIFACT_DIR}"'/configurationpolicies.yaml" || _rc=$?
+        printf "configurationpolicies %s\n" "${_rc}" >> "${_status}" || true
+        _rc=0
+        oc --request-timeout=10s get policies.policy.open-cluster-management.io -A -o json 2>/dev/null | python3 "'"${_redact}"'" > "'"${ARTIFACT_DIR}"'/policies.yaml" || _rc=$?
+        printf "policies %s\n" "${_rc}" >> "${_status}" || true
       else
         echo "redactor unavailable: policies/configurationpolicies SKIPPED (fail closed - templates can embed Secret data)" > "'"${ARTIFACT_DIR}"'/policies.yaml"
+        printf "configurationpolicies %s\n" "not-verified" >> "${_status}" || true
+        printf "policies %s\n" "not-verified" >> "${_status}" || true
       fi
-      oc --request-timeout=10s get kubeletconfigs.machineconfiguration.openshift.io -A -o yaml > "'"${ARTIFACT_DIR}"'/kubeletconfigs.yaml" 2>/dev/null || true
-      oc --request-timeout=10s get mcp -o yaml > "'"${ARTIFACT_DIR}"'/mcps.yaml" 2>/dev/null || true
-      oc --request-timeout=10s get nodes -o json > "'"${ARTIFACT_DIR}"'/nodes.json" 2>/dev/null || true
+      _rc=0
+      oc --request-timeout=10s get kubeletconfigs.machineconfiguration.openshift.io -A -o yaml > "'"${ARTIFACT_DIR}"'/kubeletconfigs.yaml" 2>/dev/null || _rc=$?
+      printf "kubeletconfigs %s\n" "${_rc}" >> "${_status}" || true
+      _rc=0
+      oc --request-timeout=10s get mcp -o yaml > "'"${ARTIFACT_DIR}"'/mcps.yaml" 2>/dev/null || _rc=$?
+      printf "mcps %s\n" "${_rc}" >> "${_status}" || true
+      _rc=0
+      oc --request-timeout=10s get nodes -o json > "'"${ARTIFACT_DIR}"'/nodes.json" 2>/dev/null || _rc=$?
+      printf "nodes %s\n" "${_rc}" >> "${_status}" || true
     ' || true
     # PRRT_kwDOBHvUUM65on13: every expected artifact is named, the redactor
     # state is recorded, and an artifact with no output turns the closing line
     # into a partial-collection report. The reported failure class is not
     # touched here: collection never decides the class.
+    # The per-query exit status captured above is reported too: an artifact
+    # that has content after a failed fetch or a failed redaction is not
+    # evidence that the query succeeded, so a nonzero or unrecorded status
+    # also makes the report partial.
     typeset _redactor_state="available"
     typeset _missing=""
+    typeset _failed=""
+    typeset _query_status="${ARTIFACT_DIR}/query-status.txt"
     if [[ -n "${_redact}" ]]; then
         rm -f "${_redact}"
     else
         _redactor_state="unavailable, policies/configurationpolicies not captured"
     fi
     for _q in machines machinesets policies configurationpolicies kubeletconfigs mcps nodes; do
+        typeset _q_rc=""
+        _q_rc="$(awk -v q="${_q}" '$1 == q { rc = $2 } END { if (rc != "") print rc }' "${_query_status}" 2>/dev/null)" || _q_rc=""
+        [[ -n "${_q_rc}" ]] || _q_rc="no-status"
+        if [[ "${_q_rc}" != "0" ]]; then
+            _failed="${_failed} ${_q}(${_q_rc})"
+            echo ">>> evidence query ${_q} reported exit status ${_q_rc}; the artifact at ${ARTIFACT_DIR}/${_q}.* is not complete evidence (tokenized error)" >&2
+        fi
         if [[ ! -s "${ARTIFACT_DIR}/${_q}.yaml" && ! -s "${ARTIFACT_DIR}/${_q}.json" ]]; then
             _missing="${_missing} ${_q}"
             echo ">>> evidence query ${_q} produced no output (failed or skipped: check ${ARTIFACT_DIR}/${_q}.*, tokenized error)" >&2
         fi
     done
-    if [[ -z "${_missing}" ]]; then
-        echo ">>> failure bundle collected to ${ARTIFACT_DIR} (machines, machinesets, policies [secret-redacted], configurationpolicies [secret-redacted], kubeletconfigs, mcps, nodes; redactor ${_redactor_state}); the reported failure class is unchanged"
+    if [[ -z "${_missing}" && -z "${_failed}" ]]; then
+        echo ">>> failure bundle collected to ${ARTIFACT_DIR} (machines, machinesets, policies [secret-redacted], configurationpolicies [secret-redacted], kubeletconfigs, mcps, nodes; redactor ${_redactor_state}; every query exited 0, per-query status in ${_query_status}); the reported failure class is unchanged"
     else
-        echo ">>> failure bundle PARTIALLY collected to ${ARTIFACT_DIR}; queries with no output:${_missing} (redactor ${_redactor_state}); the reported failure class is unchanged" >&2
+        echo ">>> failure bundle PARTIALLY collected to ${ARTIFACT_DIR}; queries with no output:${_missing:- none}; queries with a nonzero or unrecorded exit status:${_failed:- none}; per-query status in ${_query_status} (redactor ${_redactor_state}); the reported failure class is unchanged" >&2
     fi
     set -x 2>/dev/null || true
     return 0
