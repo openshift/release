@@ -844,10 +844,10 @@ WaitMcpEnospcStreakSelfTest () {
   _gotHit="${_enospcHitSignature}"
   _gotStreak=${_enospcHitStreak}
   _case="order swap (two ENOSPC pools, order reversed between polls)"
-  if [[ -n "${_gotHit}" ]] && (( _gotStreak >= 2 )); then
+  if [[ -n "${_gotHit}" ]] && (( _gotStreak >= 2 )) && (( _enospcStreakHit == 1 )); then
     echo ">>> selftest: enospc-streak ${_case}: HIT streak=${_gotStreak} signature=${_gotHit}"
   else
-    echo ">>> selftest: enospc-streak ${_case}: NO HIT (streak=${_gotStreak}) -- FAIL"
+    echo ">>> selftest: enospc-streak ${_case}: NO HIT or flag unset (streak=${_gotStreak}, flag=${_enospcStreakHit}) -- FAIL"
     _fail=1
   fi
 
@@ -872,6 +872,21 @@ WaitMcpEnospcStreakSelfTest () {
     echo ">>> selftest: enospc-streak ${_case}: NO HIT -- PASS"
   else
     echo ">>> selftest: enospc-streak ${_case}: HIT -- FAIL"
+    _fail=1
+  fi
+
+  # A new ENOSPC condition (master) appears FIRST on the second poll while
+  # the persistent one (worker) keeps its streak: the hit must name worker,
+  # and the JUnit reason follows the hit, not the poll's first condition.
+  ResetEnospcStreaks
+  UpdateEnospcStreaks "${_pollBlip1}"
+  _pollNewFirst='{"items":[{"metadata":{"name":"master"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeDegraded","message":"writing blob: no space left on device"}]}},{"metadata":{"name":"worker"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeDegraded","message":"writing blob: no space left on device"}]}}]}'
+  UpdateEnospcStreaks "${_pollNewFirst}"
+  _case="new signature first (persistent worker behind a new master on poll 2)"
+  if (( _enospcStreakHit == 1 )) && [[ "${_enospcHitSignature}" == *"worker"* ]]; then
+    echo ">>> selftest: enospc-streak ${_case}: HIT names the persistent signature -- PASS"
+  else
+    echo ">>> selftest: enospc-streak ${_case}: HIT names '${_enospcHitSignature}' (flag=${_enospcStreakHit}) -- FAIL"
     _fail=1
   fi
 
@@ -1422,6 +1437,11 @@ PY
             # it, and a poll carrying no signature clears every streak.
             UpdateEnospcStreaks "${mcpJson}"
             if (( _enospcStreakHit )); then
+                # JUnit names the signature the streak confirmed, not the
+                # condition FirstDegradedCondition happened to select this
+                # poll: a newly appeared ENOSPC condition listed ahead of the
+                # persistent one must not become the reported reason.
+                _junit_reason="${_enospcHitSignature}"
                 echo "FAILURE CLASS: storage-capacity-enospc"
                 echo "Non-self-healing ENOSPC signature persisted ${_enospcHitStreak} consecutive polls (poll ${_junit_polls}, ${elapsed}s): ${_enospcHitSignature}; failing fast instead of exhausting ${effectiveTimeout}s"
                 _junit_class="storage-capacity-enospc"
