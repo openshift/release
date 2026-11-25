@@ -157,9 +157,10 @@ BastionHostInstanceType="t2.medium"
 # there is no t2.medium instance type in us-gov-east-1 region
 if [[ "${REGION}" == "us-gov-east-1" ]]; then
     BastionHostInstanceType="t3a.medium"
-# me-west-1 has t3 but not t3a
+# me-west-1 bastion runs a manually copied FCOS AMI that includes an ephemeral0
+# instance store, so it requires an instance-store-capable instance type
 elif [[ "${REGION}" == "me-west-1" ]]; then
-    BastionHostInstanceType="t3.medium"
+    BastionHostInstanceType="i4i.large"
 # EUSC bastion AMI includes ephemeral0 instance store, requires instance-store-capable instance type
 elif [[ "${REGION}" == "eusc-de-east-1" ]]; then
     # EUSC supports m6id (6th gen) but not m5d (5th gen) instance types

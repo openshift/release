@@ -205,7 +205,7 @@ Resources:
     Properties:
       ImageId: !Ref Ami
       IamInstanceProfile: !Ref ProxyInstanceProfile
-      InstanceType: "m5.xlarge"
+      InstanceType: "${PROXY_INSTANCE_TYPE}"
       BlockDeviceMappings:
       # Manually copied FCOS AMIs (used in regions where FCOS publishes no
       # image) carry an ephemeral0 instance-store mapping on /dev/xvdb. Nitro
@@ -272,6 +272,18 @@ else
   RELEASE=$(jq -r ".architectures.x86_64.images.aws.regions[\"${REGION}\"].release // \"unknown\"" < /tmp/fcos-stable.json)
   echo "Using FCOS ${RELEASE} AMI: ${AMI}"
 fi
+
+PROXY_INSTANCE_TYPE="m5.xlarge"
+if [[ "${REGION}" == "me-west-1" ]]; then
+  # TEMPORARY: me-west-1 region qualification.
+  # The manually copied FCOS AMI used in me-west-1 declares an ephemeral0
+  # instance-store mapping, which Nitro instance types without instance store
+  # reject at launch ("Invalid number of ephemeral devices"), so use an
+  # instance-store-capable type. Drop this branch together with the pinned AMI
+  # above.
+  PROXY_INSTANCE_TYPE="i4i.large"
+fi
+echo "Using proxy instance type: ${PROXY_INSTANCE_TYPE}"
 
 ssh_pub_key=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 
