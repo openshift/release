@@ -12,7 +12,7 @@ chain:
           documentation: "The cluster's FQDN will be a subdomain of the base domain."
         - name: HYPERSHIFT_AWS_REGION
           default: "us-east-1"
-          documentation: "The AWS region of the cluster."
+          documentation: "The AWS region of the cluster. The region recorded by the create chain in SHARED_DIR/hypershift-aws-region takes precedence over this value."
       commands: |-
         set -exuo pipefail
 
@@ -27,6 +27,35 @@ chain:
 
         CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
 
+        # Resolve the region that was actually used at creation time. An empty --region makes
+        # every AWS call fail with "Invalid Configuration: Missing Region" and the step is
+        # retried until it is terminated, leaving the run's infrastructure behind.
+        if [[ -s "${SHARED_DIR}/hypershift-aws-region" ]]; then
+          HYPERSHIFT_AWS_REGION="$(cat ${SHARED_DIR}/hypershift-aws-region)"
+        elif [[ -z "${HYPERSHIFT_AWS_REGION}" ]]; then
+          HYPERSHIFT_AWS_REGION="$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.labels.topology\.kubernetes\.io/region}{"\n"}{end}' | grep -v '^$' | head -n1 || true)"
+        fi
+        if [[ -z "${HYPERSHIFT_AWS_REGION}" ]]; then
+          echo "ERROR: unable to determine the AWS region for teardown: no ${SHARED_DIR}/hypershift-aws-region, HYPERSHIFT_AWS_REGION is empty and no management cluster node carries the topology.kubernetes.io/region label. Refusing to run destroy with an empty region; the run's AWS resources may be leaked and need manual cleanup." >&2
+          exit 1
+        fi
+        # Also exported so the STS AssumeRole performed by the CLI resolves an endpoint.
+        export AWS_REGION="${HYPERSHIFT_AWS_REGION}"
+        export AWS_DEFAULT_REGION="${HYPERSHIFT_AWS_REGION}"
+
+        # Destroy by the infra ID recorded at creation time so that teardown still removes the
+        # infrastructure when the HostedCluster object is gone or was never created.
+        INFRA_ID="${CLUSTER_NAME}"
+        if [[ -s "${SHARED_DIR}/hypershift-infra-id" ]]; then
+          INFRA_ID="$(cat ${SHARED_DIR}/hypershift-infra-id)"
+        fi
+
+        # Same for the base domain: it cannot be inferred from the HostedCluster when the
+        # object is absent, and the step default does not match the create chain default.
+        if [[ -s "${SHARED_DIR}/hypershift-base-domain" ]]; then
+          HYPERSHIFT_BASE_DOMAIN="$(cat ${SHARED_DIR}/hypershift-base-domain)"
+        fi
+
         CRED_COMMAND=""
         # >= 2.6
         if [[ "$(printf '%s\n' "2.6" "$MCE_VERSION" | sort -V | head -n1)" == "2.6" ]]; then
@@ -35,13 +64,28 @@ chain:
           CRED_COMMAND=$(echo "--aws-creds ${CLUSTER_PROFILE_DIR}/.awscred")
         fi
 
-        echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
+        # The grace period is how long the CLI waits for the HostedCluster's finalizers
+        # before it gives up, and it has to fit inside this step's own timeout with room to
+        # spare: the AWS cleanup only starts once that wait returns. A 40m grace period in a
+        # 30m step meant a slow finalizer got the step killed mid-wait, with none of the
+        # infrastructure removed. 30m of waiting inside the 45m budget keeps every finalizer
+        # that used to clear in time still clearing in time - the old step was killed at 30m,
+        # so nothing waited longer than that - and leaves ~15m for the AWS cleanup that
+        # follows, rather than taking wait time away from cases that previously worked.
+        #
+        # Known limit, tracked separately: `hcp` has no --force (it exists only in the dev
+        # `hypershift` CLI), so if the grace period does expire the CLI aborts instead of
+        # force-removing finalizers, and the infrastructure is still left behind. Shortening
+        # the grace period narrows that window but cannot close it, and costs wait time that
+        # currently succeeds, so the budget is set to preserve the existing behaviour.
+        echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME} (infra-id ${INFRA_ID}) in ${HYPERSHIFT_AWS_REGION}"
         /tmp/${HYPERSHIFT_NAME} destroy cluster aws ${CRED_COMMAND} \
           --name ${CLUSTER_NAME} \
+          --infra-id ${INFRA_ID} \
           --region ${HYPERSHIFT_AWS_REGION} \
           --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
           --namespace local-cluster \
-          --cluster-grace-period 40m
+          --cluster-grace-period 30m
         echo "$(date) Finished deleting cluster"
 
         oc delete managedcluster ${CLUSTER_NAME} --ignore-not-found
@@ -55,16 +99,42 @@ chain:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 30m0s
+      timeout: 45m0s
     - as: destroy-aws-iam-cli-role
       cli: latest
+      env:
+        - name: HYPERSHIFT_AWS_REGION
+          default: "us-east-1"
+          documentation: "The AWS region of the cluster. The region recorded by the create chain in SHARED_DIR/hypershift-aws-region takes precedence over this value."
       commands: |-
         set -exuo pipefail
         if [[ -f "${SHARED_DIR}/hcp-role-arn" && -f ${SHARED_DIR}/sts-creds.json ]]; then
             hcp_role_arn="$(cat ${SHARED_DIR}/hcp-role-arn)"
             CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+
+            # Same region resolution as the destroy step: STS AssumeRole needs a region.
+            if [[ -s "${SHARED_DIR}/hypershift-aws-region" ]]; then
+              HYPERSHIFT_AWS_REGION="$(cat ${SHARED_DIR}/hypershift-aws-region)"
+            elif [[ -z "${HYPERSHIFT_AWS_REGION}" ]]; then
+              HYPERSHIFT_AWS_REGION="$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.labels.topology\.kubernetes\.io/region}{"\n"}{end}' | grep -v '^$' | head -n1 || true)"
+            fi
+            if [[ -z "${HYPERSHIFT_AWS_REGION}" ]]; then
+              echo "ERROR: unable to determine the AWS region for IAM teardown. Refusing to run destroy with an empty region; IAM resources for ${CLUSTER_NAME} may be leaked and need manual cleanup." >&2
+              exit 1
+            fi
+            export AWS_REGION="${HYPERSHIFT_AWS_REGION}"
+            export AWS_DEFAULT_REGION="${HYPERSHIFT_AWS_REGION}"
+
+            INFRA_ID="${CLUSTER_NAME}"
+            if [[ -s "${SHARED_DIR}/hypershift-infra-id" ]]; then
+              INFRA_ID="$(cat ${SHARED_DIR}/hypershift-infra-id)"
+            fi
+
+            # This removes the *guest* IAM resources (OIDC provider, component roles).
+            # --role-arn is only the role the CLI assumes to do that; the role itself is
+            # deleted by the destroy-aws-cli-role step below.
             echo "arn: $hcp_role_arn was created during the test, need to destroy it"
-            bin/hypershift destroy iam aws --infra-id $CLUSTER_NAME --role-arn $hcp_role_arn --sts-creds ${SHARED_DIR}/sts-creds.json
+            bin/hypershift destroy iam aws --infra-id $INFRA_ID --region ${HYPERSHIFT_AWS_REGION} --role-arn $hcp_role_arn --sts-creds ${SHARED_DIR}/sts-creds.json
         fi
       from: hypershift-operator
       grace_period: 5m0s
@@ -73,3 +143,97 @@ chain:
           cpu: 100m
           memory: 100Mi
       timeout: 15m0s
+    - as: destroy-aws-cli-role
+      cli: latest
+      env:
+        - name: HYPERSHIFT_BASE_DOMAIN
+          default: "origin-ci-int-aws.dev.rhcloud.com"
+          documentation: "The cluster's FQDN will be a subdomain of the base domain. Only used to pick the guest infrastructure credentials when the create chain did not record which ones it used."
+        - name: HYPERSHIFT_AWS_REGION
+          default: "us-east-1"
+          documentation: "The AWS region used for the IAM calls. IAM is global, so this only selects an endpoint; the region recorded by the create chain in SHARED_DIR/hypershift-aws-region takes precedence."
+      commands: |-
+        set -exuo pipefail
+
+        # Delete the per-job IAM role that prepare-aws-iam-cli-role created. Nothing else
+        # does: `hypershift destroy iam aws` removes the guest cluster's IAM resources, and
+        # the role passed to it as --role-arn is merely the identity it assumes, so without
+        # this step every MCE >= 2.6 run leaves a role and its inline policy behind.
+        #
+        # The role has to be deleted with the credentials that created it, not with the
+        # assumed role, and this must run last: the steps above still need the role.
+        ROLE_NAME=""
+        if [[ -s "${SHARED_DIR}/hcp-cli-role-name" ]]; then
+          ROLE_NAME="$(cat ${SHARED_DIR}/hcp-cli-role-name)"
+        elif [[ -s "${SHARED_DIR}/hcp-role-arn" ]]; then
+          # Older runs, and any run whose role name was not recorded: the role name is the
+          # last path element of the ARN (arn:aws:iam::<account>:role/<name>).
+          ROLE_NAME="$(cat ${SHARED_DIR}/hcp-role-arn)"
+          ROLE_NAME="${ROLE_NAME##*/}"
+        fi
+        if [[ -z "${ROLE_NAME}" ]]; then
+          echo "no CLI role was prepared by this run (MCE < 2.6, or role preparation never started): nothing to clean up"
+          exit 0
+        fi
+
+        # hcp-cli-role-name is written before the role is created, so this also covers a run
+        # that was interrupted between creating the role and recording its ARN, and a run
+        # that never reached the step writing sts-creds.json.
+        AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+        if [[ -s "${SHARED_DIR}/hcp-cli-role-creds-path" ]]; then
+          AWS_GUEST_INFRA_CREDENTIALS_FILE="$(cat ${SHARED_DIR}/hcp-cli-role-creds-path)"
+        elif [[ $HYPERSHIFT_BASE_DOMAIN == "ci.hypershift.devcluster.openshift.com" ]]; then
+          AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+        fi
+        export AWS_SHARED_CREDENTIALS_FILE="${AWS_GUEST_INFRA_CREDENTIALS_FILE}"
+
+        if [[ -s "${SHARED_DIR}/hypershift-aws-region" ]]; then
+          HYPERSHIFT_AWS_REGION="$(cat ${SHARED_DIR}/hypershift-aws-region)"
+        fi
+        export AWS_REGION="${HYPERSHIFT_AWS_REGION:-us-east-1}"
+        export AWS_DEFAULT_REGION="${AWS_REGION}"
+
+        # Only NoSuchEntity means "already gone". Any other lookup failure (AccessDenied,
+        # ServiceFailure, throttling, ...) leaves a role that is still there, so it must not
+        # be reported as a successful cleanup - keep the AWS diagnostic and fail the step.
+        # The error code is matched inside the CLI's "An error occurred (<Code>)" prefix
+        # rather than anywhere in the message text, which is not stable.
+        if ! role_lookup_error="$(aws iam get-role --role-name "${ROLE_NAME}" 2>&1 >/dev/null)"; then
+          if [[ "${role_lookup_error}" == *"An error occurred (NoSuchEntity)"* ]]; then
+            echo "IAM role ${ROLE_NAME} does not exist, nothing to clean up"
+            exit 0
+          fi
+          echo "${role_lookup_error}" >&2
+          echo "ERROR: unable to look up IAM role ${ROLE_NAME}; it may still exist and need manual cleanup." >&2
+          exit 1
+        fi
+
+        # A role cannot be deleted while policies are still attached to it. `create iam
+        # cli-role` attaches a single inline policy named after the role, but the lists are
+        # enumerated so that cleanup stays correct if that ever changes.
+        for policy in $(aws iam list-role-policies --role-name "${ROLE_NAME}" --query 'PolicyNames[]' --output text || true); do
+          if [[ "${policy}" != "None" ]]; then
+            aws iam delete-role-policy --role-name "${ROLE_NAME}" --policy-name "${policy}"
+          fi
+        done
+        for policy_arn in $(aws iam list-attached-role-policies --role-name "${ROLE_NAME}" --query 'AttachedPolicies[].PolicyArn' --output text || true); do
+          if [[ "${policy_arn}" != "None" ]]; then
+            aws iam detach-role-policy --role-name "${ROLE_NAME}" --policy-arn "${policy_arn}"
+          fi
+        done
+        aws iam delete-role --role-name "${ROLE_NAME}"
+        echo "$(date) Deleted CLI IAM role ${ROLE_NAME}"
+      from_image:
+        namespace: ocp
+        name: "4.16"
+        tag: upi-installer
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 15m0s
+      credentials:
+        - mount_path: /etc/hypershift-ci-jobs-awscreds
+          group: ops/hypershift-ci-jobs-awscreds
+          collection: hypershift-team

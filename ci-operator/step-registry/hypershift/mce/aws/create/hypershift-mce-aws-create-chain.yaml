@@ -12,13 +12,15 @@ chain:
           documentation: "The cluster's FQDN will be a subdomain of the base domain."
         - name: HYPERSHIFT_AWS_REGION
           default: ""
-          documentation: "The AWS region of the cluster."
+          documentation: "The AWS region used for the IAM calls that create the CLI role. When empty it is discovered from the management cluster nodes. This step does not pick the region the hosted cluster is created in; create-hostedcluster does."
       commands: |-
         set -exuo pipefail
 
+        # Below MCE 2.6 no CLI role exists, so this step stays a complete no-op: it must not
+        # resolve or record anything that create-hostedcluster is responsible for.
         # only run when MCE_VERSION >= 2.6
         if [[ "$(printf '%s\n' "2.6" "$MCE_VERSION" | sort -V | head -n1)" == "2.6" ]]; then
-          # The CLUSTER_NAME here is the same in the step below
+          # The CLUSTER_NAME here is the same in the step below, and is the IAM role's name.
           export CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
           echo "$(date) Preparing aws cli-role to create HyperShift cluster ${CLUSTER_NAME}"
           AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -27,12 +29,31 @@ chain:
           fi
 
           if [[ -z "$HYPERSHIFT_AWS_REGION" ]]; then
-            HYPERSHIFT_AWS_REGION="$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')"
+            # Discover the region from the management cluster nodes. Use a range so that a
+            # multi-node management cluster does not produce a concatenated value.
+            HYPERSHIFT_AWS_REGION="$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.labels.topology\.kubernetes\.io/region}{"\n"}{end}' | grep -v '^$' | head -n1 || true)"
           fi
           export AWS_SHARED_CREDENTIALS_FILE="${AWS_GUEST_INFRA_CREDENTIALS_FILE}"
           export AWS_REGION=${HYPERSHIFT_AWS_REGION}
+          export AWS_DEFAULT_REGION=${HYPERSHIFT_AWS_REGION}
+
+          # Record what the destroy chain needs to delete this role *before* the role exists:
+          # `create iam cli-role` names the role after --name, so the name is known up front
+          # and teardown no longer depends on this step surviving long enough to write
+          # hcp-role-arn or on create-hostedcluster writing sts-creds.json.
+          echo "${CLUSTER_NAME}" > "${SHARED_DIR}/hcp-cli-role-name"
+          echo "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" > "${SHARED_DIR}/hcp-cli-role-creds-path"
+
+          # Provenance tags so the IAM role can be traced back to the originating Prow run.
+          # `create iam cli-role` takes a single key=value map, unlike `hcp create cluster aws`.
+          # Unlike `hcp create cluster aws`, this subcommand tags the role with exactly what is
+          # passed here and adds nothing of its own, so the full set is spelled out.
+          CLI_ROLE_TAGS="hypershift.openshift.io/prow-job-id=${PROW_JOB_ID}"
+          CLI_ROLE_TAGS+=",hypershift.openshift.io/source=cli"
+          CLI_ROLE_TAGS+=",hypershift.openshift.io/cluster-name=${CLUSTER_NAME}"
+          CLI_ROLE_TAGS+=",hypershift.openshift.io/infra-id=${CLUSTER_NAME}"
           # hypershift CLI is needed to create iam cli-role, and it is already available in hypershift-operator image
-          output=$(bin/hypershift create iam cli-role --name ${CLUSTER_NAME} --aws-creds ${AWS_SHARED_CREDENTIALS_FILE})
+          output=$(bin/hypershift create iam cli-role --name ${CLUSTER_NAME} --aws-creds ${AWS_SHARED_CREDENTIALS_FILE} --additional-tags "${CLI_ROLE_TAGS}")
           echo "$output"
           hcp_role_arn="$(echo $output | grep 'arn:aws:iam:' | awk '{print $NF}')"
           echo "$hcp_role_arn" > "${SHARED_DIR}/hcp-role-arn"
@@ -66,7 +87,7 @@ chain:
           documentation: "Availability policy for hosted cluster components. Supported options: SingleReplica, HighlyAvailable, default SingleReplica"
         - name: HYPERSHIFT_AWS_REGION
           default: "us-east-1"
-          documentation: "The AWS region of the cluster."
+          documentation: "The AWS region of the cluster. The region this step resolves is recorded in SHARED_DIR/hypershift-aws-region so that teardown uses the same one."
         - name: ENABLE_ICSP
           default: "false"
           documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_icsp.yaml)"
@@ -141,8 +162,21 @@ chain:
         fi
 
         if [[ -z "$HYPERSHIFT_AWS_REGION" ]]; then
-          HYPERSHIFT_AWS_REGION="$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')"
+          # Discover the region from the management cluster nodes. Use a range so that a
+          # multi-node management cluster does not produce a concatenated value.
+          HYPERSHIFT_AWS_REGION="$(oc get nodes -o jsonpath='{range .items[*]}{.metadata.labels.topology\.kubernetes\.io/region}{"\n"}{end}' | grep -v '^$' | head -n1 || true)"
         fi
+        if [[ -z "$HYPERSHIFT_AWS_REGION" ]]; then
+          echo "ERROR: unable to determine the AWS region: HYPERSHIFT_AWS_REGION is empty and no management cluster node carries the topology.kubernetes.io/region label" >&2
+          exit 1
+        fi
+
+        # Persist the region, infra ID and base domain this step actually uses *before* any
+        # AWS resource is created, so that the destroy chain can clean up even when
+        # provisioning fails part-way through or the HostedCluster is never created.
+        echo "${HYPERSHIFT_AWS_REGION}" > "${SHARED_DIR}/hypershift-aws-region"
+        echo "${CLUSTER_NAME}" > "${SHARED_DIR}/hypershift-infra-id"
+        echo "${HYPERSHIFT_BASE_DOMAIN}" > "${SHARED_DIR}/hypershift-base-domain"
 
         AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
         if [[ $HYPERSHIFT_BASE_DOMAIN == "ci.hypershift.devcluster.openshift.com" ]]; then
@@ -168,7 +202,24 @@ chain:
           EXTRA_ARGS+=" --public-only "
         fi
 
-        eval "/tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} ${CRED_COMMAND} ${EXTRA_ARGS} \
+        # Provenance tags, applied to the infrastructure and IAM resources created here and
+        # propagated to the HostedCluster's spec.platform.aws.resourceTags so that resources
+        # created later by the cloud controllers carry them too. These let a leaked resource
+        # be traced back to the originating Prow run.
+        #
+        # Do NOT add hypershift.openshift.io/cluster-name or hypershift.openshift.io/infra-id
+        # here. The CLI stamps both on every EC2 resource it creates and appends
+        # --additional-tags after them without de-duplicating, so repeating either key makes
+        # AWS reject the request with "InvalidParameter: Duplicate tag key".
+        #
+        # source=cli is safe: the CLI appends it to the infra and IAM tag *lists*, which are
+        # de-duplicated into a map before use. Passing it explicitly is also the only way it
+        # reaches resourceTags, which is built from --additional-tags alone, so the tag stays
+        # consistent between the infra the CLI creates and what the cloud controllers create.
+        TAG_ARGS="--additional-tags hypershift.openshift.io/prow-job-id=${PROW_JOB_ID}"
+        TAG_ARGS+=" --additional-tags hypershift.openshift.io/source=cli"
+
+        eval "/tmp/${HYPERSHIFT_NAME} create cluster aws ${ICSP_COMMAND} ${CRED_COMMAND} ${EXTRA_ARGS} ${TAG_ARGS} \
         --name ${CLUSTER_NAME} \
         --infra-id ${CLUSTER_NAME} \
         --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
