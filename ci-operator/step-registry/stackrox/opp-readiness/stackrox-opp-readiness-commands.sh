@@ -394,13 +394,13 @@ _classify() {
         # flow holds it for a bounded window before finalizing (provisional-
         # hold block below), and it is final only for absent-by-design.
         set +x
-        if crdlist="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd -o name)"; then
+        if crdlist="$(oc --request-timeout="$(_read_timeout_arg)" get crd -o name)"; then
             if ! grep -q '^customresourcedefinition\.apiextensions\.k8s\.io/centrals\.platform\.stackrox\.io$' <<< "${crdlist}"; then
                 _ACS_STATE="absent"
                 (( _traceWasOff == 0 )) && set -x
                 return 0
             fi
-            if out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json)"; then
+            if out="$(oc --request-timeout="$(_read_timeout_arg)" get centrals.platform.stackrox.io -A -o json)"; then
                 set +x
                 items="$(printf '%s' "${out}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("items",[])))')" || rc=1
                 set +x
@@ -443,12 +443,29 @@ _budget_remaining() {
 # recheck), where the loop's own remaining-budget arithmetic does not apply.
 _read_timeout_arg() {
     typeset _base="${OC_READ_TIMEOUT:-10s}"
-    typeset -i _base_s="${_base%s}" _rem
+    typeset -i _base_s="${_base%s}" _rem _wait_left
     (( _base_s > 0 )) || _base_s=10
     _rem="$(_budget_remaining)"
+    # Inside a wait, one read may not outlive the wait it serves: a probe that
+    # starts with one second left must not hold the loop for the full
+    # OC_READ_TIMEOUT. _WAITFOR_DEADLINE is non-zero only while WaitFor is
+    # calling a probe or diagnostics function, so reads outside a wait stay
+    # bounded by the global budget alone.
+    if (( ${_WAITFOR_DEADLINE:-0} > 0 )); then
+        _wait_left=$(( _WAITFOR_DEADLINE - $(date +%s) ))
+        (( _wait_left < 1 )) && _wait_left=1
+        (( _rem > _wait_left )) && _rem="${_wait_left}"
+    fi
     (( _rem < 1 )) && _rem=1
     (( _base_s > _rem )) && _base_s=_rem
     echo "${_base_s}s"
+}
+
+# Same clamp as seconds, for curl --max-time.
+_read_max_secs() {
+    typeset _t
+    _t="$(_read_timeout_arg)"
+    echo "${_t%s}"
 }
 
 function WaitFor () {
@@ -464,11 +481,13 @@ function WaitFor () {
     typeset -i iteration=0
     typeset -i cap=waitCap
     typeset -i rem
-    # Status of the most recent completed check inside this wait (0 = it
-    # passed). Callers that must tell "the last look inside the budget found
-    # nothing" apart from "the last look failed or never ran" read this after
-    # WaitFor returns non-zero; it stays 0 when no check completed.
-    _WAITFOR_LAST_RC=0
+    # Status of the most recent completed check inside this wait, read by
+    # callers that must tell "the last look inside the budget found nothing"
+    # (1) apart from "the last look failed" (2) or "a probe answered only after
+    # the deadline" (3). Empty means no check completed. Keeping the late
+    # answer distinct matters: an earlier empty look followed by a present
+    # answer that arrives too late is not evidence of absence.
+    _WAITFOR_LAST_RC=""
     rem="$(_budget_remaining)"
     (( rem < cap )) && cap=rem
     _waitCap="${cap}"
@@ -492,18 +511,29 @@ function WaitFor () {
             echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (budget remaining $(_budget_remaining)s)"
             return 1
         fi
+        # The probe runs with the wait's deadline published so its own reads
+        # clamp to the time left in this wait, not just to OC_READ_TIMEOUT.
+        _WAITFOR_DEADLINE="${_deadline}"
+        typeset -i _check_rc=0
         if "${checkFn}" "$@"; then
+            _check_rc=0
+        else
+            _check_rc=$?
+        fi
+        _WAITFOR_DEADLINE=0
+        if (( _check_rc == 0 )); then
             _now=$(date +%s)
             if (( _now >= _deadline )); then
                 _waitReason="${_deadlineReason}"
+                _WAITFOR_LAST_RC=3
                 echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (post-deadline probe success not accepted, budget remaining $(_budget_remaining)s)"
                 return 1
             fi
+            _WAITFOR_LAST_RC=0
             echo "[readiness] OK: ${description}"
             return 0
-        else
-            _WAITFOR_LAST_RC=$?
         fi
+        _WAITFOR_LAST_RC="${_check_rc}"
         _now=$(date +%s)
         if (( _now >= _deadline )); then
             _waitReason="${_deadlineReason}"
@@ -526,7 +556,9 @@ function WaitFor () {
         # Every 5th iteration, dump periodic diagnostics if a function is provided
         if [[ -n "${diagnosticsFn}" ]] && (( iteration % 5 == 0 )); then
             echo "[readiness]   --- periodic diagnostics (iteration ${iteration}, $(( _now - (_deadline - cap) ))/${cap}s) ---"
+            _WAITFOR_DEADLINE="${_deadline}"
             "${diagnosticsFn}" || true
+            _WAITFOR_DEADLINE=0
             _now=$(date +%s)
             if (( _now >= _deadline )); then
                 _waitReason="${_deadlineReason}"
@@ -686,12 +718,12 @@ else:
 # Summarize matching operator Subscriptions, falling back on empty selectors.
 function SubscriptionStatus () {
     typeset output=""
-    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get sub -A -l 'operators.coreos.com/rhacs-operator.rhacs-operator' -o json \
+    if output="$(oc --request-timeout="$(_read_timeout_arg)" get sub -A -l 'operators.coreos.com/rhacs-operator.rhacs-operator' -o json \
         | FormatDiagnosticStatus subscription)" && [[ -n "${output}" ]]; then
         echo "${output}"
         return 0
     fi
-    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get sub -A -o json \
+    if output="$(oc --request-timeout="$(_read_timeout_arg)" get sub -A -o json \
         | FormatDiagnosticStatus subscription 'stackrox,rhacs')" && [[ -n "${output}" ]]; then
         echo "${output}"
         return 0
@@ -702,7 +734,7 @@ function SubscriptionStatus () {
 # Summarize StackRox/RHACS CSV state without printing CSV identifiers.
 function CsvStatus () {
     typeset output=""
-    output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get csv -A -o json \
+    output="$(oc --request-timeout="$(_read_timeout_arg)" get csv -A -o json \
         | FormatDiagnosticStatus csv 'stackrox,rhacs')" && [[ -n "${output}" ]] || return 1
     echo "${output}"
 }
@@ -710,12 +742,12 @@ function CsvStatus () {
 # Summarize matching operator pods, falling back on empty selectors.
 function OperatorPodStatus () {
     typeset output=""
-    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -A -l app=rhacs-operator -o json \
+    if output="$(oc --request-timeout="$(_read_timeout_arg)" get pods -A -l app=rhacs-operator -o json \
         | FormatDiagnosticStatus pod)" && [[ -n "${output}" ]]; then
         echo "${output}"
         return 0
     fi
-    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -A -o json \
+    if output="$(oc --request-timeout="$(_read_timeout_arg)" get pods -A -o json \
         | FormatDiagnosticStatus pod rhacs)" && [[ -n "${output}" ]]; then
         echo "${output}"
         return 0
@@ -726,7 +758,7 @@ function OperatorPodStatus () {
 # Summarize StackRox/RHACS InstallPlan state without printing identifiers.
 function InstallPlanStatus () {
     typeset output=""
-    output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get installplan -A -o json \
+    output="$(oc --request-timeout="$(_read_timeout_arg)" get installplan -A -o json \
         | FormatDiagnosticStatus installplan 'stackrox,rhacs')" && [[ -n "${output}" ]] || return 1
     echo "${output}"
 }
@@ -734,7 +766,7 @@ function InstallPlanStatus () {
 # Summarize Central conditions without printing condition content.
 function CentralStatus () {
     typeset output=""
-    output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json \
+    output="$(oc --request-timeout="$(_read_timeout_arg)" get centrals.platform.stackrox.io -A -o json \
         | FormatDiagnosticStatus central)" && [[ -n "${output}" ]] || return 1
     echo "${output}"
 }
@@ -746,14 +778,14 @@ function PreFlightDiagnostics () {
     echo "[readiness] === Pre-flight operator diagnostics ==="
 
     echo "[readiness] Checking Central CRD registration..."
-    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
+    if oc --request-timeout="$(_read_timeout_arg)" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
         echo "[readiness]   Central CRD registered"
     else
         echo "[readiness]   Central CRD NOT found"
     fi
 
     echo "[readiness] Checking SecuredCluster CRD registration..."
-    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
+    if oc --request-timeout="$(_read_timeout_arg)" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
         echo "[readiness]   SecuredCluster CRD registered"
     else
         echo "[readiness]   SecuredCluster CRD NOT found"
@@ -800,13 +832,12 @@ function PeriodicOperatorDiagnostics () {
 typeset -i _centralPresentHadSuccess=0
 # Per-call request timeout for the hold check's reads: the default unless the
 # provisional-hold recheck clamps it to the remaining budget.
-typeset _ccpReadTimeout="${OC_READ_TIMEOUT:-10s}"
 function CheckCentralPresent () {
     typeset out="" items="" crdlist=""
     typeset _traceWasOff=0
     [[ $- == *x* ]] || _traceWasOff=1
     set +x
-    if ! crdlist="$(oc --request-timeout="${_ccpReadTimeout}" get crd -o name)"; then
+    if ! crdlist="$(oc --request-timeout="$(_read_timeout_arg)" get crd -o name)"; then
         (( _traceWasOff == 0 )) && set -x
         return 2
     fi
@@ -815,7 +846,7 @@ function CheckCentralPresent () {
         (( _traceWasOff == 0 )) && set -x
         return 1
     fi
-    if ! out="$(oc --request-timeout="${_ccpReadTimeout}" get centrals.platform.stackrox.io -A -o json)"; then
+    if ! out="$(oc --request-timeout="$(_read_timeout_arg)" get centrals.platform.stackrox.io -A -o json)"; then
         (( _traceWasOff == 0 )) && set -x
         return 2
     fi
@@ -899,14 +930,12 @@ if [[ "${_ACS_STATE}" == "absent" && "${INTEROP__OPP__ACS__EXPECTATION}" == "req
             # after the deadline is still accepted: finalizing absent on a
             # Central that was arriving is the exact failure this hold exists
             # to prevent, and _BUDGET_MARGIN_S absorbs the overrun.
-            _ccpReadTimeout="$(_read_timeout_arg)"
             typeset -i _recheck_rc=0
             if CheckCentralPresent; then
                 _recheck_rc=0
             else
                 _recheck_rc=$?
             fi
-            _ccpReadTimeout="${OC_READ_TIMEOUT:-10s}"
             if (( _recheck_rc == 0 )); then
                 _ACS_STATE="present"
                 echo "[readiness] ACS state re-classified after provisional hold (late success): ${_ACS_STATE}"
@@ -956,7 +985,7 @@ PreFlightDiagnostics
 # Namespace discovery via CRs (never hardcode)
 # ---------------------------------------------------------------------------
 function DiscoverCentralNs () {
-    centralNs="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io --all-namespaces \
+    centralNs="$(oc --request-timeout="$(_read_timeout_arg)" get centrals.platform.stackrox.io --all-namespaces \
         -o jsonpath='{.items[0].metadata.namespace}')" \
         || return 1
     [[ -n "${centralNs}" ]] || return 1
@@ -964,7 +993,7 @@ function DiscoverCentralNs () {
 }
 
 function DiscoverScNs () {
-    scNs="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedclusters.platform.stackrox.io --all-namespaces \
+    scNs="$(oc --request-timeout="$(_read_timeout_arg)" get securedclusters.platform.stackrox.io --all-namespaces \
         -o jsonpath='{.items[0].metadata.namespace}')" \
         || return 1
     [[ -n "${scNs}" ]] || return 1
@@ -976,21 +1005,21 @@ typeset scNs=""
 
 typeset -i _assert_rc=0
 typeset -i _centralCrdInitiallyOk=0 _scCrdInitiallyOk=0
-if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
+if oc --request-timeout="$(_read_timeout_arg)" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
     _centralCrdInitiallyOk=1
 fi
-if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
+if oc --request-timeout="$(_read_timeout_arg)" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
     _scCrdInitiallyOk=1
 fi
 
 if ! WaitFor "Central CR namespace discovery" DiscoverCentralNs PeriodicOperatorDiagnostics; then
-    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
+    if oc --request-timeout="$(_read_timeout_arg)" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
         _add_case "central-crd" passed
     else
         _add_case "central-crd" failed "Assertion" "Central CRD not registered"
         _assert_rc=1
     fi
-    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
+    if oc --request-timeout="$(_read_timeout_arg)" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
         _add_case "securedcluster-crd" passed
     else
         _add_case "securedcluster-crd" failed "Assertion" "SecuredCluster CRD not registered"
@@ -1011,13 +1040,13 @@ echo "[readiness] Central namespace: ${centralNs}"
 # the WaitFor DiscoverScNs call is the real bounded existence wait.
 if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs; then
     # Emit deferred CRD cases before handling discovery failure
-    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
+    if oc --request-timeout="$(_read_timeout_arg)" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
         _add_case "central-crd" passed
     else
         _add_case "central-crd" failed "Assertion" "Central CRD not registered"
         _assert_rc=1
     fi
-    if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
+    if oc --request-timeout="$(_read_timeout_arg)" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
         _add_case "securedcluster-crd" passed
     else
         _add_case "securedcluster-crd" failed "Assertion" "SecuredCluster CRD not registered"
@@ -1028,7 +1057,7 @@ if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs; then
     # to separate them, so an API error or an authorization denial stays a
     # failure instead of a silent skip.
     typeset _scList=""
-    if _scList="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedclusters.platform.stackrox.io --all-namespaces -o name)" \
+    if _scList="$(oc --request-timeout="$(_read_timeout_arg)" get securedclusters.platform.stackrox.io --all-namespaces -o name)" \
         && [[ -z "${_scList}" ]]; then
         _add_case "central-route" skipped "NoSecuredCluster" "no SecuredCluster in lane: central-route not evaluated (budget remaining $(_budget_remaining)s)"
         _add_case "central-api-insecure-tls" skipped "NoSecuredCluster" "no SecuredCluster in lane: central-api not evaluated (budget remaining $(_budget_remaining)s)"
@@ -1050,13 +1079,13 @@ if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs; then
 fi
 echo "[readiness] SecuredCluster namespace: ${scNs}"
 # Emit deferred CRD assertions after successful discovery, re-checking late registration
-if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
+if oc --request-timeout="$(_read_timeout_arg)" get crd centrals.platform.stackrox.io -o name >/dev/null 2>&1; then
     _add_case "central-crd" passed
 else
     _add_case "central-crd" failed "Assertion" "Central CRD not registered"
     _assert_rc=1
 fi
-if oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
+if oc --request-timeout="$(_read_timeout_arg)" get crd securedclusters.platform.stackrox.io -o name >/dev/null 2>&1; then
     _add_case "securedcluster-crd" passed
 else
     _add_case "securedcluster-crd" failed "Assertion" "SecuredCluster CRD not registered"
@@ -1069,7 +1098,7 @@ fi
 typeset centralUrl=""
 
 function CheckCentralRoute () {
-    centralUrl="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get route central -n "${centralNs}" \
+    centralUrl="$(oc --request-timeout="$(_read_timeout_arg)" get route central -n "${centralNs}" \
         -o jsonpath='{.spec.host}')" || return 1
     [[ -n "${centralUrl}" ]] || return 1
     true
@@ -1160,7 +1189,7 @@ _verify_central_api_tls() {
     typeset _central_addr="" _central_port=""
     typeset -i _central_backend_rc=0 _central_backend_curl_rc=0
 
-    centralCa="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get secret central-tls -n "${centralNs}" \
+    centralCa="$(oc --request-timeout="$(_read_timeout_arg)" get secret central-tls -n "${centralNs}" \
         -o jsonpath='{.data.ca\.pem}' 2>/dev/null | base64 -d 2>/dev/null || true)"
     if [[ -z "${centralCa}" ]]; then
         echo "central-tls ca.pem not readable in ${centralNs}; Central's certificate cannot be verified" >"${_CENTRAL_TLS_ERR}"
@@ -1197,7 +1226,7 @@ _verify_central_api_tls() {
     # use the verified name against Central's own CA. Routes with a custom
     # certificate that includes the route host pass the direct handshake above
     # and never reach this retry.
-    _route_svc_tp="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get route central -n "${centralNs}" \
+    _route_svc_tp="$(oc --request-timeout="$(_read_timeout_arg)" get route central -n "${centralNs}" \
         -o jsonpath='{.spec.to.name}{"|"}{.spec.port.targetPort}' 2>/dev/null || true)"
     _central_svc="${_route_svc_tp%%|*}"
     if [[ "${_route_svc_tp}" == *'|'* ]]; then
@@ -1261,7 +1290,21 @@ _verify_central_api_tls() {
 }
 
 if [[ -n "${centralUrl}" ]]; then
-    if ! _verify_central_api_tls; then
+    # The helper resolves the route target, a backend address and a backend
+    # port, and Bash traces every assignment and curl argument while set -x is
+    # on (redirecting curl's stderr does not suppress Bash's own lines). Keep
+    # them out of the job log: trace only the fixed-label outcome messages
+    # below, the INTEROP-9647 log-sanitization contract.
+    typeset -i _tlsTraceWasOff=0 _tlsRc=0
+    [[ $- == *x* ]] || _tlsTraceWasOff=1
+    set +x
+    if _verify_central_api_tls; then
+        _tlsRc=0
+    else
+        _tlsRc=$?
+    fi
+    (( _tlsTraceWasOff == 0 )) && set -x
+    if (( _tlsRc != 0 )); then
         _add_case "central-api-insecure-tls" failed "TLSVerification" \
             "Central API certificate not verified against the CA in the central-tls secret (route host outside the certificate DNS names and no verifiable ready backend endpoint); no credential is sent to an unverified server"
         echo "[readiness] FATAL: Central API TLS could not be verified; see ${_CENTRAL_TLS_ERR}" >&2
@@ -1278,7 +1321,7 @@ set +x
 
 typeset roxAdminPassword=""
 echo "[readiness] Extracting roxAdminPassword..."
-roxAdminPassword="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get secret -n "${centralNs}" central-htpasswd \
+roxAdminPassword="$(oc --request-timeout="$(_read_timeout_arg)" get secret -n "${centralNs}" central-htpasswd \
     -o jsonpath='{.data.password}' | base64 -d)" || true
 
 if [[ -z "${roxAdminPassword}" ]]; then
@@ -1312,7 +1355,7 @@ function CheckCentralApi () {
     # shellcheck disable=SC2086
     httpCode="$(curl -sS ${_apiTlsOpts} -o /dev/null -w '%{http_code}' \
         -K "${_curlCfg}" \
-        "https://${centralApiHost}/v1/metadata" --max-time 10)" || return 1
+        "https://${centralApiHost}/v1/metadata" --max-time "$(_read_max_secs)")" || return 1
     [[ "${httpCode}" == "200" ]] || return 1
     true
 }
@@ -1346,7 +1389,7 @@ function CheckClustersConnected () {
     # the whole budget on a credential or routing fault.
     # shellcheck disable=SC2086
     verdict="$(curl -fsSL ${_apiTlsOpts} -K "${_curlCfg}" \
-        "https://${centralApiHost}/v1/clusters" --max-time 10 \
+        "https://${centralApiHost}/v1/clusters" --max-time "$(_read_max_secs)" \
         | python3 -c '
 import json, sys
 try:
@@ -1393,7 +1436,7 @@ function CheckSensorPods () {
     # whole run while Central reported the replacement sensor HEALTHY;
     # rehearsal build 2118028576879022080). Only live pods gate readiness.
     typeset sensorStatus=""
-    sensorStatus="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${scNs}" -l app=sensor -o json | python3 -c '
+    sensorStatus="$(oc --request-timeout="$(_read_timeout_arg)" get pods -n "${scNs}" -l app=sensor -o json | python3 -c '
 import json, sys
 
 d = json.load(sys.stdin)
@@ -1441,8 +1484,8 @@ else
     # shows counters (observed in rehearsal build 2118028576879022080, where
     # the diagnosis had to come from a later must-gather).
     echo "[readiness] Sensor pod states at timeout:"
-    oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${scNs}" -l app=sensor -o wide || true
-    oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${scNs}" -l app=sensor -o json | python3 -c '
+    oc --request-timeout="$(_read_timeout_arg)" get pods -n "${scNs}" -l app=sensor -o wide || true
+    oc --request-timeout="$(_read_timeout_arg)" get pods -n "${scNs}" -l app=sensor -o json | python3 -c '
 import json, sys
 
 d = json.load(sys.stdin)
@@ -1467,7 +1510,7 @@ function CheckPoliciesLoaded () {
     # error response must fail the check, not read as an empty policy list.
     # shellcheck disable=SC2086
     policyCount="$(curl -fsSL ${_apiTlsOpts} -K "${_curlCfg}" \
-        "https://${centralApiHost}/v1/policies?query=" --max-time 10 \
+        "https://${centralApiHost}/v1/policies?query=" --max-time "$(_read_max_secs)" \
         | JsonLength policies)" || return 1
     echo "[readiness]   policy count: ${policyCount}"
     [[ "${policyCount}" -gt 80 ]] || return 1

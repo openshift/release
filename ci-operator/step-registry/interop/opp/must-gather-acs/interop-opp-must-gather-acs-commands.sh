@@ -22,7 +22,7 @@ export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 # failure as a definite negative.
 _central_backend_target() {
     local _slice_json _backend_target _rt_port="${3:-}"
-    _slice_json="$(oc get endpointslices -n "$1" \
+    _slice_json="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get endpointslices -n "$1" \
       -l "kubernetes.io/service-name=$2" -o json 2>/dev/null)" || return 2
     _backend_target="$(printf '%s\n' "${_slice_json}" | \
       python3 -c '
@@ -173,7 +173,7 @@ collect_acs_diagnostics() {
             # Central's own CA. Routes with a custom certificate that includes
             # the route host pass the direct preflight above and never reach
             # this retry.
-            _route_svc_tp="$(oc get route central -n "${WORKLOAD_NS}" \
+            _route_svc_tp="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get route central -n "${WORKLOAD_NS}" \
               -o jsonpath='{.spec.to.name}{"|"}{.spec.port.targetPort}' 2>/dev/null || true)"
             _central_svc="${_route_svc_tp%%|*}"
             _central_route_tp=""
