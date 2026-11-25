@@ -7,18 +7,17 @@ ref:
       cpu: 10m
       memory: 100Mi
   documentation: |-
-    Trusts the disconnected bastion mirror registry's self-signed CA for
-    in-cluster consumers that run as pods rather than on the host, and so
-    don't benefit from install-config's `additionalTrustBundlePolicy: Always`
-    (set by ipi-conf-additional-ca-trust-policy), which only adds the CA to
-    the *nodes'* trusted certificate store. Notably this includes the image
-    registry's image-stream import controller and the build controller's
-    git/image fetch client, both of which instead read
-    image.config.openshift.io/cluster's spec.additionalTrustedCA.
+    Configures image.config.openshift.io/cluster's spec.additionalTrustedCA
+    for the disconnected bastion mirror registry's self-signed CA, including
+    image imports and builds. This registry-specific configuration is separate
+    from the installer's additionalTrustBundle, which the installer and MCO
+    use for node trust without requiring additionalTrustBundlePolicy: Always.
+    That policy also makes proxy/cluster reference user-ca-bundle when no
+    cluster-wide proxy is configured; it does not set image additionalTrustedCA.
 
     Creates a `registry-config` ConfigMap in the `openshift-config` namespace
-    from SHARED_DIR/additional_trust_bundle (written by
-    ipi-conf-additional-ca-trust-policy), keyed by the mirror registry host
+    from SHARED_DIR/additional_trust_bundle (written by ipi-conf-mirror
+    before installation), keyed by the mirror registry host
     with its port-separating colon replaced by two dots (host:port ->
     host..port, the documented OpenShift convention), then patches
     image.config.openshift.io/cluster to reference it. This is the same
@@ -26,6 +25,5 @@ ref:
     https://docs.openshift.com/container-platform/4.18/post_installation_configuration/post-install-image-config.html
 
     A no-op if SHARED_DIR/mirror_registry_url or
-    SHARED_DIR/additional_trust_bundle is absent (i.e. the workflow doesn't
-    provision a bastion mirror registry, or doesn't run
-    ipi-conf-additional-ca-trust-policy).
+    SHARED_DIR/additional_trust_bundle is absent. Does not require
+    ipi-conf-additional-ca-trust-policy.
