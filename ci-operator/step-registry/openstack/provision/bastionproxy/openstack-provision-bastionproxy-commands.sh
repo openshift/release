@@ -32,6 +32,7 @@ WORK_DIR=${WORK_DIR:-$(mktemp -d -t shiftstack-ci-XXXXXXXXXX)}
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
 MACHINES_NET_ID=$(<"${SHARED_DIR}"/MACHINES_NET_ID)
 MACHINES_SUBNET_ID=$(<"${SHARED_DIR}"/MACHINES_SUBNET_ID)
+MACHINES_SUBNET_RANGE=$(<"${SHARED_DIR}"/MACHINES_SUBNET_RANGE)
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
 BASTION_FLAVOR="${BASTION_FLAVOR:-$(<"${SHARED_DIR}/BASTION_FLAVOR")}"
 BASTION_USER=${BASTION_USER:-cloud-user}
@@ -65,6 +66,7 @@ sg_id="$(openstack security group create -f value -c id bastionproxy-${CLUSTER_N
 >&2 echo "Created bastion security group for ${CLUSTER_NAME}: ${sg_id}"
 openstack security group rule create --ingress --protocol tcp --dst-port 22 --description "${CLUSTER_NAME} SSH" "$sg_id" >/dev/null
 openstack security group rule create --ingress --protocol udp --dst-port 53 --description "${CLUSTER_NAME} DNS" "$sg_id" >/dev/null
+openstack security group rule create --ingress --protocol udp --dst-port 123 --description "${CLUSTER_NAME} NTP" "$sg_id" >/dev/null
 openstack security group rule create --ingress --protocol tcp --dst-port 3128 --remote-ip 0.0.0.0/0 --description "${CLUSTER_NAME} squid" "$sg_id" >/dev/null
 openstack security group rule create --ingress --protocol tcp --dst-port 3130 --remote-ip 0.0.0.0/0 --description "${CLUSTER_NAME} squid" "$sg_id" >/dev/null
 if [[ "$CONFIG_TYPE" == *"externallb"* ]]; then
@@ -155,10 +157,15 @@ fi
 echo "Deploying squid on $SQUID_IP"
 
 >&2 cat << EOF > $WORK_DIR/deploy_squid.sh
-sudo dnf install -y squid dnsmasq
+#!/usr/bin/env bash
+set -e
+sudo dnf install -y squid dnsmasq chrony
 
 sudo bash -c "cat << EOF >> /etc/dnsmasq.conf
 listen-address=${SQUID_IP}
+# The nodes cannot reach a public NTP server: point the pool name their stock
+# chrony.conf already uses at this host, which serves NTP on udp/123.
+address=/2.rhel.pool.ntp.org/${SQUID_IP}
 EOF"
 
 sudo bash -c "cat << EOF > /etc/squid/squid.conf
@@ -192,6 +199,11 @@ sudo htpasswd -bBc /etc/squid/htpasswd $CLUSTER_NAME $PASSWORD
 
 sudo systemctl start squid
 sudo systemctl start dnsmasq
+
+# Serve NTP to the cluster nodes: their only route out is this host, which does
+# not forward, so they cannot reach a public NTP server themselves.
+echo "allow ${MACHINES_SUBNET_RANGE}" | sudo tee -a /etc/chrony.conf >/dev/null
+sudo systemctl restart chronyd
 EOF
 
 if [[ $MACHINES_GATEWAY_IP != "" ]]; then
