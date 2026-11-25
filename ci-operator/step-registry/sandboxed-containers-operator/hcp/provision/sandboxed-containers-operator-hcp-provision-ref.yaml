@@ -1,0 +1,27 @@
+ref:
+  as: sandboxed-containers-operator-hcp-provision
+  from: src
+  cli: latest
+  commands: sandboxed-containers-operator-hcp-provision-commands.sh
+  timeout: 3h0m0s
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Cloud-agnostic HCP provisioning: runs the hypershift-cluster-setup script
+    (from the src checkout, hack/hcp) with --prow to create the IPI management
+    cluster (ccoctl STS, manual credentials mode), install MCE + the
+    HyperShift operator, create the hosted cluster (with nested
+    virtualization when ENABLE_NESTED_VIRT=yes and image content sources when
+    IMAGE_CONTENT_SOURCES is set) and validate worker node readiness.
+
+    The hosted cluster's pull secret is the cluster profile's pull secret
+    passed through by the script, so Pre-GA CatalogSource pods can pull from
+    Konflux/quay exactly like on the OSC IPI jobs that use the same profile.
+
+    When complete, ${SHARED_DIR}/kubeconfig points at the hosted (managed)
+    cluster and ${SHARED_DIR}/cluster-name carries its name, so the shared OSC
+    chains that follow run against the work plane. Requires
+    build_root in every consuming config (from: src).

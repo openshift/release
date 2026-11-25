@@ -3,10 +3,18 @@ base_images:
     name: "5.0"
     namespace: ocp
     tag: base-rhel9
+  hypershift-operator:
+    name: hypershift-operator
+    namespace: hypershift
+    tag: latest
   operator-sdk:
     name: "4.17"
     namespace: origin
     tag: operator-sdk
+  upi-installer:
+    name: "5.0"
+    namespace: ocp
+    tag: upi-installer
 binary_build_commands: go mod download && go mod vendor && GOFLAGS="" make build
 build_root:
   image_stream_tag:
@@ -58,6 +66,13 @@ tests:
     make generate verify
   container:
     from: src
+- always_run: false
+  as: osc-e2e-hcp-aws
+  optional: true
+  run_if_changed: ^hack/hcp/
+  steps:
+    cluster_profile: aws-sandboxed-containers-operator
+    workflow: sandboxed-containers-operator-e2e-hcp-aws
 - as: sandboxed-containers-operator-e2e
   optional: true
   steps:

@@ -1,0 +1,24 @@
+ref:
+  as: sandboxed-containers-operator-hcp-deprovision
+  from: src
+  cli: latest
+  commands: sandboxed-containers-operator-hcp-deprovision-commands.sh
+  timeout: 1h30m0s
+  grace_period: 10m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Deprovisions everything the provision step created with the
+    hypershift-cluster-setup script (from the src checkout, hack/hcp): the
+    hosted cluster (HostedCluster and NodePool deletion, OIDC S3 bucket
+    removal, ccoctl aws delete for the IAM roles) followed by the management
+    cluster (openshift-install destroy cluster).
+
+    Deliberately NOT best_effort: there is no ipi-deprovision backstop in the
+    HCP workflow, so a teardown failure or timeout must mark the job failed
+    instead of silently leaking a management cluster, a hosted cluster,
+    ccoctl IAM roles and an OIDC S3 bucket. Refuses to no-op when
+    ${SHARED_DIR}/hcp/work exists but env.sh is missing. Requires build_root
+    in every consuming config (from: src).

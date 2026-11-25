@@ -1,0 +1,22 @@
+ref:
+  as: sandboxed-containers-operator-hcp-catalog-sources
+  from: cli
+  commands: sandboxed-containers-operator-hcp-catalog-sources-commands.sh
+  timeout: 10m0s
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    Copies the default GA CatalogSources (redhat-operators,
+    certified-operators, community-operators, redhat-marketplace) from the
+    management cluster to the hosted cluster, stripping the
+    node-role.kubernetes.io/master nodeSelector and tolerations that hosted
+    clusters cannot satisfy, and deletes catalog pods stuck in
+    ImagePullBackOff so they restart with the current pull secret.
+
+    Hosted clusters do not inherit the default OperatorHub catalogs; without
+    this step the OLM subscription in install-osc-operator never resolves.
+    The custom Pre-GA catalog is created separately by install-osc-operator
+    (dev.enabled=true); the two do not overlap.
