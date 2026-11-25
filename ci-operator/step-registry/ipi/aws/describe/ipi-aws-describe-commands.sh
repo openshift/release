@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Describe AWS Cluster resources which were created by a previous install.
 #
-# This script queries AWS directly and outputs resource information to a shared file.
+# This script queries AWS using the Resource Groups Tagging API to discover all
+# cluster resources, then fetches details for each resource type.
 
 set -o nounset
 set -o errexit
@@ -34,62 +35,149 @@ if [[ -z "${INFRA_ID}" || "${INFRA_ID}" == "null" ]]; then
 fi
 
 echo "Cluster Infrastructure ID: ${INFRA_ID}"
-echo "Describing all AWS resources for cluster: ${INFRA_ID}"
+echo "Discovering all AWS resources for cluster: ${INFRA_ID}"
 
 JSON_FILE="${ARTIFACT_DIR}/aws-cluster-describe.json"
 SUMMARY_FILE="${ARTIFACT_DIR}/aws-cluster-describe.log"
 
-echo "Querying EC2 instances..."
-INSTANCES_JSON=$(aws ec2 describe-instances \
-    --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
-    --output json | jq '[
-      .Reservations[].Instances[] |
-      if .PublicIpAddress then .PublicIpAddress = "REDACTED" else . end |
-      if .NetworkInterfaces then
-        .NetworkInterfaces |= map(
-          if .Association.PublicIp then .Association.PublicIp = "REDACTED" else . end |
-          if .PrivateIpAddresses then
-            .PrivateIpAddresses |= map(
-              if .Association.PublicIp then .Association.PublicIp = "REDACTED" else . end
-            )
-          else . end
+# Discover all resources using Resource Groups Tagging API
+echo "Querying all tagged resources via Resource Groups Tagging API..."
+TAGGED_RESOURCES=$(aws resourcegroupstaggingapi get-resources \
+    --tag-filters "Key=kubernetes.io/cluster/${INFRA_ID},Values=owned" \
+    --output json 2>/dev/null | jq -r '.ResourceTagMappingList[] | .ResourceARN' 2>/dev/null) || TAGGED_RESOURCES=""
+
+if [[ -z "${TAGGED_RESOURCES}" ]]; then
+  echo "WARNING: No resources found with tag kubernetes.io/cluster/${INFRA_ID}=owned"
+fi
+
+# Extract resource IDs by type from ARNs
+EC2_INSTANCE_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':instance/' | sed 's|.*/||' | tr '\n' ' ') || EC2_INSTANCE_IDS=""
+VOLUME_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':volume/' | sed 's|.*/||' | tr '\n' ' ') || VOLUME_IDS=""
+VPC_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':vpc/' | sed 's|.*/||' | tr '\n' ' ') || VPC_IDS=""
+SUBNET_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':subnet/' | sed 's|.*/||' | tr '\n' ' ') || SUBNET_IDS=""
+SG_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':security-group/' | sed 's|.*/||' | tr '\n' ' ') || SG_IDS=""
+RTB_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':route-table/' | sed 's|.*/||' | tr '\n' ' ') || RTB_IDS=""
+IGW_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':internet-gateway/' | sed 's|.*/||' | tr '\n' ' ') || IGW_IDS=""
+NAT_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':natgateway/' | sed 's|.*/||' | tr '\n' ' ') || NAT_IDS=""
+
+# Query EC2 instances
+if [[ -n "${EC2_INSTANCE_IDS}" ]]; then
+  echo "Fetching EC2 instance details..."
+  INSTANCES_JSON=$(aws ec2 describe-instances \
+      --instance-ids ${EC2_INSTANCE_IDS} \
+      --output json | jq '[
+        .Reservations[].Instances[] |
+        if .PublicIpAddress then .PublicIpAddress = "REDACTED" else . end |
+        if .NetworkInterfaces then
+          .NetworkInterfaces |= map(
+            if .Association.PublicIp then .Association.PublicIp = "REDACTED" else . end |
+            if .PrivateIpAddresses then
+              .PrivateIpAddresses |= map(
+                if .Association.PublicIp then .Association.PublicIp = "REDACTED" else . end
+              )
+            else . end
+          )
+        else . end
+      ]') || INSTANCES_JSON="[]"
+else
+  INSTANCES_JSON="[]"
+fi
+
+# Query EBS volumes
+if [[ -n "${VOLUME_IDS}" ]]; then
+  echo "Fetching EBS volume details..."
+  VOLUMES_JSON=$(aws ec2 describe-volumes \
+      --volume-ids ${VOLUME_IDS} \
+      --output json | jq '.Volumes') || VOLUMES_JSON="[]"
+else
+  VOLUMES_JSON="[]"
+fi
+
+# Query VPCs
+if [[ -n "${VPC_IDS}" ]]; then
+  echo "Fetching VPC details..."
+  VPCS_JSON=$(aws ec2 describe-vpcs \
+      --vpc-ids ${VPC_IDS} \
+      --output json | jq '.Vpcs') || VPCS_JSON="[]"
+else
+  VPCS_JSON="[]"
+fi
+
+# Query Subnets
+if [[ -n "${SUBNET_IDS}" ]]; then
+  echo "Fetching subnet details..."
+  SUBNETS_JSON=$(aws ec2 describe-subnets \
+      --subnet-ids ${SUBNET_IDS} \
+      --output json | jq '.Subnets') || SUBNETS_JSON="[]"
+else
+  SUBNETS_JSON="[]"
+fi
+
+# Query Security Groups
+if [[ -n "${SG_IDS}" ]]; then
+  echo "Fetching security group details..."
+  SECURITY_GROUPS_JSON=$(aws ec2 describe-security-groups \
+      --group-ids ${SG_IDS} \
+      --output json | jq '.SecurityGroups') || SECURITY_GROUPS_JSON="[]"
+else
+  SECURITY_GROUPS_JSON="[]"
+fi
+
+# Query Route Tables
+if [[ -n "${RTB_IDS}" ]]; then
+  echo "Fetching route table details..."
+  ROUTE_TABLES_JSON=$(aws ec2 describe-route-tables \
+      --route-table-ids ${RTB_IDS} \
+      --output json | jq '.RouteTables') || ROUTE_TABLES_JSON="[]"
+else
+  ROUTE_TABLES_JSON="[]"
+fi
+
+# Query Internet Gateways
+if [[ -n "${IGW_IDS}" ]]; then
+  echo "Fetching internet gateway details..."
+  INTERNET_GATEWAYS_JSON=$(aws ec2 describe-internet-gateways \
+      --internet-gateway-ids ${IGW_IDS} \
+      --output json | jq '.InternetGateways') || INTERNET_GATEWAYS_JSON="[]"
+else
+  INTERNET_GATEWAYS_JSON="[]"
+fi
+
+# Query NAT Gateways
+if [[ -n "${NAT_IDS}" ]]; then
+  echo "Fetching NAT gateway details..."
+  NAT_GATEWAYS_JSON=$(aws ec2 describe-nat-gateways \
+      --nat-gateway-ids ${NAT_IDS} \
+      --output json | jq '[
+        .NatGateways[] |
+        .NatGatewayAddresses |= map(
+          if .PublicIp then .PublicIp = "REDACTED" else . end
         )
-      else . end
-    ]') || INSTANCES_JSON="[]"
+      ]') || NAT_GATEWAYS_JSON="[]"
+else
+  NAT_GATEWAYS_JSON="[]"
+fi
 
-VOLUMES_JSON=$(aws ec2 describe-volumes \
-    --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
-    --output json 2>/dev/null | jq '.Volumes' 2>/dev/null) || VOLUMES_JSON="[]"
-
-VPCS_JSON=$(aws ec2 describe-vpcs \
-    --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
-    --output json 2>/dev/null | jq '.Vpcs' 2>/dev/null) || VPCS_JSON="[]"
-
-SUBNETS_JSON=$(aws ec2 describe-subnets \
-    --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
-    --output json 2>/dev/null | jq '.Subnets' 2>/dev/null) || SUBNETS_JSON="[]"
-
-SECURITY_GROUPS_JSON=$(aws ec2 describe-security-groups \
-    --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
-    --output json 2>/dev/null | jq '.SecurityGroups' 2>/dev/null) || SECURITY_GROUPS_JSON="[]"
-
+# Query Load Balancers (Classic) - these may not be directly taggable, so use name matching
+echo "Fetching classic load balancers..."
 LOAD_BALANCERS_JSON=$(aws elb describe-load-balancers --output json 2>/dev/null | \
-    jq --arg infra "${INFRA_ID}" '[.LoadBalancerDescriptions[] | select(.LoadBalancerName | contains($infra))]' 2>/dev/null) || LOAD_BALANCERS_JSON="[]"
+    jq --arg infra "${INFRA_ID}" '[
+      .LoadBalancerDescriptions[] |
+      select(.LoadBalancerName | contains($infra))
+    ]') || LOAD_BALANCERS_JSON="[]"
 
-LOAD_BALANCERS_V2_JSON=$(aws elbv2 describe-load-balancers --output json 2>/dev/null | \
-    jq --arg infra "${INFRA_ID}" '[.LoadBalancers[] | select(.LoadBalancerName | contains($infra))]' 2>/dev/null) || LOAD_BALANCERS_V2_JSON="[]"
-
-ROUTE_TABLES_JSON=$(aws ec2 describe-route-tables \
-    --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
-    --output json 2>/dev/null | jq '.RouteTables' 2>/dev/null) || ROUTE_TABLES_JSON="[]"
-
-INTERNET_GATEWAYS_JSON=$(aws ec2 describe-internet-gateways \
-    --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
-    --output json 2>/dev/null | jq '.InternetGateways' 2>/dev/null) || INTERNET_GATEWAYS_JSON="[]"
-
-NAT_GATEWAYS_JSON=$(aws ec2 describe-nat-gateways \
-    --filter "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
-    --output json 2>/dev/null | jq '[.NatGateways[] | .NatGatewayAddresses |= map(if .PublicIp then .PublicIp = "REDACTED" else . end)]' 2>/dev/null) || NAT_GATEWAYS_JSON="[]"
+# Query Load Balancers V2 (ALB/NLB) - check tags via ARNs
+echo "Fetching application/network load balancers..."
+LB_V2_ARNS=$(echo "${TAGGED_RESOURCES}" | grep 'elasticloadbalancing:loadbalancer/' || true)
+if [[ -n "${LB_V2_ARNS}" ]]; then
+  LOAD_BALANCERS_V2_JSON=$(aws elbv2 describe-load-balancers --output json 2>/dev/null | \
+      jq --argjson arns "$(echo "${LB_V2_ARNS}" | jq -R -s 'split("\n") | map(select(length > 0))')" '[
+        .LoadBalancers[] |
+        select(.LoadBalancerArn as $arn | $arns | index($arn))
+      ]') || LOAD_BALANCERS_V2_JSON="[]"
+else
+  LOAD_BALANCERS_V2_JSON="[]"
+fi
 
 # Combine into single JSON
 jq -n \
