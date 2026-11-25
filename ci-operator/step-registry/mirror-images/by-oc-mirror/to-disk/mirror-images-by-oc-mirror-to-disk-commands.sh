@@ -95,35 +95,43 @@ KUBECONFIG="" oc registry login
 run_command "which oc"
 run_command "oc version --client"
 
-# Detect architecture for oc-mirror download
-ARCH=$(uname -m)
-case ${ARCH} in
-    x86_64) ARCH="amd64" ;;
-    aarch64) ARCH="arm64" ;;
-esac
+if [[ "${USE_OC_MIRROR_IMAGE:-false}" == "true" ]]; then
+    oc_mirror_download_dir=$(mktemp -d)
+    KUBECONFIG='' oc image extract "${OC_MIRROR_IMAGE}" \
+        --path="/usr/bin/oc-mirror:${oc_mirror_download_dir}" --confirm
+    chmod +x "${oc_mirror_download_dir}/oc-mirror"
+    oc_mirror_bin="${oc_mirror_download_dir}/oc-mirror"
+else
+    # Detect architecture for oc-mirror download
+    ARCH=$(uname -m)
+    case ${ARCH} in
+        x86_64) ARCH="amd64" ;;
+        aarch64) ARCH="arm64" ;;
+    esac
 
-# oc-mirror is distributed via CGW which only publishes "latest"
-oc_mirror_version="latest"
-CGWURL="https://mirror.openshift.com/pub/cgw"
-oc_mirror_download_dir=$(mktemp -d)
-pushd "${oc_mirror_download_dir}"
-echo "Downloading oc-mirror from ${CGWURL}/oc-mirror/${oc_mirror_version}/"
-curl -fL --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
-    "${CGWURL}/oc-mirror/${oc_mirror_version}/oc-mirror-rhel9-linux-${ARCH}.tar.gz"
+    # oc-mirror is distributed via CGW which only publishes "latest"
+    oc_mirror_version="latest"
+    CGWURL="https://mirror.openshift.com/pub/cgw"
+    oc_mirror_download_dir=$(mktemp -d)
+    pushd "${oc_mirror_download_dir}"
+    echo "Downloading oc-mirror from ${CGWURL}/oc-mirror/${oc_mirror_version}/"
+    curl -fL --retry 5 --connect-timeout 30 -o oc-mirror.tar.gz \
+        "${CGWURL}/oc-mirror/${oc_mirror_version}/oc-mirror-rhel9-linux-${ARCH}.tar.gz"
 
-echo "Verifying oc-mirror.tar.gz integrity..."
-curl -fL --retry 5 --connect-timeout 30 -o sha256sum.txt \
-    "${CGWURL}/oc-mirror/${oc_mirror_version}/sha256sum.txt"
-grep "oc-mirror-rhel9-linux-${ARCH}.tar.gz" sha256sum.txt | sed "s/oc-mirror-rhel9-linux-${ARCH}.tar.gz/oc-mirror.tar.gz/" | sha256sum -c - || {
-    echo "ERROR: oc-mirror.tar.gz checksum verification failed"
-    exit 1
-}
-echo "Checksum verification passed"
+    echo "Verifying oc-mirror.tar.gz integrity..."
+    curl -fL --retry 5 --connect-timeout 30 -o sha256sum.txt \
+        "${CGWURL}/oc-mirror/${oc_mirror_version}/sha256sum.txt"
+    grep "oc-mirror-rhel9-linux-${ARCH}.tar.gz" sha256sum.txt | sed "s/oc-mirror-rhel9-linux-${ARCH}.tar.gz/oc-mirror.tar.gz/" | sha256sum -c - || {
+        echo "ERROR: oc-mirror.tar.gz checksum verification failed"
+        exit 1
+    }
+    echo "Checksum verification passed"
 
-tar -xzf oc-mirror.tar.gz
-chmod +x oc-mirror
-oc_mirror_bin="${oc_mirror_download_dir}/oc-mirror"
-popd
+    tar -xzf oc-mirror.tar.gz
+    chmod +x oc-mirror
+    oc_mirror_bin="${oc_mirror_download_dir}/oc-mirror"
+    popd
+fi
 
 run_command "'${oc_mirror_bin}' version --output=yaml"
 
