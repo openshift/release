@@ -34,14 +34,17 @@ workflow:
     # Scoped to the Feature:ZeroEgress specs: the generic customer tail
     # (workloads pulling public images, external networking checks) is
     # expected to fail on a cluster with no internet egress.
+    # Each plane runs only its own specs: the platform step exports
+    # KUBECONFIG=mc-kubeconfig (management cluster), so the customer-plane
+    # image-pull specs must not be selected there, and vice versa.
     - ref: rosa-e2e-validate-customer
       env:
       - name: LABEL_FILTER
-        default: "Feature:ZeroEgress"
+        default: "Feature:ZeroEgress && Area:DataPlane"
     - ref: rosa-e2e-validate-platform
       env:
       - name: PLATFORM_LABEL_FILTER
-        default: "Feature:ZeroEgress"
+        default: "Feature:ZeroEgress && Area:ManagementPlane"
     post:
     - chain: rosa-cluster-deprovision
     # Delete the VPC endpoints before the VPC stack teardown: endpoints block

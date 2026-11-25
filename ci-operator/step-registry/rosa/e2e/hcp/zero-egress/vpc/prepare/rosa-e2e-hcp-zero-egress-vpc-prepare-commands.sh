@@ -55,7 +55,11 @@ aws ec2 authorize-security-group-ingress \
 echo "${ENDPOINT_SG_ID}" > "${SHARED_DIR}/zero_egress_endpoint_sg_id"
 
 # Interface endpoints for image pulls: ecr.api (authentication) and ecr.dkr
-# (image layers). S3 is covered by the gateway endpoint below.
+# (image layers). S3 is covered by the gateway endpoint below. Each ID is
+# appended to the cleanup record as soon as AWS returns it: the step runs
+# under errexit, and a later failure must not leave created endpoints
+# unrecorded (cleanup deletes endpoints via this file only).
+: > "${SHARED_DIR}/zero_egress_endpoint_ids"
 ENDPOINT_IDS=()
 for service in ecr.api ecr.dkr; do
   endpoint_id=$(aws ec2 create-vpc-endpoint \
@@ -67,6 +71,7 @@ for service in ecr.api ecr.dkr; do
     --query 'VpcEndpoint.VpcEndpointId' --output text)
   echo "Created ${service} interface endpoint ${endpoint_id}"
   ENDPOINT_IDS+=("${endpoint_id}")
+  printf '%s\n' "${endpoint_id}" >> "${SHARED_DIR}/zero_egress_endpoint_ids"
 done
 
 # Gateway endpoint for S3 (backing store for ECR image layers). The VPC
@@ -95,9 +100,8 @@ else
     --query 'VpcEndpoint.VpcEndpointId' --output text)
   echo "Created s3 gateway endpoint ${S3_ENDPOINT_ID}"
   ENDPOINT_IDS+=("${S3_ENDPOINT_ID}")
+  printf '%s\n' "${S3_ENDPOINT_ID}" >> "${SHARED_DIR}/zero_egress_endpoint_ids"
 fi
-
-printf '%s\n' "${ENDPOINT_IDS[@]}" > "${SHARED_DIR}/zero_egress_endpoint_ids"
 
 # Cut internet egress: remove every route whose target is a NAT gateway. NAT
 # routes carry NatGatewayId, not GatewayId (which is null there and would make
