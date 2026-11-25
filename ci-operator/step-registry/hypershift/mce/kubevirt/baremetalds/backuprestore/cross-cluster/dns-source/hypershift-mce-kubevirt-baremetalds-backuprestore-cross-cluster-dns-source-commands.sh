@@ -9,7 +9,7 @@ guest_domain_file="${SHARED_DIR}/cross-cluster-guest-domain"
 if [[ "${role}" == target ]]; then
   for domain_file in "${manager_domain_file}" "${guest_domain_file}"; do
     if [[ ! -s "${domain_file}" ]]; then
-      echo "Missing or empty ${domain_file}. The source DNS step must save both base domains before the target DNS hook runs." >&2
+      echo "Missing or empty ${domain_file}. The source DNS step must save both base domains before the target DNS step runs." >&2
       exit 1
     fi
   done
@@ -40,8 +40,6 @@ done
 if [[ "${role}" == source ]]; then
   printf '%s\n' "${manager_domain}" > "${manager_domain_file}"
   printf '%s\n' "${guest_domain}" > "${guest_domain_file}"
-  cp "$0" "${SHARED_DIR}/cross-cluster-dns-hook.sh"
-  chmod 700 "${SHARED_DIR}/cross-cluster-dns-hook.sh"
 else
   [[ "${manager_domain}" == "$(<"${manager_domain_file}")" ]] || { echo "Management base domains differ" >&2; exit 1; }
   [[ "${guest_domain}" == "$(<"${guest_domain_file}")" ]] || { echo "Restored guest base domain changed" >&2; exit 1; }
@@ -86,13 +84,4 @@ if ! virsh net-dumpxml ostestbm | grep -Fq "forwarder domain='${manager_domain}'
 fi
 getent ahostsv4 "api.${guest_cluster_domain}" | awk -v expected="${api_ip}" '$1 == expected {found=1} END {exit !found}'
 getent ahostsv4 "check.apps.${guest_cluster_domain}" | awk -v expected="${router_ip}" '$1 == expected {found=1} END {exit !found}'
-if [[ "${role}" == target ]]; then
-  # The base dev-scripts Squid ACL admits domains but not the guest API's
-  # LoadBalancer IP. Open it before the test checks the restored guest API.
-  sed -i "1 s|$| ${api_ip}|" /root/squid.conf
-  podman stop -t 120 external-squid
-  podman run -d --rm --net host --volume /root/squid.conf:/etc/squid/squid.conf \
-    --name external-squid --dns 127.0.0.1 \
-    quay.io/openshifttest/squid-proxy:multiarch
-fi
 EOF

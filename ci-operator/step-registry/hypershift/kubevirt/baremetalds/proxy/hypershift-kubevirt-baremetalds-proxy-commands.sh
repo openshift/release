@@ -5,7 +5,14 @@ set -o errexit
 set -o pipefail
 
 
-source "${SHARED_DIR}/packet-conf.sh" && scp "${SSHOPTS[@]}" "${SHARED_DIR}/nested_kubeconfig" "root@${IP}:nested_kubeconfig"
+source "${SHARED_DIR}/packet-conf.sh"
+proxy_port=8213
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    proxy_port="$(awk -F= '/^export PROXYPORT=/{print $2}' "${SHARED_DIR}/proxy-conf.sh")"
+    proxy_port="${proxy_port:-8213}"
+fi
+[[ "${proxy_port}" =~ ^[0-9]+$ ]] || { echo "Invalid OFCIR proxy port" >&2; exit 1; }
+scp "${SSHOPTS[@]}" "${SHARED_DIR}/nested_kubeconfig" "root@${IP}:nested_kubeconfig"
 
 # shellcheck disable=SC2087
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << 'EOF' |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
@@ -24,7 +31,7 @@ sudo podman run -d --rm \
 EOF
 
 echo "Adding proxy-url in kubeconfig"
-sed -i "/- cluster/ a\    proxy-url: http://$IP:8213/" "${SHARED_DIR}"/nested_kubeconfig
+sed -i "/- cluster/ a\    proxy-url: http://${IP}:${proxy_port}/" "${SHARED_DIR}"/nested_kubeconfig
 if [[ -f "${SHARED_DIR}/ofcir-role" ]]; then
     role="$(<"${SHARED_DIR}/ofcir-role")"
     if [[ "${role}" == source || "${role}" == target ]]; then

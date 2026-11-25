@@ -32,6 +32,14 @@ if [[ ! -x "${hcp_cli}" ]]; then
   hcp_cli=/usr/bin/hypershift
 fi
 
-"${hcp_cli}" create kubeconfig --namespace="${cluster_namespace}" --name="${cluster_name}" \
-  > "${SHARED_DIR}/nested_kubeconfig"
-cp "${SHARED_DIR}/nested_kubeconfig" "${SHARED_DIR}/nested_kubeconfig_${role}"
+guest_kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+"${hcp_cli}" create kubeconfig --namespace="${cluster_namespace}" --name="${cluster_name}" > "${guest_kubeconfig}"
+if [[ "${role}" == target ]]; then
+  # The target health check and conformance use the API name retained by the restore.
+  guest_domain="$(<"${SHARED_DIR}/cross-cluster-guest-domain")"
+  guest_cluster="$(oc config view --kubeconfig="${guest_kubeconfig}" -o jsonpath='{.clusters[0].name}')"
+  guest_server="$(oc config view --kubeconfig="${guest_kubeconfig}" -o jsonpath='{.clusters[0].cluster.server}')"
+  guest_server="$(sed -E "s#^https://(\\[[^]]+\\]|[^:/]+)#https://api.${cluster_name}.${guest_domain}#" <<< "${guest_server}")"
+  oc config set-cluster "${guest_cluster}" --kubeconfig="${guest_kubeconfig}" --server="${guest_server}" >/dev/null
+fi
+cp "${guest_kubeconfig}" "${SHARED_DIR}/nested_kubeconfig_${role}"
