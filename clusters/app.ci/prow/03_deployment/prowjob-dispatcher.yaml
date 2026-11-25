@@ -164,6 +164,7 @@ spec:
         - --jobs-storage-path=/cache/job-cache.gob
         - --snapshot-storage-path=/cache/policy-snapshot.json
         - --prow-jobs-dir=/var/repo/release/ci-operator/jobs
+        - --read-only-jobs-dir=/etc/jobs/efs
         - --rebalance-hysteresis-percent=10
         - --movement-budget-percent=10
         - --minimum-job-demand=1
@@ -231,6 +232,9 @@ spec:
         - mountPath: /etc/github
           name: token
           readOnly: true
+        - name: job-configs
+          mountPath: /etc/jobs/efs
+          readOnly: true
         - name: release
           mountPath: /var/repo
       - name: git-sync
@@ -275,6 +279,10 @@ spec:
       - name: token
         secret:
           secretName: github-credentials-openshift-bot
+      - name: job-configs
+        persistentVolumeClaim:
+          claimName: job-configs-nfs
+          readOnly: true
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
