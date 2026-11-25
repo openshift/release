@@ -9,23 +9,26 @@ ref:
       cpu: 100m
       memory: 100Mi
   documentation: |-
-    Post-install step that queries AWS for all cluster resources and writes a comprehensive
-    inventory to artifacts for debugging and documentation purposes.
+    Post-install step that uses AWS Resource Groups Tagging API to discover all cluster
+    resources tagged with kubernetes.io/cluster/${INFRA_ID}=owned, then fetches detailed
+    information and writes a comprehensive inventory to artifacts for debugging.
 
-    This step queries AWS EC2, ELB, and other services to gather information about:
-    - EC2 Instances (with nested virtualization details)
-    - EBS Volumes
-    - VPCs and Subnets
-    - Security Groups
-    - Load Balancers (Classic and Application/Network)
-    - Route Tables
-    - Internet Gateways
-    - NAT Gateways
+    This step automatically discovers and queries details for:
+    - EC2 Instances, EBS Volumes, Network Interfaces
+    - VPCs, Subnets, Security Groups, Route Tables
+    - Internet Gateways, NAT Gateways, Elastic IPs
+    - VPC Endpoints, Network ACLs, DHCP Option Sets, VPC Peering Connections
+    - Load Balancers (Classic, Application, Network) and Target Groups
+    - S3 Buckets, KMS Keys
+    - IAM Roles and Instance Profiles (with account IDs and trust policies redacted)
+    - Route53 Hosted Zones
 
     Outputs:
-    - ${ARTIFACT_DIR}/aws-cluster-describe.json - Full JSON inventory with public IPs redacted
+    - ${ARTIFACT_DIR}/aws-cluster-describe.json - Full JSON inventory with sensitive data redacted
     - ${ARTIFACT_DIR}/aws-cluster-describe.log - Human-readable summary of all resources
     - ${SHARED_DIR}/aws-cluster-describe.json - Copy of JSON for use by subsequent steps
+
+    Redacted information: Public IP addresses, AWS account IDs, IAM trust policies.
 
     This step is marked as best_effort and will not fail the test if AWS queries fail.
     It is primarily useful for debugging cluster configuration and verifying resource creation.
