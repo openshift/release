@@ -10,7 +10,8 @@ fi
 
 ECO_CI_CD_DIR=/eco-ci-cd
 if [[ -n "${ECO_CI_CD_FORK_REPO:-}" ]]; then
-  ECO_CI_CD_DIR=$(mktemp -d /tmp/eco-ci-cd-fork.XXXXXXXX)
+  ECO_CI_CD_FORK_DIR=$(mktemp -d /tmp/eco-ci-cd-fork.XXXXXXXX)
+  ECO_CI_CD_DIR="${ECO_CI_CD_FORK_DIR}"
   git clone --depth 1 --branch "${ECO_CI_CD_FORK_BRANCH:-main}" -- \
     "${ECO_CI_CD_FORK_REPO}" "${ECO_CI_CD_DIR}"
   # Use the Ansible collections installed in the step image.
@@ -70,7 +71,7 @@ PROJECT_DIR="/tmp"
 echo "Set bastion SSH configuration"
 cat /var/group_variables/common/all/ansible_ssh_private_key > "${PROJECT_DIR}/temp_ssh_key"
 chmod 600 "${PROJECT_DIR}/temp_ssh_key"
-trap 'rm -f "${PROJECT_DIR}/temp_ssh_key"' EXIT
+trap 'rm -f "${PROJECT_DIR}/temp_ssh_key"; if [[ -n "${ECO_CI_CD_FORK_DIR:-}" ]]; then rm -rf "${ECO_CI_CD_FORK_DIR}"; fi' EXIT
 
 BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
