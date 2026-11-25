@@ -85,6 +85,18 @@ if [[ ! -d ".git" ]]; then
   error "precheck: not in a git repository"
 fi
 
+# Checkout: run an exact reviewed revision instead of the job checkout
+if [[ -n "${AUTOMATION_CHECKOUT_REF:-}" ]]; then
+  debug "checkout: fetching ${AUTOMATION_CHECKOUT_REF}"
+  git fetch --quiet origin "${AUTOMATION_CHECKOUT_REF}" || error "checkout: failed to fetch ${AUTOMATION_CHECKOUT_REF}"
+  fetched="$(git rev-parse FETCH_HEAD)"
+  if [[ "${fetched}" != "${AUTOMATION_CHECKOUT_SHA:-}" ]]; then
+    error "checkout: ${AUTOMATION_CHECKOUT_REF} resolved to ${fetched}, expected ${AUTOMATION_CHECKOUT_SHA:-unset}"
+  fi
+  git checkout --quiet -B image-updater-run "${fetched}" || error "checkout: failed to check out ${fetched}"
+  info "checkout: running the pinned revision ${fetched}"
+fi
+
 # Precheck: Ensure all required tools are present
 debug "precheck: ensure required tools are present"
 required_tools=(skopeo git az bicep yq jq curl)
