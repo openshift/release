@@ -101,6 +101,15 @@ channels, branches and the test name (`from-317`) are derived:
       - {cron: weekly, source: nightly, clouds: [aws], ocp: ["4.22"], test: upgrade, upgrade_from: "3.17"}
 ```
 
+For a released operator, use `source: stable` on an OCP both versions support:
+
+```yaml
+      - {cron: daily, source: stable, clouds: [aws], ocp: ["4.18"], test: upgrade, upgrade_from: "3.14"}
+```
+
+Add `upgrade_target: nightly` to upgrade from the released n-1 to n's ART FBC
+build; the ART tag `quay-<n>__v<ocp>__quay-rhel9-operator` must exist.
+
 **Add a quay-operator Chainsaw job.** One row plus its
 `quay-quay-operator-{branch}__aws-ocp{ocp_nodot}-e2e-chainsaw.yaml` line in
 `managed_files.active`:
@@ -182,6 +191,7 @@ Per job, `quay[].jobs[]`:
 | `database` | `true` provisions a managed Postgres (`DATABASE_BY_CLOUD` in `model.py`: AWS RDS, Azure Postgres) and removes it in `post`. Not on `aws-metal`, `gcp`, or `libvirt`. Adds the DB kind to the name (`aws-s3-rds-nightly`). |
 | `storage` | Override the cloud's default storage. Besides that default, only `odf`, only on `aws`. `e2e-chainsaw` always uses `odf`. |
 | `upgrade_from` | Required for `upgrade`, invalid elsewhere: the previous Quay `X.Y`. Derives both channels, both branches and the name `from-<XY>`. |
+| `upgrade_target` | `upgrade` with `source: stable` only: `nightly` installs n-1 from `redhat-operators`, then upgrades to n's ART FBC build. |
 | `ocp_channel` | `upgrade` only: `stable` (default) or `candidate`, for an OCP minor without a stable channel yet. |
 
 ### File naming
@@ -223,7 +233,14 @@ fields (`test`, `source`, `arch`, `layout`, `storage`, `fips`, `sts`,
   `FEATURE_ROBOT_API_TOKENS` is added for Quay 5.0 and later.
 - **`upgrade`**: installs a released OCP (`releases.latest` is a stable
   `release`, not the nightly payload) and moves the Subscription channel itself,
-  so `QUAY_OPERATOR_CHANNEL` is not set.
+  so `QUAY_OPERATOR_CHANNEL` is not set. `source: stable` is for branches
+  without the Playwright suite: both channels come from the cluster's
+  `redhat-operators` catalog (`QUAY_UPGRADE_CATALOG_SOURCE`), the ART catalog
+  step, Playwright image, env and phases are dropped, and
+  `quay-operator-upgrade-seed-api` / `-verify-api` seed and check an org, repo,
+  robot and image through the API instead. With `upgrade_target: nightly` the
+  ART catalog step and its index env come back, and
+  `quay-operator-upgrade-channel` moves the Subscription to that catalog.
 - **`e2e-chainsaw`**: installs ODF (NooBaa) and the operator from the ART
   nightly catalog on channel `stable-{quay_version}`, then runs
   `quay-test-chainsaw` with `CHAINSAW_SUITE: all` (e2e, then destructive) under

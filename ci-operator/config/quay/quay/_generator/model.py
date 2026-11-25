@@ -94,6 +94,9 @@ class Cell:
     # channels, and branches are derived from quay_version + upgrade_from, so a row
     # needs only this one field.
     upgrade_from: str | None = None
+    # "nightly" on a source: stable upgrade row: install n-1 from redhat-operators,
+    # then upgrade to the ART FBC build of n.
+    upgrade_target: str | None = None
     # The upgrade lane's OCP release channel: "stable", or "candidate" for an OCP
     # minor with no stable channel yet. Other tests render a nightly payload instead.
     ocp_channel: str = "stable"
@@ -254,6 +257,7 @@ class Cell:
             "sts": self.sts,
             "ocp_channel": self.ocp_channel,
             "dualstack": self.dualstack,
+            "upgrade_target": self.upgrade_target,
         }
         if self.quay_version is not None:
             ctx["quay_version"] = self.quay_version

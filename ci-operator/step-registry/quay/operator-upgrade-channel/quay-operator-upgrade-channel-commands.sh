@@ -19,6 +19,20 @@ if [[ -s "${SHARED_DIR}/quay_index_image" ]]; then
 fi
 TARGET_CHANNEL="${QUAY_UPGRADE_TARGET_CHANNEL:-}"
 TARGET_CATALOG="${QUAY_UPGRADE_TARGET_CATALOG_NAME:-quay-upgrade-target}"
+# Released-catalog mode: the n-1 source is an existing cluster CatalogSource
+# (e.g. redhat-operators). The target is that same catalog (only the Subscription
+# channel moves) unless a target image is set or an ART FBC digest was resolved,
+# in which case the target is that image (released n-1 -> ART n).
+RELEASED_CATALOG="${QUAY_UPGRADE_CATALOG_SOURCE:-}"
+if [[ -n "${RELEASED_CATALOG}" ]]; then
+  SOURCE_CATALOG="${RELEASED_CATALOG}"
+  SOURCE_IMAGE=""
+  if [[ -z "${TARGET_IMAGE}" ]]; then
+    TARGET_CATALOG="${RELEASED_CATALOG}"
+  fi
+fi
+SAME_CATALOG=false
+[[ -n "${RELEASED_CATALOG}" && -z "${TARGET_IMAGE}" ]] && SAME_CATALOG=true
 CATALOG_NS="${QUAY_UPGRADE_CATALOG_NAMESPACE:-openshift-marketplace}"
 OPERATOR_NS="${QUAY_UPGRADE_OPERATOR_NAMESPACE:-openshift-operators}"
 SUBSCRIPTION="${QUAY_UPGRADE_SUBSCRIPTION_NAME:-quay-operator}"
@@ -36,8 +50,12 @@ duration_seconds() {
 }
 fail() { echo "ERROR: $*" >&2; exit 1; }
 
-valid_digest_image "${SOURCE_IMAGE}" || fail "QUAY_UPGRADE_SOURCE_CATALOG_IMAGE must be image@sha256:<64 hex>"
-valid_digest_image "${TARGET_IMAGE}" || fail "QUAY_UPGRADE_TARGET_CATALOG_IMAGE must be image@sha256:<64 hex>"
+if [[ -z "${RELEASED_CATALOG}" ]]; then
+  valid_digest_image "${SOURCE_IMAGE}" || fail "QUAY_UPGRADE_SOURCE_CATALOG_IMAGE must be image@sha256:<64 hex>"
+fi
+if [[ "${SAME_CATALOG}" == false ]]; then
+  valid_digest_image "${TARGET_IMAGE}" || fail "QUAY_UPGRADE_TARGET_CATALOG_IMAGE must be image@sha256:<64 hex>"
+fi
 valid_channel "${SOURCE_CHANNEL}" || fail "QUAY_UPGRADE_SOURCE_CHANNEL is required and malformed"
 valid_channel "${TARGET_CHANNEL}" || fail "QUAY_UPGRADE_TARGET_CHANNEL is required and malformed"
 for name in "${SOURCE_CATALOG}" "${TARGET_CATALOG}" "${CATALOG_NS}" "${OPERATOR_NS}" "${SUBSCRIPTION}" "${QUAY_NS}" "${QUAY_REGISTRY}"; do
@@ -76,6 +94,25 @@ wait_catalog() {
   fail "CatalogSource $1 did not become READY within ${CATALOG_TIMEOUT}"
 }
 
+# Catalog preflight: fail naming each requested channel the catalog's
+# quay-operator package lacks, so a stream absent from it stops before the move.
+preflight_channels() {
+  local catalog="$1" deadline=$(( $(date +%s) + CATALOG_SECONDS )) channels="" missing=() channel
+  shift
+  while (( $(date +%s) < deadline )); do
+    channels="$(oc get packagemanifests -n "${CATALOG_NS}" -l "catalog=${catalog}" \
+      -o jsonpath='{range .items[?(@.metadata.name=="quay-operator")]}{range .status.channels[*]}{.name}{"\n"}{end}{end}' 2>/dev/null || true)"
+    [[ -n "${channels}" ]] && break
+    sleep 10
+  done
+  printf '%s\n' "${channels}" >"${ARTIFACT_DIR}/catalog-channels.txt"
+  [[ -n "${channels}" ]] || fail "CatalogSource ${CATALOG_NS}/${catalog} served no quay-operator package within ${CATALOG_TIMEOUT}"
+  for channel in "$@"; do
+    grep -Fxq "${channel}" <<<"${channels}" || missing+=("${channel}")
+  done
+  (( ${#missing[@]} == 0 )) || fail "quay-operator in CatalogSource ${CATALOG_NS}/${catalog} lacks channel(s): ${missing[*]}; it has: $(paste -sd ' ' <<<"${channels}")"
+}
+
 # The Quay operator labels the app Deployment's own metadata with
 # quay-component=quay (the "quay" component); quay-component=quay-app is only the
 # pod-template/selector label, so `oc get deployment -l quay-component=quay-app`
@@ -111,6 +148,12 @@ pre_version="$(oc get quayregistry -n "${QUAY_NS}" "${QUAY_REGISTRY}" -o jsonpat
 target_minor="${TARGET_CHANNEL##*-}"
 echo "Pre-upgrade QuayRegistry currentVersion: ${pre_version:-<none>}; target minor: ${target_minor}"
 
+if [[ "${SAME_CATALOG}" == true ]]; then
+  wait_catalog "${TARGET_CATALOG}"
+  preflight_channels "${TARGET_CATALOG}" "${SOURCE_CHANNEL}" "${TARGET_CHANNEL}"
+  oc patch subscription -n "${OPERATOR_NS}" "${SUBSCRIPTION}" --type merge \
+    -p "{\"spec\":{\"channel\":\"${TARGET_CHANNEL}\"}}"
+else
 if oc get catalogsource -n "${CATALOG_NS}" "${TARGET_CATALOG}" >/dev/null 2>&1; then
   owner="$(oc get catalogsource -n "${CATALOG_NS}" "${TARGET_CATALOG}" -o jsonpath='{.metadata.labels.quay-operator-upgrade\.openshift\.io/managed}' 2>/dev/null || true)"
   [[ "${owner}" == true ]] || fail "CatalogSource ${CATALOG_NS}/${TARGET_CATALOG} exists but is not owned by this step"
@@ -134,6 +177,7 @@ wait_catalog "${TARGET_CATALOG}"
 
 oc patch subscription -n "${OPERATOR_NS}" "${SUBSCRIPTION}" --type merge \
   -p "{\"spec\":{\"source\":\"${TARGET_CATALOG}\",\"sourceNamespace\":\"${CATALOG_NS}\",\"channel\":\"${TARGET_CHANNEL}\"}}"
+fi
 
 deadline=$(( $(date +%s) + UPGRADE_SECONDS ))
 post_csv=""

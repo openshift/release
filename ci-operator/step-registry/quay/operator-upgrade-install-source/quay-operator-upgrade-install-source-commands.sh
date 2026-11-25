@@ -12,7 +12,15 @@ if [[ -z "${SOURCE_IMAGE}" && -s "${SHARED_DIR}/quay_index_image" ]]; then
   SOURCE_IMAGE="$(<"${SHARED_DIR}/quay_index_image")"
 fi
 SOURCE_CHANNEL="${QUAY_UPGRADE_SOURCE_CHANNEL:-}"
+TARGET_CHANNEL="${QUAY_UPGRADE_TARGET_CHANNEL:-}"
 SOURCE_CATALOG="${QUAY_UPGRADE_SOURCE_CATALOG_NAME:-quay-upgrade-source}"
+# Released-catalog mode: subscribe from an existing cluster CatalogSource (e.g.
+# redhat-operators) instead of creating one from an immutable catalog image.
+RELEASED_CATALOG="${QUAY_UPGRADE_CATALOG_SOURCE:-}"
+if [[ -n "${RELEASED_CATALOG}" ]]; then
+  SOURCE_CATALOG="${RELEASED_CATALOG}"
+  SOURCE_IMAGE=""
+fi
 CATALOG_NS="${QUAY_UPGRADE_CATALOG_NAMESPACE:-openshift-marketplace}"
 OPERATOR_NS="${QUAY_UPGRADE_OPERATOR_NAMESPACE:-openshift-operators}"
 SUBSCRIPTION="${QUAY_UPGRADE_SUBSCRIPTION_NAME:-quay-operator}"
@@ -27,7 +35,11 @@ duration_seconds() {
 }
 fail() { echo "ERROR: $*" >&2; exit 1; }
 
-valid_digest_image "${SOURCE_IMAGE}" || fail "QUAY_UPGRADE_SOURCE_CATALOG_IMAGE must be image@sha256:<64 hex>"
+if [[ -n "${RELEASED_CATALOG}" ]]; then
+  valid_channel "${TARGET_CHANNEL}" || fail "QUAY_UPGRADE_TARGET_CHANNEL is required and malformed in released-catalog mode"
+else
+  valid_digest_image "${SOURCE_IMAGE}" || fail "QUAY_UPGRADE_SOURCE_CATALOG_IMAGE must be image@sha256:<64 hex>"
+fi
 valid_channel "${SOURCE_CHANNEL}" || fail "QUAY_UPGRADE_SOURCE_CHANNEL is required and malformed"
 for name in "${SOURCE_CATALOG}" "${CATALOG_NS}" "${OPERATOR_NS}" "${SUBSCRIPTION}"; do
   valid_name "${name}" || fail "invalid Kubernetes resource name: ${name}"
@@ -59,9 +71,28 @@ wait_catalog() {
   fail "CatalogSource $1 did not become READY within ${TIMEOUT}"
 }
 
+# Catalog preflight: fail naming each requested channel the catalog's
+# quay-operator package lacks, so a stream absent from it stops before install.
+preflight_channels() {
+  local catalog="$1" deadline=$(( $(date +%s) + WAIT_SECONDS )) channels="" missing=() channel
+  shift
+  while (( $(date +%s) < deadline )); do
+    channels="$(oc get packagemanifests -n "${CATALOG_NS}" -l "catalog=${catalog}" \
+      -o jsonpath='{range .items[?(@.metadata.name=="quay-operator")]}{range .status.channels[*]}{.name}{"\n"}{end}{end}' 2>/dev/null || true)"
+    [[ -n "${channels}" ]] && break
+    sleep 10
+  done
+  printf '%s\n' "${channels}" >"${ARTIFACT_DIR}/catalog-channels.txt"
+  [[ -n "${channels}" ]] || fail "CatalogSource ${CATALOG_NS}/${catalog} served no quay-operator package within ${TIMEOUT}"
+  for channel in "$@"; do
+    grep -Fxq "${channel}" <<<"${channels}" || missing+=("${channel}")
+  done
+  (( ${#missing[@]} == 0 )) || fail "quay-operator in CatalogSource ${CATALOG_NS}/${catalog} lacks channel(s): ${missing[*]}; it has: $(paste -sd ' ' <<<"${channels}")"
+}
+
 oc get namespace "${CATALOG_NS}" >/dev/null
 oc get namespace "${OPERATOR_NS}" >/dev/null
-if oc get catalogsource -n "${CATALOG_NS}" "${SOURCE_CATALOG}" >/dev/null 2>&1; then
+if [[ -z "${RELEASED_CATALOG}" ]] && oc get catalogsource -n "${CATALOG_NS}" "${SOURCE_CATALOG}" >/dev/null 2>&1; then
   owner="$(oc get catalogsource -n "${CATALOG_NS}" "${SOURCE_CATALOG}" -o jsonpath='{.metadata.labels.quay-operator-upgrade\.openshift\.io/managed}' 2>/dev/null || true)"
   [[ "${owner}" == true ]] || fail "CatalogSource ${CATALOG_NS}/${SOURCE_CATALOG} exists but is not owned by this step"
 fi
@@ -70,6 +101,7 @@ if oc get subscription -n "${OPERATOR_NS}" "${SUBSCRIPTION}" >/dev/null 2>&1; th
   [[ "${owner}" == true ]] || fail "Subscription ${OPERATOR_NS}/${SUBSCRIPTION} exists but is not owned by this step"
 fi
 
+if [[ -z "${RELEASED_CATALOG}" ]]; then
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
@@ -84,7 +116,18 @@ spec:
   displayName: Quay n-1 upgrade source
   publisher: openshift-ci
 EOF
+fi
 wait_catalog "${SOURCE_CATALOG}"
+if [[ -n "${RELEASED_CATALOG}" ]]; then
+  # The target channel lives in the released catalog only when the upgrade step
+  # has no target image (explicit or the ART FBC digest); otherwise the target
+  # catalog is that image and the released catalog may lack the target channel.
+  if [[ -z "${QUAY_UPGRADE_TARGET_CATALOG_IMAGE:-}" && ! -s "${SHARED_DIR}/quay_index_image" ]]; then
+    preflight_channels "${SOURCE_CATALOG}" "${SOURCE_CHANNEL}" "${TARGET_CHANNEL}"
+  else
+    preflight_channels "${SOURCE_CATALOG}" "${SOURCE_CHANNEL}"
+  fi
+fi
 
 cat <<EOF | oc apply -f -
 apiVersion: operators.coreos.com/v1alpha1

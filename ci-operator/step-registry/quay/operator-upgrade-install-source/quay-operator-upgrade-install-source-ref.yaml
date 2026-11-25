@@ -18,6 +18,27 @@ ref:
   - name: QUAY_UPGRADE_SOURCE_CHANNEL
     default: ""
     documentation: Required source (n-1) Quay operator subscription channel.
+  - name: QUAY_UPGRADE_TARGET_CHANNEL
+    default: ""
+    documentation: |-
+      Target (n) channel. Read only in released-catalog mode, where the catalog
+      preflight also requires it when the target is that same released catalog
+      (no QUAY_UPGRADE_TARGET_CATALOG_IMAGE and no ART FBC digest in SHARED_DIR).
+  - name: QUAY_UPGRADE_TARGET_CATALOG_IMAGE
+    default: ""
+    documentation: |-
+      Target (n) catalog image of the upgrade step. Read only to decide whether
+      the released-catalog preflight checks the target channel.
+  - name: QUAY_UPGRADE_CATALOG_SOURCE
+    default: ""
+    documentation: |-
+      Released-catalog mode. Empty (default) creates the source CatalogSource from
+      the immutable catalog image. Set to an existing CatalogSource in
+      QUAY_UPGRADE_CATALOG_NAMESPACE (e.g. redhat-operators) to subscribe from it
+      instead: no catalog image is required or created, and the step waits for it
+      to be READY and fails unless its quay-operator package serves the source
+      channel, and the target channel when the target is this same catalog
+      (channels listed in ARTIFACT_DIR/catalog-channels.txt).
   - name: QUAY_UPGRADE_SOURCE_CATALOG_NAME
     default: quay-upgrade-source
     documentation: Name for the source CatalogSource created by this step.
@@ -37,4 +58,5 @@ ref:
     Creates an explicitly parameterized, immutable n-1 CatalogSource and installs
     the Quay operator from its requested channel. Invalid or missing source
     identity fails before mutation; the installedCSV and exact source identity
-    are written to SHARED_DIR for the upgrade step.
+    are written to SHARED_DIR for the upgrade step. With QUAY_UPGRADE_CATALOG_SOURCE
+    set, it installs from that released CatalogSource instead.
