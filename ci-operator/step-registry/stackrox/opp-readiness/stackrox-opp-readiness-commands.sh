@@ -36,14 +36,16 @@ mkdir -p "${ARTIFACT_DIR}"
 # --- Env seams (D6) --------------------------------------------------------
 # Step-config-declared variables (CIOP-4 double-underscore names). Values live
 # only in the step ref YAML (CIOP-5.3: no script-side defaults).
-: "${INTEROP__OPP__ACS__POLL_INTERVAL_S:?}"
-: "${INTEROP__OPP__ACS__WAIT_TIMEOUT_S:?}"
-: "${INTEROP__OPP__ACS__BUDGET_S:?}"
-: "${INTEROP__OPP__ACS__SELFTEST:?}"
-# EXPECTATION is the one seam whose ref default is the empty string, so it gets
-# an unset-guard only: a `:?` here would abort with status 1 before the carrier
-# and EXIT trap exist, skipping the documented InvalidInput case and exit 2. The
-# expectation validation below the trap owns that verdict.
+# No `:?` unset-guards here: an abort at this point exits with status 1 before
+# the carrier and EXIT trap exist, skipping the documented InvalidInput case and
+# exit 2. Every seam is normalized to the empty string instead, so the
+# validators below the trap own the exit-2 verdict for unset, empty, and
+# malformed values alike (SELFTEST's ref default is a non-empty "true"; a `:?`
+# there would only mask the same early-abort hole).
+INTEROP__OPP__ACS__POLL_INTERVAL_S="${INTEROP__OPP__ACS__POLL_INTERVAL_S:-}"
+INTEROP__OPP__ACS__WAIT_TIMEOUT_S="${INTEROP__OPP__ACS__WAIT_TIMEOUT_S:-}"
+INTEROP__OPP__ACS__BUDGET_S="${INTEROP__OPP__ACS__BUDGET_S:-}"
+INTEROP__OPP__ACS__SELFTEST="${INTEROP__OPP__ACS__SELFTEST:-}"
 INTEROP__OPP__ACS__EXPECTATION="${INTEROP__OPP__ACS__EXPECTATION:-}"
 _BUDGET_MARGIN_S=600   # static cross-file check: budget + margin < ref timeout - grace
 
@@ -223,6 +225,8 @@ trap '_jrc=$?; set +e; set +x; rm -f "${_curlCfg:-}"; _ensure_assertion_rows; if
 # InvalidInput carrier case, never an arithmetic abort before the carrier
 # exists.
 # ---------------------------------------------------------------------------
+# `${!_seam}` reads the value unguarded only after the `:-` normalization
+# above, so an unset variable cannot trip `set -u` and skip the carrier case.
 for _seam in INTEROP__OPP__ACS__POLL_INTERVAL_S INTEROP__OPP__ACS__WAIT_TIMEOUT_S INTEROP__OPP__ACS__BUDGET_S; do
     if ! [[ "${!_seam}" =~ ^[1-9][0-9]*$ ]]; then
         _add_classification "acs-env-invalid" failed "InvalidInput" \
@@ -232,6 +236,16 @@ for _seam in INTEROP__OPP__ACS__POLL_INTERVAL_S INTEROP__OPP__ACS__WAIT_TIMEOUT_
         exit 2
     fi
 done
+# SELFTEST is a boolean switch: anything other than true/false is invalid input,
+# judged here so the verdict is the documented exit 2 with an InvalidInput case
+# rather than a silent interpretation of a typo as "run the self-test".
+if [[ "${INTEROP__OPP__ACS__SELFTEST}" != "true" && "${INTEROP__OPP__ACS__SELFTEST}" != "false" ]]; then
+    _add_classification "acs-env-invalid" failed "InvalidInput" \
+        "INTEROP__OPP__ACS__SELFTEST must be 'true' or 'false' (got: '${INTEROP__OPP__ACS__SELFTEST}'); fail-closed"
+    _ensure_assertion_rows
+    echo "[readiness] FATAL: invalid INTEROP__OPP__ACS__SELFTEST='${INTEROP__OPP__ACS__SELFTEST}'"
+    exit 2
+fi
 pollInterval="${INTEROP__OPP__ACS__POLL_INTERVAL_S}"
 waitCap="${INTEROP__OPP__ACS__WAIT_TIMEOUT_S}"
 budget="${INTEROP__OPP__ACS__BUDGET_S}"
