@@ -56,7 +56,10 @@ tests:
     - as: test
       cli: latest
       commands: |
-        ln -sf "$(which oc)" /usr/local/bin/kubectl
+        if ! which kubectl &>/dev/null; then
+          ln -s "$(which oc)" "${HOME}/kubectl"
+          export PATH="${HOME}:${PATH}"
+        fi
         export GOFLAGS=-mod=mod
         OPERATOR_NAMESPACE=hyperfleet make test-e2e-ci
       from: src
