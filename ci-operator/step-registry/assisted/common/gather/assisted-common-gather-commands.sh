@@ -54,6 +54,79 @@ cat > gather_logs.yaml <<-'EOF'
           done
         ignore_errors: true
 
+    - name: Collect bootstrap VM debug info for VIP diagnostics
+      block:
+      - name: Get list of running libvirt VMs
+        ansible.builtin.shell: |
+          echo "=== LIBVIRT VMs ==="
+          virsh list --all
+          echo ""
+          for vm in $(virsh list --name); do
+            echo "=== VM: $vm - Network info ==="
+            virsh domifaddr "$vm" 2>/dev/null || echo "(no address info)"
+          done
+        register: vm_list
+
+      - name: Print VM listing
+        ansible.builtin.debug:
+          msg: "{{ vm_list.stdout }}"
+
+      - name: Get libvirt VM names
+        ansible.builtin.command: virsh list --name
+        register: vm_names
+
+      - name: Collect debug info from each VM via SSH
+        ansible.builtin.shell: |
+          echo "========================================"
+          echo "=== BOOTSTRAP DEBUG: {{ item }} ==="
+          echo "========================================"
+          IP=$(virsh domifaddr "{{ item }}" | grep -oP '192\.168\.\d+\.\d+' | head -1)
+          if [ -z "$IP" ]; then
+            echo "Could not determine IP for {{ item }}, skipping"
+            exit 0
+          fi
+          echo "--- IP: $IP ---"
+          SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 core@$IP"
+
+          echo "=== ip addr show ==="
+          $SSH ip addr show 2>&1 || echo "(failed)"
+
+          echo "=== ip route show ==="
+          $SSH ip route show 2>&1 || echo "(failed)"
+
+          echo "=== Listening ports (ss -tlnp) ==="
+          $SSH sudo ss -tlnp 2>&1 || echo "(failed)"
+
+          echo "=== All containers (crictl ps -a) ==="
+          $SSH sudo crictl ps -a 2>&1 || echo "(failed)"
+
+          echo "=== keepalived container logs ==="
+          KA=$($SSH sudo crictl ps -a --name keepalived -q 2>/dev/null | head -1)
+          if [ -n "$KA" ]; then
+            $SSH sudo crictl logs "$KA" 2>&1 | tail -100
+          else
+            echo "(no keepalived container found)"
+          fi
+
+          echo "=== haproxy container logs ==="
+          HA=$($SSH sudo crictl ps -a --name haproxy -q 2>/dev/null | head -1)
+          if [ -n "$HA" ]; then
+            $SSH sudo crictl logs "$HA" 2>&1 | tail -100
+          else
+            echo "(no haproxy container found)"
+          fi
+
+          echo "=== kubelet logs (last 200 lines) ==="
+          $SSH sudo journalctl -u kubelet --no-pager -n 200 2>&1 || echo "(failed)"
+
+          echo "=== bootkube logs (last 200 lines) ==="
+          $SSH sudo journalctl -u bootkube.service --no-pager -n 200 2>&1 || echo "(no bootkube service)"
+        loop: "{{ vm_names.stdout_lines | select('match', '\\S') | list }}"
+        loop_control:
+          label: "{{ item }}"
+      ignore_errors: yes
+      when: "'primary' in group_names"
+
     - name: Gather logs and debug information from primary host
       block:
       - name: Copy terraform log
