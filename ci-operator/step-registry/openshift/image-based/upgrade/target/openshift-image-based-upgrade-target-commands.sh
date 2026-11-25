@@ -35,7 +35,7 @@ echo "${TARGET_VM_NAME}" > "${SHARED_DIR}/target_vm_name"
 # - Other jobs: leave CI_LCA_GIT_* empty; ib-orchestrate-vm uses defaults.
 CI_LCA_GIT_REF=""
 CI_LCA_GIT_PULL=""
-if [[ "${REPO_OWNER}/${REPO_NAME}" == "openshift-kni/lifecycle-agent" ]]; then
+if [[ "${REPO_OWNER:-}/${REPO_NAME:-}" == "openshift-kni/lifecycle-agent" ]]; then
   CI_LCA_GIT_REF="${PULL_PULL_SHA:-}"
   CI_LCA_GIT_PULL="${PULL_NUMBER:-}"
   LCA_GIT_BRANCH="${PULL_BASE_REF:-${LCA_GIT_BRANCH:-}}"
