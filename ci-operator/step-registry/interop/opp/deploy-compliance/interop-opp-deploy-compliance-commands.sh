@@ -59,9 +59,9 @@ _opp_cleanup() {
     -e 's/password=[^ &]+/password=[REDACTED]/g' \
     -e 's/token=[^ &]+/token=[REDACTED]/g' \
     -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
-    "${_xtrace_log}" 2>/dev/null || true
+    "${_xtrace_log}" || true
   if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
-    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" || true
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
 }
@@ -141,7 +141,7 @@ _xml_escape() {
 
 # _junit_seed: write the default-FAILING case before any work, atomically.
 _junit_seed() {
-  mkdir -p "$(dirname "${_jfile}")" 2>/dev/null || true
+  mkdir -p "$(dirname "${_jfile}")" || true
   local _tmp
   _tmp=$(mktemp "$(dirname "${_jfile}")/.junit-XXXXXX")
   cat > "${_tmp}" <<JUNITEOF
@@ -199,12 +199,12 @@ _junit_emit() {
 JUNITEOF
   mv -f "${_tmp}" "${_jfile}"
   if [[ -n "${SHARED_DIR:-}" ]]; then
-    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
-    cp "${_jfile}" "${SHARED_DIR}/junit/" 2>/dev/null || true
+    mkdir -p "${SHARED_DIR}/junit" || true
+    cp "${_jfile}" "${SHARED_DIR}/junit/" || true
   fi
   # Post-condition: tests>=1 and exit!=0 implies >=1 failure/error.
   local _counts
-  _counts=$(python3 - "${_jfile}" <<'PYEOF' 2>/dev/null || echo "0 0 0"
+  _counts=$(python3 - "${_jfile}" <<'PYEOF' || echo "0 0 0"
 import sys, xml.etree.ElementTree as ET
 try:
     r = ET.parse(sys.argv[1]).getroot()
@@ -290,19 +290,19 @@ _poll_jsonpath() {
 # --- Pre-seed the default-failing JUnit case and the property file ---
 _junit_seed
 : > "${_props}"
-# --- Environment (every value env-overridable) ---
-COMPLIANCE_OPERATOR_CHANNEL="${COMPLIANCE_OPERATOR_CHANNEL:-stable}"
-COMPLIANCE_NAMESPACE="${COMPLIANCE_NAMESPACE:-openshift-compliance}"
-COMPLIANCE_CSV_WAIT_TIMEOUT="${COMPLIANCE_CSV_WAIT_TIMEOUT:-600}"
-COMPLIANCE_INSTALL_TIMEOUT="${COMPLIANCE_INSTALL_TIMEOUT:-600}"
-COMPLIANCE_REPORT_ONLY="${COMPLIANCE_REPORT_ONLY:-0}"
+# --- Environment (step-declared; ref.yaml is the single default authority) ---
+: "${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL:?}"
+: "${INTEROP__OPP__COMPLIANCE__NAMESPACE:?}"
+: "${INTEROP__OPP__COMPLIANCE__CSV_WAIT_TIMEOUT:?}"
+: "${INTEROP__OPP__COMPLIANCE__INSTALL_TIMEOUT:?}"
+: "${INTEROP__OPP__COMPLIANCE__REPORT_ONLY:?}"
 
-if ! [[ "${COMPLIANCE_OPERATOR_CHANNEL}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
-  echo "ERROR: invalid COMPLIANCE_OPERATOR_CHANNEL '${COMPLIANCE_OPERATOR_CHANNEL}'"
-  _classify "compliance-invalid-input" "COMPLIANCE_OPERATOR_CHANNEL failed validation"
+if ! [[ "${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "ERROR: invalid INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL '${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}'"
+  _classify "compliance-invalid-input" "INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL failed validation"
   exit 2
 fi
-for _v in COMPLIANCE_CSV_WAIT_TIMEOUT COMPLIANCE_INSTALL_TIMEOUT; do
+for _v in INTEROP__OPP__COMPLIANCE__CSV_WAIT_TIMEOUT INTEROP__OPP__COMPLIANCE__INSTALL_TIMEOUT; do
   _v_raw="${!_v}"
   # Bounded to 9 digits so the 10# conversion below cannot wrap a 64-bit
   # integer into the accepted range.
@@ -328,29 +328,29 @@ done
 # sequential and each independently bounded, so the SUM must multiply out.
 # Fail-fast half (exit 2); the runtime half is _work_deadline, which charges
 # elapsed setup and caps every phase deadline.
-_phase_sum=$(( COMPLIANCE_CSV_WAIT_TIMEOUT + COMPLIANCE_INSTALL_TIMEOUT ))
+_phase_sum=$(( INTEROP__OPP__COMPLIANCE__CSV_WAIT_TIMEOUT + INTEROP__OPP__COMPLIANCE__INSTALL_TIMEOUT ))
 if (( _phase_sum > 1230 )); then
-  echo "ERROR: COMPLIANCE_CSV_WAIT_TIMEOUT + COMPLIANCE_INSTALL_TIMEOUT must be <= 1230s (work budget 1650s - overhead 180s - precondition 120s - diagnostics 120s); got ${_phase_sum}s"
+  echo "ERROR: INTEROP__OPP__COMPLIANCE__CSV_WAIT_TIMEOUT + INTEROP__OPP__COMPLIANCE__INSTALL_TIMEOUT must be <= 1230s (work budget 1650s - overhead 180s - precondition 120s - diagnostics 120s); got ${_phase_sum}s"
   _classify "compliance-invalid-input" "wait sum ${_phase_sum}s exceeds the step work budget"
   exit 2
 fi
 
-echo ">>> PHASE: deploy compliance-operator (channel: ${COMPLIANCE_OPERATOR_CHANNEL}, namespace: ${COMPLIANCE_NAMESPACE}, CSV name wait: ${COMPLIANCE_CSV_WAIT_TIMEOUT}s, CSV wait: ${COMPLIANCE_INSTALL_TIMEOUT}s)"
+echo ">>> PHASE: deploy compliance-operator (channel: ${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}, namespace: ${INTEROP__OPP__COMPLIANCE__NAMESPACE}, CSV name wait: ${INTEROP__OPP__COMPLIANCE__CSV_WAIT_TIMEOUT}s, CSV wait: ${INTEROP__OPP__COMPLIANCE__INSTALL_TIMEOUT}s)"
 
 # --- Diagnostics: bounded (last 50 events, <=256KiB/object) ---
 _dump_diagnostics() {
   echo ">>> DIAG: Subscription (OLM, fully-qualified):"
-  oc get subscription.operators.coreos.com compliance-operator -n "${COMPLIANCE_NAMESPACE}" -o yaml 2>&1 | head -c 262144 || true
+  oc get subscription.operators.coreos.com compliance-operator -n "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" -o yaml 2>&1 | head -c 262144 || true
   echo
-  echo ">>> DIAG: events in ${COMPLIANCE_NAMESPACE} (last 50):"
-  oc get events -n "${COMPLIANCE_NAMESPACE}" --sort-by='.lastTimestamp' 2>&1 | tail -50 || true
+  echo ">>> DIAG: events in ${INTEROP__OPP__COMPLIANCE__NAMESPACE} (last 50):"
+  oc get events -n "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" --sort-by='.lastTimestamp' 2>&1 | tail -50 || true
   echo ">>> DIAG: events in openshift-marketplace (last 50):"
   oc get events -n openshift-marketplace --sort-by='.lastTimestamp' 2>&1 | tail -50 || true
-  echo ">>> DIAG: CSVs in ${COMPLIANCE_NAMESPACE}:"
-  oc get csv -n "${COMPLIANCE_NAMESPACE}" 2>&1 | head -50 || true
+  echo ">>> DIAG: CSVs in ${INTEROP__OPP__COMPLIANCE__NAMESPACE}:"
+  oc get csv -n "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" 2>&1 | head -50 || true
 }
 
-if [[ "${COMPLIANCE_REPORT_ONLY}" == "1" ]]; then
+if [[ "${INTEROP__OPP__COMPLIANCE__REPORT_ONLY}" == "1" ]]; then
   # Detection, not gating: report object states and exit 0. Runs before the
   # packagemanifest precondition on purpose (detection must work when the
   # catalog is absent or erroring) and before the self-disable check so the
@@ -358,9 +358,9 @@ if [[ "${COMPLIANCE_REPORT_ONLY}" == "1" ]]; then
   # A failed read is kept as its own state (undecided), never folded into the
   # absent/empty answer: detection output must not report an API or RBAC error
   # as an object state.
-  _sub=$(oc get subscription.operators.coreos.com compliance-operator -n "${COMPLIANCE_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null) || _sub="undecided"
-  _csvp=$(oc get csv -n "${COMPLIANCE_NAMESPACE}" -l "operators.coreos.com/compliance-operator.${COMPLIANCE_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _csvp="undecided"
-  _pm=$(oc get packagemanifest compliance-operator -n openshift-marketplace -o name 2>/dev/null) || _pm="undecided"
+  _sub=$(oc get subscription.operators.coreos.com compliance-operator -n "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" -o jsonpath='{.spec.channel}') || _sub="undecided"
+  _csvp=$(oc get csv -n "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" -l "operators.coreos.com/compliance-operator.${INTEROP__OPP__COMPLIANCE__NAMESPACE}=" -o jsonpath='{.items[0].status.phase}') || _csvp="undecided"
+  _pm=$(oc get packagemanifest compliance-operator -n openshift-marketplace -o name) || _pm="undecided"
   if [[ "${_pm}" == "undecided" ]]; then
     _pm_state="undecided"
   elif [[ -n "${_pm}" ]]; then
@@ -381,9 +381,9 @@ fi
 # CSV Succeeded. No post-install CRs, so no further term.
 # Queried cluster-wide by name (ACM installs the OperatorPolicy in the managed
 # cluster namespace, local-cluster) and the observed namespace is recorded.
-_prop "channel_requested" "${COMPLIANCE_OPERATOR_CHANNEL}"
+_prop "channel_requested" "${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}"
 if oc get crd operatorpolicies.policy.open-cluster-management.io >/dev/null 2>&1; then
-  _op_status=$(oc get operatorpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null) || _op_status="undecided"
+  _op_status=$(oc get operatorpolicies.policy.open-cluster-management.io -A -o json) || _op_status="undecided"
   if [[ "${_op_status}" == "undecided" ]]; then
     # A failed read is not "no policy". The self-disable verdict is withheld
     # (the install path runs and the policy is never patched) and the state is
@@ -415,7 +415,7 @@ try:
         print("absent - -")
 except Exception:
     print("absent - -")
-' "${_sd_policy}" "${COMPLIANCE_OPERATOR_CHANNEL}" 2>/dev/null) || _sd_out="absent - -"
+' "${_sd_policy}" "${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}") || _sd_out="absent - -"
     _sd_ok="absent" _sd_ns="-" _sd_ch="-"
     read -r _sd_ok _sd_ns _sd_ch <<<"${_sd_out}"
     _prop "operatorpolicy_namespace" "${_sd_ns:-unknown}"
@@ -432,13 +432,13 @@ except Exception:
     # the self-disable on its own.
     typeset _sd_sub="compliance-operator"
     typeset _live_ch=""
-    _live_ch=$(oc get subscription.operators.coreos.com "${_sd_sub}" -n "${COMPLIANCE_NAMESPACE}" -o jsonpath='{.spec.channel}') || _live_ch=""
-    if [[ -z "${_live_ch}" && "${_sd_ns}" != "-" && "${_sd_ns}" != "${COMPLIANCE_NAMESPACE}" ]]; then
+    _live_ch=$(oc get subscription.operators.coreos.com "${_sd_sub}" -n "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" -o jsonpath='{.spec.channel}') || _live_ch=""
+    if [[ -z "${_live_ch}" && "${_sd_ns}" != "-" && "${_sd_ns}" != "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" ]]; then
       _live_ch=$(oc get subscription.operators.coreos.com "${_sd_sub}" -n "${_sd_ns}" -o jsonpath='{.spec.channel}') || _live_ch=""
     fi
     _prop "live_subscription_channel" "${_live_ch:-unknown}"
-    if [[ "${_sd_ok}" == "true" && ( -z "${_live_ch}" || "${_live_ch}" == "${COMPLIANCE_OPERATOR_CHANNEL}" ) ]]; then
-      _existing_csv=$(oc get csv -n "${COMPLIANCE_NAMESPACE}" -l "operators.coreos.com/compliance-operator.${COMPLIANCE_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _existing_csv="undecided"
+    if [[ "${_sd_ok}" == "true" && ( -z "${_live_ch}" || "${_live_ch}" == "${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}" ) ]]; then
+      _existing_csv=$(oc get csv -n "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" -l "operators.coreos.com/compliance-operator.${INTEROP__OPP__COMPLIANCE__NAMESPACE}=" -o jsonpath='{.items[0].status.phase}') || _existing_csv="undecided"
       if [[ "${_existing_csv}" == "Succeeded" ]]; then
         echo ">>> workaround_removal_ready=true (OperatorPolicy Compliant, channel ${_sd_ch}, CSV Succeeded) - not installing"
         _prop "workaround_removal_ready" "true"
@@ -458,11 +458,11 @@ except Exception:
       # create-if-absent, so an existing Subscription is adopted as-is (never
       # patched: a live OperatorPolicy owns it) and the mismatch is recorded as
       # channel_self_disable_withheld; the requested channel is not installed over it.
-      echo ">>> NOTE: live Subscription channel '${_live_ch}' != requested '${COMPLIANCE_OPERATOR_CHANNEL}': self-disable withheld, install path runs (existing Subscription adopted, not patched)"
-      _prop "channel_self_disable_withheld" "${_live_ch}!=${COMPLIANCE_OPERATOR_CHANNEL}"
-    elif [[ "${_sd_ch}" != "-" && "${_sd_ch}" != "${COMPLIANCE_OPERATOR_CHANNEL}" ]]; then
-      echo ">>> NOTE: OperatorPolicy channel '${_sd_ch}' != requested '${COMPLIANCE_OPERATOR_CHANNEL}': self-disable withheld, installing"
-      _prop "channel_self_disable_withheld" "${_sd_ch}!=${COMPLIANCE_OPERATOR_CHANNEL}"
+      echo ">>> NOTE: live Subscription channel '${_live_ch}' != requested '${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}': self-disable withheld, install path runs (existing Subscription adopted, not patched)"
+      _prop "channel_self_disable_withheld" "${_live_ch}!=${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}"
+    elif [[ "${_sd_ch}" != "-" && "${_sd_ch}" != "${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}" ]]; then
+      echo ">>> NOTE: OperatorPolicy channel '${_sd_ch}' != requested '${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}': self-disable withheld, installing"
+      _prop "channel_self_disable_withheld" "${_sd_ch}!=${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}"
     fi
   fi
 fi
@@ -506,10 +506,10 @@ try:
     print("ok " + str(head) if ch in names else "absent " + ",".join(names[:8]))
 except Exception:
     print("error")
-' "${COMPLIANCE_OPERATOR_CHANNEL}" 2>/dev/null) || _channel_ok="error"
+' "${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}") || _channel_ok="error"
 case "${_channel_ok}" in
   absent*)
-    _classify "compliance-catalog-missing" "channel '${COMPLIANCE_OPERATOR_CHANNEL}' not listed for compliance-operator (${_channel_ok#absent })"
+    _classify "compliance-catalog-missing" "channel '${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}' not listed for compliance-operator (${_channel_ok#absent })"
     echo "ERROR: ${_class_detail}"
     exit 1
     ;;
@@ -519,18 +519,18 @@ case "${_channel_ok}" in
     exit 1
     ;;
 esac
-echo ">>> precondition: compliance-operator present; channel ${COMPLIANCE_OPERATOR_CHANNEL} head: ${_channel_ok#ok }"
+echo ">>> precondition: compliance-operator present; channel ${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL} head: ${_channel_ok#ok }"
 
 # --- Create-if-absent: namespace (policy-compliance-operator-install.yaml) ---
-if oc get namespace "${COMPLIANCE_NAMESPACE}" >/dev/null 2>&1; then
+if oc get namespace "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" >/dev/null 2>&1; then
   _prop "compliance_namespace" "adopted"
 else
-  if oc create namespace "${COMPLIANCE_NAMESPACE}" 2>&1; then
+  if oc create namespace "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" 2>&1; then
     _prop "compliance_namespace" "created"
-  elif oc get namespace "${COMPLIANCE_NAMESPACE}" >/dev/null 2>&1; then
+  elif oc get namespace "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" >/dev/null 2>&1; then
     _prop "compliance_namespace" "race-tolerated"
   else
-    _classify "compliance-namespace-error" "failed to create namespace ${COMPLIANCE_NAMESPACE}"
+    _classify "compliance-namespace-error" "failed to create namespace ${INTEROP__OPP__COMPLIANCE__NAMESPACE}"
     echo "ERROR: ${_class_detail}"
     exit 1
   fi
@@ -542,7 +542,7 @@ fi
 #     oc create, not apply: if a second writer (a live OperatorPolicy) wins the
 #     race, create fails AlreadyExists and we adopt; never overwrite the
 #     existing spec.targetNamespaces. ---
-if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${COMPLIANCE_NAMESPACE}" -o name 2>/dev/null)" ]]; then
+if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" -o name)" ]]; then
   _prop "compliance_operatorgroup" "adopted"
 else
   if ! cat <<EOF | oc create -f - 2>&1
@@ -550,17 +550,17 @@ apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
   name: compliance-operator
-  namespace: ${COMPLIANCE_NAMESPACE}
+  namespace: ${INTEROP__OPP__COMPLIANCE__NAMESPACE}
 spec:
   targetNamespaces:
-    - ${COMPLIANCE_NAMESPACE}
+    - ${INTEROP__OPP__COMPLIANCE__NAMESPACE}
 EOF
   then
-    if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${COMPLIANCE_NAMESPACE}" -o name 2>/dev/null)" ]]; then
+    if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" -o name)" ]]; then
       _prop "compliance_operatorgroup" "race-tolerated"
       echo ">>> NOTE: OperatorGroup created concurrently by another writer - adopting"
     else
-      _classify "compliance-operatorgroup-create-error" "failed to create OperatorGroup compliance-operator in ${COMPLIANCE_NAMESPACE}"
+      _classify "compliance-operatorgroup-create-error" "failed to create OperatorGroup compliance-operator in ${INTEROP__OPP__COMPLIANCE__NAMESPACE}"
       echo "ERROR: ${_class_detail}"
       _dump_diagnostics
       exit 1
@@ -573,13 +573,13 @@ fi
 # --- Create-if-absent: Subscription (oc create, not apply: if a second writer
 #     (a live OperatorPolicy) wins the race, create fails AlreadyExists and
 #     we adopt; never overwrite) ---
-if oc get subscription.operators.coreos.com compliance-operator -n "${COMPLIANCE_NAMESPACE}" >/dev/null 2>&1; then
-  _existing_ch=$(oc get subscription.operators.coreos.com compliance-operator -n "${COMPLIANCE_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null) || _existing_ch="unknown"
+if oc get subscription.operators.coreos.com compliance-operator -n "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" >/dev/null 2>&1; then
+  _existing_ch=$(oc get subscription.operators.coreos.com compliance-operator -n "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" -o jsonpath='{.spec.channel}') || _existing_ch="unknown"
   _prop "compliance_subscription" "adopted"
   _prop "channel_observed" "${_existing_ch:-empty}"
-  if [[ -n "${_existing_ch}" && "${_existing_ch}" != "${COMPLIANCE_OPERATOR_CHANNEL}" ]]; then
-    echo ">>> NOTE: existing Subscription channel '${_existing_ch}' != requested '${COMPLIANCE_OPERATOR_CHANNEL}' - adopting, not overwriting (a live OperatorPolicy is the owner)"
-    _prop "channel_mismatch" "${_existing_ch}!=${COMPLIANCE_OPERATOR_CHANNEL}"
+  if [[ -n "${_existing_ch}" && "${_existing_ch}" != "${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}" ]]; then
+    echo ">>> NOTE: existing Subscription channel '${_existing_ch}' != requested '${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}' - adopting, not overwriting (a live OperatorPolicy is the owner)"
+    _prop "channel_mismatch" "${_existing_ch}!=${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}"
   fi
 else
   if ! cat <<EOF | oc create -f - 2>&1
@@ -587,18 +587,18 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   name: compliance-operator
-  namespace: ${COMPLIANCE_NAMESPACE}
+  namespace: ${INTEROP__OPP__COMPLIANCE__NAMESPACE}
 spec:
-  channel: "${COMPLIANCE_OPERATOR_CHANNEL}"
+  channel: "${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}"
   installPlanApproval: Automatic
   name: compliance-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
 EOF
   then
-    if oc get subscription.operators.coreos.com compliance-operator -n "${COMPLIANCE_NAMESPACE}" >/dev/null 2>&1; then
+    if oc get subscription.operators.coreos.com compliance-operator -n "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" >/dev/null 2>&1; then
       _prop "compliance_subscription" "race-tolerated"
-      _prop "channel_observed" "$(oc get subscription.operators.coreos.com compliance-operator -n "${COMPLIANCE_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null || echo unknown)"
+      _prop "channel_observed" "$(oc get subscription.operators.coreos.com compliance-operator -n "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" -o jsonpath='{.spec.channel}' || echo unknown)"
       echo ">>> NOTE: Subscription created concurrently by another writer - adopting"
     else
       _classify "compliance-subscription-create-error" "failed to create Subscription compliance-operator"
@@ -608,25 +608,25 @@ EOF
     fi
   else
     _prop "compliance_subscription" "created"
-    _prop "channel_observed" "${COMPLIANCE_OPERATOR_CHANNEL}"
+    _prop "channel_observed" "${INTEROP__OPP__COMPLIANCE__OPERATOR_CHANNEL}"
   fi
 fi
 
 # --- Wait for the CSV name (read status.currentCSV; the patch version is
 #     never hardcoded). Elapsed-time deadline, so a slow-but-successful
 #     response is charged against the budget. ---
-echo ">>> PHASE: waiting for the compliance-operator CSV name (timeout: ${COMPLIANCE_CSV_WAIT_TIMEOUT}s)"
-_csv_want=$(( $(date +%s) + COMPLIANCE_CSV_WAIT_TIMEOUT ))
+echo ">>> PHASE: waiting for the compliance-operator CSV name (timeout: ${INTEROP__OPP__COMPLIANCE__CSV_WAIT_TIMEOUT}s)"
+_csv_want=$(( $(date +%s) + INTEROP__OPP__COMPLIANCE__CSV_WAIT_TIMEOUT ))
 _poll_deadline=$(_clamp_deadline "${_csv_want}")
 if (( _poll_deadline < _csv_want )); then
-  echo ">>> NOTE: CSV-name wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${COMPLIANCE_CSV_WAIT_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
+  echo ">>> NOTE: CSV-name wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${INTEROP__OPP__COMPLIANCE__CSV_WAIT_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
 fi
-if _poll_jsonpath subscription.operators.coreos.com compliance-operator "${COMPLIANCE_NAMESPACE}" '{.status.currentCSV}' '@any' '' "compliance-operator currentCSV"; then
+if _poll_jsonpath subscription.operators.coreos.com compliance-operator "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" '{.status.currentCSV}' '@any' '' "compliance-operator currentCSV"; then
   csvName="${_poll_last}"
   _prop "csv_name" "${csvName}"
 else
   _prc=$?
-  _cond=$(oc get subscription.operators.coreos.com compliance-operator -n "${COMPLIANCE_NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason} {end}' 2>/dev/null) || _cond="undecided"
+  _cond=$(oc get subscription.operators.coreos.com compliance-operator -n "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason} {end}') || _cond="undecided"
   if (( _prc == 2 )); then
     _classify "compliance-subscription-query-failed" "3 consecutive subscription queries failed (rc captured; API/RBAC error, not absence)"
   else
@@ -635,7 +635,7 @@ else
       *ConstraintsNotSatisfiable*)    _classify "compliance-subscription-unsatisfiable" "Subscription condition ConstraintsNotSatisfiable" ;;
       *InstallPlanMissing*)           _classify "compliance-installplan-missing" "Subscription condition InstallPlanMissing" ;;
       *InstallPlanFailed*)            _classify "compliance-installplan-failed" "Subscription condition InstallPlanFailed" ;;
-      *)                              _classify "compliance-csv-timeout" "no currentCSV after ${COMPLIANCE_CSV_WAIT_TIMEOUT}s (conditions: ${_cond:-none})" ;;
+      *)                              _classify "compliance-csv-timeout" "no currentCSV after ${INTEROP__OPP__COMPLIANCE__CSV_WAIT_TIMEOUT}s (conditions: ${_cond:-none})" ;;
     esac
   fi
   echo "ERROR: ${_class_detail}"
@@ -646,13 +646,13 @@ echo ">>> compliance-operator CSV: ${csvName}"
 
 # --- Wait for CSV Succeeded (a not-yet-created CSV object is waited out, not
 #     classified as an API failure). ---
-echo ">>> PHASE: waiting for CSV ${csvName} Succeeded (timeout: ${COMPLIANCE_INSTALL_TIMEOUT}s)"
-_install_want=$(( $(date +%s) + COMPLIANCE_INSTALL_TIMEOUT ))
+echo ">>> PHASE: waiting for CSV ${csvName} Succeeded (timeout: ${INTEROP__OPP__COMPLIANCE__INSTALL_TIMEOUT}s)"
+_install_want=$(( $(date +%s) + INTEROP__OPP__COMPLIANCE__INSTALL_TIMEOUT ))
 _poll_deadline=$(_clamp_deadline "${_install_want}")
 if (( _poll_deadline < _install_want )); then
-  echo ">>> NOTE: CSV-Succeeded wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${COMPLIANCE_INSTALL_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
+  echo ">>> NOTE: CSV-Succeeded wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${INTEROP__OPP__COMPLIANCE__INSTALL_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
 fi
-if _poll_jsonpath clusterserviceversions.operators.coreos.com "${csvName}" "${COMPLIANCE_NAMESPACE}" '{.status.phase}' Succeeded Failed "CSV ${csvName} phase"; then
+if _poll_jsonpath clusterserviceversions.operators.coreos.com "${csvName}" "${INTEROP__OPP__COMPLIANCE__NAMESPACE}" '{.status.phase}' Succeeded Failed "CSV ${csvName} phase"; then
   _prop "csv_phase" "Succeeded"
 else
   _prc=$?
@@ -661,7 +661,7 @@ else
   elif (( _prc == 2 )); then
     _classify "compliance-subscription-query-failed" "3 consecutive CSV queries for ${csvName} failed (API/RBAC error, not absence)"
   else
-    _classify "compliance-csv-timeout" "CSV ${csvName} not Succeeded after ${COMPLIANCE_INSTALL_TIMEOUT}s (phase: ${_poll_last:-unknown})"
+    _classify "compliance-csv-timeout" "CSV ${csvName} not Succeeded after ${INTEROP__OPP__COMPLIANCE__INSTALL_TIMEOUT}s (phase: ${_poll_last:-unknown})"
   fi
   echo "ERROR: ${_class_detail}"
   _dump_diagnostics

@@ -4,13 +4,13 @@ ref:
   documentation: |-
     Deploys the Quay registry operator through OLM and provisions a working
     registry for the OPP interop lanes: namespace local-quay, OperatorGroup,
-    Subscription on QUAY_OPERATOR_CHANNEL (default stable-3.17), the initial
+    Subscription on INTEROP__OPP__QUAY__OPERATOR_CHANNEL (default stable-3.17), the initial
     config bundle Secret, a QuayRegistry with managed objectstorage and tls,
     and the create-admin-user Job that initializes the Quay database and
     creates the quayadmin/quaydevel/quay-pull-secret secrets plus the devel
     organization and devel/example repository.
 
-    The create-admin-user Job runs without errexit, so every required mutation
+    The create-admin-user Job runs with errexit, so every required mutation
     (organization, application, repository, team membership, repository
     permission) is checked and stops the Job on failure: a Job that reports
     completion has created all of them. The Job logs method and path only,
@@ -21,7 +21,7 @@ ref:
     ACM policy set (policy-install-quay, policy-config-quay) already owns the
     install, the step adopts what it finds and never overwrites a live
     operator policy. An existing Subscription is adopted exactly as it stands,
-    including one that runs a different channel than QUAY_OPERATOR_CHANNEL: it
+    including one that runs a different channel than INTEROP__OPP__QUAY__OPERATOR_CHANNEL: it
     is not patched, channel_observed records the channel it runs and
     channel_mismatch records the difference. The step then reports the
     registry that Subscription produces as working (quay_deployed=true), not
@@ -42,25 +42,25 @@ ref:
   env:
     - default: stable-3.17
       documentation: OLM channel for the quay-operator subscription
-      name: QUAY_OPERATOR_CHANNEL
+      name: INTEROP__OPP__QUAY__OPERATOR_CHANNEL
     - default: local-quay
       documentation: Namespace for the Quay operator and registry (must stay local-quay; the ported create-admin-user Job hardcodes it)
-      name: QUAY_NAMESPACE
+      name: INTEROP__OPP__QUAY__NAMESPACE
     - default: "300"
       documentation: Seconds to wait for the Subscription to report status.currentCSV
-      name: QUAY_CSV_WAIT_TIMEOUT
+      name: INTEROP__OPP__QUAY__CSV_WAIT_TIMEOUT
     - default: "600"
       documentation: Seconds to wait for the quay-operator CSV to reach Succeeded
-      name: QUAY_INSTALL_TIMEOUT
+      name: INTEROP__OPP__QUAY__INSTALL_TIMEOUT
     - default: "600"
       documentation: Seconds to wait for the QuayRegistry registry to report Available=True
-      name: QUAY_REGISTRY_TIMEOUT
+      name: INTEROP__OPP__QUAY__REGISTRY_TIMEOUT
     - default: "420"
       documentation: Seconds to wait for the create-admin-user Job to Complete
-      name: QUAY_ADMIN_JOB_TIMEOUT
+      name: INTEROP__OPP__QUAY__ADMIN_JOB_TIMEOUT
     - default: "0"
       documentation: When 1, report observed object states and exit 0 without installing (detection only)
-      name: QUAY_REPORT_ONLY
+      name: INTEROP__OPP__QUAY__REPORT_ONLY
   from: cli
   grace_period: 2m30s
   resources:

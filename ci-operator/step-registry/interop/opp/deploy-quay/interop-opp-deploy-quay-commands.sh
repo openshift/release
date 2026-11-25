@@ -61,9 +61,9 @@ _opp_cleanup() {
     -e 's/password=[^ &]+/password=[REDACTED]/g' \
     -e 's/token=[^ &]+/token=[REDACTED]/g' \
     -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
-    "${_xtrace_log}" 2>/dev/null || true
+    "${_xtrace_log}" || true
   if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
-    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" || true
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
 }
@@ -162,7 +162,7 @@ _xml_escape() {
 
 # _junit_seed: write the default-FAILING case before any work, atomically.
 _junit_seed() {
-  mkdir -p "$(dirname "${_jfile}")" 2>/dev/null || true
+  mkdir -p "$(dirname "${_jfile}")" || true
   local _tmp
   _tmp=$(mktemp "$(dirname "${_jfile}")/.junit-XXXXXX")
   cat > "${_tmp}" <<JUNITEOF
@@ -220,12 +220,12 @@ _junit_emit() {
 JUNITEOF
   mv -f "${_tmp}" "${_jfile}"
   if [[ -n "${SHARED_DIR:-}" ]]; then
-    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
-    cp "${_jfile}" "${SHARED_DIR}/junit/" 2>/dev/null || true
+    mkdir -p "${SHARED_DIR}/junit" || true
+    cp "${_jfile}" "${SHARED_DIR}/junit/" || true
   fi
   # Post-condition: tests>=1 and exit!=0 implies >=1 failure/error.
   local _counts
-  _counts=$(python3 - "${_jfile}" <<'PYEOF' 2>/dev/null || echo "0 0 0"
+  _counts=$(python3 - "${_jfile}" <<'PYEOF' || echo "0 0 0"
 import sys, xml.etree.ElementTree as ET
 try:
     r = ET.parse(sys.argv[1]).getroot()
@@ -311,22 +311,22 @@ _poll_jsonpath() {
 # --- Pre-seed the default-failing JUnit case and the property file ---
 _junit_seed
 : > "${_props}"
-# --- Environment (every value env-overridable) ---
-QUAY_OPERATOR_CHANNEL="${QUAY_OPERATOR_CHANNEL:-stable-3.17}"
-QUAY_NAMESPACE="${QUAY_NAMESPACE:-local-quay}"
-QUAY_CSV_WAIT_TIMEOUT="${QUAY_CSV_WAIT_TIMEOUT:-300}"
-QUAY_INSTALL_TIMEOUT="${QUAY_INSTALL_TIMEOUT:-600}"
-QUAY_REGISTRY_TIMEOUT="${QUAY_REGISTRY_TIMEOUT:-600}"
-QUAY_ADMIN_JOB_TIMEOUT="${QUAY_ADMIN_JOB_TIMEOUT:-420}"
-QUAY_REPORT_ONLY="${QUAY_REPORT_ONLY:-0}"
+# --- Environment (step-declared; ref.yaml is the single default authority) ---
+: "${INTEROP__OPP__QUAY__OPERATOR_CHANNEL:?}"
+: "${INTEROP__OPP__QUAY__NAMESPACE:?}"
+: "${INTEROP__OPP__QUAY__CSV_WAIT_TIMEOUT:?}"
+: "${INTEROP__OPP__QUAY__INSTALL_TIMEOUT:?}"
+: "${INTEROP__OPP__QUAY__REGISTRY_TIMEOUT:?}"
+: "${INTEROP__OPP__QUAY__ADMIN_JOB_TIMEOUT:?}"
+: "${INTEROP__OPP__QUAY__REPORT_ONLY:?}"
 
 # Input validation: channel name and integer-second timeouts.
-if ! [[ "${QUAY_OPERATOR_CHANNEL}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
-  echo "ERROR: invalid QUAY_OPERATOR_CHANNEL '${QUAY_OPERATOR_CHANNEL}'"
-  _classify "quay-invalid-input" "QUAY_OPERATOR_CHANNEL failed validation"
+if ! [[ "${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "ERROR: invalid INTEROP__OPP__QUAY__OPERATOR_CHANNEL '${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}'"
+  _classify "quay-invalid-input" "INTEROP__OPP__QUAY__OPERATOR_CHANNEL failed validation"
   exit 2
 fi
-for _v in QUAY_CSV_WAIT_TIMEOUT QUAY_INSTALL_TIMEOUT QUAY_REGISTRY_TIMEOUT QUAY_ADMIN_JOB_TIMEOUT; do
+for _v in INTEROP__OPP__QUAY__CSV_WAIT_TIMEOUT INTEROP__OPP__QUAY__INSTALL_TIMEOUT INTEROP__OPP__QUAY__REGISTRY_TIMEOUT INTEROP__OPP__QUAY__ADMIN_JOB_TIMEOUT; do
   _v_raw="${!_v}"
   # Bounded to 9 digits so the 10# conversion below cannot wrap a 64-bit
   # integer into the accepted range.
@@ -351,9 +351,9 @@ done
 # local-quay in its oc calls, so the namespace is validated rather than
 # silently honored: a non-default value would create the RBAC/Job in one
 # namespace while the Job acts on another.
-if [[ "${QUAY_NAMESPACE}" != "local-quay" ]]; then
-  echo "ERROR: QUAY_NAMESPACE must be local-quay (got '${QUAY_NAMESPACE}'); the ported create-admin-user Job hardcodes it"
-  _classify "quay-invalid-input" "QUAY_NAMESPACE '${QUAY_NAMESPACE}' != local-quay (step and ported Job must act on one namespace)"
+if [[ "${INTEROP__OPP__QUAY__NAMESPACE}" != "local-quay" ]]; then
+  echo "ERROR: INTEROP__OPP__QUAY__NAMESPACE must be local-quay (got '${INTEROP__OPP__QUAY__NAMESPACE}'); the ported create-admin-user Job hardcodes it"
+  _classify "quay-invalid-input" "INTEROP__OPP__QUAY__NAMESPACE '${INTEROP__OPP__QUAY__NAMESPACE}' != local-quay (step and ported Job must act on one namespace)"
   exit 2
 fi
 
@@ -365,28 +365,28 @@ fi
 # This is the fail-fast half (reject absurd configs, exit 2); the runtime half
 # is _work_deadline above, which charges elapsed setup and caps every phase
 # deadline so the arithmetic holds regardless of setup slowness.
-_phase_sum=$(( QUAY_CSV_WAIT_TIMEOUT + QUAY_INSTALL_TIMEOUT + QUAY_REGISTRY_TIMEOUT + QUAY_ADMIN_JOB_TIMEOUT ))
+_phase_sum=$(( INTEROP__OPP__QUAY__CSV_WAIT_TIMEOUT + INTEROP__OPP__QUAY__INSTALL_TIMEOUT + INTEROP__OPP__QUAY__REGISTRY_TIMEOUT + INTEROP__OPP__QUAY__ADMIN_JOB_TIMEOUT ))
 if (( _phase_sum > 2130 )); then
   echo "ERROR: phase waits sum to ${_phase_sum}s, must be <= 2130s (work budget 2550s - overhead 180s - precondition 120s - diagnostics 120s)"
   _classify "quay-invalid-input" "phase wait sum ${_phase_sum}s exceeds the step work budget"
   exit 2
 fi
 
-echo ">>> PHASE: deploy Quay (channel: ${QUAY_OPERATOR_CHANNEL}, namespace: ${QUAY_NAMESPACE}, CSV name wait: ${QUAY_CSV_WAIT_TIMEOUT}s, CSV wait: ${QUAY_INSTALL_TIMEOUT}s, registry wait: ${QUAY_REGISTRY_TIMEOUT}s, admin job wait: ${QUAY_ADMIN_JOB_TIMEOUT}s)"
+echo ">>> PHASE: deploy Quay (channel: ${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}, namespace: ${INTEROP__OPP__QUAY__NAMESPACE}, CSV name wait: ${INTEROP__OPP__QUAY__CSV_WAIT_TIMEOUT}s, CSV wait: ${INTEROP__OPP__QUAY__INSTALL_TIMEOUT}s, registry wait: ${INTEROP__OPP__QUAY__REGISTRY_TIMEOUT}s, admin job wait: ${INTEROP__OPP__QUAY__ADMIN_JOB_TIMEOUT}s)"
 
 # --- Diagnostics: bounded (last 50 events, <=256KiB/object) ---
 _dump_diagnostics() {
   echo ">>> DIAG: Subscription (OLM, fully-qualified):"
-  oc get subscription.operators.coreos.com quay-operator -n "${QUAY_NAMESPACE}" -o yaml 2>&1 | head -c 262144 || true
+  oc get subscription.operators.coreos.com quay-operator -n "${INTEROP__OPP__QUAY__NAMESPACE}" -o yaml 2>&1 | head -c 262144 || true
   echo
-  echo ">>> DIAG: events in ${QUAY_NAMESPACE} (last 50):"
-  oc get events -n "${QUAY_NAMESPACE}" --sort-by='.lastTimestamp' 2>&1 | tail -50 || true
+  echo ">>> DIAG: events in ${INTEROP__OPP__QUAY__NAMESPACE} (last 50):"
+  oc get events -n "${INTEROP__OPP__QUAY__NAMESPACE}" --sort-by='.lastTimestamp' 2>&1 | tail -50 || true
   echo ">>> DIAG: events in openshift-marketplace (last 50):"
   oc get events -n openshift-marketplace --sort-by='.lastTimestamp' 2>&1 | tail -50 || true
-  echo ">>> DIAG: CSVs in ${QUAY_NAMESPACE}:"
-  oc get csv -n "${QUAY_NAMESPACE}" 2>&1 | head -50 || true
+  echo ">>> DIAG: CSVs in ${INTEROP__OPP__QUAY__NAMESPACE}:"
+  oc get csv -n "${INTEROP__OPP__QUAY__NAMESPACE}" 2>&1 | head -50 || true
   echo ">>> DIAG: QuayRegistry registry status:"
-  oc get quayregistries.quay.redhat.com registry -n "${QUAY_NAMESPACE}" -o yaml 2>&1 | head -c 262144 || true
+  oc get quayregistries.quay.redhat.com registry -n "${INTEROP__OPP__QUAY__NAMESPACE}" -o yaml 2>&1 | head -c 262144 || true
   echo
 }
 
@@ -401,7 +401,7 @@ _scrub_job_log() {
     -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi'
 }
 
-if [[ "${QUAY_REPORT_ONLY}" == "1" ]]; then
+if [[ "${INTEROP__OPP__QUAY__REPORT_ONLY}" == "1" ]]; then
   # Detection, not gating: report object states and exit 0. Runs before the
   # packagemanifest precondition on purpose (detection must work when the
   # catalog is absent or erroring) and before the self-disable check so the
@@ -409,10 +409,10 @@ if [[ "${QUAY_REPORT_ONLY}" == "1" ]]; then
   # A failed read is kept as its own state (undecided), never folded into the
   # absent/empty answer: detection output must not report an API or RBAC error
   # as an object state.
-  _sub=$(oc get subscription.operators.coreos.com quay-operator -n "${QUAY_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null) || _sub="undecided"
-  _csvp=$(oc get csv -n "${QUAY_NAMESPACE}" -l "operators.coreos.com/quay-operator.${QUAY_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _csvp="undecided"
-  _qr=$(oc get quayregistries.quay.redhat.com registry -n "${QUAY_NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status} {end}' 2>/dev/null) || _qr="undecided"
-  _pm=$(oc get packagemanifest quay-operator -n openshift-marketplace -o name 2>/dev/null) || _pm="undecided"
+  _sub=$(oc get subscription.operators.coreos.com quay-operator -n "${INTEROP__OPP__QUAY__NAMESPACE}" -o jsonpath='{.spec.channel}') || _sub="undecided"
+  _csvp=$(oc get csv -n "${INTEROP__OPP__QUAY__NAMESPACE}" -l "operators.coreos.com/quay-operator.${INTEROP__OPP__QUAY__NAMESPACE}=" -o jsonpath='{.items[0].status.phase}') || _csvp="undecided"
+  _qr=$(oc get quayregistries.quay.redhat.com registry -n "${INTEROP__OPP__QUAY__NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status} {end}') || _qr="undecided"
+  _pm=$(oc get packagemanifest quay-operator -n openshift-marketplace -o name) || _pm="undecided"
   if [[ "${_pm}" == "undecided" ]]; then
     _pm_state="undecided"
   elif [[ -n "${_pm}" ]]; then
@@ -443,7 +443,7 @@ _quay_admin_secrets_state() {
   for _s in quayadmin quaydevel quay-pull-secret quay-integration; do
     _fails=0
     while :; do
-      if _out=$(oc get secret "${_s}" -n "${QUAY_NAMESPACE}" --request-timeout="$(_left_budget 20)" 2>&1); then
+      if _out=$(oc get secret "${_s}" -n "${INTEROP__OPP__QUAY__NAMESPACE}" --request-timeout="$(_left_budget 20)" 2>&1); then
         break
       fi
       if grep -qF '(NotFound)' <<<"${_out}"; then
@@ -482,7 +482,7 @@ _quay_admin_job_snapshot() {
   local _out="" _payload="" _fails=0 _uid _conds _state _word
   while :; do
     _payload=""
-    if _out=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" --request-timeout="$(_left_budget 20)" \
+    if _out=$(oc get job create-admin-user -n "${INTEROP__OPP__QUAY__NAMESPACE}" --request-timeout="$(_left_budget 20)" \
       -o jsonpath='__quay_job__{.metadata.uid}{" "}{range .status.conditions[?(@.status=="True")]}{.type}{" "}{end}' 2>&1); then
       # A successful read can still write to stderr (a deprecation warning, a
       # rate-limiter notice); the sentinel keeps that text out of the UID.
@@ -545,7 +545,7 @@ _quay_admin_job_query_fail() {
 # the Prow log on failure, which must not gain credentials this step never
 # printed.
 _quay_admin_log() {
-  oc logs job/create-admin-user -n "${QUAY_NAMESPACE}" --tail=200 2>&1 \
+  oc logs job/create-admin-user -n "${INTEROP__OPP__QUAY__NAMESPACE}" --tail=200 2>&1 \
     | sed -E 's/("(client_secret|password|access_token|token|basic|encrypted_password)"[[:space:]]*:[[:space:]]*")[^"]*/\1REDACTED/g' \
     | head -c 65536
 }
@@ -561,8 +561,8 @@ _quay_admin_log() {
 #     default budgets.
 _quay_admin_job_fail() {
   local _failed _reason
-  _failed=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" -o jsonpath='{.status.failed}' 2>/dev/null) || _failed=""
-  _reason=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" -o jsonpath='{range .status.conditions[?(@.status=="True")]}{.type}{"/"}{.reason}{" "}{end}' 2>/dev/null) || _reason=""
+  _failed=$(oc get job create-admin-user -n "${INTEROP__OPP__QUAY__NAMESPACE}" -o jsonpath='{.status.failed}') || _failed=""
+  _reason=$(oc get job create-admin-user -n "${INTEROP__OPP__QUAY__NAMESPACE}" -o jsonpath='{range .status.conditions[?(@.status=="True")]}{.type}{"/"}{.reason}{" "}{end}') || _reason=""
   _reason=$(printf '%s' "${_reason}" | sed -n 's/.*Failed\/\([^ ]*\).*/\1/p')
   echo ">>> DIAG: create-admin-user Job logs (tail 200):"
   _quay_admin_log || true
@@ -614,7 +614,7 @@ _quay_token_rejected() {
 _quay_devel_repo_role() {
   local _kind="${1:-direct}" _suffix="" _body _code
   [[ "${_kind}" == "transitive" ]] && _suffix="/transitive"
-  set +x
+  set +x 2>/dev/null
   _body=$(_quay_auth_curl "${_token}" --connect-timeout "$(_left_budget 10)" --max-time "$(_left_budget 20)" -w '\n%{http_code}' \
     "https://${_host}/api/v1/repository/devel/example/permissions/user/quaydevel${_suffix}") || _body=""
   set -x
@@ -663,10 +663,10 @@ _quay_org_repo_check() {
   # The token read is bracketed for the same reason as the _quay_auth_curl
   # callers: xtrace prints the expanded value of an assignment whose right-hand
   # side is a command substitution.
-  set +x
-  _token=$(oc get secret quayadmin -n "${QUAY_NAMESPACE}" -o jsonpath='{.data.token}' 2>/dev/null | base64 -d 2>/dev/null) || _token=""
+  set +x 2>/dev/null
+  _token=$(oc get secret quayadmin -n "${INTEROP__OPP__QUAY__NAMESPACE}" -o jsonpath='{.data.token}' | base64 -d) || _token=""
   set -x
-  _host=$(oc get route -n "${QUAY_NAMESPACE}" registry-quay -o jsonpath='{.spec.host}' 2>/dev/null) || _host=""
+  _host=$(oc get route -n "${INTEROP__OPP__QUAY__NAMESPACE}" registry-quay -o jsonpath='{.spec.host}') || _host=""
   if [[ -z "${_token}" ]]; then
     _classify "quay-admin-secrets-query-failed" "the quayadmin token is empty or unreadable, so the registry reads cannot be authenticated"
     echo "ERROR: ${_class_detail}"
@@ -680,7 +680,7 @@ _quay_org_repo_check() {
     exit 1
   fi
   for _path in /api/v1/organization/devel /api/v1/repository/devel/example; do
-    set +x
+    set +x 2>/dev/null
     _code=$(_quay_auth_curl "${_token}" -o /dev/null -w '%{http_code}' --connect-timeout "$(_left_budget 10)" --max-time "$(_left_budget 30)" \
       "https://${_host}${_path}") || _code=""
     set -x
@@ -775,9 +775,9 @@ _quay_org_repo_check() {
 # Queried cluster-wide by name (ACM installs the OperatorPolicy in the managed
 # cluster namespace, local-cluster) and the observed namespace is recorded; an
 # absent/NonCompliant policy is simply "no second writer yet".
-_prop "channel_requested" "${QUAY_OPERATOR_CHANNEL}"
+_prop "channel_requested" "${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}"
 if oc get crd operatorpolicies.policy.open-cluster-management.io >/dev/null 2>&1; then
-  _op_status=$(oc get operatorpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null) || _op_status="undecided"
+  _op_status=$(oc get operatorpolicies.policy.open-cluster-management.io -A -o json) || _op_status="undecided"
   if [[ "${_op_status}" == "undecided" ]]; then
     # A failed read is not "no policy". The self-disable verdict is withheld
     # (the install path runs and the policy is never patched) and the state is
@@ -809,7 +809,7 @@ try:
         print("absent - -")
 except Exception:
     print("absent - -")
-' "${_sd_policy}" "${QUAY_OPERATOR_CHANNEL}" 2>/dev/null) || _sd_out="absent - -"
+' "${_sd_policy}" "${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}") || _sd_out="absent - -"
     _sd_ok="absent" _sd_ns="-" _sd_ch="-"
     read -r _sd_ok _sd_ns _sd_ch <<<"${_sd_out}"
     _prop "operatorpolicy_namespace" "${_sd_ns:-unknown}"
@@ -825,15 +825,15 @@ except Exception:
     # self-disable on its own.
     typeset _sd_sub="quay-operator"
     typeset _live_ch=""
-    _live_ch=$(oc get subscription.operators.coreos.com "${_sd_sub}" -n "${QUAY_NAMESPACE}" -o jsonpath='{.spec.channel}') || _live_ch=""
-    if [[ -z "${_live_ch}" && "${_sd_ns}" != "-" && "${_sd_ns}" != "${QUAY_NAMESPACE}" ]]; then
+    _live_ch=$(oc get subscription.operators.coreos.com "${_sd_sub}" -n "${INTEROP__OPP__QUAY__NAMESPACE}" -o jsonpath='{.spec.channel}') || _live_ch=""
+    if [[ -z "${_live_ch}" && "${_sd_ns}" != "-" && "${_sd_ns}" != "${INTEROP__OPP__QUAY__NAMESPACE}" ]]; then
       _live_ch=$(oc get subscription.operators.coreos.com "${_sd_sub}" -n "${_sd_ns}" -o jsonpath='{.spec.channel}') || _live_ch=""
     fi
     _prop "live_subscription_channel" "${_live_ch:-unknown}"
-    if [[ "${_sd_ok}" == "true" && ( -z "${_live_ch}" || "${_live_ch}" == "${QUAY_OPERATOR_CHANNEL}" ) ]]; then
-      _existing_csv=$(oc get csv -n "${QUAY_NAMESPACE}" -l "operators.coreos.com/quay-operator.${QUAY_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _existing_csv="undecided"
+    if [[ "${_sd_ok}" == "true" && ( -z "${_live_ch}" || "${_live_ch}" == "${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}" ) ]]; then
+      _existing_csv=$(oc get csv -n "${INTEROP__OPP__QUAY__NAMESPACE}" -l "operators.coreos.com/quay-operator.${INTEROP__OPP__QUAY__NAMESPACE}=" -o jsonpath='{.items[0].status.phase}') || _existing_csv="undecided"
       if [[ "${_existing_csv}" == "Succeeded" ]]; then
-        _qr_avail=$(oc get quayregistries.quay.redhat.com registry -n "${QUAY_NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\n"}{end}' 2>/dev/null) || _qr_avail="undecided"
+        _qr_avail=$(oc get quayregistries.quay.redhat.com registry -n "${INTEROP__OPP__QUAY__NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status}{"\n"}{end}') || _qr_avail="undecided"
         if grep -qx 'Available=True' <<<"${_qr_avail}"; then
           # Registry availability says nothing about admin initialization: a
           # policy-owned Job may still be running. Record the credential state
@@ -880,11 +880,11 @@ except Exception:
       # create-if-absent, so an existing Subscription is adopted as-is (never
       # patched: a live OperatorPolicy owns it) and the mismatch is recorded as
       # channel_self_disable_withheld; the requested channel is not installed over it.
-      echo ">>> NOTE: live Subscription channel '${_live_ch}' != requested '${QUAY_OPERATOR_CHANNEL}': self-disable withheld, install path runs (existing Subscription adopted, not patched)"
-      _prop "channel_self_disable_withheld" "${_live_ch}!=${QUAY_OPERATOR_CHANNEL}"
-    elif [[ "${_sd_ch}" != "-" && "${_sd_ch}" != "${QUAY_OPERATOR_CHANNEL}" ]]; then
-      echo ">>> NOTE: OperatorPolicy channel '${_sd_ch}' != requested '${QUAY_OPERATOR_CHANNEL}': self-disable withheld, installing"
-      _prop "channel_self_disable_withheld" "${_sd_ch}!=${QUAY_OPERATOR_CHANNEL}"
+      echo ">>> NOTE: live Subscription channel '${_live_ch}' != requested '${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}': self-disable withheld, install path runs (existing Subscription adopted, not patched)"
+      _prop "channel_self_disable_withheld" "${_live_ch}!=${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}"
+    elif [[ "${_sd_ch}" != "-" && "${_sd_ch}" != "${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}" ]]; then
+      echo ">>> NOTE: OperatorPolicy channel '${_sd_ch}' != requested '${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}': self-disable withheld, installing"
+      _prop "channel_self_disable_withheld" "${_sd_ch}!=${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}"
     fi
   fi
 fi
@@ -928,10 +928,10 @@ try:
     print("ok " + str(head) if ch in names else "absent " + ",".join(names[:8]))
 except Exception:
     print("error")
-' "${QUAY_OPERATOR_CHANNEL}" 2>/dev/null) || _channel_ok="error"
+' "${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}") || _channel_ok="error"
 case "${_channel_ok}" in
   absent*)
-    _classify "quay-catalog-missing" "channel '${QUAY_OPERATOR_CHANNEL}' not listed for quay-operator (${_channel_ok#absent })"
+    _classify "quay-catalog-missing" "channel '${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}' not listed for quay-operator (${_channel_ok#absent })"
     echo "ERROR: ${_class_detail}"
     exit 1
     ;;
@@ -941,49 +941,49 @@ case "${_channel_ok}" in
     exit 1
     ;;
 esac
-echo ">>> precondition: quay-operator present; channel ${QUAY_OPERATOR_CHANNEL} head: ${_channel_ok#ok }"
+echo ">>> precondition: quay-operator present; channel ${INTEROP__OPP__QUAY__OPERATOR_CHANNEL} head: ${_channel_ok#ok }"
 
 # --- Create-if-absent: namespace (policy-install-quay.yaml carries the
 #     cluster-monitoring label; ensured idempotently) ---
-if oc get namespace "${QUAY_NAMESPACE}" >/dev/null 2>&1; then
+if oc get namespace "${INTEROP__OPP__QUAY__NAMESPACE}" >/dev/null 2>&1; then
   _prop "quay_namespace" "adopted"
 else
-  if oc create namespace "${QUAY_NAMESPACE}" 2>&1; then
+  if oc create namespace "${INTEROP__OPP__QUAY__NAMESPACE}" 2>&1; then
     _prop "quay_namespace" "created"
-  elif oc get namespace "${QUAY_NAMESPACE}" >/dev/null 2>&1; then
+  elif oc get namespace "${INTEROP__OPP__QUAY__NAMESPACE}" >/dev/null 2>&1; then
     _prop "quay_namespace" "race-tolerated"
   else
-    _classify "quay-namespace-error" "failed to create namespace ${QUAY_NAMESPACE}"
+    _classify "quay-namespace-error" "failed to create namespace ${INTEROP__OPP__QUAY__NAMESPACE}"
     echo "ERROR: ${_class_detail}"
     exit 1
   fi
 fi
-oc label namespace "${QUAY_NAMESPACE}" openshift.io/cluster-monitoring=true --overwrite >/dev/null 2>&1 || true
+oc label namespace "${INTEROP__OPP__QUAY__NAMESPACE}" openshift.io/cluster-monitoring=true --overwrite >/dev/null 2>&1 || true
 
 # --- Create-if-absent: OperatorGroup (name local-quay, targetNamespaces
 #     [local-quay]; any existing group is adopted; a second group in one
 #     namespace puts CSVs into TooManyOperatorGroups). oc create, not apply: if
 #     a second writer (a live OperatorPolicy) wins the race, create fails
 #     AlreadyExists and we adopt; never overwrite spec.targetNamespaces. ---
-if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${QUAY_NAMESPACE}" -o name 2>/dev/null)" ]]; then
+if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${INTEROP__OPP__QUAY__NAMESPACE}" -o name)" ]]; then
   _prop "quay_operatorgroup" "adopted"
 else
   if ! cat <<EOF | oc create -f - 2>&1
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  name: ${QUAY_NAMESPACE}
-  namespace: ${QUAY_NAMESPACE}
+  name: ${INTEROP__OPP__QUAY__NAMESPACE}
+  namespace: ${INTEROP__OPP__QUAY__NAMESPACE}
 spec:
   targetNamespaces:
-    - ${QUAY_NAMESPACE}
+    - ${INTEROP__OPP__QUAY__NAMESPACE}
 EOF
   then
-    if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${QUAY_NAMESPACE}" -o name 2>/dev/null)" ]]; then
+    if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${INTEROP__OPP__QUAY__NAMESPACE}" -o name)" ]]; then
       _prop "quay_operatorgroup" "race-tolerated"
       echo ">>> NOTE: OperatorGroup created concurrently by another writer - adopting"
     else
-      _classify "quay-operatorgroup-create-error" "failed to create OperatorGroup ${QUAY_NAMESPACE} in ${QUAY_NAMESPACE}"
+      _classify "quay-operatorgroup-create-error" "failed to create OperatorGroup ${INTEROP__OPP__QUAY__NAMESPACE} in ${INTEROP__OPP__QUAY__NAMESPACE}"
       echo "ERROR: ${_class_detail}"
       _dump_diagnostics
       exit 1
@@ -996,13 +996,13 @@ fi
 # --- Create-if-absent: Subscription (oc create, not apply: if a second writer
 #     (a live OperatorPolicy) wins the race, create fails AlreadyExists and
 #     we adopt; never overwrite) ---
-if oc get subscription.operators.coreos.com quay-operator -n "${QUAY_NAMESPACE}" >/dev/null 2>&1; then
-  _existing_ch=$(oc get subscription.operators.coreos.com quay-operator -n "${QUAY_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null) || _existing_ch="unknown"
+if oc get subscription.operators.coreos.com quay-operator -n "${INTEROP__OPP__QUAY__NAMESPACE}" >/dev/null 2>&1; then
+  _existing_ch=$(oc get subscription.operators.coreos.com quay-operator -n "${INTEROP__OPP__QUAY__NAMESPACE}" -o jsonpath='{.spec.channel}') || _existing_ch="unknown"
   _prop "quay_subscription" "adopted"
   _prop "channel_observed" "${_existing_ch}"
-  if [[ "${_existing_ch}" != "${QUAY_OPERATOR_CHANNEL}" ]]; then
-    echo ">>> NOTE: existing Subscription channel '${_existing_ch}' != requested '${QUAY_OPERATOR_CHANNEL}' - adopting, not overwriting (a live OperatorPolicy is the owner)"
-    _prop "channel_mismatch" "${_existing_ch}!=${QUAY_OPERATOR_CHANNEL}"
+  if [[ "${_existing_ch}" != "${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}" ]]; then
+    echo ">>> NOTE: existing Subscription channel '${_existing_ch}' != requested '${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}' - adopting, not overwriting (a live OperatorPolicy is the owner)"
+    _prop "channel_mismatch" "${_existing_ch}!=${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}"
   fi
 else
   if ! cat <<EOF | oc create -f - 2>&1
@@ -1010,20 +1010,20 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   name: quay-operator
-  namespace: ${QUAY_NAMESPACE}
+  namespace: ${INTEROP__OPP__QUAY__NAMESPACE}
   labels:
-    operators.coreos.com/quay-operator.${QUAY_NAMESPACE}: ""
+    operators.coreos.com/quay-operator.${INTEROP__OPP__QUAY__NAMESPACE}: ""
 spec:
-  channel: "${QUAY_OPERATOR_CHANNEL}"
+  channel: "${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}"
   installPlanApproval: Automatic
   name: quay-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
 EOF
   then
-    if oc get subscription.operators.coreos.com quay-operator -n "${QUAY_NAMESPACE}" >/dev/null 2>&1; then
+    if oc get subscription.operators.coreos.com quay-operator -n "${INTEROP__OPP__QUAY__NAMESPACE}" >/dev/null 2>&1; then
       _prop "quay_subscription" "race-tolerated"
-      _prop "channel_observed" "$(oc get subscription.operators.coreos.com quay-operator -n "${QUAY_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null || echo unknown)"
+      _prop "channel_observed" "$(oc get subscription.operators.coreos.com quay-operator -n "${INTEROP__OPP__QUAY__NAMESPACE}" -o jsonpath='{.spec.channel}' || echo unknown)"
       echo ">>> NOTE: Subscription created concurrently by another writer - adopting"
     else
       _classify "quay-subscription-create-error" "failed to create Subscription quay-operator"
@@ -1033,25 +1033,25 @@ EOF
     fi
   else
     _prop "quay_subscription" "created"
-    _prop "channel_observed" "${QUAY_OPERATOR_CHANNEL}"
+    _prop "channel_observed" "${INTEROP__OPP__QUAY__OPERATOR_CHANNEL}"
   fi
 fi
 
 # --- Wait for the CSV name (read status.currentCSV; the patch version is
 #     never hardcoded). Elapsed-time deadline, so a slow-but-successful
 #     response is charged against the budget. ---
-echo ">>> PHASE: waiting for the quay-operator CSV name (timeout: ${QUAY_CSV_WAIT_TIMEOUT}s)"
-_csv_want=$(( $(date +%s) + QUAY_CSV_WAIT_TIMEOUT ))
+echo ">>> PHASE: waiting for the quay-operator CSV name (timeout: ${INTEROP__OPP__QUAY__CSV_WAIT_TIMEOUT}s)"
+_csv_want=$(( $(date +%s) + INTEROP__OPP__QUAY__CSV_WAIT_TIMEOUT ))
 _poll_deadline=$(_clamp_deadline "${_csv_want}")
 if (( _poll_deadline < _csv_want )); then
-  echo ">>> NOTE: CSV-name wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${QUAY_CSV_WAIT_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
+  echo ">>> NOTE: CSV-name wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${INTEROP__OPP__QUAY__CSV_WAIT_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
 fi
-if _poll_jsonpath subscription.operators.coreos.com quay-operator "${QUAY_NAMESPACE}" '{.status.currentCSV}' '@any' '' "quay-operator currentCSV"; then
+if _poll_jsonpath subscription.operators.coreos.com quay-operator "${INTEROP__OPP__QUAY__NAMESPACE}" '{.status.currentCSV}' '@any' '' "quay-operator currentCSV"; then
   csvName="${_poll_last}"
   _prop "csv_name" "${csvName}"
 else
   _prc=$?
-  _cond=$(oc get subscription.operators.coreos.com quay-operator -n "${QUAY_NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason} {end}' 2>/dev/null) || _cond="undecided"
+  _cond=$(oc get subscription.operators.coreos.com quay-operator -n "${INTEROP__OPP__QUAY__NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason} {end}') || _cond="undecided"
   if (( _prc == 2 )); then
     _classify "quay-subscription-query-failed" "3 consecutive subscription queries failed (rc captured; API/RBAC error, not absence)"
   else
@@ -1060,7 +1060,7 @@ else
       *ConstraintsNotSatisfiable*)    _classify "quay-subscription-unsatisfiable" "Subscription condition ConstraintsNotSatisfiable" ;;
       *InstallPlanMissing*)           _classify "quay-installplan-missing" "Subscription condition InstallPlanMissing" ;;
       *InstallPlanFailed*)            _classify "quay-installplan-failed" "Subscription condition InstallPlanFailed" ;;
-      *)                              _classify "quay-csv-timeout" "no currentCSV after ${QUAY_CSV_WAIT_TIMEOUT}s (conditions: ${_cond:-none})" ;;
+      *)                              _classify "quay-csv-timeout" "no currentCSV after ${INTEROP__OPP__QUAY__CSV_WAIT_TIMEOUT}s (conditions: ${_cond:-none})" ;;
     esac
   fi
   echo "ERROR: ${_class_detail}"
@@ -1071,13 +1071,13 @@ echo ">>> quay-operator CSV: ${csvName}"
 
 # --- Wait for CSV Succeeded (a not-yet-created CSV object is waited out, not
 #     classified as an API failure). ---
-echo ">>> PHASE: waiting for CSV ${csvName} Succeeded (timeout: ${QUAY_INSTALL_TIMEOUT}s)"
-_install_want=$(( $(date +%s) + QUAY_INSTALL_TIMEOUT ))
+echo ">>> PHASE: waiting for CSV ${csvName} Succeeded (timeout: ${INTEROP__OPP__QUAY__INSTALL_TIMEOUT}s)"
+_install_want=$(( $(date +%s) + INTEROP__OPP__QUAY__INSTALL_TIMEOUT ))
 _poll_deadline=$(_clamp_deadline "${_install_want}")
 if (( _poll_deadline < _install_want )); then
-  echo ">>> NOTE: CSV-Succeeded wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${QUAY_INSTALL_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
+  echo ">>> NOTE: CSV-Succeeded wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${INTEROP__OPP__QUAY__INSTALL_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
 fi
-if _poll_jsonpath clusterserviceversions.operators.coreos.com "${csvName}" "${QUAY_NAMESPACE}" '{.status.phase}' Succeeded Failed "CSV ${csvName} phase"; then
+if _poll_jsonpath clusterserviceversions.operators.coreos.com "${csvName}" "${INTEROP__OPP__QUAY__NAMESPACE}" '{.status.phase}' Succeeded Failed "CSV ${csvName} phase"; then
   _prop "csv_phase" "Succeeded"
 else
   _prc=$?
@@ -1086,7 +1086,7 @@ else
   elif (( _prc == 2 )); then
     _classify "quay-subscription-query-failed" "3 consecutive CSV queries for ${csvName} failed (API/RBAC error, not absence)"
   else
-    _classify "quay-csv-timeout" "CSV ${csvName} not Succeeded after ${QUAY_INSTALL_TIMEOUT}s (phase: ${_poll_last:-unknown})"
+    _classify "quay-csv-timeout" "CSV ${csvName} not Succeeded after ${INTEROP__OPP__QUAY__INSTALL_TIMEOUT}s (phase: ${_poll_last:-unknown})"
   fi
   echo "ERROR: ${_class_detail}"
   _dump_diagnostics
@@ -1096,7 +1096,7 @@ echo ">>> quay-operator CSV Succeeded"
 
 # --- Secret init-config-bundle-secret (data.config.yaml verbatim from
 #     policy-install-quay.yaml: user initialize, superusers [quayadmin]) ---
-if oc get secret init-config-bundle-secret -n "${QUAY_NAMESPACE}" >/dev/null 2>&1; then
+if oc get secret init-config-bundle-secret -n "${INTEROP__OPP__QUAY__NAMESPACE}" >/dev/null 2>&1; then
   _prop "init_bundle_secret" "adopted"
 else
   _bundle_tmp=$(mktemp /tmp/quay-config-bundle.XXXXXX)
@@ -1109,12 +1109,12 @@ FEATURE_USER_CREATION: true
 FEATURE_SUPERUSERS_FULL_ACCESS: true
 FEATURE_QUOTA_MANAGEMENT: true
 BUNDLEEOF
-  if oc create secret generic init-config-bundle-secret -n "${QUAY_NAMESPACE}" --from-file=config.yaml="${_bundle_tmp}" 2>&1; then
+  if oc create secret generic init-config-bundle-secret -n "${INTEROP__OPP__QUAY__NAMESPACE}" --from-file=config.yaml="${_bundle_tmp}" 2>&1; then
     _prop "init_bundle_secret" "created"
-  elif oc get secret init-config-bundle-secret -n "${QUAY_NAMESPACE}" >/dev/null 2>&1; then
+  elif oc get secret init-config-bundle-secret -n "${INTEROP__OPP__QUAY__NAMESPACE}" >/dev/null 2>&1; then
     _prop "init_bundle_secret" "race-tolerated"
   else
-    _classify "quay-secret-error" "failed to create Secret init-config-bundle-secret in ${QUAY_NAMESPACE}"
+    _classify "quay-secret-error" "failed to create Secret init-config-bundle-secret in ${INTEROP__OPP__QUAY__NAMESPACE}"
     echo "ERROR: ${_class_detail}"
     exit 1
   fi
@@ -1145,7 +1145,7 @@ fi
 
 # --- QuayRegistry registry (components objectstorage+tls managed, config
 #     bundle wired) ---
-if oc get quayregistries.quay.redhat.com registry -n "${QUAY_NAMESPACE}" >/dev/null 2>&1; then
+if oc get quayregistries.quay.redhat.com registry -n "${INTEROP__OPP__QUAY__NAMESPACE}" >/dev/null 2>&1; then
   _prop "quay_registry" "adopted"
 else
   if ! cat <<EOF | oc create -f - 2>&1
@@ -1153,7 +1153,7 @@ apiVersion: quay.redhat.com/v1
 kind: QuayRegistry
 metadata:
   name: registry
-  namespace: ${QUAY_NAMESPACE}
+  namespace: ${INTEROP__OPP__QUAY__NAMESPACE}
 spec:
   configBundleSecret: init-config-bundle-secret
   components:
@@ -1163,10 +1163,10 @@ spec:
       kind: tls
 EOF
   then
-    if oc get quayregistries.quay.redhat.com registry -n "${QUAY_NAMESPACE}" >/dev/null 2>&1; then
+    if oc get quayregistries.quay.redhat.com registry -n "${INTEROP__OPP__QUAY__NAMESPACE}" >/dev/null 2>&1; then
       _prop "quay_registry" "race-tolerated"
     else
-      _classify "quay-registry-error" "failed to create QuayRegistry registry in ${QUAY_NAMESPACE}"
+      _classify "quay-registry-error" "failed to create QuayRegistry registry in ${INTEROP__OPP__QUAY__NAMESPACE}"
       echo "ERROR: ${_class_detail}"
       _dump_diagnostics
       exit 1
@@ -1177,13 +1177,13 @@ EOF
 fi
 
 # --- Wait for QuayRegistry Available=True ---
-echo ">>> PHASE: waiting for QuayRegistry registry Available (timeout: ${QUAY_REGISTRY_TIMEOUT}s)"
-_reg_want=$(( $(date +%s) + QUAY_REGISTRY_TIMEOUT ))
+echo ">>> PHASE: waiting for QuayRegistry registry Available (timeout: ${INTEROP__OPP__QUAY__REGISTRY_TIMEOUT}s)"
+_reg_want=$(( $(date +%s) + INTEROP__OPP__QUAY__REGISTRY_TIMEOUT ))
 _poll_deadline=$(_clamp_deadline "${_reg_want}")
 if (( _poll_deadline < _reg_want )); then
-  echo ">>> NOTE: QuayRegistry wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${QUAY_REGISTRY_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
+  echo ">>> NOTE: QuayRegistry wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${INTEROP__OPP__QUAY__REGISTRY_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
 fi
-if _poll_jsonpath quayregistries.quay.redhat.com registry "${QUAY_NAMESPACE}" \
+if _poll_jsonpath quayregistries.quay.redhat.com registry "${INTEROP__OPP__QUAY__NAMESPACE}" \
     '{range .status.conditions[*]}{.type}={.status}{"\n"}{end}' '@contains:Available=True' '' "QuayRegistry registry conditions"; then
   _prop "quay_registry_available" "True"
 else
@@ -1191,7 +1191,7 @@ else
   if (( _prc == 2 )); then
     _classify "quay-registry-query-failed" "3 consecutive QuayRegistry queries failed (API/RBAC error, not absence)"
   else
-    _classify "quay-registry-timeout" "QuayRegistry registry never reported Available=True within ${QUAY_REGISTRY_TIMEOUT}s (last: $(printf '%s' "${_poll_last:-absent}" | tr '\n' ' '))"
+    _classify "quay-registry-timeout" "QuayRegistry registry never reported Available=True within ${INTEROP__OPP__QUAY__REGISTRY_TIMEOUT}s (last: $(printf '%s' "${_poll_last:-absent}" | tr '\n' ' '))"
   fi
   echo "ERROR: ${_class_detail}"
   _dump_diagnostics
@@ -1261,13 +1261,13 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: create-admin-user
-  namespace: ${QUAY_NAMESPACE}
+  namespace: ${INTEROP__OPP__QUAY__NAMESPACE}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: create-admin-user
-  namespace: ${QUAY_NAMESPACE}
+  namespace: ${INTEROP__OPP__QUAY__NAMESPACE}
 rules:
   - apiGroups:
       - ""
@@ -1300,7 +1300,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: create-admin-user
-  namespace: ${QUAY_NAMESPACE}
+  namespace: ${INTEROP__OPP__QUAY__NAMESPACE}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -1308,11 +1308,11 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: create-admin-user
-    namespace: ${QUAY_NAMESPACE}
+    namespace: ${INTEROP__OPP__QUAY__NAMESPACE}
 EOF
   for _obj in serviceaccount/create-admin-user role/create-admin-user rolebinding/create-admin-user; do
-    if ! oc get "${_obj}" -n "${QUAY_NAMESPACE}" >/dev/null 2>&1; then
-      _classify "quay-admin-rbac-error" "missing ${_obj} in ${QUAY_NAMESPACE} after the create attempt"
+    if ! oc get "${_obj}" -n "${INTEROP__OPP__QUAY__NAMESPACE}" >/dev/null 2>&1; then
+      _classify "quay-admin-rbac-error" "missing ${_obj} in ${INTEROP__OPP__QUAY__NAMESPACE} after the create attempt"
       echo "ERROR: ${_class_detail}"
       _dump_diagnostics
       exit 1
@@ -1359,7 +1359,7 @@ EOF
   elif [[ "${_job_state}" == "live" ]]; then
     # Deleting a live Job loses the credentials it has already generated, and the
     # single-shot replacement cannot re-initialize a non-empty database. Wait for
-    # it instead, inside the same QUAY_ADMIN_JOB_TIMEOUT budget, so the
+    # it instead, inside the same INTEROP__OPP__QUAY__ADMIN_JOB_TIMEOUT budget, so the
     # step-level budget invariant still holds.
     _job_wait=1
     # No Job started by this step minted the token, so a rejection on a registry
@@ -1381,7 +1381,7 @@ EOF
     # already initialized and the remaining objects are gone: re-running the Job
     # cannot repair that, and reporting it as an install failure would hide the
     # real cause. Fail fast with its own class instead.
-    if _qa_out=$(oc get secret quayadmin -n "${QUAY_NAMESPACE}" --request-timeout="$(_left_budget 20)" 2>&1); then
+    if _qa_out=$(oc get secret quayadmin -n "${INTEROP__OPP__QUAY__NAMESPACE}" --request-timeout="$(_left_budget 20)" 2>&1); then
       # A policy-owned Job that started after the snapshot above writes
       # quayadmin first, so presence alone can catch a healthy initialization in
       # flight. Re-read the state, and wait for a live Job instead of reporting
@@ -1579,7 +1579,7 @@ EOF
         # the delete then still frees the name and leaves no stale pods behind.
         _delete_opts=$(printf '{"apiVersion":"batch/v1","kind":"DeleteOptions","propagationPolicy":"Background","preconditions":{"uid":"%s"}}' "${_decided_uid}")
         _delete_rc=0
-        _delete_out=$(oc delete --raw "/apis/batch/v1/namespaces/${QUAY_NAMESPACE}/jobs/create-admin-user" -f - 2>&1 <<<"${_delete_opts}") || _delete_rc=$?
+        _delete_out=$(oc delete --raw "/apis/batch/v1/namespaces/${INTEROP__OPP__QUAY__NAMESPACE}/jobs/create-admin-user" -f - 2>&1 <<<"${_delete_opts}") || _delete_rc=$?
         if (( _delete_rc == 0 )); then
           # --raw returns before the object is finalized: a Job holding the
           # job-tracking finalizer keeps its name until its pods report, and the
@@ -1595,7 +1595,7 @@ EOF
           _recreated=0
           _strikes=0
           while :; do
-            if ! _still_raw=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" --request-timeout="$(_left_budget 20)" -o jsonpath='__quay_job__{.metadata.uid}' 2>&1); then
+            if ! _still_raw=$(oc get job create-admin-user -n "${INTEROP__OPP__QUAY__NAMESPACE}" --request-timeout="$(_left_budget 20)" -o jsonpath='__quay_job__{.metadata.uid}' 2>&1); then
               _still=${_still_raw}
               if grep -qF '(NotFound)' <<<"${_still_raw}"; then
                 _gone=1
@@ -1783,6 +1783,7 @@ spec:
             - |
               #!/usr/bin/env bash
               set -euo pipefail
+              set -x
 
               function quay_cmd() {
                 DATA='{}'
@@ -1795,9 +1796,8 @@ spec:
                 # artifacts.
                 echo "[$1] $2 $3" 1>&2
                 if [ "$1" = "Basic" ]; then
-                  COUNT=$(oc -n "${QUAY_NAMESPACE}" get --ignore-not-found=true secret "${QUAY_USER_SECRET}" | wc -l)
-                  if [ $COUNT -gt 1 ]; then
-                      BASIC=$(oc -n "${QUAY_NAMESPACE}" extract secret/${QUAY_USER_SECRET} --keys=basic --to=-)
+                  if oc -n "${INTEROP__OPP__QUAY__NAMESPACE}" get secret "${QUAY_USER_SECRET}" -o name >/dev/null 2>&1; then
+                      BASIC=$(oc -n "${INTEROP__OPP__QUAY__NAMESPACE}" extract secret/${QUAY_USER_SECRET} --keys=basic --to=-)
                   fi
                   # The header value is a credential read by curl from a process
                   # substitution (curl -H @file), so no secret appears in the
@@ -1849,9 +1849,9 @@ spec:
               # reports nothing when the budget runs out and hides a hung API
               # call. The outer step already waited for Available=True, so this
               # only covers a Job re-run against a registry that regressed.
-              # 300s is deliberate: it stays below the enclosing QUAY_ADMIN_JOB_TIMEOUT
+              # 300s is deliberate: it stays below the enclosing INTEROP__OPP__QUAY__ADMIN_JOB_TIMEOUT
               # (default 420s), so a regressed registry surfaces as the registry diagnosis
-              # rather than the job timeout; the ref-declared QUAY_REGISTRY_TIMEOUT
+              # rather than the job timeout; the ref-declared INTEROP__OPP__QUAY__REGISTRY_TIMEOUT
               # governs the outer step wait, not this inner re-run guard.
               echo -n "Waiting for the Quay Registry CR to be available ."
               _REG_WAIT_RC=0
@@ -1867,14 +1867,14 @@ spec:
               QUAY_ADMIN=quayadmin
               QUAY_USER=quaydevel
               QUAY_USER_SECRET="${QUAY_USER}"
-              QUAY_NAMESPACE=local-quay
-              QUAY_HOST=$(oc get route -n "${QUAY_NAMESPACE}" registry-quay -o jsonpath='{.spec.host}') || { echo "Quay route does not exist yet, please wait and try again."; exit 1; }
+              INTEROP__OPP__QUAY__NAMESPACE=local-quay
+              QUAY_HOST=$(oc get route -n "${INTEROP__OPP__QUAY__NAMESPACE}" registry-quay -o jsonpath='{.spec.host}') || { echo "Quay route does not exist yet, please wait and try again."; exit 1; }
               QUAY_ORG=devel
               QUAY_ORG_EMAIL=devel@myorg.com
               QUAY_USER_EMAIL=devel-user@myorg.com
               QUAY_REPO=example
-              if RESULT=$(oc get secret -n "${QUAY_NAMESPACE}" "${QUAY_USER_SECRET}"); then
-                echo "Quay user configuration secret already exists: ${QUAY_USER_SECRET} in namespace ${QUAY_NAMESPACE}"
+              if RESULT=$(oc get secret -n "${INTEROP__OPP__QUAY__NAMESPACE}" "${QUAY_USER_SECRET}"); then
+                echo "Quay user configuration secret already exists: ${QUAY_USER_SECRET} in namespace ${INTEROP__OPP__QUAY__NAMESPACE}"
                 exit 1
               fi
 
@@ -1893,7 +1893,7 @@ spec:
                 exit 1
               else
                 echo "[INFO] Destroy any previous secrets ..."
-                oc -n "${QUAY_NAMESPACE}" delete --ignore-not-found=true secret "${QUAY_USER_SECRET}"
+                oc -n "${INTEROP__OPP__QUAY__NAMESPACE}" delete --ignore-not-found=true secret "${QUAY_USER_SECRET}"
 
                 echo "[INFO] Creating quay admin secret quayadmin ..."
                 TOKEN=$(printf '%s' "$RESULT" | sed -n 's/.*"access_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
@@ -1901,9 +1901,9 @@ spec:
                   echo "[ERROR] no access_token in the initialize response; refusing to create the quayadmin secret" 1>&2
                   exit 1
                 fi
-                oc -n "${QUAY_NAMESPACE}" create secret generic quayadmin \
-                  --from-file=token=<(printf '%s' "${TOKEN}") \
-                  --from-file=password=<(printf '%s' "${ADMINPASS}") \
+                oc -n "${INTEROP__OPP__QUAY__NAMESPACE}" create secret generic quayadmin \
+                  --from-file=token=<( set +x; printf '%s' "${TOKEN}" ) \
+                  --from-file=password=<( set +x; printf '%s' "${ADMINPASS}" ) \
                   --from-file=basic=<(printf '%s' "${QUAY_ADMIN}:${ADMINPASS}" | base64 -w0)
                 # The password-bearing body has been consumed; drop it so it
                 # does not outlive its use.
@@ -1917,7 +1917,7 @@ spec:
                   exit 1
                 fi
 
-                QUAY_PASSWORD=$(echo "$RESPONSE" | tr ',' '\n' | grep '"password"' | cut -d \" -f 4)
+                QUAY_PASSWORD=$(printf '%s' "$RESPONSE" | jq -r '.password // empty')
                 if [ -z "$QUAY_PASSWORD" ]; then
                   echo "[ERROR] superuser/users response carried no password; refusing to create ${QUAY_USER_SECRET}" 1>&2
                   exit 1
@@ -1930,15 +1930,15 @@ spec:
                 # readable in artifacts). Two keys cannot both read stdin, so
                 # each gets its own process-substitution stream, byte-exact:
                 # same form as the quayadmin secret above.
-                oc -n "${QUAY_NAMESPACE}" create secret generic "${QUAY_USER_SECRET}" \
+                oc -n "${INTEROP__OPP__QUAY__NAMESPACE}" create secret generic "${QUAY_USER_SECRET}" \
                   --from-file=password=<( set +x; printf '%s' "${QUAY_PASSWORD}" ) \
                   --from-file=basic=<( set +x; printf '%s' "${BASE64AUTH}" )
 
                 echo "[INFO] Creating quay-pull-secret ..."
-                printf '%s' "{ \"auths\": { \"$QUAY_HOST\": { \"auth\": \"$BASE64AUTH\" } }}" | oc -n "${QUAY_NAMESPACE}" create secret generic quay-pull-secret --from-file=.dockerconfigjson=/dev/stdin --type=kubernetes.io/dockerconfigjson
+                printf '%s' "{ \"auths\": { \"$QUAY_HOST\": { \"auth\": \"$BASE64AUTH\" } }}" | oc -n "${INTEROP__OPP__QUAY__NAMESPACE}" create secret generic quay-pull-secret --from-file=.dockerconfigjson=/dev/stdin --type=kubernetes.io/dockerconfigjson
 
                 echo "[INFO] Creating quay integration token secret ..."
-                oc -n "${QUAY_NAMESPACE}" create secret generic quay-integration \
+                oc -n "${INTEROP__OPP__QUAY__NAMESPACE}" create secret generic quay-integration \
                   --from-file=token=<( set +x; printf '%s' "${TOKEN}" )
               fi
 
@@ -1981,9 +1981,7 @@ spec:
                 echo "[ERROR] GET applications for ${QUAY_ORG} failed (HTTP ${_APPS_STATUS:-no response}); refusing to create ${APPLICATION}" 1>&2
                 exit 1
               fi
-              # grep -c exits 1 on zero matches, so the count alone is the
-              # verdict here; the read above already carried the failure.
-              COUNT="$(printf '%s\n' "${_APPS_BODY}" | grep -c -- "${APPLICATION}" || true)"
+              COUNT="$(printf '%s' "${_APPS_BODY}" | jq --arg app "${APPLICATION}" '[.applications[] | select(.name == $app)] | length')"
               if [ "${COUNT}" -eq 0 ]; then
                 echo "[INFO] Creating ${APPLICATION} application..."
                 quay_required Bearer POST /api/v1/organization/$QUAY_ORG/applications "{\"name\": \"$QUAY_ORG-automation\", \"description\": \"automation app\" }"
@@ -2021,7 +2019,7 @@ spec:
                 echo "[ERROR] GET owners team members for ${QUAY_ORG} failed (HTTP ${_MEMB_STATUS:-no response}); refusing to add ${QUAY_USER}" 1>&2
                 exit 1
               fi
-              COUNT="$(printf '%s\n' "${_MEMB_BODY}" | grep -c -- "\"name\": \"${QUAY_USER}\"" || true)"
+              COUNT="$(printf '%s' "${_MEMB_BODY}" | jq --arg user "${QUAY_USER}" '[.members[]? | select(.name == $user)] | length')"
               if [ "${COUNT}" -eq 0 ]; then
                 echo "[INFO] Associating ${QUAY_USER} with ${QUAY_ORG} ..."
                 quay_required Bearer PUT /api/v1/organization/$QUAY_ORG/team/owners/members/$QUAY_USER '{}'
@@ -2033,7 +2031,7 @@ spec:
               _ADMIN_BODY="${_ADMIN_READ%$'\n'*}"
               case "${_ADMIN_STATUS}" in
                 200)
-                  COUNT="$(printf '%s\n' "${_ADMIN_BODY}" | grep -c -- '"role": "admin"' || true)"
+                  COUNT="$(printf '%s' "${_ADMIN_BODY}" | jq '[.permissions[]? | select(.role == "admin")] | length')"
                   ;;
                 404)
                   # No permission row for this user yet: a definite negative.
@@ -2091,9 +2089,9 @@ JOBEOF
     # The verification below the wait is charged against the same deadline: cap
     # the wait deadline so the Secret re-read and the registry checks still fit
     # inside it (a cap, not a subtraction from the configured timeout, so a short
-    # QUAY_ADMIN_JOB_TIMEOUT still gets its full value when the budget allows).
+    # INTEROP__OPP__QUAY__ADMIN_JOB_TIMEOUT still gets its full value when the budget allows).
     _job_started=$(date +%s)
-    _job_deadline=$(_clamp_deadline $(( _job_started + QUAY_ADMIN_JOB_TIMEOUT )))
+    _job_deadline=$(_clamp_deadline $(( _job_started + INTEROP__OPP__QUAY__ADMIN_JOB_TIMEOUT )))
     _verify_cap=$(( _work_deadline - _diag_reserve - _oc_overrun_reserve - _verify_reserve ))
     if (( _job_deadline > _verify_cap )); then _job_deadline=${_verify_cap}; fi
     if (( _job_deadline <= $(date +%s) )); then _job_deadline=$(( $(date +%s) + 1 )); fi
@@ -2120,10 +2118,10 @@ JOBEOF
       _quay_admin_job_fail
     fi
     if [[ "${_job_state}" != "complete" ]]; then
-      _job_failed=$(oc get job create-admin-user -n "${QUAY_NAMESPACE}" -o jsonpath='{.status.failed}' 2>/dev/null) || _job_failed=""
+      _job_failed=$(oc get job create-admin-user -n "${INTEROP__OPP__QUAY__NAMESPACE}" -o jsonpath='{.status.failed}') || _job_failed=""
       echo ">>> DIAG: create-admin-user Job logs (tail 200):"
       _quay_admin_log || true
-      _classify "quay-admin-job-timeout" "create-admin-user Job neither Complete nor Failed within ${_job_waited}s (QUAY_ADMIN_JOB_TIMEOUT=${QUAY_ADMIN_JOB_TIMEOUT}s, capped by the verification reserve; failed pods=${_job_failed:-none})"
+      _classify "quay-admin-job-timeout" "create-admin-user Job neither Complete nor Failed within ${_job_waited}s (INTEROP__OPP__QUAY__ADMIN_JOB_TIMEOUT=${INTEROP__OPP__QUAY__ADMIN_JOB_TIMEOUT}s, capped by the verification reserve; failed pods=${_job_failed:-none})"
       echo "ERROR: ${_class_detail}"
       _dump_diagnostics
       exit 1

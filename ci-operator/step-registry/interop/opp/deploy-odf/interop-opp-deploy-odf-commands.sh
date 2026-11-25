@@ -61,9 +61,9 @@ _opp_cleanup() {
     -e 's/password=[^ &]+/password=[REDACTED]/g' \
     -e 's/token=[^ &]+/token=[REDACTED]/g' \
     -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
-    "${_xtrace_log}" 2>/dev/null || true
+    "${_xtrace_log}" || true
   if [[ ${_exit_code} -ne 0 && -n "${ARTIFACT_DIR:-}" ]]; then
-    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    cp "${_xtrace_log}" "${ARTIFACT_DIR}/" || true
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
 }
@@ -143,7 +143,7 @@ _xml_escape() {
 
 # _junit_seed: write the default-FAILING case before any work, atomically.
 _junit_seed() {
-  mkdir -p "$(dirname "${_jfile}")" 2>/dev/null || true
+  mkdir -p "$(dirname "${_jfile}")" || true
   local _tmp
   _tmp=$(mktemp "$(dirname "${_jfile}")/.junit-XXXXXX")
   cat > "${_tmp}" <<JUNITEOF
@@ -201,12 +201,12 @@ _junit_emit() {
 JUNITEOF
   mv -f "${_tmp}" "${_jfile}"
   if [[ -n "${SHARED_DIR:-}" ]]; then
-    mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || true
-    cp "${_jfile}" "${SHARED_DIR}/junit/" 2>/dev/null || true
+    mkdir -p "${SHARED_DIR}/junit" || true
+    cp "${_jfile}" "${SHARED_DIR}/junit/" || true
   fi
   # Post-condition: tests>=1 and exit!=0 implies >=1 failure/error.
   local _counts
-  _counts=$(python3 - "${_jfile}" <<'PYEOF' 2>/dev/null || echo "0 0 0"
+  _counts=$(python3 - "${_jfile}" <<'PYEOF' || echo "0 0 0"
 import sys, xml.etree.ElementTree as ET
 try:
     r = ET.parse(sys.argv[1]).getroot()
@@ -292,29 +292,30 @@ _poll_jsonpath() {
 # --- Pre-seed the default-failing JUnit case and the property file ---
 _junit_seed
 : > "${_props}"
-# --- Environment (every value env-overridable) ---
+# --- Environment (step-declared; ref.yaml is the single default authority) ---
 # ODF_CHANNEL is accepted as a legacy alias so an existing lane override keeps
-# working; ODF_OPERATOR_CHANNEL wins when both are set.
-ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-${ODF_CHANNEL:-stable-4.22}}"
-ODF_NAMESPACE="${ODF_NAMESPACE:-openshift-storage}"
-ODF_CSV_WAIT_TIMEOUT="${ODF_CSV_WAIT_TIMEOUT:-300}"
-ODF_INSTALL_TIMEOUT="${ODF_INSTALL_TIMEOUT:-600}"
-ODF_STORAGECLUSTER_TIMEOUT="${ODF_STORAGECLUSTER_TIMEOUT:-1800}"
-NOOBAA_BACKINGSTORE_TIMEOUT="${NOOBAA_BACKINGSTORE_TIMEOUT:-600}"
-ODF_DEVICESET_STORAGECLASS="${ODF_DEVICESET_STORAGECLASS:-}"
-ODF_REPORT_ONLY="${ODF_REPORT_ONLY:-0}"
+# working; INTEROP__OPP__ODF__OPERATOR_CHANNEL wins when both are set.
+: "${INTEROP__OPP__ODF__OPERATOR_CHANNEL:=${ODF_CHANNEL:-}}"
+: "${INTEROP__OPP__ODF__OPERATOR_CHANNEL:?}"
+: "${INTEROP__OPP__ODF__NAMESPACE:?}"
+: "${INTEROP__OPP__ODF__CSV_WAIT_TIMEOUT:?}"
+: "${INTEROP__OPP__ODF__INSTALL_TIMEOUT:?}"
+: "${INTEROP__OPP__ODF__STORAGECLUSTER_TIMEOUT:?}"
+: "${INTEROP__OPP__ODF__NOOBAA_BACKINGSTORE_TIMEOUT:?}"
+INTEROP__OPP__ODF__DEVICESET_STORAGECLASS="${INTEROP__OPP__ODF__DEVICESET_STORAGECLASS:-}"  # empty means auto-detect; keep :- to allow empty
+: "${INTEROP__OPP__ODF__REPORT_ONLY:?}"
 
-if ! [[ "${ODF_OPERATOR_CHANNEL}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
-  echo "ERROR: invalid ODF_OPERATOR_CHANNEL '${ODF_OPERATOR_CHANNEL}'"
-  _classify "odf-invalid-input" "ODF_OPERATOR_CHANNEL failed validation"
+if ! [[ "${INTEROP__OPP__ODF__OPERATOR_CHANNEL}" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+  echo "ERROR: invalid INTEROP__OPP__ODF__OPERATOR_CHANNEL '${INTEROP__OPP__ODF__OPERATOR_CHANNEL}'"
+  _classify "odf-invalid-input" "INTEROP__OPP__ODF__OPERATOR_CHANNEL failed validation"
   exit 2
 fi
-if ! [[ "${ODF_DEVICESET_STORAGECLASS}" =~ ^([A-Za-z0-9][A-Za-z0-9._-]*)?$ ]]; then
-  echo "ERROR: invalid ODF_DEVICESET_STORAGECLASS '${ODF_DEVICESET_STORAGECLASS}'"
-  _classify "odf-invalid-input" "ODF_DEVICESET_STORAGECLASS failed validation"
+if ! [[ "${INTEROP__OPP__ODF__DEVICESET_STORAGECLASS}" =~ ^([A-Za-z0-9][A-Za-z0-9._-]*)?$ ]]; then
+  echo "ERROR: invalid INTEROP__OPP__ODF__DEVICESET_STORAGECLASS '${INTEROP__OPP__ODF__DEVICESET_STORAGECLASS}'"
+  _classify "odf-invalid-input" "INTEROP__OPP__ODF__DEVICESET_STORAGECLASS failed validation"
   exit 2
 fi
-for _v in ODF_CSV_WAIT_TIMEOUT ODF_INSTALL_TIMEOUT ODF_STORAGECLUSTER_TIMEOUT NOOBAA_BACKINGSTORE_TIMEOUT; do
+for _v in INTEROP__OPP__ODF__CSV_WAIT_TIMEOUT INTEROP__OPP__ODF__INSTALL_TIMEOUT INTEROP__OPP__ODF__STORAGECLUSTER_TIMEOUT INTEROP__OPP__ODF__NOOBAA_BACKINGSTORE_TIMEOUT; do
   _v_raw="${!_v}"
   # Bounded to 9 digits so the 10# conversion below cannot wrap a 64-bit
   # integer into the accepted range.
@@ -343,34 +344,34 @@ done
 # 1..2700 alone admits 4 x 2700s and would let TERM record StepTerminated
 # instead of a real classification. Fail-fast half (exit 2); the runtime half
 # is _work_deadline, which charges elapsed setup and caps every phase deadline.
-_phase_sum=$(( ODF_CSV_WAIT_TIMEOUT + ODF_INSTALL_TIMEOUT + ODF_STORAGECLUSTER_TIMEOUT + NOOBAA_BACKINGSTORE_TIMEOUT ))
+_phase_sum=$(( INTEROP__OPP__ODF__CSV_WAIT_TIMEOUT + INTEROP__OPP__ODF__INSTALL_TIMEOUT + INTEROP__OPP__ODF__STORAGECLUSTER_TIMEOUT + INTEROP__OPP__ODF__NOOBAA_BACKINGSTORE_TIMEOUT ))
 if (( _phase_sum > 3600 )); then
   echo "ERROR: phase waits sum to ${_phase_sum}s, must be <= 3600s (work budget 4020s - overhead 180s - precondition 120s - diagnostics 120s)"
   _classify "odf-invalid-input" "phase wait sum ${_phase_sum}s exceeds the step work budget"
   exit 2
 fi
 
-echo ">>> PHASE: deploy ODF (channel: ${ODF_OPERATOR_CHANNEL}, namespace: ${ODF_NAMESPACE}, CSV name wait: ${ODF_CSV_WAIT_TIMEOUT}s, CSV wait: ${ODF_INSTALL_TIMEOUT}s, StorageCluster wait: ${ODF_STORAGECLUSTER_TIMEOUT}s, BackingStore wait: ${NOOBAA_BACKINGSTORE_TIMEOUT}s)"
+echo ">>> PHASE: deploy ODF (channel: ${INTEROP__OPP__ODF__OPERATOR_CHANNEL}, namespace: ${INTEROP__OPP__ODF__NAMESPACE}, CSV name wait: ${INTEROP__OPP__ODF__CSV_WAIT_TIMEOUT}s, CSV wait: ${INTEROP__OPP__ODF__INSTALL_TIMEOUT}s, StorageCluster wait: ${INTEROP__OPP__ODF__STORAGECLUSTER_TIMEOUT}s, BackingStore wait: ${INTEROP__OPP__ODF__NOOBAA_BACKINGSTORE_TIMEOUT}s)"
 
 # --- Diagnostics: bounded (last 50 events, <=256KiB/object) ---
 _dump_diagnostics() {
   echo ">>> DIAG: Subscription (OLM, fully-qualified):"
-  oc get subscription.operators.coreos.com odf-operator -n "${ODF_NAMESPACE}" -o yaml 2>&1 | head -c 262144 || true
+  oc get subscription.operators.coreos.com odf-operator -n "${INTEROP__OPP__ODF__NAMESPACE}" -o yaml 2>&1 | head -c 262144 || true
   echo
-  echo ">>> DIAG: events in ${ODF_NAMESPACE} (last 50):"
-  oc get events -n "${ODF_NAMESPACE}" --sort-by='.lastTimestamp' 2>&1 | tail -50 || true
+  echo ">>> DIAG: events in ${INTEROP__OPP__ODF__NAMESPACE} (last 50):"
+  oc get events -n "${INTEROP__OPP__ODF__NAMESPACE}" --sort-by='.lastTimestamp' 2>&1 | tail -50 || true
   echo ">>> DIAG: events in openshift-marketplace (last 50):"
   oc get events -n openshift-marketplace --sort-by='.lastTimestamp' 2>&1 | tail -50 || true
-  echo ">>> DIAG: CSVs in ${ODF_NAMESPACE}:"
-  oc get csv -n "${ODF_NAMESPACE}" 2>&1 | head -50 || true
+  echo ">>> DIAG: CSVs in ${INTEROP__OPP__ODF__NAMESPACE}:"
+  oc get csv -n "${INTEROP__OPP__ODF__NAMESPACE}" 2>&1 | head -50 || true
   echo ">>> DIAG: StorageCluster ocs-storagecluster status:"
-  oc get storageclusters.ocs.openshift.io ocs-storagecluster -n "${ODF_NAMESPACE}" -o yaml 2>&1 | head -c 262144 || true
+  oc get storageclusters.ocs.openshift.io ocs-storagecluster -n "${INTEROP__OPP__ODF__NAMESPACE}" -o yaml 2>&1 | head -c 262144 || true
   echo
-  echo ">>> DIAG: noobaa CRs in ${ODF_NAMESPACE}:"
-  oc get backingstores.noobaa.io,bucketclasses.noobaa.io,noobaa.noobaa.io -n "${ODF_NAMESPACE}" 2>&1 | head -50 || true
+  echo ">>> DIAG: noobaa CRs in ${INTEROP__OPP__ODF__NAMESPACE}:"
+  oc get backingstores.noobaa.io,bucketclasses.noobaa.io,noobaa.noobaa.io -n "${INTEROP__OPP__ODF__NAMESPACE}" 2>&1 | head -50 || true
 }
 
-if [[ "${ODF_REPORT_ONLY}" == "1" ]]; then
+if [[ "${INTEROP__OPP__ODF__REPORT_ONLY}" == "1" ]]; then
   # Detection, not gating: report object states and exit 0. Runs before the
   # packagemanifest precondition on purpose (detection must work when the
   # catalog is absent or erroring) and before the self-disable check so the
@@ -378,10 +379,10 @@ if [[ "${ODF_REPORT_ONLY}" == "1" ]]; then
   # A failed read is kept as its own state (undecided), never folded into the
   # absent/empty answer: detection output must not report an API or RBAC error
   # as an object state.
-  _sub=$(oc get subscription.operators.coreos.com odf-operator -n "${ODF_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null) || _sub="undecided"
-  _csvp=$(oc get csv -n "${ODF_NAMESPACE}" -l "operators.coreos.com/odf-operator.${ODF_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _csvp="undecided"
-  _scp=$(oc get storageclusters.ocs.openshift.io ocs-storagecluster -n "${ODF_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null) || _scp="undecided"
-  _pm=$(oc get packagemanifest odf-operator -n openshift-marketplace -o name 2>/dev/null) || _pm="undecided"
+  _sub=$(oc get subscription.operators.coreos.com odf-operator -n "${INTEROP__OPP__ODF__NAMESPACE}" -o jsonpath='{.spec.channel}') || _sub="undecided"
+  _csvp=$(oc get csv -n "${INTEROP__OPP__ODF__NAMESPACE}" -l "operators.coreos.com/odf-operator.${INTEROP__OPP__ODF__NAMESPACE}=" -o jsonpath='{.items[0].status.phase}') || _csvp="undecided"
+  _scp=$(oc get storageclusters.ocs.openshift.io ocs-storagecluster -n "${INTEROP__OPP__ODF__NAMESPACE}" -o jsonpath='{.status.phase}') || _scp="undecided"
+  _pm=$(oc get packagemanifest odf-operator -n openshift-marketplace -o name) || _pm="undecided"
   if [[ "${_pm}" == "undecided" ]]; then
     _pm_state="undecided"
   elif [[ -n "${_pm}" ]]; then
@@ -403,9 +404,9 @@ fi
 # CSV Succeeded AND StorageCluster ocs-storagecluster phase Ready.
 # Queried cluster-wide by name (ACM installs the OperatorPolicy in the managed
 # cluster namespace, local-cluster) and the observed namespace is recorded.
-_prop "channel_requested" "${ODF_OPERATOR_CHANNEL}"
+_prop "channel_requested" "${INTEROP__OPP__ODF__OPERATOR_CHANNEL}"
 if oc get crd operatorpolicies.policy.open-cluster-management.io >/dev/null 2>&1; then
-  _op_status=$(oc get operatorpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null) || _op_status="undecided"
+  _op_status=$(oc get operatorpolicies.policy.open-cluster-management.io -A -o json) || _op_status="undecided"
   if [[ "${_op_status}" == "undecided" ]]; then
     # A failed read is not "no policy". The self-disable verdict is withheld
     # (the install path runs and the policy is never patched) and the state is
@@ -437,7 +438,7 @@ try:
         print("absent - -")
 except Exception:
     print("absent - -")
-' "${_sd_policy}" "${ODF_OPERATOR_CHANNEL}" 2>/dev/null) || _sd_out="absent - -"
+' "${_sd_policy}" "${INTEROP__OPP__ODF__OPERATOR_CHANNEL}") || _sd_out="absent - -"
     _sd_ok="absent" _sd_ns="-" _sd_ch="-"
     read -r _sd_ok _sd_ns _sd_ch <<<"${_sd_out}"
     _prop "operatorpolicy_namespace" "${_sd_ns:-unknown}"
@@ -453,14 +454,14 @@ except Exception:
     # self-disable on its own.
     typeset _sd_sub="odf-operator"
     typeset _live_ch=""
-    _live_ch=$(oc get subscription.operators.coreos.com "${_sd_sub}" -n "${ODF_NAMESPACE}" -o jsonpath='{.spec.channel}') || _live_ch=""
-    if [[ -z "${_live_ch}" && "${_sd_ns}" != "-" && "${_sd_ns}" != "${ODF_NAMESPACE}" ]]; then
+    _live_ch=$(oc get subscription.operators.coreos.com "${_sd_sub}" -n "${INTEROP__OPP__ODF__NAMESPACE}" -o jsonpath='{.spec.channel}') || _live_ch=""
+    if [[ -z "${_live_ch}" && "${_sd_ns}" != "-" && "${_sd_ns}" != "${INTEROP__OPP__ODF__NAMESPACE}" ]]; then
       _live_ch=$(oc get subscription.operators.coreos.com "${_sd_sub}" -n "${_sd_ns}" -o jsonpath='{.spec.channel}') || _live_ch=""
     fi
     _prop "live_subscription_channel" "${_live_ch:-unknown}"
-    if [[ "${_sd_ok}" == "true" && ( -z "${_live_ch}" || "${_live_ch}" == "${ODF_OPERATOR_CHANNEL}" ) ]]; then
-      _existing_csv=$(oc get csv -n "${ODF_NAMESPACE}" -l "operators.coreos.com/odf-operator.${ODF_NAMESPACE}=" -o jsonpath='{.items[0].status.phase}' 2>/dev/null) || _existing_csv="undecided"
-      _sc_phase=$(oc get storageclusters.ocs.openshift.io ocs-storagecluster -n "${ODF_NAMESPACE}" -o jsonpath='{.status.phase}' 2>/dev/null) || _sc_phase="undecided"
+    if [[ "${_sd_ok}" == "true" && ( -z "${_live_ch}" || "${_live_ch}" == "${INTEROP__OPP__ODF__OPERATOR_CHANNEL}" ) ]]; then
+      _existing_csv=$(oc get csv -n "${INTEROP__OPP__ODF__NAMESPACE}" -l "operators.coreos.com/odf-operator.${INTEROP__OPP__ODF__NAMESPACE}=" -o jsonpath='{.items[0].status.phase}') || _existing_csv="undecided"
+      _sc_phase=$(oc get storageclusters.ocs.openshift.io ocs-storagecluster -n "${INTEROP__OPP__ODF__NAMESPACE}" -o jsonpath='{.status.phase}') || _sc_phase="undecided"
       if [[ "${_existing_csv}" == "Succeeded" && "${_sc_phase}" == "Ready" ]]; then
         echo ">>> workaround_removal_ready=true (OperatorPolicy Compliant, channel ${_sd_ch}, CSV Succeeded, StorageCluster Ready) - not installing"
         _prop "workaround_removal_ready" "true"
@@ -481,11 +482,11 @@ except Exception:
       # create-if-absent, so an existing Subscription is adopted as-is (never
       # patched: a live OperatorPolicy owns it) and the mismatch is recorded as
       # channel_self_disable_withheld; the requested channel is not installed over it.
-      echo ">>> NOTE: live Subscription channel '${_live_ch}' != requested '${ODF_OPERATOR_CHANNEL}': self-disable withheld, install path runs (existing Subscription adopted, not patched)"
-      _prop "channel_self_disable_withheld" "${_live_ch}!=${ODF_OPERATOR_CHANNEL}"
-    elif [[ "${_sd_ch}" != "-" && "${_sd_ch}" != "${ODF_OPERATOR_CHANNEL}" ]]; then
-      echo ">>> NOTE: OperatorPolicy channel '${_sd_ch}' != requested '${ODF_OPERATOR_CHANNEL}': self-disable withheld, installing"
-      _prop "channel_self_disable_withheld" "${_sd_ch}!=${ODF_OPERATOR_CHANNEL}"
+      echo ">>> NOTE: live Subscription channel '${_live_ch}' != requested '${INTEROP__OPP__ODF__OPERATOR_CHANNEL}': self-disable withheld, install path runs (existing Subscription adopted, not patched)"
+      _prop "channel_self_disable_withheld" "${_live_ch}!=${INTEROP__OPP__ODF__OPERATOR_CHANNEL}"
+    elif [[ "${_sd_ch}" != "-" && "${_sd_ch}" != "${INTEROP__OPP__ODF__OPERATOR_CHANNEL}" ]]; then
+      echo ">>> NOTE: OperatorPolicy channel '${_sd_ch}' != requested '${INTEROP__OPP__ODF__OPERATOR_CHANNEL}': self-disable withheld, installing"
+      _prop "channel_self_disable_withheld" "${_sd_ch}!=${INTEROP__OPP__ODF__OPERATOR_CHANNEL}"
     fi
   fi
 fi
@@ -529,10 +530,10 @@ try:
     print("ok " + str(head) if ch in names else "absent " + ",".join(names[:8]))
 except Exception:
     print("error")
-' "${ODF_OPERATOR_CHANNEL}" 2>/dev/null) || _channel_ok="error"
+' "${INTEROP__OPP__ODF__OPERATOR_CHANNEL}") || _channel_ok="error"
 case "${_channel_ok}" in
   absent*)
-    _classify "odf-catalog-missing" "channel '${ODF_OPERATOR_CHANNEL}' not listed for odf-operator (${_channel_ok#absent })"
+    _classify "odf-catalog-missing" "channel '${INTEROP__OPP__ODF__OPERATOR_CHANNEL}' not listed for odf-operator (${_channel_ok#absent })"
     echo "ERROR: ${_class_detail}"
     exit 1
     ;;
@@ -542,24 +543,24 @@ case "${_channel_ok}" in
     exit 1
     ;;
 esac
-echo ">>> precondition: odf-operator present; channel ${ODF_OPERATOR_CHANNEL} head: ${_channel_ok#ok }"
+echo ">>> precondition: odf-operator present; channel ${INTEROP__OPP__ODF__OPERATOR_CHANNEL} head: ${_channel_ok#ok }"
 
 # --- Create-if-absent: namespace (policy-odf.yaml carries the
 #     cluster-monitoring label; ensured idempotently) ---
-if oc get namespace "${ODF_NAMESPACE}" >/dev/null 2>&1; then
+if oc get namespace "${INTEROP__OPP__ODF__NAMESPACE}" >/dev/null 2>&1; then
   _prop "odf_namespace" "adopted"
 else
-  if oc create namespace "${ODF_NAMESPACE}" 2>&1; then
+  if oc create namespace "${INTEROP__OPP__ODF__NAMESPACE}" 2>&1; then
     _prop "odf_namespace" "created"
-  elif oc get namespace "${ODF_NAMESPACE}" >/dev/null 2>&1; then
+  elif oc get namespace "${INTEROP__OPP__ODF__NAMESPACE}" >/dev/null 2>&1; then
     _prop "odf_namespace" "race-tolerated"
   else
-    _classify "odf-namespace-error" "failed to create namespace ${ODF_NAMESPACE}"
+    _classify "odf-namespace-error" "failed to create namespace ${INTEROP__OPP__ODF__NAMESPACE}"
     echo "ERROR: ${_class_detail}"
     exit 1
   fi
 fi
-oc label namespace "${ODF_NAMESPACE}" openshift.io/cluster-monitoring=true --overwrite >/dev/null 2>&1 || true
+oc label namespace "${INTEROP__OPP__ODF__NAMESPACE}" openshift.io/cluster-monitoring=true --overwrite >/dev/null 2>&1 || true
 
 # --- Create-if-absent: OperatorGroup (name openshift-storage-operatorgroup,
 #     targetNamespaces [openshift-storage]; any existing group is adopted; a
@@ -567,7 +568,7 @@ oc label namespace "${ODF_NAMESPACE}" openshift.io/cluster-monitoring=true --ove
 #     oc create, not apply: if a second writer (a live OperatorPolicy) wins the
 #     race, create fails AlreadyExists and we adopt; never overwrite the
 #     existing spec.targetNamespaces. ---
-if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${ODF_NAMESPACE}" -o name 2>/dev/null)" ]]; then
+if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${INTEROP__OPP__ODF__NAMESPACE}" -o name)" ]]; then
   _prop "odf_operatorgroup" "adopted"
 else
   if ! cat <<EOF | oc create -f - 2>&1
@@ -575,17 +576,17 @@ apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
   name: openshift-storage-operatorgroup
-  namespace: ${ODF_NAMESPACE}
+  namespace: ${INTEROP__OPP__ODF__NAMESPACE}
 spec:
   targetNamespaces:
-    - ${ODF_NAMESPACE}
+    - ${INTEROP__OPP__ODF__NAMESPACE}
 EOF
   then
-    if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${ODF_NAMESPACE}" -o name 2>/dev/null)" ]]; then
+    if [[ -n "$(oc get operatorgroups.operators.coreos.com -n "${INTEROP__OPP__ODF__NAMESPACE}" -o name)" ]]; then
       _prop "odf_operatorgroup" "race-tolerated"
       echo ">>> NOTE: OperatorGroup created concurrently by another writer - adopting"
     else
-      _classify "odf-operatorgroup-create-error" "failed to create OperatorGroup openshift-storage-operatorgroup in ${ODF_NAMESPACE}"
+      _classify "odf-operatorgroup-create-error" "failed to create OperatorGroup openshift-storage-operatorgroup in ${INTEROP__OPP__ODF__NAMESPACE}"
       echo "ERROR: ${_class_detail}"
       _dump_diagnostics
       exit 1
@@ -598,13 +599,13 @@ fi
 # --- Create-if-absent: Subscription (oc create, not apply: if a second writer
 #     (a live OperatorPolicy) wins the race, create fails AlreadyExists and
 #     we adopt; never overwrite) ---
-if oc get subscription.operators.coreos.com odf-operator -n "${ODF_NAMESPACE}" >/dev/null 2>&1; then
-  _existing_ch=$(oc get subscription.operators.coreos.com odf-operator -n "${ODF_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null) || _existing_ch="unknown"
+if oc get subscription.operators.coreos.com odf-operator -n "${INTEROP__OPP__ODF__NAMESPACE}" >/dev/null 2>&1; then
+  _existing_ch=$(oc get subscription.operators.coreos.com odf-operator -n "${INTEROP__OPP__ODF__NAMESPACE}" -o jsonpath='{.spec.channel}') || _existing_ch="unknown"
   _prop "odf_subscription" "adopted"
   _prop "channel_observed" "${_existing_ch:-empty}"
-  if [[ -n "${_existing_ch}" && "${_existing_ch}" != "${ODF_OPERATOR_CHANNEL}" ]]; then
-    echo ">>> NOTE: existing Subscription channel '${_existing_ch}' != requested '${ODF_OPERATOR_CHANNEL}' - adopting, not overwriting (a live OperatorPolicy is the owner)"
-    _prop "channel_mismatch" "${_existing_ch}!=${ODF_OPERATOR_CHANNEL}"
+  if [[ -n "${_existing_ch}" && "${_existing_ch}" != "${INTEROP__OPP__ODF__OPERATOR_CHANNEL}" ]]; then
+    echo ">>> NOTE: existing Subscription channel '${_existing_ch}' != requested '${INTEROP__OPP__ODF__OPERATOR_CHANNEL}' - adopting, not overwriting (a live OperatorPolicy is the owner)"
+    _prop "channel_mismatch" "${_existing_ch}!=${INTEROP__OPP__ODF__OPERATOR_CHANNEL}"
   fi
 else
   if ! cat <<EOF | oc create -f - 2>&1
@@ -612,18 +613,18 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   name: odf-operator
-  namespace: ${ODF_NAMESPACE}
+  namespace: ${INTEROP__OPP__ODF__NAMESPACE}
 spec:
-  channel: "${ODF_OPERATOR_CHANNEL}"
+  channel: "${INTEROP__OPP__ODF__OPERATOR_CHANNEL}"
   installPlanApproval: Automatic
   name: odf-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
 EOF
   then
-    if oc get subscription.operators.coreos.com odf-operator -n "${ODF_NAMESPACE}" >/dev/null 2>&1; then
+    if oc get subscription.operators.coreos.com odf-operator -n "${INTEROP__OPP__ODF__NAMESPACE}" >/dev/null 2>&1; then
       _prop "odf_subscription" "race-tolerated"
-      _prop "channel_observed" "$(oc get subscription.operators.coreos.com odf-operator -n "${ODF_NAMESPACE}" -o jsonpath='{.spec.channel}' 2>/dev/null || echo unknown)"
+      _prop "channel_observed" "$(oc get subscription.operators.coreos.com odf-operator -n "${INTEROP__OPP__ODF__NAMESPACE}" -o jsonpath='{.spec.channel}' || echo unknown)"
       echo ">>> NOTE: Subscription created concurrently by another writer - adopting"
     else
       _classify "odf-subscription-create-error" "failed to create Subscription odf-operator"
@@ -633,25 +634,25 @@ EOF
     fi
   else
     _prop "odf_subscription" "created"
-    _prop "channel_observed" "${ODF_OPERATOR_CHANNEL}"
+    _prop "channel_observed" "${INTEROP__OPP__ODF__OPERATOR_CHANNEL}"
   fi
 fi
 
 # --- Wait for the CSV name (read status.currentCSV; the patch version is
 #     never hardcoded). Elapsed-time deadline, so a slow-but-successful
 #     response is charged against the budget. ---
-echo ">>> PHASE: waiting for the odf-operator CSV name (timeout: ${ODF_CSV_WAIT_TIMEOUT}s)"
-_csv_want=$(( $(date +%s) + ODF_CSV_WAIT_TIMEOUT ))
+echo ">>> PHASE: waiting for the odf-operator CSV name (timeout: ${INTEROP__OPP__ODF__CSV_WAIT_TIMEOUT}s)"
+_csv_want=$(( $(date +%s) + INTEROP__OPP__ODF__CSV_WAIT_TIMEOUT ))
 _poll_deadline=$(_clamp_deadline "${_csv_want}")
 if (( _poll_deadline < _csv_want )); then
-  echo ">>> NOTE: CSV-name wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${ODF_CSV_WAIT_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
+  echo ">>> NOTE: CSV-name wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${INTEROP__OPP__ODF__CSV_WAIT_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
 fi
-if _poll_jsonpath subscription.operators.coreos.com odf-operator "${ODF_NAMESPACE}" '{.status.currentCSV}' '@any' '' "odf-operator currentCSV"; then
+if _poll_jsonpath subscription.operators.coreos.com odf-operator "${INTEROP__OPP__ODF__NAMESPACE}" '{.status.currentCSV}' '@any' '' "odf-operator currentCSV"; then
   csvName="${_poll_last}"
   _prop "csv_name" "${csvName}"
 else
   _prc=$?
-  _cond=$(oc get subscription.operators.coreos.com odf-operator -n "${ODF_NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason} {end}' 2>/dev/null) || _cond="undecided"
+  _cond=$(oc get subscription.operators.coreos.com odf-operator -n "${INTEROP__OPP__ODF__NAMESPACE}" -o jsonpath='{range .status.conditions[*]}{.type}={.status} reason={.reason} {end}') || _cond="undecided"
   if (( _prc == 2 )); then
     _classify "odf-subscription-query-failed" "3 consecutive subscription queries failed (rc captured; API/RBAC error, not absence)"
   else
@@ -660,7 +661,7 @@ else
       *ConstraintsNotSatisfiable*)    _classify "odf-subscription-unsatisfiable" "Subscription condition ConstraintsNotSatisfiable" ;;
       *InstallPlanMissing*)           _classify "odf-installplan-missing" "Subscription condition InstallPlanMissing" ;;
       *InstallPlanFailed*)            _classify "odf-installplan-failed" "Subscription condition InstallPlanFailed" ;;
-      *)                              _classify "odf-csv-timeout" "no currentCSV after ${ODF_CSV_WAIT_TIMEOUT}s (conditions: ${_cond:-none})" ;;
+      *)                              _classify "odf-csv-timeout" "no currentCSV after ${INTEROP__OPP__ODF__CSV_WAIT_TIMEOUT}s (conditions: ${_cond:-none})" ;;
     esac
   fi
   echo "ERROR: ${_class_detail}"
@@ -671,13 +672,13 @@ echo ">>> odf-operator CSV: ${csvName}"
 
 # --- Wait for CSV Succeeded (a not-yet-created CSV object is waited out, not
 #     classified as an API failure). ---
-echo ">>> PHASE: waiting for CSV ${csvName} Succeeded (timeout: ${ODF_INSTALL_TIMEOUT}s)"
-_install_want=$(( $(date +%s) + ODF_INSTALL_TIMEOUT ))
+echo ">>> PHASE: waiting for CSV ${csvName} Succeeded (timeout: ${INTEROP__OPP__ODF__INSTALL_TIMEOUT}s)"
+_install_want=$(( $(date +%s) + INTEROP__OPP__ODF__INSTALL_TIMEOUT ))
 _poll_deadline=$(_clamp_deadline "${_install_want}")
 if (( _poll_deadline < _install_want )); then
-  echo ">>> NOTE: CSV-Succeeded wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${ODF_INSTALL_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
+  echo ">>> NOTE: CSV-Succeeded wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${INTEROP__OPP__ODF__INSTALL_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
 fi
-if _poll_jsonpath clusterserviceversions.operators.coreos.com "${csvName}" "${ODF_NAMESPACE}" '{.status.phase}' Succeeded Failed "CSV ${csvName} phase"; then
+if _poll_jsonpath clusterserviceversions.operators.coreos.com "${csvName}" "${INTEROP__OPP__ODF__NAMESPACE}" '{.status.phase}' Succeeded Failed "CSV ${csvName} phase"; then
   _prop "csv_phase" "Succeeded"
 else
   _prc=$?
@@ -686,7 +687,7 @@ else
   elif (( _prc == 2 )); then
     _classify "odf-subscription-query-failed" "3 consecutive CSV queries for ${csvName} failed (API/RBAC error, not absence)"
   else
-    _classify "odf-csv-timeout" "CSV ${csvName} not Succeeded after ${ODF_INSTALL_TIMEOUT}s (phase: ${_poll_last:-unknown})"
+    _classify "odf-csv-timeout" "CSV ${csvName} not Succeeded after ${INTEROP__OPP__ODF__INSTALL_TIMEOUT}s (phase: ${_poll_last:-unknown})"
   fi
   echo "ERROR: ${_class_detail}"
   _dump_diagnostics
@@ -696,10 +697,10 @@ echo ">>> odf-operator CSV Succeeded"
 
 # --- Deviceset storage class (policy-odf-cluster.yaml): VSphere uses
 #     thin-csi-odf (and the policy creates that StorageClass), every other
-#     platform the AWS lane runs on uses gp3-csi. ODF_DEVICESET_STORAGECLASS
+#     platform the AWS lane runs on uses gp3-csi. INTEROP__OPP__ODF__DEVICESET_STORAGECLASS
 #     overrides the computed value. ---
-_platform=$(oc get infrastructure cluster -o jsonpath='{.status.platform}' 2>/dev/null) || _platform="undecided"
-_platform_spec=$(oc get infrastructure cluster -o jsonpath='{.spec.platformSpec.type}' 2>/dev/null) || _platform_spec="undecided"
+_platform=$(oc get infrastructure cluster -o jsonpath='{.status.platform}') || _platform="undecided"
+_platform_spec=$(oc get infrastructure cluster -o jsonpath='{.spec.platformSpec.type}') || _platform_spec="undecided"
 _prop "platform" "${_platform:-unknown}"
 if [[ "${_platform}" == "undecided" && ( -z "${_platform_spec}" || "${_platform_spec}" == "undecided" ) ]]; then
   # Neither read answered, so the platform is unknown and guessing it would pick
@@ -714,16 +715,16 @@ _is_vsphere=0
 if [[ "${_platform_spec}" == "VSphere" || "${_platform}" == "VSphere" ]]; then
   _is_vsphere=1
 fi
-if [[ -z "${ODF_DEVICESET_STORAGECLASS}" ]]; then
+if [[ -z "${INTEROP__OPP__ODF__DEVICESET_STORAGECLASS}" ]]; then
   if (( _is_vsphere == 1 )); then
-    ODF_DEVICESET_STORAGECLASS="thin-csi-odf"
+    INTEROP__OPP__ODF__DEVICESET_STORAGECLASS="thin-csi-odf"
   else
-    ODF_DEVICESET_STORAGECLASS="gp3-csi"
+    INTEROP__OPP__ODF__DEVICESET_STORAGECLASS="gp3-csi"
   fi
 fi
-_prop "deviceset_storageclass" "${ODF_DEVICESET_STORAGECLASS}"
-echo ">>> deviceset storage class: ${ODF_DEVICESET_STORAGECLASS} (platform: ${_platform:-unknown})"
-if (( _is_vsphere == 1 )) && [[ "${ODF_DEVICESET_STORAGECLASS}" == "thin-csi-odf" ]]; then
+_prop "deviceset_storageclass" "${INTEROP__OPP__ODF__DEVICESET_STORAGECLASS}"
+echo ">>> deviceset storage class: ${INTEROP__OPP__ODF__DEVICESET_STORAGECLASS} (platform: ${_platform:-unknown})"
+if (( _is_vsphere == 1 )) && [[ "${INTEROP__OPP__ODF__DEVICESET_STORAGECLASS}" == "thin-csi-odf" ]]; then
   if oc get storageclass thin-csi-odf >/dev/null 2>&1; then
     _prop "thin_csi_odf_storageclass" "adopted"
   else
@@ -755,14 +756,14 @@ EOF
       exit 1
     fi
   fi
-  if ! oc get storageclass "${ODF_DEVICESET_STORAGECLASS}" >/dev/null 2>&1; then
-    _classify "odf-storageclass-missing" "StorageClass ${ODF_DEVICESET_STORAGECLASS} does not exist on this cluster"
+  if ! oc get storageclass "${INTEROP__OPP__ODF__DEVICESET_STORAGECLASS}" >/dev/null 2>&1; then
+    _classify "odf-storageclass-missing" "StorageClass ${INTEROP__OPP__ODF__DEVICESET_STORAGECLASS} does not exist on this cluster"
     echo "ERROR: ${_class_detail}"
     exit 1
   fi
 else
-  if ! oc get storageclass "${ODF_DEVICESET_STORAGECLASS}" >/dev/null 2>&1; then
-    _classify "odf-storageclass-missing" "StorageClass ${ODF_DEVICESET_STORAGECLASS} does not exist on this cluster (set ODF_DEVICESET_STORAGECLASS for non-AWS/non-vSphere platforms)"
+  if ! oc get storageclass "${INTEROP__OPP__ODF__DEVICESET_STORAGECLASS}" >/dev/null 2>&1; then
+    _classify "odf-storageclass-missing" "StorageClass ${INTEROP__OPP__ODF__DEVICESET_STORAGECLASS} does not exist on this cluster (set INTEROP__OPP__ODF__DEVICESET_STORAGECLASS for non-AWS/non-vSphere platforms)"
     echo "ERROR: ${_class_detail}"
     exit 1
   fi
@@ -786,7 +787,7 @@ else
   _dump_diagnostics
   exit 1
 fi
-if oc get storageclusters.ocs.openshift.io ocs-storagecluster -n "${ODF_NAMESPACE}" >/dev/null 2>&1; then
+if oc get storageclusters.ocs.openshift.io ocs-storagecluster -n "${INTEROP__OPP__ODF__NAMESPACE}" >/dev/null 2>&1; then
   _prop "odf_storagecluster" "adopted"
 else
   if ! cat <<EOF | oc create -f - 2>&1
@@ -794,7 +795,7 @@ apiVersion: ocs.openshift.io/v1
 kind: StorageCluster
 metadata:
   name: ocs-storagecluster
-  namespace: ${ODF_NAMESPACE}
+  namespace: ${INTEROP__OPP__ODF__NAMESPACE}
 spec:
   resources:
     mds: {}
@@ -831,7 +832,7 @@ spec:
         resources:
           requests:
             storage: "100Gi"
-        storageClassName: "${ODF_DEVICESET_STORAGECLASS}"
+        storageClassName: "${INTEROP__OPP__ODF__DEVICESET_STORAGECLASS}"
         volumeMode: Block
     name: ocs-deviceset
     placement: {}
@@ -840,10 +841,10 @@ spec:
     resources: {}
 EOF
   then
-    if oc get storageclusters.ocs.openshift.io ocs-storagecluster -n "${ODF_NAMESPACE}" >/dev/null 2>&1; then
+    if oc get storageclusters.ocs.openshift.io ocs-storagecluster -n "${INTEROP__OPP__ODF__NAMESPACE}" >/dev/null 2>&1; then
       _prop "odf_storagecluster" "race-tolerated"
     else
-      _classify "odf-storagecluster-create-error" "failed to create StorageCluster ocs-storagecluster in ${ODF_NAMESPACE}"
+      _classify "odf-storagecluster-create-error" "failed to create StorageCluster ocs-storagecluster in ${INTEROP__OPP__ODF__NAMESPACE}"
       echo "ERROR: ${_class_detail}"
       _dump_diagnostics
       exit 1
@@ -854,13 +855,13 @@ EOF
 fi
 
 # --- Wait for StorageCluster Ready (phase, not a condition) ---
-echo ">>> PHASE: waiting for StorageCluster ocs-storagecluster Ready (timeout: ${ODF_STORAGECLUSTER_TIMEOUT}s)"
-_sc_want=$(( $(date +%s) + ODF_STORAGECLUSTER_TIMEOUT ))
+echo ">>> PHASE: waiting for StorageCluster ocs-storagecluster Ready (timeout: ${INTEROP__OPP__ODF__STORAGECLUSTER_TIMEOUT}s)"
+_sc_want=$(( $(date +%s) + INTEROP__OPP__ODF__STORAGECLUSTER_TIMEOUT ))
 _poll_deadline=$(_clamp_deadline "${_sc_want}")
 if (( _poll_deadline < _sc_want )); then
-  echo ">>> NOTE: StorageCluster wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${ODF_STORAGECLUSTER_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
+  echo ">>> NOTE: StorageCluster wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${INTEROP__OPP__ODF__STORAGECLUSTER_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
 fi
-if _poll_jsonpath storageclusters.ocs.openshift.io ocs-storagecluster "${ODF_NAMESPACE}" '{.status.phase}' Ready Error "StorageCluster ocs-storagecluster phase"; then
+if _poll_jsonpath storageclusters.ocs.openshift.io ocs-storagecluster "${INTEROP__OPP__ODF__NAMESPACE}" '{.status.phase}' Ready Error "StorageCluster ocs-storagecluster phase"; then
   _prop "storagecluster_phase" "Ready"
 else
   _prc=$?
@@ -869,7 +870,7 @@ else
   elif (( _prc == 2 )); then
     _classify "odf-storagecluster-query-failed" "3 consecutive StorageCluster queries failed (API/RBAC error, not absence)"
   else
-    _classify "odf-storagecluster-timeout" "StorageCluster ocs-storagecluster not Ready after ${ODF_STORAGECLUSTER_TIMEOUT}s (phase: ${_poll_last:-unknown})"
+    _classify "odf-storagecluster-timeout" "StorageCluster ocs-storagecluster not Ready after ${INTEROP__OPP__ODF__STORAGECLUSTER_TIMEOUT}s (phase: ${_poll_last:-unknown})"
   fi
   echo "ERROR: ${_class_detail}"
   _dump_diagnostics
@@ -880,7 +881,7 @@ echo ">>> StorageCluster ocs-storagecluster Ready"
 # --- NooBaa BackingStore noobaa-pv-backing-store + BucketClass
 #     noobaa-default-bucket-class (policy-odf-noobaa.yaml; the BucketClass
 #     overrides the auto-created aws-s3 default so only pv-pool is used) ---
-if oc get backingstores.noobaa.io noobaa-pv-backing-store -n "${ODF_NAMESPACE}" >/dev/null 2>&1; then
+if oc get backingstores.noobaa.io noobaa-pv-backing-store -n "${INTEROP__OPP__ODF__NAMESPACE}" >/dev/null 2>&1; then
   _prop "odf_backingstore" "adopted"
 else
   if ! cat <<EOF | oc create -f - 2>&1
@@ -888,7 +889,7 @@ apiVersion: noobaa.io/v1alpha1
 kind: BackingStore
 metadata:
   name: noobaa-pv-backing-store
-  namespace: ${ODF_NAMESPACE}
+  namespace: ${INTEROP__OPP__ODF__NAMESPACE}
 spec:
   type: pv-pool
   pvPool:
@@ -904,10 +905,10 @@ spec:
     storageClass: ocs-storagecluster-ceph-rbd
 EOF
   then
-    if oc get backingstores.noobaa.io noobaa-pv-backing-store -n "${ODF_NAMESPACE}" >/dev/null 2>&1; then
+    if oc get backingstores.noobaa.io noobaa-pv-backing-store -n "${INTEROP__OPP__ODF__NAMESPACE}" >/dev/null 2>&1; then
       _prop "odf_backingstore" "race-tolerated"
     else
-      _classify "odf-backingstore-create-error" "failed to create BackingStore noobaa-pv-backing-store in ${ODF_NAMESPACE}"
+      _classify "odf-backingstore-create-error" "failed to create BackingStore noobaa-pv-backing-store in ${INTEROP__OPP__ODF__NAMESPACE}"
       echo "ERROR: ${_class_detail}"
       _dump_diagnostics
       exit 1
@@ -917,7 +918,7 @@ EOF
   fi
 fi
 
-if oc get bucketclasses.noobaa.io noobaa-default-bucket-class -n "${ODF_NAMESPACE}" >/dev/null 2>&1; then
+if oc get bucketclasses.noobaa.io noobaa-default-bucket-class -n "${INTEROP__OPP__ODF__NAMESPACE}" >/dev/null 2>&1; then
   _prop "odf_bucketclass" "adopted"
 else
   if ! cat <<EOF | oc create -f - 2>&1
@@ -925,7 +926,7 @@ apiVersion: noobaa.io/v1alpha1
 kind: BucketClass
 metadata:
   name: noobaa-default-bucket-class
-  namespace: ${ODF_NAMESPACE}
+  namespace: ${INTEROP__OPP__ODF__NAMESPACE}
 spec:
   placementPolicy:
     tiers:
@@ -933,10 +934,10 @@ spec:
           - noobaa-pv-backing-store
 EOF
   then
-    if oc get bucketclasses.noobaa.io noobaa-default-bucket-class -n "${ODF_NAMESPACE}" >/dev/null 2>&1; then
+    if oc get bucketclasses.noobaa.io noobaa-default-bucket-class -n "${INTEROP__OPP__ODF__NAMESPACE}" >/dev/null 2>&1; then
       _prop "odf_bucketclass" "race-tolerated"
     else
-      _classify "odf-bucketclass-create-error" "failed to create BucketClass noobaa-default-bucket-class in ${ODF_NAMESPACE}"
+      _classify "odf-bucketclass-create-error" "failed to create BucketClass noobaa-default-bucket-class in ${INTEROP__OPP__ODF__NAMESPACE}"
       echo "ERROR: ${_class_detail}"
       _dump_diagnostics
       exit 1
@@ -952,8 +953,8 @@ fi
 #     above never overwrites it. Without this check the step would report
 #     odf_bucketclass=adopted and bucket claims would silently use the default
 #     store instead of the pv-pool this step provisions. ---
-_bc_stores=$(oc get bucketclasses.noobaa.io noobaa-default-bucket-class -n "${ODF_NAMESPACE}" \
-  -o jsonpath='{range .spec.placementPolicy.tiers[*].backingStores[*]}{.}{"\n"}{end}' 2>/dev/null) || _bc_stores=""
+_bc_stores=$(oc get bucketclasses.noobaa.io noobaa-default-bucket-class -n "${INTEROP__OPP__ODF__NAMESPACE}" \
+  -o jsonpath='{range .spec.placementPolicy.tiers[*].backingStores[*]}{.}{"\n"}{end}') || _bc_stores=""
 # Whole-value comparison: the placement must hold the single provisioned
 # pv-pool store. A substring or per-line test would also accept a longer name
 # containing the target, or the target among the default aws-s3 store.
@@ -967,13 +968,13 @@ _prop "bucketclass_backingstore" "noobaa-pv-backing-store"
 
 # --- Wait for BackingStore Ready (bounded: the pv-pool provisions 3 x 100Gi
 #     RBD volumes after Ceph and NooBaa are up) ---
-echo ">>> PHASE: waiting for BackingStore noobaa-pv-backing-store Ready (timeout: ${NOOBAA_BACKINGSTORE_TIMEOUT}s)"
-_bs_want=$(( $(date +%s) + NOOBAA_BACKINGSTORE_TIMEOUT ))
+echo ">>> PHASE: waiting for BackingStore noobaa-pv-backing-store Ready (timeout: ${INTEROP__OPP__ODF__NOOBAA_BACKINGSTORE_TIMEOUT}s)"
+_bs_want=$(( $(date +%s) + INTEROP__OPP__ODF__NOOBAA_BACKINGSTORE_TIMEOUT ))
 _poll_deadline=$(_clamp_deadline "${_bs_want}")
 if (( _poll_deadline < _bs_want )); then
-  echo ">>> NOTE: BackingStore wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${NOOBAA_BACKINGSTORE_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
+  echo ">>> NOTE: BackingStore wait clamped to $(( _poll_deadline - $(date +%s) ))s (requested ${INTEROP__OPP__ODF__NOOBAA_BACKINGSTORE_TIMEOUT}s) to stay inside the shared ${_work_budget}s work budget"
 fi
-if _poll_jsonpath backingstores.noobaa.io noobaa-pv-backing-store "${ODF_NAMESPACE}" '{.status.phase}' Ready Rejected "BackingStore noobaa-pv-backing-store phase"; then
+if _poll_jsonpath backingstores.noobaa.io noobaa-pv-backing-store "${INTEROP__OPP__ODF__NAMESPACE}" '{.status.phase}' Ready Rejected "BackingStore noobaa-pv-backing-store phase"; then
   _prop "backingstore_phase" "Ready"
 else
   _prc=$?
@@ -982,7 +983,7 @@ else
   elif (( _prc == 2 )); then
     _classify "odf-backingstore-query-failed" "3 consecutive BackingStore queries failed (API/RBAC error, not absence)"
   else
-    _classify "odf-backingstore-timeout" "BackingStore noobaa-pv-backing-store not Ready after ${NOOBAA_BACKINGSTORE_TIMEOUT}s (phase: ${_poll_last:-unknown})"
+    _classify "odf-backingstore-timeout" "BackingStore noobaa-pv-backing-store not Ready after ${INTEROP__OPP__ODF__NOOBAA_BACKINGSTORE_TIMEOUT}s (phase: ${_poll_last:-unknown})"
   fi
   echo "ERROR: ${_class_detail}"
   _dump_diagnostics
