@@ -204,15 +204,16 @@ function CheckOppCompatibility () {
     # Post-upgrade floor enforcement contract (PRRT_kwDOBHvUUM65TpMz):
     # export the resolved floors for the target minor so interop-opp-smoke
     # can fail operators that remain below floor after the product upgrades.
-    # Best effort, but observable: a lane without SHARED_DIR, or a failed
-    # write, leaves the post-upgrade gate inert (interop-opp-smoke skips it
-    # when the file is absent) and logs one ERROR line naming the reason. It
-    # never fails the pre-flight step itself.
+    # Without SHARED_DIR there is nowhere to write, so the gate stays inert
+    # (interop-opp-smoke skips it when the file is absent). With SHARED_DIR
+    # set, a failed write is a failed check: the contract would otherwise be
+    # claimed while unenforceable, so it logs one ERROR line naming the
+    # reason, records a fail row, and reds the pre-flight (exit 3).
     if [[ -n "${SHARED_DIR:-}" ]]; then
         typeset -i _floorsWriteRc=0
         # Redirect stderr before stdout so a failed open does not also leak the
         # shell's own "No such file or directory" line: the ERROR line below is
-        # the single, deliberate inactivity signal for this write.
+        # the deliberate signal that the gate is inactive this run.
         {
             echo "# OPP_COMPAT floors for target OCP ${ocpKey} (written by interop-opp-preflight)"
             typeset _floorEntry
@@ -221,7 +222,12 @@ function CheckOppCompatibility () {
             done
         } 2>/dev/null > "${SHARED_DIR}/opp-compat-floors.env" || _floorsWriteRc=$?
         if (( _floorsWriteRc != 0 )); then
+            # The post-upgrade floor gate cannot run without the exported
+            # floors, so a failed export is a failed check: the lane must
+            # not pass while the floor contract it claims is unenforceable.
             echo "ERROR: could not write ${SHARED_DIR}/opp-compat-floors.env (rc=${_floorsWriteRc}); the interop-opp-smoke post-upgrade floor gate stays inactive this run" >&2
+            AppendCheck "opp_compatibility_matrix" "fail" "floors export to ${SHARED_DIR}/opp-compat-floors.env failed (rc=${_floorsWriteRc}); post-upgrade floor enforcement cannot run"
+            (( CHECKS_FAILED += 1 ))
         fi
     fi
 

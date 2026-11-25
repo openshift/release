@@ -9,7 +9,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
-  _exit_code=$?
+  _exit_code="${1:-$?}"
   set +x 2>/dev/null
   # Scrub credentials before copying
   sed -i -E \
@@ -162,7 +162,7 @@ _propagate_junit () {
 }
 
 # shellcheck disable=SC2154  # _jrc is assigned at trap entry in the same string
-trap '_jrc=$?; set +e; _opp_cleanup; CollectExitArtifacts; _propagate_junit; exit "${_jrc}"' EXIT
+trap '_jrc=$?; set +e; _opp_cleanup "${_jrc}"; CollectExitArtifacts; _propagate_junit; exit "${_jrc}"' EXIT
 
 ApiEndpointState() {
     # Prints served, absent, or unknown for an API endpoint path. The probe
