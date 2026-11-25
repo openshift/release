@@ -1070,6 +1070,190 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Central API TLS verification (fail-closed; must-gather sibling precedent).
+# The route is passthrough, so the client sees the generated certificate from
+# the central-tls secret (ca.pem) in the Central namespace. Every authenticated
+# request below therefore verifies the served certificate against that CA and
+# against the name the certificate covers, and the admin password is read only
+# after a credential-free handshake has verified: with best_effort: false the
+# API answers decide the job, so an unverified server must never receive the
+# admin credentials or produce the gate verdict.
+# ---------------------------------------------------------------------------
+centralApiHost="${centralUrl}"
+_apiTlsOpts=""
+_CENTRAL_CA_FILE="${ARTIFACT_DIR}/central-api-ca.pem"
+_CENTRAL_TLS_ERR="${ARTIFACT_DIR}/central-api-tls.err"
+
+# _central_backend_target <namespace> <service> [<route-target-port>]
+# Prints "<address> <port>" for one ready backend of the service, taken from
+# the EndpointSlices the endpoint controller maintains for it. When a Route
+# target port is given, the port is the one OpenShift resolves for it.
+# Exit status: 0 with output for a ready backend; 0 with no output when the
+# EndpointSlices were read and list no ready backend; 2 when the read fails;
+# 3 when the read returns a body that cannot be parsed. The two error states
+# stay distinct from "no ready backend" so a caller cannot record a read
+# failure as a definite negative.
+_central_backend_target() {
+    local _slice_json _backend_target _rt_port="${3:-}"
+    _slice_json="$(oc get endpointslices -n "$1" \
+      -l "kubernetes.io/service-name=$2" -o json 2>/dev/null)" || return 2
+    _backend_target="$(printf '%s\n' "${_slice_json}" | \
+      python3 -c '
+import json, sys
+
+try:
+    data = json.load(sys.stdin)
+except ValueError:
+    sys.exit(3)
+
+routeTargetPort = (sys.argv[1] if len(sys.argv) > 1 else "").strip()
+for item in data.get("items", []):
+    ports = [p for p in item.get("ports", []) or [] if p.get("port")]
+    if not ports:
+        continue
+    if routeTargetPort:
+        if routeTargetPort.isdigit():
+            matched = [p for p in ports if str(p.get("port")) == routeTargetPort]
+        else:
+            matched = [p for p in ports if str(p.get("name")) == routeTargetPort]
+        if not matched:
+            # The route selects a port this slice does not expose: a ready
+            # endpoint here would redirect --connect-to to the wrong container
+            # port, so keep looking at the remaining slices instead of
+            # settling for ports[0].
+            continue
+        ports = matched
+    if len(ports) > 1:
+        # A single-port service has one entry; prefer an explicitly named https
+        # port when several remain.
+        ports.sort(key=lambda p: 0 if p.get("name") == "https" else 1)
+    for endpoint in item.get("endpoints", []) or []:
+        if (endpoint.get("conditions") or {}).get("ready") is False:
+            continue
+        addresses = endpoint.get("addresses") or []
+        if addresses:
+            print(addresses[0], ports[0]["port"])
+            sys.exit(0)
+' "${_rt_port}")" || return 3
+    printf '%s\n' "${_backend_target}"
+}
+
+_verify_central_api_tls() {
+    typeset centralCa="" _route_svc_tp="" _central_svc="" _central_route_tp=""
+    typeset _central_backend="" _central_svc_dns="" _central_connect_to=""
+    typeset _central_addr="" _central_port=""
+    typeset -i _central_backend_rc=0 _central_backend_curl_rc=0
+
+    centralCa="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get secret central-tls -n "${centralNs}" \
+        -o jsonpath='{.data.ca\.pem}' 2>/dev/null | base64 -d 2>/dev/null || true)"
+    if [[ -z "${centralCa}" ]]; then
+        echo "central-tls ca.pem not readable in ${centralNs}; Central's certificate cannot be verified" >"${_CENTRAL_TLS_ERR}"
+        return 1
+    fi
+    printf '%s\n' "${centralCa}" > "${_CENTRAL_CA_FILE}"
+
+    # Credential-free handshake against the route host, the host the checks
+    # below use: curl exit 0 means the served certificate chained to Central's
+    # CA (an unauthenticated 401 is still a verified handshake); non-zero means
+    # CA or hostname mismatch -- no credential is involved either way.
+    if curl -sS -o /dev/null --cacert "${_CENTRAL_CA_FILE}" \
+          --connect-timeout 10 --max-time 30 -w '' \
+          "https://${centralUrl}/v1/metadata" 2>"${_CENTRAL_TLS_ERR}"; then
+        centralApiHost="${centralUrl}"
+        _apiTlsOpts="--cacert ${_CENTRAL_CA_FILE}"
+        # The handshake redirect above created the error file unconditionally;
+        # drop it so a green step publishes no empty central-api-tls.err.
+        rm -f "${_CENTRAL_TLS_ERR}"
+        echo "[readiness] Central API TLS verified against Central's own CA (route host covered by the certificate)"
+        return 0
+    fi
+
+    # A passthrough route serving Central's generated certificate can have a
+    # route host outside the certificate's service DNS names: the direct
+    # handshake then fails hostname verification (curl exit 60) even though the
+    # CA is correct. The service DNS name is the name the generated certificate
+    # covers, but it cannot be presented as SNI to the route host: a passthrough
+    # router picks the backend by TLS SNI route match, so a ClientHello naming
+    # the service DNS name selects no route. Retry against a ready backend
+    # endpoint of the Central service instead: --connect-to redirects only the
+    # TCP connection (backend address and container port) while the URL host
+    # stays the service DNS name, so SNI and hostname verification continue to
+    # use the verified name against Central's own CA. Routes with a custom
+    # certificate that includes the route host pass the direct handshake above
+    # and never reach this retry.
+    _route_svc_tp="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get route central -n "${centralNs}" \
+        -o jsonpath='{.spec.to.name}{"|"}{.spec.port.targetPort}' 2>/dev/null || true)"
+    _central_svc="${_route_svc_tp%%|*}"
+    if [[ "${_route_svc_tp}" == *'|'* ]]; then
+        _central_route_tp="${_route_svc_tp#*|}"
+    fi
+    if [[ -n "${_central_svc}" ]]; then
+        _central_backend="$(
+          _central_backend_target "${centralNs}" "${_central_svc}" "${_central_route_tp}"
+        )" || _central_backend_rc=$?
+    fi
+    if [[ "${_central_backend_rc}" -eq 0 && -n "${_central_svc}" && -n "${_central_backend}" ]]; then
+        _central_svc_dns="${_central_svc}.${centralNs}.svc"
+        read -r _central_addr _central_port <<<"${_central_backend}"
+        if [[ "${_central_addr}" == *:* ]]; then
+            _central_addr="[${_central_addr}]"
+        fi
+        _central_connect_to="${_central_svc_dns}:443:${_central_addr}:${_central_port}"
+        if curl -sS -o /dev/null --cacert "${_CENTRAL_CA_FILE}" \
+              --connect-to "${_central_connect_to}" \
+              --connect-timeout 10 --max-time 30 -w '' \
+              "https://${_central_svc_dns}/v1/metadata" \
+              2>/dev/null; then
+            centralApiHost="${_central_svc_dns}"
+            _apiTlsOpts="--cacert ${_CENTRAL_CA_FILE} --connect-to ${_central_connect_to}"
+            rm -f "${_CENTRAL_TLS_ERR}"
+            # Log and artifact text name no service host, backend address or
+            # port (INTEROP-9647 log sanitization): curl's own stderr, which
+            # carries the service DNS name, is discarded and a failure is
+            # recorded as its exit status.
+            echo "[readiness] Central API TLS verified against Central's own CA through a ready backend endpoint of the route target service, with the certificate's service name as SNI and verified name (route host outside certificate DNS names)"
+            return 0
+        else
+            _central_backend_curl_rc=$?
+            echo "backend-direct TLS handshake against a ready backend endpoint failed (curl exit ${_central_backend_curl_rc})" >>"${_CENTRAL_TLS_ERR}"
+        fi
+    else
+        # Record why the retry could not run: a missing route target, a failed
+        # or unparseable EndpointSlice read, and a read that shows no ready
+        # backend all leave the retry without a target. Presence only: neither
+        # the route target service name nor the backend address belongs in an
+        # artifact.
+        typeset _svc_present="no" _backend_present="no" _lookup_state=""
+        if [[ -n "${_central_svc}" ]]; then
+            _svc_present="yes"
+        fi
+        if [[ -n "${_central_backend}" ]]; then
+            _backend_present="yes"
+        fi
+        if [[ -z "${_central_svc}" ]]; then
+            _lookup_state="the route target service is absent, so no EndpointSlice lookup ran"
+        elif [[ "${_central_backend_rc}" -eq 2 ]]; then
+            _lookup_state="the EndpointSlice read failed, so a ready backend cannot be ruled out"
+        elif [[ "${_central_backend_rc}" -eq 3 ]]; then
+            _lookup_state="the EndpointSlice read returned an unparseable body, so a ready backend cannot be ruled out"
+        else
+            _lookup_state="the EndpointSlices read cleanly and list no ready backend"
+        fi
+        echo "Backend-direct fallback not attempted: route target service present=${_svc_present} ready backend present=${_backend_present} (${_lookup_state})." >>"${_CENTRAL_TLS_ERR}"
+    fi
+    return 1
+}
+
+if [[ -n "${centralUrl}" ]]; then
+    if ! _verify_central_api_tls; then
+        _add_case "central-api-insecure-tls" failed "TLSVerification" \
+            "Central API certificate not verified against the CA in the central-tls secret (route host outside the certificate DNS names and no verifiable ready backend endpoint); no credential is sent to an unverified server"
+        echo "[readiness] FATAL: Central API TLS could not be verified; see ${_CENTRAL_TLS_ERR}" >&2
+        exit 1
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # Credential region (D7): set +x bracket spans every credential
 # read/check/use/write below -- no set -x may be active at any of these
 # sites (static ordering check enforces this).
@@ -1103,14 +1287,16 @@ printf 'user = "admin:%s"\n' "${_pwEsc}" > "${_curlCfg}"
 echo "[readiness] roxAdminPassword extracted successfully"
 
 # ---------------------------------------------------------------------------
-# Check: Central API health (authenticated v1/metadata; curl -sk, with
-# the assertion case named for its mode per D4)
+# Check: Central API health (authenticated v1/metadata over the TLS connection
+# verified above; the assertion case name is retained because the
+# verification-channel contract pins the carrier case names)
 # ---------------------------------------------------------------------------
 function CheckCentralApi () {
     typeset httpCode=""
-    httpCode="$(curl -sk -o /dev/null -w '%{http_code}' \
+    # shellcheck disable=SC2086
+    httpCode="$(curl -sS ${_apiTlsOpts} -o /dev/null -w '%{http_code}' \
         -K "${_curlCfg}" \
-        "https://${centralUrl}/v1/metadata" --max-time 10)" || return 1
+        "https://${centralApiHost}/v1/metadata" --max-time 10)" || return 1
     [[ "${httpCode}" == "200" ]] || return 1
     true
 }
@@ -1142,8 +1328,9 @@ function CheckClustersConnected () {
     # exit status reaches the `|| return 1`) instead of parsing the error
     # body into a misleading "no connected sensor yet" verdict that burns
     # the whole budget on a credential or routing fault.
-    verdict="$(curl -fskSL -K "${_curlCfg}" \
-        "https://${centralUrl}/v1/clusters" --max-time 10 \
+    # shellcheck disable=SC2086
+    verdict="$(curl -fsSL ${_apiTlsOpts} -K "${_curlCfg}" \
+        "https://${centralApiHost}/v1/clusters" --max-time 10 \
         | python3 -c '
 import json, sys
 try:
@@ -1262,8 +1449,9 @@ function CheckPoliciesLoaded () {
     typeset policyCount=""
     # Body fetch: -f for the same reason as CheckClustersConnected - an HTTP
     # error response must fail the check, not read as an empty policy list.
-    policyCount="$(curl -fskSL -K "${_curlCfg}" \
-        "https://${centralUrl}/v1/policies?query=" --max-time 10 \
+    # shellcheck disable=SC2086
+    policyCount="$(curl -fsSL ${_apiTlsOpts} -K "${_curlCfg}" \
+        "https://${centralApiHost}/v1/policies?query=" --max-time 10 \
         | JsonLength policies)" || return 1
     echo "[readiness]   policy count: ${policyCount}"
     [[ "${policyCount}" -gt 80 ]] || return 1

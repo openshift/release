@@ -71,3 +71,15 @@ ref:
     and numeric counts grouped into fixed safe status categories.
     Namespace and resource identifiers, arbitrary status or condition text,
     operator logs, events, stderr, and raw resource output are not emitted.
+
+    API calls are TLS-verified. Once the Central route resolves, the step
+    reads the CA from the central-tls secret, verifies a credential-free
+    handshake against Central's own CA, and only then reads the admin
+    password. The route host is used when the served certificate covers it;
+    when it does not (passthrough route to Central's generated certificate),
+    a ready backend endpoint of the route target service is reached with
+    curl --connect-to so SNI and hostname verification keep using the
+    certificate's service name. If neither path verifies, the step fails with
+    the central-api-insecure-tls case (name retained: the verification-channel
+    contract pins the carrier case names), records the reason under
+    central-api-tls.err in ARTIFACT_DIR, and no credential is sent.
