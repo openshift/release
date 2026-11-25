@@ -1,11 +1,17 @@
 #!/bin/bash
 set -euo pipefail; shopt -s inherit_errexit
 
+# --- Trace-to-file: always capture, dump on failure only ---
+_xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
+exec {_xtrace_fd}>"${_xtrace_log}"
+BASH_XTRACEFD=${_xtrace_fd}
+set -x
+
 # ---------------------------------------------------------------------------
 # ACS OPP SMOKE runner (INTEROP-9647 PR-A, team review revision 3 D4/D6/D7)
 #
 # Contract (fail-closed):
-#   ACS_EXPECTATION   required | absent-by-design   (unset/other => exit 2)
+#   INTEROP__OPP__ACS__EXPECTATION   required | absent-by-design   (unset/other => exit 2)
 #   Classification runs BEFORE any SHARED_DIR consumption, by this step's
 #   own query (the image ships oc): present / absent (0-exit read, 0 items)
 #   / unknown (read failure after 3 attempts => FAILED, exit != 0).
@@ -26,8 +32,8 @@ fi
 ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
 
-ACS_EXPECTATION="${ACS_EXPECTATION:-}"
-ACS_SELFTEST="${ACS_SELFTEST:-true}"
+INTEROP__OPP__ACS__EXPECTATION="${INTEROP__OPP__ACS__EXPECTATION:-}"
+INTEROP__OPP__ACS__SELFTEST="${INTEROP__OPP__ACS__SELFTEST:-true}"
 
 # --- JUnit carrier machinery (deploy-acs precedent, D4/D6) -----------------
 _SUITE="lp-interop--OPP--stackrox-opp-smoke"
@@ -72,8 +78,8 @@ _write_carrier() {
             [[ -n "${c}" ]] && echo "  ${c}"
         done
         echo '</testsuite>'
-    } > "${_tmp}" 2>/dev/null || return 1
-    mv -f "${_tmp}" "${_CARRIER}" 2>/dev/null || return 1
+    } > "${_tmp}" 2>>"${ARTIFACT_DIR}/junit-write.err" || return 1
+    mv -f "${_tmp}" "${_CARRIER}" 2>>"${ARTIFACT_DIR}/junit-write.err" || return 1
 }
 
 _write_shared_copy() {
@@ -85,7 +91,7 @@ _write_shared_copy() {
     mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || return 1
     typeset _dst="${SHARED_DIR}/junit/junit_${_SUITE}.xml"
     typeset _tmp="${_dst}.tmp"
-    if [[ "${_ACS_STATE}" == "absent" && "${ACS_EXPECTATION}" == "absent-by-design" ]]; then
+    if [[ "${_ACS_STATE}" == "absent" && "${INTEROP__OPP__ACS__EXPECTATION}" == "absent-by-design" ]]; then
         {
             echo '<?xml version="1.0" encoding="UTF-8"?>'
             echo "<testsuite name=\"${_SUITE}\" tests=\"${_N_TOTAL}\" failures=\"${_N_FAILURES}\" errors=\"0\" skipped=\"$(( _N_SKIPPED + 1 ))\" time=\"$(( $(date +%s) - _junit_start ))\">"
@@ -99,8 +105,8 @@ _write_shared_copy() {
                 fi
             done
             echo '</testsuite>'
-        } > "${_tmp}" 2>/dev/null || return 1
-        mv -f "${_tmp}" "${_dst}" 2>/dev/null || return 1
+        } > "${_tmp}" 2>>"${ARTIFACT_DIR}/junit-write.err" || return 1
+        mv -f "${_tmp}" "${_dst}" 2>>"${ARTIFACT_DIR}/junit-write.err" || return 1
     else
         {
             echo '<?xml version="1.0" encoding="UTF-8"?>'
@@ -110,8 +116,8 @@ _write_shared_copy() {
                 [[ -n "${c}" ]] && echo "  ${c}"
             done
             echo '</testsuite>'
-        } > "${_tmp}" 2>/dev/null || return 1
-        mv -f "${_tmp}" "${_dst}" 2>/dev/null || return 1
+        } > "${_tmp}" 2>>"${ARTIFACT_DIR}/junit-write.err" || return 1
+        mv -f "${_tmp}" "${_dst}" 2>>"${ARTIFACT_DIR}/junit-write.err" || return 1
     fi
 }
 
@@ -179,8 +185,24 @@ _propagate_junit () {
     return "${_rc}"
 }
 
+_save_xtrace() {
+    # Scrub credentials before copying, mirror opp-quay-smoke precedent
+    { set +x; } 2>/dev/null
+    sed -i -E \
+        -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+        -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
+        -e 's/password=[^ &]+/password=[REDACTED]/g' \
+        -e 's/token=[^ &]+/token=[REDACTED]/g' \
+        -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
+        "${_xtrace_log}" 2>/dev/null || true
+    if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+        cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    fi
+    { set -x; } 2>/dev/null
+}
+
 _jrc=0
-trap '_jrc=$?; set +e; set +x; if (( _jrc != 0 && _N_FAILURES == 0 )); then _add_case "step-exited-nonzero" failed "StepExit" "step exited ${_jrc} without a recorded failure (state=${_ACS_STATE:-unclassified})"; fi; if ! _propagate_junit; then _add_case "junit-propagation" failed "Propagation" "failed to propagate JUnit results to SHARED_DIR"; if (( _jrc == 0 )); then _jrc=1; fi; fi; typeset -i _fin_rc=0; _finalize || _fin_rc=1; if (( _fin_rc != 0 )); then if (( _jrc == 0 )); then _jrc=1; fi; fi; if (( _N_FAILURES > 0 && _jrc == 0 )); then _jrc=1; fi; exit "${_jrc}"' EXIT
+trap '_jrc=$?; set +e; { set +x; } 2>/dev/null; _save_xtrace; if (( _jrc != 0 && _N_FAILURES == 0 )); then _add_case "step-exited-nonzero" failed "StepExit" "step exited ${_jrc} without a recorded failure (state=${_ACS_STATE:-unclassified})"; fi; if ! _propagate_junit; then _add_case "junit-propagation" failed "Propagation" "failed to propagate JUnit results to SHARED_DIR"; if (( _jrc == 0 )); then _jrc=1; fi; fi; typeset -i _fin_rc=0; _finalize || _fin_rc=1; if (( _fin_rc != 0 )); then if (( _jrc == 0 )); then _jrc=1; fi; fi; if (( _N_FAILURES > 0 && _jrc == 0 )); then _jrc=1; fi; exit "${_jrc}"' EXIT
 
 # ---------------------------------------------------------------------------
 # Self-test (D6 named executor): machinery validation, always on
@@ -216,13 +238,13 @@ _classify() {
         # Every read carries --request-timeout (OC_READ_TIMEOUT, default 10s):
         # a poll loop only re-evaluates its deadline after the call returns, so
         # an unbounded read would overrun the cap it is meant to respect.
-        if crdlist="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd -o name 2>/dev/null)"; then
+        if crdlist="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd -o name)"; then
             if ! grep -q '^customresourcedefinition\.apiextensions\.k8s\.io/centrals\.platform\.stackrox\.io$' <<< "${crdlist}"; then
                 _ACS_STATE="absent"
                 return 0
             fi
-            if out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json 2>/dev/null)"; then
-                items="$(printf '%s' "${out}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("items",[])))' 2>/dev/null)" || rc=1
+            if out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json)"; then
+                items="$(printf '%s' "${out}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("items",[])))')" || rc=1
                 if (( rc == 0 )); then
                     if (( items > 0 )); then
                         _ACS_STATE="present"
@@ -241,15 +263,15 @@ _classify() {
 }
 
 # --- Fail-closed expectation validation (D4) -------------------------------
-case "${ACS_EXPECTATION}" in
+case "${INTEROP__OPP__ACS__EXPECTATION}" in
     required|absent-by-design)
-        echo "[smoke] ACS_EXPECTATION=${ACS_EXPECTATION}"
+        echo "[smoke] INTEROP__OPP__ACS__EXPECTATION=${INTEROP__OPP__ACS__EXPECTATION}"
         ;;
     *)
         _ACS_STATE="unknown"
         _add_classification "acs-expectation-invalid" failed "InvalidInput" \
-            "ACS_EXPECTATION must be 'required' or 'absent-by-design' (got: '${ACS_EXPECTATION:-unset}'); fail-closed"
-        echo "[smoke] FATAL: invalid ACS_EXPECTATION '${ACS_EXPECTATION:-unset}'"
+            "INTEROP__OPP__ACS__EXPECTATION must be 'required' or 'absent-by-design' (got: '${INTEROP__OPP__ACS__EXPECTATION:-unset}'); fail-closed"
+        echo "[smoke] FATAL: invalid INTEROP__OPP__ACS__EXPECTATION '${INTEROP__OPP__ACS__EXPECTATION:-unset}'"
         exit 2
         ;;
 esac
@@ -271,7 +293,7 @@ for _seam in ACS_SCANNER_WAIT_S ACS_SCANNER_POLL_S; do
     fi
 done
 
-if [[ "${ACS_SELFTEST}" != "false" ]]; then
+if [[ "${INTEROP__OPP__ACS__SELFTEST}" != "false" ]]; then
     if ! _run_selftest; then
         exit 2
     fi
@@ -287,15 +309,15 @@ if [[ "${_ACS_STATE}" == "unknown" ]]; then
 fi
 
 if [[ "${_ACS_STATE}" == "absent" ]]; then
-    if [[ "${ACS_EXPECTATION}" == "required" ]]; then
+    if [[ "${INTEROP__OPP__ACS__EXPECTATION}" == "required" ]]; then
         _add_classification "acs-required-but-absent" failed "Classification" \
-            "acs-central-not-created: Central CR absent on a successful read while ACS_EXPECTATION=required"
-        _add_case "stackrox-opp-smoke" failed "Classification" "Central CR absent on a successful read while ACS_EXPECTATION=required (no discovery wait)"
-        echo "[smoke] Central CR absent but required by ACS_EXPECTATION"
+            "acs-central-not-created: Central CR absent on a successful read while INTEROP__OPP__ACS__EXPECTATION=required"
+        _add_case "stackrox-opp-smoke" failed "Classification" "Central CR absent on a successful read while INTEROP__OPP__ACS__EXPECTATION=required (no discovery wait)"
+        echo "[smoke] Central CR absent but required by INTEROP__OPP__ACS__EXPECTATION"
         exit 1
     fi
     _add_classification "acs-absent-by-design" passed
-    echo "[smoke] Central CR absent by design (ACS_EXPECTATION=absent-by-design); nothing to smoke-test"
+    echo "[smoke] Central CR absent by design (INTEROP__OPP__ACS__EXPECTATION=absent-by-design); nothing to smoke-test"
     exit 0
 fi
 
@@ -304,8 +326,8 @@ _add_classification "acs-present" passed
 # Terminal-state wait for SecuredCluster CR: oc wait --for=create with --all never waits on kubectl v1.31 (empty list visits nothing). Use a bounded poll loop with wall-clock deadline instead.
 _smokeCheckScExists() {
     typeset _out="" _cnt=""
-    _out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedclusters.platform.stackrox.io --all-namespaces -o json 2>/dev/null)" || return 1
-    _cnt="$(printf '%s' "${_out}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("items",[])))' 2>/dev/null)" || return 1
+    _out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedclusters.platform.stackrox.io --all-namespaces -o json)" || return 1
+    _cnt="$(printf '%s' "${_out}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("items",[])))')" || return 1
     (( _cnt > 0 ))
 }
 typeset -i _smokeTermCap=900
@@ -346,7 +368,7 @@ fi
 typeset _scList=""
 typeset -i _sc_rc=0 _sc_attempt=0
 for _sc_attempt in 1 2 3; do
-    if _scList="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedclusters.platform.stackrox.io --all-namespaces -o name 2>/dev/null)"; then
+    if _scList="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedclusters.platform.stackrox.io --all-namespaces -o name)"; then
         _sc_rc=0
         break
     else
@@ -362,30 +384,30 @@ if (( _sc_rc != 0 )); then
 fi
 if [[ -z "${_scList}" ]]; then
     _add_case "scanner-v4-ready" skipped "NoSecuredCluster" "no SecuredCluster in lane: scanner not evaluated"
-    if [[ "${ACS_EXPECTATION}" == "required" ]]; then
+    if [[ "${INTEROP__OPP__ACS__EXPECTATION}" == "required" ]]; then
         if (( _termWaitTimedOut )); then
             _add_case "securedcluster-discovery" failed "Timeout" "SecuredCluster discovery timeout after 900s: no SecuredCluster CR created within 900s"
         else
-            _add_case "securedcluster-discovery" failed "Discovery" "SecuredCluster list empty after the terminal wait (recorded failures ${_N_FAILURES}); workload is absent while ACS_EXPECTATION=required"
+            _add_case "securedcluster-discovery" failed "Discovery" "SecuredCluster list empty after the terminal wait (recorded failures ${_N_FAILURES}); workload is absent while INTEROP__OPP__ACS__EXPECTATION=required"
         fi
-        _add_case "stackrox-opp-smoke" failed "Discovery" "SecuredCluster discovery failed (recorded failures ${_N_FAILURES}); workload is absent while ACS_EXPECTATION=required"
+        _add_case "stackrox-opp-smoke" failed "Discovery" "SecuredCluster discovery failed (recorded failures ${_N_FAILURES}); workload is absent while INTEROP__OPP__ACS__EXPECTATION=required"
         exit 1
     fi
     if (( _termWaitTimedOut )); then
-        _add_case "securedcluster-discovery" skipped "NoSecuredCluster" "no SecuredCluster CR created within 900s and ACS_EXPECTATION=${ACS_EXPECTATION}: not required in this lane"
+        _add_case "securedcluster-discovery" skipped "NoSecuredCluster" "no SecuredCluster CR created within 900s and INTEROP__OPP__ACS__EXPECTATION=${INTEROP__OPP__ACS__EXPECTATION}: not required in this lane"
     fi
-    _add_case "stackrox-opp-smoke" skipped "NoSecuredCluster" "no SecuredCluster in lane: smoke not evaluated (ACS_EXPECTATION=${ACS_EXPECTATION})"
+    _add_case "stackrox-opp-smoke" skipped "NoSecuredCluster" "no SecuredCluster in lane: smoke not evaluated (INTEROP__OPP__ACS__EXPECTATION=${INTEROP__OPP__ACS__EXPECTATION})"
     exit 0
 fi
 # ---------------------------------------------------------------------------
 # Present: run the SMOKE suite (existing flow)
 # ---------------------------------------------------------------------------
 echo "[smoke] Reading connection details from SHARED_DIR..."
-
+set +x
 typeset centralUrl=''
 centralUrl="$(cat "${SHARED_DIR}/CENTRAL_URL")"
 ROX_ADMIN_PASSWORD="$(cat "${SHARED_DIR}/ROX_ADMIN_PASSWORD")"
-
+set -x
 echo "[smoke] Connection details loaded from SHARED_DIR"
 
 # ---------------------------------------------------------------------------
@@ -413,7 +435,7 @@ fi
 typeset _deps=""
 typeset -i _deps_rc=0 _deps_attempt=0
 for _deps_attempt in 1 2 3; do
-    if _deps="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get deployment -n "${_centralNs}" -o name 2>/dev/null)"; then
+    if _deps="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get deployment -n "${_centralNs}" -o name)"; then
         _deps_rc=0
         break
     else
@@ -434,7 +456,7 @@ else
     typeset -i _scan_deadline=$(( $(date +%s) + ACS_SCANNER_WAIT_S ))
     typeset _scan_ready=""
     while true; do
-        _scan_ready="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${_centralNs}" -l app=scanner-v4-matcher -o json 2>/dev/null | python3 -c '
+        _scan_ready="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${_centralNs}" -l app=scanner-v4-matcher -o json | python3 -c '
 import json, sys
 
 d = json.load(sys.stdin)
@@ -447,7 +469,7 @@ for pod in d.get("items", []):
     if conditions.get("Ready") == "True":
         print(meta.get("name", "?"))
         break
-' 2>/dev/null || true)"
+' || true)"
         if [[ -n "${_scan_ready}" ]]; then
             break
         fi
@@ -466,7 +488,7 @@ for pod in d.get("items", []):
         _add_case "scanner-v4-ready" passed
     else
         echo "[smoke] Scanner V4 matcher pods not Ready within ${ACS_SCANNER_WAIT_S}s:"
-        oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${_centralNs}" -l app=scanner-v4-matcher -o wide 2>/dev/null || true
+        oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${_centralNs}" -l app=scanner-v4-matcher -o wide || true
         _add_case "scanner-v4-ready" failed "Environment" "no Ready scanner-v4-matcher pod in ${_centralNs} within ${ACS_SCANNER_WAIT_S}s; scan-dependent test results may report MISSING_SCAN_DATA for environment reasons"
     fi
 fi
@@ -511,11 +533,8 @@ grep -q 'DEFAULT_CLUSTER_NAME = "local-cluster"' \
 export API_HOSTNAME="${centralUrl}"
 export API_PORT="443"
 export ROX_USERNAME="admin"
+set +x
 export ROX_ADMIN_PASSWORD
-export CLUSTER="OPENSHIFT"
-export CI="true"
-export POD_SECURITY_POLICIES="false"
-export TEST_TARGET="smoke-test"
 REGISTRY_USERNAME="$(cat /tmp/vault/stackrox-stackrox-e2e-tests/QUAY_RHACS_ENG_RO_USERNAME)"
 export REGISTRY_USERNAME
 REGISTRY_PASSWORD="$(cat /tmp/vault/stackrox-stackrox-e2e-tests/QUAY_RHACS_ENG_RO_PASSWORD)"
@@ -528,11 +547,11 @@ if [[ -f /tmp/vault/stackrox-stackrox-e2e-tests/GOOGLE_ARTIFACT_REGISTRY_SERVICE
     GOOGLE_ARTIFACT_REGISTRY_SERVICE_ACCOUNT_V2="$(cat /tmp/vault/stackrox-stackrox-e2e-tests/GOOGLE_ARTIFACT_REGISTRY_SERVICE_ACCOUNT_V2)"
     export GOOGLE_ARTIFACT_REGISTRY_SERVICE_ACCOUNT_V2
 fi
-
-# Re-enable trace logging only now that all credentials are loaded (D7:
-# no set -x may precede any credential read/echo; static ordering check
-# enforces this).
 set -x
+export CLUSTER="OPENSHIFT"
+export CI="true"
+export POD_SECURITY_POLICIES="false"
+export TEST_TARGET="smoke-test"
 
 cd /tmp/stackrox/qa-tests-backend
 

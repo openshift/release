@@ -11,7 +11,7 @@ shopt -s inherit_errexit
 # downstream steps.
 #
 # Contract (fail-closed):
-#   ACS_EXPECTATION   required | absent-by-design   (unset/other => exit 2)
+#   INTEROP__OPP__ACS__EXPECTATION   required | absent-by-design   (unset/other => exit 2)
 #   Classification (own query, before any SHARED_DIR consumption):
 #     present  - Central CR(s) exist (0-exit oc get, >=1 item)
 #     absent   - Central CR list empty on a successful read (0-exit, 0 items)
@@ -34,11 +34,13 @@ ARTIFACT_DIR="${ARTIFACT_DIR:-/tmp/artifacts}"
 mkdir -p "${ARTIFACT_DIR}"
 
 # --- Env seams (D6) --------------------------------------------------------
-ACS_POLL_INTERVAL_S="${ACS_POLL_INTERVAL_S:-30}"
-ACS_WAIT_TIMEOUT_S="${ACS_WAIT_TIMEOUT_S:-900}"
-ACS_BUDGET_S="${ACS_BUDGET_S:-3300}"
-ACS_SELFTEST="${ACS_SELFTEST:-true}"
-ACS_EXPECTATION="${ACS_EXPECTATION:-}"
+# Step-config-declared variables (CIOP-4 double-underscore names). Values live
+# only in the step ref YAML (CIOP-5.3: no script-side defaults).
+: "${INTEROP__OPP__ACS__POLL_INTERVAL_S:?}"
+: "${INTEROP__OPP__ACS__WAIT_TIMEOUT_S:?}"
+: "${INTEROP__OPP__ACS__BUDGET_S:?}"
+: "${INTEROP__OPP__ACS__SELFTEST:?}"
+: "${INTEROP__OPP__ACS__EXPECTATION:?}"
 _BUDGET_MARGIN_S=600   # static cross-file check: budget + margin < ref timeout - grace
 
 # Validated and typeset after the carrier/trap machinery is installed, so an
@@ -93,8 +95,8 @@ _write_carrier() {
             [[ -n "${c}" ]] && echo "  ${c}"
         done
         echo '</testsuite>'
-    } > "${_tmp}" 2>/dev/null || return 1
-    mv -f "${_tmp}" "${_CARRIER}" 2>/dev/null || return 1
+    } > "${_tmp}" 2>>"${ARTIFACT_DIR}/junit-write.err" || return 1
+    mv -f "${_tmp}" "${_CARRIER}" 2>>"${ARTIFACT_DIR}/junit-write.err" || return 1
 }
 
 _write_shared_copy() {
@@ -106,7 +108,7 @@ _write_shared_copy() {
     mkdir -p "${SHARED_DIR}/junit" 2>/dev/null || return 1
     typeset _dst="${SHARED_DIR}/junit/junit_${_SUITE}.xml"
     typeset _tmp="${_dst}.tmp"
-    if [[ "${_ACS_STATE}" == "absent" && "${ACS_EXPECTATION}" == "absent-by-design" ]]; then
+    if [[ "${_ACS_STATE}" == "absent" && "${INTEROP__OPP__ACS__EXPECTATION}" == "absent-by-design" ]]; then
         {
             echo '<?xml version="1.0" encoding="UTF-8"?>'
             echo "<testsuite name=\"${_SUITE}\" tests=\"${_N_TOTAL}\" failures=\"${_N_FAILURES}\" errors=\"0\" skipped=\"$(( _N_SKIPPED + 1 ))\" time=\"$(( $(date +%s) - _junit_start ))\">"
@@ -120,8 +122,8 @@ _write_shared_copy() {
                 fi
             done
             echo '</testsuite>'
-        } > "${_tmp}" 2>/dev/null || return 1
-        mv -f "${_tmp}" "${_dst}" 2>/dev/null || return 1
+        } > "${_tmp}" 2>>"${ARTIFACT_DIR}/junit-write.err" || return 1
+        mv -f "${_tmp}" "${_dst}" 2>>"${ARTIFACT_DIR}/junit-write.err" || return 1
     else
         {
             echo '<?xml version="1.0" encoding="UTF-8"?>'
@@ -131,8 +133,8 @@ _write_shared_copy() {
                 [[ -n "${c}" ]] && echo "  ${c}"
             done
             echo '</testsuite>'
-        } > "${_tmp}" 2>/dev/null || return 1
-        mv -f "${_tmp}" "${_dst}" 2>/dev/null || return 1
+        } > "${_tmp}" 2>>"${ARTIFACT_DIR}/junit-write.err" || return 1
+        mv -f "${_tmp}" "${_dst}" 2>>"${ARTIFACT_DIR}/junit-write.err" || return 1
     fi
 }
 
@@ -213,11 +215,11 @@ trap '_jrc=$?; set +e; set +x; rm -f "${_curlCfg:-}"; _ensure_assertion_rows; if
 
 # ---------------------------------------------------------------------------
 # Env-seam validation (fail-closed, unconditional - runs even when
-# ACS_SELFTEST=false): a non-positive-integer seam must exit 2 with an
+# INTEROP__OPP__ACS__SELFTEST=false): a non-positive-integer seam must exit 2 with an
 # InvalidInput carrier case, never an arithmetic abort before the carrier
 # exists.
 # ---------------------------------------------------------------------------
-for _seam in ACS_POLL_INTERVAL_S ACS_WAIT_TIMEOUT_S ACS_BUDGET_S; do
+for _seam in INTEROP__OPP__ACS__POLL_INTERVAL_S INTEROP__OPP__ACS__WAIT_TIMEOUT_S INTEROP__OPP__ACS__BUDGET_S; do
     if ! [[ "${!_seam}" =~ ^[1-9][0-9]*$ ]]; then
         _add_classification "acs-env-invalid" failed "InvalidInput" \
             "${_seam} must be a positive integer (got: '${!_seam}'); fail-closed"
@@ -226,9 +228,9 @@ for _seam in ACS_POLL_INTERVAL_S ACS_WAIT_TIMEOUT_S ACS_BUDGET_S; do
         exit 2
     fi
 done
-pollInterval="${ACS_POLL_INTERVAL_S}"
-waitCap="${ACS_WAIT_TIMEOUT_S}"
-budget="${ACS_BUDGET_S}"
+pollInterval="${INTEROP__OPP__ACS__POLL_INTERVAL_S}"
+waitCap="${INTEROP__OPP__ACS__WAIT_TIMEOUT_S}"
+budget="${INTEROP__OPP__ACS__BUDGET_S}"
 typeset -i _budgetDeadline=$(( $(date +%s) + budget ))
 # Wait outcome exported by WaitFor for JUnit messages (cap=min(waitCap, budget remaining))
 typeset -i _waitCap=0
@@ -257,9 +259,9 @@ _run_selftest() {
     command -v oc >/dev/null 2>&1 || { echo "[selftest] FAIL: oc not found"; st_rc=1; }
     command -v python3 >/dev/null 2>&1 || { echo "[selftest] FAIL: python3 not found"; st_rc=1; }
     command -v curl >/dev/null 2>&1 || { echo "[selftest] FAIL: curl not found"; st_rc=1; }
-    [[ "${pollInterval}" -gt 0 ]] || { echo "[selftest] FAIL: ACS_POLL_INTERVAL_S must be > 0"; st_rc=1; }
-    [[ "${waitCap}" -gt 0 ]] || { echo "[selftest] FAIL: ACS_WAIT_TIMEOUT_S must be > 0"; st_rc=1; }
-    [[ "${budget}" -gt 0 ]] || { echo "[selftest] FAIL: ACS_BUDGET_S must be > 0"; st_rc=1; }
+    [[ "${pollInterval}" -gt 0 ]] || { echo "[selftest] FAIL: INTEROP__OPP__ACS__POLL_INTERVAL_S must be > 0"; st_rc=1; }
+    [[ "${waitCap}" -gt 0 ]] || { echo "[selftest] FAIL: INTEROP__OPP__ACS__WAIT_TIMEOUT_S must be > 0"; st_rc=1; }
+    [[ "${budget}" -gt 0 ]] || { echo "[selftest] FAIL: INTEROP__OPP__ACS__BUDGET_S must be > 0"; st_rc=1; }
     # Discovery wait message selftest: verify both budget-exhausted and timeout
     # paths and a shortened effective cap are reported in JUnit messages.
     if (( st_rc == 0 )); then
@@ -275,7 +277,7 @@ _run_selftest() {
         _waitCap=0; _waitReason=""
         WaitFor "selftest discovery timeout" _selftest_probe_fail >/dev/null 2>&1 || true
         typeset _msg=""
-        _msg="$(_discovery_wait_message "no SecuredCluster CR found while ACS_EXPECTATION=required")"
+        _msg="$(_discovery_wait_message "no SecuredCluster CR found while INTEROP__OPP__ACS__EXPECTATION=required")"
         if [[ "${_msg}" != *"timeout after 3s"* ]]; then
             echo "[selftest] FAIL: discovery timeout message should report effective cap 3s, got: ${_msg}" >&2
             st_rc=1
@@ -307,7 +309,7 @@ _run_selftest() {
         _waitCap=0; _waitReason=""
         WaitFor "selftest zero-result path" _selftest_probe_fail >/dev/null 2>&1 || true
         typeset _zeroMsg=""
-        _zeroMsg="$(_discovery_wait_message "no SecuredCluster CR found while ACS_EXPECTATION=required")"
+        _zeroMsg="$(_discovery_wait_message "no SecuredCluster CR found while INTEROP__OPP__ACS__EXPECTATION=required")"
         _budgetDeadline=$(( $(date +%s) - 1 ))
         _waitCap=0; _waitReason=""
         WaitFor "selftest failed-read path" _selftest_probe_fail >/dev/null 2>&1 || true
@@ -329,7 +331,7 @@ _run_selftest() {
         _waitCap=0; _waitReason=""
         WaitFor "selftest budget-limited wait" _selftest_probe_fail >/dev/null 2>&1 || true
         typeset _limitedMsg=""
-        _limitedMsg="$(_discovery_wait_message "no SecuredCluster CR found while ACS_EXPECTATION=required")"
+        _limitedMsg="$(_discovery_wait_message "no SecuredCluster CR found while INTEROP__OPP__ACS__EXPECTATION=required")"
         if [[ "${_limitedMsg}" != *"budget exhausted"* ]]; then
             echo "[selftest] FAIL: budget-limited wait should report budget exhausted, got: ${_limitedMsg}" >&2
             st_rc=1
@@ -374,15 +376,15 @@ _classify() {
         # flow holds it for a bounded window before finalizing (provisional-
         # hold block below), and it is final only for absent-by-design.
         set +x
-        if crdlist="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd -o name 2>/dev/null)"; then
+        if crdlist="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd -o name)"; then
             if ! grep -q '^customresourcedefinition\.apiextensions\.k8s\.io/centrals\.platform\.stackrox\.io$' <<< "${crdlist}"; then
                 _ACS_STATE="absent"
                 (( _traceWasOff == 0 )) && set -x
                 return 0
             fi
-            if out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json 2>/dev/null)"; then
+            if out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json)"; then
                 set +x
-                items="$(printf '%s' "${out}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("items",[])))' 2>/dev/null)" || rc=1
+                items="$(printf '%s' "${out}" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("items",[])))')" || rc=1
                 set +x
                 if (( rc == 0 )); then
                     if (( items > 0 )); then
@@ -638,18 +640,18 @@ elif resource_type == "central":
     )
 else:
     sys.exit(1)
-' "${resourceType}" "${nameFilter}" 2>/dev/null
+' "${resourceType}" "${nameFilter}"
 }
 
 # Summarize matching operator Subscriptions, falling back on empty selectors.
 function SubscriptionStatus () {
     typeset output=""
-    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get sub -A -l 'operators.coreos.com/rhacs-operator.rhacs-operator' -o json 2>/dev/null \
+    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get sub -A -l 'operators.coreos.com/rhacs-operator.rhacs-operator' -o json \
         | FormatDiagnosticStatus subscription)" && [[ -n "${output}" ]]; then
         echo "${output}"
         return 0
     fi
-    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get sub -A -o json 2>/dev/null \
+    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get sub -A -o json \
         | FormatDiagnosticStatus subscription 'stackrox,rhacs')" && [[ -n "${output}" ]]; then
         echo "${output}"
         return 0
@@ -660,7 +662,7 @@ function SubscriptionStatus () {
 # Summarize StackRox/RHACS CSV state without printing CSV identifiers.
 function CsvStatus () {
     typeset output=""
-    output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get csv -A -o json 2>/dev/null \
+    output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get csv -A -o json \
         | FormatDiagnosticStatus csv 'stackrox,rhacs')" && [[ -n "${output}" ]] || return 1
     echo "${output}"
 }
@@ -668,12 +670,12 @@ function CsvStatus () {
 # Summarize matching operator pods, falling back on empty selectors.
 function OperatorPodStatus () {
     typeset output=""
-    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -A -l app=rhacs-operator -o json 2>/dev/null \
+    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -A -l app=rhacs-operator -o json \
         | FormatDiagnosticStatus pod)" && [[ -n "${output}" ]]; then
         echo "${output}"
         return 0
     fi
-    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -A -o json 2>/dev/null \
+    if output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -A -o json \
         | FormatDiagnosticStatus pod rhacs)" && [[ -n "${output}" ]]; then
         echo "${output}"
         return 0
@@ -684,7 +686,7 @@ function OperatorPodStatus () {
 # Summarize StackRox/RHACS InstallPlan state without printing identifiers.
 function InstallPlanStatus () {
     typeset output=""
-    output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get installplan -A -o json 2>/dev/null \
+    output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get installplan -A -o json \
         | FormatDiagnosticStatus installplan 'stackrox,rhacs')" && [[ -n "${output}" ]] || return 1
     echo "${output}"
 }
@@ -692,7 +694,7 @@ function InstallPlanStatus () {
 # Summarize Central conditions without printing condition content.
 function CentralStatus () {
     typeset output=""
-    output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json 2>/dev/null \
+    output="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json \
         | FormatDiagnosticStatus central)" && [[ -n "${output}" ]] || return 1
     echo "${output}"
 }
@@ -752,7 +754,7 @@ function PeriodicOperatorDiagnostics () {
 # acm-policies-openshift-plus but excluded from its policy-compliance wait
 # (they are listed in SKIP_POLICIES), so this step can read before Central
 # exists. The main flow therefore holds absent provisionally, bounded by
-# ACS_WAIT_TIMEOUT_S and the global budget, and finalizes it only when that
+# INTEROP__OPP__ACS__WAIT_TIMEOUT_S and the global budget, and finalizes it only when that
 # hold expires.
 # ---------------------------------------------------------------------------
 typeset -i _centralPresentHadSuccess=0
@@ -761,7 +763,7 @@ function CheckCentralPresent () {
     typeset _traceWasOff=0
     [[ $- == *x* ]] || _traceWasOff=1
     set +x
-    if ! crdlist="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd -o name 2>/dev/null)"; then
+    if ! crdlist="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd -o name)"; then
         (( _traceWasOff == 0 )) && set -x
         return 2
     fi
@@ -770,7 +772,7 @@ function CheckCentralPresent () {
         (( _traceWasOff == 0 )) && set -x
         return 1
     fi
-    if ! out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json 2>/dev/null)"; then
+    if ! out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json)"; then
         (( _traceWasOff == 0 )) && set -x
         return 2
     fi
@@ -785,21 +787,21 @@ function CheckCentralPresent () {
 # ---------------------------------------------------------------------------
 
 # Fail-closed expectation validation (D4)
-case "${ACS_EXPECTATION}" in
+case "${INTEROP__OPP__ACS__EXPECTATION}" in
     required|absent-by-design)
-        echo "[readiness] ACS_EXPECTATION=${ACS_EXPECTATION}"
+        echo "[readiness] INTEROP__OPP__ACS__EXPECTATION=${INTEROP__OPP__ACS__EXPECTATION}"
         ;;
     *)
         _ACS_STATE="unknown"
         _add_classification "acs-expectation-invalid" failed "InvalidInput" \
-            "ACS_EXPECTATION must be 'required' or 'absent-by-design' (got: '${ACS_EXPECTATION:-unset}'); fail-closed"
+            "INTEROP__OPP__ACS__EXPECTATION must be 'required' or 'absent-by-design' (got: '${INTEROP__OPP__ACS__EXPECTATION:-unset}'); fail-closed"
         _ensure_assertion_rows
-        echo "[readiness] FATAL: invalid ACS_EXPECTATION '${ACS_EXPECTATION:-unset}'"
+        echo "[readiness] FATAL: invalid INTEROP__OPP__ACS__EXPECTATION '${INTEROP__OPP__ACS__EXPECTATION:-unset}'"
         exit 2
         ;;
 esac
 
-if [[ "${ACS_SELFTEST}" != "false" ]]; then
+if [[ "${INTEROP__OPP__ACS__SELFTEST}" != "false" ]]; then
     if ! _run_selftest; then
         if [[ -z "${_CLASSIFICATION_CASE}" ]]; then
             _add_classification "acs-selftest-failed" failed "SelfTest" "acs-preflight-selftest failed: machinery validation"
@@ -815,13 +817,13 @@ echo "[readiness] ACS state classified: ${_ACS_STATE}"
 
 # Provisional hold on a required lane: a deterministic-absent read must not
 # finalize acs-required-but-absent while ACS provisioning may still be in
-# flight. Bounded by ACS_WAIT_TIMEOUT_S (further capped by the global budget).
+# flight. Bounded by INTEROP__OPP__ACS__WAIT_TIMEOUT_S (further capped by the global budget).
 # absent-by-design keeps the immediate verdict and does not wait at all;
 # unknown (a failed read) is never held and stays exit 3 below.
-if [[ "${_ACS_STATE}" == "absent" && "${ACS_EXPECTATION}" == "required" ]]; then
+if [[ "${_ACS_STATE}" == "absent" && "${INTEROP__OPP__ACS__EXPECTATION}" == "required" ]]; then
     echo "[readiness] absent read on a required lane: holding provisionally (cap ${waitCap}s, budget remaining $(_budget_remaining)s)"
     _centralPresentHadSuccess=0
-    if WaitFor "Central CR present (ACS_EXPECTATION=required)" CheckCentralPresent PeriodicOperatorDiagnostics; then
+    if WaitFor "Central CR present (INTEROP__OPP__ACS__EXPECTATION=required)" CheckCentralPresent PeriodicOperatorDiagnostics; then
         _ACS_STATE="present"
         echo "[readiness] ACS state re-classified after provisional hold: ${_ACS_STATE}"
     else
@@ -875,14 +877,14 @@ if [[ "${_ACS_STATE}" == "absent" ]]; then
     for _a in central-crd securedcluster-crd central-route central-api-insecure-tls clusters-connected policies-loaded sensor-ready; do
         _add_case "${_a}" skipped "StateAbsent" "state=absent: assertion not evaluated"
     done
-    if [[ "${ACS_EXPECTATION}" == "required" ]]; then
+    if [[ "${INTEROP__OPP__ACS__EXPECTATION}" == "required" ]]; then
         _add_classification "acs-required-but-absent" failed "Classification" \
-            "acs-central-not-created: Central CR absent on a successful read while ACS_EXPECTATION=required"
-        echo "[readiness] Central CR absent but required by ACS_EXPECTATION"
+            "acs-central-not-created: Central CR absent on a successful read while INTEROP__OPP__ACS__EXPECTATION=required"
+        echo "[readiness] Central CR absent but required by INTEROP__OPP__ACS__EXPECTATION"
         exit 1
     fi
     _add_classification "acs-absent-by-design" passed
-    echo "[readiness] Central CR absent by design (ACS_EXPECTATION=absent-by-design)"
+    echo "[readiness] Central CR absent by design (INTEROP__OPP__ACS__EXPECTATION=absent-by-design)"
     exit 0
 fi
 
@@ -895,7 +897,7 @@ PreFlightDiagnostics
 # ---------------------------------------------------------------------------
 function DiscoverCentralNs () {
     centralNs="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io --all-namespaces \
-        -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
+        -o jsonpath='{.items[0].metadata.namespace}')" \
         || return 1
     [[ -n "${centralNs}" ]] || return 1
     true
@@ -903,7 +905,7 @@ function DiscoverCentralNs () {
 
 function DiscoverScNs () {
     scNs="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedclusters.platform.stackrox.io --all-namespaces \
-        -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null)" \
+        -o jsonpath='{.items[0].metadata.namespace}')" \
         || return 1
     [[ -n "${scNs}" ]] || return 1
     true
@@ -966,14 +968,14 @@ if ! WaitFor "SecuredCluster CR namespace discovery" DiscoverScNs; then
     # to separate them, so an API error or an authorization denial stays a
     # failure instead of a silent skip.
     typeset _scList=""
-    if _scList="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedclusters.platform.stackrox.io --all-namespaces -o name 2>/dev/null)" \
+    if _scList="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get securedclusters.platform.stackrox.io --all-namespaces -o name)" \
         && [[ -z "${_scList}" ]]; then
         _add_case "central-route" skipped "NoSecuredCluster" "no SecuredCluster in lane: central-route not evaluated (budget remaining $(_budget_remaining)s)"
         _add_case "central-api-insecure-tls" skipped "NoSecuredCluster" "no SecuredCluster in lane: central-api not evaluated (budget remaining $(_budget_remaining)s)"
         _add_case "clusters-connected" skipped "NoSecuredCluster" "no SecuredCluster in lane: clusters-connected not evaluated"
         _add_case "policies-loaded" skipped "NoSecuredCluster" "no SecuredCluster in lane: policies-loaded not evaluated"
         _add_case "sensor-ready" skipped "NoSecuredCluster" "no SecuredCluster in lane: sensor-ready not evaluated (budget remaining $(_budget_remaining)s)"
-        if [[ "${ACS_EXPECTATION}" == "required" ]]; then _add_case "securedcluster-discovery" failed "Discovery" "$(_discovery_wait_message "no SecuredCluster CR found while ACS_EXPECTATION=required")"; _add_case "stackrox-opp-readiness" failed "Discovery" "SecuredCluster discovery failed while ACS_EXPECTATION=required (budget remaining $(_budget_remaining)s)"; exit 1; fi
+        if [[ "${INTEROP__OPP__ACS__EXPECTATION}" == "required" ]]; then _add_case "securedcluster-discovery" failed "Discovery" "$(_discovery_wait_message "no SecuredCluster CR found while INTEROP__OPP__ACS__EXPECTATION=required")"; _add_case "stackrox-opp-readiness" failed "Discovery" "SecuredCluster discovery failed while INTEROP__OPP__ACS__EXPECTATION=required (budget remaining $(_budget_remaining)s)"; exit 1; fi
         if (( _assert_rc != 0 )); then _add_case "stackrox-opp-readiness" failed "Assertion" "earlier assertion failed and SecuredCluster workload is absent (budget remaining $(_budget_remaining)s)"; exit 1; fi
         _add_case "stackrox-opp-readiness" skipped "NoSecuredCluster" "no SecuredCluster in lane: readiness assertions not evaluated (budget remaining $(_budget_remaining)s)"
         exit 0
@@ -1008,7 +1010,7 @@ typeset centralUrl=""
 
 function CheckCentralRoute () {
     centralUrl="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get route central -n "${centralNs}" \
-        -o jsonpath='{.spec.host}' 2>/dev/null)" || return 1
+        -o jsonpath='{.spec.host}')" || return 1
     [[ -n "${centralUrl}" ]] || return 1
     true
 }
@@ -1113,7 +1115,7 @@ if any(norm(c) in ("HEALTHY", "DEGRADED") for c in clusters):
     print("connected")
 else:
     print("waiting:" + (",".join(states) or "noclusters"))
-' 2>/dev/null)" || return 1
+' )" || return 1
     if [[ "${verdict}" == connected ]]; then
         return 0
     fi
@@ -1144,7 +1146,7 @@ function CheckSensorPods () {
     # whole run while Central reported the replacement sensor HEALTHY;
     # rehearsal build 2118028576879022080). Only live pods gate readiness.
     typeset sensorStatus=""
-    sensorStatus="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${scNs}" -l app=sensor -o json 2>/dev/null | python3 -c '
+    sensorStatus="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${scNs}" -l app=sensor -o json | python3 -c '
 import json, sys
 
 d = json.load(sys.stdin)
@@ -1171,7 +1173,7 @@ elif all(ready == "True" for _, ready in live):
 else:
     not_ready = ["%s(Ready=%s)" % (name, ready) for name, ready in live if ready != "True"]
     print("NOT_READY: " + " ".join(not_ready))
-' 2>/dev/null)" || return 1
+' )" || return 1
     if grep -q '^OOMKilled:' <<< "${sensorStatus}"; then
         echo "[readiness] WARNING: OOMKilled detected in sensor containers: $(printf '%s\n' "${sensorStatus}" | sed -n 's/^OOMKilled: //p')"
     fi
@@ -1192,8 +1194,8 @@ else
     # shows counters (observed in rehearsal build 2118028576879022080, where
     # the diagnosis had to come from a later must-gather).
     echo "[readiness] Sensor pod states at timeout:"
-    oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${scNs}" -l app=sensor -o wide 2>/dev/null || true
-    oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${scNs}" -l app=sensor -o json 2>/dev/null | python3 -c '
+    oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${scNs}" -l app=sensor -o wide || true
+    oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get pods -n "${scNs}" -l app=sensor -o json | python3 -c '
 import json, sys
 
 d = json.load(sys.stdin)
@@ -1204,7 +1206,7 @@ for pod in d.get("items", []):
     print("%s phase=%s Ready=%s deletionTimestamp=%s" % (
         meta.get("name", "?"), status.get("phase", "?"),
         conditions.get("Ready", "Unknown"), meta.get("deletionTimestamp")))
-' 2>/dev/null || true
+' || true
     _add_case "sensor-ready" failed "Assertion" "sensor pods not Ready in ${scNs} (budget remaining $(_budget_remaining)s)"
     _assert_rc=1
 fi
