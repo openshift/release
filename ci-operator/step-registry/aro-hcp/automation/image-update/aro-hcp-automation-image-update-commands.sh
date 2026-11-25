@@ -80,6 +80,17 @@ run() {
   fi
 }
 
+# Precheck: run from the job checkout, not the image copy
+REPO_ROOT="${REPO_ROOT:-/go/src/github.com/Azure/ARO-HCP}"
+if [[ ! -d "${REPO_ROOT}/.git" ]]; then
+  error "precheck: repository checkout not found at ${REPO_ROOT}"
+fi
+cd "${REPO_ROOT}"
+
+# Git: trust the checkout even when the clone is owned by another uid
+export GIT_CONFIG_GLOBAL=/tmp/gitconfig
+git config --global --add safe.directory "${REPO_ROOT}"
+
 # Precheck: Ensure we're in a git repository
 if [[ ! -d ".git" ]]; then
   error "precheck: not in a git repository"
