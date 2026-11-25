@@ -1,0 +1,28 @@
+ref:
+  as: ibmcloud-deprovision-post
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  best_effort: true
+  grace_period: 10m
+  timeout: 1h0m0s
+  commands: ibmcloud-deprovision-post-commands.sh
+  env:
+  - name: BASE_DOMAIN
+    default: "ci-ibmcloud.devcluster.openshift.com"
+    documentation: |-
+      Base domain used for CIS DNS record cleanup.
+  resources:
+    requests:
+      cpu: "1"
+      memory: 600Mi
+  documentation: |-
+    Runs after openshift-install destroy cluster as a safety net for any
+    resources the installer failed to delete. Reads infraID and region from
+    SHARED_DIR/metadata.json. Performs ccoctl IBM Cloud service ID cleanup,
+    then resource-by-resource ibmcloud CLI cleanup in dependency order:
+    instances, load balancers, subnets, public gateways, VPCs, images,
+    volumes, COS instances, CIS DNS records, and resource groups.
+    Writes any remaining resources to ARTIFACT_DIR for post-mortem inspection.
+    Runs with best_effort: true so it never blocks the post phase.
