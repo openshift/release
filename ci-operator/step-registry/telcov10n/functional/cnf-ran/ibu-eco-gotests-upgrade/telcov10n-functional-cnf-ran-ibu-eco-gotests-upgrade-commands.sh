@@ -163,17 +163,8 @@ scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
   2>/dev/null || echo "No k8sreporter artifacts in eco_gotests upgrade — skipping"
 rm -f "${PROJECT_DIR}/temp_ssh_key"
 
-# ibu-report sends polarion_* files to Report Portal (POLARION_REPORT_PATH)
-# and junit_* files to the Polarion converter (JUNIT_REPORT_PATH).
-echo "Store Polarion and junit reports for reporter step"
+echo "Store suite JUnit reports for reporter step"
 for f in "${ARTIFACT_DIR}/junit_eco_gotests_upgrade/"*suite_test_junit.xml; do
-  if [[ -f "$f" ]]; then
-    filename=$(basename "$f")
-    echo "Copying polarion report: ${filename} -> polarion_ibu_upgrade_${filename}"
-    cp "$f" "${SHARED_DIR}/polarion_ibu_upgrade_${filename}"
-  fi
-done
-for f in "${ARTIFACT_DIR}/junit_eco_gotests_upgrade/"*.xml; do
   if [[ -f "$f" ]]; then
     filename=$(basename "$f")
     echo "Copying junit report: ${filename} -> junit_ibu_upgrade_${filename}"

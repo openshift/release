@@ -67,21 +67,12 @@ for REPORTPORTAL_FILE in ${REPORTPORTAL_FILES//;/ }; do
   fi
 done
 
-POLARION_URL="N/A"
-if scp ${SSH_OPTS} "${BASTION_USER}@${BASTION_IP}:/tmp/.polarion_url" "${SHARED_DIR}/polarion_url" 2>/dev/null; then
-  if [[ -f "${SHARED_DIR}/polarion_url" ]] && [[ -s "${SHARED_DIR}/polarion_url" ]]; then
-    POLARION_URL="$(cat "${SHARED_DIR}/polarion_url")"
-  fi
-fi
-echo "Polarion URL: ${POLARION_URL}"
-
 echo "Sending Slack notification"
 cd "$SCRIPTS_FOLDER"
 
 python3 "$PYTHON_SCRIPT" \
   --webhook-url "$WEBHOOK_URL" \
   --build "$BUILD_VERSION" \
-  --polarion-url "$POLARION_URL" \
   --job-url "$JOB_URL" \
   ${REPORT_FLAGS}
 

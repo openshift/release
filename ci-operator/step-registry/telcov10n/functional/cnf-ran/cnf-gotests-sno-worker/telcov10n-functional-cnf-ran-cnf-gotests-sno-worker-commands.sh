@@ -283,19 +283,11 @@ if [[ ${scp_rc} -ne 0 ]]; then
 fi
 rm -f "${scp_stderr}"
 
-echo "Copy reports to SHARED_DIR with prefixes"
-for f in "${ARTIFACT_DIR}"/junit_downstream/*_polarion.xml; do
-  if [[ -f "$f" ]]; then
-    filename=$(basename "$f")
-    echo "Copying polarion report: $filename -> polarion_${filename}"
-    cp "$f" "${SHARED_DIR}/polarion_${filename}"
-  fi
-done
-
+echo "Copy suite JUnit reports to SHARED_DIR"
 for f in "${ARTIFACT_DIR}"/junit_downstream/*.xml; do
   if [[ -f "$f" ]]; then
     filename=$(basename "$f")
-    if [[ "$filename" == *_suite_test.xml ]] && [[ "$filename" != *_polarion.xml ]]; then
+    if [[ "$filename" == *_suite_test.xml ]] && [[ "$filename" != report_*.xml ]]; then
       echo "Copying junit report: $filename -> junit_${filename}"
       cp "$f" "${SHARED_DIR}/junit_${filename}"
     fi

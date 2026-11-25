@@ -221,20 +221,10 @@ for feature in ${ECO_GOTESTS_FEATURES}; do
     "${ARTIFACT_SUBDIR}/" 2>/dev/null || echo "No k8sreporter artifacts for ${feature} — skipping"
 done
 
-echo "Copy reports to SHARED_DIR with prefixes"
+echo "Copy suite JUnit reports to SHARED_DIR"
 for feature in ${ECO_GOTESTS_FEATURES}; do
   ARTIFACT_SUBDIR="${ARTIFACT_DIR}/junit_eco_gotests_${feature}"
 
-  # Polarion reports
-  for f in "${ARTIFACT_SUBDIR}"/report_*.xml; do
-    if [[ -f "$f" ]]; then
-      filename=$(basename "$f")
-      echo "Copying polarion report: ${feature}/${filename} -> polarion_${feature}_${filename}"
-      cp "$f" "${SHARED_DIR}/polarion_${feature}_${filename}"
-    fi
-  done
-
-  # Junit reports
   for f in "${ARTIFACT_SUBDIR}"/*.xml; do
     if [[ -f "$f" ]]; then
       filename=$(basename "$f")

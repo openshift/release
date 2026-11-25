@@ -34,23 +34,23 @@ echo "CLUSTER_NAME=${CLUSTER_NAME}"
 
 KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
-echo "Remove report directories"
-rm -rf /tmp/reports /tmp/junit
-
-echo "Create reports directory"
-mkdir -pv /tmp/reports
-
-echo "Create junit directory"
-mkdir -pv /tmp/junit
-
-if ! compgen -G "${SHARED_DIR}/*polarion*.xml" > /dev/null 2>&1; then
+CI_LANE="${REPORTER_LAUNCH_NAME}"
+BASTION_JUNIT_DIR_FILE="${SHARED_DIR}/bastion_junit_report_dir"
+if [[ -s "${BASTION_JUNIT_DIR_FILE}" ]]; then
+  REPORT_DIR=$(cat "${BASTION_JUNIT_DIR_FILE}")
+  UPLOAD_SHARED_DIR=""
+  LEGACY_JUNIT_ARG=""
+  # Keep the metrics lane stable across versioned RAN launches.
+  CI_LANE="${REPORTER_LAUNCH_NAME%-[0-9]*.[0-9]*}"
+elif ! compgen -G "${SHARED_DIR}/*polarion*.xml" > /dev/null 2>&1; then
   echo "No Reports found in ${SHARED_DIR}, Using Bastion"
-  BASTION_REPORT_DIR="/tmp/test_reports"
-  POLARION_REPORT_DIR="${BASTION_REPORT_DIR}/polarion"
-  JUNIT_REPORT_DIR="${BASTION_REPORT_DIR}/junit"
+  REPORT_DIR="/tmp/test_reports/polarion"
+  LEGACY_JUNIT_ARG="junit_report_dir=/tmp/test_reports/junit"
   UPLOAD_SHARED_DIR=""
 else
   echo "Reports found in SHARED_DIR"
+  rm -rf /tmp/reports /tmp/junit
+  mkdir -pv /tmp/reports /tmp/junit
   for f in "${SHARED_DIR}"/*polarion*.xml; do
     if [[ -f "$f" ]]; then
       filename=$(basename "$f" | sed 's/^polarion_//')
@@ -71,8 +71,8 @@ else
       cp "$f" "/tmp/junit/${filename}"
     fi
   done
-  POLARION_REPORT_DIR=/tmp/reports
-  JUNIT_REPORT_DIR=/tmp/junit
+  REPORT_DIR=/tmp/reports
+  LEGACY_JUNIT_ARG="junit_report_dir=/tmp/junit"
   UPLOAD_SHARED_DIR="${SHARED_DIR}"
 fi
 
@@ -84,7 +84,7 @@ echo "Collecting metrics"
 ansible-playbook ./playbooks/collect-metrics.yml \
   -i ./inventories/cnf/switch-config.yaml \
   --extra-vars "kubeconfig=${KUBECONFIG} \
-    ci_lane='${REPORTER_LAUNCH_NAME}' \
+    ci_lane='${CI_LANE}' \
     output_file=${METRICS_FILE} \
     metrics_list=${METRICS_LIST}" || true
 
@@ -94,15 +94,21 @@ if [[ -f "${METRICS_FILE}" ]]; then
   echo "REPORTS_PORTAL_ATTRIBUTES: ${REPORTS_PORTAL_ATTRIBUTES}"
 fi
 
-echo "Uploading reports to Polarion and Report Portal"
+echo "Uploading reports from ${REPORT_DIR}"
 SHARED_DIR="${UPLOAD_SHARED_DIR}" ansible-playbook ./playbooks/upload-report.yaml \
   -i ./inventories/cnf/switch-config.yaml \
   --extra-vars "kubeconfig=${KUBECONFIG} \
     reporter_template_name='${REPORTER_TEMPLATE_NAME}' \
-    processed_report_dir=${POLARION_REPORT_DIR} \
-    junit_report_dir=${JUNIT_REPORT_DIR} \
+    processed_report_dir='${REPORT_DIR}' \
+    ${LEGACY_JUNIT_ARG} \
     reports_directory=/tmp/upload \
     reporter_launch_name='${REPORTER_LAUNCH_NAME}' \
     upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} \
     report_portal_url_filename='${REPORTPORTAL_FILES}' \
     reports_portal_attributes='${REPORTS_PORTAL_ATTRIBUTES}'"
+
+if [[ -s "${BASTION_JUNIT_DIR_FILE}" ]]; then
+  case "${UPLOAD_TO_REPORT_PORTAL,,}" in
+    true|yes|on|1) touch "${SHARED_DIR}/report_portal_uploaded" ;;
+  esac
+fi

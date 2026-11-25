@@ -144,3 +144,4 @@ ansible-playbook ./playbooks/ran/deploy-run-eco-gotests-ptp-gm.yaml \
     ptp_report_dir=${BASTION_REPORT_DIR}" \
   --extra-vars "@/tmp/ptp_cycle_configs.yml"
 
+printf '%s\n' "${BASTION_REPORT_DIR}/junit" > "${SHARED_DIR}/bastion_junit_report_dir"

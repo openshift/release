@@ -35,7 +35,7 @@ chmod 600 "/tmp/temp_ssh_key"
 
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
 
-scp -r ${SSH_OPTS} -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}":/tmp/.polarion_url "${SHARED_DIR}/polarion_url"
+scp -r ${SSH_OPTS} -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}":/tmp/.polarion_url "${SHARED_DIR}/polarion_url" 2>/dev/null || true
 scp ${SSH_OPTS} -i /tmp/temp_ssh_key "${BASTION_USER}@${BASTION_IP}:/tmp/${REPORTPORTAL_FILES:-}" "${SHARED_DIR}/reportportal_url" 2>/dev/null || true
 
 

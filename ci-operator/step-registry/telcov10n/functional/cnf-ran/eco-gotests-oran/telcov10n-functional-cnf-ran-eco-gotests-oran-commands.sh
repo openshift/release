@@ -149,4 +149,8 @@ scp -r "${SSH_OPTS[@]}" -i "${WORKDIR}/temp_ssh_key" \
   "${BASTION_USER}@${BASTION_IP}:${BASTION_ARTIFACTS_DIR}/junit_eco_gotests_*" "${ARTIFACT_DIR}/" \
   || echo "No staged artifacts to fetch"
 
+if (( collect_rc == 0 )); then
+  printf '%s\n' "${JUNIT_REPORT_DIR}" > "${SHARED_DIR}/bastion_junit_report_dir"
+fi
+
 exit "${step_failed}"
