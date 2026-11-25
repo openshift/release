@@ -50,6 +50,7 @@ tests:
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
       MIRROR_BIN: oc-mirror
       PAUSE_IMAGE_ORG: test-org
+      SETUP_ONLY_GINKGO_RUN: TestWMCO/create/Creation/Machine_controller
       TEST_ARGS: --monitor=e2e-test-analyzer
       TEST_SKIPS: ChkUpgrade\|ConnectedOnly\|Disruptive\|Serial\|\[node-proxy\]\|\[tls-adherence\]
       TEST_SUITE: windows-machine-config-operator/smokerun
@@ -70,6 +71,12 @@ tests:
       dependencies:
       - env: OPERATOR_IMAGE
         name: windows-machine-config-operator-test
+      env:
+      - default: TestWMCO/create/Creation
+        documentation: Ginkgo run filter for the setup-only creation path. OTE jobs
+          narrow it to the Machine controller so the BYOH ConfigMap subtest, which
+          disables the cluster machine approver, does not run during setup.
+        name: SETUP_ONLY_GINKGO_RUN
       from: windows-machine-config-operator-test
       resources:
         requests:
@@ -94,6 +101,7 @@ tests:
       EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      SETUP_ONLY_GINKGO_RUN: TestWMCO/create/Creation/Machine_controller
       TEST_ARGS: --monitor=e2e-test-analyzer
       TEST_SKIPS: \[node-proxy\]\|\[tls-adherence\]
       TEST_SUITE: windows-machine-config-operator/all
@@ -103,10 +111,18 @@ tests:
       commands: |
         export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
         export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
-        hack/run-ci-e2e-test.sh -t setup-only -s
+        # Two Windows Machine nodes up front, so the serial scale-up cases
+        # start from a two-node baseline instead of provisioning during the test.
+        hack/run-ci-e2e-test.sh -t setup-only -s -m 2
       dependencies:
       - env: OPERATOR_IMAGE
         name: windows-machine-config-operator-test
+      env:
+      - default: TestWMCO/create/Creation
+        documentation: Ginkgo run filter for the setup-only creation path. OTE jobs
+          narrow it to the Machine controller so the BYOH ConfigMap subtest, which
+          disables the cluster machine approver, does not run during setup.
+        name: SETUP_ONLY_GINKGO_RUN
       from: windows-machine-config-operator-test
       resources:
         requests:
@@ -125,6 +141,7 @@ tests:
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_REPLICAS: "3"
       EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
+      SETUP_ONLY_GINKGO_RUN: TestWMCO/create/Creation/Machine_controller
     test:
     - as: enable-tls-adherence
       cli: latest
@@ -177,7 +194,7 @@ tests:
           for ((index = 1; index < ${#revision_lines[@]}; index++)); do
             IFS='|' read -r current_revision target_revision <<< "${revision_lines[$index]}"
             [[ "${current_revision}" == "${revision}" ]] || return 1
-            [[ "${target_revision}" == 0 ]] || return 1
+            [[ -z "${target_revision}" || "${target_revision}" == 0 ]] || return 1
             ((pod_count += 1))
           done
           (( pod_count > 0 ))
@@ -290,7 +307,7 @@ tests:
             IFS='|' read -r node_name current_revision target_revision <<< "${state_lines[$index]}"
             [[ -n "${node_name}" && "${current_revision}" =~ ^[1-9][0-9]*$ ]] || return 1
             [[ "${current_revision}" == "${latest_revision}" ]] || return 1
-            [[ "${target_revision}" == 0 ]] || return 1
+            [[ -z "${target_revision}" || "${target_revision}" == 0 ]] || return 1
             ((node_count += 1))
           done
           (( node_count > 0 )) || return 1
@@ -465,6 +482,12 @@ tests:
       dependencies:
       - env: OPERATOR_IMAGE
         name: windows-machine-config-operator-test
+      env:
+      - default: TestWMCO/create/Creation
+        documentation: Ginkgo run filter for the setup-only creation path. OTE jobs
+          narrow it to the Machine controller so the BYOH ConfigMap subtest, which
+          disables the cluster machine approver, does not run during setup.
+        name: SETUP_ONLY_GINKGO_RUN
       from: windows-machine-config-operator-test
       resources:
         requests:
@@ -537,6 +560,7 @@ tests:
       EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      SETUP_ONLY_GINKGO_RUN: TestWMCO/create/Creation/Machine_controller
       TEST_ARGS: --monitor=e2e-test-analyzer
       TEST_SUITE: windows-machine-config-operator/proxy
     test:
@@ -548,6 +572,12 @@ tests:
       dependencies:
       - env: OPERATOR_IMAGE
         name: windows-machine-config-operator-test
+      env:
+      - default: TestWMCO/create/Creation
+        documentation: Ginkgo run filter for the setup-only creation path. OTE jobs
+          narrow it to the Machine controller so the BYOH ConfigMap subtest, which
+          disables the cluster machine approver, does not run during setup.
+        name: SETUP_ONLY_GINKGO_RUN
       from: windows-machine-config-operator-test
       resources:
         requests:
@@ -569,6 +599,7 @@ tests:
       EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
       EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
       EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      SETUP_ONLY_GINKGO_RUN: TestWMCO/create/Creation/Machine_controller
       TEST_ARGS: --monitor=e2e-test-analyzer
       TEST_SKIPS: \[node-proxy\]\|\[tls-adherence\]
       TEST_SUITE: windows-machine-config-operator/all
@@ -578,10 +609,18 @@ tests:
       commands: |
         export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
         oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'
-        hack/run-ci-e2e-test.sh -t setup-only -s
+        # Two Windows Machine nodes up front, so the serial scale-up cases
+        # start from a two-node baseline instead of provisioning during the test.
+        hack/run-ci-e2e-test.sh -t setup-only -s -m 2
       dependencies:
       - env: OPERATOR_IMAGE
         name: windows-machine-config-operator-test
+      env:
+      - default: TestWMCO/create/Creation
+        documentation: Ginkgo run filter for the setup-only creation path. OTE jobs
+          narrow it to the Machine controller so the BYOH ConfigMap subtest, which
+          disables the cluster machine approver, does not run during setup.
+        name: SETUP_ONLY_GINKGO_RUN
       from: windows-machine-config-operator-test
       resources:
         requests:
@@ -591,6 +630,166 @@ tests:
     - ref: openshift-tests-extension-setup-out-of-payload
     - ref: openshift-e2e-test
     workflow: ipi-nutanix-ovn-hybrid
+- always_run: false
+  as: gcp-ipi-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      SETUP_ONLY_GINKGO_RUN: TestWMCO/create/Creation/Machine_controller
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]\|\[tls-adherence\]
+      TEST_SUITE: windows-machine-config-operator/all
+    test:
+    - as: wmco-setup
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        # Two Windows Machine nodes up front, so the serial scale-up cases
+        # start from a two-node baseline instead of provisioning during the test.
+        hack/run-ci-e2e-test.sh -t setup-only -s -m 2
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      env:
+      - default: TestWMCO/create/Creation
+        documentation: Ginkgo run filter for the setup-only creation path. OTE jobs
+          narrow it to the Machine controller so the BYOH ConfigMap subtest, which
+          disables the cluster machine approver, does not run during setup.
+        name: SETUP_ONLY_GINKGO_RUN
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-gcp-ovn-hybrid
+- always_run: false
+  as: azure-ipi-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-azure
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "1"
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      SETUP_ONLY_GINKGO_RUN: TestWMCO/create/Creation/Machine_controller
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]\|\[tls-adherence\]
+      TEST_SUITE: windows-machine-config-operator/all
+    test:
+    - as: wmco-setup
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        # The Azure profile already configures azure storage on the registry, so
+        # only the management state is patched here. Adding emptyDir on top of the
+        # existing azure stanza leaves two storage types configured and the
+        # image-registry operator refuses to reconcile.
+        oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed"}}'
+        # Two Windows Machine nodes up front, so the serial scale-up cases
+        # start from a two-node baseline instead of provisioning during the test.
+        hack/run-ci-e2e-test.sh -t setup-only -s
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      env:
+      - default: TestWMCO/create/Creation
+        documentation: Ginkgo run filter for the setup-only creation path. OTE jobs
+          narrow it to the Machine controller so the BYOH ConfigMap subtest, which
+          disables the cluster machine approver, does not run during setup.
+        name: SETUP_ONLY_GINKGO_RUN
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-azure-ovn-hybrid
+- always_run: false
+  as: vsphere-ipi-ote
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      CONTROL_PLANE_REPLICAS: "3"
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      SETUP_ONLY_GINKGO_RUN: TestWMCO/create/Creation/Machine_controller
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]\|\[tls-adherence\]
+      TEST_SUITE: windows-machine-config-operator/all
+    test:
+    - as: wmco-setup
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        # Two Windows Machine nodes up front, so the serial scale-up cases
+        # start from a two-node baseline instead of provisioning during the test.
+        hack/run-ci-e2e-test.sh -t setup-only -s -m 2
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      env:
+      - default: TestWMCO/create/Creation
+        documentation: Ginkgo run filter for the setup-only creation path. OTE jobs
+          narrow it to the Machine controller so the BYOH ConfigMap subtest, which
+          disables the cluster machine approver, does not run during setup.
+        name: SETUP_ONLY_GINKGO_RUN
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 2h15m0s
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- always_run: false
+  as: aws-upi-ote
+  optional: true
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      EXTENSION_IMAGE: windows-machine-config-operator-test
+    env:
+      EXTENSION_BINARY_OVERRIDE_EXCLUDE_TAGS: ovn-kubernetes
+      EXTENSION_BINARY_PATH: /usr/bin/wmco-tests-ext.gz
+      EXTENSION_COMPONENT_NAME: windows-machine-config-operator
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
+      SUB_PACKAGE: windows-machine-config-operator
+      SUB_SOURCE: wmco
+      SUB_TARGET_NAMESPACES: '!install'
+      TEST_ARGS: --monitor=e2e-test-analyzer
+      TEST_SKIPS: \[node-proxy\]\|\[tls-adherence\]
+      TEST_SUITE: windows-machine-config-operator/all
+    post:
+    - chain: cucushift-installer-rehearse-aws-upi-ovn-winc-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-upi-ovn-winc-provision
+    test:
+    - ref: openshift-tests-extension-setup-out-of-payload
+    - ref: openshift-e2e-test
 zz_generated_metadata:
   branch: master
   org: openshift
