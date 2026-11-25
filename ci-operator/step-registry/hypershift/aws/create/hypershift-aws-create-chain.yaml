@@ -145,6 +145,20 @@ chain:
       if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
         AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
         DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
+
+        # A cluster profile set (for example openshift-org-aws) leases an
+        # account and a region together: CLUSTER_PROFILE_DIR holds that
+        # account's profile and LEASED_RESOURCE is the region. Create the
+        # cluster there, so that the lease accounts for it, under the account's
+        # own base domain. Zone names differ between accounts; the management
+        # cluster is in the leased region too, so use the zone of its first node.
+        if [[ -n "${CLUSTER_PROFILE_SET_NAME:-}" ]]; then
+          if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+            DEFAULT_BASE_DOMAIN="$(< "${CLUSTER_PROFILE_DIR}/baseDomain")"
+          fi
+          HC_REGION="${LEASED_RESOURCE}"
+          HC_ZONES="$(oc get node -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/zone}')"
+        fi
       fi
       DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
       RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}

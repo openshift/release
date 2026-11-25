@@ -12,10 +12,28 @@ else
   AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
   DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
   export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
+  MGMT_REGION=us-east-1
+  MGMT_ZONES="${HYPERSHIFT_ZONES}"
+  MGMT_NODE_POOL_REPLICAS="${HYPERSHIFT_NODE_COUNT}"
 
   if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
     AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
     DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
+
+    # A cluster profile set (for example openshift-org-aws) leases an account
+    # and a region together: CLUSTER_PROFILE_DIR holds that account's profile
+    # and LEASED_RESOURCE is the region. Create the cluster there, so that the
+    # lease accounts for it, under the account's own base domain. Zone names
+    # differ between accounts, so let the CLI pick the region's first available
+    # zone and put all the nodes in it.
+    if [[ -n "${CLUSTER_PROFILE_SET_NAME:-}" ]]; then
+      if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+        DEFAULT_BASE_DOMAIN="$(< "${CLUSTER_PROFILE_DIR}/baseDomain")"
+      fi
+      MGMT_REGION="${LEASED_RESOURCE}"
+      MGMT_ZONES=""
+      MGMT_NODE_POOL_REPLICAS=$((HYPERSHIFT_NODE_COUNT * 3))
+    fi
   fi
 fi
 
@@ -96,23 +114,22 @@ EOF
     --dns-zone-rg-name=os4-common \
     --etcd-storage-class=managed-csi-premium-v2
 else
-  echo "Creating AWS management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
+  echo "Creating AWS management cluster ${CLUSTER_NAME} in ${MGMT_REGION} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
   AWS_CREATE_ARGS=(
     "--annotations=hypershift.openshift.io/prow-job-id=${PROW_JOB_ID}"
     --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson
     "--aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}"
     --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
     "--name=${CLUSTER_NAME}"
-    --region=us-east-1
+    "--region=${MGMT_REGION}"
     "--infra-id=${CLUSTER_NAME}"
     "--base-domain=${DOMAIN}"
     --oidc-issuer-url=https://hypershift-ci-2-oidc.s3.us-east-1.amazonaws.com/shared-mgmt
     --sa-token-issuer-private-key-path=/etc/hypershift-ci-jobs-awscreds/serviceaccount-signer.private
     "--instance-type=${HYPERSHIFT_INSTANCE_TYPE}"
-    "--zones=${HYPERSHIFT_ZONES}"
     --service-cidr=172.29.0.0/16
     --cluster-cidr=10.124.0.0/14
-    "--node-pool-replicas=${HYPERSHIFT_NODE_COUNT}"
+    "--node-pool-replicas=${MGMT_NODE_POOL_REPLICAS}"
     --node-selector=hypershift.openshift.io/control-plane=true
     "--release-image=${HYPERSHIFT_HC_RELEASE_IMAGE}"
     "--release-stream=${DEFAULT_RELEASE_STREAM}"
@@ -120,6 +137,9 @@ else
     --shared-role
     "--namespace=${HYPERSHIFT_NAMESPACE}"
   )
+  if [[ -n "${MGMT_ZONES}" ]]; then
+    AWS_CREATE_ARGS+=("--zones=${MGMT_ZONES}")
+  fi
 
   if [[ -z "${HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE:-}" ]]; then
     bin/hypershift create cluster aws "${AWS_CREATE_ARGS[@]}"
