@@ -10,7 +10,7 @@ eval "$(
         https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
 )"
 BIN_DIR="$(mktemp -d)"
-trap 'ExitTrap--PostProcessPrep; rm -rf "${BIN_DIR}"' EXIT
+trap 'ExitTrap--PostProcessPrep junit--acm-policy-all.xml; rm -rf "${BIN_DIR}"' EXIT
 
 # Run all ACM policy tests via the standalone OTE binary: on OCP 4.22
 # openshift-tests exposes `run SUITE` and no --extension-local-binaries flag.
