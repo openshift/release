@@ -37,6 +37,14 @@ tests:
   container:
     from: src
   run_if_changed: ^(ci-operator/step-registry/hyperfleet/risk-scorer/|hack/hyperfleet/validate-risk-scorer-step\.sh).*
+- as: hypershift-gcp-setup-unit
+  commands: |-
+    set -euo pipefail
+    python3 hack/tests/hypershift-gcp-iam_test.py
+    python3 hack/tests/hypershift-gcp-prerequisites_test.py
+  container:
+    from: src
+  run_if_changed: ^(ci-operator/step-registry/hypershift/gcp/|hack/tests/hypershift-gcp-).*
 - as: ship-status-component-monitor-config
   commands: /app/component-monitor --validate-only --config-path=core-services/ship-status/component-monitor-config.yaml
     --kubeconfig-dir=/etc/kubeconfig
