@@ -1,0 +1,93 @@
+workflow:
+  as: opct-conformance-external-aws-disconnected
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: opct-pre-init
+    - chain: platform-external-cluster-aws-pre-disconnected
+    - as: opct-disconnected-env
+      from: cli
+      commands: |-
+        set -euo pipefail
+        # Source proxy configuration so OPCT can reach the K-API through
+        # the bastion squid proxy in the disconnected VPC.
+        if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+          cat >> "${SHARED_DIR}/env" <<'ENVEOF'
+
+        # Proxy configuration for disconnected environment
+        if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+        ENVEOF
+        fi
+
+        # Resolve --image-repository from the mirror registry provisioned
+        # by the disconnected install chain. The OPCT images (sonobuoy,
+        # collector, must-gather, plugin) must be mirrored there; for now
+        # we point at the public quay.io/opct and only exercise the
+        # disconnected test-selection flag.
+        if [[ -f "${SHARED_DIR}/mirror_registry_url" ]]; then
+          MIRROR_URL=$(head -n1 "${SHARED_DIR}/mirror_registry_url")
+          echo "export OPCT_MIRROR_REGISTRY=${MIRROR_URL}" >> "${SHARED_DIR}/env"
+        fi
+        cp "${SHARED_DIR}/env" "${ARTIFACT_DIR}/env-disconnected"
+      resources:
+        requests:
+          cpu: 10m
+          memory: 100Mi
+      timeout: 5m0s
+    - chain: opct-pre
+    test:
+    - as: opct-disconnected-run
+      from: cli
+      credentials:
+      - namespace: test-credentials
+        bundle: registry-pull-credentials
+        mount_path: /var/run/ci-credentials/registry
+      commands: |-
+        set -o nounset
+        set -o errexit
+        set -o pipefail
+
+        # shellcheck source=/dev/null
+        source "${SHARED_DIR}/env"
+        extract_opct
+
+        trap 'dump_opct_namespace' EXIT TERM INT
+
+        echo "Running OPCT with disconnected workflow on External platform"
+        ${OPCT_CLI} run \
+            --watch \
+            --workflow=disconnected \
+            --image-repository=quay.io/opct \
+            --plugins-image=quay.io/opct/plugin-openshift-tests:latest \
+            --validation-timeout=900 \
+            --validation-retry-interval=30
+      timeout: 6h
+      grace_period: 6h
+      resources:
+        requests:
+          cpu: 10m
+          memory: 100Mi
+    post:
+    - chain: gather
+    - chain: opct-post
+    - chain: platform-external-cluster-aws-post-disconnected
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      PROVIDER_NAME: aws
+      PLATFORM_EXTERNAL_CCM_ENABLED: "no"
+      DISCONNECTED_INSTALL: "yes"
+      MIRROR_IN_BASTION: "yes"
+      QE_IMAGES: "false"
+      ZONES_COUNT: "2"
+      OPCT_CLI_IMAGE: "quay.io/opct/opct:latest"
+  documentation: |-
+    The OPCT Conformance External AWS Disconnected workflow provisions a
+    disconnected AWS cluster with platform type External (using the
+    platform-external disconnected CI steps), then runs OPCT with
+    --workflow=disconnected to validate that tests tagged
+    [Skipped:Disconnected] are excluded and conformance passes on
+    an offline cluster. Used to verify OPCT-512.
