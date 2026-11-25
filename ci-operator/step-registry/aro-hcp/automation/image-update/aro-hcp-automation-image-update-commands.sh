@@ -198,7 +198,9 @@ fi
 
 # GitHub: Publish the rolling pull request
 info "github: publishing the pull request"
-if ! receipt="$(./tooling/image-updater/image-updater publish \
+PUBLISH_OUT="/tmp/image-updater-publish.out"
+PUBLISH_ERR="/tmp/image-updater-publish.err"
+if ! ./tooling/image-updater/image-updater publish \
   --repo . \
   --base "${GITHUB_REPO_BRANCH}" \
   --head-repo "${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}" \
@@ -209,12 +211,15 @@ if ! receipt="$(./tooling/image-updater/image-updater publish \
   --git-name "${GITHUB_PR_USER}" \
   --git-email "${GITHUB_PR_EMAIL}" \
   --app-id-file "${GITHUB_APP_ID_PATH}" \
-  --app-key-file "${GITHUB_APP_KEY_PATH}")"; then
+  --app-key-file "${GITHUB_APP_KEY_PATH}" >"${PUBLISH_OUT}" 2>"${PUBLISH_ERR}"; then
+  # The command logs through slog on stdout, so surface both streams.
+  cat "${PUBLISH_ERR}" >&2 || true
+  cat "${PUBLISH_OUT}" >&2 || true
   notify "❌ Image digest updater job failed to publish the pull request. Please check prow at ${PROW_JOB_URL}"
   error "github: publish command failed"
 fi
 
-PR_URL="$(printf '%s' "${receipt}" | jq -r '.URL // empty')"
+PR_URL="$(jq -r '.URL // empty' "${PUBLISH_OUT}")"
 if [[ -z "${PR_URL}" ]]; then
   notify "❌ Image digest updater job published without a pull request URL. Please check prow at ${PROW_JOB_URL}"
   error "github: publish returned no pull request URL"
