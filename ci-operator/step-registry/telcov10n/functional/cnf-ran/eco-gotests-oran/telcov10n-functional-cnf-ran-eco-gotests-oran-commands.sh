@@ -30,6 +30,13 @@ process_inventory() {
 }
 
 ECO_CI_CD_DIR=/eco-ci-cd
+if [[ -n "${ECO_CI_CD_FORK_REPO:-}" ]]; then
+  ECO_CI_CD_DIR=$(mktemp -d /tmp/eco-ci-cd-fork.XXXXXXXX)
+  git clone --depth 1 --branch "${ECO_CI_CD_FORK_BRANCH:-main}" -- \
+    "${ECO_CI_CD_FORK_REPO}" "${ECO_CI_CD_DIR}"
+  # Use the Ansible collections installed in the step image.
+  export ANSIBLE_COLLECTIONS_PATH=/eco-ci-cd/collections
+fi
 INVENTORY_PATH="${ECO_CI_CD_DIR}/inventories/ocp-deployment"
 
 echo "CLUSTER_NAME=${CLUSTER_NAME}"

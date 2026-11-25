@@ -12,7 +12,13 @@ if [ "$JOB_TYPE" = "presubmit" ]; then
   exit 0
 fi
 
-SCRIPTS_FOLDER="/eco-ci-cd/scripts/ran"
+ECO_CI_CD_DIR=/eco-ci-cd
+if [[ -n "${ECO_CI_CD_FORK_REPO:-}" ]]; then
+  ECO_CI_CD_DIR=$(mktemp -d /tmp/eco-ci-cd-fork.XXXXXXXX)
+  git clone --depth 1 --branch "${ECO_CI_CD_FORK_BRANCH:-main}" -- \
+    "${ECO_CI_CD_FORK_REPO}" "${ECO_CI_CD_DIR}"
+fi
+SCRIPTS_FOLDER="${ECO_CI_CD_DIR}/scripts/ran"
 PYTHON_SCRIPT="send-ran-slack-notification.py"
 WEBHOOK_URL_FILE=/var/run/slack-webhook-url/url
 

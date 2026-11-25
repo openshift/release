@@ -8,7 +8,15 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
-INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
+ECO_CI_CD_DIR=/eco-ci-cd
+if [[ -n "${ECO_CI_CD_FORK_REPO:-}" ]]; then
+  ECO_CI_CD_DIR=$(mktemp -d /tmp/eco-ci-cd-fork.XXXXXXXX)
+  git clone --depth 1 --branch "${ECO_CI_CD_FORK_BRANCH:-main}" -- \
+    "${ECO_CI_CD_FORK_REPO}" "${ECO_CI_CD_DIR}"
+  # Use the Ansible collections installed in the step image.
+  export ANSIBLE_COLLECTIONS_PATH=/eco-ci-cd/collections
+fi
+INVENTORY_PATH="${ECO_CI_CD_DIR}/inventories/ocp-deployment"
 
 echo "Create group_vars directory"
 mkdir -p "${INVENTORY_PATH}/group_vars"
@@ -46,7 +54,7 @@ ssh -o ServerAliveInterval=60 \
   oc get secret -n ${SPOKE_CLUSTER_NAME} ${SPOKE_CLUSTER_NAME}-admin-kubeconfig \
   -o jsonpath='{.data.kubeconfig}' | base64 -d > ${SPOKE_KUBECONFIG_PATH}"
 
-cd /eco-ci-cd
+cd "${ECO_CI_CD_DIR}"
 
 printf 'ptp_cycle_configs: %s\n' "${PTP_CONFIGS}" > /tmp/ptp_cycle_configs.yml
 
