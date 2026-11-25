@@ -6,6 +6,12 @@ set -o pipefail
 
 source "${SHARED_DIR}/init-fn.sh" || true
 
+# In disconnected environments, route API requests through the bastion proxy.
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # Set up the traps
 trap collect_bootstrap_error_handler TERM INT HUP
 trap collect_bootstrap_error_handler EXIT

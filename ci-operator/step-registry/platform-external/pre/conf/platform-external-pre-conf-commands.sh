@@ -50,6 +50,19 @@ else
   echo "Using baseDomain from default,value: ${BASE_DOMAIN}"
 fi
 
+#  Patching SSH keys when disconnected - using pipeline-generated keys
+#
+if [[ "${DISCONNECTED_INSTALL:-no}" == "yes" ]]; then
+  log "Retrieving generated ephemeral SSH keypair for bootstrap gather (disconnected)"
+  gather_pub=$(<"${SHARED_DIR}/gather-sshkey.pub")
+
+  log "Appending ephemeral gather pubkey to install-config sshKey"
+  existing_key=$(yq4 '.sshKey' "${INSTALL_DIR}/install-config.yaml")
+  yq4 -i ".sshKey = \"${existing_key}
+${gather_pub}\"" "${INSTALL_DIR}/install-config.yaml"
+fi
+
+
 #
 # Patch the install-config.yaml
 #
