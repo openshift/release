@@ -464,6 +464,11 @@ function WaitFor () {
     typeset -i iteration=0
     typeset -i cap=waitCap
     typeset -i rem
+    # Status of the most recent completed check inside this wait (0 = it
+    # passed). Callers that must tell "the last look inside the budget found
+    # nothing" apart from "the last look failed or never ran" read this after
+    # WaitFor returns non-zero; it stays 0 when no check completed.
+    _WAITFOR_LAST_RC=0
     rem="$(_budget_remaining)"
     (( rem < cap )) && cap=rem
     _waitCap="${cap}"
@@ -496,6 +501,8 @@ function WaitFor () {
             fi
             echo "[readiness] OK: ${description}"
             return 0
+        else
+            _WAITFOR_LAST_RC=$?
         fi
         _now=$(date +%s)
         if (( _now >= _deadline )); then
@@ -871,38 +878,47 @@ if [[ "${_ACS_STATE}" == "absent" && "${INTEROP__OPP__ACS__EXPECTATION}" == "req
         fi
         typeset -i _recheck_budget
         _recheck_budget="$(_budget_remaining)"
-        if (( _recheck_budget == 0 )); then
-            echo "[readiness] provisional hold recheck: budget exhausted, failing indeterminate" >&2
+        if (( _recheck_budget == 0 && ${_WAITFOR_LAST_RC:-0} == 1 )); then
+            # The hold's final in-budget observation was a successful read that
+            # found no Central, so the absence is confirmed even though the
+            # global budget leaves no room for another recheck. Reach the same
+            # verdict as the per-check cap path (acs-required-but-absent, exit
+            # 1); the indeterminate verdict stays reserved for a hold whose
+            # last look failed or never completed.
+            echo "[readiness] provisional hold expired at the global budget with a confirmed absence read; finalizing absent"
+        elif (( _recheck_budget == 0 )); then
+            echo "[readiness] provisional hold: budget exhausted after a failed or incomplete read (last check status ${_WAITFOR_LAST_RC:-none}), failing indeterminate" >&2
             _ACS_STATE="unknown"
-            _add_classification "acs-state-indeterminate" failed "Classification" "acs-unclassified:central-query/read failed during provisional hold recheck; never classified as absent without a successful read"
-            _ensure_assertion_rows
-            exit 3
-        fi
-        # Bound the recheck reads by what is left of the budget (each read would
-        # otherwise be free to take the full OC_READ_TIMEOUT past the deadline).
-        # A read that starts inside the budget and succeeds just after the
-        # deadline is still accepted: finalizing absent on a Central that was
-        # arriving is the exact failure this hold exists to prevent, and
-        # _BUDGET_MARGIN_S absorbs the overrun.
-        _ccpReadTimeout="$(_read_timeout_arg)"
-        typeset -i _recheck_rc=0
-        if CheckCentralPresent; then
-            _recheck_rc=0
-        else
-            _recheck_rc=$?
-        fi
-        _ccpReadTimeout="${OC_READ_TIMEOUT:-10s}"
-        if (( _recheck_rc == 0 )); then
-            _ACS_STATE="present"
-            echo "[readiness] ACS state re-classified after provisional hold (late success): ${_ACS_STATE}"
-        elif (( _recheck_rc == 2 )); then
-            echo "[readiness] provisional hold recheck: read failed, failing indeterminate" >&2
-            _ACS_STATE="unknown"
-            _add_classification "acs-state-indeterminate" failed "Classification" "acs-unclassified:central-query/read failed during provisional hold recheck; never classified as absent without a successful read"
+            _add_classification "acs-state-indeterminate" failed "Classification" "acs-unclassified:budget exhausted during the provisional hold with no confirming read (last check failed or did not complete); never classified as absent without a successful read"
             _ensure_assertion_rows
             exit 3
         else
-            echo "[readiness] provisional hold expired: finalizing absent"
+            # Bound the recheck reads by what is left of the budget (each read
+            # would otherwise be free to take the full OC_READ_TIMEOUT past the
+            # deadline). A read that starts inside the budget and succeeds just
+            # after the deadline is still accepted: finalizing absent on a
+            # Central that was arriving is the exact failure this hold exists
+            # to prevent, and _BUDGET_MARGIN_S absorbs the overrun.
+            _ccpReadTimeout="$(_read_timeout_arg)"
+            typeset -i _recheck_rc=0
+            if CheckCentralPresent; then
+                _recheck_rc=0
+            else
+                _recheck_rc=$?
+            fi
+            _ccpReadTimeout="${OC_READ_TIMEOUT:-10s}"
+            if (( _recheck_rc == 0 )); then
+                _ACS_STATE="present"
+                echo "[readiness] ACS state re-classified after provisional hold (late success): ${_ACS_STATE}"
+            elif (( _recheck_rc == 2 )); then
+                echo "[readiness] provisional hold recheck: read failed, failing indeterminate" >&2
+                _ACS_STATE="unknown"
+                _add_classification "acs-state-indeterminate" failed "Classification" "acs-unclassified:central-query/read failed during provisional hold recheck; never classified as absent without a successful read"
+                _ensure_assertion_rows
+                exit 3
+            else
+                echo "[readiness] provisional hold expired: finalizing absent"
+            fi
         fi
     fi
 fi

@@ -338,11 +338,20 @@ _smokeCheckScExists() {
 typeset -i _smokeTermCap=900
 typeset -i _smokeDeadline=$(( $(date +%s) + _smokeTermCap ))
 typeset -i _smokeFound=0
+typeset -i _smokeFailedLooks=0
+typeset -i _smokeAppearedLate=0
 while true; do
     if _smokeCheckScExists; then
         _smokeFound=1
+        # A first-look success means the workload existed when this step
+        # started; any later success means it appeared during this wait, after
+        # readiness had already run and published (or not) its handoff.
+        if (( _smokeFailedLooks > 0 )); then
+            _smokeAppearedLate=1
+        fi
         break
     fi
+    _smokeFailedLooks=$((_smokeFailedLooks + 1))
     typeset -i _smokeNow
     _smokeNow=$(date +%s)
     if (( _smokeNow >= _smokeDeadline )); then
@@ -421,9 +430,22 @@ for _hf in CENTRAL_URL ROX_ADMIN_PASSWORD CENTRAL_NS; do
     [[ -s "${SHARED_DIR}/${_hf}" ]] || _missingHandoff+=("${_hf}")
 done
 if (( ${#_missingHandoff[@]} > 0 )); then
+    # Name the cause instead of the two possibilities: a late-appearing
+    # SecuredCluster and a readiness run that saw a present Central without a
+    # route are different lane faults, and the handoff cannot be recovered
+    # here either way (readiness is not re-runnable), so this stays fail-closed
+    # in every EXPECTATION mode.
+    typeset _handoffCause=""
+    if (( _smokeAppearedLate )); then
+        _handoffCause="the SecuredCluster appeared during this step's own terminal wait, after readiness had already classified the lane (late appearance, INTEROP__OPP__ACS__EXPECTATION=${INTEROP__OPP__ACS__EXPECTATION}); readiness is not re-runnable, so no handoff exists"
+    elif [[ ${#_missingHandoff[@]} -eq 1 && "${_missingHandoff[0]}" == "CENTRAL_URL" ]]; then
+        _handoffCause="readiness found a present Central whose route was absent, so it published the credential and namespaces but skipped CENTRAL_URL"
+    else
+        _handoffCause="readiness stopped before publishing the handoff (no state=present path reached the writes)"
+    fi
     _add_case "stackrox-opp-smoke" failed "Handoff" \
-        "readiness published no connection handoff in SHARED_DIR (missing: ${_missingHandoff[*]}); the workload appeared after the readiness run, or its Central route was absent, so the SMOKE suite cannot run"
-    echo "[smoke] FATAL: readiness published no connection handoff (missing: ${_missingHandoff[*]})" >&2
+        "readiness published no usable connection handoff in SHARED_DIR (missing: ${_missingHandoff[*]}); ${_handoffCause}"
+    echo "[smoke] FATAL: readiness published no usable connection handoff (missing: ${_missingHandoff[*]}); ${_handoffCause}" >&2
     exit 1
 fi
 set +x
