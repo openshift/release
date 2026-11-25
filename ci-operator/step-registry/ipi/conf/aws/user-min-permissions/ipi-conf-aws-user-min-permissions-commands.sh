@@ -23,7 +23,7 @@ function version_ge() {
 # post check steps after cluster installation, exit code 101 if failed,
 # save to install-post-check-status.txt
 EXIT_CODE=100
-trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; rm -rf /tmp/aws_cred_output /tmp/pull-secret /tmp/min_perms/ /tmp/jsoner.py' EXIT TERM INT
+trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_DIR}/install-pre-config-status.txt"; CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi; rm -rf /tmp/aws_cred_output /tmp/pull-secret /tmp/min_perms/ /tmp/jsoner.py /tmp/awscli-bootstrap' EXIT TERM INT
 
 JSONER_PY="/tmp/jsoner.py"
 GET_ACTIONS_PY="/tmp/get_actions.py"
@@ -80,12 +80,21 @@ if [[ "${AWS_INSTALL_USE_MINIMAL_PERMISSIONS}" == "yes" ]]; then
 	# AWS_SHARED_CREDENTIALS_FILE (.awscred) and AWS_CONFIG_FILE (STS role
 	# chain) makes openshift-install fail to resolve credentials (interactive
 	# "AWS Access Key ID" prompt / EC2 client EOF). See DPTP-4756 / #80755.
+	#
+	# openshift-install create permissions-policy also does not consume the
+	# multi-hop STS shared config alone (DPTP-5558). Materialize session
+	# credentials via the AWS CLI immediately before invoking the installer.
 	STS_CONFIG="/var/run/secrets/aws/config/config"
+	USE_STS_CREDENTIALS=false
 	if [[ -f "${STS_CONFIG}" ]]; then
 		export AWS_CONFIG_FILE="${STS_CONFIG}"
 		export AWS_SDK_LOAD_CONFIG=1
 		unset AWS_SHARED_CREDENTIALS_FILE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN || true
+		USE_STS_CREDENTIALS=true
 		echo "Using STS credentials from ${AWS_CONFIG_FILE}"
+		if [[ -z "${AWS_DEFAULT_REGION:-}" && -z "${AWS_REGION:-}" ]]; then
+			export AWS_DEFAULT_REGION="${LEASED_RESOURCE:-us-east-1}"
+		fi
 	else
 		export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 		unset AWS_CONFIG_FILE || true
@@ -378,6 +387,43 @@ EOF
 		fi
 
 		${INSTALLER_BINARY} version
+
+		if [[ "${USE_STS_CREDENTIALS}" == "true" ]]; then
+			if ! command -v aws >/dev/null 2>&1; then
+				# Installer image has no AWS CLI; bootstrap a local copy only for STS.
+				echo "Bootstrapping AWS CLI for STS credential materialization"
+				aws_tmp="/tmp/awscli-bootstrap"
+				rm -rf "${aws_tmp}"
+				mkdir -p "${aws_tmp}"
+				arch="$(uname -m)"
+				case "${arch}" in
+					aarch64|arm64) arch=aarch64 ;;
+					*) arch=x86_64 ;;
+				esac
+				curl -sSLo "${aws_tmp}/awscliv2.zip" "https://awscli.amazonaws.com/awscli-exe-linux-${arch}.zip"
+				python3 -c "import zipfile; zipfile.ZipFile('${aws_tmp}/awscliv2.zip').extractall('${aws_tmp}')"
+				chmod +x "${aws_tmp}/aws/dist/aws"
+				export PATH="${aws_tmp}/aws/dist:${PATH}"
+			fi
+			# Disable tracing due to credential handling
+			[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+			set +x
+			sts_env="$(mktemp)"
+			if ! aws configure export-credentials --format env >"${sts_env}"; then
+				${WAS_TRACING} && set -x
+				echo "ERROR: failed to materialize STS session credentials for openshift-install"
+				rm -f "${sts_env}"
+				exit 1
+			fi
+			# shellcheck disable=SC1090
+			source "${sts_env}"
+			rm -f "${sts_env}"
+			${WAS_TRACING} && set -x
+			# Hand the installer env credentials only; do not leave AWS_CONFIG_FILE
+			# set alongside them (dual credential sources break resolution).
+			unset AWS_CONFIG_FILE || true
+			echo "Materialized STS session credentials for openshift-install"
+		fi
 
 		${INSTALLER_BINARY} create permissions-policy --dir ${dir}
 
