@@ -312,6 +312,71 @@ TestOppOperators() {
             : "PASS: CSV ${csvName} phase=Succeeded"
         fi
 
+        # Post-upgrade compatibility floor (PRRT_kwDOBHvUUM65TpMz): an
+        # operator this lane upgraded (interop-opp-product-upgrade-* writes
+        # ${SHARED_DIR}/<key>-upgraded-version on success) must not remain
+        # below the OPP_COMPAT floor for the target OCP minor, which
+        # interop-opp-preflight exports to ${SHARED_DIR}/opp-compat-floors.env.
+        # Install lanes carry no upgrade marker and lanes without a matrix
+        # entry carry no floors file, so the gate is inert there; an operator
+        # with no floor row or an unparsable CSV version is traced, not
+        # failed, because the phase check above already owns presence.
+        if [[ "${csvPhase}" == "Succeeded" && -n "${SHARED_DIR:-}" && -f "${SHARED_DIR}/opp-compat-floors.env" ]]; then
+            typeset floorVersion="" floorMajor="" floorMinor=""
+            floorVersion="$(awk -F= -v op="${op}" '$1 == op {print $2; exit}' "${SHARED_DIR}/opp-compat-floors.env" 2>/dev/null)" || floorVersion=""
+            # The floor file is M.N by construction; parse defensively so a
+            # truncated or hand-edited row reads as "no floor", never as a
+            # silent pass against a bogus 0.0.
+            if [[ "${floorVersion}" =~ ^([0-9]+)\.([0-9]+) ]]; then
+                floorMajor="${BASH_REMATCH[1]}"
+                floorMinor="${BASH_REMATCH[2]}"
+            else
+                : "INFO: ${op}: no usable OPP_COMPAT floor row (found '${floorVersion}'); post-upgrade floor not checked"
+            fi
+            if [[ -n "${floorMajor}" ]]; then
+                typeset upgradeKey=""
+                case "${op}" in
+                    rhacs-operator) upgradeKey="acs" ;;
+                    advanced-cluster-management) upgradeKey="acm" ;;
+                    odf-operator) upgradeKey="odf" ;;
+                    quay-operator) upgradeKey="quay" ;;
+                    *) upgradeKey="${op}" ;;
+                esac
+                if [[ -f "${SHARED_DIR}/${upgradeKey}-upgraded-version" ]]; then
+                    typeset csvMajor="" csvMinor="" csvSpecVersion=""
+                    if [[ "${csvName}" =~ \.v([0-9]+)\.([0-9]+) ]]; then
+                        csvMajor="${BASH_REMATCH[1]}"
+                        csvMinor="${BASH_REMATCH[2]}"
+                    else
+                        # Same fallback as interop-opp-preflight: a CSV name
+                        # without the .vM.N shape still carries spec.version.
+                        csvSpecVersion="$(oc get csv "${csvName}" -n "${csvNs}" -o jsonpath='{.spec.version}' 2>/dev/null)" || csvSpecVersion=""
+                        if [[ "${csvSpecVersion}" =~ ^([0-9]+)\.([0-9]+) ]]; then
+                            csvMajor="${BASH_REMATCH[1]}"
+                            csvMinor="${BASH_REMATCH[2]}"
+                        fi
+                    fi
+                    if [[ -n "${csvMajor}" ]]; then
+                        if (( csvMajor < floorMajor || (csvMajor == floorMajor && csvMinor < floorMinor) )); then
+                            typeset upgradedVersion=""
+                            upgradedVersion="$(cat "${SHARED_DIR}/${upgradeKey}-upgraded-version" 2>/dev/null)" || upgradedVersion=""
+                            typeset floorMsg="CSV ${csvName} version ${csvMajor}.${csvMinor} is below the post-upgrade floor ${floorVersion} (OPP_COMPAT; upgraded this run to ${upgradedVersion:-unknown})"
+                            : "FAIL: ${floorMsg}"
+                            if [[ -n "${failMsg}" ]]; then
+                                failMsg="${failMsg}; ${floorMsg}"
+                            else
+                                failMsg="${floorMsg}"
+                            fi
+                        else
+                            : "PASS: ${op} ${csvMajor}.${csvMinor} meets post-upgrade floor ${floorVersion}"
+                        fi
+                    else
+                        : "INFO: ${op}: CSV ${csvName} carries no parsable version; post-upgrade floor ${floorVersion} not checked"
+                    fi
+                fi
+            fi
+        fi
+
         # Check pods are Ready in the operator namespace (with settling window)
         : "Waiting ${SMOKE_SETTLE_SECONDS}s settling window for pods in ${csvNs}..."
         sleep "${SMOKE_SETTLE_SECONDS}"

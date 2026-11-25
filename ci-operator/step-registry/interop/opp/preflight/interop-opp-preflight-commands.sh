@@ -201,6 +201,22 @@ function CheckOppCompatibility () {
         return 0
     fi
 
+    # Post-upgrade floor enforcement contract (PRRT_kwDOBHvUUM65TpMz):
+    # export the resolved floors for the target minor so interop-opp-smoke
+    # can fail operators that remain below floor after the product upgrades.
+    # Best effort: a lane without SHARED_DIR, or a failed write, simply
+    # leaves the post-upgrade gate inert (interop-opp-smoke skips it when
+    # the file is absent), never failing the pre-flight step itself.
+    if [[ -n "${SHARED_DIR:-}" ]]; then
+        {
+            echo "# OPP_COMPAT floors for target OCP ${ocpKey} (written by interop-opp-preflight)"
+            typeset _floorEntry
+            for _floorEntry in ${compatSpec}; do
+                printf '%s=%s\n' "${_floorEntry%%:*}" "${_floorEntry##*:}"
+            done
+        } 2>/dev/null > "${SHARED_DIR}/opp-compat-floors.env" || true
+    fi
+
     typeset details=""
     for entry in ${compatSpec}; do
         typeset opPrefix="${entry%%:*}"
@@ -287,22 +303,18 @@ function CheckOppCompatibility () {
         # upgrade lanes intentionally install below the target floor
         # (rhacs-operator 4.10 via the versioned channel, openshift/release#87865)
         # and the product-upgrade steps move the operators forward mid-run.
-        # Nothing enforces these floors after the upgrade today: the
-        # product-upgrade steps only require forward progress from the
-        # installed version (no downgrades, no no-forward-path upgrades), and
-        # interop-opp-smoke checks CSV phase, not the floor. An operator left
-        # below the target floor can therefore pass the lanes while this check
-        # reports only a warning. Adding the post-upgrade floor enforcement is
-        # tracked in INTEROP-9553.
-        # Gating here reds every upgrade lane at pre-flight on the reviewed
-        # baseline (first seen after #87865 + #87963 combined).
+        # The post-upgrade state is enforced where it is observable: the
+        # product-upgrade steps require forward progress (no downgrades, no
+        # no-forward-path upgrades) and interop-opp-smoke fails any operator
+        # this lane upgraded that still sits below the exported floor
+        # (PRRT_kwDOBHvUUM65TpMz; the exported floors file above is that
+        # contract). Pre-flight itself stays informational because gating
+        # here reds every upgrade lane on the pre-upgrade baseline.
+        # (first seen after #87865 + #87963 combined).
         : "${belowFloor} operator(s) below the target-version compatibility floor (pre-upgrade baseline)"
-        # PRRT_kwDOBHvUUM65TpMz: re-enforce compatibility floor after product upgrades (post-upgrade check tracked INTEROP-9553)
-        # Pre-flight is informational; post-upgrade floor enforcement must happen in product-upgrade/smoke steps
         AppendCheck "opp_compatibility_matrix" "warn" "${details}"
-        # PRRT_kwDOBHvUUM65TpMz: floor marker removed - no step consumed compat-floor-below.txt (git grep found only the write); post-upgrade enforcement tracked INTEROP-9553 as design decision, preflight remains informational
         if [[ -n "${belowFloor}" ]]; then
-            echo "WARN: operator below target floor ${ocpKey}; post-upgrade floor enforcement is deferred (tracked in INTEROP-9553)" > "${ARTIFACT_DIR}/compat-floor-preflight-warn.txt" 2>/dev/null || true
+            echo "WARN: operator below target floor ${ocpKey}; the post-upgrade floor is enforced by interop-opp-smoke for operators upgraded this run (floors exported to opp-compat-floors.env in SHARED_DIR)" > "${ARTIFACT_DIR}/compat-floor-preflight-warn.txt" 2>/dev/null || true
         fi
     else
         : "All OPP operators are compatible with OCP ${ocpKey}"
