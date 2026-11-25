@@ -92,7 +92,7 @@ if [[ "$base_branch" != "$base" ]]; then
   git merge --no-edit "origin/${base}"
 fi
 
-# Install tools only during this periodic. OpenWiki 0.7.1 needs Node >=22.22.0.
+# Install tools only during this periodic. OpenWiki 0.9.0 needs Node >=22.22.0.
 case "$(uname -m)" in
   x86_64) node_arch=x64; node_sha=9aa8e9d2298ab68c600bd6fb86a6c13bce11a4eca1ba9b39d79fa021755d7c37 ;;
   aarch64) node_arch=arm64; node_sha=1bf1eb9ee63ffc4e5d324c0b9b62cf4a289f44332dfef9607cea1a0d9596ba6f ;;
@@ -104,7 +104,7 @@ mkdir -p "$workdir/node"
 tar -xJf "$workdir/node.tar.xz" --strip-components=1 -C "$workdir/node"
 rm "$workdir/node.tar.xz"
 export PATH="$workdir/node/bin:$workdir/tools/bin:$PATH"
-npm install --global --prefix "$workdir/tools" openwiki@0.7.1 mermaid@11.16.0 jsdom@29.1.1
+npm install --global --prefix "$workdir/tools" openwiki@0.9.0 mermaid@11.16.0 jsdom@29.1.1
 # Record the installed version and requested model for the publisher's PR
 # description. SHARED_DIR accepts only flat files; the read token is gone.
 jq -er '.version' "$workdir/tools/lib/node_modules/openwiki/package.json" > "${SHARED_DIR}/openwiki-version"
