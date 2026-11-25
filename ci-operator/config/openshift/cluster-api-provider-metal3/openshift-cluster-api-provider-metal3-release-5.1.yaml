@@ -80,7 +80,9 @@ tests:
         # The error "object has been modified" is an optimistic concurrency error caused by
         # these metadata fields being copied from the source secret
         ssh "${SSHOPTS[@]}" "root@${IP}" "sed -i 's#oc apply -f -#sed -e \"/^  resourceVersion:/d\" -e \"/^  uid:/d\" -e \"/^  creationTimestamp:/d\" | oc apply -f -#g' /root/dev-scripts/setup_capi_e2e.sh"
-        ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts && make capi_e2e"
+        : "${RELEASE_IMAGE_LATEST:?ci-operator did not supply the release image}"
+        printf -v target_release '%q' "$RELEASE_IMAGE_LATEST"
+        ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts && RELEASE_IMAGE_LATEST=${target_release} make capi_e2e"
       from: dev-scripts
       resources:
         requests:
@@ -106,7 +108,9 @@ tests:
         # The error "object has been modified" is an optimistic concurrency error caused by
         # these metadata fields being copied from the source secret
         ssh "${SSHOPTS[@]}" "root@${IP}" "sed -i 's#oc apply -f -#sed -e \"/^  resourceVersion:/d\" -e \"/^  uid:/d\" -e \"/^  creationTimestamp:/d\" | oc apply -f -#g' /root/dev-scripts/setup_capi_e2e.sh"
-        ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts && make capi_e2e"
+        : "${RELEASE_IMAGE_LATEST:?ci-operator did not supply the release image}"
+        printf -v target_release '%q' "$RELEASE_IMAGE_LATEST"
+        ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts && RELEASE_IMAGE_LATEST=${target_release} make capi_e2e"
       from: dev-scripts
       resources:
         requests:
