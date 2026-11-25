@@ -559,6 +559,9 @@ CONFIG = {
     'powervs-sno-quota-slice': {
         'dal14': 2,
     },
+    'powervs-ops-quota-slice': {
+        'lon06': 2,
+    },
     'powervs-multi-1-quota-slice': {
         'lon04': 2,
     },
