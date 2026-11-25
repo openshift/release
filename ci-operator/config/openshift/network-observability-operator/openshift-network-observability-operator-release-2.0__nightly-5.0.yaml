@@ -58,13 +58,21 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6i.2xlarge
-      SKIP_QE_APP_REGISTRY: "true"
       TIMEOUT: +6 hours
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    - ref: send-results-to-reportportal
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-aws-usage-info
+    - chain: aws-provision-iam-user-minimal-permission
+    - chain: ipi-install
+    - chain: cucushift-installer-check
+    - ref: cucushift-installer-reportportal-marker
     test:
     - ref: netobserv-apply-redhat-operators
     - chain: openshift-e2e-test-netobserv
     - ref: wait
-    workflow: cucushift-installer-rehearse-aws-ipi
   timeout: 12h0m0s
 - as: netobserv-aws-ipi-arm-f28
   cron: 2 13 19 * *
