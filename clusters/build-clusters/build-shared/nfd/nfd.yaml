@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
+  name: openshift-nfd
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+    openshift.io/cluster-monitoring: "true"
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: openshift-nfd
+  namespace: openshift-nfd
+spec:
+  targetNamespaces:
+    - openshift-nfd
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: nfd
+  namespace: openshift-nfd
+spec:
+  channel: stable
+  installPlanApproval: Automatic
+  name: nfd
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace

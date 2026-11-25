@@ -1,0 +1,66 @@
+ref:
+  as: osd-ccs-gather-gcp-boot-diagnostics
+  optional_on_success: true
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  commands: osd-ccs-gather-gcp-boot-diagnostics-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 10m0s
+  grace_period: 1m0s
+  env:
+  - name: OSD_CCS_GATHER_GCP_BOOT_DIAGNOSTICS
+    default: "false"
+    documentation: |-
+      Opt-in switch for the whole collector. Must be exactly "true" to enable.
+      While it is any other value the step reads no credential file, performs
+      no cloud authentication and issues no cloud API call; it only writes a
+      fixed "disabled" collection outcome. Enabling it is a deliberate
+      decision that requires the cloud-use approval described in README.md.
+  - name: OSD_CCS_GATHER_GCP_BOOT_BUDGET_SECONDS
+    default: "240"
+    documentation: |-
+      Total wall-clock budget for all cloud reads, capped at 540. Out-of-range
+      or non-numeric values fall back to the default.
+  - name: OSD_CCS_GATHER_GCP_BOOT_CALL_TIMEOUT_SECONDS
+    default: "45"
+    documentation: |-
+      Per-call deadline for a single read-only gcloud invocation, capped at 120.
+      Out-of-range or non-numeric values fall back to the default.
+  - name: OSD_CCS_GATHER_GCP_BOOT_MAX_INSTANCES
+    default: "8"
+    documentation: |-
+      Maximum number of in-scope instances examined, capped at 32. Out-of-range
+      or non-numeric values fall back to the default.
+  documentation: |-
+    Records bounded, allow-listed boot signals from the GCP instances belonging
+    to this run, before the cluster is deleted, so that a worker instance that
+    was created but never joined the cluster leaves evidence behind.
+
+    Disabled by default. While disabled it touches no credential and no cloud
+    API. When explicitly enabled it reuses the GCP credential the surrounding
+    workflow already uses, and performs only non-interactive read-only
+    instances list and get-serial-port-output calls. It adds no credential
+    mount, no role and no interactive access.
+
+    Identity comes solely from SHARED_DIR/cluster-name and fails closed when it
+    is missing, ambiguous or malformed; there is no broad project scan and no
+    caller-supplied project or instance input. Every listed instance is
+    re-verified against this run's name scope before it is read.
+
+    Serial output is hostile input. It is written only to a private scratch
+    directory outside ARTIFACT_DIR and SHARED_DIR that is removed on exit and
+    on signals. Published artifacts contain only counts and values from a fixed
+    vocabulary, never serial text, command output, instance names, zones or
+    project identifiers.
+
+    Unit values are signals observed in serial-console output, not the
+    authoritative current systemd state of a unit. An absent signal is reported
+    as no_signal, which means not observed and never healthy. The observations
+    do not establish a root cause. Exits 0 on every path, including permission
+    denied, unavailable and timeout, so the deprovision steps that follow it
+    always run.

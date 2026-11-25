@@ -1,0 +1,20 @@
+workflow:
+  as: medik8s-sbr-hypershift
+  documentation: |-
+    HyperShift AWS cluster lifecycle for medik8s SBR e2e tests.
+    Provisions a nested management cluster + hosted cluster (3x m5.4xlarge workers)
+    and tears them down after tests. Equivalent to hypershift-optional-operators
+    minus the optional-operators-operator-sdk pre step; medik8s uses its own
+    operator installation refs in the test phase.
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - chain: hypershift-aws-create
+    - ref: medik8s-sbr-hypershift-apply-image-sources
+    post:
+    - ref: medik8s-sbr-hypershift-restore-kubeconfig
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy
+    - chain: hypershift-destroy-nested-management-cluster

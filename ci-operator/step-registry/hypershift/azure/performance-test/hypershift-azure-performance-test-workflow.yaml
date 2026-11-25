@@ -1,0 +1,35 @@
+workflow:
+  as: hypershift-azure-performance-test
+  documentation: |-
+    This workflow performs comprehensive performance testing for Azure self-managed HyperShift clusters.
+    It sets up a nested management cluster, installs the HyperShift operator, executes performance
+    benchmarking scenarios, and collects metrics for cluster lifecycle operations.
+
+    Performance scenarios tested:
+    1. HostedCluster creation time
+    2. NodePool scaling performance (scale up from 2→10 nodes, scale down from 10→2 nodes)
+    3. API server availability during operations
+    4. HostedCluster deletion time
+
+    The workflow creates the nested OpenShift management cluster on the sm-azure-root-ci root in
+    UK South and measures performance against baseline targets.
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - ref: hypershift-setup-nested-management-cluster-azure-v2
+    - ref: hypershift-azure-setup-private-link-v2
+    - ref: hypershift-install-azure-v2
+    test:
+    - ref: hypershift-azure-performance-test
+    post:
+    - ref: hypershift-dump-management-cluster-azure-v2
+    - ref: hypershift-dump-extra
+    - ref: hypershift-destroy-nested-management-cluster-azure-v2
+    env:
+      CLOUD_PROVIDER: "Azure"
+      AZURE_SELF_MANAGED: "true"
+      HYPERSHIFT_AZURE_LOCATION: "uksouth"
+      HYPERSHIFT_BASE_DOMAIN: "hcp-sm-azure.azure.devcluster.openshift.com"
+      HYPERSHIFT_EXTERNAL_DNS_DOMAIN: "sm-azure-root-ci.hcp-sm-azure.azure.devcluster.openshift.com"
+      # One node per zone, as before. The v2 setup step defaults to six for the e2e guests.
+      HYPERSHIFT_NODE_COUNT: "1"

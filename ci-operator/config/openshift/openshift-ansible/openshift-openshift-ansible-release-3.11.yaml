@@ -1,0 +1,52 @@
+base_rpm_images:
+  base:
+    name: origin-v3.11
+    namespace: openshift
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.25-openshift-4.23
+images:
+  items:
+  - dockerfile_path: images/installer/Dockerfile
+    from: base
+    to: ansible
+promotion:
+  to:
+  - name: origin-v3.11
+    namespace: openshift
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit:
+    requests:
+      cpu: "1"
+      memory: 1.5Gi
+rpm_build_commands: tito tag --offline --accept-auto-changelog --use-release '9999%{?dist}';
+  tito build --output="_output/local/releases" --rpm --test --offline --quiet; mkdir
+  -p _output/local/releases/rpms; mv _output/local/releases/noarch/* _output/local/releases/rpms;
+  createrepo _output/local/releases/rpms
+tag_specification:
+  name: origin-v3.11
+  namespace: openshift
+test_binary_build_commands: |
+  set -eo pipefail
+  yum install -y gcc libffi-devel python-devel openssl-devel python3
+  pip3 install tox virtualenv==16.7.9
+  chmod uga+w /etc/passwd
+tests:
+- as: unit
+  commands: |
+    set -o pipefail
+    echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+    tox
+  container:
+    from: test-bin
+zz_generated_metadata:
+  branch: release-3.11
+  org: openshift
+  repo: openshift-ansible

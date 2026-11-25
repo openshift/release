@@ -1,0 +1,1 @@
+../../test/cleanup-msi-roleassignments/capz-test-cleanup-msi-roleassignments-commands.sh

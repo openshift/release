@@ -1,0 +1,28 @@
+workflow:
+  as: baremetalds-e2e-bgp-vip-dualstack
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
+        NUM_WORKERS=2
+        ENABLE_BGP_TOR=true
+        BGP_VIP_MANAGEMENT=true
+      FEATURE_SET: DevPreviewNoUpgrade
+    pre:
+      - ref: baremetalds-devscripts-conf-featureset
+      - chain: baremetalds-ofcir-pre
+    test:
+      - ref: baremetalds-e2e-bgp-vip-verify
+    post:
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    The dual-stack (IP_STACK=v4v6) variant of baremetalds-e2e-bgp-vip: a
+    baremetal IPI cluster installed via dev-scripts with BGP-based VIP
+    management (enhancement 1982, DevPreviewNoUpgrade), peering with the
+    top-of-rack FRR speaker on the hypervisor over both IPv4 and IPv6, so the
+    API and ingress VIPs of both families are advertised over BGP. The test
+    step is the same as in baremetalds-e2e-bgp-vip and checks every address
+    family the cluster peers on.

@@ -1,0 +1,26 @@
+tests:
+- steps:
+    cluster_profile: aws-quay-qe
+    env:
+      BASE_DOMAIN: quayqe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m5.4xlarge
+{%- if sts and ocp_version.split(".") | map("int") | list < [4, 14] %}
+      # ipi-conf-aws-oidc-creds-provision passes `oc adm release extract
+      # --included` by default, and the oc 4.12 and 4.13 clients reject it.
+      EXTRACT_MANIFEST_INCLUDED: "false"
+{%- endif %}
+    post:
+    - ref: quay-gather-jaeger-traces
+    - ref: quay-gather
+    - ref: quay-deprovision
+{%- if database_deprovision_ref %}
+    - ref: "{{ database_deprovision_ref }}"
+{%- endif %}
+{% if sts %}
+    - chain: ipi-aws-post-manual-oidc-sts
+    pre:
+    - chain: ipi-aws-pre-manual-oidc-sts
+{% else %}
+    - chain: ipi-aws-post
+{% endif %}
+    workflow: ipi-aws

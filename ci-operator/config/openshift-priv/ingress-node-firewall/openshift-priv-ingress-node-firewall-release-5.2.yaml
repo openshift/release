@@ -1,0 +1,111 @@
+base_images:
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.39.2
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.14_base-rhel9:
+    name: "4.14"
+    namespace: ocp-priv
+    tag: base-rhel9
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/ingress-node-firewall
+images:
+  items:
+  - dockerfile_path: Dockerfile.openshift
+    from: ocp_4.14_base-rhel9
+    to: ingress-node-firewall
+  - dockerfile_path: Dockerfile.daemon.openshift
+    from: ocp_4.14_base-rhel9
+    to: ingress-node-firewall-daemon
+operator:
+  bundles:
+  - as: ingress-node-firewall-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/openshift/origin-ingress-node-firewall:latest
+    with: pipeline:ingress-node-firewall
+  - pullspec: quay.io/openshift/origin-ingress-node-firewall-daemon:latest
+    with: pipeline:ingress-node-firewall-daemon
+promotion:
+  to:
+  - name: "5.2"
+    namespace: ocp-priv
+prowgen:
+  private: true
+releases:
+  initial:
+    integration:
+      name: "5.2"
+      namespace: ocp-priv
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.2"
+      namespace: ocp-priv
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test-fmt
+  commands: |
+    make fmt
+  container:
+    from: src
+- as: unit-test
+  commands: |
+    make test
+  container:
+    from: src
+- as: lint
+  commands: |
+    make lint
+  container:
+    from: src
+- as: ingress-node-firewall-e2e-metal-ipi
+  capabilities:
+  - intranet
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-ingress-node-firewall-e2e
+- always_run: false
+  as: e2e-aws-ovn-infw-extension
+  optional: true
+  steps:
+    cluster_profile: aws-5
+    dependencies:
+      OO_BUNDLE: ingress-node-firewall-bundle
+    env:
+      OO_INSTALL_MODE: AllNamespaces
+      OO_INSTALL_NAMESPACE: openshift-ingress-node-firewall
+      OO_SECURITY_CONTEXT: restricted
+    observers:
+      enable:
+      - observers-resource-watch
+    test:
+    - ref: optional-operators-operator-sdk
+    - ref: infw-extension
+    workflow: openshift-e2e-aws-ovn
+- as: verify-deps
+  steps:
+    env:
+      CHECK_MOD_LIST: "false"
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-5.2
+  org: openshift-priv
+  repo: ingress-node-firewall

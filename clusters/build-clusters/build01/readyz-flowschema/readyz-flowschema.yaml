@@ -1,0 +1,27 @@
+apiVersion: flowcontrol.apiserver.k8s.io/v1
+kind: FlowSchema
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: health-checks
+spec:
+  distinguisherMethod:
+    type: ByUser
+  matchingPrecedence: 2
+  priorityLevelConfiguration:
+    name: exempt
+  rules:
+  - nonResourceRules:
+    - nonResourceURLs:
+      - '/healthz'
+      - '/readyz'
+      - '/livez'
+      verbs:
+      - 'get'
+    subjects:
+    - group:
+        name: system:authenticated
+      kind: Group
+    - group:
+        name: system:unauthenticated
+      kind: Group

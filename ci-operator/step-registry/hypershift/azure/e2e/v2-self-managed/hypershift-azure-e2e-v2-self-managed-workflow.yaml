@@ -1,0 +1,46 @@
+workflow:
+  as: hypershift-azure-e2e-v2-self-managed
+  documentation: |-
+    The HyperShift Azure e2e v2 self-managed workflow provisions a nested management
+    cluster on self-managed Azure infrastructure, installs the HyperShift operator, creates
+    three self-managed Azure guest clusters (public, private, OAuth LoadBalancer), and runs
+    the v2 Ginkgo test suite against each. Each test spec produces a separate JUnit XML
+    entry for Sippy.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - [@jparrill](https://github.com/jparrill)
+    - [@mgencur](https://github.com/mgencur)
+    - Cesar Wong (cewong@redhat.com)
+    - Bryan Cox (brcox@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/CNTRLPLANE/summary
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - ref: hypershift-setup-nested-management-cluster-azure-v2
+    - ref: hypershift-azure-setup-private-link-v2
+    - ref: hypershift-install-azure-v2
+    - ref: hypershift-resolve-nodepool-releases
+    - chain: hypershift-azure-create-selfmanaged-guests
+    test:
+    - chain: hypershift-azure-run-e2e-v2-selfmanaged
+    post:
+    - chain: hypershift-azure-dump-selfmanaged-guests
+    - chain: hypershift-azure-destroy-selfmanaged-guests
+    - ref: hypershift-dump-management-cluster-azure-v2
+    - ref: hypershift-dump-extra
+    - ref: hypershift-destroy-nested-management-cluster-azure-v2
+    env:
+      CLOUD_PROVIDER: "Azure"
+      HYPERSHIFT_PLATFORM: "azure"
+      HYPERSHIFT_BASE_DOMAIN: "hcp-sm-azure.azure.devcluster.openshift.com"
+      HYPERSHIFT_NODE_COUNT: "6"
+      HYPERSHIFT_AZURE_LOCATION: "uksouth"
+      AZURE_SELF_MANAGED: "true"
+      HYPERSHIFT_EXTERNAL_DNS_DOMAIN: "sm-azure-root-ci.hcp-sm-azure.azure.devcluster.openshift.com"
+      HYPERSHIFT_ETCD_STORAGE_CLASS: "managed-csi-premium-v2"

@@ -1,0 +1,32 @@
+ref:
+  as: openshift-agentic-trt-pr-followup
+  from: agentic-dev
+  commands: openshift-agentic-trt-pr-followup-commands.sh
+  credentials:
+  - collection: technical-release-team
+    group: openshift-trt-agent-gh-app
+    mount_path: /var/run/github-token
+  env:
+  - name: PR_NUMBER
+    default: ""
+    documentation: |-
+      Optional upstream pull request number. When set, the step looks up this
+      PR directly and does not search by Jira issue key.
+      Override via Gangway: MULTISTAGE_PARAM_OVERRIDE_PR_NUMBER.
+  - name: MULTISTAGE_PARAM_OVERRIDE_PR_NUMBER
+    default: ""
+    documentation: |-
+      Gangway API override for PR_NUMBER. When triggering via Gangway, pass as
+      pod_spec_options.envs. Takes precedence over PR_NUMBER.
+  - name: UPSTREAM_REPO
+  - name: FORK_REPO
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+  timeout: 5m0s
+  documentation: |-
+    Selects an explicit PR number when supplied, otherwise finds the PR for a
+    Jira issue. Validates the upstream PR and configured fork before checking
+    out its exact head, then writes the PR number to SHARED_DIR for the
+    review-responder step.

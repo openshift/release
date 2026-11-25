@@ -1,0 +1,41 @@
+ref:
+  as: ipi-install-nutanix-csi
+  from: cli
+  commands: ipi-install-nutanix-csi-commands.sh
+  env:
+    - name: NUTANIX_CSI_USE_CERTIFIED_CATALOG
+      default: "false"
+      documentation: |-
+        Install the CSI operator from the certified-operators catalog on the
+        stable-3.x channel instead of the Nutanix beta dev catalog
+        (quay.io/ntnx-csi/nutanix-csi-operator-catalog:latest). Only use this
+        on clusters where the certified catalog resolves the
+        nutanixcsioperator package (4.x clusters; on 5.0 nightlies OLM
+        resolution currently fails with "no operators found in package
+        nutanixcsioperator"). The certified operator (v3.9.0) sets
+        terminationMessagePolicy=FallbackToLogsOnError on all of its
+        containers, which keeps the termination-message-policy monitor green
+        (OCPBUGS-99481); the beta operator does not, so jobs using the beta
+        catalog must keep --disable-monitor=termination-message-policy.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    The ipi-install-nutanix-csi step installs the Nutanix CSI driver on the cluster.
+
+    By default the CSI operator is installed from the Nutanix beta dev catalog
+    (quay.io/ntnx-csi/nutanix-csi-operator-catalog:latest), which is currently
+    the only catalog that resolves the nutanixcsioperator package on 5.0
+    nightly clusters. The beta operator does not set
+    terminationMessagePolicy on its containers, so jobs using it must keep
+    --disable-monitor=termination-message-policy.
+
+    Set NUTANIX_CSI_USE_CERTIFIED_CATALOG=true to install the operator from
+    certified-operators on the stable-3.x channel instead. This works on 4.x
+    clusters (for example, the stable-initial 4.22 cluster of the
+    4.22 -> 5.0 upgrade job) and installs an operator (v3.9.0) that sets
+    terminationMessagePolicy=FallbackToLogsOnError on all of its containers,
+    keeping the termination-message-policy monitor green (OCPBUGS-99481). On
+    5.0 nightly clusters the certified catalog does not yet publish a
+    compatible bundle and OLM resolution fails.

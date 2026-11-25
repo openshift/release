@@ -1,0 +1,51 @@
+ref:
+  as: assisted-capi-kubevirt-test
+  from: src
+  cli: latest
+  grace_period: 10m
+  timeout: 5h0m0s
+  commands: assisted-capi-kubevirt-test-commands.sh
+  dependencies:
+  - env: CAPOA_CONTROLPLANE_IMAGE
+    name: cluster-api-controlplane-provider-openshift-assisted
+  - env: CAPOA_BOOTSTRAP_IMAGE
+    name: cluster-api-bootstrap-provider-openshift-assisted
+  - env: CAPK_IMAGE
+    name: capk-pinned-main
+  env:
+  - name: TEST_TARGET
+    default: e2e-kubevirt-test
+    documentation: CAPOA Make target that owns the complete KubeVirt E2E lifecycle.
+  - name: OPENSHIFT_VERSION
+    default: "4.22"
+    documentation: |-
+      OpenShift version used by the CAPOA tenant. A major.minor value is
+      resolved to the latest available patch release before the test runs.
+  - name: KUBEVIRT_STORAGE_CLASS
+    default: managed-csi
+    documentation: Block-capable Azure storage class used for the tenant root disks.
+  - name: CAPI_VERSION
+    default: v1.13.4
+    documentation: CAPI core release installed with the pinned CAPK source.
+  - name: CAPK_SOURCE_REPOSITORY
+    default: https://github.com/kubernetes-sigs/cluster-api-provider-kubevirt
+    documentation: Repository containing the CAPK source used for manifests.
+  - name: CAPK_SOURCE_REF
+    default: c5c530b33067c434304743a8376015352aec21d0
+    documentation: Exact CAPK commit containing the CAPI v1beta2 and annotation-exclusion fixes.
+  - name: CAPK_LOCAL_VERSION
+    default: v0.11.99-capoa.c5c530b
+    documentation: |-
+      Local clusterctl version used for the unreleased CAPK source commit. It
+      intentionally uses the v0.11 release series because CAPK's metadata does
+      not yet declare a v0.12 series.
+  resources:
+    requests:
+      cpu: "3"
+      memory: 600Mi
+    limits:
+      memory: 4Gi
+  documentation: |-
+    Runs the CAPOA KubeVirt E2E target against the kubeconfig supplied by the
+    workflow. CI-built CAPOA and pinned CAPK images are passed through
+    dependency environment variables and are not pushed to an external registry.

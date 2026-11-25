@@ -1,0 +1,1 @@
+../../../helm/disconnected/nightly/redhat-developer-rhdh-ocp-helm-disconnected-nightly-commands.sh

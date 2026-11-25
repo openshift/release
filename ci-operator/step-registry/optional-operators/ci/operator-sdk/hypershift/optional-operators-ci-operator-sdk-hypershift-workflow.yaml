@@ -1,0 +1,17 @@
+workflow:
+  as: optional-operators-ci-operator-sdk-hypershift
+  steps:
+    pre:
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-rbac
+    - chain: hypershift-hostedcluster-create
+    - ref: optional-operators-operator-sdk
+    post:
+    - chain: hypershift-hostedcluster-dump
+    - chain: hypershift-hostedcluster-destroy
+  documentation: |-
+    Installs a Hypershift cluster with a default configuration and installs an
+    optional operator using the built index image that refers to build bundle
+    images. Currently only supported on AWS due to usage of the introspection credentials from
+    CLUSTER_PROFILE_DIR so that tests relying on the AWS APIs still succeed. It also uses the ipi-install-rbac step to expose the Bundle Images
+    similarly to IPI for usage in a Hypershift Cluster

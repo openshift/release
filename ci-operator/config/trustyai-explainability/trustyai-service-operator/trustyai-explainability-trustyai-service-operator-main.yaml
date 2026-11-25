@@ -1,0 +1,213 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+  tls-scanner-tool:
+    name: tls-scanner
+    namespace: tls-scanner
+    tag: tls-scanner-tool
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-4.23
+images:
+  items:
+  - context_dir: tests/
+    dockerfile_path: Dockerfile
+    from: os
+    to: trustyai-service-operator-ci-tests
+  - dockerfile_path: Dockerfile
+    to: trustyai-service-operator
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+tests:
+- as: trustyai-service-operator-e2e
+  run_if_changed: ^(tests/*|config/*|controllers/*|hack/*|Dockerfile|main.go|go.mod|go.sum|api/*|.github/*)
+  steps:
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+    test:
+    - as: e2e
+      commands: PYTEST_MARKERS="openshift and not heavy" $HOME/peak/installandtest.sh
+      from: trustyai-service-operator-ci-tests
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+    workflow: hypershift-hostedcluster-workflow
+- as: tls-scan-pqc
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-opendatahub
+    env:
+      BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      HYPERSHIFT_AWS_REGION: us-west-2
+      HYPERSHIFT_NODE_COUNT: "3"
+      OPERATOR_NAMESPACE: opendatahub
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: opendatahub,trustyai-tls-scan
+      SCANNER_CPU_LIMIT: "2"
+      SCANNER_CPU_REQUEST: "1"
+      SCANNER_MEM_LIMIT: 2Gi
+      SCANNER_MEM_REQUEST: 2Gi
+      SCANNER_NAMESPACE: opendatahub
+      TENANT_NAMESPACE: trustyai-tls-scan
+    test:
+    - as: deploy-and-prepare-scan
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        # Builder defaults to -mod=vendor; clear so make can install kustomize.
+        export GOFLAGS=''
+
+        # Makefile deploy/manifest-gen invoke kubectl; cli image only ships oc.
+        # Use a writable dir: step pods often run as non-root and cannot write
+        # to /usr/local/bin.
+        if ! command -v kubectl >/dev/null 2>&1; then
+          mkdir -p /tmp/bin
+          ln -sf "$(command -v oc)" /tmp/bin/kubectl
+          export PATH="/tmp/bin:${PATH}"
+        fi
+
+        make manifest-gen \
+          NAMESPACE="${OPERATOR_NAMESPACE}" \
+          OVERLAY=odh \
+          OPERATOR_IMAGE="${OPERATOR_IMAGE}"
+        # odh overlay defaults to quay.io/opendatahub/...; Makefile sed only
+        # rewrites quay.io/trustyai/..., so force the CI-built image here.
+        sed -i "s|quay.io/opendatahub/trustyai-service-operator:latest|${OPERATOR_IMAGE}|g; s|quay.io/trustyai/trustyai-service-operator:latest|${OPERATOR_IMAGE}|g" \
+          release/trustyai_odh_bundle.yaml
+
+        oc create namespace "${OPERATOR_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+
+        # TrustyAIService controller watches InferenceService; without the CRD
+        # controller-runtime never starts that reconciler (no status, no pods).
+        # Stub CRD is enough for watches; full KServe is not required for PVC deploy.
+        oc apply -f - <<'EOF'
+        apiVersion: apiextensions.k8s.io/v1
+        kind: CustomResourceDefinition
+        metadata:
+          name: inferenceservices.serving.kserve.io
+        spec:
+          group: serving.kserve.io
+          names:
+            kind: InferenceService
+            listKind: InferenceServiceList
+            plural: inferenceservices
+            singular: inferenceservice
+          scope: Namespaced
+          versions:
+          - name: v1beta1
+            served: true
+            storage: true
+            schema:
+              openAPIV3Schema:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+        EOF
+
+        # Webhook Service has no metadata.namespace; without -n it lands in
+        # default while the Deployment (and cert mount) are in OPERATOR_NAMESPACE.
+        oc apply -n "${OPERATOR_NAMESPACE}" -f release/trustyai_odh_bundle.yaml
+
+        # Pod mounts webhook-server-cert from OpenShift service-ca on the webhook Service.
+        oc -n "${OPERATOR_NAMESPACE}" annotate service/trustyai-service-operator-webhook-service \
+          service.beta.openshift.io/serving-cert-secret-name=webhook-server-cert --overwrite
+        echo "Waiting for secret/webhook-server-cert..."
+        for _ in $(seq 1 60); do
+          if oc -n "${OPERATOR_NAMESPACE}" get secret webhook-server-cert >/dev/null 2>&1; then
+            break
+          fi
+          sleep 5
+        done
+        oc -n "${OPERATOR_NAMESPACE}" get secret webhook-server-cert
+
+        if ! oc -n "${OPERATOR_NAMESPACE}" wait --for=condition=Available \
+          deployment/trustyai-service-operator-controller-manager --timeout=10m; then
+          echo "ERROR: operator Deployment not Available; collecting diagnostics"
+          oc -n "${OPERATOR_NAMESPACE}" get pods,deploy,events,secret,svc || true
+          oc -n "${OPERATOR_NAMESPACE}" get svc trustyai-service-operator-webhook-service -o yaml || true
+          oc -n "${OPERATOR_NAMESPACE}" describe deploy/trustyai-service-operator-controller-manager || true
+          oc -n "${OPERATOR_NAMESPACE}" describe pods || true
+          exit 1
+        fi
+
+        # Tenant/workload namespace: TrustyAIService exposes TLS endpoints
+        # (e.g. 4443/8443) that must be PQC-ready for AI Safety.
+        oc create namespace "${TENANT_NAMESPACE}" --dry-run=client -o yaml | oc apply -f -
+        oc apply -f - <<EOF
+        apiVersion: trustyai.opendatahub.io/v1
+        kind: TrustyAIService
+        metadata:
+          name: tls-scan
+          namespace: ${TENANT_NAMESPACE}
+        spec:
+          storage:
+            format: "PVC"
+            folder: "/inputs"
+            size: "1Gi"
+          data:
+            filename: "data.csv"
+            format: "CSV"
+          metrics:
+            schedule: "5s"
+            batchSize: 5000
+          replicas: 1
+        EOF
+
+        # Prefer CR Ready; fall back to Deployment Available for older status shapes.
+        if ! oc -n "${TENANT_NAMESPACE}" wait --for=condition=Ready \
+          trustyaiservice/tls-scan --timeout=15m; then
+          echo "ERROR: TrustyAIService not Ready; collecting diagnostics"
+          oc -n "${TENANT_NAMESPACE}" get trustyaiservice,pods,pvc,deploy,svc,events || true
+          oc -n "${TENANT_NAMESPACE}" get trustyaiservice tls-scan -o yaml || true
+          oc -n "${OPERATOR_NAMESPACE}" get pods || true
+          oc -n "${OPERATOR_NAMESPACE}" logs deploy/trustyai-service-operator-controller-manager --tail=200 || true
+          if ! oc -n "${TENANT_NAMESPACE}" wait --for=condition=Available \
+            deployment -l app.kubernetes.io/name=trustyai-service --timeout=5m; then
+            exit 1
+          fi
+        fi
+
+        oc -n "${OPERATOR_NAMESPACE}" get pods,svc
+        oc -n "${TENANT_NAMESPACE}" get pods,svc
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: trustyai-service-operator
+      env:
+      - default: opendatahub
+        documentation: Namespace where trustyai-service-operator is deployed.
+        name: OPERATOR_NAMESPACE
+      - default: trustyai-tls-scan
+        documentation: Tenant namespace where TrustyAIService workload is created
+          for scanning.
+        name: TENANT_NAMESPACE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 1h15m0s
+    - ref: tls-scanner-run
+    workflow: hypershift-hostedcluster-workflow
+zz_generated_metadata:
+  branch: main
+  org: trustyai-explainability
+  repo: trustyai-service-operator

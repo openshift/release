@@ -1,0 +1,65 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.15-openshift-4.6
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: ./hack/install-mkdocs.sh
+tests:
+- as: build
+  commands: |
+    make build
+
+    # Publish a browsable copy of the site to the job artifacts.
+    # --no-directory-urls emits "<page>.html" instead of "<page>/": GCS has no
+    # directory index, so directory-style links land on a gcsweb file listing
+    # instead of the page. Requires the .md-path links from
+    # openshift/infrastructure-provider-onboarding-guide#35.
+    ARTIFACT_DIR="${ARTIFACT_DIR:-$(pwd)/_artifacts}"
+    mkdir -p "${ARTIFACT_DIR}"
+    mkdocs build --no-directory-urls --site-dir "${ARTIFACT_DIR}/site"
+
+    # ci-operator uploads a container test's ARTIFACT_DIR under
+    # <job>/artifacts/test/artifacts/, and Deck renders custom-link-*.html on
+    # the job page, so surface a direct link to the rendered preview.
+    # Mirror prow's PathForSpec (pkg/pod-utils/gcs/target.go): batch jobs land
+    # under pr-logs/pull/batch/ and get no PULL_NUMBER, not under logs/.
+    case "${JOB_TYPE:-}" in
+      presubmit)
+        GCS_JOB_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}"
+        ;;
+      batch)
+        GCS_JOB_PATH="pr-logs/pull/batch/${JOB_NAME}/${BUILD_ID}"
+        ;;
+      *)
+        GCS_JOB_PATH="logs/${JOB_NAME}/${BUILD_ID}"
+        ;;
+    esac
+    # gcs.ci.openshift.org is gcsweb's own vanity host (clusters/core-ci/
+    # cert-manager/gcsweb_ingress.yaml), not a cluster router hostname, so it
+    # survives app.ci moving. Browsing needs gcsweb rather than
+    # storage.googleapis.com: directory-URL links resolve to prefixes, and only
+    # gcsweb renders those as a listing.
+    GCSWEB_HOST="${GCSWEB_HOST:-gcs.ci.openshift.org}"
+    GCS_BUCKET="${GCS_BUCKET:-test-platform-results-public}"
+    SITE_URL="https://${GCSWEB_HOST}/gcs/${GCS_BUCKET}/${GCS_JOB_PATH}/artifacts/test/artifacts/site/index.html"
+    echo "Site preview: ${SITE_URL}"
+    cat >"${ARTIFACT_DIR}/custom-link-docs.html" <<EOF
+    <html><head><title>Documentation preview</title></head>
+    <body style="background:#303030;color:#fff;font-family:Roboto,Helvetica,Arial,sans-serif;padding:16px;margin:0">
+    <a style="color:#4fc3f7;font-size:1.1em" href="${SITE_URL}" target="_blank" rel="noopener noreferrer">Browse the rendered documentation preview</a>
+    <p style="color:#bbb;font-size:.9em">Built from this pull request by the <code>build</code> job.</p>
+    </body></html>
+    EOF
+  container:
+    from: test-bin
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: infrastructure-provider-onboarding-guide

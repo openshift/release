@@ -1,0 +1,73 @@
+workflow:
+  as: rosa-e2e-hcp-kms
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "true"
+      REPLICAS: "3"
+      ETCD_ENCRYPTION: "true"
+      STORAGE_ENCRYPTION: "true"
+    pre:
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+    - chain: rosa-sts-oidc-config-create
+    # The customer-managed KMS key consumed by rosa-cluster-provision via
+    # ${SHARED_DIR}/aws_kms_key_arn (ETCD_ENCRYPTION adds
+    # --etcd-encryption-kms-arn, STORAGE_ENCRYPTION adds
+    # --enable-customer-managed-key --kms-key-arn).
+    - ref: rosa-sts-kms-key-create
+    - chain: rosa-cluster-provision
+    # Publish the SHARED_DIR provisioner-to-validator contract (cluster-id,
+    # kubeconfig, cluster-metadata.json, ROSAENG-67580) after the rosa-CLI head
+    # has provisioned the cluster.
+    - ref: rosa-e2e-rosa-cli-publish-contract
+    - ref: aws-provision-tags-for-byo-vpc
+    - ref: rosa-cluster-wait-ready-hosted-cp
+    - ref: rosa-cluster-wait-ready-nodes
+    # Platform-plane access: bp-kubeconfig / mc-kubeconfig / sc-kubeconfig via
+    # backplane (ROSAENG-67580).
+    - ref: rosa-backplane-login
+    test:
+    # The customer step runs its default tail (Area:DataPlane ||
+    # Area:CustomerFeatures) so the job also validates normal behaviour
+    # (workloads, networking, storage, ...) on an encrypted cluster; the
+    # customer-plane KMS specs are part of that tail. The platform step is
+    # scoped to the rosa-e2e Feature:KMS specs via PLATFORM_LABEL_FILTER (the
+    # per-plane filter pattern from the PrivateLink job): the KMS key health
+    # spec. The unscoped platform tail runs in the other rows of the
+    # ROSAENG-308 provision x validate matrix.
+    - ref: rosa-e2e-validate-customer
+    - ref: rosa-e2e-validate-platform
+      env:
+      - name: PLATFORM_LABEL_FILTER
+        default: "Feature:KMS"
+    post:
+    # Not best-effort: if the deprovision fails, abort the post chain so the
+    # KMS key below is not scheduled for deletion while the cluster still
+    # references it.
+    - chain: rosa-cluster-deprovision
+    # Delete the KMS key only after the cluster is gone: it is referenced by
+    # the etcd encryption config and the EBS volumes until then.
+    - ref: rosa-sts-kms-key-delete
+      best_effort: true
+    - chain: rosa-sts-oidc-config-delete
+      best_effort: true
+    - ref: rosa-e2e-cleanup-vpc
+      best_effort: true
+    - ref: aws-deprovision-stacks
+      best_effort: true
+  documentation: |-
+    The KMS-encryption row of the ROSAENG-308 provision x validate matrix
+    (ROSAENG-63351): the rosa-CLI head provisions an HCP cluster with etcd
+    encryption and EBS storage encryption backed by a customer-managed KMS key
+    (rosa-sts-kms-key-create), then validates the cluster with the shared,
+    provisioner-agnostic tail: the customer step runs its default
+    Area:DataPlane || Area:CustomerFeatures selection (which includes the
+    rosa-e2e KMS specs: data-plane PV encryption and EBS root-volume
+    encryption), while the platform step is scoped to the KMS key health spec
+    via PLATFORM_LABEL_FILTER=Feature:KMS.
+
+    The platform plane requires corp-network reachability: run this workflow
+    only where backplane is reachable (capabilities: [intranet],
+    restrict_network_access: false, network-access-rehearsals-ok label for
+    rehearsals).

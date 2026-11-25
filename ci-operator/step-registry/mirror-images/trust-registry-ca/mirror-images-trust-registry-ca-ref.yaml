@@ -1,0 +1,31 @@
+ref:
+  as: mirror-images-trust-registry-ca
+  from: upi-installer
+  commands: mirror-images-trust-registry-ca-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Trusts the disconnected bastion mirror registry's self-signed CA for
+    in-cluster consumers that run as pods rather than on the host, and so
+    don't benefit from install-config's `additionalTrustBundlePolicy: Always`
+    (set by ipi-conf-additional-ca-trust-policy), which only adds the CA to
+    the *nodes'* trusted certificate store. Notably this includes the image
+    registry's image-stream import controller and the build controller's
+    git/image fetch client, both of which instead read
+    image.config.openshift.io/cluster's spec.additionalTrustedCA.
+
+    Creates a `registry-config` ConfigMap in the `openshift-config` namespace
+    from SHARED_DIR/additional_trust_bundle (written by
+    ipi-conf-additional-ca-trust-policy), keyed by the mirror registry host
+    with its port-separating colon replaced by two dots (host:port ->
+    host..port, the documented OpenShift convention), then patches
+    image.config.openshift.io/cluster to reference it. This is the same
+    procedure documented for disconnected mirrors with self-signed certs:
+    https://docs.openshift.com/container-platform/4.18/post_installation_configuration/post-install-image-config.html
+
+    A no-op if SHARED_DIR/mirror_registry_url or
+    SHARED_DIR/additional_trust_bundle is absent (i.e. the workflow doesn't
+    provision a bastion mirror registry, or doesn't run
+    ipi-conf-additional-ca-trust-policy).

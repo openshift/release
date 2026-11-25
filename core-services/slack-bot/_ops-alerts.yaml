@@ -1,0 +1,52 @@
+# Classification data for the proposed Slack-fed ops dashboard.
+# The underscore prevents applyconfig from treating this as a Kubernetes manifest.
+# Source-owned Prometheus and Prow classifications live beside their definitions.
+version: 1
+defaults:
+  color: orange
+  category: other
+source_policies:
+  chai_reports:
+    kind: report
+    color: green
+    category: chai_reports
+    view: chai_reports
+  ship_outages:
+    kind: alert
+    color: yellow
+    category: other
+    component_categories:
+    - component: Build Farm
+      category: cluster_fleet
+    - component: Downstream CI
+      subcomponent: CI-Config
+      category: repo_automation
+platform_alerts:
+- alertname_glob: '*etcd*'
+  color: red
+  category: cluster_fleet
+- alertname_glob: '*ETCD*'
+  color: red
+  category: cluster_fleet
+- alertname: MachineWithNoRunningPhase
+  color: red
+  category: cluster_fleet
+- alertname: KubeSchedulerDown
+  color: orange
+  category: cluster_fleet
+# The Hive rule's owning definition has not been located. The hosted-mgmt
+# root manifest is outside every Argo CD Application source path. Keep these
+# classifications here until the producers have managed source definitions.
+legacy_alerts:
+- alertname: hive-blocked-deprovision
+  color: orange
+  category: cloud_cleanup
+- alertname: hosted-controllers-down
+  color: orange
+  category: cloud_cleanup
+- alertname: hive-clustersync-down
+  color: orange
+  category: cloud_cleanup
+- alertname: hosted-mgmt-blocked-deprovision
+  color: orange
+  category: cloud_cleanup

@@ -1,0 +1,61 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
+images:
+  items:
+  - context_dir: ci/tools
+    dockerfile_path: Dockerfile
+    to: hyperfleet-infra-tools
+  - dockerfile_literal: |
+      FROM hyperfleet-infra-tools
+      USER 0
+      COPY --chown=1001:0 /src /go/src/github.com/openshift-hyperfleet
+      RUN chmod -R g+rwX /go/src/github.com/openshift-hyperfleet/hyperfleet-infra
+      WORKDIR /go/src/github.com/openshift-hyperfleet/hyperfleet-infra
+      USER 1001:0
+    from: hyperfleet-infra-tools
+    inputs:
+      src:
+        paths:
+        - destination_dir: src
+          source_path: /go/src/github.com/openshift-hyperfleet/hyperfleet-infra
+    to: tools-src
+  reporter_config:
+    channel: '#hyperfleet-e2e-status'
+    job_states_to_report:
+    - failure
+    - error
+    report_template: |-
+      {{if eq .Spec.Type "postsubmit"}}:rotating_light: *{{.Spec.Job}}* ended with *{{.Status.State}}*. Promotion did not complete; infra jobs may still use the previous tools. Inspect `ci/hyperfleet-infra-tools:latest` and rerun only the newest main postsubmit. An older rerun can replace newer tools.{{else}}:x: *{{.Spec.Job}}* ended with *{{.Status.State}}*{{range .Spec.Refs.Pulls}} on PR #{{.Number}}{{end}}. The promoted image is not affected.{{end}}
+      Details: <{{.Status.URL}}|View logs>
+  run_if_changed: ^ci/tools/
+promotion:
+  to:
+  - excluded_images:
+    - tools-src
+    namespace: ci
+    tag: latest
+    tag_by_commit: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: "1"
+      memory: 1Gi
+tests:
+- as: tools-validate
+  commands: |
+    set -euo pipefail
+    git config --global --add safe.directory /go/src/github.com/openshift-hyperfleet/hyperfleet-infra
+    make ci-dry-run
+  container:
+    from: tools-src
+  run_if_changed: ^ci/tools/
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: hyperfleet-infra
+  variant: images

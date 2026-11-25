@@ -1,0 +1,38 @@
+workflow:
+  as: baremetalds-two-node-fencing-cnv-odf-ha
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: equinix-edge-enablement
+    pre:
+      - chain: baremetalds-ofcir-pre
+      - chain: baremetalds-two-node-fencing-post-install
+      - ref: openshift-cluster-bot-rbac
+      - ref: baremetalds-two-node-fencing-odf-install
+      - ref: interop-tests-deploy-cnv
+    test:
+    - ref: baremetalds-two-node-fencing-cnv-vm-ha
+    post:
+      - chain: baremetalds-ofcir-post
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NUM_MASTERS=2
+        MASTER_MEMORY=65536
+        MASTER_DISK=100
+        MASTER_VCPU=16
+        NUM_WORKERS=0
+        BMC_DRIVER=redfish
+        VM_EXTRADISKS=true
+        VM_EXTRADISKS_LIST="vda vdb"
+        VM_EXTRADISKS_SIZE=100G
+      ODF_OPERATOR_CHANNEL: "stable-4.22"
+      CNV_VERSION: "4.22"
+  documentation: |-
+    This workflow provisions a Two Node OpenShift with Fencing (TNF) cluster,
+    deploys ODF with DRBD floating monitor for 2-node Ceph replication,
+    deploys CNV, and validates VM HA by fencing a node via pcs stonith and
+    verifying the VM migrates to the surviving node.
+    ODF provides RWX volumes via ocs-storagecluster-ceph-rbd-virtualization,
+    enabling live-migration that is not possible with the LVMS-based workflow.
+    Requires 64 GiB per node (MASTER_MEMORY=65536) to support ODF + CNV + VM
+    failover without memory pressure.

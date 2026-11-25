@@ -1,0 +1,56 @@
+base_images:
+  upi-installer:
+    name: "4.17"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.17"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: regression-scale-loaded-projects
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SCRIPT: perfscale_regression_ci/scripts/scalability/loaded-projects.sh
+    test:
+    - ref: openshift-svt-regression
+    workflow: openshift-qe-installer-aws
+- always_run: false
+  as: regression-scale-affinity-rules
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SCRIPT: perfscale_regression_ci/scripts/scalability/node-affinity-anti-affinity.sh
+      SCRIPT_1: perfscale_regression_ci/scripts/scalability/pod-affinity-anti-affinity.sh
+    test:
+    - chain: openshift-svt-regression-one
+    workflow: openshift-qe-installer-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: svt
+  variant: regression-aws-4.17-nightly-x86

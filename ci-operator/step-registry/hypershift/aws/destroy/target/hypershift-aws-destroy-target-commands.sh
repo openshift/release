@@ -1,0 +1,1 @@
+../hypershift-aws-destroy-commands.sh

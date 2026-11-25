@@ -1,0 +1,63 @@
+# promtool unit tests for infrastructure-job-failures (converted to the latestRunFailed
+# latest-transition helper). The old rule was increase(failure[13h]) unless
+# increase(success[7h]) -- asymmetric windows that RE-FIRED ~7h after a recovery when
+# the success aged out of the 7h window while the failure remained in the 13h window.
+# The latest-transition rule compares last_failure_ts vs last_success_ts per job_name
+# (restricted to role=infra via a prow_job_labels join), so a recovered job resolves
+# once and never re-fires for the same failure. Case 2 is the regression guard for the
+# age-out re-fire; case 3 proves the role=infra restrict-join excludes unlabeled jobs.
+# label-sync does not match the repo/fleet/cleanup classification patterns, so
+# ops_category=ci_platform and ops_color=orange.
+rule_files:
+  - .rendered-rules.yaml
+
+tests:
+  # 1. role=infra job fails (increment at t=30m) and never succeeds -> fires.
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="branch-ci-openshift-release-main-label-sync", job="prow-controller-manager", state="failure"}'
+        values: '0+0x29 1+0x170'
+      - series: 'prow_job_labels{job_name="branch-ci-openshift-release-main-label-sync", job_agent="kubernetes", label_ci_openshift_io_role="infra"}'
+        values: '1x200'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: infrastructure-job-failures
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              job_name: branch-ci-openshift-release-main-label-sync
+            exp_annotations:
+              ops_category: ci_platform
+              ops_color: orange
+              message: 'Infrastructure CI job branch-ci-openshift-release-main-label-sync is failing. Investigate the symptoms, assess the urgency and take appropriate action (<https://ci-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&viewPanel=4|Grafana Dashboard> | <https://prow.ci.openshift.org/?job=branch-ci-openshift-release-main-label-sync|Deck> | <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#branch-ci-openshift-release-main-label-sync|SOP>).'
+
+  # 2. REGRESSION GUARD (age-out re-fire): fail at t=30m (fires), success at t=90m ->
+  #    resolves. It must STAY resolved even past t=510m (t90 + 7h), where the old
+  #    asymmetric-window rule re-fired with nothing newly broken. latest-transition
+  #    keeps it resolved because the newest transition is a success.
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="branch-ci-openshift-release-main-gsm-secrets-reconciler", job="prow-controller-manager", state="failure"}'
+        values: '0+0x29 1+0x510'
+      - series: 'prowjob_state_transitions{job_name="branch-ci-openshift-release-main-gsm-secrets-reconciler", job="prow-controller-manager", state="success"}'
+        values: '0+0x89 1+0x450'
+      - series: 'prow_job_labels{job_name="branch-ci-openshift-release-main-gsm-secrets-reconciler", job_agent="kubernetes", label_ci_openshift_io_role="infra"}'
+        values: '1x540'
+    alert_rule_test:
+      - eval_time: 150m
+        alertname: infrastructure-job-failures
+        exp_alerts: []
+      - eval_time: 540m
+        alertname: infrastructure-job-failures
+        exp_alerts: []
+
+  # 3. restrict-join: a failing job with NO role=infra prow_job_labels must NOT fire
+  #    (the role=infra join is what scopes this alert; it is not a name match).
+  - interval: 1m
+    input_series:
+      - series: 'prowjob_state_transitions{job_name="some-unlabeled-job", job="prow-controller-manager", state="failure"}'
+        values: '0+0x29 1+0x170'
+    alert_rule_test:
+      - eval_time: 90m
+        alertname: infrastructure-job-failures
+        exp_alerts: []

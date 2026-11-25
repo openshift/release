@@ -1,0 +1,35 @@
+ref:
+  as: sandboxed-containers-operator-provision-isolation-common-acr-endpoint
+  from: upi-installer
+  timeout: 1h0m0s
+  grace_period: 10m
+  commands: sandboxed-containers-operator-provision-isolation-common-acr-endpoint-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: ACR_RESOURCE_GROUP
+    default: ""
+    documentation: Resource group of the reused ACR. Required when ACR_NAME is set.
+  - name: ACR_NAME
+    default: ""
+    documentation: |-
+      Name of an ACR to reuse across runs; created if missing and never
+      deleted by the job. Empty (default) creates a per-run ACR in the
+      cluster resource group, deleted together with it.
+  - name: ACR_LOCATION
+    default: "eastus"
+    documentation: Azure region for ACR_RESOURCE_GROUP, only used when it has to be created.
+  - name: ACR_ENDPOINT_SUBNET
+    default: ""
+    documentation: Subnet for the ACR private endpoint. Auto-discovered if empty.
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  documentation: |-
+    Creates an ACR for disconnected testing and mirrors the OCP release
+    images into it. By default the ACR is per run, in the cluster resource
+    group. With ACR_NAME set, that ACR is reused and runs skip what is
+    already mirrored. Each run creates a private endpoint in the cluster
+    VNet for access.

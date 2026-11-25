@@ -1,0 +1,21 @@
+workflow:
+  as: hypershift-aws-e2e-nested-capi-migration
+  documentation: |-
+    Tests CAPI storage version migration from v1beta1 to v1beta2, then runs
+    the full HyperShift e2e suite to verify everything works post-migration.
+
+    The workflow installs HyperShift from an older release (via
+    INSTALL_FROM_LATEST), runs the migration e2e test which upgrades the
+    operator and triggers automatic storage migration, then runs the full
+    e2e suite against the migrated cluster.
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - ref: hypershift-resolve-nodepool-releases
+    test:
+    - ref: hypershift-aws-run-e2e-capi-migration
+    - ref: hypershift-aws-run-e2e-nested
+    post:
+    - chain: hypershift-destroy-nested-management-cluster

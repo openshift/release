@@ -1,0 +1,60 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.19-openshift-4.14
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: terraform-rhcs-rosa-hcp-clients
+releases:
+  latest:
+    integration:
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: true
+  as: verify-format
+  commands: make verify
+  container:
+    from: terraform-rhcs-rosa-hcp-clients
+- always_run: true
+  as: verify-gen
+  commands: make verify-gen
+  container:
+    from: terraform-rhcs-rosa-hcp-clients
+- always_run: true
+  as: rosa-hcp-private
+  steps:
+    cluster_profile: oex-aws-qe
+    env:
+      EXAMPLE_NAME: rosa-hcp-private
+    test:
+    - ref: rhcs-module-run-example-hcp
+- always_run: true
+  as: rosa-hcp-public
+  steps:
+    cluster_profile: oex-aws-qe
+    env:
+      EXAMPLE_NAME: rosa-hcp-public
+    test:
+    - ref: rhcs-module-run-example-hcp
+- always_run: false
+  as: rosa-hcp-public-unmanaged-oidc
+  steps:
+    cluster_profile: oex-aws-qe
+    env:
+      EXAMPLE_NAME: rosa-hcp-public-unmanaged-oidc
+    test:
+    - ref: rhcs-module-run-example-hcp
+zz_generated_metadata:
+  branch: release-1.6.3
+  org: terraform-redhat
+  repo: terraform-rhcs-rosa-hcp

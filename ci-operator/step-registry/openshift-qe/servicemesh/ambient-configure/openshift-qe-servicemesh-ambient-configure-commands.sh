@@ -1,0 +1,1 @@
+../configure/openshift-qe-servicemesh-configure-commands.sh

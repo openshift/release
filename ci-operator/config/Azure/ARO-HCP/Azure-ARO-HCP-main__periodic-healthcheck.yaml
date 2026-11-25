@@ -1,0 +1,47 @@
+base_images:
+  aro-hcp-e2e-tests:
+    name: aro-hcp-e2e-tests
+    namespace: aro-hcp
+    tag: latest
+  aro-hcp-e2e-tools:
+    name: aro-hcp-e2e-tools
+    namespace: aro-hcp
+    tag: latest
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: provision-westus3
+  cron: 0 */2 * * *
+  steps:
+    env:
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      LOCATION: westus3
+    workflow: aro-hcp-provision-healthcheck
+  timeout: 2h0m0s
+- as: provision-centralus
+  cron: 20 */2 * * *
+  steps:
+    env:
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      LOCATION: centralus
+    workflow: aro-hcp-provision-healthcheck
+  timeout: 2h0m0s
+- as: provision-canadacentral
+  cron: 40 */2 * * *
+  steps:
+    env:
+      ARO_HCP_CLOUD: dev
+      ARO_HCP_DEPLOY_ENV: ci01
+      LOCATION: canadacentral
+    workflow: aro-hcp-provision-healthcheck
+  timeout: 2h0m0s
+zz_generated_metadata:
+  branch: main
+  org: Azure
+  repo: ARO-HCP
+  variant: periodic-healthcheck

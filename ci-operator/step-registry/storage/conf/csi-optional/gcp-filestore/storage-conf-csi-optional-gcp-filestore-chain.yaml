@@ -1,0 +1,27 @@
+chain:
+  as: storage-conf-csi-optional-gcp-filestore
+  steps:
+    - ref: optional-operators-subscribe
+    - ref: storage-create-csi-gcp-filestore
+    - ref: storage-conf-wait-for-csi-driver
+    - ref: storage-conf-storageclass-set-default-storageclass
+  env:
+  - name: REQUIRED_DEFAULT_STORAGECLASS
+    default: "filestore-csi"
+  - name: CLUSTERCSIDRIVER
+    default: filestore.csi.storage.gke.io
+  - name: OO_PACKAGE
+    default: gcp-filestore-csi-driver-operator
+  - name: OO_CHANNEL
+    default: stable
+  - name: OO_INSTALL_NAMESPACE
+    default : openshift-cluster-csi-drivers
+  - name: OO_TARGET_NAMESPACES
+    default: '!all'
+  - name: TRUECONDITIONS
+    default: GCPFILESTOREDriverControllerServiceControllerAvailable GCPFILESTOREDriverNodeServiceControllerAvailable
+  - name: TEST_CSI_DRIVER_MANIFEST
+    default: manifest-gcp-filestore.yaml
+  documentation: |-
+    The storage-conf-csi-optional-gcp-filestore step subscribes the gcp-filestore-csi-driver-operator, creates filestore csidriver
+    custom resource to install the gcp-filestore-csi-driver and create the storageclass `filestore-csi`.

@@ -1,0 +1,30 @@
+chain:
+  as: rosa-e2e-hcp-ocm-provision
+  env:
+  - name: HOSTED_CP
+    default: "true"
+  - name: ENABLE_BYOVPC
+    default: "true"
+  - name: STS
+    default: "true"
+  - name: PROVISION_ENTRYPOINT
+    default: ""
+    documentation: |-
+      Command (from the rosa-e2e image) that creates the HCP cluster via the OCM Go
+      SDK and writes its OCM id to ${SHARED_DIR}/cluster-id. Required: the nested
+      rosa-e2e-ocm-provision ref exits 1 when this is empty. The rosa-e2e image does
+      not yet ship a stand-alone hand-off provisioner (its only entrypoint is
+      e2e.test, whose lifecycle spec self-deletes), so consumers must set this once
+      that subcommand exists. Tracked as a ROSAENG-308 follow-up.
+  steps:
+  - ref: aws-provision-vpc-shared
+  - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+  - chain: rosa-sts-oidc-config-create
+  - ref: rosa-e2e-ocm-provision
+  - ref: aws-provision-tags-for-byo-vpc
+  documentation: >-
+    Provisions a ROSA HCP cluster with the rosa-e2e OCM Go SDK provisioner into a
+    BYO shared VPC with an STS OIDC config, and publishes the SHARED_DIR
+    provisioner-to-validator contract (cluster-id, kubeconfig, cluster-metadata.json)
+    defined in ROSAENG-67580. This is the swappable "head" of the provision x
+    validate matrix; the validation tail is provisioner-agnostic.

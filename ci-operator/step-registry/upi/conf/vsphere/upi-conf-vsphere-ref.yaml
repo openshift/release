@@ -1,0 +1,89 @@
+ref:
+  as: upi-conf-vsphere
+  from: upi-installer
+  grace_period: 10m
+  commands: upi-conf-vsphere-commands.sh
+  env:
+  - name: FIPS_ENABLED
+    default: "false"
+    documentation: "Indicates a FIPS-enabled cluster, to disable FIPS host checks in the installer."
+  - name: CONTROL_PLANE_REPLICAS
+    default: "3"
+    documentation: |-
+      the number of the master nodes for upi on vsphere cluster.
+  - name: COMPUTE_NODE_REPLICAS
+    default: "2"
+    documentation: |-
+      the number of the worker nodes for upi on vsphere cluster.
+  - name: OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
+    default: "true"
+    documentation: "Set to true to disable the Sigstore image signature policy to allow the installation of an unsigned release image. This is for internal CI testing only"
+  - name: CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    default: ""
+    documentation: "Used to overwrite the OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to a customized payload"
+  - name: STRIP_VSPHERE_FAILURE_DOMAINS
+    default: ""
+    documentation: >-
+      When set to "true", deletes spec.platformSpec.vsphere.vcenters and
+      spec.platformSpec.vsphere.failureDomains from the generated
+      Infrastructure manifest right after `create manifests`, and rewrites
+      the generated openshift-config/cloud-provider-config ConfigMap from
+      YAML into the legacy INI format (using the server/datacenter/
+      datastore/folder values the installer resolved for the sole failure
+      domain) inside bootstrap.ign, once the bootstrap host's own render of
+      that ConfigMap has already consumed the installer's native YAML (a
+      byte-for-byte mismatch between that render and the in-cluster one
+      otherwise permanently degrades the machine-config ClusterOperator).
+      This simulates a cluster installed without vSphere failure domain
+      information (e.g. pre-4.13 or UPI installs that never populate it, a
+      state the installer never backfills on upgrade) in a form that can
+      actually occur on a real cluster: no installer version in active use
+      renders cloud-provider-config as INI anymore, so without the rewrite,
+      stripping alone leaves no source of datastore/topology data anywhere,
+      which keeps storage permanently Degraded and the install from ever
+      completing.
+  - name: VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER
+    default: post-bootstrap
+    documentation: >-
+      vSphere only, and only meaningful with STRIP_VSPHERE_FAILURE_DOMAINS.
+      Selects when the legacy-INI openshift-config/cloud-provider-config
+      substitution is applied on the bootstrap host, which must match how the
+      target payload renders that ConfigMap in-cluster. The in-cluster
+      ControllerConfig value comes from
+      openshift-config-managed/kube-cloud-config, and who writes that copy is
+      gated on the VSphereMultiVCenterDay2 feature gate:
+      "post-bootstrap" (the default) waits for bootkube's config-bootstrap
+      stage, correct from 4.22/5.x on, where CCMO owns the managed copy and
+      always normalizes it to YAML; "pre-bootstrap" orders the swap
+      Before=bootkube.service and is correct while the gate is off (4.19,
+      4.20, 4.21), where cluster-config-operator copies the ConfigMap
+      verbatim, so the in-cluster render follows the live ConfigMap's format.
+      Choosing wrongly makes the bootstrap-rendered and in-cluster rendered
+      master MachineConfigs hash differently, which permanently degrades the
+      machine-config ClusterOperator mid-install. Set per-test in the release
+      config; it cannot be derived from install-config or the generated
+      manifests.
+  credentials:
+    - collection: vsphere-vmc
+      group: terraform
+      mount_path: /var/run/vault/vsphere
+    - collection: vsphere-vmc
+      group: ibmcloud
+      mount_path: /var/run/vault/ibmcloud
+    - collection: vsphere
+      group: ibmcloud/config
+      mount_path: /var/run/vault/vsphere-ibmcloud-config
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST
+  documentation: >-
+    This step creates the files necessary to deploy a vSphere UPI cluster.
+    It requires an existing install-config.yaml to exist in the shared directory with the necessary configuration to deploy a cluster to the vSphere CI project.
+    It uses this install-config.yaml to generate the govc.sh, Ignition, metadata.json, and kubeconfig files with the modifications required to support the vSphere UPI workflow.
+    These files are copied to the shared directory for future consumption.

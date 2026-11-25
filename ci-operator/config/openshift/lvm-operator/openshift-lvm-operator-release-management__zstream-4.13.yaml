@@ -1,0 +1,106 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  upi-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.18
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-sno
+  run_if_changed: releases/lvm-operator-(catalog-4-13|rhba-v4\.13).*
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      ZSTREAM_VERSION: "4.13"
+    test:
+    - as: lvms-e2e
+      cli: latest
+      commands: |
+        # The e2e ginkgo suite lives on the release branch (not the catalog
+        # vcs-ref / release-management branch). LVMS is already installed into
+        # openshift-storage by the workflow pre-phase from the PR catalog, so
+        # run the suite in tests-only mode (no install/disk/uninstall).
+        cd /tmp && git init src && cd src
+        git remote add origin https://github.com/openshift/lvm-operator.git
+        git fetch --depth 1 origin release-4.13 && git checkout FETCH_HEAD
+        cd e2e
+        GO_COMPLIANCE_POLICY=exempt_all GOFLAGS="" CGO_ENABLED=0 go test -c -o /tmp/e2e.test .
+        /tmp/e2e.test \
+          --lvm-operator-install=false \
+          --lvm-operator-uninstall=false \
+          --disk-install=false \
+          -ginkgo.v -ginkgo.junit-report=${ARTIFACT_DIR}/junit_e2e.xml
+      from: root
+      resources:
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      timeout: 2h0m0s
+    workflow: cucushift-installer-rehearse-aws-ipi-sno-lvms
+- as: e2e-aws-mno
+  run_if_changed: releases/lvm-operator-(catalog-4-13|rhba-v4\.13).*
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      LVM_OPERATOR_SUB_INSTALL_NAMESPACE: openshift-storage
+      LVM_OPERATOR_SUB_SOURCE: lvm-catalogsource
+      ZSTREAM_VERSION: "4.13"
+    test:
+    - as: lvms-e2e
+      cli: latest
+      commands: |
+        # The e2e ginkgo suite lives on the release branch (not the catalog
+        # vcs-ref / release-management branch). LVMS is already installed into
+        # openshift-storage by the workflow pre-phase from the PR catalog, so
+        # run the suite in tests-only mode (no install/disk/uninstall).
+        cd /tmp && git init src && cd src
+        git remote add origin https://github.com/openshift/lvm-operator.git
+        git fetch --depth 1 origin release-4.13 && git checkout FETCH_HEAD
+        cd e2e
+        GO_COMPLIANCE_POLICY=exempt_all GOFLAGS="" CGO_ENABLED=0 go test -c -o /tmp/e2e.test .
+        /tmp/e2e.test \
+          --lvm-operator-install=false \
+          --lvm-operator-uninstall=false \
+          --disk-install=false \
+          -ginkgo.v -ginkgo.junit-report=${ARTIFACT_DIR}/junit_e2e.xml
+      from: root
+      resources:
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      timeout: 2h0m0s
+    workflow: cucushift-installer-rehearse-aws-ipi-mno-lvms
+zz_generated_metadata:
+  branch: release-management
+  org: openshift
+  repo: lvm-operator
+  variant: zstream-4.13

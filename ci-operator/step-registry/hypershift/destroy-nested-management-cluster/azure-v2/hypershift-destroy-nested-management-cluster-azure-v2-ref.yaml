@@ -1,0 +1,39 @@
+ref:
+  as: hypershift-destroy-nested-management-cluster-azure-v2
+  cli: latest
+  env:
+  - name: HYPERSHIFT_NAMESPACE
+    default: clusters
+    documentation: The Namespace where to create the HostedCluster and NodePools
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: ''
+    documentation: The cluster's FQDN will be a subdomain of the base domain.
+  - name: HYPERSHIFT_AZURE_LOCATION
+    default: uksouth
+    documentation: The Azure location for the cluster (only used when CLOUD_PROVIDER=Azure)
+  - name: CLOUD_PROVIDER
+    default: Azure
+    documentation: The cloud provider to use for the management cluster
+  - name: HYPERSHIFT_CLUSTER_ROLE
+    default: ''
+    documentation: Optional role suffix used to select a distinct management cluster.
+  commands: hypershift-destroy-nested-management-cluster-azure-v2-commands.sh
+  credentials:
+  - mount_path: /etc/hypershift-kubeconfig-azure
+    collection: hypershift-team
+    group: ops/clusters/sm-azure-root-ci
+    field: hypershift-ops-admin-kubeconfig
+    as: hypershift-ops-admin.kubeconfig
+  - mount_path: /etc/hypershift-ci-jobs-self-managed-azure
+    collection: hypershift-team
+    group: ops/clusters/sm-azure-root-ci
+    field: azure-credentials
+    as: credentials.json
+  from_image:
+    namespace: hypershift
+    name: hypershift-operator
+    tag: latest
+  grace_period: 15m0s
+  resources:
+    requests:
+      cpu: 100m

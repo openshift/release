@@ -1,0 +1,34 @@
+ref:
+  as: rosa-cluster-upgrade-hcp
+  from: rosa-aws-cli
+  grace_period: 10m
+  commands: rosa-cluster-upgrade-hcp-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 10h0m0s
+  env:
+  - name: OCM_LOGIN_ENV
+    default: "staging"
+    documentation: The environment for rosa login. The supported values are [production, staging, integration].
+  - name: CP_UPGRADE_TIMEOUT
+    default: "14400"
+    documentation: Set to number of seconds for the control plane upgrade to timeout if it's not ready.
+  - name: UPGRADED_TO_VERSION
+    default: ""
+    documentation: Upgrade the ROSA HCP control plane to the specified Y-stream, e.g. "4.18"; the recommended patch within that stream is chosen for you. Must be given as major.minor - the recommendation list is matched with a trailing separator, so a patch-level value such as "4.18.7" could never match an entry, and the step rejects anything that is not major.minor rather than quietly finding no version to upgrade to. When set and UPGRADE_CHANNEL is empty, the channel is derived from this target and no version discovery runs, so a version-query failure cannot block an explicitly requested hop.
+  - name: HOLD_TIME_BEFORE_UPGRADE
+    default: ""
+    documentation: Set to number of seconds before cluster upgrade action
+  - name: Z_STREAM_UPGRADE
+    default: "false"
+    documentation: When set to "true", performs a Z stream upgrade (latest patch within the current Y stream). When "false" (default), performs a Y stream upgrade to UPGRADED_TO_VERSION.
+  - name: UPGRADE_CHANNEL
+    default: ""
+    documentation: The target upgrade channel (e.g., candidate-4.22, stable-4.22). When set, the cluster channel is changed to this value before performing the upgrade. If empty and Z_STREAM_UPGRADE is false, auto-derived as UPGRADE_CHANNEL_PREFIX-{target Y-stream}, where the target Y-stream is UPGRADED_TO_VERSION when that is set, otherwise the next Y-stream newer than the cluster's current version.
+  - name: UPGRADE_CHANNEL_PREFIX
+    default: "candidate"
+    documentation: Prefix used to auto-derive UPGRADE_CHANNEL when it is not explicitly set (e.g., 'candidate' produces 'candidate-4.19'). When UPGRADE_CHANNEL, UPGRADED_TO_VERSION and Z_STREAM_UPGRADE are all unset it is also the channel group queried to discover the target Y-stream, and must then name one of the supported channel groups [stable, candidate, nightly]. Any of those three being set skips discovery entirely.
+  documentation: |-
+    Using rosa cli to upgrade the rosa HCP control plane to the specified openshift version.

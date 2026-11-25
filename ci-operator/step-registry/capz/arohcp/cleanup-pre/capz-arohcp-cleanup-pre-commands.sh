@@ -1,0 +1,1 @@
+../../test/cleanup-pre/capz-test-cleanup-pre-commands.sh

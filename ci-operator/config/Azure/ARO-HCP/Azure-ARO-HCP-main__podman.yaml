@@ -1,0 +1,35 @@
+build_root:
+  image_stream_tag:
+    name: aro-hcp-ci-images
+    namespace: aro-hcp
+    tag: aro-hcp-nested-podman-ci
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: "3"
+      memory: 6Gi
+tests:
+- as: integration
+  capabilities:
+  - nested-podman
+  - arm64
+  nested_podman: true
+  skip_if_only_changed: ^(?:docs/.*|.*\.md|(.*/)?(CODE)?OWNERS(_ALIASES)?|LICENSE|\.github/.*|\.(?:ci-operator\.yaml|editorconfig|gitattributes|gitignore|gitguardian\.yaml|gitleaks\.toml|golangci\.yml|mega-linter\.yml|yamlfmt\.yaml|yamllint\.yml))$
+  steps:
+    test:
+    - ref: aro-hcp-frontend-run-integration-tests
+- as: mega-linter
+  capabilities:
+  - nested-podman
+  - arm64
+  nested_podman: true
+  steps:
+    test:
+    - ref: aro-hcp-mega-lint
+zz_generated_metadata:
+  branch: main
+  org: Azure
+  repo: ARO-HCP
+  variant: podman

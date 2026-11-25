@@ -1,0 +1,37 @@
+workflow:
+  as: hypershift-agentic-qe-aws
+  steps:
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-setup-nested-management-cluster
+    - ref: hypershift-install
+    - chain: hypershift-aws-create
+    test:
+    - ref: hypershift-agentic-qe-process
+    post:
+    - ref: hypershift-agentic-qe-report
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy
+    - chain: hypershift-destroy-nested-management-cluster
+  documentation: |-
+    HyperShift Agent QE workflow: a live environment built from the PR under test.
+
+    This workflow provisions a management cluster with the HyperShift operator
+    installed from the PR under test, creates a HostedCluster from the PR's
+    release payload, then holds the environment so that a person or an agent
+    (Chai Bot, triggering the job through Gangway) can work with it.
+
+    Pre phase:
+    1. Provisions a nested management cluster via IPI
+    2. Installs the HyperShift operator built from the PR
+    3. Creates a HostedCluster with the PR payload via hypershift CLI
+
+    Test phase:
+    1. Holds the environment for HOLD_DURATION (default 30m); with
+       CHAI_SHARED_DIR_ACCESS=true, first grants Chai Bot read access to the
+       test's SHARED_DIR secret, which holds both kubeconfigs
+
+    Post phase:
+    1. Dumps cluster artifacts for debugging
+    2. Destroys the HostedCluster via hypershift CLI
+    3. Destroys the management cluster infrastructure

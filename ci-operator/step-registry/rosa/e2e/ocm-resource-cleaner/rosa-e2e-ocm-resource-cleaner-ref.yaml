@@ -1,0 +1,32 @@
+ref:
+  as: rosa-e2e-ocm-resource-cleaner
+  from: rosa-aws-cli
+  commands: rosa-e2e-ocm-resource-cleaner-commands.sh
+  grace_period: 5m
+  credentials:
+  - collection: ocm-fvt-credentials
+    group: cs-qe-credentials
+    mount_path: /usr/local/cs-qe-credentials
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  env:
+  - name: OCM_CLEANER_REGIONS
+    default: "us-west-2 us-east-1 us-east-2 eu-west-1 ap-southeast-1"
+    documentation: |-
+      Space-separated list of AWS regions to clean. Defaults to all common ROSA regions.
+  - name: OCM_CLEANER_HOURS_OLD
+    default: "12"
+    documentation: |-
+      Only delete resources older than this many hours (default: 12).
+  - name: OCM_CLEANER_CREDENTIALS_FILE
+    default: "/usr/local/cs-qe-credentials/aws-cred-ocp5"
+    documentation: |-
+      Path to the AWS credentials file to use. Defaults to the OCP5 account credentials.
+  documentation: |-
+    Cleans up stale AWS resources (NAT gateways, EIPs, load balancers) left behind
+    by OCM FVT test runs in the OCP5 staging account. Prevents AWS quota exhaustion
+    (e.g. NatGatewayLimitExceeded) that blocks subsequent CI jobs.
+    Targets VPCs matching known OCM backend-test profile names, older than the
+    configured age threshold. Tracks ROSAENG-66900.

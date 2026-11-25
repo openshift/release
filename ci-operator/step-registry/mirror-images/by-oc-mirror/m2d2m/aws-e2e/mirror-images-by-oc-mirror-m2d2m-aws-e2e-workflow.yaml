@@ -1,0 +1,43 @@
+workflow:
+  as: mirror-images-by-oc-mirror-m2d2m-aws-e2e
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: mirror-images-by-oc-mirror-m2d2m-aws-pre
+    - ref: ipi-conf-additional-ca-trust-policy
+    test:
+    - ref: mirror-images-by-oc-mirror-m2d2m-enable-registry-route
+    - ref: mirror-images-community-e2e-images
+    - ref: mirror-images-qe-test-images
+    - ref: mirror-images-trust-registry-ca
+    - ref: mirror-images-by-oc-mirror-m2d2m-registry-route-trust
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-core-dump
+    - chain: ipi-aws-post-disconnected
+    - ref: mirror-images-by-oc-mirror-analyze-e2e-failure
+  documentation: |-
+    The mirror-images-by-oc-mirror-m2d2m-aws-e2e workflow executes the common
+    end-to-end test suite on a disconnected AWS cluster using the two-phase
+    oc-mirror mirror-to-disk/disk-to-mirror (m2d2m) workflow.
+
+    The cluster is installed in a private VPC with no direct internet access.
+    A bastion host on the public subnet provides a mirror registry, egress
+    proxy, and SSH jump host.
+
+    Unlike openshift-e2e-aws-disconnected (which uses a single mirror-to-mirror
+    pass), this workflow first mirrors the release payload to a local disk archive
+    (with internet access), then pushes from the archive into the bastion mirror
+    registry with public internet access blocked via iptables on the bastion,
+    verifying that the import succeeds in a no-public-internet environment before
+    cluster installation proceeds.
+
+    Before the e2e test phase, mirror-images-by-oc-mirror-m2d2m-enable-registry-route patches the
+    cluster image-registry operator to expose the integrated registry via a public
+    Route for public integrated-registry references used by e2e build/test cases.
+    Community e2e images are mirrored to the bastion registry, not this route.
+    After configuring bastion mirror trust, mirror-images-by-oc-mirror-m2d2m-registry-route-trust
+    adds the ingress CA to the same trust ConfigMap without replacing mirror trust.
+    It gates conformance on authenticated default-route pulls on all Linux workers.
+    This does not weaken the air-gap assertion: it exposes only an inbound Route,
+    not outbound cluster or bastion egress.

@@ -1,0 +1,87 @@
+ref:
+  as: openshift-hyperfleet-e2e-test-perf
+  from: hyperfleet-e2e
+  grace_period: 10m
+  commands: openshift-hyperfleet-e2e-test-perf-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  timeout: 2h0m0s
+  env:
+  - name: PROCS
+    default: "8"
+    documentation: >-
+      Number of parallel ginkgo processes for E2E execution. The ginkgo CLI
+      distributes specs across this many OS processes. Tests marked
+      ginkgo.Serial run after all parallel specs complete.
+  - name: LABEL_FILTER
+    default: ""
+    documentation: The label filter for the e2e tests.
+  - name: SUITE_TIMEOUT
+    default: "2h"
+    documentation: >-
+      Ginkgo suite timeout for the whole e2e run, read by the e2e binary.
+      Defaults to 2h so the combined tier0+tier1 rc-e2e job (~60 min) is not
+      cut off at Ginkgo's 1h default. Nightly single-tier jobs finish well
+      under this.
+  - name: FLAKE_ATTEMPTS
+    default: "1"
+    documentation: >-
+      Ginkgo --flake-attempts for the perf specs. Fixed at 1 on purpose: a
+      retry turns a latency regression that fails once into a green run, and
+      catching that is what the perf job is for. Other e2e jobs don't declare
+      this param and keep the script default of 2.
+  - name: ADAPTER_CHART_REPO
+    default: "https://github.com/openshift-hyperfleet/hyperfleet-adapter.git"
+    documentation: The Helm chart repository URL for the Adapter component.
+  - name: ADAPTER_CHART_REF
+    default: "main"
+    documentation: The git reference (branch/tag/commit) for the Adapter chart repository.
+  - name: MULTISTAGE_PARAM_OVERRIDE_ADAPTER_CHART_REF
+    default: ""
+    documentation: Gangway override for ADAPTER_CHART_REF. When set, it takes precedence over ADAPTER_CHART_REF.
+  - name: ADAPTER_CHART_PATH
+    default: "charts"
+    documentation: The path to the charts directory within the Adapter chart repository.
+  - name: IMAGE_REGISTRY
+    default: "quay.io"
+    documentation: The container image registry to pull images from.
+  - name: ADAPTER_IMAGE_REPO
+    default: "redhat-services-prod/hyperfleet-tenant/hyperfleet/hyperfleet-adapter"
+    documentation: The image repository path for the Adapter component.
+  - name: MULTISTAGE_PARAM_OVERRIDE_ADAPTER_IMAGE_TAG
+    default: "latest"
+    documentation: The image tag for the Adapter component.
+  - name: API_CHART_REPO
+    default: "https://github.com/openshift-hyperfleet/hyperfleet-api.git"
+    documentation: The Helm chart repository URL for the API component.
+  - name: API_CHART_REF
+    default: "main"
+    documentation: The git reference (branch/tag/commit) for the API chart repository.
+  - name: MULTISTAGE_PARAM_OVERRIDE_API_CHART_REF
+    default: ""
+    documentation: Gangway override for API_CHART_REF. When set, it takes precedence over API_CHART_REF.
+  - name: API_CHART_PATH
+    default: "charts"
+    documentation: The path to the charts directory within the API chart repository.
+  - name: MULTISTAGE_PARAM_OVERRIDE_E2E_REF
+    default: ""
+    documentation: >-
+      When set, the test step clones hyperfleet-e2e at this ref into
+      /tmp/e2e-src, runs `make build`, and points E2E_BIN at
+      /tmp/e2e-src/bin/hyperfleet-e2e (with TESTDATA from the same
+      clone). When empty, uses the pre-built binary and testdata from
+      the pod image (the last promoted main). Prefixed for Gangway
+      override compatibility.
+  credentials:
+  - collection: hyperfleet
+    group: hyperfleet-e2e
+    mount_path: /var/run/hyperfleet-e2e
+  documentation: |-
+    Hyperfleet e2e test step with its own resource budget for the perf specs
+    (500m CPU, 1Gi memory) and no retries (FLAKE_ATTEMPTS=1). Otherwise
+    identical to openshift-hyperfleet-e2e-test: the commands file is a symlink
+    to that step's script. Env and credentials are duplicated, so when you add
+    or change an env param, make the same change in both refs, or Gangway
+    overrides of it will not reach perf runs.

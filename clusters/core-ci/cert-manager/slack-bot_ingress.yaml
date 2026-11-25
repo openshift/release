@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    haproxy.router.openshift.io/timeout: "90s"
+  name: slack-bot
+  namespace: ci
+spec:
+  ingressClassName: openshift-default
+  tls:
+  - secretName: slack-bot-tls
+    hosts:
+    - slack.ci.openshift.org
+  rules:
+  - host: slack.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: slack-bot
+            port:
+              number: 8888
+        pathType: ImplementationSpecific

@@ -1,0 +1,60 @@
+ref:
+  as: interop-tests-ibm-fusion-access-test-vm-snapshots
+  from: cli
+  commands: interop-tests-ibm-fusion-access-test-vm-snapshots-commands.sh
+  timeout: 2h0m0s
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    Test CNV VM snapshot operations with IBM Storage Scale shared storage.
+    
+    This step tests VM snapshot creation, verification, restore, and deletion
+    to verify that VM snapshots work correctly with IBM Storage Scale CSI driver.
+    
+    Tests implemented:
+    - FA-CNV-1025: Create VM snapshot using VirtualMachineSnapshot
+    - FA-CNV-1026: Verify snapshot exists and check VolumeSnapshot resources
+    - FA-CNV-1027: Restore VM from snapshot using VirtualMachineRestore
+    - FA-CNV-1028: Delete snapshot and verify cleanup
+    
+    Prerequisites:
+    - CNV must be deployed and operational
+    - IBM Storage Scale shared storage class must be configured
+    - VolumeSnapshotClass for IBM Storage Scale CSI (will be created if missing)
+    - Test namespace will be created if it doesn't exist
+    
+    Note: This step will attempt to create a VolumeSnapshotClass if none exists,
+    but snapshot operations may fail if the CSI driver doesn't support snapshots.
+  env:
+  - name: CNV_NAMESPACE
+    documentation: The namespace for CNV
+    default: "openshift-cnv"
+  - name: SHARED_STORAGE_CLASS
+    documentation: Storage class for shared storage between CNV and IBM Fusion Access
+    default: "ibm-spectrum-scale-cnv"
+  - name: TEST_NAMESPACE
+    documentation: Namespace for testing VM snapshots
+    default: "cnv-snapshots-test"
+  - name: VM_NAME
+    documentation: Name of the test VM
+    default: "test-snapshot-vm"
+  - name: SNAPSHOT_NAME
+    documentation: Name of the VM snapshot
+    default: "test-vm-snapshot"
+  - name: RESTORE_VM_NAME
+    documentation: Name of the restored VM
+    default: "restored-vm"
+  - name: VM_CPU_REQUEST
+    documentation: CPU request for test VM
+    default: "1"
+  - name: VM_MEMORY_REQUEST
+    documentation: Memory request for test VM
+    default: "1Gi"
+  - name: VM_SNAPSHOT_TIMEOUT
+    documentation: Timeout for VM snapshot and restore operations
+    default: "10m"
+
+

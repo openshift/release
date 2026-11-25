@@ -1,0 +1,30 @@
+ref:
+  as: opct-conformance-test-results
+  from: upi-installer
+  credentials:
+  - namespace: test-credentials
+    bundle: registry-pull-credentials
+    mount_path: /var/run/ci-credentials/registry
+  - collection: splat
+    group: opct
+    mount_path: /var/run/vault/opct
+  commands: opct-conformance-test-results-commands.sh
+  timeout: 30m
+  grace_period: 30m
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: >-
+    This step gather the OPCT result artifact and publish it on persistent storage (S3).
+
+    The step fails when one of its own processing stages fails (retrieve, opct results,
+    opct report, adm baseline publish, adm baseline indexer) or when OPCT reports that a
+    plugin did not execute validly (checks OPCT-022, OPCT-023A and OPCT-023B). Conformance
+    test failures do not fail the step: they are OCP engineering's to address and remain
+    available in opct-report.json. A baseline rejected by OPCT's own SLO checks is likewise
+    not a step failure.
+
+    Results are also written as JUnit to ${ARTIFACT_DIR}/junit_opct_results.xml so the
+    failing stage is visible directly in the Prow job view. Only the stages above appear
+    there; individual conformance tests are deliberately excluded.

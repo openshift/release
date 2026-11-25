@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Generate an oc image mirror plan file for a given release and destination
+
+v="${VERSION:-v3.11}"
+base="${BASE:-docker.io/openshift/origin-}"
+tag="${TAG:-${v},${v}.0}"
+
+out="$( oc describe is -n openshift origin-${v} | grep 'tagged from' -B1 | grep -E '^[a-z]' )"
+for i in $out; do
+  a="registry.ci.openshift.org/openshift/origin-${v}:${i} "
+  for t in ${tag//,/ }; do
+    a+=" ${base}${i}:${t}"
+  done
+  echo $a
+done

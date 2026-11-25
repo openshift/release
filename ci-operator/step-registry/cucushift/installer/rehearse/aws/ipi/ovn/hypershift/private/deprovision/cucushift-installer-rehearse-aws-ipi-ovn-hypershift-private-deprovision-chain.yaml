@@ -1,0 +1,25 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-private-deprovision
+  steps:
+  - chain: hypershift-dump
+  - chain: gather-network
+  - ref: gather-proxy
+  - chain: gather-core-dump
+  - ref: gather-aws-console
+  - ref: aws-deprovision-security-group
+  - ref: aws-deprovision-stacks
+  - ref: aws-deprovision-s3buckets
+  - ref: proxy-config-remove
+  - chain: hypershift-aws-destroy
+  - chain: ipi-deprovision
+  env:
+  - name: HYPERSHIFT_AWS_REGION
+    default: ""
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: "hypershift-ci.qe.devcluster.openshift.com"
+  - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
+    default: "true"
+  documentation: |-
+    This chain deprovisions a fully private Hypershift hosted cluster on AWS. 
+    Note that the bastion host must be deprovisioned before the hosted cluster to avoid dependency violations 
+    which will otherwise occur during the removal of the hosted cluster. 

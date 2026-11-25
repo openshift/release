@@ -1,0 +1,21 @@
+workflow:
+  as: openshift-upgrade-gcp-heterogeneous
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: ipi-gcp-pre-stableinitial
+    - ref: ipi-install-heterogeneous
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-network
+    - chain: ipi-gcp-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+      TEST_UPGRADE_OPTIONS: ""
+  documentation: |-
+    The Openshift E2E GCP workflow executes the upgrade end-to-end test suite on GCP with a multi-arch compute cluster configuration, exercising an upgrade during the process.

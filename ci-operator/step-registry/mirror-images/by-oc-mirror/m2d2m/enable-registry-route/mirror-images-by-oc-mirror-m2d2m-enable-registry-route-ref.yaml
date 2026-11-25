@@ -1,0 +1,26 @@
+ref:
+  as: mirror-images-by-oc-mirror-m2d2m-enable-registry-route
+  from: cli
+  commands: mirror-images-by-oc-mirror-m2d2m-enable-registry-route-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  timeout: 15m0s
+  grace_period: 1m0s
+  documentation: |-
+    Enables the OpenShift integrated image-registry's default route
+    (configs.imageregistry.operator.openshift.io cluster spec.defaultRoute=true)
+    and waits until 'oc registry info --public' resolves successfully.
+
+    Required for external integrated-registry access, including e2e build/test
+    cases that use public registry references, because the internal registry
+    Service is not reachable from CI pods.
+
+    Hostname readiness alone does not configure node trust for the route's
+    certificate. Use mirror-images-by-oc-mirror-m2d2m-registry-route-trust as a
+    separate trust and authenticated worker-pull gate.
+
+    This step does not restore or weaken any air-gap or disconnected-egress
+    configuration: it only exposes an inbound OpenShift Route so the CI pod
+    can push test images into the cluster.

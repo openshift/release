@@ -1,0 +1,57 @@
+ref:
+  as: rosa-seaplane-e2e-run
+  from_image:
+    namespace: ci
+    name: rosa-regional-platform-ci
+    tag: latest
+  commands: rosa-seaplane-e2e-run-commands.sh
+  grace_period: 15m
+  timeout: 7200s
+  resources:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+  credentials:
+  - collection: cluster-secrets-rosa-regional-platform-int
+    group: ephemeral-creds
+    mount_path: /var/run/rosa-credentials
+  env:
+  - name: AWS_CONFIG_FILE
+    default: "/var/run/rosa-credentials/aws_config"
+    documentation: |-
+      Path to the AWS CLI config file with named profiles from the mounted
+      credential secret.
+  - name: ROSA_REGIONAL_PLATFORM_REF
+    default: "main"
+    documentation: |-
+      Git ref of openshift-online/rosa-seaplane to clone for the platform
+      hooks (before-suites.sh / after-suites.sh). Only used when the
+      provision step did not pin a commit; the pinned commit wins.
+  - name: E2E_SUITES
+    default: "api zoa rosa-cli monitoring"
+    documentation: |-
+      Space-separated list of e2e suites to run. Defaults to all suites.
+      An unknown suite fails the step immediately, listing the available
+      suites discovered from the checked-out suite repos.
+  - name: E2E_SUITE_ENV
+    default: ""
+    documentation: |-
+      Optional pass-through to narrow down inside suites, one KEY=VALUE per
+      line (e.g. ROSA_LABEL_FILTER=hyperfleet-sanity). Applied after
+      e2e.env, so it wins over the environment defaults.
+  - name: E2E_SUITE_TIMEOUT
+    default: "1h"
+    documentation: |-
+      Per-suite timeout (timeout(1) format). A suite that exceeds it is
+      counted as a normal failure and the environment dump still runs.
+  documentation: |-
+    Generic parallel e2e suite runner for rosa-seaplane. Knows nothing
+    about any particular suite: it sources e2e.env (written by the
+    rosa-seaplane-e2e-env step) and the platform hooks
+    (ci/e2e-hooks/before-suites.sh), checks out each suite repo at its
+    pinned commit from e2e.env — or at the job's own source (PR merged
+    into its base) for the repo whose CI runs the job — discovers suites
+    by folder (ci/e2e/<suite>/run), validates E2E_SUITES (a typo fails
+    before anything starts), runs the selected suites in parallel with
+    per-suite artifact dirs, logs and timeouts, reports PASS/FAIL per
+    suite, and sources ci/e2e-hooks/after-suites.sh once at the end.

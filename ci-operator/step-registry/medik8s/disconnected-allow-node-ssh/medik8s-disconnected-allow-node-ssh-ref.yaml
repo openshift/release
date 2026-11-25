@@ -1,0 +1,32 @@
+ref:
+  as: medik8s-disconnected-allow-node-ssh
+  from: upi-installer
+  cli: latest
+  grace_period: 10m
+  commands: medik8s-disconnected-allow-node-ssh-commands.sh
+  best_effort: true
+  timeout: 10m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: NODE_SSH_PORT
+    documentation: TCP port to open on the worker node security group for SSH.
+    default: "22"
+  documentation: |-
+    Opens inbound SSH (TCP/22 by default) on the worker node security
+    group from the disconnected external bastion's private IP.
+
+    Disconnected AWS clusters are installed in a private VPC and reached
+    through an EC2 bastion in the public subnet, which the test SSH helper
+    uses as a ProxyCommand jump host. The bastion's own security group
+    allows inbound SSH, but the worker node security group does not permit
+    SSH from the bastion, so the bastion->worker hop is silently dropped
+    (connection timed out during banner exchange).
+
+    This step authorizes TCP/22 on the worker node security group
+    (tag sigs.k8s.io/cluster-api-provider-aws/role=node, Name=<infraID>-*)
+    from the bastion's private IP /32, enabling destructive tests that must
+    SSH into a worker (e.g. to stop kubelet) on disconnected clusters. It is
+    idempotent (tolerates InvalidPermission.Duplicate) and best_effort.

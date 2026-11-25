@@ -1,0 +1,199 @@
+#!/usr/bin/env bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+# https://docs.aws.amazon.com/cli/latest/topic/config-vars.html
+export AWS_DEFAULT_REGION=us-east-1
+export AWS_DEFAULT_OUTPUT=json
+
+if [ "${BASE_DOMAIN}" = "shiftstack.devcluster.openshift.com" ]; then
+  # Creds managed by the ShiftStack team controlling the shiftstack.devcluster.openshift.com zone
+  export AWS_SHARED_CREDENTIALS_FILE="/var/run/aws/.awscred"
+else
+  # Global creds for all other zones
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+fi
+if [ ! -f "${AWS_SHARED_CREDENTIALS_FILE}" ]; then
+  echo "Credentials file is not correctly mounted"
+fi
+
+TMP_DIR=$(mktemp -d)
+
+if [ -f "${SHARED_DIR}/CLUSTER_NAME" ]; then
+  CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
+else
+  CLUSTER_NAME="$(echo -n "$PROW_JOB_ID"|sha256sum|cut -c-20)"
+fi
+
+echo "Getting the hosted zone ID for domain: ${BASE_DOMAIN}"
+HOSTED_ZONE_ID="$(aws route53 list-hosted-zones-by-name \
+  --dns-name "${BASE_DOMAIN}" \
+  --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${BASE_DOMAIN}.\`].Id" \
+  --output text)"
+
+cat > "${SHARED_DIR}/dns_up.json" <<EOF
+{
+  "Comment": "Upsert records for ${CLUSTER_NAME}.${BASE_DOMAIN}",
+  "Changes": []
+}
+EOF
+
+# Records published by this step, as "<name>|<type>|<space separated values>".
+# Used at the end to read them back from Route 53 once the change is INSYNC.
+PUBLISHED_RRSETS=()
+
+if [ -f "${SHARED_DIR}/API_IP" ]; then
+  API_IP=$(<"${SHARED_DIR}"/API_IP)
+
+  # LB_HOSTS present => multi-value api RR; else API_IP.
+  # api-int uses LB_PRIVATE_IPS when present, else API_IP.
+  API_RECORD_VALUES=()
+  if [[ "${CONFIG_TYPE:-}" == *"externallb"* && -f "${SHARED_DIR}/LB_HOSTS" ]]; then
+    while IFS= read -r ip || [[ -n "${ip}" ]]; do
+      [[ -z "${ip}" ]] && continue
+      API_RECORD_VALUES+=("${ip}")
+    done < "${SHARED_DIR}/LB_HOSTS"
+  fi
+  if [[ "${#API_RECORD_VALUES[@]}" -eq 0 ]]; then
+    API_RECORD_VALUES+=("${API_IP}")
+  fi
+
+  if [[ "${API_RECORD_VALUES[0]}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    API_RECORD_TYPE="A"
+  else
+    API_RECORD_TYPE="AAAA"
+  fi
+  API_RESOURCE_RECORDS="$(printf '%s\n' "${API_RECORD_VALUES[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0)) | map({"Value": .})')"
+
+  echo "Creating API DNS ${API_RECORD_TYPE} record for ${CLUSTER_NAME}.${BASE_DOMAIN} -> ${API_RECORD_VALUES[*]}"
+  jq --arg name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." \
+    --arg type "${API_RECORD_TYPE}" \
+    --argjson rr "${API_RESOURCE_RECORDS}" \
+    '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": $name, "Type": $type, "TTL": 300, "ResourceRecords": $rr}}]' \
+    "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_api.json"
+  cp "${TMP_DIR}/dns_api.json" "${SHARED_DIR}/dns_up.json"
+  PUBLISHED_RRSETS+=("api.${CLUSTER_NAME}.${BASE_DOMAIN}.|${API_RECORD_TYPE}|${API_RECORD_VALUES[*]}")
+  if [[ "${CONFIG_TYPE:-}" == *"externallb"* ]]; then
+    API_INT_VALUES=()
+    if [[ -f "${SHARED_DIR}/LB_PRIVATE_IPS" ]]; then
+      while IFS= read -r ip || [[ -n "${ip}" ]]; do
+        [[ -z "${ip}" ]] && continue
+        API_INT_VALUES+=("${ip}")
+      done < "${SHARED_DIR}/LB_PRIVATE_IPS"
+    fi
+    if [[ "${#API_INT_VALUES[@]}" -eq 0 ]]; then
+      API_INT_VALUES+=("${API_IP}")
+    fi
+
+    if [[ "${API_INT_VALUES[0]}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      API_INT_RECORD_TYPE="A"
+    else
+      API_INT_RECORD_TYPE="AAAA"
+    fi
+    API_INT_RESOURCE_RECORDS="$(printf '%s\n' "${API_INT_VALUES[@]}" | jq -R -s -c 'split("\n") | map(select(length > 0)) | map({"Value": .})')"
+
+    echo "Creating API-INT DNS ${API_INT_RECORD_TYPE} record for ${CLUSTER_NAME}.${BASE_DOMAIN} -> ${API_INT_VALUES[*]}"
+    jq --arg name "api-int.${CLUSTER_NAME}.${BASE_DOMAIN}." \
+      --arg type "${API_INT_RECORD_TYPE}" \
+      --argjson rr "${API_INT_RESOURCE_RECORDS}" \
+      '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": $name, "Type": $type, "TTL": 300, "ResourceRecords": $rr}}]' \
+      "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_api_int.json"
+    cp "${TMP_DIR}/dns_api_int.json" "${SHARED_DIR}/dns_up.json"
+    PUBLISHED_RRSETS+=("api-int.${CLUSTER_NAME}.${BASE_DOMAIN}.|${API_INT_RECORD_TYPE}|${API_INT_VALUES[*]}")
+  fi
+fi
+
+if [ -f "${SHARED_DIR}/INGRESS_IP" ]; then
+  INGRESS_IP=$(<"${SHARED_DIR}"/INGRESS_IP)
+  if [[ "${INGRESS_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    INGRESS_RECORD_TYPE="A"
+  else
+    INGRESS_RECORD_TYPE="AAAA"
+  fi
+  echo "Creating INGRESS DNS $INGRESS_RECORD_TYPE record for $CLUSTER_NAME.$BASE_DOMAIN"
+  jq '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": "*.apps.'${CLUSTER_NAME}'.'${BASE_DOMAIN}'.", "Type": "'${INGRESS_RECORD_TYPE}'", "TTL": 300, "ResourceRecords": [{"Value": "'${INGRESS_IP}'"}]}}]' "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_ingress.json"
+  cp "${TMP_DIR}/dns_ingress.json" "${SHARED_DIR}/dns_up.json"
+fi
+
+if [ -f "${SHARED_DIR}/HCP_INGRESS_IP" ]; then
+  # Hosted Cluster name always depends on the following pattern.
+  HOSTED_CLUSTER_NAME="$(echo -n "$PROW_JOB_ID"|sha256sum|cut -c-20)"
+  HCP_INGRESS_IP=$(<"${SHARED_DIR}"/HCP_INGRESS_IP)
+  if [[ "${HCP_INGRESS_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    HCP_INGRESS_RECORD_TYPE="A"
+  else
+    HCP_INGRESS_RECORD_TYPE="AAAA"
+  fi
+  echo "Creating HCP INGRESS DNS $HCP_INGRESS_RECORD_TYPE record for $CLUSTER_NAME.$BASE_DOMAIN"
+  jq '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": "*.apps.'${HOSTED_CLUSTER_NAME}'.'${BASE_DOMAIN}'.", "Type": "'${HCP_INGRESS_RECORD_TYPE}'", "TTL": 300, "ResourceRecords": [{"Value": "'${HCP_INGRESS_IP}'"}]}}]' "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_hcp_ingress.json"
+  cp "${TMP_DIR}/dns_hcp_ingress.json" "${SHARED_DIR}/dns_up.json"
+fi
+
+if [ -f "${SHARED_DIR}/MIRROR_REGISTRY_IP" ]; then
+  MIRROR_REGISTRY_IP=$(<"${SHARED_DIR}"/MIRROR_REGISTRY_IP)
+  if [[ "${MIRROR_REGISTRY_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    MIRROR_REGISTRY_RECORD_TYPE="A"
+  else
+    MIRROR_REGISTRY_RECORD_TYPE="AAAA"
+  fi
+  echo "Creating Mirror Registry DNS $MIRROR_REGISTRY_RECORD_TYPE record for $CLUSTER_NAME.$BASE_DOMAIN"
+  jq '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": "mirror-registry.'${CLUSTER_NAME}'.'${BASE_DOMAIN}'.", "Type": "'${MIRROR_REGISTRY_RECORD_TYPE}'", "TTL": 300, "ResourceRecords": [{"Value": "'${MIRROR_REGISTRY_IP}'"}]}}]' "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_mirror_registry.json"
+  cp "${TMP_DIR}/dns_mirror_registry.json" "${SHARED_DIR}/dns_up.json"
+fi
+
+if [[ -s "${SHARED_DIR}/HIVE_FIP_API" && -s "${SHARED_DIR}/HIVE_FIP_INGRESS" && -s "${SHARED_DIR}/HIVE_CLUSTER_NAME" ]]; then
+  HIVE_FIP_API=$(<"${SHARED_DIR}"/HIVE_FIP_API)
+  HIVE_CLUSTER_NAME=$(<"${SHARED_DIR}"/HIVE_CLUSTER_NAME)
+  if [[ "${HIVE_FIP_API}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    HIVE_FIP_API_RECORD_TYPE="A"
+  else
+    HIVE_FIP_API_RECORD_TYPE="AAAA"
+  fi
+  echo "Creating Hive API DNS $HIVE_FIP_API_RECORD_TYPE record for ${HIVE_CLUSTER_NAME}.$BASE_DOMAIN"
+  jq '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": "api.'${HIVE_CLUSTER_NAME}'.'${BASE_DOMAIN}'.", "Type": "'${HIVE_FIP_API_RECORD_TYPE}'", "TTL": 300, "ResourceRecords": [{"Value": "'${HIVE_FIP_API}'"}]}}]' "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_hive_api.json"
+  cp "${TMP_DIR}/dns_hive_api.json" "${SHARED_DIR}/dns_up.json"
+
+  HIVE_FIP_INGRESS=$(<"${SHARED_DIR}"/HIVE_FIP_INGRESS)
+  if [[ "${HIVE_FIP_INGRESS}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    HIVE_FIP_INGRESS_RECORD_TYPE="A"
+  else
+    HIVE_FIP_INGRESS_RECORD_TYPE="AAAA"
+  fi
+  echo "Creating Hive Ingress DNS $HIVE_FIP_INGRESS_RECORD_TYPE record for ${HIVE_CLUSTER_NAME}.$BASE_DOMAIN"
+  jq '.Changes += [{"Action": "UPSERT", "ResourceRecordSet": {"Name": "*.apps.'${HIVE_CLUSTER_NAME}'.'${BASE_DOMAIN}'.", "Type": "'${HIVE_FIP_INGRESS_RECORD_TYPE}'", "TTL": 300, "ResourceRecords": [{"Value": "'${HIVE_FIP_INGRESS}'"}]}}]' "${SHARED_DIR}/dns_up.json" > "${TMP_DIR}/dns_hive_ingress.json"
+  cp "${TMP_DIR}/dns_hive_ingress.json" "${SHARED_DIR}/dns_up.json"
+fi
+
+cp "${SHARED_DIR}/dns_up.json" "${ARTIFACT_DIR}/"
+
+echo "Submitting DNS change batch"
+CHANGE_ID="$(aws route53 change-resource-record-sets --hosted-zone-id "${HOSTED_ZONE_ID}" \
+  --change-batch "file://${SHARED_DIR}/dns_up.json" --query '"ChangeInfo"."Id"' --output text)"
+echo "Waiting for DNS records to sync (change ${CHANGE_ID})"
+aws route53 wait resource-record-sets-changed --id "${CHANGE_ID}"
+
+# dns_up.json only proves what was submitted. Read the records back from
+# Route 53 so a dropped or truncated RRset fails here, before install.
+for rrset in "${PUBLISHED_RRSETS[@]}"; do
+  IFS='|' read -r rr_name rr_type rr_values <<<"${rrset}"
+  rr_expected="$(tr ' ' '\n' <<<"${rr_values}" | sort)"
+  rr_record="$(aws route53 list-resource-record-sets --hosted-zone-id "${HOSTED_ZONE_ID}" \
+    --start-record-name "${rr_name}" --start-record-type "${rr_type}" --max-items 1 \
+    --query 'ResourceRecordSets[0]' --output json)"
+  rr_actual_name="$(jq -r '.Name // empty' <<<"${rr_record}")"
+  rr_actual_type="$(jq -r '.Type // empty' <<<"${rr_record}")"
+  rr_actual="$(jq -r '.ResourceRecords[]?.Value' <<<"${rr_record}" | sort)"
+  if [[ "${rr_actual_name}" != "${rr_name}" || "${rr_actual_type}" != "${rr_type}" ]]; then
+    echo "ERROR: Route 53 has no ${rr_type} record for ${rr_name} (found '${rr_actual_name}' '${rr_actual_type}')"
+    exit 1
+  fi
+  if [[ "${rr_actual}" != "${rr_expected}" ]]; then
+    echo "ERROR: ${rr_name} ${rr_type} in Route 53 does not match the published values"
+    echo "  expected: $(tr '\n' ' ' <<<"${rr_expected}")"
+    echo "  actual:   $(tr '\n' ' ' <<<"${rr_actual}")"
+    exit 1
+  fi
+  echo "Route 53 ${rr_name} ${rr_type} matches published values: $(tr '\n' ' ' <<<"${rr_expected}")"
+done

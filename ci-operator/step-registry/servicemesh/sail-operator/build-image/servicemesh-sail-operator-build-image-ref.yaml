@@ -1,0 +1,28 @@
+ref:
+  as: servicemesh-sail-operator-build-image
+  from: src
+  resources:
+    requests:
+      cpu: '2'
+      memory: 2Gi
+  credentials:
+  - mount_path: /tmp/secrets
+    group: quay
+    collection: openshift-service-mesh
+  timeout: 1h0m0s
+  commands: servicemesh-sail-operator-build-image-commands.sh
+  env:
+  - name: HUB
+    default: "quay.io/sail-dev"
+    documentation: |-
+      Container registry hub (registry/org) where the operator image will be pushed.
+      The image will be pushed as ${HUB}/sail-operator:${BUILD_TAG}.
+  - name: XDG_CACHE_HOME
+    default: "/tmp/cache"
+    documentation: |-
+      Cache directory for build tools
+  documentation: |-
+    Builds the sail-operator container image using an OCP BuildConfig and pushes it to
+    the external registry defined by HUB. Writes the resolved HUB and TAG values to
+    ${SHARED_DIR}/BUILD_HUB and ${SHARED_DIR}/BUILD_TAG for consumption by downstream
+    test steps such as servicemesh-sail-operator-e2e-ocp.

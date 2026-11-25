@@ -1,0 +1,46 @@
+ref:
+  as: quay-test-e2e-legacy
+  cli: latest
+  from_image:
+    name: quay-test-console
+    namespace: ci
+    tag: latest
+  commands: quay-test-e2e-legacy-commands.sh
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+  timeout: 1h30m0s
+  grace_period: 15m0s
+  env:
+  - name: QUAY_VERSION
+    documentation: Quay X.Y under test, passed to the suite as CYPRESS_QUAY_VERSION.
+  - name: QUAY_E2E_LEGACY_SUPERUSER
+    default: quaye2eci
+    documentation: |-
+      Username the step creates and passes to Cypress as CYPRESS_QUAY_USER for
+      specs that sign in with it; the default specs create their own users. It
+      must be listed in the deployed Quay's SUPER_USERS (QUAY_EXTRA_CONFIG of
+      the deploy step).
+  - name: E2E_LEGACY_SPECS
+    default: "cypress/integration/smoke/SmokeTesting.js"
+    documentation: Comma-separated Cypress specs under quay-frontend-tests to run in full.
+  - name: E2E_LEGACY_GREP_SPECS
+    default: "cypress/integration/quayConsole/quayConsoleTesting.js"
+    documentation: Comma-separated Cypress specs under quay-frontend-tests to run filtered by E2E_LEGACY_GREP.
+  - name: E2E_LEGACY_GREP
+    default: "OCP-22450;OCP-20936;OCP-22873;OCP-26188"
+    documentation: |-
+      @cypress/grep include list for E2E_LEGACY_GREP_SPECS; a test runs when
+      its suite and test title contain one of the terms. The default keeps
+      the quayConsole tests that pass against a stock deployment without
+      cluster credentials: they reconfigure nothing and use only Quay creds.
+  documentation: |-
+    Run the quay-tests old-UI Cypress smoke spec plus selected quayConsole
+    tests (quay-frontend-tests, E2E_LEGACY_SPECS, plus E2E_LEGACY_GREP_SPECS
+    filtered by E2E_LEGACY_GREP) against the Quay deployed by a quay-deploy-*
+    step (${SHARED_DIR}/quayroute). The step creates the
+    QUAY_E2E_LEGACY_SUPERUSER account with a per-run random password and
+    passes it to Cypress as CYPRESS_QUAY_USER/CYPRESS_QUAY_PASSWORD. JUnit, videos and screenshots go to
+    ${ARTIFACT_DIR}. The step fails when the user cannot be created, Cypress
+    fails, or either run's JUnit output reports zero tests.

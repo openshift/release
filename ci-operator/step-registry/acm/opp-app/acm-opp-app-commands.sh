@@ -1,0 +1,489 @@
+#!/bin/bash
+set -euxo pipefail
+shopt -s inherit_errexit
+
+# shellcheck disable=SC2317
+_propagate_junit () {
+    mkdir -p "${SHARED_DIR}/junit"
+    find "${ARTIFACT_DIR}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; 2>/dev/null || true
+}
+
+################################################################################
+# Test Overview
+################################################################################
+# This script deploys a sample OPP application and validates the integration
+# with OPP bundle components (Quay, ACS).
+#
+# Test Cases:
+#   1. Deploy OPP Application
+#      - Deploys httpd-example application via deploy.sh
+#      - Waits for deployment availability (implicitly waits for build)
+#      - Verifies deployment is running successfully
+#      - If ANY step fails, test fails and subsequent cases are skipped
+#
+#   2. Test ACS Integration
+#      - Queries ACS API for httpd-example image
+#      - Validates image appears in ACS with CVE scanning results
+#      - Only runs if Case 1 passes
+#      - Skipped (not failed) when no SecuredCluster exists anywhere on
+#        the cluster: without a secured cluster ACS cannot scan images, so
+#        the case would otherwise burn its retry budget and fail with a
+#        generic message
+#
+# Test Reporting:
+#   - Results are recorded in JUnit XML format
+#   - JUnit XML is generated on exit (via trap) regardless of test results
+#   - Script always exits 0 to allow subsequent Prow test steps to run
+#   - Individual test failures are visible in Prow UI via JUnit reporting
+#
+################################################################################
+
+# cd to writable directory
+cd /tmp/ || { echo "ERROR: Cannot cd to /tmp" >&2; exit 1; }
+
+# Define all test cases with initial "skipped" status
+typeset -A testStatus
+typeset -A testDuration
+typeset -A testFailureMsg
+
+# All test cases that should appear in JUnit XML
+typeset -a allTestCasesArr=(
+    "deploy-opp-application"
+    "test-acs-integration"
+)
+
+# Initialize all tests as failed (will be updated to passed if they succeed)
+typeset test=""
+for test in "${allTestCasesArr[@]}"; do
+    testStatus["${test}"]="failed"
+    testDuration["${test}"]=0
+    testFailureMsg["${test}"]="Test did not run"
+done
+
+typeset -i startTime=0
+startTime=$(date +%s)
+
+# Function to record test result
+function RecordTestResult () {
+    typeset testName="${1:-}"; (($#)) && shift
+    typeset status="${1:-}"; (($#)) && shift
+    typeset failureMessage="${1:-}"; (($#)) && shift
+    typeset duration="${1:-0}"; (($#)) && shift
+
+    testStatus["${testName}"]="${status}"
+    testDuration["${testName}"]="${duration}"
+    testFailureMsg["${testName}"]="${failureMessage}"
+    true
+}
+
+# Function to generate JUnit XML
+function GenerateJunitXml () {
+    typeset junitFile="${ARTIFACT_DIR}/junit_acm-opp-app.xml"
+    typeset -i totalDuration=0
+    totalDuration=$(( $(date +%s) - startTime ))
+
+    # Count test results
+    typeset -i totalTests=${#allTestCasesArr[@]}
+    typeset -i failedTests=0
+    typeset -i skippedTests=0
+    typeset test=""
+
+    for test in "${allTestCasesArr[@]}"; do
+        if [ "${testStatus[${test}]}" = "failed" ]; then
+            failedTests=$((failedTests + 1))
+        elif [ "${testStatus[${test}]}" = "skipped" ]; then
+            skippedTests=$((skippedTests + 1))
+        fi
+    done
+
+    : "Generating JUnit XML Report"
+    : "Total Tests: ${totalTests}"
+    : "Failed Tests: ${failedTests}"
+    : "Skipped Tests: ${skippedTests}"
+    : "Passed Tests: $((totalTests - failedTests - skippedTests))"
+    : "Duration: ${totalDuration}s"
+
+    cat > "${junitFile}" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="acm-opp-app" tests="${totalTests}" failures="${failedTests}" errors="0" skipped="${skippedTests}" time="${totalDuration}">
+EOF
+
+    # Generate XML for each test case
+    for test in "${allTestCasesArr[@]}"; do
+        typeset status="${testStatus[${test}]}"
+        typeset duration="${testDuration[${test}]}"
+        typeset failureMsg="${testFailureMsg[${test}]}"
+
+        if [ "${status}" = "failed" ]; then
+            typeset escapedMsg=""
+            escapedMsg=$(echo "${failureMsg}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
+            echo "    <testcase name=\"${test}\" classname=\"acm-opp-app\" time=\"${duration}\"><failure message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
+        elif [ "${status}" = "skipped" ]; then
+            typeset escapedMsg=""
+            escapedMsg=$(echo "${failureMsg}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')
+            echo "    <testcase name=\"${test}\" classname=\"acm-opp-app\" time=\"${duration}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
+        else
+            echo "    <testcase name=\"${test}\" classname=\"acm-opp-app\" time=\"${duration}\"/>" >> "${junitFile}"
+        fi
+    done
+
+    cat >> "${junitFile}" << EOF
+  </testsuite>
+</testsuites>
+EOF
+
+    : "JUnit XML generated at: ${junitFile}"
+    cat "${junitFile}"
+    true
+}
+
+################################################################################
+# Test Case 1: Deploy OPP Application and Wait for Build/Deployment
+################################################################################
+function RunTestCase1 () {
+    : "====== Test Case 1: Deploy OPP Application ======"
+
+    # Download jq
+    curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq || return 1
+    chmod +x /tmp/jq
+
+    # Clone and deploy
+    git clone https://github.com/stolostron/policy-collection.git || return 1
+    cd policy-collection/deploy/ || return 1
+    echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp || return 1
+
+    sleep 60
+
+    # Verify e2e-opp namespace was created
+    oc get namespace e2e-opp || return 1
+
+    oc label managedcluster local-cluster oppapps=httpd-example --overwrite
+
+    # Check initial status
+    oc get policies -n policies | sed -n '/example/p'
+    oc get build -n e2e-opp || true
+    oc get po -n e2e-opp || true
+    oc get deployment -n e2e-opp || true
+
+    # Trigger build if needed
+    typeset latestBuildName=""
+    latestBuildName=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' || echo "")
+    [ -z "${latestBuildName}" ] && { latestBuildName=$(oc start-build httpd-example -n e2e-opp -o name | cut -d'/' -f2) || return 1; }
+    : "Monitoring build: ${latestBuildName}"
+
+    # Wait for deployment (which implicitly waits for build to complete)
+    : "Waiting for deployment to be available (timeout: 10m)..."
+    if ! oc wait --for=condition=Available deployment/httpd-example -n e2e-opp --timeout=10m; then
+        : "ERROR: Deployment did not become available"
+
+        # Collect diagnostics to understand why deployment failed
+        : "=== Build Status ==="
+        typeset latestBuild=""
+        latestBuild=$(oc get builds -n e2e-opp --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1].metadata.name}' || echo "")
+        if [ -n "${latestBuild}" ]; then
+            typeset buildStatus=""
+            buildStatus=$(oc get build "${latestBuild}" -n e2e-opp -o jsonpath='{.status.phase}' || echo "Unknown")
+            : "Latest build: ${latestBuild}"
+            : "Build status: ${buildStatus}"
+
+            if [ "${buildStatus}" != "Complete" ]; then
+                : "=== Build Details ==="
+                oc get build "${latestBuild}" -n e2e-opp -o yaml --ignore-not-found || true
+                oc describe build "${latestBuild}" -n e2e-opp || true
+                (oc get buildconfig httpd-example -n e2e-opp -o json --ignore-not-found | python3 -c "
+import sys,json
+bc=json.load(sys.stdin)
+for t in bc.get('spec',{}).get('triggers',[]):
+    for k in ('secret','secretReference'):
+        t.pop(k,None)
+        if 'generic' in t: t['generic'].pop(k,None)
+        if 'github' in t: t['github'].pop(k,None)
+json.dump(bc,sys.stdout,indent=2)
+" 2>/dev/null) || true
+                (oc describe buildconfig httpd-example -n e2e-opp 2>/dev/null | sed -E 's#(/webhooks/)[^/[:space:]]+#\1REDACTED#g') || true
+            fi
+        fi
+
+        : "=== Events ==="
+        oc get event -n e2e-opp || true
+
+        : "=== Deployment Status ==="
+        oc get deployment -n e2e-opp || true
+        oc get deployment httpd-example -n e2e-opp -o yaml --ignore-not-found || true
+        oc describe deployment httpd-example -n e2e-opp || true
+
+        : "=== Pod Status ==="
+        oc get po -n e2e-opp || true
+
+        : "=== ImageStream Status ==="
+        oc get is -n e2e-opp httpd-example -o yaml --ignore-not-found | awk '/status:/{n=11} n>0{print; n--}'
+
+        : "=== Quay Integration Status ==="
+        oc get quayintegration quay -o yaml || true
+        oc get cm -n openshift-config opp-ingres-ca -o yaml || true
+        oc get secret -n policies quay-integration --no-headers || true
+
+        : "=== Quay Bridge Operator Logs ==="
+        typeset operatorPod=""
+        operatorPod=$(oc get pod -n openshift-operators -l name=quay-bridge-operator -o jsonpath='{.items[0].metadata.name}' || echo "")
+        [ -n "${operatorPod}" ] && oc logs -n openshift-operators "${operatorPod}" -c manager --tail=100 || true
+
+        return 1
+    fi
+
+    : "Deployment is available"
+
+    # Collect final status
+    oc get build,po,deployment -n e2e-opp || true
+    oc get is -n e2e-opp httpd-example -o yaml --ignore-not-found | awk '/status:/{n=6} n>0{print; n--}'
+
+    return 0
+}
+
+################################################################################
+# Test Case 2: Test ACS Integration
+################################################################################
+# The skip and failure reasons are declared at script scope because
+# RunTestCase2 sets them as a side channel: the caller reads them after the
+# call to tell a skip from a failure. A typeset inside the function would
+# make them local and silently empty the channel.
+typeset _acs_skip_reason=""
+typeset _acs_fail_reason=""
+function RunTestCase2 () {
+    : "====== Test Case 2: Test ACS Integration ======"
+    : "NOTE: Waiting for ACS to scan the httpd-example image built in Test Case 1."
+
+    # Pre-flight: a SecuredCluster is what registers and scans images with
+    # ACS Central. When none exists the image can never appear, so the
+    # retries below cannot succeed; skip the case with a named reason
+    # instead of failing after 300s of dead retries. Return 2 = skip.
+    typeset scOutput=""
+    typeset -i scRc=0
+    scOutput=$(oc get securedclusters.platform.stackrox.io --all-namespaces -o name) || scRc=$?
+    if (( scRc != 0 )); then
+        : "WARNING: oc get securedclusters failed (rc=${scRc}) - cannot determine SecuredCluster presence"
+        _acs_fail_reason="oc get securedclusters failed (rc=${scRc}) - cannot determine SecuredCluster presence"
+        return 1
+    elif [[ -z "${scOutput}" ]]; then
+        : "No SecuredCluster CR found in any namespace - ACS integration unavailable, skipping test case"
+        _acs_skip_reason="No SecuredCluster deployed; ACS image scanning unavailable"
+        return 2
+    fi
+
+    # Fetch ACS credentials - disable xtrace for secret handling. The
+    # emptiness check stays inside the untraced block as well: bash prints the
+    # expanded arguments of a test under `set -x`, so `[[ -z "${acsPassword}" ]]`
+    # would write the password to the build log. Tracing is restored on both
+    # the success and the credential-missing path.
+    typeset acsPassword=""
+    typeset acsHost=""
+    typeset -i acsCredsMissing=0
+    set +x
+    typeset acsPasswordB64="" acsHostB64=""
+    typeset -i acsPasswordRc=0 acsHostRc=0
+    acsPasswordB64=$(oc get secret -n stackrox central-htpasswd -o json | /tmp/jq -r '.data.password') || acsPasswordRc=$?
+    acsHostB64=$(oc get secret -n stackrox sensor-tls -o json | /tmp/jq -r '.data."acs-host"') || acsHostRc=$?
+    if (( acsPasswordRc != 0 )) || (( acsHostRc != 0 )) || [[ -z "${acsPasswordB64}" ]] || [[ "${acsPasswordB64}" == "null" ]] || [[ -z "${acsHostB64}" ]] || [[ "${acsHostB64}" == "null" ]]; then
+        acsCredsMissing=1
+    else
+        acsPassword=$(printf '%s' "${acsPasswordB64}" | base64 -d)
+        acsHost=$(printf '%s' "${acsHostB64}" | base64 -d)
+        if [[ -z "${acsPassword}" ]] || [[ -z "${acsHost}" ]]; then
+            acsCredsMissing=1
+        fi
+    fi
+    set -x
+    if (( acsCredsMissing )); then
+        : "ERROR: ACS credentials unavailable - central-htpasswd or sensor-tls secret missing in namespace stackrox"
+        _acs_fail_reason="ACS credentials unavailable: central-htpasswd/sensor-tls secret not found in namespace stackrox"
+        return 1
+    fi
+
+    # Query ACS for httpd-example image
+    typeset jqFilter='.images[] | select(.name | contains("httpd-example"))'
+
+    typeset -i retries=10
+    typeset -i retryInterval=30
+    typeset isImageFound=false
+    typeset httpdImageJson="" imageId="" cves="" image=""
+
+    : "Waiting for httpd-example image to appear in ACS (max $((retries * retryInterval))s)..."
+    typeset -i attempt=0
+    for ((attempt = 1; attempt <= retries; ++attempt)); do
+        : "Attempt ${attempt}/${retries}: Querying ACS for httpd-example image..."
+        # Disable xtrace to protect ACS password in curl arguments. -f makes
+        # an HTTP error fail the fetch so the retry loop can act on it, -L
+        # follows redirects. The `if !` capture keeps that failure status
+        # visible to the loop instead of discarding it, so a failed query is
+        # reported and retried instead of being read as "image not present".
+        set +x
+        if ! httpdImageJson=$(curl -fskSL -u "admin:${acsPassword}" \
+                "https://${acsHost}/v1/images" | /tmp/jq "${jqFilter}"); then
+            set -x
+            : "Attempt ${attempt}/${retries}: ACS image query failed"
+            [ "${attempt}" -lt "${retries}" ] && sleep "${retryInterval}"
+            continue
+        fi
+        set -x
+        imageId=$(echo "${httpdImageJson}" | /tmp/jq .id)
+        if [ "${imageId}" != "" ]; then
+            cves=$(echo "${httpdImageJson}" | /tmp/jq .cves)
+            image=$(echo "${httpdImageJson}" | /tmp/jq .name)
+            : "Success: Found ${cves} CVEs for image ${image}"
+            isImageFound=true
+            break
+        fi
+
+        [ "${attempt}" -lt "${retries}" ] && sleep "${retryInterval}"
+    done
+
+    [ "${isImageFound}" = true ] || return 1
+
+    return 0
+}
+
+################################################################################
+# Test Execution Setup
+################################################################################
+# Set trap to generate JUnit XML on exit (regardless of success or failure)
+trap '{( GenerateJunitXml; _propagate_junit; true )}' EXIT
+
+if [ "${MAP_TESTS:-}" = "true" ]; then
+    eval "$(
+        typeset -a fetchCmd=()
+        type -t wget 1>/dev/null && fetchCmd=(wget --timeout=30 -qO-) || fetchCmd=(curl --connect-timeout 10 --max-time 30 -fsSL)
+        "${fetchCmd[@]}" \
+            https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+    )"
+    if type -t ExitTrap--PostProcessPrep; then
+        trap '{(
+            GenerateJunitXml
+            _propagate_junit
+            LP_IO__ET_PPP__NEW_TS_NAME="${LP_QE__CR__TS_NAME__PFX__ACM:+${LP_QE__CR__TS_NAME__PFX__ACM}--}%s" \
+                ExitTrap--PostProcessPrep junit--acm-opp-app.xml
+            true
+        )}' EXIT
+    else
+        : "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping"
+    fi
+fi
+
+################################################################################
+# Pre-flight Checks
+################################################################################
+: "====== Pre-flight Check: QuayIntegration ======"
+
+# Distinguish between "CRD not installed" (skip) and "CRD exists but CR
+# missing" (fail).  On OCP versions where the Quay Bridge Operator is not
+# available in the catalog the QuayIntegration CRD will be absent entirely;
+# that is an environment limitation, not a test failure.
+typeset apiOutput=""
+typeset -i apiRc=0
+apiOutput=$(oc api-resources --api-group=quay.redhat.com) || apiRc=$?
+
+if ((apiRc != 0)); then
+    : "WARNING: oc api-resources failed (rc=${apiRc}) - cannot determine CRD presence, falling through to CR check"
+elif ! grep -qi quayintegration <<< "${apiOutput}"; then
+    : "QuayIntegration CRD is not installed on this cluster."
+    : "Quay Bridge Operator is not available - skipping OPP app tests."
+
+    for test in "${allTestCasesArr[@]}"; do
+        testStatus["${test}"]="skipped"
+        testFailureMsg["${test}"]="QuayIntegration CRD not available - Quay Bridge Operator not installed"
+    done
+
+    exit 0
+fi
+
+typeset getOutput=""
+typeset -i getRc=0
+getOutput=$(oc get quayintegration quay --ignore-not-found -o name) || getRc=$?
+
+if ((getRc != 0)); then
+    : "WARNING: oc get quayintegration failed (rc=${getRc}) - cluster API error"
+    : "Marking all test cases as failed."
+
+    for test in "${allTestCasesArr[@]}"; do
+        testStatus["${test}"]="failed"
+        testFailureMsg["${test}"]="oc get quayintegration failed (rc=${getRc}) - cluster API error"
+    done
+
+    exit 0
+elif [[ -z "${getOutput}" ]]; then
+    : "ERROR: QuayIntegration CRD exists but CR 'quay' not found!"
+    : "OPP bundle components are not properly configured."
+    : "Cannot proceed with testing - marking all test cases as failed."
+
+    for test in "${allTestCasesArr[@]}"; do
+        testStatus["${test}"]="failed"
+        testFailureMsg["${test}"]="QuayIntegration CR 'quay' not found - OPP bundle not configured"
+    done
+
+    exit 0
+fi
+
+: "QuayIntegration quay found"
+oc get quayintegration quay -o yaml --ignore-not-found
+
+################################################################################
+# Execute Test Cases
+################################################################################
+# Run Test Case 1
+typeset -i case1Start=0
+case1Start=$(date +%s)
+if RunTestCase1; then
+    typeset -i case1Duration=0
+    case1Duration=$(( $(date +%s) - case1Start ))
+    RecordTestResult "deploy-opp-application" "passed" "" "${case1Duration}"
+    : "Test Case 1 (Deploy OPP Application) Result: PASSED"
+
+    # Run Test Case 2 (ACS Integration). A skip is distinguished from a
+    # failure by the _acs_skip_reason side-channel (reset just below,
+    # before the call); the return code is not captured.
+    typeset -i case2Start=0
+    case2Start=$(date +%s)
+    _acs_skip_reason=""
+    _acs_fail_reason=""
+    if RunTestCase2; then
+        typeset -i case2Duration=0
+        case2Duration=$(( $(date +%s) - case2Start ))
+        RecordTestResult "test-acs-integration" "passed" "" "${case2Duration}"
+        : "Test Case 2 (Test ACS Integration) Result: PASSED"
+    elif [[ -n "${_acs_skip_reason}" ]]; then
+        typeset -i case2Duration=0
+        case2Duration=$(( $(date +%s) - case2Start ))
+        RecordTestResult "test-acs-integration" "skipped" "${_acs_skip_reason}" "${case2Duration}"
+        : "Test Case 2 (Test ACS Integration) Result: SKIPPED (${_acs_skip_reason})"
+    else
+        typeset -i case2Duration=0
+        case2Duration=$(( $(date +%s) - case2Start ))
+        RecordTestResult "test-acs-integration" "failed" "${_acs_fail_reason:-ACS integration test failed}" "${case2Duration}"
+        : "Test Case 2 (Test ACS Integration) Result: FAILED"
+    fi
+else
+    typeset -i case1Duration=0
+    case1Duration=$(( $(date +%s) - case1Start ))
+    : "Test Case 1 (Deploy OPP Application) Result: FAILED"
+    : "Test Case 1 failed, skipping remaining test cases..."
+    RecordTestResult "deploy-opp-application" "failed" "OPP application deployment failed" "${case1Duration}"
+    RecordTestResult "test-acs-integration" "skipped" "Skipped: prerequisite Test Case 1 (deploy) failed" "0"
+fi
+
+: "====== Test Summary ======"
+: "All test results will be available in JUnit XML report"
+
+# Exit based on whether any test failed
+typeset _overall_status="PASS"
+for test in "${allTestCasesArr[@]}"; do
+    if [[ "${testStatus[${test}]}" == "failed" ]]; then
+        _overall_status="FAIL"
+        break
+    fi
+done
+
+if [[ "${_overall_status}" == "PASS" ]]; then
+    exit 0
+else
+    exit 1
+fi

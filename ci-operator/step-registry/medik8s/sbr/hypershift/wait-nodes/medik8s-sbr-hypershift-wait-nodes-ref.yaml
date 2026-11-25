@@ -1,0 +1,30 @@
+ref:
+  as: medik8s-sbr-hypershift-wait-nodes
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: medik8s-sbr-hypershift-wait-nodes-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 50Mi
+  timeout: 25m0s
+  env:
+  - name: HYPERSHIFT_NODE_COUNT
+    default: "3"
+    documentation: Expected number of hosted cluster worker nodes; inherited from the job env.
+  documentation: |-
+    Waits for the HyperShift hosted cluster worker nodes to finish their NodePool
+    revision rotation before ODF node labeling begins.
+
+    The medik8s-sbr-hypershift-apply-image-sources step patches the HostedCluster
+    imageContentSources, triggering the NodePool controller to replace all worker
+    nodes.  The MCP "Updated" wait in that step can complete while rotation is still
+    in progress (MCO and the NodePool controller operate independently).  Running
+    odf-prepare-cluster while nodes are being replaced causes the ODF labels to be
+    applied to nodes that are immediately deleted, leaving the replacement nodes
+    unlabeled and making the Ceph mon pods unschedulable.
+
+    This step must run (against the hosted cluster kubeconfig) immediately after
+    medik8s-sbr-hypershift-switch-kubeconfig and before odf-prepare-cluster.

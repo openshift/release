@@ -1,0 +1,22 @@
+ref:
+  as: rosa-marketplace-release-detect
+  from: rosa-aws-cli
+  grace_period: 1m
+  commands: rosa-marketplace-release-detect-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: OCM_LOGIN_ENV
+    default: production
+    documentation: OCM environment queried for each accepted OCP nightly X.Y release.
+  credentials:
+  - namespace: ci
+    bundle: cluster-secrets-rosa-e2e-01
+    mount_path: /etc/rosa-credentials
+  documentation: |-
+    Reads accepted OCP nightly streams and queries OCM for a ROSA-enabled
+    version of each X.Y. It reports every missing X.Y and hands off the newest
+    missing version. Invalid OCM responses fail closed; a missing version
+    writes ready and one X.Y to SHARED_DIR.

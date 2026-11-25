@@ -1,0 +1,34 @@
+ref:
+  as: openstack-conf-disable-redirect
+  from: openstack-installer
+  commands: openstack-conf-disable-redirect-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: OPENSTACK_DISABLE_REGISTRY_REDIRECT
+    default: ""
+    documentation: |-
+      When set to "true", patches the image registry to disable redirect
+      (TempURL) on any cloud. When empty (default), the step auto-enables
+      the workaround for cloud profiles known to be affected (currently
+      openstack-vexxhost).
+  - name: CLUSTER_TYPE_OVERRIDE
+    default: ""
+    documentation: |-
+      If set, overrides CLUSTER_TYPE for cloud detection.
+  documentation: |-
+    Works around a Ceph RGW / Swift TempURL compatibility issue where the
+    registry's Swift storage driver signs TempURLs with container-level
+    keys but RGW validates against account-level keys, causing HTTP 403
+    on redirected blob reads (OCPBUGS-128588).
+
+    This step patches the image registry config to set
+    spec.disableRedirect=true, which makes the registry proxy blob data
+    directly instead of redirecting clients to Swift TempURLs.
+
+    The step auto-enables for openstack-vexxhost and can be explicitly
+    enabled for any cloud via OPENSTACK_DISABLE_REGISTRY_REDIRECT=true.
+
+    Remove this step when OCPBUGS-128588 is resolved.

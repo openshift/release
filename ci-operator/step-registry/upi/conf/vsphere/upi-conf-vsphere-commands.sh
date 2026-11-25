@@ -1,0 +1,736 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+  echo "using VCM sibling of this step"
+  exit 0
+fi
+
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+
+if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
+  echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
+  exit 1
+fi
+# ensure LEASED_RESOURCE is set
+if [[ -z "${LEASED_RESOURCE}" ]]; then
+  echo "Failed to acquire lease"
+  exit 1
+fi
+
+openshift_install_path="/var/lib/openshift-install"
+
+echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
+# shellcheck source=/dev/null
+declare vsphere_datacenter
+declare vsphere_datastore
+declare vsphere_cluster
+declare dns_server
+declare vsphere_url
+declare vlanid
+declare primaryrouterhostname
+declare vsphere_portgroup
+
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/vsphere_context.sh"
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc.sh"
+unset SSL_CERT_FILE
+unset GOVC_TLS_CA_CERTS
+
+SUBNETS_CONFIG=/var/run/vault/vsphere-ibmcloud-config/subnets.json
+if [[ "${CLUSTER_PROFILE_NAME:-}" == "vsphere-elastic" ]]; then
+  SUBNETS_CONFIG="${SHARED_DIR}/subnets.json"
+fi
+
+if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
+  echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json."
+  exit 1
+fi
+
+# ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
+
+dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
+gateway=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].gateway' "${SUBNETS_CONFIG}")
+netmask=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].mask' "${SUBNETS_CONFIG}")
+
+lb_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[2]' "${SUBNETS_CONFIG}")
+bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[3]' "${SUBNETS_CONFIG}")
+machine_cidr=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
+
+printf "***** DEBUG %s %s %s %s ******\n" "$dns_server" "$lb_ip_address" "$bootstrap_ip_address" "$machine_cidr"
+
+control_plane_idx=0
+control_plane_addrs=()
+control_plane_hostnames=()
+start_master_num=4
+end_master_num=$((start_master_num + CONTROL_PLANE_REPLICAS - 1))
+start_worker_num=$((end_master_num + 1))
+end_worker_num=$((start_worker_num + COMPUTE_NODE_REPLICAS - 1))
+
+for n in $(seq "$start_master_num" "$end_master_num"); do
+  control_plane_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+  control_plane_hostnames+=("control-plane-$((control_plane_idx++))")
+done
+
+printf "**** DEBUG %s ******\n" "${control_plane_addrs[@]}"
+
+printf -v control_plane_ip_addresses "\"%s\"," "${control_plane_addrs[@]}"
+control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
+
+compute_idx=0
+compute_addrs=()
+compute_hostnames=()
+for n in $(seq "$start_worker_num" "$end_worker_num"); do
+  compute_addrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+  compute_hostnames+=("compute-$((compute_idx++))")
+done
+
+printf "**** DEBUG %s ******\n" "${compute_addrs[@]}"
+
+printf -v compute_ip_addresses "\"%s\"," "${compute_addrs[@]}"
+compute_ip_addresses="[${compute_ip_addresses%,}]"
+
+
+# First one for api, second for apps.
+echo "${lb_ip_address}" >>"${SHARED_DIR}"/vips.txt
+echo "${lb_ip_address}" >>"${SHARED_DIR}"/vips.txt
+
+export HOME=/tmp
+#export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
+echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+# Ensure ignition assets are configured with the correct invoker to track CI jobs.
+export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}
+
+echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
+# Create basedomain.txt
+echo "vmc-ci.devcluster.openshift.com" >"${SHARED_DIR}"/basedomain.txt
+base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
+
+# Create clustername.txt
+echo "${NAMESPACE}-${UNIQUE_HASH}" >"${SHARED_DIR}"/clustername.txt
+cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
+
+# Create clusterdomain.txt
+echo "${cluster_name}.${base_domain}" >"${SHARED_DIR}"/clusterdomain.txt
+cluster_domain=$(<"${SHARED_DIR}"/clusterdomain.txt)
+
+ssh_pub_key_path="${CLUSTER_PROFILE_DIR}/ssh-publickey"
+install_config="${SHARED_DIR}/install-config.yaml"
+
+legacy_installer_json="${openshift_install_path}/rhcos.json"
+fcos_json_file="${openshift_install_path}/fcos.json"
+
+if [[ -f "$fcos_json_file" ]]; then
+  legacy_installer_json=$fcos_json_file
+fi
+
+if [[ -n "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+  CUSTOM_PAYLOAD_DIGEST=$(oc adm release info "${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" --output=jsonpath="{.digest}")
+  CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"@"$CUSTOM_PAYLOAD_DIGEST"
+  echo "Overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to ${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} for cluster installation"
+  export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}
+  echo "Extracting installer from ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+  oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+  --command=openshift-install --to="/tmp" || exit 1
+  export INSTALLER_BINARY="/tmp/openshift-install"
+else
+  export INSTALLER_BINARY="openshift-install"
+fi
+
+echo "=============== openshift-install version =============="
+${INSTALLER_BINARY} version
+
+# https://github.com/openshift/installer/blob/master/docs/user/overview.md#coreos-bootimages
+# This code needs to handle pre-4.8 installers though too.
+if ${INSTALLER_BINARY} coreos print-stream-json 2>/tmp/err.txt >${SHARED_DIR}/coreos.json; then
+  echo "Using stream metadata"
+  ova_url=$(jq -r '.architectures.x86_64.artifacts.vmware.formats.ova.disk.location' <${SHARED_DIR}/coreos.json)
+else
+  if ! grep -qF 'unknown command \"coreos\"' /tmp/err.txt; then
+    echo "Unhandled error from openshift-install" 1>&2
+    cat /tmp/err.txt
+    exit 1
+  fi
+  legacy_installer_json=/var/lib/openshift-install/rhcos.json
+  echo "Falling back to parsing ${legacy_installer_json}"
+  ova_url="$(jq -r '.baseURI + .images["vmware"].path' ${legacy_installer_json})"
+fi
+rm -f /tmp/err.txt
+
+echo "${ova_url}" >"${SHARED_DIR}"/ova_url.txt
+ova_url=$(<"${SHARED_DIR}"/ova_url.txt)
+
+vm_template="${ova_url##*/}"
+
+# select a hardware version for testing
+vsphere_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $1}')
+vsphere_minor_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $3}')
+hw_versions=(15 17 18 19)
+if [[ ${vsphere_version} -eq 8 ]]; then
+  hw_versions=(20)
+  if [[ ${vsphere_minor_version} -ge 2 ]]; then
+  hw_versions=(20 21)
+  fi
+fi
+hw_available_versions=${#hw_versions[@]}
+selected_hw_version_index=$((RANDOM % ${hw_available_versions}))
+target_hw_version=${hw_versions[$selected_hw_version_index]}
+echo "$(date -u --rfc-3339=seconds) - Selected hardware version ${target_hw_version}"
+vm_template=${vm_template}-hw${target_hw_version}
+
+echo "export target_hw_version=${target_hw_version}" >>${SHARED_DIR}/vsphere_context.sh
+echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
+
+# If platform none is present in the install-config, extension is skipped.
+declare platform_none="none: {}"
+platform_required=true
+if grep -F "${platform_none}" "${install_config}"; then
+  echo "platform none present, install-config will not be extended"
+  platform_required=false
+fi
+
+# Create DNS files for nodes
+if command -v pwsh &> /dev/null
+then
+  ROUTE53_CREATE_JSON='{"Comment": "Create public OpenShift DNS records for Nodes of VSphere UPI CI install", "Changes": []}'
+  ROUTE53_DELETE_JSON='{"Comment": "Delete public OpenShift DNS records for Nodes of VSphere UPI CI install", "Changes": []}'
+  DNS_RECORD='{
+  "Action": "${ACTION}",
+  "ResourceRecordSet": {
+    "Name": "${CLUSTER_NAME}-${VM_NAME}.${CLUSTER_DOMAIN}.",
+    "Type": "A",
+    "TTL": 60,
+    "ResourceRecords": [{"Value": "${IP_ADDRESS}"}]
+    }
+  }'
+
+  # Generate control plane DNS entries
+  for (( node=0; node < ${CONTROL_PLANE_REPLICAS}; node++)); do
+    echo "Creating DNS entry for ${control_plane_hostnames[$node]}"
+    node_record=$(echo "${DNS_RECORD}" |
+      jq -r --arg ACTION "CREATE" \
+            --arg CLUSTER_NAME "$cluster_name" \
+            --arg VM_NAME "${control_plane_hostnames[$node]}" \
+            --arg CLUSTER_DOMAIN "${cluster_domain}" \
+            --arg IP_ADDRESS "${control_plane_addrs[$node]}" \
+            '.Action = $ACTION |
+             .ResourceRecordSet.Name = $CLUSTER_NAME+"-"+$VM_NAME+"."+$CLUSTER_DOMAIN+"." |
+             .ResourceRecordSet.ResourceRecords[0].Value = $IP_ADDRESS')
+    ROUTE53_CREATE_JSON=$(echo "${ROUTE53_CREATE_JSON}" | jq --argjson DNS_RECORD "$node_record" -r '.Changes[.Changes|length] |= .+ $DNS_RECORD')
+    node_record=$(echo "${node_record}" |
+      jq -r --arg ACTION "DELETE" '.Action = $ACTION')
+    ROUTE53_DELETE_JSON=$(echo "${ROUTE53_DELETE_JSON}" | jq --argjson DNS_RECORD "$node_record" -r '.Changes[.Changes|length] |= .+ $DNS_RECORD')
+  done
+  # Generate compute DNS entries
+  for (( node=0; node < ${COMPUTE_NODE_REPLICAS}; node++)); do
+    echo "Creating DNS entry for ${compute_hostnames[$node]}"
+    node_record=$(echo "${DNS_RECORD}" |
+      jq -r --arg ACTION "CREATE" \
+            --arg CLUSTER_NAME "$cluster_name" \
+            --arg VM_NAME "${compute_hostnames[$node]}" \
+            --arg CLUSTER_DOMAIN "${cluster_domain}" \
+            --arg IP_ADDRESS "${compute_addrs[$node]}" \
+            '.Action = $ACTION |
+             .ResourceRecordSet.Name = $CLUSTER_NAME+"-"+$VM_NAME+"."+$CLUSTER_DOMAIN+"." |
+             .ResourceRecordSet.ResourceRecords[0].Value = $IP_ADDRESS')
+    ROUTE53_CREATE_JSON=$(echo "${ROUTE53_CREATE_JSON}" | jq --argjson DNS_RECORD "$node_record" -r '.Changes[.Changes|length] |= .+ $DNS_RECORD')
+    node_record=$(echo "${node_record}" |
+      jq -r --arg ACTION "DELETE" '.Action = $ACTION')
+    ROUTE53_DELETE_JSON=$(echo "${ROUTE53_DELETE_JSON}" | jq --argjson DNS_RECORD "$node_record" -r '.Changes[.Changes|length] |= .+ $DNS_RECORD')
+  done
+
+  echo "Creating json to create Node DNS records..."
+  echo ${ROUTE53_CREATE_JSON} > "${SHARED_DIR}"/dns-nodes-create.json
+
+  echo "Creating json file to delete Node DNS records..."
+  echo ${ROUTE53_DELETE_JSON} > "${SHARED_DIR}"/dns-nodes-delete.json
+fi
+
+${platform_required} && cat >>"${install_config}" <<EOF
+baseDomain: $base_domain
+controlPlane:
+  name: "master"
+  replicas: ${CONTROL_PLANE_REPLICAS}
+compute:
+- name: "worker"
+  replicas: 0
+platform:
+  vsphere:
+    vcenter: "${vsphere_url}"
+    datacenter: "${vsphere_datacenter}"
+    defaultDatastore: "${vsphere_datastore}"
+    cluster: "${vsphere_cluster}"
+    network: "${vsphere_portgroup}"
+    password: "${GOVC_PASSWORD}"
+    username: "${GOVC_USERNAME}"
+EOF
+
+#set machine cidr if proxy is enabled
+if grep 'httpProxy' "${install_config}"; then
+  cat >>"${install_config}" <<EOF
+networking:
+  machineNetwork:
+  - cidr: "$machine_cidr"
+EOF
+fi
+
+echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
+cat >"${SHARED_DIR}/terraform.tfvars" <<-EOF
+
+machine_cidr = "${machine_cidr}"
+
+vm_template = "${vm_template}"
+vsphere_cluster = "${vsphere_cluster}"
+vsphere_datacenter = "${vsphere_datacenter}"
+vsphere_datastore = "${vsphere_datastore}"
+vsphere_server = "${vsphere_url}"
+ipam = "ipam.vmc.ci.openshift.org"
+cluster_id = "${cluster_name}"
+base_domain = "${base_domain}"
+cluster_domain = "${cluster_domain}"
+ssh_public_key_path = "${ssh_pub_key_path}"
+compute_memory = "16384"
+compute_num_cpus = "4"
+vm_network = "${vsphere_portgroup}"
+vm_dns_addresses = ["${dns_server}"]
+bootstrap_ip_address = "${bootstrap_ip_address}"
+lb_ip_address = "${lb_ip_address}"
+
+control_plane_count = ${CONTROL_PLANE_REPLICAS}
+compute_count = ${COMPUTE_NODE_REPLICAS}
+compute_ip_addresses = ${compute_ip_addresses}
+control_plane_ip_addresses = ${control_plane_ip_addresses}
+EOF
+
+echo "$(date -u --rfc-3339=seconds) - Create variables.ps1 ..."
+cat >"${SHARED_DIR}/variables.ps1" <<-EOF
+\$clustername = "${cluster_name}"
+\$basedomain = "${base_domain}"
+\$clusterdomain = "${cluster_domain}"
+\$sshkeypath = "${ssh_pub_key_path}"
+
+\$machine_cidr = "${machine_cidr}"
+
+\$vm_template = "$(basename "${vm_template}")"
+\$vcenter = "${vsphere_url}"
+\$portgroup = "$(basename "${vsphere_portgroup}")"
+\$datastore = "$(basename "${vsphere_datastore}")"
+\$datacenter = "$(basename "${vsphere_datacenter}")"
+\$cluster = "$(basename "${vsphere_cluster}")"
+\$vcentercredpath = "secrets/vcenter-creds.xml"
+\$storagepolicy = ""
+\$secureboot = \$false
+
+\$ipam = "ipam.vmc.ci.openshift.org"
+
+\$dns = "${dns_server}"
+\$gateway = "${gateway}"
+\$netmask ="${netmask}"
+
+\$bootstrap_ip_address = "${bootstrap_ip_address}"
+\$lb_ip_address = "${lb_ip_address}"
+
+\$control_plane_memory = 16384
+\$control_plane_num_cpus = 4
+\$control_plane_count = ${CONTROL_PLANE_REPLICAS}
+\$control_plane_ip_addresses = $(echo ${control_plane_ip_addresses} | tr -d '[]')
+\$control_plane_hostnames = $(printf "\"%s\"," "${control_plane_hostnames[@]}" | sed 's/,$//')
+
+\$compute_memory = 16384
+\$compute_num_cpus = 4
+\$compute_count = ${COMPUTE_NODE_REPLICAS}
+\$compute_ip_addresses = $(echo ${compute_ip_addresses} | tr -d '[]')
+\$compute_hostnames = $(printf "\"%s\"," "${compute_hostnames[@]}" | sed 's/,$//')
+EOF
+
+echo "$(date -u --rfc-3339=seconds) - Create secrets.auto.tfvars..."
+cat >"${SHARED_DIR}/secrets.auto.tfvars" <<-EOF
+vsphere_password="${GOVC_PASSWORD}"
+vsphere_user="${GOVC_USERNAME}"
+ipam_token=""
+EOF
+
+if command -v pwsh &> /dev/null
+then
+  echo "Creating powercli credentials file"
+  pwsh -command "\$User='${GOVC_USERNAME}';\$Password=ConvertTo-SecureString -String '${GOVC_PASSWORD}' -AsPlainText -Force;\$Credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList \$User, \$Password;\$Credential | Export-Clixml ${SHARED_DIR}/vcenter-creds.xml"
+fi
+
+dir=/tmp/installer
+mkdir "${dir}/"
+pushd ${dir}
+cp -t "${dir}" \
+  "${SHARED_DIR}/install-config.yaml"
+
+echo "$(date +%s)" >"${SHARED_DIR}/TEST_TIME_INSTALL_START"
+
+if [ "${FIPS_ENABLED:-false}" = "true" ]; then
+    export OPENSHIFT_INSTALL_SKIP_HOSTCRYPT_VALIDATION=true
+fi
+
+### Create manifests
+echo "Creating manifests..."
+${INSTALLER_BINARY} --dir="${dir}" create manifests &
+
+set +e
+wait "$!"
+ret="$?"
+set -e
+
+if [ $ret -ne 0 ]; then
+  cp "${dir}/.openshift_install.log" "${ARTIFACT_DIR}/.openshift_install.log"
+  exit "$ret"
+fi
+
+# remove channel from CVO
+sed -i '/^  channel:/d' "manifests/cvo-overrides.yaml"
+
+### Remove control plane machines
+echo "Removing control plane machines..."
+rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
+
+### Remove compute machinesets (optional)
+echo "Removing compute machinesets..."
+rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+
+### Remove CPMS manifests
+rm -f openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml || true
+
+### Make control-plane nodes unschedulable
+echo "Making control-plane nodes unschedulable..."
+sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" manifests/cluster-scheduler-02-config.yml
+
+### Check hybrid network manifest
+if test -f "${SHARED_DIR}/manifest_cluster-network-03-config.yml"; then
+  echo "Applying hybrid network manifest..."
+  cp "${SHARED_DIR}/manifest_cluster-network-03-config.yml" manifests/cluster-network-03-config.yml
+fi
+
+# Simulate a cluster installed without vSphere failure domain information (e.g.
+# pre-4.13 or UPI installs that never populate it). vcenters/failureDomains are
+# only present under spec.platformSpec.vsphere (VSpherePlatformStatus carries
+# neither field), and the installer never backfills this on upgrade, so deleting
+# it here from the pre-bootstrap manifest reproduces that persistent state
+# without fighting any later immutability/admission checks on a live cluster.
+#
+# Before deleting it, compute the legacy-INI form of
+# openshift-config/cloud-provider-config from the installer-rendered YAML,
+# using the exact server/datacenter/datastore/folder values the installer
+# resolved for this install's sole failure domain. No installer version in
+# active use renders cloud-provider-config as INI anymore -- a fresh install
+# always emits YAML there, regardless of install-config schema -- so
+# stripping alone produces a config-format/Infra-CR combination (new-format
+# config + legacy-shaped Infra) that cannot occur on a real cluster, and
+# leaves vmware-vsphere-csi-driver-operator with no source of
+# datastore/topology data at all: a storage ClusterOperator that never
+# leaves Degraded, which keeps the install itself from ever completing
+# (SPLAT-3028). Real UPI/pre-4.13 clusters have always carried this data in
+# the INI [Workspace] section instead; a real 4.12-origin cluster upgraded
+# through day-2 multi-vCenter GA confirms cloud-provider-config stays INI,
+# untouched since original install, and that storage stays Available in
+# that exact state.
+#
+# The computed INI is staged to a file outside manifests/, not written
+# straight into cloud-provider-config.yaml, because cluster-config-operator's
+# bootstrap-time render (invoked from bootkube.sh's "config-bootstrap" stage)
+# has no vSphere-specific transformer and just copies that ConfigMap
+# byte-for-byte into ControllerConfig.Spec.CloudProviderConfig, and from
+# there into /etc/kubernetes/cloud.conf on every node. The in-cluster
+# machine-config-controller regenerates that same field moments later from
+# cluster-cloud-controller-manager-operator's CCCMO-normalized (YAML) copy of
+# the same ConfigMap, so if the file were already legacy INI at render time,
+# the two renders would disagree byte-for-byte and trip MCD's one-time
+# "bootstrap generated MC vs in-cluster generated MC" mismatch check,
+# permanently degrading the machine-config ClusterOperator. The staged
+# content is applied later, after `create ignition-configs` and
+# cluster-config-operator's render have both consumed the installer's
+# native (modern) YAML -- see the injection below, right before this
+# script hands the ignition files off to the VM-provisioning step.
+if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - staging legacy-INI cloud-provider-config for later injection (SPLAT-3028)"
+  infra_manifest="manifests/cluster-infrastructure-02-config.yml"
+  ccm_manifest="manifests/cloud-provider-config.yaml"
+  staged_ccm_manifest="vsphere-legacy-cloud-provider-config.yaml"
+
+  # infraID comes from the Infrastructure manifest's own
+  # status.infrastructureName rather than metadata.json: metadata.json is not
+  # written to disk until `create ignition-configs` runs, so reading it here
+  # (right after `create manifests`) would either read a stale file or,
+  # under `set -o errexit`, silently kill the whole script when it doesn't
+  # exist yet.
+  vsphere_fd_server=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.vcenters[0].server")
+  vsphere_fd_datacenter=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.datacenter")
+  vsphere_fd_datastore_path=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.datastore")
+  vsphere_fd_folder=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.folder")
+  vsphere_fd_resource_pool=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.failureDomains[0].topology.resourcePool")
+  vsphere_fd_port=$(yq-go r "${infra_manifest}" "spec.platformSpec.vsphere.vcenters[0].port")
+  vsphere_infra_id=$(yq-go r "${infra_manifest}" "status.infrastructureName")
+  for v in vsphere_fd_server vsphere_fd_datacenter vsphere_fd_datastore_path vsphere_fd_folder vsphere_fd_resource_pool vsphere_fd_port vsphere_infra_id; do
+    [[ "${!v}" == "null" ]] && eval "${v}=\"\""
+  done
+  # The legacy in-tree vSphere provider takes a datastore name, or
+  # "<datastore-cluster>/<datastore>" when the datastore lives in a datastore
+  # cluster, relative to the datacenter's datastore folder -- not a full
+  # inventory path. Strip only the "/<datacenter>/datastore/" prefix so a
+  # nested datastore keeps its cluster segment; a bare name or an
+  # already-relative value passes through unchanged. Taking the basename
+  # instead would silently drop that segment and point the provider at the
+  # wrong datastore.
+  vsphere_fd_datastore="${vsphere_fd_datastore_path#*/datastore/}"
+  [[ "${vsphere_fd_port}" == "0" ]] && vsphere_fd_port=""
+
+  if [[ -z "${vsphere_fd_server}" || -z "${vsphere_fd_datacenter}" || -z "${vsphere_fd_datastore}" ]]; then
+    echo "ERROR: could not read vCenter server/datacenter/datastore from ${infra_manifest}; cannot build a legacy cloud-provider-config" >&2
+    exit 1
+  fi
+
+  if [[ -z "${vsphere_fd_folder}" ]]; then
+    if [[ -n "${vsphere_infra_id}" ]]; then
+      vsphere_fd_folder="/${vsphere_fd_datacenter}/vm/${vsphere_infra_id}"
+    else
+      echo "WARNING: no topology.folder resolved and no status.infrastructureName available; omitting 'folder' from the legacy [Workspace] section" >&2
+    fi
+  fi
+
+  vsphere_cm_name=$(yq-go r "${ccm_manifest}" "metadata.name")
+  vsphere_cm_namespace=$(yq-go r "${ccm_manifest}" "metadata.namespace")
+
+  vsphere_port_line="" vsphere_folder_line="" vsphere_resource_pool_line=""
+  [[ -n "${vsphere_fd_port}" ]] && vsphere_port_line="    port = \"${vsphere_fd_port}\""$'\n'
+  [[ -n "${vsphere_fd_folder}" ]] && vsphere_folder_line="    folder = \"${vsphere_fd_folder}\""
+  [[ -n "${vsphere_fd_resource_pool}" ]] && vsphere_resource_pool_line="    resourcepool-path = \"${vsphere_fd_resource_pool}\""
+
+  # Mirrors openshift-installer's own CloudProviderConfigIni() in
+  # pkg/asset/manifests/vsphere/cloudproviderconfig.go -- dead code there
+  # (no caller in the installer outside its own tests, since no installer
+  # version in active use ever selects this format for a fresh install) but
+  # still the product's canonical legacy-INI shape, including its
+  # infraID-based default folder, so what this job manufactures matches as
+  # closely as possible what a real pre-4.13/UPI install would have produced.
+  #
+  # Written to staged_ccm_manifest, not ccm_manifest: see the comment above
+  # for why this must not land in manifests/ until after the bootstrap-time
+  # swap below.
+  cat > "${staged_ccm_manifest}" <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${vsphere_cm_name}
+  namespace: ${vsphere_cm_namespace}
+data:
+  config: |
+    [Global]
+    secret-name = "vsphere-creds"
+    secret-namespace = "kube-system"
+    insecure-flag = "1"
+
+    [VirtualCenter "${vsphere_fd_server}"]
+${vsphere_port_line}    datacenters = "${vsphere_fd_datacenter}"
+
+    [Workspace]
+    server = "${vsphere_fd_server}"
+    datacenter = "${vsphere_fd_datacenter}"
+    default-datastore = "${vsphere_fd_datastore}"
+${vsphere_folder_line}
+${vsphere_resource_pool_line}
+EOF
+
+  echo "$(date -u --rfc-3339=seconds) - stripping vcenters/failureDomains from the Infrastructure manifest"
+  yq-go d -i "manifests/cluster-infrastructure-02-config.yml" "spec.platformSpec.vsphere.vcenters"
+  yq-go d -i "manifests/cluster-infrastructure-02-config.yml" "spec.platformSpec.vsphere.failureDomains"
+fi
+
+### Create Ignition configs
+echo "Creating Ignition configs..."
+${INSTALLER_BINARY} --dir="${dir}" create ignition-configs &
+
+set +e
+wait "$!"
+ret="$?"
+set -e
+
+echo "$(date +%s)" >"${SHARED_DIR}/TEST_TIME_INSTALL_END"
+
+cp "${dir}/.openshift_install.log" "${ARTIFACT_DIR}/.openshift_install.log"
+
+if [ $ret -ne 0 ]; then
+  exit "$ret"
+fi
+
+# Swap cloud-provider-config to the legacy INI form inside bootstrap.ign. That
+# file is what bootkube's "config-bootstrap" stage (cluster-config-operator's
+# bootstrap-time render) turns into ControllerConfig.Spec.CloudProviderConfig,
+# and what "cb-bootstrap" later applies to the API server as the live
+# openshift-config/cloud-provider-config.
+#
+# Two independent renders consume it and must agree byte-for-byte, or MCD's
+# one-time bootstrap-vs-in-cluster MachineConfig check degrades the master pool
+# permanently: the bootstrap one reads manifests/cloud-provider-config.yaml,
+# while MCO's syncCloudConfig() reads
+# openshift-config-managed/kube-cloud-config, key cloud.conf.
+#
+# The in-cluster format is decided by whoever writes that managed copy, and
+# that flips on the VSphereMultiVCenterDay2 feature gate:
+#
+#   gate disabled (4.19/4.20/4.21 defaults): cluster-config-operator copies
+#     openshift-config/<Infrastructure.spec.cloudConfig.name> VERBATIM, so the
+#     in-cluster format equals the live ConfigMap's. The manifest must be INI
+#     at render time too, so the unit is ordered Before=bootkube.service
+#     (VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER=pre-bootstrap).
+#
+#   gate enabled (GA from 4.22 / 5.x): CCMO owns that copy and rewrites it
+#     through its vSphere transformer, which emits normalized YAML from either
+#     input. The in-cluster render is YAML regardless, so the manifest must stay
+#     the installer's modern YAML at render time and the swap must wait for
+#     config-bootstrap.done (post-bootstrap, the default).
+#
+# VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER selects which; gate-off releases set
+# it per-test in the release config. Either way the live ConfigMap ends up INI
+# (pre: from the start; post: cb-bootstrap applies manifests/ after
+# config-bootstrap.done, observed on 5.x). Getting it wrong costs a full job.
+if [[ "${STRIP_VSPHERE_FAILURE_DOMAINS:-}" == "true" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - injecting the legacy cloud-provider-config swap into bootstrap.ign (SPLAT-3028)"
+
+  if [[ ! -s "${staged_ccm_manifest}" ]]; then
+    echo "ERROR: ${staged_ccm_manifest} is missing or empty; the legacy cloud-provider-config staging step above must have failed silently" >&2
+    exit 1
+  fi
+
+  vsphere_legacy_swap_order="${VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER:-post-bootstrap}"
+  case "${vsphere_legacy_swap_order}" in
+    pre-bootstrap)
+      vsphere_legacy_unit_description="Swap cloud-provider-config to the legacy INI form before bootkube derives the bootstrap cloud config (SPLAT-3028)"
+      vsphere_legacy_before_line="        Before=bootkube.service"$'\n'
+      ;;
+    post-bootstrap)
+      vsphere_legacy_unit_description="Swap cloud-provider-config to the legacy INI form once cluster-config-operator's bootstrap render has consumed the modern YAML (SPLAT-3028)"
+      vsphere_legacy_before_line=""
+      ;;
+    *)
+      echo "ERROR: VSPHERE_LEGACY_CLOUD_CONFIG_SWAP_ORDER must be 'pre-bootstrap' or 'post-bootstrap', got '${vsphere_legacy_swap_order}'" >&2
+      exit 1
+      ;;
+  esac
+
+  if [[ "${vsphere_legacy_swap_order}" == "pre-bootstrap" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - legacy cloud-provider-config swap order: vsphere_legacy_swap_order=${vsphere_legacy_swap_order} (assumes VSphereMultiVCenterDay2 is DISABLED on this payload: cluster-config-operator copies openshift-config-managed/kube-cloud-config verbatim, so the bootstrap render must see INI)"
+  else
+    echo "$(date -u --rfc-3339=seconds) - legacy cloud-provider-config swap order: vsphere_legacy_swap_order=${vsphere_legacy_swap_order} (assumes VSphereMultiVCenterDay2 is ENABLED on this payload: CCMO normalizes openshift-config-managed/kube-cloud-config to YAML, so the bootstrap render must see the installer YAML)"
+  fi
+  vsphere_legacy_cc_dir=/tmp/vsphere-legacy-cloud-config
+  mkdir -p "${vsphere_legacy_cc_dir}"
+  cp "${staged_ccm_manifest}" "${vsphere_legacy_cc_dir}/cloud-provider-config-legacy.yaml"
+
+  cat > "${vsphere_legacy_cc_dir}/swap-cloud-provider-config.sh" << 'SCRIPT_EOF'
+#!/bin/bash
+set -o nounset
+set -o pipefail
+
+mode="${1:-post-bootstrap}"
+target=/opt/openshift/manifests/cloud-provider-config.yaml
+source_file=/opt/openshift/cloud-provider-config-legacy.yaml
+
+# pre-bootstrap: the unit is ordered Before=bootkube.service, so bootkube
+#   cannot read the manifest until this finishes; wait only for the
+#   ignition-written layout to appear.
+# post-bootstrap: wait for the marker of the very stage whose render must
+#   consume the installer's YAML first; the swap then still lands before
+#   cb-bootstrap reads manifests/, several bootkube stages later.
+if [[ "${mode}" == "pre-bootstrap" ]]; then
+  marker="${target}"
+  timeout_seconds=120
+  poll_seconds=2
+else
+  marker=/opt/openshift/config-bootstrap.done
+  timeout_seconds=900
+  poll_seconds=5
+fi
+elapsed=0
+
+if [[ ! -s "${source_file}" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - ERROR: ${source_file} is missing or empty; the legacy INI staging in the install step must have failed" >&2
+  exit 1
+fi
+
+echo "$(date -u --rfc-3339=seconds) - [${mode}] waiting for ${marker} before swapping cloud-provider-config to legacy INI (SPLAT-3028)"
+until [[ -f "${marker}" ]]; do
+  if (( elapsed >= timeout_seconds )); then
+    echo "$(date -u --rfc-3339=seconds) - ERROR: ${marker} did not appear within ${timeout_seconds}s; leaving cloud-provider-config.yaml in its modern (non-legacy) form. The legacy vSphere infra simulation did NOT take effect for cloud-provider-config (SPLAT-3028)." >&2
+    exit 1
+  fi
+  sleep "${poll_seconds}"
+  elapsed=$((elapsed + poll_seconds))
+done
+
+if ! cp "${source_file}" "${target}"; then
+  echo "$(date -u --rfc-3339=seconds) - ERROR: failed to overwrite ${target} with ${source_file}" >&2
+  exit 1
+fi
+echo "$(date -u --rfc-3339=seconds) - [${mode}] overwrote ${target} with the legacy INI ConfigMap after a ${elapsed}s wait for ${marker} (SPLAT-3028)"
+SCRIPT_EOF
+
+  cat > "${vsphere_legacy_cc_dir}/fcct.yml" << EOF
+variant: fcos
+version: 1.1.0
+ignition:
+  config:
+    merge:
+      - local: bootstrap_initial.ign
+storage:
+  files:
+    - path: /opt/openshift/cloud-provider-config-legacy.yaml
+      mode: 0644
+      overwrite: true
+      contents:
+        local: cloud-provider-config-legacy.yaml
+    - path: /usr/local/bin/swap-vsphere-cloud-provider-config.sh
+      mode: 0755
+      overwrite: true
+      contents:
+        local: swap-cloud-provider-config.sh
+systemd:
+  units:
+    - name: swap-vsphere-cloud-provider-config.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=${vsphere_legacy_unit_description}
+        After=network-online.target
+        Wants=network-online.target
+${vsphere_legacy_before_line}
+        [Service]
+        Type=oneshot
+        RemainAfterExit=yes
+        ExecStart=/usr/local/bin/swap-vsphere-cloud-provider-config.sh ${vsphere_legacy_swap_order}
+
+        [Install]
+        WantedBy=multi-user.target
+EOF
+
+  cp "${dir}/bootstrap.ign" "${vsphere_legacy_cc_dir}/bootstrap_initial.ign"
+  # SSL_CERT_FILE may be set to a vCenter-only CA bundle in this environment
+  # (the other vsphere step scripts in this repo unset it for the same
+  # reason), which breaks TLS verification of this public mirror's normal
+  # certificate. Use the system trust store for this call instead.
+  if ! env -u SSL_CERT_FILE curl --fail --location --silent --show-error --connect-timeout 10 --max-time 60 \
+    "https://openshift-mirror-list.ci-systems.workers.dev/pub/openshift-v4/clients/butane/latest/butane-amd64" -o /tmp/fcct; then
+    echo "ERROR: failed to download butane/fcct for the vsphere legacy cloud-provider-config swap" >&2
+    exit 1
+  fi
+  chmod ug+x /tmp/fcct
+  /tmp/fcct --pretty --strict -d "${vsphere_legacy_cc_dir}" "${vsphere_legacy_cc_dir}/fcct.yml" > "${dir}/bootstrap.ign"
+fi
+
+cp -t "${SHARED_DIR}" \
+  "${dir}/auth/kubeadmin-password" \
+  "${dir}/auth/kubeconfig" \
+  "${dir}/metadata.json" \
+  "${dir}"/*.ign
+
+# Removed tar of openshift state. Not enough room in SHARED_DIR with terraform state
+
+popd

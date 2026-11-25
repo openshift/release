@@ -1,0 +1,19 @@
+workflow:
+  as: openshift-e2e-external-aws
+  steps:
+    pre:
+    - chain: platform-external-cluster-aws-pre
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather
+    - chain: platform-external-cluster-aws-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      PROVIDER_NAME: aws
+      PLATFORM_EXTERNAL_CCM_ENABLED: no
+      TEST_ARGS: '--disable-monitor=service-type-load-balancer-availability'
+  documentation: |-
+    The origin E2E workflow to validate clusters installed on AWS with platform type external.
