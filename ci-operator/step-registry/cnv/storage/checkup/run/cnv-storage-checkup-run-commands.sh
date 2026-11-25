@@ -15,7 +15,9 @@ failure_reason="Storage checkup runner failed before results were validated"
 failure_category=setup
 job_complete=false
 namespace=""
+hold_pid=""
 started=${SECONDS}
+pre_job_hold_seconds=${CHECKUP_PRE_JOB_HOLD_SECONDS:-0}
 require_live_migration=${CHECKUP_REQUIRE_LIVE_MIGRATION:-false}
 expected_snapshot_class=${CHECKUP_EXPECTED_RWX_BLOCK_SNAPSHOT_CLASS:-}
 disk_snapshot_file="${ARTIFACT_DIR}/vm-disk-snapshots.json"
@@ -81,6 +83,10 @@ capture_vm_disk_snapshots() {
 finish() {
   local exit_code=$?
   trap - EXIT
+  if [[ -n ${hold_pid} ]]; then
+    kill "${hold_pid}" 2>/dev/null || true
+    wait "${hold_pid}" 2>/dev/null || true
+  fi
   if [[ -n ${namespace} && ${exit_code} != 0 ]]; then
     capture_result || true
     if [[ -n ${expected_snapshot_class} && ! -f ${disk_snapshot_file} ]]; then
@@ -156,9 +162,12 @@ fail() {
 }
 
 [[ ${CHECKUP_NUM_VMS} =~ ^([1-9]|[1-9][0-9]|100)$ ]] || fail "CHECKUP_NUM_VMS must be between 1 and 100"
+if [[ ! ${pre_job_hold_seconds} =~ ^(0|[1-9][0-9]{0,3})$ ]] || (( pre_job_hold_seconds > 7200 )); then
+  fail "CHECKUP_PRE_JOB_HOLD_SECONDS must be between 0 and 7200"
+fi
 [[ ${CHECKUP_JOB_TIMEOUT_SECONDS} =~ ^[1-9][0-9]*$ ]] || fail "CHECKUP_JOB_TIMEOUT_SECONDS must be a positive integer"
-# Reserve five minutes of the registry step's 40-minute timeout for setup,
-# API calls, and reporting after the Job deadline.
+# At the maximum hold, the registry step leaves 40 minutes for the Job,
+# including five minutes for setup, API calls, and reporting.
 (( CHECKUP_JOB_TIMEOUT_SECONDS <= 2100 )) || fail "CHECKUP_JOB_TIMEOUT_SECONDS must not exceed 2100"
 
 duration_seconds() {
@@ -216,6 +225,17 @@ render_manifest() {
 
 printf '%s\n' "${CHECKUP_RBAC_MANIFEST}" | render_manifest | oc --request-timeout=30s create -f -
 printf '%s\n' "${CHECKUP_CONFIGMAP_MANIFEST}" | render_manifest | oc --request-timeout=30s create -f -
+
+if (( pre_job_hold_seconds > 0 )); then
+  echo "Namespace, RBAC, and ConfigMap are ready in ${namespace}. Holding for ${pre_job_hold_seconds} seconds before creating the storage checkup Job."
+  # Wait on a child so the runner can handle termination during the hold.
+  sleep "${pre_job_hold_seconds}" &
+  hold_pid=$!
+  wait "${hold_pid}" || fail "Storage checkup hold did not complete"
+  hold_pid=""
+  echo "Pre-Job hold complete"
+fi
+
 printf '%s\n' "${CHECKUP_JOB_MANIFEST}" | render_manifest | oc --request-timeout=30s create -f -
 
 echo "Running CNV storage checkup in ${namespace} against ${storage_class}"
