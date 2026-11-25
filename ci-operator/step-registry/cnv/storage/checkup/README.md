@@ -180,10 +180,16 @@ for the checkup, and 2100 seconds for the Job. The current jobs use these budget
 
 | Input | Cloud job value |
 | --- | --- |
-| `CHECKUP_VMI_TIMEOUT` | AWS `6m`, Azure and GCP `3m` |
-| `CHECKUP_TIMEOUT` | `10m` |
-| `CHECKUP_JOB_TIMEOUT_SECONDS` | `900` (15 minutes) |
+| `CHECKUP_VMI_TIMEOUT` | AWS `6m`, Azure `12m`, GCP `3m` |
+| `CHECKUP_TIMEOUT` | Azure `30m`, AWS and GCP `10m` |
+| `CHECKUP_JOB_TIMEOUT_SECONDS` | Azure `2100` (35 minutes), AWS and GCP `900` (15 minutes) |
 | `CHECKUP_POST_GATHER_HOLD_SECONDS` | `7200` (2 hours) |
+
+The [Azure File NFS rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-azure/2125558401814499328)
+passed migration, snapshot, and restore. The first VM started in 5m36s, and the
+hotplug DataVolume became ready in 9m50s. Both exceeded the former three-minute
+VMI timeout. The Azure budgets allow for those copy-backed operations and a
+longer concurrent boot window for all ten VMs.
 
 The first clone of a freshly imported golden image can wait for an EBS snapshot.
 In the initial [AWS ten-VM rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2118584516665675776),
