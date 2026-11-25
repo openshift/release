@@ -401,6 +401,20 @@ print(len(ns))
     fi
     centralNs="$(printf '%s' "${centralJson}" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["items"][0]["metadata"]["namespace"])' 2>/dev/null)" || return 1
     [[ -n "${centralNs}" ]] || return 1
+    # The Central under test identifies the only acceptable SecuredCluster
+    # owner: its name and uid are carried into the SecuredCluster link check.
+    # Tab-separated, not space-separated: with a space the trailing-field
+    # expansion returns the name when the uid is absent, and the link check
+    # then rejects a Central owner whose uid it actually matches.
+    typeset centralIdent=""
+    centralIdent="$(printf '%s' "${centralJson}" | python3 -c '
+import json,sys
+md=json.load(sys.stdin)["items"][0].get("metadata",{}) or {}
+print("%s\t%s" % (md.get("name","") or "", md.get("uid","") or ""))
+' 2>/dev/null)" || centralIdent=""
+    centralName=""
+    centralUid=""
+    IFS=$'\t' read -r centralName centralUid <<< "${centralIdent}" || true
     true
 }
 
@@ -448,13 +462,16 @@ print(len(ns))
         return 1
     fi
     # Single foreign namespace found: validate linkage to Central before accepting.
-    # Accepted link fields: ownerReference with kind Central, label or annotation
-    # with known key central-namespace or centralNamespace or rhacs.redhat.com/central-namespace
-    # or stackrox.io/central-namespace where value equals centralNs exactly, spec
+    # Accepted link fields: ownerReference with kind Central whose name equals the
+    # Central CR name in centralNs (and whose namespace, when present, equals centralNs;
+    # a uid on both sides must match too), label or annotation with known key
+    # central-namespace or centralNamespace or rhacs.redhat.com/central-namespace or
+    # stackrox.io/central-namespace where value equals centralNs exactly, spec
     # centralName or centralNamespace equals centralNs exactly, spec centralEndpoint
-    # namespace segment equals centralNs exactly. Metadata name and namespace are
-    # not considered links. If no link is found, fail and keep waiting instead of
-    # selecting items[0].
+    # namespace segment equals centralNs exactly. SecuredCluster metadata name and
+    # namespace are not considered links, and a kind-only owner match is not a link
+    # either: a stale or unrelated Central owner reference cannot satisfy the gate.
+    # If no link is found, fail and keep waiting instead of selecting items[0].
     typeset candidateScNs=""
     candidateScNs="$(printf '%s' "${allScJson}" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d["items"][0]["metadata"]["namespace"])' 2>/dev/null)" || return 1
     [[ -n "${candidateScNs}" ]] || return 1
@@ -462,10 +479,29 @@ print(len(ns))
     scLinked="$(printf '%s' "${allScJson}" | python3 -c '
 import json,sys
 central_ns=sys.argv[1]
+central_name=sys.argv[2] if len(sys.argv) > 2 else ""
+central_uid=sys.argv[3] if len(sys.argv) > 3 else ""
 try:
     items=json.load(sys.stdin).get("items",[])
 except Exception:
     sys.exit(1)
+def owner_links_central(ref):
+    # An owner reference is a link only when it points at the Central under
+    # test: kind Central, the discovered Central CR name, the Central namespace
+    # when the reference carries one, and the discovered uid when both sides
+    # carry one. A kind-only match accepts a stale or unrelated owner.
+    if not isinstance(ref, dict) or ref.get("kind") != "Central":
+        return False
+    ref_ns=ref.get("namespace") or ""
+    if ref_ns and ref_ns != central_ns:
+        return False
+    ref_name=ref.get("name") or ""
+    ref_uid=ref.get("uid") or ""
+    if central_uid and ref_uid:
+        return ref_uid == central_uid
+    if not central_name:
+        return False
+    return ref_name == central_name
 def endpoint_ns(ep):
     if not isinstance(ep, str) or not ep:
         return ""
@@ -487,7 +523,7 @@ for it in items:
     if not isinstance(spec, dict):
         spec={}
     for ref in md.get("ownerReferences",[]) or []:
-        if isinstance(ref, dict) and ref.get("kind") == "Central":
+        if owner_links_central(ref):
             linked=True
             break
     if linked:
@@ -517,9 +553,9 @@ for it in items:
         linked=True
         break
 print("1" if linked else "0")
-' "${centralNs}" 2>/dev/null)" || scLinked=""
+' "${centralNs}" "${centralName:-}" "${centralUid:-}" 2>/dev/null)" || scLinked=""
     if [[ "${scLinked}" != "1" ]]; then
-        echo "[readiness] ERROR: SecuredCluster in namespace ${candidateScNs} has no link to Central in namespace ${centralNs} (expected ownerReference kind Central, label or annotation central-namespace or centralNamespace or rhacs.redhat.com/central-namespace or stackrox.io/central-namespace == centralNs, spec centralName or centralNamespace == centralNs, or centralEndpoint namespace == centralNs)" >&2
+        echo "[readiness] ERROR: SecuredCluster in namespace ${candidateScNs} has no link to Central ${centralName:-?} in namespace ${centralNs} (expected ownerReference kind Central naming ${centralName:-?} with namespace ${centralNs} when set, label or annotation central-namespace or centralNamespace or rhacs.redhat.com/central-namespace or stackrox.io/central-namespace == centralNs, spec centralName or centralNamespace == centralNs, or centralEndpoint namespace == centralNs)" >&2
         return 1
     fi
     scNs="${candidateScNs}"
@@ -551,6 +587,8 @@ function SecuredClusterDiscoveryFailureDiagnostics () {
 }
 
 typeset centralNs=""
+typeset centralName=""
+typeset centralUid=""
 typeset scNs=""
 
 if ! WaitFor "Central CR namespace discovery" DiscoverCentralNs PeriodicOperatorDiagnostics; then
