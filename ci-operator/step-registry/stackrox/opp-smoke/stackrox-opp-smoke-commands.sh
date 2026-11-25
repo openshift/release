@@ -186,13 +186,20 @@ _propagate_junit () {
 }
 
 _save_xtrace() {
-    # Scrub credentials before copying, mirror opp-quay-smoke precedent
+    # Scrub credentials before copying, mirror opp-quay-smoke precedent.
+    # The copy is gated on the scrub succeeding: an unscrubbed trace can carry
+    # credential values, so a failed scrub must leave the log unpublished (the
+    # step artifact is what reviewers and the world can read).
     { set +x; } 2>/dev/null
-    sed -i -E \
+    if ! sed -i -E \
         -e 's/([A-Za-z0-9_]*(password|passwd|token|secret|credential|account|key)[A-Za-z0-9_]*)=[^ ]*/\1=REDACTED/gi' \
         -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
         -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
-        "${_xtrace_log}" 2>/dev/null || true
+        "${_xtrace_log}" 2>/dev/null; then
+        echo "[smoke] WARN: xtrace scrub failed; not publishing the trace artifact" >&2
+        { set -x; } 2>/dev/null
+        return 0
+    fi
     if [[ -n "${ARTIFACT_DIR:-}" ]]; then
         cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
     fi
