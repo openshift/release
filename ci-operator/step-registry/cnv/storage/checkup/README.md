@@ -33,8 +33,11 @@ explicitly select a valid development image for the rehearsal.
    and Job manifests are in the run ref's `CHECKUP_*_MANIFEST` defaults, separate
    from the execution script. The script substitutes only the namespace, image,
    timeout, storage class, and checkup parameters.
-7. `cnv-storage-checkup-gather` collects diagnostics and removes the namespace and
-   its cluster-reader binding. The platform's post chain then deletes OCP.
+7. `cnv-storage-checkup-gather` collects diagnostics after the checkup runner
+   finishes, including on failure.
+8. `cnv-storage-checkup-debug-hold` keeps the cluster available for inspection.
+   `cnv-storage-checkup-cleanup` then removes the namespace and its cluster-reader
+   binding, followed by the platform's OCP teardown.
 
 ## Cloud workflows
 
@@ -163,10 +166,9 @@ success and an empty failure reason.
 
 Timeout inputs accept positive durations in hours, minutes, or seconds. The VMI
 timeout must be shorter than the checkup timeout, which must be shorter than the
-Job deadline. The runner allows up to two hours for a hold after namespace, RBAC,
-and ConfigMap creation. The Job deadline starts when the Job is created. It is
+Job deadline. The Job deadline starts when the Job is created. It is
 capped at 2100 seconds to leave at least five minutes for setup and reporting
-within the 2h40m runner timeout. Invalid timeouts and result
+within the 40-minute runner timeout. Invalid timeouts and result
 expressions are rejected before creating checkup resources. Failed API reads
 retain the last complete result document so that a failing JUnit report can
 still be written.
@@ -181,7 +183,7 @@ for the checkup, and 2100 seconds for the Job. The current jobs use these budget
 | `CHECKUP_VMI_TIMEOUT` | AWS `6m`, Azure and GCP `3m` |
 | `CHECKUP_TIMEOUT` | `10m` |
 | `CHECKUP_JOB_TIMEOUT_SECONDS` | `900` (15 minutes) |
-| `CHECKUP_PRE_JOB_HOLD_SECONDS` | `7200` (2 hours) |
+| `CHECKUP_POST_GATHER_HOLD_SECONDS` | `7200` (2 hours) |
 
 The first clone of a freshly imported golden image can wait for an EBS snapshot.
 In the initial [AWS ten-VM rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2118584516665675776),
@@ -200,6 +202,20 @@ PVC-backed golden-image snapshot was pending. With snapshot-backed boot sources,
 the [AWS rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2124828233328234496)
 reached live migration, then timed out after three minutes waiting for the VM snapshot.
 Each parent job retains a five-hour limit, including installation and teardown.
+
+### Interactive debugging
+
+The cloud jobs retain checkup resources with `CHECKUP_SKIP_TEARDOWN=always`.
+Once the runner and artifact gather steps finish, open the `test` container
+for the `cnv-storage-checkup-debug-hold` step in Prow. The step logs when the
+two-hour window starts. From that container, inspect the checkup namespace
+and logs using the installed cluster's credentials.
+
+```bash
+ns=$(cat "${SHARED_DIR}/cnv-storage-checkup-namespace")
+oc -n "$ns" get job,pods,vm,vmi,pvc
+oc -n "$ns" logs --timestamps job/storage-checkup -c storage-checkup
+```
 
 ### Collected artifacts
 
