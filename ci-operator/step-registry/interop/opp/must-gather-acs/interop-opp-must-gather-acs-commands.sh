@@ -43,8 +43,13 @@ for item in data.get("items", []):
             matched = [p for p in ports if str(p.get("port")) == routeTargetPort]
         else:
             matched = [p for p in ports if str(p.get("name")) == routeTargetPort]
-        if matched:
-            ports = matched
+        if not matched:
+            # The route selects a port this slice does not expose: a ready
+            # endpoint here would redirect --connect-to to the wrong container
+            # port, so keep looking at the remaining slices instead of
+            # settling for ports[0].
+            continue
+        ports = matched
     if len(ports) > 1:
         # A single-port service has one entry; prefer an explicitly named https
         # port when several remain.
