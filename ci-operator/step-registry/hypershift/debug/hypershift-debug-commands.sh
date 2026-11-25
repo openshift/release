@@ -23,6 +23,10 @@ cat >> ${SHARED_DIR}/custom-links.txt << EOF
 <a target="_blank" href="https://sippy.dptools.openshift.org/sippy-ng/job_runs/${BUILD_ID}/${extra_args}/intervals" title="Intervals charts give insight into what was happening on the cluster at various points in time, including when tests failed or when operators were in certain states.">Intervals</a>
 EOF
 
+if [[ "${HYPERSHIFT_DEBUG_LINKS_ONLY:-false}" == "true" ]]; then
+  exit 0
+fi
+
 # Create custom-link-tools.html from custom-links.txt
 REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
 cat >> ${REPORT} << EOF
