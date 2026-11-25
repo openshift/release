@@ -1989,6 +1989,13 @@ spec:
               # The only way to get another OAuth token is to go to: Organization -> Applications -> {app} -> Generate Token
               # If there was a programatic way to do it here, we could avoid the problem with the bearer token expiring after 150min
               APPLICATION=automation
+              # The applications response carries the automation app's
+              # client_secret: app_view decrypts it for an org admin, and this
+              # request runs as one. Tracing stays off from the read through the
+              # count (the printf argument is the whole body) so the secret cannot
+              # reach the Job log; it resumes before the create decision, whose
+              # command carries no secret.
+              set +x
               _APPS_READ="$(quay_api_get "/api/v1/organization/${QUAY_ORG}/applications")"
               _APPS_STATUS="${_APPS_READ##*$'\n'}"
               _APPS_BODY="${_APPS_READ%$'\n'*}"
@@ -1997,6 +2004,7 @@ spec:
                 exit 1
               fi
               COUNT="$(printf '%s' "${_APPS_BODY}" | jq --arg app "${APPLICATION}" '[.applications[] | select(.name == $app)] | length')"
+              set -x
               if [ "${COUNT}" -eq 0 ]; then
                 echo "[INFO] Creating ${APPLICATION} application..."
                 quay_required Bearer POST /api/v1/organization/$QUAY_ORG/applications "{\"name\": \"$QUAY_ORG-automation\", \"description\": \"automation app\" }"
