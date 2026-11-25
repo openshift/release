@@ -68,6 +68,83 @@ tests:
           exit 1
         fi
         echo "The leased GCP profile provided both AWS STS mounts."
+        case "$CLUSTER_PROFILE_NAME" in
+          gcp)
+            project=openshift-gce-devel-ci
+            provisioner=do-not-delete-ci-provisioner
+            ;;
+          gcp-openshift-gce-devel-ci-2)
+            project=openshift-gce-devel-ci-2
+            provisioner=ci-provisioner-2
+            ;;
+          gcp-3)
+            project=openshift-gce-devel-ci-3
+            provisioner=ci-provisioner
+            ;;
+          *)
+            echo "Unexpected GCP profile: $CLUSTER_PROFILE_NAME" >&2
+            exit 1
+            ;;
+        esac
+        if [[ "$project" != "$(<"${CLUSTER_PROFILE_DIR:?}/openshift_gcp_project")" ]]; then
+          echo "Leased GCP profile and project do not match." >&2
+          exit 1
+        fi
+
+        scratch=$(mktemp -d)
+        trap 'rm -rf -- "$scratch"' EXIT
+        export AWS_CONFIG_FILE=/var/run/secrets/aws/config/config
+        export AWS_SHARED_CREDENTIALS_FILE=/dev/null AWS_EC2_METADATA_DISABLED=true
+        export AWS_REGION=us-east-1 AWS_DEFAULT_REGION=us-east-1 AWS_PAGER=""
+        unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_SECURITY_TOKEN
+        unset AWS_ROLE_ARN AWS_WEB_IDENTITY_TOKEN_FILE GOOGLE_APPLICATION_CREDENTIALS
+        unset CLOUDSDK_AUTH_ACCESS_TOKEN CLOUDSDK_AUTH_ACCESS_TOKEN_FILE
+        export CLOUDSDK_CONFIG="$scratch/gcloud"
+        aws_cli=$(command -v aws || true)
+        if [[ -z "$aws_cli" ]] || ! "$aws_cli" configure export-credentials help >/dev/null 2>&1; then
+          curl -fsSL --retry 3 https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.32.0.zip -o "$scratch/aws.zip"
+          echo "2e57ed5587de3789d39841c0f309134ccc13a215af597c7739f7102deca30dad  $scratch/aws.zip" | sha256sum -c -
+          python3 -m zipfile -e "$scratch/aws.zip" "$scratch"
+          aws_cli="$scratch/aws/dist/aws"
+          chmod +x "$aws_cli"
+        fi
+        caller=$("$aws_cli" sts get-caller-identity --profile hub --query Arn --output text)
+        if [[ "$caller" != arn:aws:sts::320297955214:assumed-role/ci-step-runner-hub/* ]]; then
+          echo "The AWS hub profile resolved to an unexpected role." >&2
+          exit 1
+        fi
+
+        gcloud iam workload-identity-pools create-cred-config \
+          projects/263120870185/locations/global/workloadIdentityPools/ci-aws-pilot/providers/aws-ci-hub \
+          --aws --service-account="$provisioner@$project.iam.gserviceaccount.com" \
+          --output-file="$scratch/google-wif.json"
+        export CLOUDSDK_AUTH_CREDENTIAL_FILE_OVERRIDE="$scratch/google-wif.json"
+        # Pass the temporary AWS session directly to gcloud in this process.
+        python3 - "$aws_cli" "$project" <<'PYTHON'
+        import json
+        import os
+        import subprocess
+        import sys
+
+        aws_cli, project = sys.argv[1:]
+        credentials = json.loads(subprocess.check_output([
+            aws_cli, "configure", "export-credentials", "--profile", "hub",
+        ]))
+        env = os.environ.copy()
+        env.update(
+            AWS_ACCESS_KEY_ID=credentials["AccessKeyId"],
+            AWS_SECRET_ACCESS_KEY=credentials["SecretAccessKey"],
+            AWS_SESSION_TOKEN=credentials["SessionToken"],
+        )
+        zone = subprocess.check_output([
+            "gcloud", "compute", "zones", "list", f"--project={project}",
+            "--limit=1", "--format=value(name)",
+        ], env=env, text=True).strip()
+        if not zone:
+            sys.exit("Google Cloud returned no zone.")
+        print(f"Federated gcloud zone lookup passed in {project}.")
+        PYTHON
+      grace_period: 30s
       resources:
         requests:
           cpu: 100m
