@@ -436,6 +436,21 @@ _budget_remaining() {
     echo "${rem}"
 }
 
+# Per-call read timeout clamped to the remaining global budget. The budget is
+# only re-evaluated after a call returns, so a read bounded only by
+# OC_READ_TIMEOUT (10s default) can overrun the deadline it is meant to respect.
+# Used by reads that run outside the WaitFor loop (the provisional-hold
+# recheck), where the loop's own remaining-budget arithmetic does not apply.
+_read_timeout_arg() {
+    typeset _base="${OC_READ_TIMEOUT:-10s}"
+    typeset -i _base_s="${_base%s}" _rem
+    (( _base_s > 0 )) || _base_s=10
+    _rem="$(_budget_remaining)"
+    (( _rem < 1 )) && _rem=1
+    (( _base_s > _rem )) && _base_s=_rem
+    echo "${_base_s}s"
+}
+
 function WaitFor () {
     typeset description="$1"
     shift
@@ -776,12 +791,15 @@ function PeriodicOperatorDiagnostics () {
 # hold expires.
 # ---------------------------------------------------------------------------
 typeset -i _centralPresentHadSuccess=0
+# Per-call request timeout for the hold check's reads: the default unless the
+# provisional-hold recheck clamps it to the remaining budget.
+typeset _ccpReadTimeout="${OC_READ_TIMEOUT:-10s}"
 function CheckCentralPresent () {
     typeset out="" items="" crdlist=""
     typeset _traceWasOff=0
     [[ $- == *x* ]] || _traceWasOff=1
     set +x
-    if ! crdlist="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get crd -o name)"; then
+    if ! crdlist="$(oc --request-timeout="${_ccpReadTimeout}" get crd -o name)"; then
         (( _traceWasOff == 0 )) && set -x
         return 2
     fi
@@ -790,7 +808,7 @@ function CheckCentralPresent () {
         (( _traceWasOff == 0 )) && set -x
         return 1
     fi
-    if ! out="$(oc --request-timeout="${OC_READ_TIMEOUT:-10s}" get centrals.platform.stackrox.io -A -o json)"; then
+    if ! out="$(oc --request-timeout="${_ccpReadTimeout}" get centrals.platform.stackrox.io -A -o json)"; then
         (( _traceWasOff == 0 )) && set -x
         return 2
     fi
@@ -860,12 +878,20 @@ if [[ "${_ACS_STATE}" == "absent" && "${INTEROP__OPP__ACS__EXPECTATION}" == "req
             _ensure_assertion_rows
             exit 3
         fi
+        # Bound the recheck reads by what is left of the budget (each read would
+        # otherwise be free to take the full OC_READ_TIMEOUT past the deadline).
+        # A read that starts inside the budget and succeeds just after the
+        # deadline is still accepted: finalizing absent on a Central that was
+        # arriving is the exact failure this hold exists to prevent, and
+        # _BUDGET_MARGIN_S absorbs the overrun.
+        _ccpReadTimeout="$(_read_timeout_arg)"
         typeset -i _recheck_rc=0
         if CheckCentralPresent; then
             _recheck_rc=0
         else
             _recheck_rc=$?
         fi
+        _ccpReadTimeout="${OC_READ_TIMEOUT:-10s}"
         if (( _recheck_rc == 0 )); then
             _ACS_STATE="present"
             echo "[readiness] ACS state re-classified after provisional hold (late success): ${_ACS_STATE}"
