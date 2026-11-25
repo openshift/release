@@ -8,9 +8,9 @@ workflow:
     - as: opct-mirror-images
       from: cli
       credentials:
-      - namespace: test-credentials
-        bundle: registry-pull-credentials
-        mount_path: /var/run/ci-credentials/registry
+      - collection: openshift-qe
+        group: mirror-registry
+        mount_path: /var/run/vault/mirror-registry
       commands: |-
         set -euo pipefail
         source "${SHARED_DIR}/env" || true
@@ -21,13 +21,13 @@ workflow:
         fi
         MIRROR_REGISTRY_HOST=$(head -n1 "${SHARED_DIR}/mirror_registry_url")
 
-        # Build the pull-secret with the mirror registry credentials
+        # Build pull-secret with bastion mirror registry credentials merged in.
+        # The mirror-images-payload step creates new_pull_secret but deletes it
+        # after use, so we rebuild it from the vault credentials.
         new_pull_secret=$(mktemp)
-        if [[ -f "${SHARED_DIR}/new_pull_secret" ]]; then
-          cp "${SHARED_DIR}/new_pull_secret" "${new_pull_secret}"
-        else
-          cp "${CLUSTER_PROFILE_DIR}/pull-secret" "${new_pull_secret}"
-        fi
+        registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
+        jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"${registry_cred}\"}}" \
+          '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
 
         # Mirror OPCT images to the bastion registry so pods inside the
         # disconnected cluster can pull them.
