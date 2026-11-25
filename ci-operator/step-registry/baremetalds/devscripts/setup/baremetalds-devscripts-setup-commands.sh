@@ -222,6 +222,33 @@ scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret
 
 # Copy any additional manifests from previous CI steps
 export EXTRA_MANIFESTS=false
+if [[ "${DEVSCRIPTS_PREFER_BR_EX_DNS:-false}" == true ]]; then
+  # Keep the management network's resolver ahead of DNS learned on extra NICs.
+  dns_config=$(base64 -w0 <<'EOF'
+[connection-br-ex-dns]
+match-device=interface-name:br-ex
+ipv4.dns-priority=10
+EOF
+  )
+  cat > "${SHARED_DIR}/manifest_99-master-br-ex-dns.yaml" <<EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  name: 99-master-br-ex-dns
+  labels:
+    machineconfiguration.openshift.io/role: master
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+      - path: /etc/NetworkManager/conf.d/99-br-ex-dns.conf
+        mode: 420
+        contents:
+          source: data:text/plain;base64,${dns_config}
+EOF
+fi
 echo "Will include manifests:"
 find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
 
