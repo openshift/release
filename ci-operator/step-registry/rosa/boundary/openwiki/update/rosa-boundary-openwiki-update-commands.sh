@@ -92,19 +92,20 @@ if [[ "$base_branch" != "$base" ]]; then
   git merge --no-edit "origin/${base}"
 fi
 
-# Install tools only during this periodic. OpenWiki 0.7.1 needs Node >=22.22.0.
+# Install tools only during this periodic. OpenWiki 0.9.0 needs Node >=22.22.0.
+node_version=v26.13.1
 case "$(uname -m)" in
-  x86_64) node_arch=x64; node_sha=9aa8e9d2298ab68c600bd6fb86a6c13bce11a4eca1ba9b39d79fa021755d7c37 ;;
-  aarch64) node_arch=arm64; node_sha=1bf1eb9ee63ffc4e5d324c0b9b62cf4a289f44332dfef9607cea1a0d9596ba6f ;;
-  *) echo 'Unsupported architecture for Node 22' >&2; exit 1 ;;
+  x86_64) node_arch=x64; node_sha=5c063e46bab0fbc1c17cc445d7ff129cbdcd0471be6ed83b6ab864f8143bc864 ;;
+  aarch64) node_arch=arm64; node_sha=89e1853138db51e8b82d3e98ba9c0d3f2956a28e5e55ea1b7e12d25aae92d5dd ;;
+  *) echo "Unsupported architecture for Node ${node_version}" >&2; exit 1 ;;
 esac
-curl -fsSL "https://nodejs.org/dist/v22.22.0/node-v22.22.0-linux-${node_arch}.tar.xz" -o "$workdir/node.tar.xz"
+curl -fsSL "https://nodejs.org/dist/${node_version}/node-${node_version}-linux-${node_arch}.tar.xz" -o "$workdir/node.tar.xz"
 printf '%s  %s\n' "$node_sha" "$workdir/node.tar.xz" | sha256sum -c -
 mkdir -p "$workdir/node"
 tar -xJf "$workdir/node.tar.xz" --strip-components=1 -C "$workdir/node"
 rm "$workdir/node.tar.xz"
 export PATH="$workdir/node/bin:$workdir/tools/bin:$PATH"
-npm install --global --prefix "$workdir/tools" openwiki@0.7.1 mermaid@11.16.0 jsdom@29.1.1
+npm install --global --prefix "$workdir/tools" openwiki@0.9.0 mermaid@11.16.0 jsdom@29.1.1
 # Record the installed version and requested model for the publisher's PR
 # description. SHARED_DIR accepts only flat files; the read token is gone.
 jq -er '.version' "$workdir/tools/lib/node_modules/openwiki/package.json" > "${SHARED_DIR}/openwiki-version"
