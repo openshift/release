@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail; shopt -s inherit_errexit
 
-# --- Trace-to-file: always capture, dump on failure only ---
+# --- Trace-to-file: always capture, copy scrubbed on every exit ---
 _xtrace_log="/tmp/xtrace-$(basename "$0" .sh).log"
 exec {_xtrace_fd}>"${_xtrace_log}"
 BASH_XTRACEFD=${_xtrace_fd}
@@ -189,10 +189,8 @@ _save_xtrace() {
     # Scrub credentials before copying, mirror opp-quay-smoke precedent
     { set +x; } 2>/dev/null
     sed -i -E \
-        -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+        -e 's/([A-Za-z0-9_]*(password|passwd|token|secret|credential|account|key)[A-Za-z0-9_]*)=[^ ]*/\1=REDACTED/gi' \
         -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
-        -e 's/password=[^ &]+/password=[REDACTED]/g' \
-        -e 's/token=[^ &]+/token=[REDACTED]/g' \
         -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
         "${_xtrace_log}" 2>/dev/null || true
     if [[ -n "${ARTIFACT_DIR:-}" ]]; then

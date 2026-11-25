@@ -40,7 +40,11 @@ mkdir -p "${ARTIFACT_DIR}"
 : "${INTEROP__OPP__ACS__WAIT_TIMEOUT_S:?}"
 : "${INTEROP__OPP__ACS__BUDGET_S:?}"
 : "${INTEROP__OPP__ACS__SELFTEST:?}"
-: "${INTEROP__OPP__ACS__EXPECTATION:?}"
+# EXPECTATION is the one seam whose ref default is the empty string, so it gets
+# an unset-guard only: a `:?` here would abort with status 1 before the carrier
+# and EXIT trap exist, skipping the documented InvalidInput case and exit 2. The
+# expectation validation below the trap owns that verdict.
+INTEROP__OPP__ACS__EXPECTATION="${INTEROP__OPP__ACS__EXPECTATION:-}"
 _BUDGET_MARGIN_S=600   # static cross-file check: budget + margin < ref timeout - grace
 
 # Validated and typeset after the carrier/trap machinery is installed, so an
