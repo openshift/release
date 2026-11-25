@@ -681,6 +681,13 @@ for r in items:
     # route, so the route carries no certificate and only these payloads can
     # verify it; each candidate is proved against the endpoint below, so
     # widening the sources cannot admit an anchor that does not fit.
+    # Every candidate is also tied to this QuayRegistry, not just to the
+    # cluster: a secret reaches the candidate set only when the operator owns
+    # it, when it is the configured bundle secret, or (label fallback) when
+    # its ownerReferences name this QuayRegistry.  An app=quay label alone is
+    # not evidence of association: a certificate published for some other
+    # registry can verify nothing here, and admitting it would let an
+    # unrelated anchor stand in for this registry's trust.
     oc get secrets -n "${QUAY_NS}" -o json | \
         QUAY_OWNER="${QUAY_REGISTRY}" QUAY_OWNER_UID="${QUAY_UID:-}" QUAY_BUNDLE_SECRET="${QUAY_CONFIG_BUNDLE:-}" CA_DIR="${quayCaDir}" python3 -c "
 import base64, json, os, sys
@@ -711,6 +718,23 @@ def is_owned(refs):
             return True
     return False
 
+
+def is_associated(refs):
+    # Association for the label fallback below: an owner of kind
+    # QuayRegistry that names the selected registry, by uid when the caller
+    # supplied one, otherwise by name.  Any other owner kind, a uid that
+    # differs (a registry recreated after the secret was stamped) and a
+    # missing ownerReferences list all mean unassociated.
+    for r in refs:
+        if r.get('kind') != 'QuayRegistry':
+            continue
+        if owner_uid:
+            if r.get('uid') == owner_uid:
+                return True
+        elif r.get('name') == owner:
+            return True
+    return False
+
 # Primary: secrets owned by selected QuayRegistry (uid match) or the config bundle secret
 for s in items:
     meta = s.get('metadata') or {}
@@ -732,17 +756,29 @@ for s in items:
         if data.get('ca.crt'):
             write('20-owned', base64.b64decode(data['ca.crt']))
 
-# Fallback: label-matched unowned secrets only when no owned candidate exists
+# Fallback: only when no owned candidate exists, and only for a secret that
+# is both labelled app=quay and owner-referenced to the selected
+# QuayRegistry.  The label says which product wrote the secret; only the
+# ownerReference says which registry it belongs to, so a labelled secret
+# with no such owner is not admitted.  When nothing remains the caller's
+# no-candidate path fails closed before any credential is sent, which is the
+# intended direction: a probe-verified anchor that belongs to another
+# registry is not this registry's trust.
 if counts['20-owned'] == 0 and counts['25-ssl'] == 0:
     fallback_used = False
     for s in items:
         meta = s.get('metadata') or {}
         data = s.get('data') or {}
-        if data.get('ssl.cert') and (meta.get('labels') or {}).get('app') == 'quay':
-            write('25-ssl', base64.b64decode(data['ssl.cert']))
-            fallback_used = True
+        if not data.get('ssl.cert'):
+            continue
+        if (meta.get('labels') or {}).get('app') != 'quay':
+            continue
+        if not is_associated(meta.get('ownerReferences') or []):
+            continue
+        write('25-ssl', base64.b64decode(data['ssl.cert']))
+        fallback_used = True
     if fallback_used:
-        print('WARNING: no owned Quay TLS secret found for %s (uid %s); falling back to label app=quay secrets' % (owner, owner_uid), file=sys.stderr)
+        print('WARNING: no owned Quay TLS secret found for %s (uid %s); falling back to app=quay labelled secrets owner-referenced to that QuayRegistry only (label-only secrets are not admitted)' % (owner, owner_uid), file=sys.stderr)
 " || { _rc=$?; echo "WARNING: Quay TLS trust candidate extraction failed (python rc=${_rc})" >&2; }
 
     # The ingress CA signs route certificates that no operator issued.
@@ -778,6 +814,147 @@ if counts['20-owned'] == 0 and counts['25-ssl'] == 0:
     fi
     quayTlsOpts=( --cacert "${quayCaFile}" )
     : "INFO: Quay route TLS verified against ${quayCaFile}"
+    return 0
+}
+
+# Offline pin for the label-fallback association rule
+# (PRRT_kwDOBHvUUM65MrmC).  ResolveQuayTlsTrust runs against a stub oc that
+# serves a fixed secret list and a stub curl whose probe verifies only the
+# candidate prefixes a case admits, so the assertion is about which secrets
+# become candidates, not about any real certificate:
+#   associated fallback  an app=quay labelled secret owner-referenced to this
+#                        QuayRegistry by kind plus uid is admitted when no
+#                        owned ca.crt/tls.crt candidate exists
+#   label only           an app=quay labelled secret with no such owner is
+#                        refused, and the function fails closed even though
+#                        the probe would have verified it
+#   owned preference     an owned candidate still wins over a labelled
+#                        associated one
+# Dormant by design, like the other self-tests here: this change adds no call
+# in Main.  The offline review harness runs this function.
+QuayTlsFallbackSelfTest() {
+    typeset _origHost="${QUAY_HOST:-}" _origNs="${QUAY_NS:-}"
+    typeset _origReg="${QUAY_REGISTRY:-}" _origUid="${QUAY_UID:-}"
+    typeset _origBundle="${QUAY_CONFIG_BUNDLE:-}" _origCaFile="${quayCaFile:-}"
+    typeset _xtraceOn=false
+    if [[ "${-}" == *x* ]]; then
+        _xtraceOn=true
+    fi
+    set +x
+    export QUAY_HOST="quay-test.example.com"
+    export QUAY_NS="test-ns"
+    export QUAY_REGISTRY="quay-registry"
+    export QUAY_UID="11111111-2222-3333-4444-555555555555"
+    export QUAY_CONFIG_BUNDLE=""
+    typeset -i _failures=0
+    typeset _b64=''
+    _b64="$(printf 'STUB-CERT' | base64 | tr -d '\n')"
+    typeset _selftestSecrets='' _selftestAdmit=''
+
+    # Stub cluster: no matching route, no ingress CA, the fixed secret list.
+    oc() {
+        case "$*" in
+            *"get routes"*) printf '%s' '{"items":[]}' ;;
+            *"get secrets"*) printf '%s' "${_selftestSecrets}" ;;
+            *) return 1 ;;
+        esac
+    }
+    # Stub probe: verifies only the candidate prefixes the case lists in
+    # _selftestAdmit, nothing else.  A case that expects a refusal lists the
+    # prefix the fallback would have produced, so the refusal is about
+    # admission, not about the probe.
+    curl() {
+        typeset _p=''
+        for _p in ${_selftestAdmit}; do
+            if [[ -n "${_p}" && "$*" == *"--cacert "*"${_p}"* ]]; then
+                printf '200'
+                return 0
+            fi
+        done
+        printf '000'
+    }
+    export -f oc curl
+
+    # Path 1: associated labelled secret, no owned candidate.
+    _selftestAdmit='25-ssl-'
+    _selftestSecrets="$(printf '{"items":[{"metadata":{"name":"quay-registry-ssl","labels":{"app":"quay"},"ownerReferences":[{"kind":"QuayRegistry","name":"quay-registry","uid":"%s"}]},"data":{"ssl.cert":"%s"}}]}' "${QUAY_UID}" "${_b64}")"
+    quayCaFile=''
+    typeset -i _path1Rc=0
+    ResolveQuayTlsTrust || _path1Rc=$?
+    typeset -i _path1Ssl=0
+    _path1Ssl="$(find "${quayCaDir}" -maxdepth 1 -name '25-ssl-*.pem' 2>/dev/null | wc -l)"
+    if (( _path1Rc == 0 )) && (( _path1Ssl == 1 )) && [[ "${quayCaFile}" == *"/25-ssl-"* ]]; then
+        echo "SELF-TEST PASS: the fallback admits an app=quay secret owner-referenced to the selected QuayRegistry by kind and uid" >&2
+    else
+        echo "SELF-TEST FAIL: the fallback did not admit an owner-referenced app=quay secret (rc=${_path1Rc}, ssl candidates=${_path1Ssl}, anchor=${quayCaFile})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+
+    # Path 2: the same secret with no ownerReference at all, and with an
+    # ownerReference to a different registry uid; both must be refused.
+    typeset _labelOnly=''
+    _selftestSecrets="$(printf '{"items":[{"metadata":{"name":"quay-registry-ssl","labels":{"app":"quay"},"data":{"ssl.cert":"%s"}}}]}' "${_b64}")"
+    quayCaFile=''
+    typeset -i _path2Rc=0
+    ResolveQuayTlsTrust || _path2Rc=$?
+    typeset -i _path2Ssl=0
+    _path2Ssl="$(find "${quayCaDir}" -maxdepth 1 -name '25-ssl-*.pem' 2>/dev/null | wc -l)"
+    if (( _path2Rc != 0 )) && (( _path2Ssl == 0 )) && [[ -z "${quayCaFile}" ]]; then
+        echo "SELF-TEST PASS: an app=quay labelled secret with no ownerReference is refused and the function fails closed" >&2
+    else
+        echo "SELF-TEST FAIL: a label-only app=quay secret was admitted (rc=${_path2Rc}, ssl candidates=${_path2Ssl}, anchor=${quayCaFile})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+    _labelOnly="$(printf '{"items":[{"metadata":{"name":"quay-registry-ssl","labels":{"app":"quay"},"ownerReferences":[{"kind":"QuayRegistry","name":"other-registry","uid":"99999999-8888-7777-6666-555555555555"}]},"data":{"ssl.cert":"%s"}}]}' "${_b64}")"
+    _selftestSecrets="${_labelOnly}"
+    quayCaFile=''
+    typeset -i _path2bRc=0
+    ResolveQuayTlsTrust || _path2bRc=$?
+    typeset -i _path2bSsl=0
+    _path2bSsl="$(find "${quayCaDir}" -maxdepth 1 -name '25-ssl-*.pem' 2>/dev/null | wc -l)"
+    if (( _path2bRc != 0 )) && (( _path2bSsl == 0 )); then
+        echo "SELF-TEST PASS: a QuayRegistry ownerReference with a different uid is refused" >&2
+    else
+        echo "SELF-TEST FAIL: a QuayRegistry ownerReference with a different uid was admitted (rc=${_path2bRc}, ssl candidates=${_path2bSsl})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+
+    # Path 3: an owned ca.crt candidate exists, so the fallback never runs and
+    # the owned candidate is the anchor even though the labelled ssl.cert
+    # candidate verifies the probe too (both prefixes admitted).
+    _selftestAdmit='20-owned- 25-ssl-'
+    _selftestSecrets="$(printf '{"items":[{"metadata":{"name":"quay-registry-tls","ownerReferences":[{"kind":"QuayRegistry","name":"quay-registry","uid":"%s"}]},"data":{"ca.crt":"%s"}},{"metadata":{"name":"quay-registry-ssl","labels":{"app":"quay"},"ownerReferences":[{"kind":"QuayRegistry","name":"quay-registry","uid":"%s"}]},"data":{"ssl.cert":"%s"}}]}' "${QUAY_UID}" "${_b64}" "${QUAY_UID}" "${_b64}")"
+    quayCaFile=''
+    typeset -i _path3Rc=0
+    ResolveQuayTlsTrust || _path3Rc=$?
+    typeset -i _path3Owned=0
+    _path3Owned="$(find "${quayCaDir}" -maxdepth 1 -name '20-owned-*.pem' 2>/dev/null | wc -l)"
+    if (( _path3Rc == 0 )) && [[ "${quayCaFile}" == *"/20-owned-"* ]] && (( _path3Owned >= 1 )); then
+        echo "SELF-TEST PASS: an owner-referenced ca.crt candidate is preferred over the labelled ssl.cert candidate" >&2
+    else
+        echo "SELF-TEST FAIL: owned-candidate preference changed (rc=${_path3Rc}, anchor=${quayCaFile}, owned candidates=${_path3Owned})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+
+    # Restore.
+    unset -f oc curl
+    rm -rf "${quayCaDir}" || true
+    QUAY_HOST="${_origHost}"
+    QUAY_NS="${_origNs}"
+    QUAY_REGISTRY="${_origReg}"
+    QUAY_UID="${_origUid}"
+    QUAY_CONFIG_BUNDLE="${_origBundle}"
+    quayCaFile="${_origCaFile}"
+    quayTlsOpts=()
+    if [[ "${_xtraceOn}" == true ]]; then
+        set -x
+    fi
+
+    if (( _failures > 0 )); then
+        echo "SELF-TEST FAIL: ${_failures} Quay TLS label-fallback path(s) did not behave as specified" >&2
+        return 1
+    fi
+    echo "SELF-TEST PASS: the label fallback admits only secrets owner-referenced to the selected QuayRegistry" >&2
     return 0
 }
 
