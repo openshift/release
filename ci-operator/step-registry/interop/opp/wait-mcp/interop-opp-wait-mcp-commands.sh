@@ -108,6 +108,7 @@ _junit_class=""
 _junit_reason=""
 _junit_selftest="not-run"
 _junit_classifierselftest="not-run"
+_junit_enospcselftest="not-run"
 _junit_trapselftest="not-run"
 _junit_emit() {
   # Emit a JUnit XML result for the wait-mcp step and propagate
@@ -128,6 +129,7 @@ _junit_emit() {
   local _st_failed=""
   if [[ "${_junit_selftest}" == "fail" ]]; then _st_failed="predicate"; fi
   if [[ "${_junit_classifierselftest}" == "fail" ]]; then _st_failed="${_st_failed:+${_st_failed}+}classifier"; fi
+  if [[ "${_junit_enospcselftest}" == "fail" ]]; then _st_failed="${_st_failed:+${_st_failed}+}enospc-streak"; fi
   if [[ "${_junit_trapselftest}" == "fail" ]]; then _st_failed="${_st_failed:+${_st_failed}+}trap"; fi
   local _st_note=""
   if [[ -n "${_st_failed}" ]]; then
@@ -160,6 +162,7 @@ _junit_emit() {
     <property name="first_signature_poll" value="${_junit_first_signature_poll}"/>
     <property name="predicate_selftest" value="${_junit_selftest}"/>
     <property name="classifier_selftest" value="${_junit_classifierselftest}"/>
+    <property name="enospc_streak_selftest" value="${_junit_enospcselftest}"/>
     <property name="trap_selftest" value="${_junit_trapselftest}"/>
     <property name="final_class" value="${_esc_class}"/>
   </properties>
@@ -233,10 +236,17 @@ typeset -a updatedHistory=()
 typeset -a machineCountHistory=()
 typeset -i _renderChurnCount=0
 typeset _lastGenPrint=""
-typeset -i _signatureRepeat=0
+# ENOSPC signature bookkeeping (PRRT_kwDOBHvUUM65on19): one consecutive-poll
+# count per DISTINCT ENOSPC signature, keyed by the verbatim condition line.
+# A single selected condition cannot carry this: when two pools carry ENOSPC
+# conditions and the order they appear in the poll changes, the selected line
+# changes with it and a persistent signature never accumulates a streak.
+typeset -A _enospcStreaks=()
+typeset -i _enospcStreakHit=0
+typeset -i _enospcHitStreak=0
+typeset _enospcHitSignature=""
 typeset -i _bundleCollected=0
 typeset -i _vetoStreakHit=0
-_lastSignatureReason=""
 typeset -i extensionsApplied=0
 typeset -i pollsSinceLastExtension=0
 typeset -ri extensionCheckInterval=5
@@ -715,6 +725,160 @@ else:
     true
 }
 
+function EnospcSignatures () {
+    # Print every DISTINCT ENOSPC-matching Degraded/NodeDegraded condition
+    # line from the given MCP JSON, sorted, one per line, or nothing. Never
+    # fails. Same line format and same signature regex as
+    # FirstDegradedCondition: that helper answers "which one condition do I
+    # report", this one answers "which signatures does this poll carry", and
+    # the streak comparison needs the set, not one member of it
+    # (PRRT_kwDOBHvUUM65on19).
+    echo "${1}" | timeout 10s python3 -c "
+import re, sys, json
+enospc = re.compile(r'no space left on device|disk full|could not write image pull secret')
+seen = set()
+data = json.load(sys.stdin)
+for m in data.get('items', []):
+    if m.get('spec', {}).get('paused', False):
+        continue
+    name = m['metadata']['name']
+    for c in m.get('status', {}).get('conditions', []):
+        if c.get('type') in ('Degraded', 'NodeDegraded') and c.get('status') == 'True':
+            line = f'{name}: {c.get(\"type\")} reason={c.get(\"reason\")!r} message={c.get(\"message\")!r}'
+            if enospc.search(line):
+                seen.add(line)
+for line in sorted(seen):
+    print(line)
+" 2>/dev/null || true
+    true
+}
+
+function ResetEnospcStreaks () {
+    # End every ENOSPC streak. A non-Degraded poll, an oc failure and a status
+    # parse error all mean the signature is not demonstrably continuous, so a
+    # one-poll blip can never reach the 2-poll fail-fast.
+    _enospcStreaks=()
+    _enospcStreakHit=0
+    _enospcHitStreak=0
+    _enospcHitSignature=""
+    true
+}
+
+function UpdateEnospcStreaks () {
+    # Advance the per-signature ENOSPC streaks by one Degraded poll
+    # (PRRT_kwDOBHvUUM65on19). This poll's distinct signature set is compared
+    # with the previous poll's: a signature present now increments its own
+    # consecutive-poll count, a signature absent now is dropped, and a poll
+    # carrying no ENOSPC signature clears every streak. The comparison is over
+    # sets, so pool ordering is irrelevant and a persistent signature reaches
+    # the fail-fast even when the first ENOSPC match moves between polls.
+    # Sets _enospcStreakHit (1 when some signature reached 2),
+    # _enospcHitSignature (that signature, verbatim) and _enospcHitStreak (its
+    # count). Never fails. Must run in the caller's shell, not in a command
+    # substitution: it mutates the streak map.
+    typeset _sigs="" _sig=""
+    typeset -A _next=()
+    typeset -i _n=0
+    typeset _hit=""
+    _enospcStreakHit=0
+    _enospcHitStreak=0
+    _enospcHitSignature=""
+    _sigs="$(EnospcSignatures "${1}")"
+    if [[ -z "${_sigs}" ]]; then
+        ResetEnospcStreaks
+        return 0
+    fi
+    # Sorted order (EnospcSignatures sorts) keeps the reported hit
+    # deterministic when two signatures reach the threshold on the same poll.
+    while IFS= read -r _sig; do
+        if [[ -z "${_sig}" ]]; then
+            continue
+        fi
+        _n=$(( ${_enospcStreaks["${_sig}"]:-0} + 1 ))
+        _next["${_sig}"]=${_n}
+        if (( _n >= 2 )) && [[ -z "${_hit}" ]]; then
+            _hit="${_sig}"
+            _enospcHitStreak=${_n}
+        fi
+    done <<< "${_sigs}"
+    # Rewrite the map from this poll's signatures only: the absent ones are
+    # gone, the carried ones keep their new count.
+    _enospcStreaks=()
+    for _sig in "${!_next[@]}"; do
+        _enospcStreaks["${_sig}"]=${_next["${_sig}"]}
+    done
+    if [[ -n "${_hit}" ]]; then
+        _enospcStreakHit=1
+        _enospcHitSignature="${_hit}"
+    fi
+    true
+}
+
+WaitMcpEnospcStreakSelfTest () {
+  # Offline pin for the ENOSPC streak comparison (PRRT_kwDOBHvUUM65on19),
+  # evaluated against UpdateEnospcStreaks at the poll loop's own call shape
+  # (no cluster, no clock):
+  #   order swap     two pools carry distinct ENOSPC signatures and their
+  #                  poll order swaps between two consecutive polls: the
+  #                  fail-fast must still fire (the pre-change single
+  #                  selection reset the streak here)
+  #   single blip    a signature present on one poll and absent on the next
+  #                  must not fire it
+  #   reset          a non-Degraded poll between two identical ENOSPC polls
+  #                  must not fire it either
+  # Dormant by design: this change adds no runtime self-test to the step (no
+  # phase 0 wiring); the offline review harness runs this function.
+  local _pollSwap1 _pollSwap2 _pollBlip1 _pollBlip2 _fail=0
+  local _gotHit="" _gotStreak=0 _case=""
+  # master and worker carry different ENOSPC messages, so the two signatures
+  # are distinct; only their order in the list changes between polls.
+  _pollSwap1='{"items":[{"metadata":{"name":"master"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeDegraded","message":"writing blob: no space left on device"}]}},{"metadata":{"name":"worker"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeDegraded","message":"could not write image pull secret: disk full"}]}}]}'
+  _pollSwap2='{"items":[{"metadata":{"name":"worker"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeDegraded","message":"could not write image pull secret: disk full"}]}},{"metadata":{"name":"master"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeDegraded","message":"writing blob: no space left on device"}]}}]}'
+  _pollBlip1='{"items":[{"metadata":{"name":"worker"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeDegraded","message":"writing blob: no space left on device"}]}}]}'
+  # second poll is Degraded but carries no ENOSPC signature at all
+  _pollBlip2='{"items":[{"metadata":{"name":"worker"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeFilesystemError","message":"unit kubelet.service entered failed state"}]}}]}'
+
+  ResetEnospcStreaks
+  UpdateEnospcStreaks "${_pollSwap1}"
+  UpdateEnospcStreaks "${_pollSwap2}"
+  _gotHit="${_enospcHitSignature}"
+  _gotStreak=${_enospcHitStreak}
+  _case="order swap (two ENOSPC pools, order reversed between polls)"
+  if [[ -n "${_gotHit}" ]] && (( _gotStreak >= 2 )); then
+    echo ">>> selftest: enospc-streak ${_case}: HIT streak=${_gotStreak} signature=${_gotHit}"
+  else
+    echo ">>> selftest: enospc-streak ${_case}: NO HIT (streak=${_gotStreak}) -- FAIL"
+    _fail=1
+  fi
+
+  ResetEnospcStreaks
+  UpdateEnospcStreaks "${_pollBlip1}"
+  local -i _blipFirstHit=${_enospcStreakHit}
+  UpdateEnospcStreaks "${_pollBlip2}"
+  _case="single blip (signature present one poll, absent the next)"
+  if (( _blipFirstHit == 0 )) && (( _enospcStreakHit == 0 )) && (( ${#_enospcStreaks[@]} == 0 )); then
+    echo ">>> selftest: enospc-streak ${_case}: NO HIT -- PASS"
+  else
+    echo ">>> selftest: enospc-streak ${_case}: HIT or stale streak (streaks=${#_enospcStreaks[@]}) -- FAIL"
+    _fail=1
+  fi
+
+  ResetEnospcStreaks
+  UpdateEnospcStreaks "${_pollBlip1}"
+  ResetEnospcStreaks
+  UpdateEnospcStreaks "${_pollBlip1}"
+  _case="reset between polls (non-Degraded poll breaks the run)"
+  if (( _enospcStreakHit == 0 )); then
+    echo ">>> selftest: enospc-streak ${_case}: NO HIT -- PASS"
+  else
+    echo ">>> selftest: enospc-streak ${_case}: HIT -- FAIL"
+    _fail=1
+  fi
+
+  ResetEnospcStreaks
+  return "${_fail}"
+}
+
 if ! WaitMcpSelfTest; then
   _junit_selftest="fail"
   echo "FAILURE CLASS: Invalid step input" >&2
@@ -731,6 +895,14 @@ if ! WaitMcpClassifierSelfTest; then
 fi
 _junit_classifierselftest="pass"
 echo ">>> PHASE 0: classifier self-test passed (converged STABLE, degraded DEGRADED pinned)"
+if ! WaitMcpEnospcStreakSelfTest; then
+  _junit_enospcselftest="fail"
+  echo "FAILURE CLASS: Invalid step input" >&2
+  echo "enospc-streak self-test failed: UpdateEnospcStreaks does not reproduce its pinned behavior" >&2
+  exit 2
+fi
+_junit_enospcselftest="pass"
+echo ">>> PHASE 0: enospc-streak self-test passed (order swap fires, single blip and reset do not)"
 if [[ -z "${WAIT_MCP_SELFTEST_CHILD:-}" ]]; then
   if WaitMcpTrapSelfTest; then
     # keep a warn verdict set inside the harness-failure paths
@@ -1082,8 +1254,7 @@ while (( SECONDS < deadline )); do
             exit 1
         fi
         consecutivePasses=0
-        _signatureRepeat=0
-        _lastSignatureReason=""
+        ResetEnospcStreaks
         _bounded_sleep "${currentPollInterval}"
         continue
     fi
@@ -1150,8 +1321,7 @@ PY
     if [[ "${statusDetail}" == "python parse error" ]]; then
         echo "WARNING: MCP status parse error; retaining last valid generation fingerprint" >&2
         consecutivePasses=0
-        _signatureRepeat=0
-        _lastSignatureReason=""
+        ResetEnospcStreaks
         continue
     fi
     # Validate as plain strings first: a typeset -i target evaluates its input
@@ -1189,14 +1359,14 @@ PY
     degradedHistory+=("${anyDegraded}")
     typeset -i elapsed=$(( SECONDS - startSeconds ))
 
-    # Non-Degraded poll (clean or merely updating): reset the ENOSPC signature
-    # streak so only consecutive Degraded polls count, and drop the captured
-    # condition so a later timeout or health-gate failure is never reported
-    # with a condition the cluster no longer has. The reset must also run on
-    # clean polls, which never reach the UNSTABLE branch below (preflight
-    # review).
+    # Non-Degraded poll (clean or merely updating): reset every ENOSPC
+    # signature streak so only consecutive Degraded polls count, and drop the
+    # captured condition so a later timeout or health-gate failure is never
+    # reported with a condition the cluster no longer has. The reset must also
+    # run on clean polls, which never reach the UNSTABLE branch below
+    # (preflight review).
     if (( ! anyDegraded )); then
-        _signatureRepeat=0
+        ResetEnospcStreaks
         _junit_reason=""
     fi
 
@@ -1240,24 +1410,23 @@ PY
             fi
             typeset _degCond=""
             _degCond="$(FirstDegradedCondition "${mcpJson}")"
-            if [[ -z "${_degCond}" ]]; then
-                _signatureRepeat=0
-                _lastSignatureReason=""
-            else
+            # Reporting keeps the single selected condition (the JUnit
+            # failure body reads it as the reason); the fail-fast below is
+            # decided on the whole ENOSPC signature set instead.
+            if [[ -n "${_degCond}" ]]; then
                 _junit_reason="${_degCond}"
-                if [[ "${_degCond}" == "${_lastSignatureReason}" ]]; then
-                    (( ++_signatureRepeat )) || true
-                else
-                    _signatureRepeat=1
-                    _lastSignatureReason="${_degCond}"
-                fi
-                if (( _signatureRepeat >= 2 )) && [[ "${_degCond}" =~ (no\ space\ left\ on\ device|disk\ full|could\ not\ write\ image\ pull\ secret) ]]; then
-                    echo "FAILURE CLASS: storage-capacity-enospc"
-                    echo "Non-self-healing ENOSPC signature persisted ${_signatureRepeat} consecutive polls (poll ${_junit_polls}, ${elapsed}s); failing fast instead of exhausting ${effectiveTimeout}s"
-                    _junit_class="storage-capacity-enospc"
-                    CollectFailureBundle
-                    exit 1
-                fi
+            fi
+            # Per-signature streaks (PRRT_kwDOBHvUUM65on19): a persistent
+            # signature is detected by comparing adjacent polls' signature
+            # sets, so two Degraded pools whose poll order swaps cannot reset
+            # it, and a poll carrying no signature clears every streak.
+            UpdateEnospcStreaks "${mcpJson}"
+            if (( _enospcStreakHit )); then
+                echo "FAILURE CLASS: storage-capacity-enospc"
+                echo "Non-self-healing ENOSPC signature persisted ${_enospcHitStreak} consecutive polls (poll ${_junit_polls}, ${elapsed}s): ${_enospcHitSignature}; failing fast instead of exhausting ${effectiveTimeout}s"
+                _junit_class="storage-capacity-enospc"
+                CollectFailureBundle
+                exit 1
             fi
         fi
 
