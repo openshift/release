@@ -161,7 +161,35 @@ _propagate_junit () {
     done
 }
 
-trap '_jrc=$?; set +e; _opp_cleanup; CollectExitArtifacts; _propagate_junit; exit 0' EXIT
+# shellcheck disable=SC2154  # _jrc is assigned at trap entry in the same string
+trap '_jrc=$?; set +e; _opp_cleanup; CollectExitArtifacts; _propagate_junit; exit "${_jrc}"' EXIT
+
+ApiEndpointState() {
+    # Prints served, absent, or unknown for an API endpoint path. The probe
+    # is a direct `oc get --raw`, which bypasses the RESTMapper: a 404 here
+    # distinguishes an endpoint the server genuinely does not serve from the
+    # partial-discovery artifact that also produces
+    # "the server doesn't have a resource type" while the resource is
+    # actually served. Every caller treats unknown as failure, so an
+    # unusable probe can never turn a red lane green.
+    typeset path="${1:-}"
+    typeset raw=""
+    if [[ -z "${path}" ]]; then
+        echo unknown
+        return 0
+    fi
+    raw="$(oc get --raw "${path}" 2>&1)" || true
+    if printf '%s' "${raw}" | grep -q '"versions"\|"groupVersion"\|"resources"'; then
+        echo served
+        return 0
+    fi
+    if printf '%s' "${raw}" | grep -qi '404 page not found\|could not find the requested resource'; then
+        echo absent
+        return 0
+    fi
+    echo unknown
+    return 0
+}
 
 # ---------------------------------------------------------------------------
 # Test 1: cluster-health
@@ -266,14 +294,19 @@ TestOppOperators() {
         op="$(echo "${op}" | xargs)"  # trim whitespace
         : "Checking operator: ${op}"
 
-        # Find CSV matching this operator prefix. The jq array + `first`
+        # Find CSV matching this operator. The name must be the exact
+        # package or the package plus a dot-delimited suffix (the same rule
+        # as interop-opp-preflight): a bare startswith($prefix) also matched
+        # a different operator sharing the prefix (for example
+        # rhacs-operator-canary), which could satisfy the phase check and
+        # the post-upgrade floor with the wrong CSV. The jq array + `first`
         # form is pipefail-safe: `jq | head -1` raced SIGPIPE under
         # `set -o pipefail` and surfaced as spurious "Failed to query CSVs"
         # on healthy clusters (INTEROP-9670).
         typeset csvInfo=""
         if ! csvInfo="$(oc get csv --all-namespaces -o json | jq -r --arg prefix "${op}" '
             [ .items[]
-              | select(.metadata.name | startswith($prefix))
+              | select(.metadata.name == $prefix or (.metadata.name | startswith($prefix + ".")))
               | select(.status.reason != "Copied")
               | "\(.metadata.namespace)/\(.metadata.name)/\(.status.phase)" ]
             | first // empty
@@ -318,9 +351,11 @@ TestOppOperators() {
         # below the OPP_COMPAT floor for the target OCP minor, which
         # interop-opp-preflight exports to ${SHARED_DIR}/opp-compat-floors.env.
         # Install lanes carry no upgrade marker and lanes without a matrix
-        # entry carry no floors file, so the gate is inert there; an operator
-        # with no floor row or an unparsable CSV version is traced, not
-        # failed, because the phase check above already owns presence.
+        # entry carry no floors file, so the gate is inert there. An operator
+        # with no usable floor row is traced, not failed (the phase check
+        # above already owns presence); a CSV version that cannot be
+        # determined while a floor row applies fails, because an unreadable
+        # version must never satisfy the gate.
         if [[ "${csvPhase}" == "Succeeded" && -n "${SHARED_DIR:-}" && -f "${SHARED_DIR}/opp-compat-floors.env" ]]; then
             typeset floorVersion="" floorMajor="" floorMinor=""
             floorVersion="$(awk -F= -v op="${op}" '$1 == op {print $2; exit}' "${SHARED_DIR}/opp-compat-floors.env" 2>/dev/null)" || floorVersion=""
@@ -371,7 +406,17 @@ TestOppOperators() {
                             : "PASS: ${op} ${csvMajor}.${csvMinor} meets post-upgrade floor ${floorVersion}"
                         fi
                     else
-                        : "INFO: ${op}: CSV ${csvName} carries no parsable version; post-upgrade floor ${floorVersion} not checked"
+                        # The floor check is applicable (upgrade marker plus a
+                        # floor row), so an undeterminable version is a
+                        # failure, not a trace: a CSV whose version cannot be
+                        # read must not silently pass the gate.
+                        typeset floorVerMsg="post-upgrade floor ${floorVersion} applies to ${op} but the version of CSV ${csvName} could not be determined (name shape and spec.version both unparsable)"
+                        : "FAIL: ${floorVerMsg}"
+                        if [[ -n "${failMsg}" ]]; then
+                            failMsg="${failMsg}; ${floorVerMsg}"
+                        else
+                            failMsg="${floorVerMsg}"
+                        fi
                     fi
                 fi
             fi
@@ -435,9 +480,28 @@ TestAcmConnectivity() {
     typeset -i mcCount=0
     if ! mcCount="$(oc get managedclusters -o json 2>"${_opp_smoke_tmp}/mc.err" | jq '.items | length')"; then
         if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/mc.err"; then
-            : "SKIP: managedclusters CRD not served by this cluster"
-            AddResult "acm-connectivity" "skip" "managedclusters CRD not served by this cluster"
-            return
+            # A resource-type error alone does not prove the API is absent:
+            # partial discovery produces the same message while the group is
+            # served. Skip only when a direct group-endpoint probe confirms
+            # the group is not served; a served group or an unusable probe
+            # is a failure.
+            typeset _mcGroupState=""
+            _mcGroupState="$(ApiEndpointState "/apis/cluster.open-cluster-management.io")"
+            case "${_mcGroupState}" in
+                absent)
+                    : "SKIP: managedclusters API group not served by this cluster"
+                    AddResult "acm-connectivity" "skip" "managedclusters API group not served by this cluster"
+                    return
+                    ;;
+                served)
+                    AddResult "acm-connectivity" "fail" "ManagedClusters lookup failed although the API group is served (partial discovery?): $(head -c 300 "${_opp_smoke_tmp}/mc.err")"
+                    return
+                    ;;
+                *)
+                    AddResult "acm-connectivity" "fail" "Failed to query ManagedClusters and could not confirm the API group state"
+                    return
+                    ;;
+            esac
         fi
         AddResult "acm-connectivity" "fail" "Failed to query ManagedClusters"
         return
@@ -499,9 +563,27 @@ TestAcsSensors() {
         | first // empty
     ')"; then
         if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/sc.err"; then
-            : "SKIP: securedclusters CRD not served by this cluster"
-            AddResult "acs-sensors" "skip" "securedclusters CRD not served by this cluster"
-            return
+            # Same rule as the managedclusters branch above: the
+            # resource-type message can come from partial discovery while
+            # the CRD-backed group is served. Skip only on a confirmed
+            # absent group endpoint; served or unknown is a failure.
+            typeset _scGroupState=""
+            _scGroupState="$(ApiEndpointState "/apis/platform.stackrox.io")"
+            case "${_scGroupState}" in
+                absent)
+                    : "SKIP: securedclusters API group not served by this cluster"
+                    AddResult "acs-sensors" "skip" "securedclusters API group not served by this cluster"
+                    return
+                    ;;
+                served)
+                    AddResult "acs-sensors" "fail" "SecuredCluster lookup failed although the API group is served (partial discovery?): $(head -c 300 "${_opp_smoke_tmp}/sc.err")"
+                    return
+                    ;;
+                *)
+                    AddResult "acs-sensors" "fail" "Failed to query SecuredCluster resources and could not confirm the API group state"
+                    return
+                    ;;
+            esac
         fi
         AddResult "acs-sensors" "fail" "Failed to query SecuredCluster resources"
         return
@@ -524,20 +606,27 @@ TestAcsSensors() {
             .items[] | "\(.metadata.name):\(.status.phase)"
         ')"; then
             if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/sensor.err"; then
-                # Confirm absence via independent discovery, only skip after verified
-                typeset _acsSensorConfirmOut=""
-                typeset -i _acsSensorConfirmRc=0
-                _acsSensorConfirmOut="$(oc api-resources --verbs=list --namespaced -o name 2>&1)" || _acsSensorConfirmRc=$?
-                if (( _acsSensorConfirmRc != 0 )); then
-                    AddResult "acs-sensors" "fail" "Failed to query sensor pods in ${scNs}: ${_acsSensorConfirmOut}"
-                    return
-                fi
-                if printf '%s' "${_acsSensorConfirmOut}" | grep -qw "pods"; then
-                    AddResult "acs-sensors" "fail" "Failed to query sensor pods in ${scNs}: $(cat "${_opp_smoke_tmp}/sensor.err")"
-                    return
-                fi
-                AddResult "acs-sensors" "skip" "pods resource not served by this cluster"
-                return
+                # Confirm absence with the direct core-API probe (the same
+                # rule as the two branches above): the old
+                # `oc api-resources` confirmation shared discovery with the
+                # failing lookup, so a partial discovery result could skip
+                # the sensor check while pods are served.
+                typeset _coreState=""
+                _coreState="$(ApiEndpointState "/api/v1")"
+                case "${_coreState}" in
+                    absent)
+                        AddResult "acs-sensors" "skip" "pods resource not served by this cluster"
+                        return
+                        ;;
+                    served)
+                        AddResult "acs-sensors" "fail" "Failed to query sensor pods in ${scNs} although the core API is served (partial discovery?): $(head -c 300 "${_opp_smoke_tmp}/sensor.err")"
+                        return
+                        ;;
+                    *)
+                        AddResult "acs-sensors" "fail" "Failed to query sensor pods in ${scNs} and could not confirm the core API state"
+                        return
+                        ;;
+                esac
             fi
             AddResult "acs-sensors" "fail" "Failed to query sensor pods in ${scNs}"
             return
@@ -560,8 +649,11 @@ TestAcsSensors() {
         # No SecuredCluster CR; check if ACS operator is even installed
         typeset acsCsv=""
         typeset -i _acsCsvRc=0
+        # Same identity rule as the opp-operators CSV match above: the exact
+        # package or the package plus a dot-delimited suffix, so a CSV such as
+        # rhacs-operator-canary does not read as the ACS operator.
         acsCsv="$(oc get csv --all-namespaces -o json 2>"${_opp_smoke_tmp}/acs-csv.err" | jq -r '
-            [ .items[] | select(.metadata.name | startswith("rhacs-operator")) | .metadata.name ] | first // empty
+            [ .items[] | select(.metadata.name == "rhacs-operator" or (.metadata.name | startswith("rhacs-operator."))) | .metadata.name ] | first // empty
         ')" || _acsCsvRc=$?
         if (( _acsCsvRc != 0 )); then
             if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/acs-csv.err" 2>/dev/null; then
@@ -681,8 +773,9 @@ TestQuayPull() {
             if (( qrCount == 0 )); then
                 # Check if Quay operator is even installed
                 typeset quayCsv=""
+                # Same identity rule as the opp-operators CSV match above.
                 if ! quayCsv="$(oc get csv --all-namespaces -o json | jq -r '
-                [ .items[] | select(.metadata.name | startswith("quay-operator")) | .metadata.name ] | first // empty
+                [ .items[] | select(.metadata.name == "quay-operator" or (.metadata.name | startswith("quay-operator."))) | .metadata.name ] | first // empty
             ')"; then
                     AddResult "quay-pull" "fail" "Failed to query CSVs for Quay operator"
                     return

@@ -204,17 +204,25 @@ function CheckOppCompatibility () {
     # Post-upgrade floor enforcement contract (PRRT_kwDOBHvUUM65TpMz):
     # export the resolved floors for the target minor so interop-opp-smoke
     # can fail operators that remain below floor after the product upgrades.
-    # Best effort: a lane without SHARED_DIR, or a failed write, simply
-    # leaves the post-upgrade gate inert (interop-opp-smoke skips it when
-    # the file is absent), never failing the pre-flight step itself.
+    # Best effort, but observable: a lane without SHARED_DIR, or a failed
+    # write, leaves the post-upgrade gate inert (interop-opp-smoke skips it
+    # when the file is absent) and logs one ERROR line naming the reason. It
+    # never fails the pre-flight step itself.
     if [[ -n "${SHARED_DIR:-}" ]]; then
+        typeset -i _floorsWriteRc=0
+        # Redirect stderr before stdout so a failed open does not also leak the
+        # shell's own "No such file or directory" line: the ERROR line below is
+        # the single, deliberate inactivity signal for this write.
         {
             echo "# OPP_COMPAT floors for target OCP ${ocpKey} (written by interop-opp-preflight)"
             typeset _floorEntry
             for _floorEntry in ${compatSpec}; do
                 printf '%s=%s\n' "${_floorEntry%%:*}" "${_floorEntry##*:}"
             done
-        } 2>/dev/null > "${SHARED_DIR}/opp-compat-floors.env" || true
+        } 2>/dev/null > "${SHARED_DIR}/opp-compat-floors.env" || _floorsWriteRc=$?
+        if (( _floorsWriteRc != 0 )); then
+            echo "ERROR: could not write ${SHARED_DIR}/opp-compat-floors.env (rc=${_floorsWriteRc}); the interop-opp-smoke post-upgrade floor gate stays inactive this run" >&2
+        fi
     fi
 
     typeset details=""
