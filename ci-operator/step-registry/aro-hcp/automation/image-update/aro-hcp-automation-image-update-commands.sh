@@ -29,6 +29,7 @@ VERBOSITY=${VERBOSITY:-1}
 # Internal variables (not configurable via ref.yaml)
 readonly IMAGE_UPDATER_OUTPUT="/tmp/image-updater-output.md"
 readonly IMAGE_UPDATER_OUTPUT_FORMAT="markdown"
+readonly AUTOMATION_REPO_URL="https://github.com/Azure/ARO-HCP.git"
 
 # Logging functions with timestamps and severity levels
 log() { echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] ${*}"; }
@@ -88,7 +89,7 @@ fi
 # Checkout: run an exact reviewed revision instead of the job checkout
 if [[ -n "${AUTOMATION_CHECKOUT_REF:-}" ]]; then
   debug "checkout: fetching ${AUTOMATION_CHECKOUT_REF}"
-  git fetch --quiet origin "${AUTOMATION_CHECKOUT_REF}" || error "checkout: failed to fetch ${AUTOMATION_CHECKOUT_REF}"
+  git fetch --quiet "${AUTOMATION_REPO_URL}" "${AUTOMATION_CHECKOUT_REF}" || error "checkout: failed to fetch ${AUTOMATION_CHECKOUT_REF}"
   fetched="$(git rev-parse FETCH_HEAD)"
   if [[ "${fetched}" != "${AUTOMATION_CHECKOUT_SHA:-}" ]]; then
     error "checkout: ${AUTOMATION_CHECKOUT_REF} resolved to ${fetched}, expected ${AUTOMATION_CHECKOUT_SHA:-unset}"
