@@ -390,10 +390,17 @@ Resources:
       BlockDeviceMappings:
         !If
           - "UseIgnition"
+          # Manually copied FCOS AMIs (used in regions where FCOS publishes no
+          # image) carry an ephemeral0 instance-store mapping on /dev/xvdb.
+          # Nitro instance types with no instance store reject that at launch
+          # ("Invalid number of ephemeral devices"), and the bastion does not
+          # need instance store, so suppress it. No-op for AMIs without it.
           - - DeviceName: /dev/xvda
               Ebs:
                 VolumeSize: "500"
                 VolumeType: gp2
+            - DeviceName: /dev/xvdb
+              NoDevice: {}
           - - DeviceName: /dev/sda1
               Ebs:
                 VolumeSize: "500"
