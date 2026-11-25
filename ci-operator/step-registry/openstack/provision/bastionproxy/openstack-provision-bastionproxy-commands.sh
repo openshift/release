@@ -157,6 +157,8 @@ fi
 echo "Deploying squid on $SQUID_IP"
 
 >&2 cat << EOF > $WORK_DIR/deploy_squid.sh
+#!/usr/bin/env bash
+set -e
 sudo dnf install -y squid dnsmasq chrony
 
 sudo bash -c "cat << EOF >> /etc/dnsmasq.conf
