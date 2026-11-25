@@ -33,12 +33,17 @@ declare -p REPOSITORY_URL REPOSITORY_BRANCH PINNED_SHA > "${SHARED_DIR}/rosa-sea
 echo "Pinned ${REPOSITORY_URL}@${REPOSITORY_BRANCH} at ${PINNED_SHA}"
 
 # Write one override file per ROSA_REGIONAL_COMPONENTS entry that has a
-# target, with IMAGE_REPO/IMAGE_TAG replaced by the image-push result and
-# PR_SOURCE_SHA replaced by the triggering PR's source commit.
+# target, with IMAGE_REPO/IMAGE_TAG replaced by the image-push result.
+# PR_SOURCE_SHA is replaced only when this job is a rosa-seaplane-api PR;
+# otherwise that key is dropped so Argo CD keeps the Application default.
 # Prints one "<target>:<override-file>" line per override.
 write_overrides() {
   python3 <<'PYEOF'
-import os, re, sys, yaml
+import copy, json, os, re, sys, yaml
+
+CHART_SOURCE_ORG = "openshift-online"
+CHART_SOURCE_REPO = "rosa-seaplane-api"
+
 shared = os.environ["SHARED_DIR"]
 pushed = {}
 pushed_file = os.path.join(shared, "component-images")
@@ -47,7 +52,50 @@ if os.path.exists(pushed_file):
         for line in f:
             repo, _, tag = line.strip().rpartition(":")
             pushed[repo] = tag
-source_revision = os.environ.get("PULL_PULL_SHA", "")
+
+
+def drop_pr_source_sha(obj):
+    # Leave no literal PR_SOURCE_SHA for Argo CD to treat as a git revision.
+    if isinstance(obj, dict):
+        out = {}
+        for key, value in obj.items():
+            if key == "targetRevision" and value == "PR_SOURCE_SHA":
+                continue
+            out[key] = drop_pr_source_sha(value)
+        return out
+    if isinstance(obj, list):
+        return [drop_pr_source_sha(v) for v in obj]
+    return obj
+
+
+def api_pr_source_sha():
+    # Pin charts only when JOB_SPEC.refs is rosa-seaplane-api. pj-rehearse of
+    # openshift/release has PULL_PULL_SHA of the release commit, which is not
+    # in that repo. Dropping the override uses api main instead of a SHA
+    # Argo CD 422s on. Do not fail provision when the SHA is absent.
+    spec = {}
+    raw = os.environ.get("JOB_SPEC") or ""
+    if raw:
+        try:
+            spec = json.loads(raw)
+        except json.JSONDecodeError:
+            spec = {}
+    refs = spec.get("refs") or {}
+    sha = ""
+    if refs.get("org") == CHART_SOURCE_ORG and refs.get("repo") == CHART_SOURCE_REPO:
+        pulls = refs.get("pulls") or []
+        sha = (pulls[0].get("sha") if pulls else None) or os.environ.get("PULL_PULL_SHA") or ""
+    elif (
+        os.environ.get("REPO_OWNER") == CHART_SOURCE_ORG
+        and os.environ.get("REPO_NAME") == CHART_SOURCE_REPO
+    ):
+        sha = os.environ.get("PULL_PULL_SHA") or ""
+    if re.fullmatch(r"[0-9a-fA-F]{40}", sha or ""):
+        return sha
+    return ""
+
+
+source_revision = api_pr_source_sha()
 components = yaml.safe_load(os.environ["ROSA_REGIONAL_COMPONENTS"]) or []
 for i, c in enumerate(components):
     repo = c.get("repo", "")
@@ -55,14 +103,15 @@ for i, c in enumerate(components):
         sys.exit(f"ERROR: no image was pushed for {c['image']} -> {repo or '(no repo)'}; see the image-push step")
     if "target" not in c or "override" not in c:
         continue
-    text = yaml.safe_dump(c["override"], default_flow_style=False)
+    override = copy.deepcopy(c["override"])
+    if not source_revision:
+        override = drop_pr_source_sha(override)
+    text = yaml.safe_dump(override, default_flow_style=False)
     if repo:
         text = text.replace("IMAGE_REPO", repo)
     if repo in pushed:
         text = text.replace("IMAGE_TAG", pushed[repo])
-    if "PR_SOURCE_SHA" in text:
-        if not re.fullmatch(r"[0-9a-fA-F]{40}", source_revision):
-            sys.exit("ERROR: PR_SOURCE_SHA requires PULL_PULL_SHA to contain a full 40-character commit SHA")
+    if source_revision and "PR_SOURCE_SHA" in text:
         text = text.replace("PR_SOURCE_SHA", source_revision)
     path = os.path.join(shared, f"component-override-{i}.yaml")
     with open(path, "w") as f:

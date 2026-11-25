@@ -35,9 +35,11 @@ ref:
       'override' (YAML content to deep-merge), and 'repo' (quay.io
       repository). IMAGE_REPO is substituted from 'repo' and IMAGE_TAG
       from the per-image tag written by the image-push step to
-      SHARED_DIR/component-images. PR_SOURCE_SHA is substituted from the
-      triggering PR's PULL_PULL_SHA, allowing a component job to select
-      charts from the same PR commit as its image.
+      SHARED_DIR/component-images. PR_SOURCE_SHA is substituted only when
+      JOB_SPEC.refs is openshift-online/rosa-seaplane-api (the api
+      presubmit). On an openshift/release rehearsal that key is dropped so
+      Argo CD keeps the Application default instead of pinning a release
+      SHA that is not in rosa-seaplane-api.
       Example:
         - image: CI_IMAGE_1
           repo: quay.io/rrp-dev-ci/platform-api
@@ -56,5 +58,5 @@ ref:
     PR the environment, and the e2e and teardown steps after it, use the PR's
     own code; otherwise ROSA_REGIONAL_PLATFORM_REF is used. Components listed
     in ROSA_REGIONAL_COMPONENTS are deep-merged into their target files
-    with IMAGE_REPO/IMAGE_TAG substitution. PR_SOURCE_SHA can pin a child
-    chart to the component PR's source commit.
+    with IMAGE_REPO/IMAGE_TAG substitution. PR_SOURCE_SHA pins a child
+    chart only on a rosa-seaplane-api PR; rehearsals omit it.
