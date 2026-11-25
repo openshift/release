@@ -9,9 +9,13 @@ eval "$(
     "${_fURL[@]}" \
         https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
 )"
-trap 'ExitTrap--PostProcessPrep' EXIT
+BIN_DIR="$(mktemp -d)"
+trap 'ExitTrap--PostProcessPrep; rm -rf "${BIN_DIR}"' EXIT
 
-# Run ACM policy smoke tests via openshift-tests with local extension binary
-openshift-tests run-suite acm/policy/smoke \
-  --extension-local-binaries /usr/bin/acm-policy-tests.gz \
-  --junit-dir "${ARTIFACT_DIR}/junit"
+# Run ACM policy smoke tests via the standalone OTE binary: on OCP 4.22
+# openshift-tests exposes `run SUITE` and no --extension-local-binaries flag.
+mkdir -p "${ARTIFACT_DIR}/junit"
+gunzip -c /usr/bin/acm-policy-tests.gz > "${BIN_DIR}/acm-policy-tests"
+chmod +x "${BIN_DIR}/acm-policy-tests"
+"${BIN_DIR}/acm-policy-tests" run-suite acm/policy/smoke \
+  --junit-path "${ARTIFACT_DIR}/junit/junit-acm-policy-smoke.xml"
