@@ -408,6 +408,24 @@ fi
 # Present: run the SMOKE suite (existing flow)
 # ---------------------------------------------------------------------------
 echo "[smoke] Reading connection details from SHARED_DIR..."
+# Readiness publishes the handoff (ROX_ADMIN_PASSWORD, CENTRAL_URL, CENTRAL_NS)
+# only on its state=present path that reaches the writes. Two reachable states
+# leave this step without one: readiness skipped because no SecuredCluster
+# existed yet (the CR then appears inside smoke's own terminal wait), and a
+# present Central whose route was absent (readiness skips the CENTRAL_URL
+# write). Name the gap instead of dying inside a `cat` under errexit, which
+# surfaces only as an unattributed non-zero exit.
+typeset -a _missingHandoff=()
+typeset _hf=""
+for _hf in CENTRAL_URL ROX_ADMIN_PASSWORD CENTRAL_NS; do
+    [[ -s "${SHARED_DIR}/${_hf}" ]] || _missingHandoff+=("${_hf}")
+done
+if (( ${#_missingHandoff[@]} > 0 )); then
+    _add_case "stackrox-opp-smoke" failed "Handoff" \
+        "readiness published no connection handoff in SHARED_DIR (missing: ${_missingHandoff[*]}); the workload appeared after the readiness run, or its Central route was absent, so the SMOKE suite cannot run"
+    echo "[smoke] FATAL: readiness published no connection handoff (missing: ${_missingHandoff[*]})" >&2
+    exit 1
+fi
 set +x
 typeset centralUrl=''
 centralUrl="$(cat "${SHARED_DIR}/CENTRAL_URL")"
@@ -427,6 +445,10 @@ echo "[smoke] Connection details loaded from SHARED_DIR"
 # ---------------------------------------------------------------------------
 _centralNs="$(cat "${SHARED_DIR}/CENTRAL_NS" 2>/dev/null || true)"
 if [[ -z "${_centralNs}" ]]; then
+    # The handoff guard above already requires CENTRAL_NS, so this fallback is
+    # unreachable in normal flow and stays as belt-and-braces; it is logged so a
+    # future regression cannot look like a healthy default namespace.
+    echo "[smoke] WARN: SHARED_DIR/CENTRAL_NS is empty; falling back to 'stackrox' for the scanner gate" >&2
     _centralNs="stackrox"
 fi
 # Capture first, then match: grep -q closes the pipe as soon as it matches, and
