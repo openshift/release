@@ -35,16 +35,39 @@ if [[ -s "${SHARED_DIR}/zero_egress_endpoint_ids" ]]; then
   # Endpoint deletion is asynchronous: interface endpoints leave network
   # interfaces that hold the endpoint security group. Wait for the endpoints
   # to disappear before deleting the group — a DependencyViolation there
-  # would strand the group and block VPC deletion at stack teardown.
+  # would strand the group and block VPC deletion at stack teardown. Only a
+  # confirmed absent endpoint counts as gone (empty lookup result, or a
+  # lookup error naming it not-found); transient lookup failures such as
+  # RequestLimitExceeded keep polling so the security-group retry window is
+  # not started while deletion is still in flight. The step fails if any
+  # recorded endpoint survives the poll so the leftover is visible.
+  all_gone=true
   for endpoint_id in "${ENDPOINT_IDS[@]}"; do
     [[ -n "${endpoint_id}" ]] || continue
+    gone=false
     for _ in $(seq 1 60); do
-      state=$(aws ec2 describe-vpc-endpoints --vpc-endpoint-ids "${endpoint_id}" \
-        --query 'VpcEndpoints[0].VpcEndpointId' --output text 2>/dev/null) || state="None"
-      [[ "${state}" == "None" ]] && break
+      if output=$(aws ec2 describe-vpc-endpoints --vpc-endpoint-ids "${endpoint_id}" \
+        --query 'VpcEndpoints[0].VpcEndpointId' --output text 2>&1); then
+        if [[ "${output}" == "None" ]]; then
+          gone=true
+          break
+        fi
+      elif grep -qiE 'not ?found|does not exist' <<<"${output}"; then
+        gone=true
+        break
+      else
+        echo "WARNING: endpoint ${endpoint_id} lookup failed: ${output}"
+      fi
       sleep 10
     done
+    if [[ "${gone}" != true ]]; then
+      echo "ERROR: endpoint ${endpoint_id} still present after 10 minutes"
+      all_gone=false
+    fi
   done
+  if [[ "${all_gone}" != true ]]; then
+    exit 1
+  fi
 else
   echo "No zero-egress VPC endpoints to delete"
 fi

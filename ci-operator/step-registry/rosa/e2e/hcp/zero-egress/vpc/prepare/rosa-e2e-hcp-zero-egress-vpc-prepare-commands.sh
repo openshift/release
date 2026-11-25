@@ -74,9 +74,12 @@ done
 # route tables, and AWS rejects a second route for the same service in a
 # route table, so reuse the stack-owned endpoint instead of creating a
 # duplicate. Only an endpoint created here is recorded for cleanup.
-mapfile -t ROUTE_TABLES < <(aws ec2 describe-route-tables \
+# Command substitution (not process substitution) so a failed enumeration
+# stops the step instead of silently skipping the NAT-route removal below.
+ROUTE_TABLES_RAW=$(aws ec2 describe-route-tables \
   --filters "Name=vpc-id,Values=${VPC_ID}" \
   --query 'RouteTables[].[RouteTableId]' --output text)
+mapfile -t ROUTE_TABLES <<< "${ROUTE_TABLES_RAW}"
 S3_SERVICE_NAME="com.amazonaws.${CLOUD_PROVIDER_REGION}.s3"
 S3_ENDPOINT_ID=$(aws ec2 describe-vpc-endpoints \
   --filters "Name=vpc-id,Values=${VPC_ID}" "Name=service-name,Values=${S3_SERVICE_NAME}" \
