@@ -1,5 +1,27 @@
 #!/bin/bash
 
+# Install DNS records for the KubeVirt guest on the active OFCIR virthost.
+# Runs twice: as the dns-source step (pre, after hypershift-kubevirt-create-source)
+# and as the dns-target step (test, after the restore), dispatched via the
+# ofcir-role file. dns-target symlinks to this script.
+#
+# Why this step exists only in the cross-cluster workflow: each management
+# cluster runs on its own virthost, and guest names are resolved by the
+# virthost's local dnsmasq. After the restore the guest must be reached from
+# the target virthost, where the source's records do not exist. The guest API
+# endpoint also changes: the kube-apiserver is published through a MetalLB
+# LoadBalancer whose IP is allocated per management cluster, while
+# hypershift-kubevirt-create pins a stable name (KUBEVIRT_CROSS_CLUSTER_STABLE_DNS
+# sets --kas-dns-name=api.<cluster>.apps.<management-base-domain>) so the API
+# URL and certificate SAN survive the management cluster change. This step maps
+# that stable name to the current virthost's LoadBalancer IP.
+#
+# The plain single-virthost conformance workflow needs no such step: dev-scripts
+# configures the virthost's dnsmasq for the management base domain, and
+# hypershift-kubevirt-baremetalds-proxy routes all guest traffic through squid
+# on the virthost (podman run ... --dns 127.0.0.1) with a proxy-url injected
+# into nested_kubeconfig, so the job pod never resolves guest names itself.
+
 set -euo pipefail
 
 role="$(<"${SHARED_DIR}/ofcir-role")"
