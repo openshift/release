@@ -713,25 +713,26 @@ def write(prefix, payload):
 bundle = os.environ.get('QUAY_BUNDLE_SECRET') or ''
 
 def is_owned(refs):
+    # Ownership means the QuayRegistry itself owns the secret: kind and uid
+    # together, because a uid alone does not say which object kind stamped
+    # the reference (PRRT_kwDOBHvUUM65MrmC).
     for r in refs:
-        if owner_uid and r.get('uid') == owner_uid:
+        if owner_uid and r.get('kind') == 'QuayRegistry' and r.get('uid') == owner_uid:
             return True
     return False
 
 
 def is_associated(refs):
     # Association for the label fallback below: an owner of kind
-    # QuayRegistry that names the selected registry, by uid when the caller
-    # supplied one, otherwise by name.  Any other owner kind, a uid that
-    # differs (a registry recreated after the secret was stamped) and a
-    # missing ownerReferences list all mean unassociated.
+    # QuayRegistry whose NAME is the selected registry.  Name, not uid: a
+    # uid match with this kind is ownership and lands in the primary set
+    # above, so the fallback exists for the shapes ownership cannot cover,
+    # a registry recreated after its secret was stamped (same name, new
+    # uid) or an ownerReference recorded without a uid.  Any other owner
+    # kind, a different registry name and a missing ownerReferences list
+    # all mean unassociated.
     for r in refs:
-        if r.get('kind') != 'QuayRegistry':
-            continue
-        if owner_uid:
-            if r.get('uid') == owner_uid:
-                return True
-        elif r.get('name') == owner:
+        if r.get('kind') == 'QuayRegistry' and r.get('name') == owner:
             return True
     return False
 
@@ -757,10 +758,11 @@ for s in items:
             write('20-owned', base64.b64decode(data['ca.crt']))
 
 # Fallback: only when no owned candidate exists, and only for a secret that
-# is both labelled app=quay and owner-referenced to the selected
-# QuayRegistry.  The label says which product wrote the secret; only the
-# ownerReference says which registry it belongs to, so a labelled secret
-# with no such owner is not admitted.  When nothing remains the caller's
+# is both labelled app=quay and associated with the selected QuayRegistry by
+# an ownerReference of kind QuayRegistry carrying the registry's name.  The
+# label says which product wrote the secret; the ownerReference says which
+# registry it belongs to, so a labelled secret with no such owner is not
+# admitted.  When nothing remains the caller's
 # no-candidate path fails closed before any credential is sent, which is the
 # intended direction: a probe-verified anchor that belongs to another
 # registry is not this registry's trust.
@@ -778,7 +780,7 @@ if counts['20-owned'] == 0 and counts['25-ssl'] == 0:
         write('25-ssl', base64.b64decode(data['ssl.cert']))
         fallback_used = True
     if fallback_used:
-        print('WARNING: no owned Quay TLS secret found for %s (uid %s); falling back to app=quay labelled secrets owner-referenced to that QuayRegistry only (label-only secrets are not admitted)' % (owner, owner_uid), file=sys.stderr)
+        print('WARNING: no owned Quay TLS secret found for %s (uid %s); falling back to app=quay labelled secrets whose ownerReference names that QuayRegistry (kind QuayRegistry, matching name; label-only secrets are not admitted)' % (owner, owner_uid), file=sys.stderr)
 " || { _rc=$?; echo "WARNING: Quay TLS trust candidate extraction failed (python rc=${_rc})" >&2; }
 
     # The ingress CA signs route certificates that no operator issued.
@@ -875,18 +877,23 @@ QuayTlsFallbackSelfTest() {
     }
     export -f oc curl
 
-    # Path 1: associated labelled secret, no owned candidate.
+    # Path 1: the actual fallback path.  The secret is associated by an
+    # ownerReference of kind QuayRegistry carrying the registry NAME but a
+    # different uid (a registry recreated after the secret was stamped), so
+    # ownership does not hold and only the association rule can admit it.
     _selftestAdmit='25-ssl-'
-    _selftestSecrets="$(printf '{"items":[{"metadata":{"name":"quay-registry-ssl","labels":{"app":"quay"},"ownerReferences":[{"kind":"QuayRegistry","name":"quay-registry","uid":"%s"}]},"data":{"ssl.cert":"%s"}}]}' "${QUAY_UID}" "${_b64}")"
+    _selftestSecrets="$(printf '{"items":[{"metadata":{"name":"quay-registry-ssl","labels":{"app":"quay"},"ownerReferences":[{"kind":"QuayRegistry","name":"quay-registry","uid":"99999999-8888-7777-6666-555555555555"}]},"data":{"ssl.cert":"%s"}}]}' "${_b64}")"
     quayCaFile=''
     typeset -i _path1Rc=0
     ResolveQuayTlsTrust || _path1Rc=$?
     typeset -i _path1Ssl=0
+    typeset -i _path1Owned=0
     _path1Ssl="$(find "${quayCaDir}" -maxdepth 1 -name '25-ssl-*.pem' 2>/dev/null | wc -l)"
-    if (( _path1Rc == 0 )) && (( _path1Ssl == 1 )) && [[ "${quayCaFile}" == *"/25-ssl-"* ]]; then
-        echo "SELF-TEST PASS: the fallback admits an app=quay secret owner-referenced to the selected QuayRegistry by kind and uid" >&2
+    _path1Owned="$(find "${quayCaDir}" -maxdepth 1 -name '20-owned-*.pem' 2>/dev/null | wc -l)"
+    if (( _path1Rc == 0 )) && (( _path1Ssl == 1 )) && (( _path1Owned == 0 )) && [[ "${quayCaFile}" == *"/25-ssl-"* ]]; then
+        echo "SELF-TEST PASS: the fallback (not the primary path) admits an app=quay secret associated by kind QuayRegistry and registry name" >&2
     else
-        echo "SELF-TEST FAIL: the fallback did not admit an owner-referenced app=quay secret (rc=${_path1Rc}, ssl candidates=${_path1Ssl}, anchor=${quayCaFile})" >&2
+        echo "SELF-TEST FAIL: the associated-by-name secret did not take the fallback path (rc=${_path1Rc}, ssl=${_path1Ssl}, owned=${_path1Owned}, anchor=${quayCaFile})" >&2
         _failures=$(( _failures + 1 ))
     fi
 
@@ -906,6 +913,23 @@ QuayTlsFallbackSelfTest() {
         _failures=$(( _failures + 1 ))
     fi
     _labelOnly="$(printf '{"items":[{"metadata":{"name":"quay-registry-ssl","labels":{"app":"quay"},"ownerReferences":[{"kind":"QuayRegistry","name":"other-registry","uid":"99999999-8888-7777-6666-555555555555"}]},"data":{"ssl.cert":"%s"}}]}' "${_b64}")"
+    # A wrong-kind ownerReference carrying the SELECTED registry uid must not
+    # enter the primary candidate set either: kind and uid are checked
+    # together (it carries ca.crt so only the primary path could admit it).
+    _wrongKind="$(printf '{"items":[{"metadata":{"name":"quay-registry-tls","ownerReferences":[{"kind":"Deployment","name":"quay-registry","uid":"%s"}]},"data":{"ca.crt":"%s"}}]}' "${QUAY_UID}" "${_b64}")"
+    _selftestSecrets="${_wrongKind}"
+    _selftestAdmit='20-owned- 25-ssl-'
+    quayCaFile=''
+    typeset -i _path2cRc=0
+    ResolveQuayTlsTrust || _path2cRc=$?
+    typeset -i _path2cOwned=0
+    _path2cOwned="$(find "${quayCaDir}" -maxdepth 1 -name '20-owned-*.pem' 2>/dev/null | wc -l)"
+    if (( _path2cRc != 0 )) && (( _path2cOwned == 0 )); then
+        echo "SELF-TEST PASS: a wrong-kind ownerReference with the selected uid is refused by the primary path" >&2
+    else
+        echo "SELF-TEST FAIL: a wrong-kind ownerReference with the selected uid entered the primary path (rc=${_path2cRc}, owned=${_path2cOwned})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
     _selftestSecrets="${_labelOnly}"
     quayCaFile=''
     typeset -i _path2bRc=0
