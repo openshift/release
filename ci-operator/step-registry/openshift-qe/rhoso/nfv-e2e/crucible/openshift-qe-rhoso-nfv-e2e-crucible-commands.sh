@@ -88,43 +88,53 @@ workspace="$5"
 log_file="$6"
 workload_pid=''
 termination_complete=0
+alarm_pid=''
+pid_file="${log_file}.pid"
+timeout_flag="${log_file}.timeout"
 
 terminate_workload() {
-  [[ -n "${workload_pid}" ]] || {
-    termination_complete=1
-    return 0
-  }
-  if ! kill -0 -- "-${workload_pid}" 2>/dev/null; then
-    termination_complete=1
-    return 0
+  # The workload runs in its own session, so only the leader PID it publishes
+  # through pid_file owns the killable process group; the launcher PID lives
+  # in this shell's group and must never be group-signalled.
+  local leader=''
+  leader=$(cat -- "${pid_file}" 2>/dev/null || :)
+  if [[ -n "${leader}" ]] && kill -0 -- "-${leader}" 2>/dev/null; then
+    kill -TERM -- "-${leader}" 2>/dev/null || true
+    for ((i = 1; i <= 60; i++)); do
+      kill -0 -- "-${leader}" 2>/dev/null || { termination_complete=1; return 0; }
+      sleep 1
+    done
+    kill -KILL -- "-${leader}" 2>/dev/null || true
+    for ((i = 1; i <= 5; i++)); do
+      kill -0 -- "-${leader}" 2>/dev/null || { termination_complete=1; return 0; }
+      sleep 1
+    done
+    echo 'NFV_E2E_TERMINATION=failed' >&2
+    return 1
   fi
-  kill -TERM -- "-${workload_pid}" 2>/dev/null || true
-  for ((i = 1; i <= 60; i++)); do
-    kill -0 -- "-${workload_pid}" 2>/dev/null || {
-      termination_complete=1
-      return 0
-    }
-    sleep 1
-  done
-  kill -KILL -- "-${workload_pid}" 2>/dev/null || true
-  for ((i = 1; i <= 5; i++)); do
-    kill -0 -- "-${workload_pid}" 2>/dev/null || {
-      termination_complete=1
-      return 0
-    }
-    sleep 1
-  done
-  echo 'NFV_E2E_TERMINATION=failed' >&2
-  return 1
+  # The workload never published a leader: bound the launcher process alone.
+  if [[ -n "${workload_pid}" ]] && kill -0 "${workload_pid}" 2>/dev/null; then
+    kill -TERM "${workload_pid}" 2>/dev/null || true
+    for ((i = 1; i <= 10; i++)); do
+      kill -0 "${workload_pid}" 2>/dev/null || break
+      sleep 1
+    done
+    kill -KILL "${workload_pid}" 2>/dev/null || true
+  fi
+  termination_complete=1
+  return 0
 }
 
 cleanup() {
   status=$?
   trap - EXIT HUP TERM INT
+  if [[ -n "${alarm_pid}" ]]; then
+    kill -KILL "${alarm_pid}" 2>/dev/null || true
+  fi
   if (( termination_complete == 0 )); then
     terminate_workload || status=1
   fi
-  rm -f -- "${log_file}" || true
+  rm -f -- "${log_file}" "${pid_file}" "${timeout_flag}" || true
   exit "${status}"
 }
 
@@ -144,13 +154,17 @@ if ! tmp_log=$(mktemp "${log_file}.XXXXXX") ||
   echo 'NFV_E2E_LOG_SETUP=failed'
   exit 1
 fi
-
+rm -f -- "${pid_file}" "${timeout_flag}" || true
 if ! cd -- "${workspace}"; then
   echo 'NFV_E2E_WORKSPACE=unavailable'
   exit 1
 fi
 
-setsid bash -s -- "${scenario}" "${timeout_crucible}" "${edpm_host}" "${frame_sizes}" "${log_file}" <<'WORKLOAD' &
+# --fork --wait makes setsid always fork and always wait for the workload, so
+# $! stays alive exactly as long as the workload and propagates its exit
+# status.  A bare setsid forks only when the caller is a process-group
+# leader, which leaves the tracked PID's meaning dependent on context.
+setsid --fork --wait bash -s -- "${scenario}" "${timeout_crucible}" "${edpm_host}" "${frame_sizes}" "${log_file}" "${pid_file}" <<'WORKLOAD' &
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -160,6 +174,11 @@ timeout_crucible="$2"
 edpm_host="$3"
 frame_sizes="$4"
 log_file="$5"
+pid_file="$6"
+
+# The workload bash is the session leader setsid created, so $$ is also the
+# process-group ID every watchdog signal must target.
+printf '%s\n' "$$" > "${pid_file}"
 
 set +o errexit
 make e2e-crucible \
@@ -190,20 +209,47 @@ exit "${workload_status}"
 WORKLOAD
 workload_pid=$!
 
-deadline=$((SECONDS + timeout_crucible))
-while kill -0 -- "-${workload_pid}" 2>/dev/null; do
-  if (( SECONDS >= deadline )); then
-    terminate_workload || exit 1
-    printf 'NFV_E2E_TERMINAL=1\nNFV_E2E_WORKLOAD_EXIT=124\nNFV_E2E_FILTER_EXIT=unknown\nNFV_E2E_CAPTURE_EXIT=unknown\n'
-    exit 124
+# Independent deadline alarm: a separate process enforces TIMEOUT_CRUCIBLE so
+# a stalled workload pipeline, a survivor holding the output pipe, or a
+# wedged wrapper loop cannot keep this step alive past its bound.  Output and
+# error are discarded so neither the alarm nor its sleep can hold the SSH
+# session channel open.
+(
+  sleep "${timeout_crucible}"
+  # If the wrapper is gone the job already ended; acting now could hit a
+  # reused PID, so stand down.
+  if [[ ${PPID} -eq 1 ]]; then
+    exit 0
   fi
-  sleep 1
-done
+  : > "${timeout_flag}"
+  leader=$(cat -- "${pid_file}" 2>/dev/null || :)
+  if [[ -n "${leader}" ]]; then
+    kill -TERM -- "-${leader}" 2>/dev/null || true
+    for ((i = 1; i <= 65; i++)); do
+      kill -0 -- "-${leader}" 2>/dev/null || break
+      sleep 1
+    done
+    kill -KILL -- "-${leader}" 2>/dev/null || true
+  else
+    # No published leader: bound the launcher so the wrapper's wait returns.
+    kill -TERM "${workload_pid}" 2>/dev/null || true
+  fi
+) >/dev/null 2>&1 &
+alarm_pid=$!
 
 set +o errexit
 wait "${workload_pid}"
 workload_status=$?
+# KILL, not TERM: bash defers TERM while the alarm waits on its sleep, but
+# KILL reaps the alarm at once and leaves only an fd-less orphan sleep.
+kill -KILL "${alarm_pid}" 2>/dev/null || true
+wait "${alarm_pid}" 2>/dev/null || true
 set -o errexit
+
+if [[ -f "${timeout_flag}" ]]; then
+  printf 'NFV_E2E_TERMINAL=1\nNFV_E2E_WORKLOAD_EXIT=124\nNFV_E2E_FILTER_EXIT=unknown\nNFV_E2E_CAPTURE_EXIT=unknown\n'
+  exit 124
+fi
 exit "${workload_status}"
 INNER
 REMOTE
