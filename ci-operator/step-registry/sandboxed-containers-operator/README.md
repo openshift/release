@@ -48,6 +48,42 @@ Local resolver tests: `make -C ci-operator/config/openshift/sandboxed-containers
 
 The [sandboxed-containers-operator-install-trustee-operator](./install-trustee-operator/) step installs the Trustee operator for Confidential Containers (CoCo) workloads. This step is only needed for CoCo tests.
 
+### sandboxed-containers-operator-e2e-hcp-aws
+
+The [sandboxed-containers-operator-e2e-hcp-aws](./e2e/hcp-aws/) workflow runs
+the standard OSC test suites on a HyperShift (HCP) hosted cluster on AWS. It
+follows the shared OSC workflow structure — get cluster → configure + install
+operator → sanity → suites → gather → wait → deprovision — where only the
+cluster bookends are HCP-specific, under the [`hcp/`](./hcp/) namespace:
+
+- [hcp/conf/aws](./hcp/conf/aws/) — the only cloud-specific step: region/base
+  domain from the cluster profile, `ccoctl` + `hypershift` CLI extraction,
+  writes `${SHARED_DIR}/hcp/env.sh` (OSC CI vocabulary).
+- [hcp/provision](./hcp/provision/) — cloud-agnostic: management cluster +
+  HyperShift operator + hosted cluster (nested-virt workers) via the
+  `hypershift-cluster-setup` script from `src` (`hack/hcp`), in its `--prow`
+  mode; points `${SHARED_DIR}/kubeconfig` at the hosted cluster.
+- [hcp/catalog-sources](./hcp/catalog-sources/) — copies the default GA
+  catalogs from the management to the hosted cluster (hosted clusters do not
+  inherit them).
+- [hcp/deprovision](./hcp/deprovision/) — hosted then management teardown;
+  deliberately not best-effort (no `ipi-deprovision` backstop exists, so a
+  teardown failure must fail the job rather than leak AWS resources).
+
+Everything between the bookends is the shared machinery: the
+[pre](./pre/)/[test](./test/)/[testsuites](./testsuites/) chains install OSC
+(helm charts, DaemonSet-mode KataConfig), run the sanity workload + gate, and
+run the gated suites — unchanged from the other OSC e2e workflows. The
+`hypershift-cluster-setup` script itself lives in the operator repository
+(`hack/hcp`, merged via its own PR) and is consumed via `from: src`; there is
+no runtime fetch.
+
+Namespace rule: `hcp/` owns everything HyperShift, keyed by the script's
+`HCP_CLOUD` (`hcp/conf/aws` today; future clouds are `hcp/conf/azure`,
+`hcp/conf/aro`). The existing top-level `aro/{provision,deprovision}` is
+standalone ARO without HyperShift and stays as-is; HCP-on-ARO would be
+`hcp/conf/aro`.
+
 ## Catalog Source Configuration
 
 Both OSC and Trustee operators can be installed from different catalog sources depending on whether you're testing pre-release builds or using production catalogs.
