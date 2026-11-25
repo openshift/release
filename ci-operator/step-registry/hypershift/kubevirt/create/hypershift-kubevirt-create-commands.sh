@@ -797,8 +797,26 @@ recover_stuck_localnet_multi_vmis() {
 # discovery), an expired credential and an unreachable apiserver are all
 # indistinguishable from an empty node list to a bare `oc` call, and collapsing
 # them into 0 turns an infrastructure problem into a worker networking failure.
+# Kubeconfig every guest-side check in this step reads. It normally points at
+# ${SHARED_DIR}/nested_kubeconfig, but ensure_localnet_multi_guest_kubeconfig may
+# repoint it at a step-local file that reaches the hosted apiserver through an
+# `oc port-forward` tunnel. The SHARED_DIR copy is never rewritten that way: it
+# has to keep the externally routable endpoint for the steps that run later
+# (hypershift-kubevirt-baremetalds-proxy adds proxy-url to it, and the
+# conformance chain consumes it from a different pod).
+LOCALNET_MULTI_GUEST_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+LOCALNET_MULTI_PF_PID=""
+
+localnet_multi_stop_guest_port_forward() {
+  [[ -n "${LOCALNET_MULTI_PF_PID}" ]] || return 0
+  kill "${LOCALNET_MULTI_PF_PID}" 2>/dev/null || true
+  wait "${LOCALNET_MULTI_PF_PID}" 2>/dev/null || true
+  LOCALNET_MULTI_PF_PID=""
+}
+trap localnet_multi_stop_guest_port_forward EXIT
+
 localnet_multi_joined_node_count() {
-  local kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+  local kubeconfig="${LOCALNET_MULTI_GUEST_KUBECONFIG}"
   local output ready
 
   if [[ ! -r "${kubeconfig}" ]]; then
@@ -819,7 +837,7 @@ localnet_multi_joined_node_count() {
 # localnet_multi_nodes_summary prints "name=STATUS" for every node so the log
 # distinguishes "no node registered" from "nodes registered but not Ready".
 localnet_multi_nodes_summary() {
-  local kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+  local kubeconfig="${LOCALNET_MULTI_GUEST_KUBECONFIG}"
   local output
 
   output=$(oc --kubeconfig "${kubeconfig}" get nodes --no-headers --request-timeout=15s 2>&1) || {
@@ -869,6 +887,68 @@ ensure_localnet_multi_guest_kubeconfig() {
     return 0
   fi
   rm -f "${tmp}" 2>/dev/null || true
+
+  # Last resort: tunnel to the hosted apiserver through the management cluster.
+  #
+  # Both kubeconfigs above point at the HostedCluster's external endpoint, so when
+  # that address is unreachable from this pod they fail identically and the second
+  # attempt proves nothing. That is the normal state here:
+  # hypershift-kubevirt-baremetalds-proxy is what allowlists the endpoint in squid
+  # and adds proxy-url to the kubeconfig, and it runs AFTER this step in the
+  # provisioning chain, so squid answers "Forbidden" for an address it has never
+  # been told about.
+  #
+  # `oc port-forward` goes through the management apiserver, which this pod can
+  # already reach (the admin-kubeconfig lookup above used it), so it needs no
+  # squid entry and no routing to 192.168.111.0/24. Only the step-local copy is
+  # repointed; ${SHARED_DIR}/nested_kubeconfig keeps the external endpoint for the
+  # later steps that depend on it.
+  local pf_kubeconfig="/tmp/guest-portforward.kubeconfig"
+  local pf_port="${LOCALNET_MULTI_GUEST_PF_PORT:-16443}"
+  local cluster_entry
+
+  echo "WARNING: falling back to an oc port-forward tunnel on localhost:${pf_port}" >&2
+  if ! oc -n "${hcp_ns}" get secret "${CLUSTER_NAME}-admin-kubeconfig" \
+         -o jsonpath='{.data.kubeconfig}' 2>/dev/null | base64 -d >"${pf_kubeconfig}" 2>/dev/null \
+     || [[ ! -s "${pf_kubeconfig}" ]]; then
+    echo "ERROR: could not read ${CLUSTER_NAME}-admin-kubeconfig from ${hcp_ns}" >&2
+    rm -f "${pf_kubeconfig}" 2>/dev/null || true
+    return 1
+  fi
+
+  localnet_multi_stop_guest_port_forward
+  oc -n "${hcp_ns}" port-forward "svc/kube-apiserver" "${pf_port}:6443" \
+    >/tmp/guest-portforward.log 2>&1 &
+  LOCALNET_MULTI_PF_PID=$!
+
+  # The serving certificate has no localhost SAN, so verification has to be
+  # skipped; certificate-authority-data must go or oc rejects the combination.
+  cluster_entry=$(oc --kubeconfig "${pf_kubeconfig}" config view \
+    -o jsonpath='{.clusters[0].name}' 2>/dev/null || true)
+  if [[ -z "${cluster_entry}" ]]; then
+    echo "ERROR: could not determine the cluster entry in the admin kubeconfig" >&2
+    localnet_multi_stop_guest_port_forward
+    return 1
+  fi
+  oc --kubeconfig "${pf_kubeconfig}" config unset \
+    "clusters.${cluster_entry}.certificate-authority-data" >/dev/null 2>&1 || true
+  oc --kubeconfig "${pf_kubeconfig}" config set-cluster "${cluster_entry}" \
+    --server="https://localhost:${pf_port}" --insecure-skip-tls-verify=true >/dev/null 2>&1 || true
+
+  for attempt in 1 2 3 4 5 6; do
+    if oc --kubeconfig "${pf_kubeconfig}" get nodes --request-timeout=15s -o name \
+         >/dev/null 2>&1; then
+      LOCALNET_MULTI_GUEST_KUBECONFIG="${pf_kubeconfig}"
+      echo "Reaching the hosted cluster through port-forward on localhost:${pf_port}" >&2
+      return 0
+    fi
+    sleep 5
+  done
+
+  echo "ERROR: port-forward tunnel to svc/kube-apiserver in ${hcp_ns} did not work:" >&2
+  tail -5 /tmp/guest-portforward.log >&2 || true
+  localnet_multi_stop_guest_port_forward
+  rm -f "${pf_kubeconfig}" 2>/dev/null || true
   return 1
 }
 
@@ -890,7 +970,7 @@ localnet_multi_agent_connected_count() {
 # authorization policy missing".
 dump_localnet_multi_api_diagnostics() {
   local multi_ns="$1"
-  local guest_kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+  local guest_kubeconfig="${LOCALNET_MULTI_GUEST_KUBECONFIG}"
   local server cert_file key_file
 
   echo "--- guest kubeconfig / hosted API ---"
@@ -938,7 +1018,7 @@ dump_localnet_multi_api_diagnostics() {
 # requiring a live cluster afterwards.
 dump_localnet_multi_diagnostics() {
   local multi_ns="$1"
-  local guest_kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+  local guest_kubeconfig="${LOCALNET_MULTI_GUEST_KUBECONFIG}"
   local vmi agent launcher
 
   echo ""
@@ -2001,7 +2081,7 @@ if [[ "${ATTACH_DEFAULT_NETWORK}" == "localnet" ]]; then
   # these return packets are silently dropped by the kernel.
   # OVN-Kubernetes only enables forwarding on interfaces it manages (br-ex,
   # ovn-k8s-mp0) but not on the secondary NIC.
-  NESTED_KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+  NESTED_KUBECONFIG="${LOCALNET_MULTI_GUEST_KUBECONFIG}"
   if [[ -f "${NESTED_KUBECONFIG}" ]]; then
     echo "Waiting for OVN node pods to be ready in hosted cluster..."
     for _ in $(seq 1 60); do
