@@ -1797,7 +1797,11 @@ spec:
                 echo "[$1] $2 $3" 1>&2
                 if [ "$1" = "Basic" ]; then
                   if oc -n "${INTEROP__OPP__QUAY__NAMESPACE}" get secret "${QUAY_USER_SECRET}" -o name >/dev/null 2>&1; then
+                      # BASH-7.3: the assignment traces its expanded value, so
+                      # tracing is off while the credential is read.
+                      set +x
                       BASIC=$(oc -n "${INTEROP__OPP__QUAY__NAMESPACE}" extract secret/${QUAY_USER_SECRET} --keys=basic --to=-)
+                      set -x
                   fi
                   # The header value is a credential read by curl from a process
                   # substitution (curl -H @file), so no secret appears in the
@@ -1878,6 +1882,14 @@ spec:
                 exit 1
               fi
 
+              # BASH-7.3: xtrace records the expanded value of an assignment, so
+              # tracing is off across the whole credential window (admin password
+              # generation, database initialization, all four Secrets). Otherwise
+              # the generated password, the initialize body and its access_token,
+              # the generated user password and both basic credentials reach the
+              # Job log, which is published with the artifacts. Tracing resumes at
+              # the end of the window, after the last Secret is written.
+              set +x
               ADMINPASS=$(head -c 8 /dev/urandom | base64 | tr -d "=" | tr -d "\n")
               # The initialize body carries the generated admin password, so it
               # is built in an assignment and streamed on stdin: never in argv.
@@ -1940,6 +1952,9 @@ spec:
                 echo "[INFO] Creating quay integration token secret ..."
                 oc -n "${INTEROP__OPP__QUAY__NAMESPACE}" create secret generic quay-integration \
                   --from-file=token=<( set +x; printf '%s' "${TOKEN}" )
+                # End of the credential window: every Secret holding a credential
+                # is written, so control flow below is traced again.
+                set -x
               fi
 
               echo "[INFO] Looking for initial organization ..."
@@ -2031,7 +2046,12 @@ spec:
               _ADMIN_BODY="${_ADMIN_READ%$'\n'*}"
               case "${_ADMIN_STATUS}" in
                 200)
-                  COUNT="$(printf '%s' "${_ADMIN_BODY}" | jq '[.permissions[]? | select(.role == "admin")] | length')"
+                  # GET /repository/<repo>/permissions/user/<user> answers one flat
+                  # permission object ({"role": "admin", "name": "<user>"}), not a
+                  # .permissions collection: read the role off the object itself,
+                  # and stay tolerant of a list-shaped body so an answer shape
+                  # change cannot turn "already admin" into "grant it again".
+                  COUNT="$(printf '%s' "${_ADMIN_BODY}" | jq '[.role, (.permissions[]?.role)] | map(select(. == "admin")) | length')"
                   ;;
                 404)
                   # No permission row for this user yet: a definite negative.

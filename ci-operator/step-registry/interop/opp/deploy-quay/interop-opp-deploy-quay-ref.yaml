@@ -13,8 +13,10 @@ ref:
     The create-admin-user Job runs with errexit, so every required mutation
     (organization, application, repository, team membership, repository
     permission) is checked and stops the Job on failure: a Job that reports
-    completion has created all of them. The Job logs method and path only,
-    never a request or response body, and the step redacts
+    completion has created all of them. The Job traces its control flow but
+    runs with tracing disabled across the whole credential window (admin
+    password generation, database initialization, all four Secrets), so no
+    credential value reaches the Job log; the step also redacts
     credential-shaped values from the pod log it copies into the artifacts.
 
     Every object is created only if absent (oc create, never apply): when the
