@@ -144,73 +144,148 @@ echo "Raw JSON written to ${JSON_FILE}"
 
     # EC2 Instances
     echo "--- EC2 Instances ---"
-    jq -r '.Instances[] |
-        . as $inst |
-        "  \(.InstanceId)  \(.InstanceType)  state=\(.State.Name)  az=\(.Placement.AvailabilityZone)\n    privateIP=\(.PrivateIpAddress // "none")  publicIP=\(if .PublicIpAddress then "REDACTED" else "none" end)\n    Name=\((.Tags // [] | map(select(.Key == "Name") | .Value) | .[0]) // "untagged")\n    RootVolume: \(.RootDeviceName)  \((.BlockDeviceMappings[] | select(.DeviceName == $inst.RootDeviceName) | "volumeId=\(.Ebs.VolumeId)  deleteOnTerm=\(.Ebs.DeleteOnTermination)") // "N/A")\n    VirtualizationType=\(.VirtualizationType)  Architecture=\(.Architecture)  CpuOptions: coreCount=\(.CpuOptions.CoreCount)  threadsPerCore=\(.CpuOptions.ThreadsPerCore)  nestedVirtualization=\(.CpuOptions.NestedVirtualization // "N/A")"' "${JSON_FILE}" \
-        || echo "  (none)"
+    jq -r '
+      .Instances[] |
+      . as $inst |
+      "  \(.InstanceId)  \(.InstanceType)  state=\(.State.Name)  az=\(.Placement.AvailabilityZone)
+    privateIP=\(.PrivateIpAddress // "none")  publicIP=\(if .PublicIpAddress then "REDACTED" else "none" end)
+    Name=\((.Tags // [] | map(select(.Key == "Name") | .Value) | .[0]) // "untagged")
+    RootVolume: \(.RootDeviceName)  \((.BlockDeviceMappings[] | select(.DeviceName == $inst.RootDeviceName) | "volumeId=\(.Ebs.VolumeId)  deleteOnTerm=\(.Ebs.DeleteOnTermination)") // "N/A")
+    VirtualizationType=\(.VirtualizationType)  Architecture=\(.Architecture)  CpuOptions: coreCount=\(.CpuOptions.CoreCount)  threadsPerCore=\(.CpuOptions.ThreadsPerCore)  nestedVirtualization=\(.CpuOptions.NestedVirtualization // "N/A")"
+    ' "${JSON_FILE}" || echo "  (none)"
     echo ""
 
     # EBS Volumes
     echo "--- EBS Volumes ---"
-    jq -r '.Volumes[] |
-        "  \(.VolumeId)  size=\(.Size)GB  type=\(.VolumeType)  state=\(.State)  az=\(.AvailabilityZone)\n    iops=\(.Iops // "default")  throughput=\(.Throughput // "default")  encrypted=\(.Encrypted)\n    attachments: \(if (.Attachments | length) > 0 then (.Attachments | map("\(.InstanceId):\(.Device)  deleteOnTerm=\(.DeleteOnTermination)") | join(", ")) else "none" end)"' "${JSON_FILE}" \
-        || echo "  (none)"
+    jq -r '
+      .Volumes[] |
+      "  \(.VolumeId)  size=\(.Size)GB  type=\(.VolumeType)  state=\(.State)  az=\(.AvailabilityZone)
+    iops=\(.Iops // "default")  throughput=\(.Throughput // "default")  encrypted=\(.Encrypted)
+    attachments: \(if (.Attachments | length) > 0 then (.Attachments | map("\(.InstanceId):\(.Device)  deleteOnTerm=\(.DeleteOnTermination)") | join(", ")) else "none" end)"
+    ' "${JSON_FILE}" || echo "  (none)"
     echo ""
 
     # VPCs
     echo "--- VPCs ---"
-    jq -r '.VPCs[] |
-        "  \(.VpcId)  cidr=\(.CidrBlock)  state=\(.State)  tenancy=\(.InstanceTenancy)\n    enableDnsSupport=\(.EnableDnsSupport // "unknown")  enableDnsHostnames=\(.EnableDnsHostnames // "unknown")\n    Name=\((.Tags // [] | map(select(.Key == "Name") | .Value) | .[0]) // "untagged")"' "${JSON_FILE}" \
-        || echo "  (none)"
+    jq -r '
+      .VPCs[] |
+      "  \(.VpcId)  cidr=\(.CidrBlock)  state=\(.State)  tenancy=\(.InstanceTenancy)
+    enableDnsSupport=\(.EnableDnsSupport // "unknown")  enableDnsHostnames=\(.EnableDnsHostnames // "unknown")
+    Name=\((.Tags // [] | map(select(.Key == "Name") | .Value) | .[0]) // "untagged")"
+    ' "${JSON_FILE}" || echo "  (none)"
     echo ""
 
     # Subnets
     echo "--- Subnets ---"
-    jq -r '.Subnets[] |
-        "  \(.SubnetId)  cidr=\(.CidrBlock)  az=\(.AvailabilityZone)  vpc=\(.VpcId)\n    availableIPs=\(.AvailableIpAddressCount)  mapPublicIP=\(.MapPublicIpOnLaunch)\n    Name=\((.Tags // [] | map(select(.Key == "Name") | .Value) | .[0]) // "untagged")"' "${JSON_FILE}" \
-        || echo "  (none)"
+    jq -r '
+      .Subnets[] |
+      "  \(.SubnetId)  cidr=\(.CidrBlock)  az=\(.AvailabilityZone)  vpc=\(.VpcId)
+    availableIPs=\(.AvailableIpAddressCount)  mapPublicIP=\(.MapPublicIpOnLaunch)
+    Name=\((.Tags // [] | map(select(.Key == "Name") | .Value) | .[0]) // "untagged")"
+    ' "${JSON_FILE}" || echo "  (none)"
     echo ""
 
     # Security Groups
     echo "--- Security Groups ---"
-    jq -r '.SecurityGroups[] |
-        "  \(.GroupId)  \(.GroupName)  vpc=\(.VpcId)\n    Description: \(.Description)\n    IngressRules=\(.IpPermissions | length)  EgressRules=\(.IpPermissionsEgress | length)\n\(if (.IpPermissions | length) > 0 then "    Ingress:\n" + (.IpPermissions | map("      \(.IpProtocol) port=\(if .FromPort then "\(.FromPort)-\(.ToPort)" else "all" end) from=\(if (.IpRanges | length) > 0 then (.IpRanges | map(.CidrIp) | join(",")) elif (.UserIdGroupPairs | length) > 0 then (.UserIdGroupPairs | map(.GroupId) | join(",")) else "all" end)") | join("\n")) else "" end)\n\(if (.IpPermissionsEgress | length) > 0 then "    Egress:\n" + (.IpPermissionsEgress | map("      \(.IpProtocol) port=\(if .FromPort then "\(.FromPort)-\(.ToPort)" else "all" end) to=\(if (.IpRanges | length) > 0 then (.IpRanges | map(.CidrIp) | join(",")) elif (.UserIdGroupPairs | length) > 0 then (.UserIdGroupPairs | map(.GroupId) | join(",")) else "all" end)") | join("\n")) else "" end)"' "${JSON_FILE}" \
-        || echo "  (none)"
+    jq -r '
+      .SecurityGroups[] |
+      "  \(.GroupId)  \(.GroupName)  vpc=\(.VpcId)
+    Description: \(.Description)
+    IngressRules=\(.IpPermissions | length)  EgressRules=\(.IpPermissionsEgress | length)
+\(
+  if (.IpPermissions | length) > 0 then
+    "    Ingress:\n" + (
+      .IpPermissions | map(
+        "      \(.IpProtocol) port=\(if .FromPort then "\(.FromPort)-\(.ToPort)" else "all" end) from=\(
+          if (.IpRanges | length) > 0 then
+            (.IpRanges | map(.CidrIp) | join(","))
+          elif (.UserIdGroupPairs | length) > 0 then
+            (.UserIdGroupPairs | map(.GroupId) | join(","))
+          else
+            "all"
+          end
+        )"
+      ) | join("\n")
+    )
+  else
+    ""
+  end
+)
+\(
+  if (.IpPermissionsEgress | length) > 0 then
+    "    Egress:\n" + (
+      .IpPermissionsEgress | map(
+        "      \(.IpProtocol) port=\(if .FromPort then "\(.FromPort)-\(.ToPort)" else "all" end) to=\(
+          if (.IpRanges | length) > 0 then
+            (.IpRanges | map(.CidrIp) | join(","))
+          elif (.UserIdGroupPairs | length) > 0 then
+            (.UserIdGroupPairs | map(.GroupId) | join(","))
+          else
+            "all"
+          end
+        )"
+      ) | join("\n")
+    )
+  else
+    ""
+  end
+)"
+    ' "${JSON_FILE}" || echo "  (none)"
     echo ""
 
     # Classic Load Balancers
     echo "--- Classic Load Balancers ---"
-    jq -r '.LoadBalancers[] |
-        "  \(.LoadBalancerName)  dns=\(.DNSName)\n    scheme=\(.Scheme)  vpc=\(.VPCId // "classic")\n    subnets: \(.Subnets // [] | join(", "))\n    azs: \(.AvailabilityZones // [] | join(", "))\n    listeners: \(.ListenerDescriptions | map("\(.Listener.Protocol):\(.Listener.LoadBalancerPort)->\(.Listener.InstancePort)") | join(", "))"' "${JSON_FILE}" \
-        || echo "  (none)"
+    jq -r '
+      .LoadBalancers[] |
+      "  \(.LoadBalancerName)  dns=\(.DNSName)
+    scheme=\(.Scheme)  vpc=\(.VPCId // "classic")
+    subnets: \(.Subnets // [] | join(", "))
+    azs: \(.AvailabilityZones // [] | join(", "))
+    listeners: \(.ListenerDescriptions | map("\(.Listener.Protocol):\(.Listener.LoadBalancerPort)->\(.Listener.InstancePort)") | join(", "))"
+    ' "${JSON_FILE}" || echo "  (none)"
     echo ""
 
     # Application/Network Load Balancers
     echo "--- Application/Network Load Balancers ---"
-    jq -r '.LoadBalancersV2[] |
-        "  \(.LoadBalancerName)  type=\(.Type)  dns=\(.DNSName)\n    scheme=\(.Scheme)  vpc=\(.VpcId)\n    state=\(.State.Code)  ipAddressType=\(.IpAddressType)\n    azs: \(.AvailabilityZones | map("\(.ZoneName) (\(.SubnetId))") | join(", "))"' "${JSON_FILE}" \
-        || echo "  (none)"
+    jq -r '
+      .LoadBalancersV2[] |
+      "  \(.LoadBalancerName)  type=\(.Type)  dns=\(.DNSName)
+    scheme=\(.Scheme)  vpc=\(.VpcId)
+    state=\(.State.Code)  ipAddressType=\(.IpAddressType)
+    azs: \(.AvailabilityZones | map("\(.ZoneName) (\(.SubnetId))") | join(", "))"
+    ' "${JSON_FILE}" || echo "  (none)"
     echo ""
 
     # Route Tables
     echo "--- Route Tables ---"
-    jq -r '.RouteTables[] |
-        "  \(.RouteTableId)  vpc=\(.VpcId)  routes=\(.Routes | length)\n    associations: \((.Associations | length) // 0) subnets\n    Routes:\n\(.Routes | map("      dest=\(.DestinationCidrBlock // .DestinationIpv6CidrBlock // "unknown")  target=\(.GatewayId // .NatGatewayId // .NetworkInterfaceId // .InstanceId // "local")  state=\(.State // "active")") | join("\n"))"' "${JSON_FILE}" \
-        || echo "  (none)"
+    jq -r '
+      .RouteTables[] |
+      "  \(.RouteTableId)  vpc=\(.VpcId)  routes=\(.Routes | length)
+    associations: \((.Associations | length) // 0) subnets
+    Routes:
+\(.Routes | map("      dest=\(.DestinationCidrBlock // .DestinationIpv6CidrBlock // "unknown")  target=\(.GatewayId // .NatGatewayId // .NetworkInterfaceId // .InstanceId // "local")  state=\(.State // "active")") | join("\n"))"
+    ' "${JSON_FILE}" || echo "  (none)"
     echo ""
 
     # Internet Gateways
     echo "--- Internet Gateways ---"
-    jq -r '.InternetGateways[] |
-        "  \(.InternetGatewayId)\n    attachments: \(.Attachments | map("vpc=\(.VpcId)  state=\(.State)") | join(", "))\n    Name=\((.Tags // [] | map(select(.Key == "Name") | .Value) | .[0]) // "untagged")"' "${JSON_FILE}" \
-        || echo "  (none)"
+    jq -r '
+      .InternetGateways[] |
+      "  \(.InternetGatewayId)
+    attachments: \(.Attachments | map("vpc=\(.VpcId)  state=\(.State)") | join(", "))
+    Name=\((.Tags // [] | map(select(.Key == "Name") | .Value) | .[0]) // "untagged")"
+    ' "${JSON_FILE}" || echo "  (none)"
     echo ""
 
     # NAT Gateways
     echo "--- NAT Gateways ---"
-    jq -r '.NatGateways[] |
-        "  \(.NatGatewayId)  state=\(.State)  subnet=\(.SubnetId)  vpc=\(.VpcId)\n    privateIP=\(.NatGatewayAddresses[0].PrivateIp // "none")  publicIP=\(if .NatGatewayAddresses[0].PublicIp then "REDACTED" else "none" end)\n    connectivityType=\(.ConnectivityType // "public")\n    Name=\((.Tags // [] | map(select(.Key == "Name") | .Value) | .[0]) // "untagged")"' "${JSON_FILE}" \
-        || echo "  (none)"
+    jq -r '
+      .NatGateways[] |
+      "  \(.NatGatewayId)  state=\(.State)  subnet=\(.SubnetId)  vpc=\(.VpcId)
+    privateIP=\(.NatGatewayAddresses[0].PrivateIp // "none")  publicIP=\(if .NatGatewayAddresses[0].PublicIp then "REDACTED" else "none" end)
+    connectivityType=\(.ConnectivityType // "public")
+    Name=\((.Tags // [] | map(select(.Key == "Name") | .Value) | .[0]) // "untagged")"
+    ' "${JSON_FILE}" || echo "  (none)"
     echo ""
 
     echo "============================================"
