@@ -35,6 +35,9 @@ ref:
                       require a proxy server to be deployed.
         * 'proxy' - Configure the install-config to use a pre-created restricted network (BYON) and
                    a Cluster Proxy.
+    - name: IGNITIONVERSION
+      default: "3.1.0"
+      documentation: Ignition configuration version to use for MachineConfigs.
     - name: NETWORK_TYPE
       default: 'OVNKubernetes'
       documentation: The Network type used during the installation
@@ -59,7 +62,11 @@ ref:
     group: bastionproxy
     mount_path: /var/run/bastionproxy
   documentation: |-
-    This step creates the bastion proxy when $CONFIG_TYPE is "proxy".
+    This step creates the bastion proxy when $CONFIG_TYPE contains "proxy".
+    The bastion also serves NTP to the machines subnet using its upstream Chrony
+    sources. The step verifies upstream synchronization and writes master and
+    worker manifest_99-chrony-*.yaml MachineConfigs to SHARED_DIR for inclusion
+    by ipi-install-install. NTP access is restricted to the machines subnet.
     For externallb, it also exposes LB_HOST / LB_HOSTS for the UserManaged load
     balancer endpoints, and LB_PRIVATE_IPS with their machines-subnet IPs, used
     later to publish the api-int DNS record (see EXTERNAL_LB_COUNT).
