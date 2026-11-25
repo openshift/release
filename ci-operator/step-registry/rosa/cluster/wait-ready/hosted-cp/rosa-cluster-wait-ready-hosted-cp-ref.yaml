@@ -23,3 +23,16 @@ ref:
     2. HostedControlPlane CR status in the HCP namespace (ocm-<env>-<cluster_id>-<cluster_name>)
     3. All pods in the HCP namespace are running and ready
     4. VpcEndpoint 'private-hcp' is healthy in the HCP namespace
+
+    When check 3 does not succeed the step makes one bounded, best-effort
+    collection pass over the same HCP namespace and writes
+    ${ARTIFACT_DIR}/rosa-hcp-pod-diagnostics-<timestamp>.json before failing.
+    At most 60 pods are reported, not-ready ones first, so the bound drops
+    healthy pods rather than the ones the wait failed on; the artifact records
+    how many pods were observed and whether the list was truncated. Collection
+    is skipped with a log line, and no artifact is written, when ARTIFACT_DIR
+    is unset or not writable. The step outcome is unchanged either way.
+    Because ARTIFACT_DIR is published publicly, the artifact is restricted to
+    run-local pod aliases, allowlisted condition, phase, reason and event enum
+    values, timestamps and counters; names, labels, messages and command
+    output are never written.
