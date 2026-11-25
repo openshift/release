@@ -18,6 +18,12 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 source "${SHARED_DIR}/init-fn.sh" || true
 
+# In disconnected environments, route API requests through the bastion proxy.
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # Only run when CCM is enabled
 if [[ "${PLATFORM_EXTERNAL_CCM_ENABLED:-}" != "yes" ]]; then
   log "ℹ️  Skipping CCM node initialization check - PLATFORM_EXTERNAL_CCM_ENABLED != yes"
