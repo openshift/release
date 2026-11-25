@@ -26,6 +26,13 @@ if ! type log &>/dev/null; then
   log() { echo "$(date -u --rfc-3339=seconds) - $*"; }
 fi
 
+# The bootstrap API name only exists in the private zone, so the installer
+# must reach it through the bastion proxy.
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   log "Failed to acquire lease"
@@ -74,3 +81,9 @@ wait "$!" || gather_bootstrap_and_fail
 log "Bootstrap complete, destroying bootstrap resources"
 aws --region "${AWS_REGION}" cloudformation delete-stack --stack-name "${STACK_NAME_BOOTSTRAP}" &
 wait "$!"
+
+# Drop it from the stack list so the post-install destroy step does not try to
+# delete it again and abort before tearing down the remaining stacks.
+if [[ -f "${SHARED_DIR}/aws_cfn_stacks" ]]; then
+  sed -i "\|^${STACK_NAME_BOOTSTRAP}$|d" "${SHARED_DIR}/aws_cfn_stacks"
+fi

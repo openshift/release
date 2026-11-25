@@ -160,15 +160,18 @@ function gather_bootstrap_via_bastion() {
     fi
   fi
 
-  # Copy installer binary and ephemeral gather key to bastion.
-  # Only the ephemeral key is transferred — the vault key stays on the runner.
+  # Copy installer binary, ephemeral gather key and install metadata to
+  # bastion. Only the ephemeral key is transferred — the vault key stays on
+  # the runner.
   scp \${ssh_opts} -i "\${bastion_key}" "\${installer_bin}" "\${bastion_user}@\${bastion_dns}:/tmp/openshift-install" || true
   scp \${ssh_opts} -i "\${bastion_key}" "\${gather_key}" "\${bastion_user}@\${bastion_dns}:/tmp/ssh-gatherkey" || true
+  # gather reads cluster metadata from --dir; without it the bundle is not produced.
+  scp \${ssh_opts} -i "\${bastion_key}" "\${SHARED_DIR}/metadata.json" "\${bastion_user}@\${bastion_dns}:/tmp/gather-metadata.json" 2>/dev/null || true
 
   # Run gather on bastion with --dir /tmp/gather-dir so output location is known.
-  # The key is removed immediately after gather regardless of exit code.
+  # The key and metadata are removed immediately after gather regardless of exit code.
   ssh \${ssh_opts} -i "\${bastion_key}" "\${bastion_user}@\${bastion_dns}" \
-    "mkdir -p /tmp/gather-dir; /tmp/openshift-install gather bootstrap --dir /tmp/gather-dir --key /tmp/ssh-gatherkey \${gather_args} --log-level debug 2>/tmp/gather-bootstrap.log; rc=\\\$?; rm -f /tmp/ssh-gatherkey; exit \\\$rc" || true
+    "mkdir -p /tmp/gather-dir; cp /tmp/gather-metadata.json /tmp/gather-dir/metadata.json 2>/dev/null || true; /tmp/openshift-install gather bootstrap --dir /tmp/gather-dir --key /tmp/ssh-gatherkey \${gather_args} --log-level debug 2>/tmp/gather-bootstrap.log; rc=\\\$?; rm -f /tmp/ssh-gatherkey /tmp/gather-metadata.json; exit \\\$rc" || true
 
   # Copy results back to artifact dir
   scp \${ssh_opts} -i "\${bastion_key}" "\${bastion_user}@\${bastion_dns}:/tmp/gather-bootstrap.log" "\${ARTIFACT_DIR}/" 2>/dev/null || true
@@ -176,7 +179,7 @@ function gather_bootstrap_via_bastion() {
 
   # Cleanup: remove ephemeral key and installer from bastion on every path
   ssh \${ssh_opts} -i "\${bastion_key}" "\${bastion_user}@\${bastion_dns}" \
-    "rm -f /tmp/ssh-gatherkey /tmp/openshift-install" 2>/dev/null || true
+    "rm -f /tmp/ssh-gatherkey /tmp/openshift-install /tmp/gather-metadata.json" 2>/dev/null || true
 
   log "[BASTION GATHER]: Completed"
 }
