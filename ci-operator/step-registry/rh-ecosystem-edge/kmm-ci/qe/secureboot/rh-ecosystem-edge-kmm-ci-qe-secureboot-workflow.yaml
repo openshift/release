@@ -1,0 +1,31 @@
+workflow:
+  as: rh-ecosystem-edge-kmm-ci-qe-secureboot
+  steps:
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-aws-secureboot
+    - chain: aws-provision-iam-user-minimal-permission
+    - chain: ipi-install
+    test:
+    - ref: aws-secureboot-verify
+    - ref: rh-ecosystem-edge-kmm-ci-qe-configure-stage-registry
+    - ref: rh-ecosystem-edge-kmm-ci-qe-install
+    - ref: rh-ecosystem-edge-kmm-ci-qe-preflight
+    - ref: rh-ecosystem-edge-kmm-ci-qe-tests
+    post:
+    - ref: gather-must-gather
+    - ref: aws-deprovision-secureboot
+    - ref: ipi-deprovision-deprovision
+    - ref: aws-deprovision-users-and-policies
+    - ref: aws-deprovision-verification
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    env:
+      CONTROL_PLANE_REPLICAS: "1"
+      CONTROL_PLANE_INSTANCE_TYPE: m5d.2xlarge
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m5d.2xlarge
+  documentation: |-
+    Provisions an AWS OpenShift cluster with Secure Boot enabled on the worker
+    node, enrolls the KMM QE signing CA into the worker firmware, and runs the
+    common KMM QE flow against the selected KMM release channel.
