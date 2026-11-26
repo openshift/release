@@ -102,10 +102,12 @@ checkup it selects the virtualization default before CNV imports golden images.
 - Azure creates `checkup-azurefile-nfs` using Azure File CSI with NFS and
   `Premium_LRS`. This configuration is a trial following a golden-image import
   failure caused by a permissions change on the default Azure File class.
-  The Azure job sets the default guest CPU model to `Broadwell` before creating
-  checkup VMs. It verifies that at least two ready KVM workers support that
-  model. A rehearsal on `Standard_D16s_v5` workers mixed Sapphire Rapids and
-  Ice Lake hosts, and the migration target could not match the source host model.
+  Before creating checkup VMs, the Azure job sets the HyperConverged v1
+  `spec.virtualization.virtualMachineOptions.defaultCPUModel` to `Broadwell`.
+  It verifies that at least two ready KVM workers support the model and waits
+  for KubeVirt to apply it. A rehearsal on `Standard_D16s_v5` workers mixed
+  Sapphire Rapids and Ice Lake hosts, and the migration target could not match
+  the source host model.
 - GCP runs one shipped checkup on zonal `hyperdisk-balanced`. Three C3
   workers share one zone so the source and destination can attach the same
   RWX Block guest disk during live migration. CDI imports the golden image

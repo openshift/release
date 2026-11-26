@@ -112,8 +112,14 @@ tests:
           exit 1
         fi
 
-        patch=$(jq -nc --arg model "${cpu_model}" '{spec:{defaultCPUModel:$model}}')
-        oc --request-timeout=30s -n openshift-cnv patch hyperconverged kubevirt-hyperconverged --type=merge -p "${patch}"
+        patch=$(jq -nc --arg model "${cpu_model}" '{spec:{virtualization:{virtualMachineOptions:{defaultCPUModel:$model}}}}')
+        configured_model=$(oc --request-timeout=30s -n openshift-cnv patch \
+          hyperconvergeds.v1.hco.kubevirt.io kubevirt-hyperconverged --type=merge -p "${patch}" \
+          -o 'jsonpath={.spec.virtualization.virtualMachineOptions.defaultCPUModel}')
+        if [[ ${configured_model} != "${cpu_model}" ]]; then
+          echo "HyperConverged did not record the requested CPU model ${cpu_model}." >&2
+          exit 1
+        fi
         oc -n openshift-cnv wait kubevirt/kubevirt-kubevirt-hyperconverged \
           --for="jsonpath={.spec.configuration.cpuModel}=${cpu_model}" --timeout=3m
       from_image:
