@@ -22,6 +22,8 @@ case "${ARM_IBX_DEPLOY_ROLE:?ARM_IBX_DEPLOY_ROLE must be configured}" in
     : "${ZTP_SEED_POLICIES_PATH:?ZTP_SEED_POLICIES_PATH must be configured}"
     ZTP_CLUSTERS_PATH="${ZTP_SEED_CLUSTERS_PATH}"
     ZTP_POLICIES_PATH="${ZTP_SEED_POLICIES_PATH}"
+    playbook=deploy-spoke-ztp-mno.yaml
+    deploy_vars=(--extra-vars "ocp_version=${VERSION} force_cleanup=false")
     ;;
   target)
     SPOKE_NAME="${TARGET_SPOKE_CLUSTER:?TARGET_SPOKE_CLUSTER must be configured}"
@@ -29,6 +31,11 @@ case "${ARM_IBX_DEPLOY_ROLE:?ARM_IBX_DEPLOY_ROLE must be configured}" in
     : "${ZTP_TARGET_POLICIES_PATH:?ZTP_TARGET_POLICIES_PATH must be configured}"
     ZTP_CLUSTERS_PATH="${ZTP_TARGET_CLUSTERS_PATH}"
     ZTP_POLICIES_PATH="${ZTP_TARGET_POLICIES_PATH}"
+    playbook=arm-ibx-deploy-target.yml
+    deploy_vars=(
+      --extra-vars "@${SHARED_DIR}/arm-ibx-releases.json"
+      --extra-vars @playbooks/ran/vars/arm-ibx-target.yml
+    )
     ;;
   *)
     echo "ARM_IBX_DEPLOY_ROLE must be seed or target" >&2
@@ -54,23 +61,10 @@ chmod 600 "${SPOKE_HOST_VARS}"
 trap 'rm -f "${SPOKE_HOST_VARS}"' EXIT
 cd /eco-ci-cd
 
-if [[ "${ARM_IBX_DEPLOY_ROLE}" == "seed" ]]; then
-  for field in hostname bmc_user bmc_password; do
-    value=$(cat "/var/host_variables/${CLUSTER_NAME}/spoke-master0/${field}")
-    printf "%s: '%s'\n" "${field}" "${value//\'/\'\'}"
-  done > "${SPOKE_HOST_VARS}"
-else
-  # The target still uses the BMC credentials from its bastion inventory.
-  ansible-inventory -i ./inventories/ocp-deployment/build-inventory.py --host bastion |
-    python3 -c '
-import json
-import sys
-
-bastion = json.load(sys.stdin)
-json.dump({"hostname": sys.argv[1],
-           "bmc_user": bastion["bmc_user"], "bmc_password": bastion["bmc_password"]}, sys.stdout)
-' "${SPOKE_NAME}" > "${SPOKE_HOST_VARS}"
-fi
+for field in hostname bmc_user bmc_password; do
+  value=$(cat "/var/host_variables/${CLUSTER_NAME}/spoke-master0/${field}")
+  printf "%s: '%s'\n" "${field}" "${value//\'/\'\'}"
+done > "${SPOKE_HOST_VARS}"
 
 KUBECONFIG_PATH="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
@@ -79,13 +73,12 @@ echo "ZTP branch: ${ZTP_GIT_BRANCH}"
 echo "ZTP clusters path: ${ZTP_CLUSTERS_PATH}"
 echo "ZTP policies path: ${ZTP_POLICIES_PATH}"
 
-ansible-playbook ./playbooks/ran/deploy-spoke-ztp-mno.yaml \
+ansible-playbook "./playbooks/ran/${playbook}" \
   -i ./inventories/ocp-deployment/build-inventory.py \
+  "${deploy_vars[@]}" \
   --extra-vars "kubeconfig=${KUBECONFIG_PATH} \
     spoke_cluster=${SPOKE_NAME} \
-    ocp_version=${VERSION} \
     arch=${SPOKE_ARCH} \
-    force_cleanup=false \
     ztp_git_repo_url=${ZTP_GIT_REPO} \
     ztp_clusters_git_path=${ZTP_CLUSTERS_PATH} \
     ztp_policies_git_path=${ZTP_POLICIES_PATH} \
