@@ -9,6 +9,14 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
 fi
 
 ECO_CI_CD_DIR=/eco-ci-cd
+if [[ -n "${ECO_CI_CD_FORK_REPO:-}" ]]; then
+  ECO_CI_CD_FORK_DIR=$(mktemp -d /tmp/eco-ci-cd-fork.XXXXXXXX)
+  ECO_CI_CD_DIR="${ECO_CI_CD_FORK_DIR}"
+  git clone --depth 1 --branch "${ECO_CI_CD_FORK_BRANCH:-main}" -- \
+    "${ECO_CI_CD_FORK_REPO}" "${ECO_CI_CD_DIR}"
+  # Use the Ansible collections installed in the step image.
+  export ANSIBLE_COLLECTIONS_PATH=/eco-ci-cd/collections
+fi
 ECO_CI_CD_INVENTORY_PATH="${ECO_CI_CD_DIR}/inventories/cnf"
 
 process_inventory() {
@@ -136,6 +144,9 @@ cleanup() {
   ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${WORKDIR}/temp_ssh_key" \
     "rm -rf '${REMOTE_WORKDIR}'" 2>/dev/null || true
   rm -rf "${WORKDIR}"
+  if [[ -n "${ECO_CI_CD_FORK_DIR:-}" ]]; then
+    rm -rf "${ECO_CI_CD_FORK_DIR}"
+  fi
 }
 trap cleanup EXIT
 

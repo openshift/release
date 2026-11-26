@@ -7,7 +7,17 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
-ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
+ECO_CI_CD_DIR=/eco-ci-cd
+if [[ -n "${ECO_CI_CD_FORK_REPO:-}" ]]; then
+  ECO_CI_CD_FORK_DIR=$(mktemp -d /tmp/eco-ci-cd-fork.XXXXXXXX)
+  ECO_CI_CD_DIR="${ECO_CI_CD_FORK_DIR}"
+  trap 'rm -rf "${ECO_CI_CD_FORK_DIR}"' EXIT
+  git clone --depth 1 --branch "${ECO_CI_CD_FORK_BRANCH:-main}" -- \
+    "${ECO_CI_CD_FORK_REPO}" "${ECO_CI_CD_DIR}"
+  # Use the Ansible collections installed in the step image.
+  export ANSIBLE_COLLECTIONS_PATH=/eco-ci-cd/collections
+fi
+ECO_CI_CD_INVENTORY_PATH="${ECO_CI_CD_DIR}/inventories/cnf"
 HUB_KUBECONFIG="/home/telcov10n/project/generated/${CLUSTER_NAME}/auth/kubeconfig"
 
 process_inventory() {
@@ -57,25 +67,23 @@ find "/var/host_variables/${CLUSTER_NAME}/" -mindepth 1 -type d 2>/dev/null | wh
   process_inventory "$dir" "${ECO_CI_CD_INVENTORY_PATH}/host_vars/$(basename "${dir}")"
 done
 
-rm -rf /tmp/reports /tmp/junit
+rm -rf /tmp/reports
 
 mkdir -p /tmp/reports
-for f in "${SHARED_DIR}"/polarion_*.xml; do
+# Only the suite JUnit XMLs are uploaded. The report_*.xml aggregates are a
+# lossy duplicate of the same specs, so they are never uploaded.
+for f in "${SHARED_DIR}"/junit_*.xml; do
   if [[ -f "$f" ]]; then
-    filename=$(basename "$f" | sed 's/^polarion_//')
+    filename=$(basename "$f" | sed 's/^junit_//')
     cp "$f" "/tmp/reports/${filename}"
   fi
 done
 
-mkdir -p /tmp/junit
-for f in "${SHARED_DIR}"/junit_*.xml; do
-  if [[ -f "$f" ]]; then
-    filename=$(basename "$f" | sed 's/^junit_//')
-    cp "$f" "/tmp/junit/${filename}"
-  fi
-done
+cd "${ECO_CI_CD_DIR}"
 
-cd /eco-ci-cd
+# Launches are version-qualified so different OCP versions do not collide in
+# Report Portal, but the metrics ci_lane attribute must stay versionless.
+CI_LANE="${REPORTER_LAUNCH_NAME%-[0-9]*.[0-9]*}"
 
 METRICS_FILE="/tmp/metrics/ran-metrics.txt"
 
@@ -83,7 +91,7 @@ echo "Collecting metrics"
 ansible-playbook ./playbooks/collect-metrics.yml \
   -i ./inventories/cnf/switch-config.yaml \
   --extra-vars "kubeconfig=${HUB_KUBECONFIG} \
-    ci_lane='${REPORTER_LAUNCH_NAME}' \
+    ci_lane='${CI_LANE}' \
     output_file=${METRICS_FILE} \
     metrics_list=${RAN_METRICS_LIST}" || true
 
@@ -93,15 +101,18 @@ if [[ -f "${METRICS_FILE}" ]]; then
   echo "REPORTS_PORTAL_ATTRIBUTES: ${REPORTS_PORTAL_ATTRIBUTES}"
 fi
 
-echo "Uploading reports to Polarion and Report Portal"
+echo "Uploading reports from /tmp/reports to Report Portal"
 ansible-playbook ./playbooks/upload-report.yaml \
   -i ./inventories/cnf/switch-config.yaml \
   --extra-vars "kubeconfig=${HUB_KUBECONFIG} \
     reporter_template_name='${REPORTER_TEMPLATE_NAME}' \
     processed_report_dir=/tmp/reports \
-    junit_report_dir=/tmp/junit \
     reports_directory=/tmp/upload \
     reporter_launch_name='${REPORTER_LAUNCH_NAME}' \
     upload_to_report_portal=${UPLOAD_TO_REPORT_PORTAL} \
     report_portal_url_filename='${REPORTPORTAL_FILES}' \
     reports_portal_attributes='${REPORTS_PORTAL_ATTRIBUTES}'"
+
+case "${UPLOAD_TO_REPORT_PORTAL,,}" in
+  true|yes|on|1) touch "${SHARED_DIR}/report_portal_uploaded" ;;
+esac

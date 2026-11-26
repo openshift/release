@@ -8,7 +8,16 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
-INVENTORY_PATH="/eco-ci-cd/inventories/ocp-deployment"
+ECO_CI_CD_DIR=/eco-ci-cd
+if [[ -n "${ECO_CI_CD_FORK_REPO:-}" ]]; then
+  ECO_CI_CD_FORK_DIR=$(mktemp -d /tmp/eco-ci-cd-fork.XXXXXXXX)
+  ECO_CI_CD_DIR="${ECO_CI_CD_FORK_DIR}"
+  git clone --depth 1 --branch "${ECO_CI_CD_FORK_BRANCH:-main}" -- \
+    "${ECO_CI_CD_FORK_REPO}" "${ECO_CI_CD_DIR}"
+  # Use the Ansible collections installed in the step image.
+  export ANSIBLE_COLLECTIONS_PATH=/eco-ci-cd/collections
+fi
+INVENTORY_PATH="${ECO_CI_CD_DIR}/inventories/ocp-deployment"
 
 echo "Create group_vars directory"
 mkdir -p "${INVENTORY_PATH}/group_vars"
@@ -31,7 +40,7 @@ PROJECT_DIR="/tmp"
 echo "Set bastion SSH configuration"
 cat /var/group_variables/common/all/ansible_ssh_private_key > "${PROJECT_DIR}/temp_ssh_key"
 chmod 600 "${PROJECT_DIR}/temp_ssh_key"
-trap 'rm -f "${PROJECT_DIR}/temp_ssh_key"' EXIT
+trap 'rm -f "${PROJECT_DIR}/temp_ssh_key"; if [[ -n "${ECO_CI_CD_FORK_DIR:-}" ]]; then rm -rf "${ECO_CI_CD_FORK_DIR}"; fi' EXIT
 
 BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
@@ -46,7 +55,7 @@ ssh -o ServerAliveInterval=60 \
   oc get secret -n ${SPOKE_CLUSTER_NAME} ${SPOKE_CLUSTER_NAME}-admin-kubeconfig \
   -o jsonpath='{.data.kubeconfig}' | base64 -d > ${SPOKE_KUBECONFIG_PATH}"
 
-cd /eco-ci-cd
+cd "${ECO_CI_CD_DIR}"
 
 printf 'ptp_cycle_configs: %s\n' "${PTP_CONFIGS}" > /tmp/ptp_cycle_configs.yml
 
@@ -130,3 +139,5 @@ ansible-playbook ./playbooks/ran/deploy-run-eco-gotests-ptp.yaml \
   --tags process \
   --extra-vars "eco_gotest_base_dir=/tmp/eco_gotests_ptp \
     ptp_report_dir=${BASTION_REPORT_DIR}"
+
+printf '%s\n' "${BASTION_REPORT_DIR}/junit" > "${SHARED_DIR}/bastion_junit_report_dir"

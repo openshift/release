@@ -39,6 +39,7 @@ echo "Set bastion SSH configuration"
 cat /var/group_variables/common/all/ansible_ssh_private_key > "${PROJECT_DIR}/temp_ssh_key"
 
 chmod 600 "${PROJECT_DIR}/temp_ssh_key"
+trap 'rm -f "${PROJECT_DIR}/temp_ssh_key"' EXIT
 BASTION_IP=$(grep -oP '(?<=ansible_host: ).*' "${INVENTORY_PATH}/host_vars/bastion" | sed "s/'//g")
 BASTION_USER=$(grep -oP '(?<=ansible_user: ).*' "${INVENTORY_PATH}/group_vars/all" | sed "s/'//g")
 
@@ -73,13 +74,23 @@ for suite in "${TEST_SUITES[@]}"; do
     "${artifact_dir}/" 2>/dev/null || echo "No k8sreporter artifacts in eco_gotests_${suite} — skipping"
 done
 
-rm -rf "${PROJECT_DIR}/temp_ssh_key"
-
-echo "Store Polarion report for reporter step"
-for suite in "${TEST_SUITES[@]}"; do
-  artifact_dir="${ARTIFACT_DIR}/junit_eco_gotests_${suite}"
-  if [ -f "${artifact_dir}/report_testrun.xml" ]; then
-    mv "${artifact_dir}/report_testrun.xml" "${SHARED_DIR}/polarion_testrun_${suite}.xml"
-    cp "${SHARED_DIR}/polarion_testrun_${suite}.xml" "${SHARED_DIR}/junit_${suite}_suite_test_junit.xml"
+echo "Stage Ginkgo suite JUnit reports on the bastion"
+REPORT_DIR=$(ssh "${SSH_OPTS[@]}" -i "${PROJECT_DIR}/temp_ssh_key" \
+  "${BASTION_USER}@${BASTION_IP}" bash -s -- "${TEST_SUITES[@]}" <<'EOF'
+set -e
+report_dir=$(mktemp -d /tmp/telcov10n-two-sno-junit.XXXXXXXX)
+shopt -s nullglob
+for suite in "$@"; do
+  reports=(/tmp/eco_gotests_"${suite}"/report/*_suite_test_junit.xml)
+  if (( ${#reports[@]} == 0 )); then
+    echo "No suite JUnit reports found for ${suite}" >&2
+    exit 1
   fi
+  for report in "${reports[@]}"; do
+    cp "$report" "${report_dir}/junit_${suite}_${report##*/}"
+  done
 done
+printf '%s\n' "${report_dir}"
+EOF
+)
+printf '%s\n' "${REPORT_DIR}" > "${SHARED_DIR}/bastion_junit_report_dir"

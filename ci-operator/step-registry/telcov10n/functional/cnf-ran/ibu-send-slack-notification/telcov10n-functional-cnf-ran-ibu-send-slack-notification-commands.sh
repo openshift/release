@@ -12,7 +12,15 @@ if [ "$JOB_TYPE" = "presubmit" ]; then
   exit 0
 fi
 
-SCRIPTS_FOLDER="/eco-ci-cd/scripts/ran"
+ECO_CI_CD_DIR=/eco-ci-cd
+if [[ -n "${ECO_CI_CD_FORK_REPO:-}" ]]; then
+  ECO_CI_CD_FORK_DIR=$(mktemp -d /tmp/eco-ci-cd-fork.XXXXXXXX)
+  ECO_CI_CD_DIR="${ECO_CI_CD_FORK_DIR}"
+  trap 'rm -rf "${ECO_CI_CD_FORK_DIR}"' EXIT
+  git clone --depth 1 --branch "${ECO_CI_CD_FORK_BRANCH:-main}" -- \
+    "${ECO_CI_CD_FORK_REPO}" "${ECO_CI_CD_DIR}"
+fi
+SCRIPTS_FOLDER="${ECO_CI_CD_DIR}/scripts/ran"
 PYTHON_SCRIPT="send-ran-slack-notification.py"
 WEBHOOK_URL_FILE=/var/run/slack-webhook-url/url
 
@@ -67,21 +75,12 @@ for REPORTPORTAL_FILE in ${REPORTPORTAL_FILES//;/ }; do
   fi
 done
 
-POLARION_URL="N/A"
-if scp ${SSH_OPTS} "${BASTION_USER}@${BASTION_IP}:/tmp/.polarion_url" "${SHARED_DIR}/polarion_url" 2>/dev/null; then
-  if [[ -f "${SHARED_DIR}/polarion_url" ]] && [[ -s "${SHARED_DIR}/polarion_url" ]]; then
-    POLARION_URL="$(cat "${SHARED_DIR}/polarion_url")"
-  fi
-fi
-echo "Polarion URL: ${POLARION_URL}"
-
 echo "Sending Slack notification"
 cd "$SCRIPTS_FOLDER"
 
 python3 "$PYTHON_SCRIPT" \
   --webhook-url "$WEBHOOK_URL" \
   --build "$BUILD_VERSION" \
-  --polarion-url "$POLARION_URL" \
   --job-url "$JOB_URL" \
   ${REPORT_FLAGS}
 
