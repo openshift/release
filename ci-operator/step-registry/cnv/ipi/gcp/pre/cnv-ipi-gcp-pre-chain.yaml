@@ -1,0 +1,22 @@
+# Copy of the ipi-gcp-pre chain (ci-operator/step-registry/ipi/gcp/pre), adapted
+# for CNV/virtualization. It reuses ipi-gcp-pre unchanged and only adds the
+# machine-type env defaults; keep in sync with ipi-gcp-pre.
+chain:
+  as: cnv-ipi-gcp-pre
+  steps:
+  - chain: ipi-gcp-pre
+  env:
+  - name: CONTROL_PLANE_NODE_TYPE
+    default: e2-standard-8
+    documentation: |-
+      Pinned to a predefined type because the gcp-virtualization project's org
+      policy custom.denyCostlyMachineTypes rejects the shared custom default
+      (e2-custom-8-16384). e2-standard-8 keeps the validated 8 vCPU sizing.
+  - name: COMPUTE_NODE_TYPE
+    default: n2-standard-4
+    documentation: |-
+      Workers host guest VMs and need nested virtualization, which the GCP N2
+      family supports but the E2 default (e2-standard-4) does not.
+  documentation: |-
+    ipi-gcp-pre with CNV/virtualization machine types pinned for the
+    gcp-virtualization cluster profile.
