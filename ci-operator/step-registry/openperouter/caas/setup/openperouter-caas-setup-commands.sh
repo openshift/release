@@ -122,7 +122,7 @@ fi
 
 echo "  ===> Building appliance and config image"
 export SSH_PUB_KEY="\$(cat /root/.ssh/id_rsa.pub)"
-export OPENSHIFT_RELEASE_IMAGE="${RELEASE_IMAGE_LATEST}"
+# export OPENSHIFT_RELEASE_IMAGE="${RELEASE_IMAGE_LATEST}"
 export IMAGE_OPENPEROUTER_OPERATOR="${IMAGE_OPENPEROUTER_OPERATOR}"
 export OCP_RELEASE_VERSION=\$(
   oc adm release info --registry-config ${PULL_SECRET} ${RELEASE_IMAGE_LATEST} -ojsonpath='{.metadata.version}' |
