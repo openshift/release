@@ -52,7 +52,7 @@ if [[ -f "${SHARED_DIR}/bastion_ssh_key" ]]; then
   chmod 400 "${BASTION_SSH_KEY}"
   BASTION_HOST=$(cat "${SHARED_DIR}/bastion_public_address")
   BASTION_SSH_USER=$(cat "${SHARED_DIR}/bastion_ssh_user" 2>/dev/null || echo "root")
-  SSH_ARGS="-i ${BASTION_SSH_KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o GlobalKnownHostsFile=/dev/null"
+  SSH_ARGS="-i ${BASTION_SSH_KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o GlobalKnownHostsFile=/dev/null -o ServerAliveInterval=60 -o ServerAliveCountMax=120 -o TCPKeepAlive=yes"
   BASTION_WORK_DIR="/root/udn-bgp"
   BASTION_KUBECONFIG_PATH=""
 elif [[ -f "${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key" ]]; then
@@ -60,7 +60,7 @@ elif [[ -f "${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key" ]]; then
   JUMPHOST=$(cat "${CLUSTER_PROFILE_DIR}/address")
   BASTION_HOST=$(cat "${CLUSTER_PROFILE_DIR}/bastion" 2>/dev/null || cat "${SHARED_DIR}/bastion")
   BASTION_SSH_USER="root"
-  SSH_ARGS="-i ${BASTION_SSH_KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+  SSH_ARGS="-i ${BASTION_SSH_KEY} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=60 -o ServerAliveCountMax=120 -o TCPKeepAlive=yes"
   BASTION_WORK_DIR="/tmp"
   TYPE=${TYPE:-mno}
   if [[ "${TYPE}" == "hmno" ]]; then
@@ -108,6 +108,7 @@ BASTION_ENV=( \
   JOB_NAME="${JOB_NAME:-}" \
   JOB_TYPE="${JOB_TYPE:-}" \
   KUBE_BURNER_VERSION="${KUBE_BURNER_VERSION}" \
+  LOG_LEVEL="${LOG_LEVEL:-info}" \
   PROFILE_TYPE="${PROFILE_TYPE}" \
   PROW_JOB_ID="${PROW_JOB_ID:-}" \
   PULL_NUMBER="${PULL_NUMBER:-0}" \
@@ -138,6 +139,30 @@ for node in $(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.ite
   oc debug "node/${node}" -n default -- chroot /host crictl pull quay.io/cloud-bulldozer/sampleapp:latest
 done
 
+echo "=== Pre-flight Network Diagnostics from Bastion ==="
+echo "FRR Peer IP: ${FRR_PEER_IP}"
+
+echo "=== Current BGP neighbors status ==="
+podman exec frr vtysh -c 'show bgp neighbors' || echo "WARNING: Cannot get BGP neighbors"
+
+echo "=== Current BGP routes ==="
+podman exec frr vtysh -c 'show bgp ipv4' || echo "WARNING: Cannot get BGP routes"
+
+echo "=== Bastion kernel routing table ==="
+ip route show
+
+echo "=== Check if 40.x.x.x routes are present ==="
+ip route show | grep '^40\.' || echo "INFO: No 40.x.x.x routes in kernel routing table yet"
+
+echo "=== Test ping to worker nodes ==="
+for node_ip in $(oc get nodes -l node-role.kubernetes.io/worker= -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}' | tr ' ' '\n' | head -3); do
+  echo "Testing connectivity to worker node ${node_ip}..."
+  ping -c 2 -W 2 ${node_ip} && echo "OK: Can reach ${node_ip}" || echo "WARNING: Cannot reach ${node_ip}"
+done
+
+echo "=== Cluster-side FRR daemonset status ==="
+oc get pods -n openshift-frr-k8s -o wide || echo "WARNING: Cannot get FRR pods"
+
 EXTRA_FLAGS=""
 if [[ "${ENABLE_LOCAL_INDEX}" == "true" ]]; then
   EXTRA_FLAGS+=" --local-indexing"
@@ -146,7 +171,7 @@ EXTRA_FLAGS+=" --gc-metrics=false --profile-type=${PROFILE_TYPE}"
 EXTRA_FLAGS+=" --frr-external-ip=${FRR_PEER_IP}"
 
 export WORKLOAD=udn-bgp
-export ES_SERVER ES_METADATA_INDEX EXTRA_FLAGS GC ITERATIONS KUBE_BURNER_VERSION UUID
+export ES_SERVER ES_METADATA_INDEX EXTRA_FLAGS GC ITERATIONS KUBE_BURNER_VERSION LOG_LEVEL UUID
 export PROW_JOB_ID BUILD_ID JOB_NAME JOB_TYPE PULL_NUMBER REPO_OWNER REPO_NAME
 set +o errexit
 ./run.sh
@@ -159,6 +184,40 @@ set -o errexit
 METRICS_FOLDER="${BASTION_WORK_DIR}/e2e-benchmarking/workloads/kube-burner-ocp-wrapper/collected-metrics-${UUID}"
 if bastion_ssh "test -f ${METRICS_FOLDER}/jobSummary.json"; then
   bastion_scp -r "${BASTION_SSH_USER}@${BASTION_HOST}:${METRICS_FOLDER}" "${ARTIFACT_DIR}/"
+fi
+
+# Post-failure diagnostics for AWS
+if [[ ${RUN_EXIT_CODE} -ne 0 ]]; then
+  echo "=== UDN-BGP Test Failed (exit code: ${RUN_EXIT_CODE}) - Collecting Post-Failure Diagnostics ==="
+
+  if [[ -f "${SHARED_DIR}/bastion_ssh_key" ]]; then
+    echo "=== Post-Failure: BGP Routes on Bastion ==="
+    bastion_ssh "podman exec frr vtysh -c 'show bgp ipv4'" 2>&1 || true
+
+    echo "=== Post-Failure: Kernel Routes on Bastion ==="
+    bastion_ssh "ip route show" 2>&1 || true
+
+    echo "=== Post-Failure: Check 40.x routes in kernel ==="
+    bastion_ssh "ip route show | grep '^40\.'" 2>&1 || echo "No 40.x routes in kernel table"
+
+    echo "=== Post-Failure: BGP Neighbors ==="
+    bastion_ssh "podman exec frr vtysh -c 'show bgp neighbors'" 2>&1 || true
+
+    echo "=== Post-Failure: Try ping to 40.x network from bastion ==="
+    bastion_ssh "ping -c 3 40.0.0.1 || ping -c 3 40.1.0.1 || ping -c 3 40.3.2.4" 2>&1 || echo "Cannot ping any 40.x addresses"
+
+    echo "=== Post-Failure: Cluster RouteAdvertisements ==="
+    oc get routeadvertisements -A -o yaml 2>&1 || true
+
+    echo "=== Post-Failure: Cluster UDN resources ==="
+    oc get clusteruserdefinednetwork -o yaml 2>&1 || true
+
+    echo "=== Post-Failure: FRR pods logs (last 50 lines) ==="
+    for pod in $(oc get pods -n openshift-frr-k8s -l app=frr-k8s -o name 2>/dev/null | head -3); do
+      echo "--- Logs from ${pod} ---"
+      oc logs -n openshift-frr-k8s ${pod} --tail=50 2>&1 || true
+    done
+  fi
 fi
 
 exit ${RUN_EXIT_CODE}
