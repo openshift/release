@@ -57,8 +57,8 @@ echo "==================================="
 echo "Retrieving CloudFormation Templates"
 echo "==================================="
 
-TEMPLATES_BASE=https://raw.githubusercontent.com/mtulio/installer-labs
-TEMPLATES_VERSION=SPLAT-3059-pext-disconnected
+TEMPLATES_BASE=https://raw.githubusercontent.com/openshift-eng/installer-labs
+TEMPLATES_VERSION=main
 TEMPLATES_PATH=installer-upi/aws/cloudformation/templates
 
 TEMPLATE_URL=${TEMPLATES_BASE}/${TEMPLATES_VERSION}/${TEMPLATES_PATH}
