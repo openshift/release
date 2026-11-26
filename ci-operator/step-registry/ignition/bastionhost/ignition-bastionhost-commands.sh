@@ -388,66 +388,55 @@ if [[ "${AWS_REGION_OVERWRITE:-}" == "me-west-1" ]]; then
     # bootstrap. Trusting another CA cannot fix this: the failure is a hostname
     # mismatch, not an untrusted chain. The bastion's hostname is not knowable
     # here either, since ignition is rendered before the instance exists and its
-    # public IP is auto-assigned. So mint a throwaway CA and a wildcard server
-    # certificate covering the region, and publish the CA through
+    # public IP is auto-assigned. So mint a single self-signed wildcard
+    # certificate covering the region and publish it through
     # ${SHARED_DIR}/additional_trust_bundle, which ipi-conf-mirror appends into
     # additionalTrustBundle and mirror-images-trust-registry-ca later feeds to
-    # the in-cluster trust store. Drop this branch once the shared certificate
-    # covers me-west-1.
+    # the in-cluster trust store. A self-signed leaf is its own trust anchor, so
+    # no separate CA is needed.
+    #
+    # Earlier revisions served a leaf+CA chain, which made `oc adm release
+    # mirror` on the bastion abort every handshake with a TLS decode_error
+    # (then silently retry over plain HTTP, which the registry's TLS listener
+    # answered with 400, surfacing as the misleading `does not support v2 API`).
+    # A single self-signed certificate is the shape proven to work for the
+    # equivalent AWS China disconnected install. Drop this branch once the
+    # shared certificate covers me-west-1.
     echo "me-west-1: generating a self-signed mirror registry certificate"
     registry_cert_dir="${workdir}/me-west-1-registry-cert"
     mkdir -p "${registry_cert_dir}"
 
-    openssl req -x509 -newkey rsa:4096 -nodes -sha256 -days 30 \
-        -subj "/CN=me-west-1 CI mirror registry CA" \
-        -addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
-        -addext "keyUsage=critical,keyCertSign,cRLSign" \
-        -keyout "${registry_cert_dir}/ca.key" \
-        -out "${registry_cert_dir}/ca.crt" 2>/dev/null
-
-    openssl req -newkey rsa:4096 -nodes -sha256 \
+    # One self-signed certificate, used both as the registry's serving cert and
+    # as its own trust anchor. The registry is reached at the public EC2 DNS
+    # name; the private wildcard is included so the same certificate also covers
+    # the private name.
+    openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 30 \
         -subj "/CN=*.me-west-1.compute.amazonaws.com" \
+        -addext "subjectAltName=DNS:*.me-west-1.compute.amazonaws.com,DNS:*.me-west-1.compute.internal" \
         -keyout "${registry_cert_dir}/server.key" \
-        -out "${registry_cert_dir}/server.csr" 2>/dev/null
-
-    # The registry is reached at the public EC2 DNS name; the private wildcard
-    # is included so the same certificate also covers the private name.
-    cat > "${registry_cert_dir}/server.ext" << 'EOF'
-basicConstraints=CA:FALSE
-keyUsage=critical,digitalSignature,keyEncipherment
-extendedKeyUsage=serverAuth
-subjectAltName=DNS:*.me-west-1.compute.amazonaws.com,DNS:*.me-west-1.compute.internal
-EOF
-
-    openssl x509 -req -sha256 -days 30 \
-        -in "${registry_cert_dir}/server.csr" \
-        -CA "${registry_cert_dir}/ca.crt" \
-        -CAkey "${registry_cert_dir}/ca.key" \
-        -CAcreateserial \
-        -extfile "${registry_cert_dir}/server.ext" \
         -out "${registry_cert_dir}/server.crt" 2>/dev/null
 
     openssl x509 -in "${registry_cert_dir}/server.crt" -noout -text |
         grep -A1 "Subject Alternative Name"
 
-    # Serve the full chain so clients holding only the CA can build a path.
-    REGISTRY_CRT_CONTENT=$(cat "${registry_cert_dir}/server.crt" "${registry_cert_dir}/ca.crt" | base64 -w0)
+    # Serve only the leaf -- no chain. It is self-signed, so it is complete.
+    REGISTRY_CRT_CONTENT=$(base64 -w0 < "${registry_cert_dir}/server.crt")
     REGISTRY_KEY_CONTENT=$(base64 -w0 < "${registry_cert_dir}/server.key")
 
     # Appended, never truncated: other steps contribute to the same file.
-    cat "${registry_cert_dir}/ca.crt" >> "${SHARED_DIR}/additional_trust_bundle"
+    cat "${registry_cert_dir}/server.crt" >> "${SHARED_DIR}/additional_trust_bundle"
 
-    # Trust this CA on the bastion itself, not just in the cluster.
+    # Trust this certificate on the bastion itself, not just in the cluster.
     # mirror-images-by-oc-adm-in-bastion runs `oc adm release mirror` over SSH
     # on this host, and gather/debug steps curl the registry from here too.
     # Those paths lean on --insecure / -k today, which also suppresses genuine
-    # TLS errors and makes failures hard to read; with the CA in the host trust
-    # store they can validate normally. Ignition can drop the anchor file, but
-    # only update-ca-trust regenerates the consolidated bundles that Go and
+    # TLS errors and makes failures hard to read; with the cert in the host
+    # trust store they can validate normally. Ignition can drop the anchor file,
+    # but only update-ca-trust regenerates the consolidated bundles that Go and
     # curl actually read, so that runs as a oneshot unit. It is ordered before
     # the registries for determinism only -- nothing Requires it, so a failure
     # here cannot keep the registries from starting.
-    REGISTRY_CA_CONTENT=$(base64 -w0 < "${registry_cert_dir}/ca.crt")
+    REGISTRY_CA_CONTENT=$(base64 -w0 < "${registry_cert_dir}/server.crt")
 
     ca_trust_unit_file="${workdir}/mirror-registry-ca-trust.service"
     cat > "${ca_trust_unit_file}" << 'EOF'
