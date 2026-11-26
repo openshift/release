@@ -86,6 +86,13 @@ workflow:
         source "${SHARED_DIR}/env"
         extract_opct
 
+        # Trust the bastion mirror registry's self-signed CA so preflight
+        # image accessibility checks (oc image info) succeed.
+        if [[ -f "${SHARED_DIR}/additional_trust_bundle" ]]; then
+          cp "${SHARED_DIR}/additional_trust_bundle" /etc/pki/tls/certs/opct-mirror-registry-ca.pem
+          update-ca-trust
+        fi
+
         trap 'dump_opct_namespace' EXIT TERM INT
 
         MIRROR_REPO="${OPCT_MIRROR_REGISTRY}/opct"
