@@ -34,9 +34,12 @@ echo "Pinned ${REPOSITORY_URL}@${REPOSITORY_BRANCH} at ${PINNED_SHA}"
 
 # Write one override file per ROSA_REGIONAL_COMPONENTS entry that has a
 # target, with IMAGE_REPO/IMAGE_TAG replaced by the image-push result.
-# PR_SOURCE_SHA is replaced only when this job is a rosa-seaplane-api PR;
-# otherwise that key is dropped so Argo CD keeps the Application default.
-# Prints one "<target>:<override-file>" line per override.
+# PR_SOURCE_SHA is the rosa-seaplane-api commit from JOB_SPEC (refs or
+# extra_refs), the same bag resolve-ocp-image already uses. That is the
+# checkout the images were built from. PULL_PULL_SHA is not used: on
+# pj-rehearse it is the openshift/release commit. If JOB_SPEC has no
+# api SHA, the key is dropped. Prints one "<target>:<override-file>"
+# line per override.
 write_overrides() {
   python3 <<'PYEOF'
 import copy, json, os, re, sys, yaml
@@ -68,11 +71,17 @@ def drop_pr_source_sha(obj):
     return obj
 
 
+def ref_sha(r):
+    pulls = r.get("pulls") or []
+    return (pulls[0].get("sha") if pulls else None) or r.get("base_sha") or ""
+
+
 def api_pr_source_sha():
-    # Pin charts only when JOB_SPEC.refs is rosa-seaplane-api. pj-rehearse of
-    # openshift/release has PULL_PULL_SHA of the release commit, which is not
-    # in that repo. Dropping the override uses api main instead of a SHA
-    # Argo CD 422s on. Do not fail provision when the SHA is absent.
+    # Chart SHA is the rosa-seaplane-api git commit in JOB_SPEC, not
+    # PULL_PULL_SHA. On an api presubmit that is refs; on pj-rehearse
+    # refs is openshift/release and the api checkout is extra_refs
+    # (workdir:true), same as resolve-ocp-image. pulls[0].sha if the
+    # extra_ref is a PR, else base_sha. No api ref → drop the pin.
     spec = {}
     raw = os.environ.get("JOB_SPEC") or ""
     if raw:
@@ -80,18 +89,18 @@ def api_pr_source_sha():
             spec = json.loads(raw)
         except json.JSONDecodeError:
             spec = {}
-    refs = spec.get("refs") or {}
-    sha = ""
-    if refs.get("org") == CHART_SOURCE_ORG and refs.get("repo") == CHART_SOURCE_REPO:
-        pulls = refs.get("pulls") or []
-        sha = (pulls[0].get("sha") if pulls else None) or os.environ.get("PULL_PULL_SHA") or ""
-    elif (
-        os.environ.get("REPO_OWNER") == CHART_SOURCE_ORG
-        and os.environ.get("REPO_NAME") == CHART_SOURCE_REPO
-    ):
-        sha = os.environ.get("PULL_PULL_SHA") or ""
-    if re.fullmatch(r"[0-9a-fA-F]{40}", sha or ""):
-        return sha
+    candidates = [r for r in [spec.get("refs"), *(spec.get("extra_refs") or [])] if r]
+    api_refs = [
+        r for r in candidates
+        if r.get("org") == CHART_SOURCE_ORG and r.get("repo") == CHART_SOURCE_REPO
+    ]
+    ordered = [r for r in api_refs if r.get("workdir") is True] + [
+        r for r in api_refs if r.get("workdir") is not True
+    ]
+    for r in ordered:
+        sha = ref_sha(r)
+        if re.fullmatch(r"[0-9a-fA-F]{40}", sha or ""):
+            return sha
     return ""
 
 

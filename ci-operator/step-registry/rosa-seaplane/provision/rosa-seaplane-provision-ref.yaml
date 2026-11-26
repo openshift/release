@@ -35,11 +35,11 @@ ref:
       'override' (YAML content to deep-merge), and 'repo' (quay.io
       repository). IMAGE_REPO is substituted from 'repo' and IMAGE_TAG
       from the per-image tag written by the image-push step to
-      SHARED_DIR/component-images. PR_SOURCE_SHA is substituted only when
-      JOB_SPEC.refs is openshift-online/rosa-seaplane-api (the api
-      presubmit). On an openshift/release rehearsal that key is dropped so
-      Argo CD keeps the Application default instead of pinning a release
-      SHA that is not in rosa-seaplane-api.
+      SHARED_DIR/component-images. PR_SOURCE_SHA is the rosa-seaplane-api
+      commit from JOB_SPEC (refs or extra_refs, preferring workdir:true),
+      the same source resolve-ocp-image uses. That is the checkout the
+      images were built from. PULL_PULL_SHA is not used. If JOB_SPEC has
+      no api SHA the key is dropped.
       Example:
         - image: CI_IMAGE_1
           repo: quay.io/rrp-dev-ci/platform-api
@@ -59,4 +59,4 @@ ref:
     own code; otherwise ROSA_REGIONAL_PLATFORM_REF is used. Components listed
     in ROSA_REGIONAL_COMPONENTS are deep-merged into their target files
     with IMAGE_REPO/IMAGE_TAG substitution. PR_SOURCE_SHA pins a child
-    chart only on a rosa-seaplane-api PR; rehearsals omit it.
+    chart to the rosa-seaplane-api JOB_SPEC SHA when one exists.
