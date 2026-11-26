@@ -7,6 +7,26 @@ if [ -f "${SHARED_DIR}/skip.txt" ]; then
   exit 0
 fi
 
+# eco-ci-cd checkout used by this step: the content baked into the step image,
+# or a shallow clone of ECO_CI_CD_FORK_REPO@ECO_CI_CD_FORK_BRANCH when the
+# fork override is set (rehearsal-only knob provided by the lane's ci-operator
+# config; the clone lives in /tmp because /eco-ci-cd is not writable by the
+# step's runtime user).
+ECO_CI_CD="/eco-ci-cd"
+if [[ -n "${ECO_CI_CD_FORK_REPO:-}" ]]; then
+  ECO_CI_CD_FORK_BRANCH="${ECO_CI_CD_FORK_BRANCH:-main}"
+  ECO_CI_CD="/tmp/eco-ci-cd-fork"
+  echo "Using eco-ci-cd fork ${ECO_CI_CD_FORK_REPO}@${ECO_CI_CD_FORK_BRANCH}"
+  git clone --depth 1 --branch "${ECO_CI_CD_FORK_BRANCH}" \
+    "${ECO_CI_CD_FORK_REPO}" "${ECO_CI_CD}"
+  # collections/ is not tracked in git (it only exists in the step image,
+  # installed at /eco-ci-cd/collections by ansible-galaxy during the image
+  # build), so the clone lacks it. Copy the image's collections over so
+  # ansible.cfg's ./collections resolves inside the fork checkout as well.
+  mkdir -p "${ECO_CI_CD}/collections"
+  cp -R --no-preserve=ownership /eco-ci-cd/collections/. "${ECO_CI_CD}/collections/"
+fi
+
 process_inventory() {
   local directory="$1"
   local dest_file="$2"
@@ -39,18 +59,18 @@ process_inventory() {
 }
 
 echo "Processing common group_vars"
-mkdir -p /eco-ci-cd/inventories/ocp-deployment/group_vars
+mkdir -p ${ECO_CI_CD}/inventories/ocp-deployment/group_vars
 
 find /var/group_variables/common/ -mindepth 1 -type d 2>/dev/null | while read -r dir; do
   echo "  group_var: $(basename "${dir}")"
-  process_inventory "$dir" /eco-ci-cd/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
+  process_inventory "$dir" ${ECO_CI_CD}/inventories/ocp-deployment/group_vars/"$(basename "${dir}")"
 done
 
 echo "Copying host_vars from SHARED_DIR"
-mkdir -p /eco-ci-cd/inventories/ocp-deployment/host_vars
+mkdir -p ${ECO_CI_CD}/inventories/ocp-deployment/host_vars
 
-cp "${SHARED_DIR}/bastion" /eco-ci-cd/inventories/ocp-deployment/host_vars/bastion
-cp "${SHARED_DIR}/master0" /eco-ci-cd/inventories/ocp-deployment/host_vars/master0
+cp "${SHARED_DIR}/bastion" ${ECO_CI_CD}/inventories/ocp-deployment/host_vars/bastion
+cp "${SHARED_DIR}/master0" ${ECO_CI_CD}/inventories/ocp-deployment/host_vars/master0
 
 if [[ -f "${SHARED_DIR}/cluster_name" ]]; then
   CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster_name")
@@ -75,7 +95,7 @@ echo "VERSION_TAG=${VERSION_TAG}"
 HUB_OPERATORS=$(echo "${HUB_OPERATORS}" | sed "s/\${VERSION_TAG}/${VERSION_TAG}/g")
 echo "HUB_OPERATORS=${HUB_OPERATORS}"
 
-cd /eco-ci-cd/
+cd ${ECO_CI_CD}/
 
 echo "Deploying hub operators (VERSION=${VERSION}, VERSION_TAG=${VERSION_TAG})"
 

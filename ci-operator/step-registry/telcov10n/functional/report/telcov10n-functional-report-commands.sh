@@ -2,7 +2,27 @@
 set -e
 set -o pipefail
 
-ECO_CI_CD_INVENTORY_PATH="/eco-ci-cd/inventories/cnf"
+# eco-ci-cd checkout used by this step: the content baked into the step image,
+# or a shallow clone of ECO_CI_CD_FORK_REPO@ECO_CI_CD_FORK_BRANCH when the
+# fork override is set (rehearsal-only knob provided by the lane's ci-operator
+# config; the clone lives in /tmp because /eco-ci-cd is not writable by the
+# step's runtime user).
+ECO_CI_CD="/eco-ci-cd"
+if [[ -n "${ECO_CI_CD_FORK_REPO:-}" ]]; then
+  ECO_CI_CD_FORK_BRANCH="${ECO_CI_CD_FORK_BRANCH:-main}"
+  ECO_CI_CD="/tmp/eco-ci-cd-fork"
+  echo "Using eco-ci-cd fork ${ECO_CI_CD_FORK_REPO}@${ECO_CI_CD_FORK_BRANCH}"
+  git clone --depth 1 --branch "${ECO_CI_CD_FORK_BRANCH}" \
+    "${ECO_CI_CD_FORK_REPO}" "${ECO_CI_CD}"
+  # collections/ is not tracked in git (it only exists in the step image,
+  # installed at /eco-ci-cd/collections by ansible-galaxy during the image
+  # build), so the clone lacks it. Copy the image's collections over so
+  # ansible.cfg's ./collections resolves inside the fork checkout as well.
+  mkdir -p "${ECO_CI_CD}/collections"
+  cp -R --no-preserve=ownership /eco-ci-cd/collections/. "${ECO_CI_CD}/collections/"
+fi
+
+ECO_CI_CD_INVENTORY_PATH="${ECO_CI_CD}/inventories/cnf"
 
 echo "Checking if the job should be skipped..."
 if [ -f "${SHARED_DIR}/skip.txt" ]; then
@@ -76,7 +96,7 @@ else
   UPLOAD_SHARED_DIR="${SHARED_DIR}"
 fi
 
-cd /eco-ci-cd
+cd "${ECO_CI_CD}"
 
 METRICS_FILE="/tmp/metrics/metrics.txt"
 
