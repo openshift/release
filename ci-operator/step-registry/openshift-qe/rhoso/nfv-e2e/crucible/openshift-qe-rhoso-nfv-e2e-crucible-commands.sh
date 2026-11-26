@@ -115,13 +115,17 @@ terminate_workload() {
     return 1
   fi
   # The workload never published a leader: bound the launcher process alone.
+  # setsid --wait forwards no signals, so also kill its children (the
+  # session-leader bash) or a KILL on the launcher orphans the workload.
   if [[ -n "${workload_pid}" ]] && kill -0 "${workload_pid}" 2>/dev/null; then
     kill -TERM "${workload_pid}" 2>/dev/null || true
+    pkill -TERM -P "${workload_pid}" 2>/dev/null || true
     for ((i = 1; i <= 10; i++)); do
       kill -0 "${workload_pid}" 2>/dev/null || break
       sleep 1
     done
     kill -KILL "${workload_pid}" 2>/dev/null || true
+    pkill -KILL -P "${workload_pid}" 2>/dev/null || true
   fi
   termination_complete=1
   return 0
@@ -231,11 +235,11 @@ workload_pid=$!
 # session channel open.
 (
   sleep "${timeout_crucible}"
-  # Wrapper liveness: a subshell PPID is frozen at fork time and never
-  # reflects this shell's real parent, so check the wrapper PID recorded
-  # before the alarm started instead.  If the wrapper is gone the job already
-  # ended; acting now could hit a reused PID, so stand down.
-  if ! kill -0 "${wrapper_pid}" 2>/dev/null; then
+  # Launcher liveness: the setsid --wait launcher lives exactly as long as
+  # the workload, so it stands down only when the workload truly ended.
+  # Checking the wrapper instead would stand down after a mid-run wrapper
+  # kill and leave an orphaned workload unbounded on the shared host.
+  if ! kill -0 "${workload_pid}" 2>/dev/null; then
     exit 0
   fi
   : > "${timeout_flag}"
@@ -250,6 +254,7 @@ workload_pid=$!
   else
     # No published leader: bound the launcher so the wrapper's wait returns.
     kill -TERM "${workload_pid}" 2>/dev/null || true
+    pkill -TERM -P "${workload_pid}" 2>/dev/null || true
   fi
 ) >/dev/null 2>&1 &
 printf '%s\n' "${wrapper_pid}" > "${owner_file}"
