@@ -42,7 +42,7 @@ base_images:
   ocp_os:
     name: "5.2"
     namespace: ocp
-    tag: rhel-coreos
+    tag: rhel-coreos-10
   tls-scanner-tool:
     name: "5.2"
     namespace: ocp
@@ -75,7 +75,8 @@ images:
     to: zacks-toolbox
 promotion:
   to:
-  - excluded_images:
+  - disabled: true
+    excluded_images:
     - custom-os-image
     - src-with-skopeo
     - zacks-toolbox
@@ -91,6 +92,11 @@ releases:
       include_built_images: true
       name: "5.2"
       namespace: ocp
+  stable-latest:
+    release:
+      architecture: amd64
+      channel: candidate
+      version: "5.0"
 resources:
   '*':
     requests:
@@ -234,6 +240,17 @@ tests:
   optional: true
   steps:
     cluster_profile: openshift-org-gcp
+    workflow: openshift-upgrade-gcp
+- always_run: true
+  as: e2e-gcp-mco-upgrade
+  optional: true
+  steps:
+    cluster_profile: openshift-org-gcp
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:stable-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      TEST_TYPE: mco-upgrade
     workflow: openshift-upgrade-gcp
 - always_run: false
   as: e2e-gcp-rt-op
