@@ -41,13 +41,39 @@ JSON_FILE="${ARTIFACT_DIR}/aws-cluster-describe.json"
 SUMMARY_FILE="${ARTIFACT_DIR}/aws-cluster-describe.log"
 
 # Discover all resources using Resource Groups Tagging API
-echo "Querying all tagged resources via Resource Groups Tagging API..."
-TAGGED_RESOURCES=$(aws resourcegroupstaggingapi get-resources \
+echo "Querying regional tagged resources via Resource Groups Tagging API..."
+TAGGED_RESOURCES_OUTPUT=$(aws resourcegroupstaggingapi get-resources \
     --tag-filters "Key=kubernetes.io/cluster/${INFRA_ID},Values=owned" \
-    --output json 2>/dev/null | jq -r '.ResourceTagMappingList[] | .ResourceARN' 2>/dev/null) || TAGGED_RESOURCES=""
+    --output json 2>&1)
+TAGGED_RESOURCES_EXIT_CODE=$?
 
-if [[ -z "${TAGGED_RESOURCES}" ]]; then
-  echo "WARNING: No resources found with tag kubernetes.io/cluster/${INFRA_ID}=owned"
+if [[ ${TAGGED_RESOURCES_EXIT_CODE} -ne 0 ]]; then
+  echo "ERROR: Failed to query resource tagging API in region ${AWS_REGION}"
+  echo "${TAGGED_RESOURCES_OUTPUT}"
+  echo "This may indicate missing tag:GetResources permission or API unavailability"
+  TAGGED_RESOURCES=""
+else
+  TAGGED_RESOURCES=$(echo "${TAGGED_RESOURCES_OUTPUT}" | jq -r '.ResourceTagMappingList[] | .ResourceARN' 2>/dev/null) || TAGGED_RESOURCES=""
+  if [[ -z "${TAGGED_RESOURCES}" ]]; then
+    echo "WARNING: No regional resources found with tag kubernetes.io/cluster/${INFRA_ID}=owned"
+  fi
+fi
+
+# Query global IAM and Route53 resources from us-east-1
+echo "Querying global IAM and Route53 resources from us-east-1..."
+GLOBAL_TAGGED_RESOURCES_OUTPUT=$(aws resourcegroupstaggingapi get-resources \
+    --region us-east-1 \
+    --resource-type-filters iam:instance-profile route53:hostedzone \
+    --tag-filters "Key=kubernetes.io/cluster/${INFRA_ID},Values=owned" \
+    --output json 2>&1)
+GLOBAL_EXIT_CODE=$?
+
+if [[ ${GLOBAL_EXIT_CODE} -ne 0 ]]; then
+  echo "WARNING: Failed to query global resources from us-east-1 (IAM/Route53 may be missing)"
+  echo "${GLOBAL_TAGGED_RESOURCES_OUTPUT}"
+  GLOBAL_TAGGED_RESOURCES=""
+else
+  GLOBAL_TAGGED_RESOURCES=$(echo "${GLOBAL_TAGGED_RESOURCES_OUTPUT}" | jq -r '.ResourceTagMappingList[] | .ResourceARN' 2>/dev/null) || GLOBAL_TAGGED_RESOURCES=""
 fi
 
 # Extract resource IDs by type from ARNs
@@ -65,32 +91,61 @@ VPCE_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':vpc-endpoint/' | sed 's|.*/||' | 
 NACL_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':network-acl/' | sed 's|.*/||' | tr '\n' ' ') || NACL_IDS=""
 DHCP_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':dhcp-options/' | sed 's|.*/||' | tr '\n' ' ') || DHCP_IDS=""
 PEERING_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':vpc-peering-connection/' | sed 's|.*/||' | tr '\n' ' ') || PEERING_IDS=""
-S3_BUCKETS=$(echo "${TAGGED_RESOURCES}" | grep '^arn:aws:s3:::' | sed 's|^arn:aws:s3:::||' | tr '\n' ' ') || S3_BUCKETS=""
+S3_BUCKETS=$(echo "${TAGGED_RESOURCES}" | grep -E '^arn:aws[a-z-]*:s3:::' | sed 's|^arn:[^:]*:s3:::||' | tr '\n' ' ') || S3_BUCKETS=""
 KMS_KEY_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':key/' | sed 's|.*/||' | tr '\n' ' ') || KMS_KEY_IDS=""
-IAM_PROFILE_NAMES=$(echo "${TAGGED_RESOURCES}" | grep ':instance-profile/' | sed 's|.*/||' | tr '\n' ' ') || IAM_PROFILE_NAMES=""
-HOSTED_ZONE_IDS=$(echo "${TAGGED_RESOURCES}" | grep 'route53:::hostedzone/' | sed 's|.*/||' | tr '\n' ' ') || HOSTED_ZONE_IDS=""
 
-# IAM roles are not returned by GetResources API, so use native IAM enumeration
+# IAM instance profiles and Route53 hosted zones are global resources in us-east-1
+IAM_PROFILE_NAMES=$(echo "${GLOBAL_TAGGED_RESOURCES}" | grep ':instance-profile/' | sed 's|.*/||' | tr '\n' ' ') || IAM_PROFILE_NAMES=""
+HOSTED_ZONE_IDS=$(echo "${GLOBAL_TAGGED_RESOURCES}" | grep 'route53:::hostedzone/' | sed 's|.*/||' | tr '\n' ' ') || HOSTED_ZONE_IDS=""
+
+# IAM roles are not returned by GetResources API, and list-roles doesn't return tags
+# Use list-roles to get all role names, then filter by tags using list-role-tags
 echo "Discovering IAM roles via IAM API..."
-IAM_ROLE_NAMES=$(aws iam list-roles --output json 2>/dev/null | \
-    jq -r --arg cluster "kubernetes.io/cluster/${INFRA_ID}" --arg value "owned" \
-    '.Roles[] | select(.Tags[]? | .Key == $cluster and .Value == $value) | .RoleName' | \
-    tr '\n' ' ') || IAM_ROLE_NAMES=""
+IAM_ROLE_NAMES=""
+ALL_ROLES=$(aws iam list-roles --output json 2>/dev/null | jq -r '.Roles[].RoleName' 2>/dev/null) || ALL_ROLES=""
+if [[ -n "${ALL_ROLES}" ]]; then
+  for role_name in ${ALL_ROLES}; do
+    ROLE_TAGS=$(aws iam list-role-tags --role-name "${role_name}" --output json 2>/dev/null | \
+        jq -r --arg cluster "kubernetes.io/cluster/${INFRA_ID}" --arg value "owned" \
+        '.Tags[] | select(.Key == $cluster and .Value == $value) | .Key' 2>/dev/null) || ROLE_TAGS=""
+    if [[ -n "${ROLE_TAGS}" ]]; then
+      IAM_ROLE_NAMES="${IAM_ROLE_NAMES}${role_name} "
+    fi
+  done
+fi
 
 # Query EC2 instances
 if [[ -n "${EC2_INSTANCE_IDS}" ]]; then
   echo "Fetching EC2 instance details..."
   INSTANCES_JSON=$(aws ec2 describe-instances \
       --instance-ids ${EC2_INSTANCE_IDS} \
+      --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
       --output json | jq '[
         .Reservations[].Instances[] |
         if .PublicIpAddress then .PublicIpAddress = "REDACTED" else . end |
+        if .PublicDnsName then .PublicDnsName = "REDACTED" else . end |
+        if .Ipv6Address then .Ipv6Address = "REDACTED" else . end |
         if .NetworkInterfaces then
           .NetworkInterfaces |= map(
-            if .Association.PublicIp then .Association.PublicIp = "REDACTED" else . end |
+            if .Association then
+              .Association |= (
+                if .PublicIp then .PublicIp = "REDACTED" else . end |
+                if .PublicDnsName then .PublicDnsName = "REDACTED" else . end |
+                if .IpOwnerId then .IpOwnerId = "REDACTED" else . end
+              )
+            else . end |
+            if .Ipv6Addresses then
+              .Ipv6Addresses |= map(if .Ipv6Address then .Ipv6Address = "REDACTED" else . end)
+            else . end |
             if .PrivateIpAddresses then
               .PrivateIpAddresses |= map(
-                if .Association.PublicIp then .Association.PublicIp = "REDACTED" else . end
+                if .Association then
+                  .Association |= (
+                    if .PublicIp then .PublicIp = "REDACTED" else . end |
+                    if .PublicDnsName then .PublicDnsName = "REDACTED" else . end |
+                    if .IpOwnerId then .IpOwnerId = "REDACTED" else . end
+                  )
+                else . end
               )
             else . end
           )
@@ -143,7 +198,21 @@ if [[ -n "${SG_IDS}" ]]; then
       --group-ids ${SG_IDS} \
       --output json | jq '[
         .SecurityGroups[] |
-        .OwnerId = "REDACTED"
+        .OwnerId = "REDACTED" |
+        if .IpPermissions then
+          .IpPermissions |= map(
+            if .UserIdGroupPairs then
+              .UserIdGroupPairs |= map(if .UserId then .UserId = "REDACTED" else . end)
+            else . end
+          )
+        else . end |
+        if .IpPermissionsEgress then
+          .IpPermissionsEgress |= map(
+            if .UserIdGroupPairs then
+              .UserIdGroupPairs |= map(if .UserId then .UserId = "REDACTED" else . end)
+            else . end
+          )
+        else . end
       ]') || SECURITY_GROUPS_JSON="[]"
 else
   SECURITY_GROUPS_JSON="[]"
@@ -208,10 +277,28 @@ if [[ -n "${ENI_IDS}" ]]; then
       --output json | jq '[
         .NetworkInterfaces[] |
         .OwnerId = "REDACTED" |
-        if .Association.PublicIp then .Association.PublicIp = "REDACTED" else . end |
+        if .Attachment then
+          .Attachment |= (if .InstanceOwnerId then .InstanceOwnerId = "REDACTED" else . end)
+        else . end |
+        if .Association then
+          .Association |= (
+            if .PublicIp then .PublicIp = "REDACTED" else . end |
+            if .PublicDnsName then .PublicDnsName = "REDACTED" else . end |
+            if .IpOwnerId then .IpOwnerId = "REDACTED" else . end
+          )
+        else . end |
+        if .Ipv6Addresses then
+          .Ipv6Addresses |= map(if .Ipv6Address then .Ipv6Address = "REDACTED" else . end)
+        else . end |
         if .PrivateIpAddresses then
           .PrivateIpAddresses |= map(
-            if .Association.PublicIp then .Association.PublicIp = "REDACTED" else . end
+            if .Association then
+              .Association |= (
+                if .PublicIp then .PublicIp = "REDACTED" else . end |
+                if .PublicDnsName then .PublicDnsName = "REDACTED" else . end |
+                if .IpOwnerId then .IpOwnerId = "REDACTED" else . end
+              )
+            else . end
           )
         else . end
       ]') || NETWORK_INTERFACES_JSON="[]"
@@ -287,7 +374,17 @@ if [[ -n "${LB_V2_ARNS}" ]]; then
   LOAD_BALANCERS_V2_JSON=$(aws elbv2 describe-load-balancers --output json 2>/dev/null | \
       jq --argjson arns "$(echo "${LB_V2_ARNS}" | jq -R -s 'split("\n") | map(select(length > 0))')" '[
         .LoadBalancers[] |
-        select(.LoadBalancerArn as $arn | $arns | index($arn))
+        select(.LoadBalancerArn as $arn | $arns | index($arn)) |
+        .LoadBalancerArn |= gsub(":[0-9]{12}:"; ":REDACTED:") |
+        if .AvailabilityZones then
+          .AvailabilityZones |= map(
+            if .LoadBalancerAddresses then
+              .LoadBalancerAddresses |= map(
+                if .IpAddress then .IpAddress = "REDACTED" else . end
+              )
+            else . end
+          )
+        else . end
       ]') || LOAD_BALANCERS_V2_JSON="[]"
 else
   LOAD_BALANCERS_V2_JSON="[]"
@@ -300,7 +397,11 @@ if [[ -n "${TG_ARNS}" ]]; then
   TARGET_GROUPS_JSON=$(aws elbv2 describe-target-groups --output json 2>/dev/null | \
       jq --argjson arns "$(echo "${TG_ARNS}" | jq -R -s 'split("\n") | map(select(length > 0))')" '[
         .TargetGroups[] |
-        select(.TargetGroupArn as $arn | $arns | index($arn))
+        select(.TargetGroupArn as $arn | $arns | index($arn)) |
+        .TargetGroupArn |= gsub(":[0-9]{12}:"; ":REDACTED:") |
+        if .LoadBalancerArns then
+          .LoadBalancerArns |= map(gsub(":[0-9]{12}:"; ":REDACTED:"))
+        else . end
       ]') || TARGET_GROUPS_JSON="[]"
 else
   TARGET_GROUPS_JSON="[]"
@@ -328,7 +429,17 @@ if [[ -n "${KMS_KEY_IDS}" ]]; then
   for key_id in ${KMS_KEY_IDS}; do
     KEY_INFO=$(aws kms describe-key --key-id "${key_id}" 2>/dev/null | jq '.KeyMetadata |
       .AWSAccountId = "REDACTED" |
-      .Arn |= gsub(":[0-9]{12}:"; ":REDACTED:")
+      .Arn |= gsub(":[0-9]{12}:"; ":REDACTED:") |
+      if .MultiRegionConfiguration then
+        .MultiRegionConfiguration |= (
+          if .PrimaryKey then
+            .PrimaryKey.Arn |= gsub(":[0-9]{12}:"; ":REDACTED:")
+          else . end |
+          if .ReplicaKeys then
+            .ReplicaKeys |= map(.Arn |= gsub(":[0-9]{12}:"; ":REDACTED:"))
+          else . end
+        )
+      else . end
     ') || KEY_INFO="{}"
     if [[ "${KEY_INFO}" != "{}" ]]; then
       KMS_KEYS_JSON=$(echo "${KMS_KEYS_JSON}" | jq --argjson key "${KEY_INFO}" '. + [$key]')
@@ -345,7 +456,10 @@ if [[ -n "${IAM_ROLE_NAMES}" ]]; then
   for role_name in ${IAM_ROLE_NAMES}; do
     ROLE_INFO=$(aws iam get-role --role-name "${role_name}" 2>/dev/null | jq '.Role |
       .Arn |= gsub(":[0-9]{12}:"; ":REDACTED:") |
-      .AssumeRolePolicyDocument = "REDACTED"
+      .AssumeRolePolicyDocument = "REDACTED" |
+      if .PermissionsBoundary then
+        .PermissionsBoundary.PermissionsBoundaryArn |= gsub(":[0-9]{12}:"; ":REDACTED:")
+      else . end
     ') || ROLE_INFO="{}"
     if [[ "${ROLE_INFO}" != "{}" ]]; then
       IAM_ROLES_JSON=$(echo "${IAM_ROLES_JSON}" | jq --argjson role "${ROLE_INFO}" '. + [$role]')
@@ -364,7 +478,10 @@ if [[ -n "${IAM_PROFILE_NAMES}" ]]; then
       .Arn |= gsub(":[0-9]{12}:"; ":REDACTED:") |
       .Roles |= map(
         .Arn |= gsub(":[0-9]{12}:"; ":REDACTED:") |
-        .AssumeRolePolicyDocument = "REDACTED"
+        .AssumeRolePolicyDocument = "REDACTED" |
+        if .PermissionsBoundary then
+          .PermissionsBoundary.PermissionsBoundaryArn |= gsub(":[0-9]{12}:"; ":REDACTED:")
+        else . end
       )
     ') || PROFILE_INFO="{}"
     if [[ "${PROFILE_INFO}" != "{}" ]]; then
@@ -389,53 +506,82 @@ else
   HOSTED_ZONES_JSON="[]"
 fi
 
-# Combine into single JSON
+# Combine into single JSON using temp files to avoid 128KB kernel arg limit
+# Create temp directory for JSON fragments
+TEMP_JSON_DIR=$(mktemp -d)
+trap 'rm -rf "${TEMP_JSON_DIR}"' EXIT
+
+# Write each collection to a temp file
+echo "${INSTANCES_JSON}" > "${TEMP_JSON_DIR}/instances.json"
+echo "${VOLUMES_JSON}" > "${TEMP_JSON_DIR}/volumes.json"
+echo "${VPCS_JSON}" > "${TEMP_JSON_DIR}/vpcs.json"
+echo "${SUBNETS_JSON}" > "${TEMP_JSON_DIR}/subnets.json"
+echo "${SECURITY_GROUPS_JSON}" > "${TEMP_JSON_DIR}/securityGroups.json"
+echo "${LOAD_BALANCERS_JSON}" > "${TEMP_JSON_DIR}/loadBalancers.json"
+echo "${LOAD_BALANCERS_V2_JSON}" > "${TEMP_JSON_DIR}/loadBalancersV2.json"
+echo "${TARGET_GROUPS_JSON}" > "${TEMP_JSON_DIR}/targetGroups.json"
+echo "${ROUTE_TABLES_JSON}" > "${TEMP_JSON_DIR}/routeTables.json"
+echo "${INTERNET_GATEWAYS_JSON}" > "${TEMP_JSON_DIR}/internetGateways.json"
+echo "${NAT_GATEWAYS_JSON}" > "${TEMP_JSON_DIR}/natGateways.json"
+echo "${ELASTIC_IPS_JSON}" > "${TEMP_JSON_DIR}/elasticIps.json"
+echo "${NETWORK_INTERFACES_JSON}" > "${TEMP_JSON_DIR}/networkInterfaces.json"
+echo "${VPC_ENDPOINTS_JSON}" > "${TEMP_JSON_DIR}/vpcEndpoints.json"
+echo "${NETWORK_ACLS_JSON}" > "${TEMP_JSON_DIR}/networkAcls.json"
+echo "${DHCP_OPTIONS_JSON}" > "${TEMP_JSON_DIR}/dhcpOptions.json"
+echo "${VPC_PEERINGS_JSON}" > "${TEMP_JSON_DIR}/vpcPeerings.json"
+echo "${S3_BUCKETS_JSON}" > "${TEMP_JSON_DIR}/s3Buckets.json"
+echo "${KMS_KEYS_JSON}" > "${TEMP_JSON_DIR}/kmsKeys.json"
+echo "${IAM_ROLES_JSON}" > "${TEMP_JSON_DIR}/iamRoles.json"
+echo "${IAM_PROFILES_JSON}" > "${TEMP_JSON_DIR}/iamProfiles.json"
+echo "${HOSTED_ZONES_JSON}" > "${TEMP_JSON_DIR}/hostedZones.json"
+
+# Combine using slurpfile to read from files
 jq -n \
-    --argjson instances "${INSTANCES_JSON}" \
-    --argjson volumes "${VOLUMES_JSON}" \
-    --argjson vpcs "${VPCS_JSON}" \
-    --argjson subnets "${SUBNETS_JSON}" \
-    --argjson securityGroups "${SECURITY_GROUPS_JSON}" \
-    --argjson loadBalancers "${LOAD_BALANCERS_JSON}" \
-    --argjson loadBalancersV2 "${LOAD_BALANCERS_V2_JSON}" \
-    --argjson targetGroups "${TARGET_GROUPS_JSON}" \
-    --argjson routeTables "${ROUTE_TABLES_JSON}" \
-    --argjson internetGateways "${INTERNET_GATEWAYS_JSON}" \
-    --argjson natGateways "${NAT_GATEWAYS_JSON}" \
-    --argjson elasticIps "${ELASTIC_IPS_JSON}" \
-    --argjson networkInterfaces "${NETWORK_INTERFACES_JSON}" \
-    --argjson vpcEndpoints "${VPC_ENDPOINTS_JSON}" \
-    --argjson networkAcls "${NETWORK_ACLS_JSON}" \
-    --argjson dhcpOptions "${DHCP_OPTIONS_JSON}" \
-    --argjson vpcPeerings "${VPC_PEERINGS_JSON}" \
-    --argjson s3Buckets "${S3_BUCKETS_JSON}" \
-    --argjson kmsKeys "${KMS_KEYS_JSON}" \
-    --argjson iamRoles "${IAM_ROLES_JSON}" \
-    --argjson iamProfiles "${IAM_PROFILES_JSON}" \
-    --argjson hostedZones "${HOSTED_ZONES_JSON}" \
+    --slurpfile instances "${TEMP_JSON_DIR}/instances.json" \
+    --slurpfile volumes "${TEMP_JSON_DIR}/volumes.json" \
+    --slurpfile vpcs "${TEMP_JSON_DIR}/vpcs.json" \
+    --slurpfile subnets "${TEMP_JSON_DIR}/subnets.json" \
+    --slurpfile securityGroups "${TEMP_JSON_DIR}/securityGroups.json" \
+    --slurpfile loadBalancers "${TEMP_JSON_DIR}/loadBalancers.json" \
+    --slurpfile loadBalancersV2 "${TEMP_JSON_DIR}/loadBalancersV2.json" \
+    --slurpfile targetGroups "${TEMP_JSON_DIR}/targetGroups.json" \
+    --slurpfile routeTables "${TEMP_JSON_DIR}/routeTables.json" \
+    --slurpfile internetGateways "${TEMP_JSON_DIR}/internetGateways.json" \
+    --slurpfile natGateways "${TEMP_JSON_DIR}/natGateways.json" \
+    --slurpfile elasticIps "${TEMP_JSON_DIR}/elasticIps.json" \
+    --slurpfile networkInterfaces "${TEMP_JSON_DIR}/networkInterfaces.json" \
+    --slurpfile vpcEndpoints "${TEMP_JSON_DIR}/vpcEndpoints.json" \
+    --slurpfile networkAcls "${TEMP_JSON_DIR}/networkAcls.json" \
+    --slurpfile dhcpOptions "${TEMP_JSON_DIR}/dhcpOptions.json" \
+    --slurpfile vpcPeerings "${TEMP_JSON_DIR}/vpcPeerings.json" \
+    --slurpfile s3Buckets "${TEMP_JSON_DIR}/s3Buckets.json" \
+    --slurpfile kmsKeys "${TEMP_JSON_DIR}/kmsKeys.json" \
+    --slurpfile iamRoles "${TEMP_JSON_DIR}/iamRoles.json" \
+    --slurpfile iamProfiles "${TEMP_JSON_DIR}/iamProfiles.json" \
+    --slurpfile hostedZones "${TEMP_JSON_DIR}/hostedZones.json" \
     '{
-        Instances: $instances,
-        Volumes: $volumes,
-        VPCs: $vpcs,
-        Subnets: $subnets,
-        SecurityGroups: $securityGroups,
-        LoadBalancers: $loadBalancers,
-        LoadBalancersV2: $loadBalancersV2,
-        TargetGroups: $targetGroups,
-        RouteTables: $routeTables,
-        InternetGateways: $internetGateways,
-        NatGateways: $natGateways,
-        ElasticIps: $elasticIps,
-        NetworkInterfaces: $networkInterfaces,
-        VpcEndpoints: $vpcEndpoints,
-        NetworkAcls: $networkAcls,
-        DhcpOptions: $dhcpOptions,
-        VpcPeerings: $vpcPeerings,
-        S3Buckets: $s3Buckets,
-        KmsKeys: $kmsKeys,
-        IamRoles: $iamRoles,
-        IamProfiles: $iamProfiles,
-        HostedZones: $hostedZones
+        Instances: $instances[0],
+        Volumes: $volumes[0],
+        VPCs: $vpcs[0],
+        Subnets: $subnets[0],
+        SecurityGroups: $securityGroups[0],
+        LoadBalancers: $loadBalancers[0],
+        LoadBalancersV2: $loadBalancersV2[0],
+        TargetGroups: $targetGroups[0],
+        RouteTables: $routeTables[0],
+        InternetGateways: $internetGateways[0],
+        NatGateways: $natGateways[0],
+        ElasticIps: $elasticIps[0],
+        NetworkInterfaces: $networkInterfaces[0],
+        VpcEndpoints: $vpcEndpoints[0],
+        NetworkAcls: $networkAcls[0],
+        DhcpOptions: $dhcpOptions[0],
+        VpcPeerings: $vpcPeerings[0],
+        S3Buckets: $s3Buckets[0],
+        KmsKeys: $kmsKeys[0],
+        IamRoles: $iamRoles[0],
+        IamProfiles: $iamProfiles[0],
+        HostedZones: $hostedZones[0]
     }' > "${JSON_FILE}"
 
 echo "Raw JSON written to ${JSON_FILE}"
