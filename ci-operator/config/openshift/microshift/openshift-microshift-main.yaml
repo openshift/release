@@ -172,24 +172,24 @@ tests:
     workflow: openshift-microshift-e2e-metal-cache
   timeout: 4h0m0s
 - always_run: false
-  as: e2e-aws-tests
+  as: e2e-aws-tests-rpm-el9
   pipeline_run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: presubmits
+      SCENARIO_TYPE: rpm-presubmits-el9
     workflow: openshift-microshift-e2e-metal-tests
 - always_run: false
-  as: e2e-aws-tests-arm
+  as: e2e-aws-tests-rpm-el10
   pipeline_run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
-      EC2_INSTANCE_TYPE: m7g.metal
+      EC2_INSTANCE_TYPE: c5.metal
       MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: presubmits
+      SCENARIO_TYPE: rpm-presubmits-el10
     workflow: openshift-microshift-e2e-metal-tests
 - always_run: false
   as: e2e-aws-tests-cache
@@ -217,7 +217,7 @@ tests:
     workflow: openshift-microshift-e2e-metal-cache
 - always_run: false
   as: e2e-aws-tests-periodic
-  pipeline_run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
+  pipeline_run_if_changed: ^(test/bin/.*|test/scenarios/periodics/.*|test/image-blueprints/.*|test/kickstart-templates/.*|test/suites/(upgrade|backup|tuned)/.*|test/resources/ostree.*|pkg/admin/.*|pkg/cmd/admin\.go|packaging/greenboot/.*|packaging/tuned/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -228,7 +228,7 @@ tests:
     workflow: openshift-microshift-e2e-metal-tests
 - always_run: false
   as: e2e-aws-tests-periodic-arm
-  pipeline_run_if_changed: ^(test/bin/.*|test/scenarios-periodics/.*|test/scenarios/periodics/.*)$
+  pipeline_run_if_changed: ^(test/bin/.*|test/scenarios/periodics/.*|test/image-blueprints/.*|test/kickstart-templates/.*|test/suites/(upgrade|backup|tuned)/.*|test/resources/ostree.*|pkg/admin/.*|pkg/cmd/admin\.go|packaging/greenboot/.*|packaging/tuned/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -238,48 +238,28 @@ tests:
       TEST_EXECUTION_TIMEOUT: 45m
     workflow: openshift-microshift-e2e-metal-tests
 - always_run: false
-  as: e2e-aws-tests-bootc-el9
-  pipeline_run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      EC2_INSTANCE_TYPE: c5.metal
-      MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: bootc-presubmits-el9
-    workflow: openshift-microshift-e2e-metal-tests
-- always_run: false
-  as: e2e-aws-tests-bootc-el10
-  pipeline_run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
-  steps:
-    cluster_profile: openshift-org-aws
-    env:
-      EC2_INSTANCE_TYPE: c5.metal
-      MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: bootc-presubmits-el10
-    workflow: openshift-microshift-e2e-metal-tests
-- always_run: false
-  as: e2e-aws-tests-bootc-arm-el9
+  as: e2e-aws-tests-rpm-arm-el9
   pipeline_run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: m7g.metal
       MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: bootc-presubmits-el9
+      SCENARIO_TYPE: rpm-presubmits-el9
     workflow: openshift-microshift-e2e-metal-tests
 - always_run: false
-  as: e2e-aws-tests-bootc-arm-el10
+  as: e2e-aws-tests-rpm-arm-el10
   pipeline_run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|Makefile.*|scripts/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
       EC2_INSTANCE_TYPE: m7g.metal
       MICROSHIFT_OS: rhel-9.8
-      SCENARIO_TYPE: bootc-presubmits-el10
+      SCENARIO_TYPE: rpm-presubmits-el10
     workflow: openshift-microshift-e2e-metal-tests
 - always_run: false
   as: e2e-aws-tests-bootc-periodic-el9
-  pipeline_run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
+  pipeline_run_if_changed: ^(test/bin/.*|test/scenarios-bootc/el9/periodics/.*|test/image-blueprints-bootc/.*|test/kickstart-templates/.*|test/suites/(upgrade|backup|osconfig)/.*|test/resources/ostree.*|pkg/admin/.*|pkg/cmd/admin\.go|packaging/greenboot/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -290,7 +270,7 @@ tests:
     workflow: openshift-microshift-e2e-metal-tests
 - always_run: false
   as: e2e-aws-tests-bootc-periodic-el10
-  pipeline_run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
+  pipeline_run_if_changed: ^(test/bin/.*|test/scenarios-bootc/el10/periodics/.*|test/image-blueprints-bootc/.*|test/kickstart-templates/.*|test/suites/(upgrade|backup|osconfig)/.*|test/resources/ostree.*|pkg/admin/.*|pkg/cmd/admin\.go|packaging/greenboot/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -301,7 +281,7 @@ tests:
     workflow: openshift-microshift-e2e-metal-tests
 - always_run: false
   as: e2e-aws-tests-bootc-periodic-arm-el9
-  pipeline_run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
+  pipeline_run_if_changed: ^(test/bin/.*|test/scenarios-bootc/el9/periodics/.*|test/image-blueprints-bootc/.*|test/kickstart-templates/.*|test/suites/(upgrade|backup|osconfig)/.*|test/resources/ostree.*|pkg/admin/.*|pkg/cmd/admin\.go|packaging/greenboot/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
@@ -312,7 +292,7 @@ tests:
     workflow: openshift-microshift-e2e-metal-tests
 - always_run: false
   as: e2e-aws-tests-bootc-periodic-arm-el10
-  pipeline_run_if_changed: ^(test/bin/.*|test/scenarios-bootc/periodics/.*)$
+  pipeline_run_if_changed: ^(test/bin/.*|test/scenarios-bootc/el10/periodics/.*|test/image-blueprints-bootc/.*|test/kickstart-templates/.*|test/suites/(upgrade|backup|osconfig)/.*|test/resources/ostree.*|pkg/admin/.*|pkg/cmd/admin\.go|packaging/greenboot/.*)$
   steps:
     cluster_profile: openshift-org-aws
     env:
