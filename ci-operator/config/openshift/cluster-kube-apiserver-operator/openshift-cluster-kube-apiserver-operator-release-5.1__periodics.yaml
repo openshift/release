@@ -118,6 +118,20 @@ tests:
     - chain: etcd-encryption-vault-setup
     - ref: openshift-e2e-test
     workflow: ipi-aws
+- as: e2e-aws-encryption-kms-fips
+  interval: 168h
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/cluster-kube-apiserver-operator/encryption-kms
+      VAULT_ENTERPRISE_IMAGE: quay.io/openshifttest/vault-enterprise:2.0.0-ent
+      VAULT_KMS_PLUGIN_IMAGE: quay.io/openshifttest/vault-kube-kms@sha256:222bba6cc71fb7527bac262b67f614152491105c25f3f0a7a19385a5d878123a
+    test:
+    - ref: fips-check-node-scan
+    - chain: etcd-encryption-vault-setup
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
 - as: e2e-azure-encryption-kms
   interval: 168h
   steps:
