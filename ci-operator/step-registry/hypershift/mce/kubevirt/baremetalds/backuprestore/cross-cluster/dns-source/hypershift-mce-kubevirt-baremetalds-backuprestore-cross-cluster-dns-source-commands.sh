@@ -83,17 +83,17 @@ done
 router_host="$(oc get route console -n openshift-console -o jsonpath='{.spec.host}')"
 [[ -n "${router_host}" ]] || { echo "Management console route has no hostname" >&2; exit 1; }
 source "${SHARED_DIR}/packet-conf.sh"
-ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${guest_domain}" "${manager_domain}" "${api_ip}" "${router_host}" "${cluster_name}" "${role}" <<'EOF'
+ssh "${SSHOPTS[@]}" "root@${IP}" bash -s -- "${guest_domain}" "${api_ip}" "${router_host}" "${cluster_name}" <<'EOF'
 set -euo pipefail
 guest_domain="$1"
-manager_domain="$2"
-api_ip="$3"
-router_host="$4"
-cluster_name="$5"
-role="$6"
+api_ip="$2"
+router_host="$3"
+cluster_name="$4"
 guest_cluster_domain="${cluster_name}.${guest_domain}"
 router_ip="$(getent ahostsv4 "${router_host}" | awk 'NR == 1 {print $1}')"
 [[ "${router_ip}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Management router hostname did not resolve to IPv4" >&2; exit 1; }
+resolver_ip="$(ip -o -4 addr show dev ostestbm scope global | awk 'NR == 1 {split($4, address, "/"); print address[1]}')"
+[[ "${resolver_ip}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Libvirt bridge has no IPv4 resolver address" >&2; exit 1; }
 dns_file="/etc/NetworkManager/dnsmasq.d/hypershift-cross-cluster-${cluster_name}.conf"
 cat > "${dns_file}" <<DNS
 address=/api.${guest_cluster_domain}/${api_ip}
@@ -101,9 +101,25 @@ address=/api-int.${guest_cluster_domain}/${api_ip}
 address=/.apps.${guest_cluster_domain}/${router_ip}
 DNS
 nmcli general reload dns-full
-if ! virsh net-dumpxml ostestbm | grep -Fq "forwarder domain='${manager_domain}'"; then
-  virsh net-update ostestbm add dns-forwarder "<forwarder domain='${manager_domain}' addr='127.0.0.1'/>" --live --config
-fi
-getent ahostsv4 "api.${guest_cluster_domain}" | awk -v expected="${api_ip}" '$1 == expected {found=1} END {exit !found}'
-getent ahostsv4 "check.apps.${guest_cluster_domain}" | awk -v expected="${router_ip}" '$1 == expected {found=1} END {exit !found}'
+
+# Dev-scripts already forwards the management apps domain to the virthost DNS.
+verify_guest_record() {
+  local prefix="$1" expected_ip="$2"
+  local name="${prefix}.${guest_cluster_domain}"
+  if ! dig +short +time=3 +tries=1 "@${resolver_ip}" "${name}" A |
+    awk -v expected="${expected_ip}" '$1 == expected {found=1} END {exit !found}'; then
+    echo "Guest ${prefix} record did not resolve to its expected address through libvirt DNS" >&2
+    return 1
+  fi
+  if ! getent ahostsv4 "${name}" |
+    awk -v expected="${expected_ip}" '$1 == expected {found=1} END {exit !found}'; then
+    echo "Guest ${prefix} record did not resolve to its expected address through virthost DNS" >&2
+    return 1
+  fi
+  echo "Verified guest ${prefix} record through libvirt and virthost DNS"
+}
+
+verify_guest_record api "${api_ip}"
+verify_guest_record api-int "${api_ip}"
+verify_guest_record check.apps "${router_ip}"
 EOF
