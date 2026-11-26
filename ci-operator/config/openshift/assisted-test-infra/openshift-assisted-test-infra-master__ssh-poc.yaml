@@ -19,10 +19,35 @@ tests:
   optional: true
   restrict_network_access: false
   steps:
-    env:
-      SSH_USER: kni
     test:
-    - ref: assisted-ssh-hostname
+    - as: ssh-hostname
+      commands: |
+        set -euo pipefail
+        umask 077
+        creds=/var/run/assisted-ssh-poc
+        for field in ssh-privatekey ssh-hostname known-hosts; do
+          test -s "${creds}/${field}" || { echo "Missing ${field}" >&2; exit 1; }
+        done
+        host=$(cat "${creds}/ssh-hostname")
+        key=$(mktemp)
+        trap 'rm -f "${key}"' EXIT
+        cp "${creds}/ssh-privatekey" "${key}"
+        chmod 600 "${key}"
+        timeout 90s ssh -F /dev/null -T -i "${key}" \
+          -o BatchMode=yes -o ConnectTimeout=20 \
+          -o StrictHostKeyChecking=yes \
+          -o "UserKnownHostsFile=${creds}/known-hosts" \
+          "kni@${host}" hostname
+      credentials:
+      - collection: edge-group
+        group: assisted-qe-ssh-poc
+        mount_path: /var/run/assisted-ssh-poc
+      from: dev-scripts
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
   timeout: 10m0s
 zz_generated_metadata:
   branch: master
