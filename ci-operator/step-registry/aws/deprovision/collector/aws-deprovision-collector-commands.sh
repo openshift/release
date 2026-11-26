@@ -9,8 +9,19 @@ set -o pipefail
 # /var/run/secrets/aws/config/config. Running under a cluster_profile means this
 # pod executes as a trusted ci-op-* identity (which the ci-step-runner roles
 # trust), unlike a raw pod in the "ci" namespace.
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-export AWS_CONFIG_FILE="/var/run/secrets/aws/config/config"
+#
+# Do not also export AWS_SHARED_CREDENTIALS_FILE when STS config is present:
+# openshift-install cannot resolve credentials when STS and static .awscred
+# are dual-set (DPTP-4756 / #80755).
+STS_CONFIG="/var/run/secrets/aws/config/config"
+if [[ -f "${STS_CONFIG}" ]]; then
+	export AWS_CONFIG_FILE="${STS_CONFIG}"
+	export AWS_SDK_LOAD_CONFIG=1
+	unset AWS_SHARED_CREDENTIALS_FILE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN || true
+else
+	export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+	unset AWS_CONFIG_FILE || true
+fi
 
 function finish {
 	CHILDREN=$(jobs -p)

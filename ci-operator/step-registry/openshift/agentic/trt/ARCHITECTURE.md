@@ -100,8 +100,11 @@ omitted from this overview.
   the issue. The agent works on a feature branch and commits locally. The
   surrounding script verifies that a committed change exists, pushes only to
   the configured fork, and opens the upstream PR.
-- **`pr-followup`** finds the PR associated with the issue and prepares its fork
-  branch. It is the runner entry point for feedback that arrives after an
+- **`pr-followup`** accepts an optional `PR_NUMBER` (or Gangway's
+  `MULTISTAGE_PARAM_OVERRIDE_PR_NUMBER`) and otherwise finds the PR associated
+  with the issue. It verifies that the selected PR belongs to the configured
+  upstream and that its exact head belongs to the configured fork before
+  checkout. It is the runner entry point for feedback that arrives after an
   earlier workflow has ended.
 - **`review-responder`** uses a read-only gate to separate actionable review
   comments from required-CI work. Dedicated workers address comments or triage
@@ -146,9 +149,12 @@ appears, Chai launches the configured follow-up job through Gangway and tracks
 that job to completion.
 
 The follow-up workflow repeats authentication and initialization, uses
-`pr-followup` to locate the existing PR, then runs the same review responder.
-Before a worker runs, the responder verifies the PR head repository, branch,
-and SHA and checks out that exact commit. After a worker finishes, the pipeline
+`pr-followup` to select the explicit PR supplied by the orchestrator or fall
+back to Jira-key discovery, then runs the same review responder. A supplied PR
+number is authoritative: an invalid or missing PR fails without falling back
+to Jira-key discovery. Before checkout, `pr-followup` verifies the upstream,
+fork, branch, and exact head SHA. Before a worker runs, the responder repeats
+those head checks. After a worker finishes, the pipeline
 revalidates those boundaries before updating the configured fork ref. A
 history-rewriting rebase is published only with a force-with-lease tied to the
 previously observed head. When the bounded job ends, Chai resumes PR tracking;

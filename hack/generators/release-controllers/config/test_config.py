@@ -17,7 +17,7 @@ class ReleaseDiscoveryTests(unittest.TestCase):
         return jobs_path
 
     def test_retains_legacy_resources_without_periodics(self):
-        expected = sorted(['4.6', '4.7', '4.8', '4.9', '4.10', '4.11', '4.23', '5.0', '5.1'])
+        expected = sorted(['4.6', '4.7', '4.8', '4.9', '4.10', '4.11', '4.23', '5.0', '5.1', '5.2'])
         with tempfile.TemporaryDirectory() as directory:
             self.prepare_checkout(directory, ())
             self.assertEqual(Config(directory).releases, expected)

@@ -17,6 +17,16 @@ b64url() {
     openssl base64 -A | tr '+/' '-_' | tr -d '='
 }
 
+# Validate the requested permission set before any credential or network use.
+# The downstream step names the smallest write permission set it needs. The
+# default keeps the original PR-comment behaviour; a publisher that also pushes
+# a branch asks for contents and pull_requests.
+wanted_permissions="${GITHUB_APP_TOKEN_PERMISSIONS:-[\"issues\",\"pull_requests\"]}"
+if ! jq -e 'type == "array" and length > 0 and (map(type == "string") | all)' >/dev/null 2>&1 <<<"${wanted_permissions}"; then
+    echo "ERROR: GITHUB_APP_TOKEN_PERMISSIONS must be a nonempty JSON array of permission names." >&2
+    exit 1
+fi
+
 for tool in openssl curl jq; do
     if ! command -v "${tool}" &>/dev/null; then
         echo "ERROR: ${tool} not found; cannot mint the GitHub App token." >&2
@@ -55,9 +65,6 @@ if [[ -z "${installation_id}" ]]; then
     exit 1
 fi
 
-# The downstream step creates/updates/deletes PR comments, so ask for the
-# smallest permission set that allows write permissions to issues and pull_requests.
-wanted_permissions='["issues","pull_requests"]'
 permissions=$(jq -c --argjson wanted "${wanted_permissions}" \
     '(.permissions // {}) | with_entries(select(.value == "write" and ((.key as $k | $wanted | index($k)) != null)))' \
     <<<"${installation}")
@@ -66,11 +73,25 @@ if [[ -z "${permissions}" || "${permissions}" == "{}" ]]; then
     exit 1
 fi
 
-# Exit just before posting so that pj-rehearse can test everything above this line
+# Refuse a token that cannot do everything the caller asked for. A partially
+# granted request would otherwise mint successfully and fail much later, in the
+# consumer that needed the missing permission.
+missing_permissions=$(jq -rn --argjson wanted "${wanted_permissions}" --argjson granted "${permissions}" \
+    '$wanted - ($granted | keys)')
+if [[ "${missing_permissions}" != "[]" ]]; then
+    echo "ERROR: the installation does not grant write access to ${missing_permissions}; it grants ${permissions}." >&2
+    exit 1
+fi
+
+# Exit just before posting so that pj-rehearse can test everything above this line,
+# unless a rehearsal explicitly opts in to mint and hand the token downstream.
 if [[ -n "${REPO_OWNER:-}${REPO_NAME:-}" \
     && "${REPO_OWNER:-}/${REPO_NAME:-}" != "${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}" ]]; then
-    echo "This job runs for ${REPO_OWNER:-}/${REPO_NAME:-}, not ${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}. Verified the App credentials, but token minting will be skipped." >&2
-    exit 0
+    if [[ "${GITHUB_APP_AUTH_REHEARSAL_MINT:-false}" != true ]]; then
+        echo "This job runs for ${REPO_OWNER:-}/${REPO_NAME:-}, not ${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}. Verified the App credentials, but token minting will be skipped." >&2
+        exit 0
+    fi
+    echo "Rehearsal minting is explicitly enabled for ${GITHUB_REPO_OWNER}/${GITHUB_REPO_NAME}." >&2
 fi
 
 # Scope the token to the single repository the comment is posted on.

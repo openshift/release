@@ -1,0 +1,119 @@
+workflow:
+  as: rosa-e2e-hcp-zero-egress
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      HOSTED_CP: "true"
+      STS: "true"
+      REPLICAS: "3"
+      # Private cluster: the supported zero-egress posture (matches the
+      # official terraform-vpc-example/zero-egress template and the
+      # rosa-backend-tests rosa-hcp-zero-egress profile). The public-cluster
+      # posture leaves the internet-facing LBs unreachable once the NAT routes
+      # are cut, and the 5.0 console dies initializing its OAuth endpoint
+      # cache through the route; with a private API and a private default
+      # ingress every service endpoint is reachable in-cluster.
+      PRIVATE: "true"
+      PRIVATE_DEFAULT_INGRESS: "true"
+      # Day-1-only feature: rosa create cluster --properties zero_egress:true
+      # (threaded through rosa-cluster-provision via ADDITIONAL_PROPERTIES,
+      # which requires CLUSTER_SECTOR so a provision shard is pinned).
+      ADDITIONAL_PROPERTIES: zero_egress:true
+      # Recorded as feature_flags.zero_egress in cluster-metadata.json so the
+      # validation specs self-select via FEATURE_ZERO_EGRESS.
+      ZERO_EGRESS: "true"
+      # Scoped to the Feature:ZeroEgress specs: the generic customer tail
+      # (workloads pulling public images, external networking checks) is
+      # expected to fail on a cluster with no internet egress. Env on the
+      # workflow step list is silently dropped by the registry resolver for
+      # ref steps; only this map overrides the validate-customer ref's
+      # default filter (the autoscaling row's pattern). The workflow env map
+      # applies to every step declaring the parameter, so LABEL_FILTER would
+      # leak into the platform step (whose filter falls back to LABEL_FILTER);
+      # pin the platform plane to its own zero-egress selection.
+      LABEL_FILTER: "Feature:ZeroEgress && Area:DataPlane"
+      PLATFORM_LABEL_FILTER: "Feature:ZeroEgress && Area:ManagementPlane"
+    pre:
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+    # ECR mirror VPC endpoints + NAT route removal; must run after the VPC
+    # exists and before the cluster is provisioned (day-1-only feature).
+    - ref: rosa-e2e-hcp-zero-egress-vpc-prepare
+    - chain: rosa-sts-oidc-config-create
+    # Individual refs instead of the rosa-cluster-provision chain so that
+    # rosa-cluster-credentials-backplane lands before the oc-based waits:
+    # with PRIVATE=true the cluster API is not reachable directly from CI.
+    - ref: rosa-cluster-provision
+    - ref: rosa-cluster-wait-ready-cluster
+    - ref: rosa-cluster-notify-error
+    # The cluster API is only reachable via backplane from here on. This step
+    # writes ${SHARED_DIR}/kubeconfig and ${SHARED_DIR}/proxy-conf.sh, which
+    # the subsequent oc-based steps consume.
+    - ref: rosa-cluster-credentials-backplane
+    - ref: rosa-cluster-wait-ready-operators
+    # Publish the SHARED_DIR provisioner-to-validator contract (cluster-id,
+    # cluster-metadata.json, ROSAENG-67580). OCM-only: it deliberately leaves
+    # ${SHARED_DIR}/kubeconfig to the backplane flow on private clusters.
+    - ref: rosa-e2e-rosa-cli-publish-contract
+    - ref: aws-provision-tags-for-byo-vpc
+    - ref: rosa-cluster-wait-ready-hosted-cp
+    - ref: rosa-cluster-wait-ready-nodes
+    # Customer-plane access (bp-kubeconfig fallback) and platform-plane access
+    # (mc-kubeconfig / sc-kubeconfig) via backplane (ROSAENG-67580).
+    - ref: rosa-backplane-login
+    test:
+    # Each plane runs only its own specs: the platform step exports
+    # KUBECONFIG=mc-kubeconfig (management cluster), so the customer-plane
+    # image-pull specs must not be selected there, and vice versa. Both
+    # filters come from the workflow env map above (per-step env on a ref
+    # is silently dropped by the registry resolver).
+    - ref: rosa-e2e-validate-customer
+    - ref: rosa-e2e-validate-platform
+    post:
+    - chain: rosa-cluster-deprovision
+    # Delete the VPC endpoints before the VPC stack teardown: endpoints block
+    # VPC deletion.
+    - ref: rosa-e2e-hcp-zero-egress-vpc-cleanup
+      best_effort: true
+    - chain: rosa-sts-oidc-config-delete
+      best_effort: true
+    - ref: rosa-e2e-cleanup-vpc
+      best_effort: true
+    - ref: aws-deprovision-stacks
+      best_effort: true
+  documentation: |-
+    The zero-egress row of the ROSAENG-308 provision x validate matrix
+    (ROSAENG-66391): the rosa-CLI head provisions a private HCP cluster
+    (private API, private default ingress — the supported zero-egress
+    posture, matching the official terraform-vpc-example/zero-egress
+    template) with properties zero_egress:true in a BYO VPC whose private
+    subnets have no route to the internet
+    (rosa-e2e-hcp-zero-egress-vpc-prepare creates the ecr.api/ecr.dkr/s3 VPC
+    endpoints and removes the NAT routes). Payload images are served from the
+    provision shard's regional ECR mirror, and the HCP worker account role
+    carries AmazonEC2ContainerRegistryReadOnly (added by the rosa CLI at
+    account-role creation).
+
+    The cluster is private because a public zero-egress cluster is not a
+    supported combination: once the NAT routes are cut, the internet-facing
+    API and ingress load balancers are unreachable from the private subnets,
+    which breaks any in-cluster client of the apps routes (the 5.0 console
+    initializes its OAuth endpoint cache through the route and dies with a
+    five-minute timeout).
+
+    Validation is scoped to the Feature:ZeroEgress specs: the customer plane
+    pulls a digest-pinned payload image through the ECR mirror and asserts
+    non-mirrored public images cannot be pulled; the platform plane verifies
+    the HostedCluster imageContentSources point at the ECR mirror, the
+    HostedControlPlane propagation, the ignition credential provider delivery,
+    and the nodepool kubelet ECR credential provider. The generic customer
+    tail is not run: its workloads pull public images, which is impossible
+    without egress by design.
+
+    The private API means the cluster is only reachable via backplane from CI:
+    the workflow requires corp-network reachability (capabilities: [intranet],
+    restrict_network_access: false, network-access-rehearsals-ok label for
+    rehearsals). rosa-cluster-credentials-backplane provides the kubeconfig
+    and proxy that the oc-based pre steps consume; the validation steps use
+    bp-kubeconfig (customer plane fallback) and mc-kubeconfig / sc-kubeconfig
+    (platform plane) from rosa-backplane-login.

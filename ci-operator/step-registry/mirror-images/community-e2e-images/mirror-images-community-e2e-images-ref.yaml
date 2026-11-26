@@ -27,6 +27,15 @@ ref:
     them from the bastion mirror registry (read from
     SHARED_DIR/mirror_registry_url) instead of their public sources.
 
+    Requires SHARED_DIR/proxy-conf.sh and a fully qualified RELEASE_IMAGE_LATEST.
+    Preserves existing proxy bypass entries and adds only registry.ci.openshift.org
+    and the payload registry endpoint, not broad CI-domain exemptions that could
+    bypass the proxy for the private test-cluster API. Before discovery, reports
+    credential-safe proxy presence and API-hostname NO_PROXY matching, then probes
+    API node listing with the normal environment and with proxy bypass disabled
+    (unless kubeconfig already selects an explicit proxy). Fails early if normal
+    API access fails; the forced probe does not alter discovery's environment.
+
     Also always mirrors the known registry.k8s.io/pause versions (3.9, 3.10,
     3.10.1, 3.10.2), since `openshift-tests images` does not include them
     (their layers aren't compressed) and pause is used as the pod

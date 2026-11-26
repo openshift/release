@@ -54,6 +54,31 @@ if [[ "${BASH_SOURCE[0]:-$0}" != "$0" ]]; then
     return 0
 fi
 
+PROVISION_STATE=unknown
+PROVISION_ATTEMPT=0
+PROVISION_LOOKUP=not_attempted
+PROVISION_STARTED=${SECONDS}
+
+record_provisioning_outcome() {
+    local outcome="$1"
+    if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+        printf '{"outcome":"%s","state":"%s","attempts":%d,"elapsed_seconds":%d,"lookup":"%s"}\n' \
+            "${outcome}" "${PROVISION_STATE}" "${PROVISION_ATTEMPT}" \
+            "$((SECONDS - PROVISION_STARTED))" "${PROVISION_LOOKUP}" \
+            2>/dev/null >> "${ARTIFACT_DIR}/provisioning-outcomes.jsonl" || true
+    fi
+}
+
+cancel_provisioning() {
+    trap '' TERM INT
+    printf 'Controller cancelled; no further operations will be started.\n' >&2 || true
+    record_provisioning_outcome cancelled
+    exit "$1"
+}
+
+trap 'cancel_provisioning 143' TERM
+trap 'cancel_provisioning 130' INT
+
 LEASE_NAMESPACE="${LEASE_NAMESPACE:-rosa-cluster-lease}"
 LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
 OCM_LOGIN_ENV="${OCM_LOGIN_ENV:-staging}"
@@ -84,7 +109,7 @@ dry_run_guard() {
 ocm_get_cluster() {
     local name="$1" response=""
     if ! response=$(ocm get /api/clusters_mgmt/v1/clusters --parameter search="name = '${name}'" 2>&1); then
-        log "ERROR: OCM lookup failed for ${name}: ${response}"
+        log "ERROR: OCM lookup failed"
         return 1
     fi
     echo "${response}" | jq '.items[0] // empty' 2>/dev/null
@@ -483,6 +508,11 @@ log "Phase 3: Checking for missing clusters"
 while IFS= read -r cluster_json; do
     [[ -z "${cluster_json}" ]] && continue
 
+    PROVISION_STATE=unknown
+    PROVISION_ATTEMPT=0
+    PROVISION_LOOKUP=not_attempted
+    PROVISION_STARTED=${SECONDS}
+
     NAME=$(echo "${cluster_json}" | jq -r '.name')
     ENV=$(echo "${cluster_json}" | jq -r '.env // "staging"')
     REGION=$(echo "${cluster_json}" | jq -r '.region // "us-east-1"')
@@ -580,8 +610,21 @@ while IFS= read -r cluster_json; do
 
     # Wait for cluster to be ready (up to 60 min)
     log "Waiting for ${NAME} to be ready..."
+    PROVISION_STARTED=${SECONDS}
     for attempt in $(seq 1 60); do
-        STATE=$(ocm_get_cluster "${NAME}" | jq -r '.status.state // "unknown"' 2>/dev/null || echo "unknown")
+        PROVISION_ATTEMPT=${attempt}
+        if POLL_CLUSTER_JSON=$(ocm_get_cluster "${NAME}"); then
+            PROVISION_LOOKUP=ok
+            STATE=$(echo "${POLL_CLUSTER_JSON}" | jq -r '.status.state // "unknown"' 2>/dev/null || echo "unknown")
+        else
+            PROVISION_LOOKUP=failed
+            STATE=unknown
+        fi
+        case "${STATE}" in
+            ready|error|installing|pending|waiting|uninstalling) ;;
+            *) STATE=unknown ;;
+        esac
+        PROVISION_STATE=${STATE}
         if [[ "${STATE}" == "ready" ]]; then
             break
         fi
@@ -594,6 +637,11 @@ while IFS= read -r cluster_json; do
     done
 
     if [[ "${STATE}" != "ready" ]]; then
+        if [[ "${STATE}" == "error" ]]; then
+            record_provisioning_outcome error
+        else
+            record_provisioning_outcome exhausted
+        fi
         log "WARNING: ${NAME} not ready after 60 min (state: ${STATE}). Will retry next reconcile."
         continue
     fi
@@ -639,7 +687,29 @@ log "Phase 4: Health checking existing clusters"
 ACTUAL_CMS=$(lease_oc get configmap -n "${LEASE_NAMESPACE}" -l "rosa-cluster-lease/managed=true" -o json 2>/dev/null || echo '{"items":[]}')
 ACTUAL_COUNT=$(echo "${ACTUAL_CMS}" | jq '.items | length')
 
+# Summary counters:
+#   HEALTHY       clusters the run leaves usable: available ones that passed
+#                 every check below, in-use ones OCM reports ready, clusters
+#                 that finished installing during the run, and clusters
+#                 restored from error. Also maintenance clusters (upgrading or
+#                 being refreshed), unconditionally: they are not leasable, but
+#                 folding them into HEALTHY is pre-existing behaviour this
+#                 change does not alter.
+#   PROVISIONING  clusters OCM is still building (pending/installing/waiting),
+#                 counted apart from HEALTHY so in-flight capacity is not
+#                 reported as usable.
+#   UNHEALTHY     clusters the run found or left unusable: the ones it marks
+#                 error, in-use ones with a bad OCM status (reported only, no
+#                 action while a job holds them), provisioning ones that are
+#                 gone from OCM, and clusters already in error whose restore
+#                 this run defers.
+#   RECOVERED     stale leases released back to the pool.
+# Clusters left for the next reconcile are counted in none of these -- OCM
+# unreachable, an unexpected OCM state, or a ready cluster whose data was
+# incomplete or whose patch failed -- so the totals may be lower than the
+# inventory.
 HEALTHY=0
+PROVISIONING=0
 UNHEALTHY=0
 RECOVERED=0
 
@@ -808,8 +878,9 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
             fi
             UNHEALTHY=$((UNHEALTHY + 1))
         elif [[ "${OCM_CHECK_STATUS}" == "pending" || "${OCM_CHECK_STATUS}" == "installing" || "${OCM_CHECK_STATUS}" == "waiting" ]]; then
+            # Still building in OCM: not an error, but not usable capacity either.
             echo "PROVISIONING: ${CM_NAME} (OCM: ${OCM_CHECK_STATUS})" >> "${REPORT}"
-            HEALTHY=$((HEALTHY + 1))
+            PROVISIONING=$((PROVISIONING + 1))
         else
             log "WARNING: ${CM_NAME} has unexpected OCM state ${OCM_CHECK_STATUS}, leaving provisioning for retry"
             echo "SKIPPED: ${CM_NAME} (unexpected OCM state: ${OCM_CHECK_STATUS})" >> "${REPORT}"
@@ -1315,7 +1386,7 @@ for i in $(seq 0 $((FINAL_COUNT - 1))); do
 done
 
 echo "" >> "${REPORT}"
-echo "Summary: ${HEALTHY} healthy, ${UNHEALTHY} unhealthy, ${RECOVERED} recovered" >> "${REPORT}"
+echo "Summary: ${HEALTHY} healthy, ${PROVISIONING} provisioning, ${UNHEALTHY} unhealthy, ${RECOVERED} recovered" >> "${REPORT}"
 
-log "Controller reconcile complete"
+log "Controller reconcile complete: ${HEALTHY} healthy, ${PROVISIONING} provisioning, ${UNHEALTHY} unhealthy, ${RECOVERED} recovered"
 cat "${REPORT}"

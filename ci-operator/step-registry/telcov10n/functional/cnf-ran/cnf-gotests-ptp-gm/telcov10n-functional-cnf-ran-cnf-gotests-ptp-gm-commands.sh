@@ -159,9 +159,15 @@ echo "Read BMC credentials from ansible group_all secret"
 [[ -f /var/group_variables/common/all/bmc_password ]] && BMC_PASSWORD=$(tr -d '[:space:]' < /var/group_variables/common/all/bmc_password)
 echo "BMC_USER=${BMC_USER}"
 
+echo "Write pull secret to bastion for registry authentication"
+PULL_SECRET_PATH="${REMOTE_WORKDIR}/pull-secret.json"
+base64 -d /var/group_variables/common/bastions/pull_secret_string > "${WORKDIR}/pull-secret.json"
+scp "${SSH_OPTS[@]}" -i "${WORKDIR}/temp_ssh_key" \
+  "${WORKDIR}/pull-secret.json" "${BASTION_USER}@${BASTION_IP}:${PULL_SECRET_PATH}"
+
 echo "Resolve OCP tools image for CNF_TEST_IMAGE (available on disconnected registry)"
 CNF_TEST_IMAGE=$(ssh "${SSH_OPTS[@]}" "${BASTION_USER}@${BASTION_IP}" -i "${WORKDIR}/temp_ssh_key" \
-  "oc --kubeconfig='${SPOKE_KUBECONFIG}' adm release info --image-for=tools")
+  "REGISTRY_AUTH_FILE='${PULL_SECRET_PATH}' oc --kubeconfig='${SPOKE_KUBECONFIG}' adm release info --image-for=tools")
 echo "CNF_TEST_IMAGE=${CNF_TEST_IMAGE}"
 
 cd "${ECO_CI_CD_DIR}"

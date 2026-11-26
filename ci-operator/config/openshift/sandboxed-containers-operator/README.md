@@ -1,12 +1,26 @@
-This directory contain the ci-operator configuration files to generate the Prow jobs for the Openshift Sandboxed Containers (OSC) operator.
+# OpenShift Sandboxed Containers CI Configuration
+
+This directory contains the ci-operator configuration used to generate OSC Prow
+jobs. Set job-specific parameters in the ci-operator configuration
+(`tests[].steps.env`) to override step defaults.
+
+Change shared steps, chains, or workflows in the
+[OSC step registry](../../../step-registry/sandboxed-containers-operator/README.md)
+when their behavior needs to change.
+
+Review the [OSC CI contribution guide](CONTRIBUTING.md)
+for the intended workflow, its Mermaid step graph, and guidance on finding reusable
+steps. If the workflow outline changes, follow the
+[graph regeneration instructions](CONTRIBUTING.md#regenerating-the-step-graph).
 
 ## Downstream
 
-The jobs in this category are used to test the downstream builds of OSC. In
-this repo we host the base-workflow files marked with `__downstream` in their
-name. One should copy those into per-variant workflow and send a PR, keep
-updating the ``KATA_RPM_VERSIONS`` and running the jobs via `/pj-rehearse`. The
-usual changes to those files are::
+The `__downstream` config variants define jobs that test downstream OSC builds.
+Update the applicable variant's release and parameter overrides, such as
+`KATA_RPM_VERSION`, then use `/pj-rehearse <job-name>` on the `openshift/release`
+PR to rehearse the affected job.
+
+Example overrides:
 
     releases:
       latest:
@@ -25,21 +39,17 @@ usual changes to those files are::
           KATA_RPM_VERSION: 4.2.0-2.rhaos4.20.el9
           # Add sleep here if you need to do manual testing
           # connect to cluster and delete the sandboxed-containers-operator-post-wait pod when done
-          SLEEP_DURATION: "0"
+           SLEEP_DURATION: "0h"
     zz_generated_metadata:
       # Set a sensible variant name like "downstream-1.9-release-4.18" or so
       variant: downstream-release
 
-The downstream jobs use custom steps, chains and workflows hosted at [here](../../../step-registry/sandboxed-containers-operator/). Please refer to [their documentation](../../../step-registry/sandboxed-containers-operator/README.md) for further information.
-
 ## Tests
 
-The test phase runs the `sandboxed-containers-operator-testsuites-gate` step, which
-creates `${SHARED_DIR}/testsuites_gate` so the POST-phase test suites know pre/test
-setup completed successfully.
+The shared `sandboxed-containers-operator-test` chain runs a sanity check by
+default, then creates `${SHARED_DIR}/testsuites_gate`. If provisioning, OSC setup,
+or the sanity check fails, the gate is absent and the post-phase suites skip.
 
-For the actual tests, refer to the POST-phase test-suite chain documented in
-[the testsuites README](../../../step-registry/sandboxed-containers-operator/testsuites/README.md).
-It explains the non-blocking `sandboxed-containers-operator-testsuites` chain, the
-`TEST_<STEP_NAME>_ENABLE` convention, and the `skeleton`/`skeleton2` demo suites
-(disabled by default).
+Opt in to individual post-phase suites with `TESTS_<SUITE_NAME>_ENABLE`. See the
+[testsuites README](../../../step-registry/sandboxed-containers-operator/testsuites/README.md)
+for suite parameters and failure behavior.
