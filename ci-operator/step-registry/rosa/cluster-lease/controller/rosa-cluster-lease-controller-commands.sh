@@ -54,6 +54,31 @@ if [[ "${BASH_SOURCE[0]:-$0}" != "$0" ]]; then
     return 0
 fi
 
+PROVISION_STATE=unknown
+PROVISION_ATTEMPT=0
+PROVISION_LOOKUP=not_attempted
+PROVISION_STARTED=${SECONDS}
+
+record_provisioning_outcome() {
+    local outcome="$1"
+    if [[ -n "${ARTIFACT_DIR:-}" ]]; then
+        printf '{"outcome":"%s","state":"%s","attempts":%d,"elapsed_seconds":%d,"lookup":"%s"}\n' \
+            "${outcome}" "${PROVISION_STATE}" "${PROVISION_ATTEMPT}" \
+            "$((SECONDS - PROVISION_STARTED))" "${PROVISION_LOOKUP}" \
+            2>/dev/null >> "${ARTIFACT_DIR}/provisioning-outcomes.jsonl" || true
+    fi
+}
+
+cancel_provisioning() {
+    trap '' TERM INT
+    printf 'Controller cancelled; no further operations will be started.\n' >&2 || true
+    record_provisioning_outcome cancelled
+    exit "$1"
+}
+
+trap 'cancel_provisioning 143' TERM
+trap 'cancel_provisioning 130' INT
+
 LEASE_NAMESPACE="${LEASE_NAMESPACE:-rosa-cluster-lease}"
 LEASE_HOST_KUBECONFIG="/etc/rosa-cluster-lease-manager/kubeconfig"
 OCM_LOGIN_ENV="${OCM_LOGIN_ENV:-staging}"
@@ -84,7 +109,7 @@ dry_run_guard() {
 ocm_get_cluster() {
     local name="$1" response=""
     if ! response=$(ocm get /api/clusters_mgmt/v1/clusters --parameter search="name = '${name}'" 2>&1); then
-        log "ERROR: OCM lookup failed for ${name}: ${response}"
+        log "ERROR: OCM lookup failed"
         return 1
     fi
     echo "${response}" | jq '.items[0] // empty' 2>/dev/null
@@ -483,6 +508,11 @@ log "Phase 3: Checking for missing clusters"
 while IFS= read -r cluster_json; do
     [[ -z "${cluster_json}" ]] && continue
 
+    PROVISION_STATE=unknown
+    PROVISION_ATTEMPT=0
+    PROVISION_LOOKUP=not_attempted
+    PROVISION_STARTED=${SECONDS}
+
     NAME=$(echo "${cluster_json}" | jq -r '.name')
     ENV=$(echo "${cluster_json}" | jq -r '.env // "staging"')
     REGION=$(echo "${cluster_json}" | jq -r '.region // "us-east-1"')
@@ -580,8 +610,21 @@ while IFS= read -r cluster_json; do
 
     # Wait for cluster to be ready (up to 60 min)
     log "Waiting for ${NAME} to be ready..."
+    PROVISION_STARTED=${SECONDS}
     for attempt in $(seq 1 60); do
-        STATE=$(ocm_get_cluster "${NAME}" | jq -r '.status.state // "unknown"' 2>/dev/null || echo "unknown")
+        PROVISION_ATTEMPT=${attempt}
+        if POLL_CLUSTER_JSON=$(ocm_get_cluster "${NAME}"); then
+            PROVISION_LOOKUP=ok
+            STATE=$(echo "${POLL_CLUSTER_JSON}" | jq -r '.status.state // "unknown"' 2>/dev/null || echo "unknown")
+        else
+            PROVISION_LOOKUP=failed
+            STATE=unknown
+        fi
+        case "${STATE}" in
+            ready|error|installing|pending|waiting|uninstalling) ;;
+            *) STATE=unknown ;;
+        esac
+        PROVISION_STATE=${STATE}
         if [[ "${STATE}" == "ready" ]]; then
             break
         fi
@@ -594,6 +637,11 @@ while IFS= read -r cluster_json; do
     done
 
     if [[ "${STATE}" != "ready" ]]; then
+        if [[ "${STATE}" == "error" ]]; then
+            record_provisioning_outcome error
+        else
+            record_provisioning_outcome exhausted
+        fi
         log "WARNING: ${NAME} not ready after 60 min (state: ${STATE}). Will retry next reconcile."
         continue
     fi
