@@ -102,6 +102,10 @@ checkup it selects the virtualization default before CNV imports golden images.
 - Azure creates `checkup-azurefile-nfs` using Azure File CSI with NFS and
   `Premium_LRS`. This configuration is a trial following a golden-image import
   failure caused by a permissions change on the default Azure File class.
+  The job sets the [recommended NFS mount option](https://learn.microsoft.com/en-us/azure/storage/files/nfs-performance)
+  `nconnect=4` before CNV creates golden-image PVCs, so the source and clone
+  volumes can use four TCP connections. The ten-VM rehearsal measures whether
+  this helps the concurrent copies finish within the boot window.
   Before creating checkup VMs, the Azure job sets the HyperConverged v1
   `spec.virtualization.virtualMachineOptions.defaultCPUModel` to `Broadwell`.
   It verifies that at least two ready KVM workers support the model and waits

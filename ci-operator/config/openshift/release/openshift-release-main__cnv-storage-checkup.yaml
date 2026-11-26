@@ -91,6 +91,20 @@ tests:
     - chain: ipi-azure-pre
     - ref: cnv-storage-checkup-pull-secret
     - ref: cnv-storage-checkup-configure-storage
+    - as: configure-azure-checkup-nfs
+      cli: latest
+      commands: |
+        # Apply the Azure Files NFS mount option before CDI provisions golden-image volumes.
+        oc --request-timeout=30s patch storageclass checkup-azurefile-nfs --type=merge \
+          -p '{"mountOptions":["nconnect=4"]}'
+      from_image:
+        namespace: ocp
+        name: cli-jq
+        tag: latest
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
     - ref: cnv-deploy-cnv
     - ref: cnv-storage-checkup-prepare
     - ref: cnv-storage-checkup-pvc-sources
