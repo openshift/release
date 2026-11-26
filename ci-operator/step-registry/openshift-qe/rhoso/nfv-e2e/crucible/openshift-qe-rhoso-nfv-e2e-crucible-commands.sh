@@ -91,6 +91,8 @@ termination_complete=0
 alarm_pid=''
 pid_file="${log_file}.pid"
 timeout_flag="${log_file}.timeout"
+owner_file="${log_file}.owner"
+wrapper_pid=$$
 
 terminate_workload() {
   # The workload runs in its own session, so only the leader PID it publishes
@@ -134,7 +136,7 @@ cleanup() {
   if (( termination_complete == 0 )); then
     terminate_workload || status=1
   fi
-  rm -f -- "${log_file}" "${pid_file}" "${timeout_flag}" || true
+  rm -f -- "${log_file}" "${pid_file}" "${timeout_flag}" "${owner_file}" || true
   exit "${status}"
 }
 
@@ -154,7 +156,7 @@ if ! tmp_log=$(mktemp "${log_file}.XXXXXX") ||
   echo 'NFV_E2E_LOG_SETUP=failed'
   exit 1
 fi
-rm -f -- "${pid_file}" "${timeout_flag}" || true
+rm -f -- "${pid_file}" "${timeout_flag}" "${owner_file}" || true
 if ! cd -- "${workspace}"; then
   echo 'NFV_E2E_WORKSPACE=unavailable'
   exit 1
@@ -164,7 +166,7 @@ fi
 # $! stays alive exactly as long as the workload and propagates its exit
 # status.  A bare setsid forks only when the caller is a process-group
 # leader, which leaves the tracked PID's meaning dependent on context.
-setsid --fork --wait bash -s -- "${scenario}" "${timeout_crucible}" "${edpm_host}" "${frame_sizes}" "${log_file}" "${pid_file}" <<'WORKLOAD' &
+setsid --fork --wait bash -s -- "${scenario}" "${timeout_crucible}" "${edpm_host}" "${frame_sizes}" "${log_file}" "${pid_file}" "${owner_file}" <<'WORKLOAD' &
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -175,6 +177,19 @@ edpm_host="$3"
 frame_sizes="$4"
 log_file="$5"
 pid_file="$6"
+owner_file="$7"
+
+# Owner handshake: wait until the wrapper confirms it is still alive before
+# starting anything.  If the wrapper died first (uncatchable kill between
+# launch and this point), exit without starting so no orphaned workload runs.
+for ((i = 1; i <= 300; i++)); do
+  [[ -f "${owner_file}" ]] && break
+  sleep 0.1
+done
+if [[ ! -f "${owner_file}" ]]; then
+  printf 'NFV_E2E_OWNER_LOST=1\n' >&2
+  exit 125
+fi
 
 # The workload bash is the session leader setsid created, so $$ is also the
 # process-group ID every watchdog signal must target.
@@ -216,9 +231,11 @@ workload_pid=$!
 # session channel open.
 (
   sleep "${timeout_crucible}"
-  # If the wrapper is gone the job already ended; acting now could hit a
-  # reused PID, so stand down.
-  if [[ ${PPID} -eq 1 ]]; then
+  # Wrapper liveness: a subshell PPID is frozen at fork time and never
+  # reflects this shell's real parent, so check the wrapper PID recorded
+  # before the alarm started instead.  If the wrapper is gone the job already
+  # ended; acting now could hit a reused PID, so stand down.
+  if ! kill -0 "${wrapper_pid}" 2>/dev/null; then
     exit 0
   fi
   : > "${timeout_flag}"
@@ -235,6 +252,7 @@ workload_pid=$!
     kill -TERM "${workload_pid}" 2>/dev/null || true
   fi
 ) >/dev/null 2>&1 &
+printf '%s\n' "${wrapper_pid}" > "${owner_file}"
 alarm_pid=$!
 
 set +o errexit
@@ -248,8 +266,10 @@ set -o errexit
 
 if [[ -f "${timeout_flag}" ]]; then
   printf 'NFV_E2E_TERMINAL=1\nNFV_E2E_WORKLOAD_EXIT=124\nNFV_E2E_FILTER_EXIT=unknown\nNFV_E2E_CAPTURE_EXIT=unknown\n'
+  rm -f -- "${owner_file}" || true
   exit 124
 fi
+rm -f -- "${owner_file}" || true
 exit "${workload_status}"
 INNER
 REMOTE
