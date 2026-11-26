@@ -67,9 +67,15 @@ DHCP_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':dhcp-options/' | sed 's|.*/||' | 
 PEERING_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':vpc-peering-connection/' | sed 's|.*/||' | tr '\n' ' ') || PEERING_IDS=""
 S3_BUCKETS=$(echo "${TAGGED_RESOURCES}" | grep '^arn:aws:s3:::' | sed 's|^arn:aws:s3:::||' | tr '\n' ' ') || S3_BUCKETS=""
 KMS_KEY_IDS=$(echo "${TAGGED_RESOURCES}" | grep ':key/' | sed 's|.*/||' | tr '\n' ' ') || KMS_KEY_IDS=""
-IAM_ROLE_NAMES=$(echo "${TAGGED_RESOURCES}" | grep ':role/' | sed 's|.*/||' | tr '\n' ' ') || IAM_ROLE_NAMES=""
 IAM_PROFILE_NAMES=$(echo "${TAGGED_RESOURCES}" | grep ':instance-profile/' | sed 's|.*/||' | tr '\n' ' ') || IAM_PROFILE_NAMES=""
 HOSTED_ZONE_IDS=$(echo "${TAGGED_RESOURCES}" | grep 'route53:::hostedzone/' | sed 's|.*/||' | tr '\n' ' ') || HOSTED_ZONE_IDS=""
+
+# IAM roles are not returned by GetResources API, so use native IAM enumeration
+echo "Discovering IAM roles via IAM API..."
+IAM_ROLE_NAMES=$(aws iam list-roles --output json 2>/dev/null | \
+    jq -r --arg cluster "kubernetes.io/cluster/${INFRA_ID}" --arg value "owned" \
+    '.Roles[] | select(.Tags[]? | .Key == $cluster and .Value == $value) | .RoleName' | \
+    tr '\n' ' ') || IAM_ROLE_NAMES=""
 
 # Query EC2 instances
 if [[ -n "${EC2_INSTANCE_IDS}" ]]; then
@@ -109,7 +115,10 @@ if [[ -n "${VPC_IDS}" ]]; then
   echo "Fetching VPC details..."
   VPCS_JSON=$(aws ec2 describe-vpcs \
       --vpc-ids ${VPC_IDS} \
-      --output json | jq '.Vpcs') || VPCS_JSON="[]"
+      --output json | jq '[
+        .Vpcs[] |
+        .OwnerId = "REDACTED"
+      ]') || VPCS_JSON="[]"
 else
   VPCS_JSON="[]"
 fi
@@ -119,7 +128,10 @@ if [[ -n "${SUBNET_IDS}" ]]; then
   echo "Fetching subnet details..."
   SUBNETS_JSON=$(aws ec2 describe-subnets \
       --subnet-ids ${SUBNET_IDS} \
-      --output json | jq '.Subnets') || SUBNETS_JSON="[]"
+      --output json | jq '[
+        .Subnets[] |
+        .OwnerId = "REDACTED"
+      ]') || SUBNETS_JSON="[]"
 else
   SUBNETS_JSON="[]"
 fi
@@ -129,7 +141,10 @@ if [[ -n "${SG_IDS}" ]]; then
   echo "Fetching security group details..."
   SECURITY_GROUPS_JSON=$(aws ec2 describe-security-groups \
       --group-ids ${SG_IDS} \
-      --output json | jq '.SecurityGroups') || SECURITY_GROUPS_JSON="[]"
+      --output json | jq '[
+        .SecurityGroups[] |
+        .OwnerId = "REDACTED"
+      ]') || SECURITY_GROUPS_JSON="[]"
 else
   SECURITY_GROUPS_JSON="[]"
 fi
@@ -139,7 +154,10 @@ if [[ -n "${RTB_IDS}" ]]; then
   echo "Fetching route table details..."
   ROUTE_TABLES_JSON=$(aws ec2 describe-route-tables \
       --route-table-ids ${RTB_IDS} \
-      --output json | jq '.RouteTables') || ROUTE_TABLES_JSON="[]"
+      --output json | jq '[
+        .RouteTables[] |
+        .OwnerId = "REDACTED"
+      ]') || ROUTE_TABLES_JSON="[]"
 else
   ROUTE_TABLES_JSON="[]"
 fi
@@ -189,7 +207,13 @@ if [[ -n "${ENI_IDS}" ]]; then
       --network-interface-ids ${ENI_IDS} \
       --output json | jq '[
         .NetworkInterfaces[] |
-        if .Association.PublicIp then .Association.PublicIp = "REDACTED" else . end
+        .OwnerId = "REDACTED" |
+        if .Association.PublicIp then .Association.PublicIp = "REDACTED" else . end |
+        if .PrivateIpAddresses then
+          .PrivateIpAddresses |= map(
+            if .Association.PublicIp then .Association.PublicIp = "REDACTED" else . end
+          )
+        else . end
       ]') || NETWORK_INTERFACES_JSON="[]"
 else
   NETWORK_INTERFACES_JSON="[]"
@@ -200,7 +224,10 @@ if [[ -n "${VPCE_IDS}" ]]; then
   echo "Fetching VPC endpoint details..."
   VPC_ENDPOINTS_JSON=$(aws ec2 describe-vpc-endpoints \
       --vpc-endpoint-ids ${VPCE_IDS} \
-      --output json | jq '.VpcEndpoints') || VPC_ENDPOINTS_JSON="[]"
+      --output json | jq '[
+        .VpcEndpoints[] |
+        .OwnerId = "REDACTED"
+      ]') || VPC_ENDPOINTS_JSON="[]"
 else
   VPC_ENDPOINTS_JSON="[]"
 fi
@@ -210,7 +237,10 @@ if [[ -n "${NACL_IDS}" ]]; then
   echo "Fetching network ACL details..."
   NETWORK_ACLS_JSON=$(aws ec2 describe-network-acls \
       --network-acl-ids ${NACL_IDS} \
-      --output json | jq '.NetworkAcls') || NETWORK_ACLS_JSON="[]"
+      --output json | jq '[
+        .NetworkAcls[] |
+        .OwnerId = "REDACTED"
+      ]') || NETWORK_ACLS_JSON="[]"
 else
   NETWORK_ACLS_JSON="[]"
 fi
@@ -220,7 +250,10 @@ if [[ -n "${DHCP_IDS}" ]]; then
   echo "Fetching DHCP option set details..."
   DHCP_OPTIONS_JSON=$(aws ec2 describe-dhcp-options \
       --dhcp-options-ids ${DHCP_IDS} \
-      --output json | jq '.DhcpOptions') || DHCP_OPTIONS_JSON="[]"
+      --output json | jq '[
+        .DhcpOptions[] |
+        .OwnerId = "REDACTED"
+      ]') || DHCP_OPTIONS_JSON="[]"
 else
   DHCP_OPTIONS_JSON="[]"
 fi
@@ -230,7 +263,11 @@ if [[ -n "${PEERING_IDS}" ]]; then
   echo "Fetching VPC peering connection details..."
   VPC_PEERINGS_JSON=$(aws ec2 describe-vpc-peering-connections \
       --vpc-peering-connection-ids ${PEERING_IDS} \
-      --output json | jq '.VpcPeeringConnections') || VPC_PEERINGS_JSON="[]"
+      --output json | jq '[
+        .VpcPeeringConnections[] |
+        .AccepterVpcInfo.OwnerId = "REDACTED" |
+        .RequesterVpcInfo.OwnerId = "REDACTED"
+      ]') || VPC_PEERINGS_JSON="[]"
 else
   VPC_PEERINGS_JSON="[]"
 fi
@@ -245,7 +282,7 @@ LOAD_BALANCERS_JSON=$(aws elb describe-load-balancers --output json 2>/dev/null 
 
 # Query Load Balancers V2 (ALB/NLB) - check tags via ARNs
 echo "Fetching application/network load balancers..."
-LB_V2_ARNS=$(echo "${TAGGED_RESOURCES}" | grep 'elasticloadbalancing:loadbalancer/' || true)
+LB_V2_ARNS=$(echo "${TAGGED_RESOURCES}" | grep 'elasticloadbalancing:[^:]*:[^:]*:loadbalancer/' || true)
 if [[ -n "${LB_V2_ARNS}" ]]; then
   LOAD_BALANCERS_V2_JSON=$(aws elbv2 describe-load-balancers --output json 2>/dev/null | \
       jq --argjson arns "$(echo "${LB_V2_ARNS}" | jq -R -s 'split("\n") | map(select(length > 0))')" '[
@@ -258,7 +295,7 @@ fi
 
 # Query Target Groups
 echo "Fetching target groups..."
-TG_ARNS=$(echo "${TAGGED_RESOURCES}" | grep 'elasticloadbalancing:targetgroup/' || true)
+TG_ARNS=$(echo "${TAGGED_RESOURCES}" | grep 'elasticloadbalancing:[^:]*:[^:]*:targetgroup/' || true)
 if [[ -n "${TG_ARNS}" ]]; then
   TARGET_GROUPS_JSON=$(aws elbv2 describe-target-groups --output json 2>/dev/null | \
       jq --argjson arns "$(echo "${TG_ARNS}" | jq -R -s 'split("\n") | map(select(length > 0))')" '[
@@ -289,7 +326,10 @@ if [[ -n "${KMS_KEY_IDS}" ]]; then
   echo "Fetching KMS key details..."
   KMS_KEYS_JSON="[]"
   for key_id in ${KMS_KEY_IDS}; do
-    KEY_INFO=$(aws kms describe-key --key-id "${key_id}" 2>/dev/null | jq '.KeyMetadata') || KEY_INFO="{}"
+    KEY_INFO=$(aws kms describe-key --key-id "${key_id}" 2>/dev/null | jq '.KeyMetadata |
+      .AWSAccountId = "REDACTED" |
+      .Arn |= gsub(":[0-9]{12}:"; ":REDACTED:")
+    ') || KEY_INFO="{}"
     if [[ "${KEY_INFO}" != "{}" ]]; then
       KMS_KEYS_JSON=$(echo "${KMS_KEYS_JSON}" | jq --argjson key "${KEY_INFO}" '. + [$key]')
     fi
@@ -320,7 +360,13 @@ if [[ -n "${IAM_PROFILE_NAMES}" ]]; then
   echo "Fetching IAM instance profile details..."
   IAM_PROFILES_JSON="[]"
   for profile_name in ${IAM_PROFILE_NAMES}; do
-    PROFILE_INFO=$(aws iam get-instance-profile --instance-profile-name "${profile_name}" 2>/dev/null | jq '.InstanceProfile') || PROFILE_INFO="{}"
+    PROFILE_INFO=$(aws iam get-instance-profile --instance-profile-name "${profile_name}" 2>/dev/null | jq '.InstanceProfile |
+      .Arn |= gsub(":[0-9]{12}:"; ":REDACTED:") |
+      .Roles |= map(
+        .Arn |= gsub(":[0-9]{12}:"; ":REDACTED:") |
+        .AssumeRolePolicyDocument = "REDACTED"
+      )
+    ') || PROFILE_INFO="{}"
     if [[ "${PROFILE_INFO}" != "{}" ]]; then
       IAM_PROFILES_JSON=$(echo "${IAM_PROFILES_JSON}" | jq --argjson profile "${PROFILE_INFO}" '. + [$profile]')
     fi
