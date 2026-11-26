@@ -96,16 +96,7 @@ tests:
         GH_VERSION=2.62.0
         curl -fsSL "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
           | tar -xz -C /tmp
-        mkdir -p /tmp/bin
-
-        OSV_VERSION=2.7.1
-        curl -fsSL "https://github.com/google/osv-scanner/releases/download/v${OSV_VERSION}/osv-scanner_linux_amd64" \
-          -o /tmp/bin/osv-scanner
-        printf '%s  %s\n' fb7dab19a8bd9bbe5c3189f09d4b7ee1820c9553a23bac202648a56efd2f6ee8 /tmp/bin/osv-scanner \
-          | sha256sum --check --strict
-        chmod 755 /tmp/bin/osv-scanner
-
-        export PATH="/tmp/bin:/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
+        export PATH="/tmp/gh_${GH_VERSION}_linux_amd64/bin:${PATH}"
 
         git config --global --add safe.directory "$(pwd)"
         if ! git remote get-url origin >/dev/null 2>&1; then
@@ -114,6 +105,8 @@ tests:
 
         export CONTAINER_ENGINE=podman
         export REGISTRY_AUTH_FILE=/var/run/secrets/ci-pull-credentials/.dockerconfigjson
+        # TODO: Remove OVERRIDE_TAG after rehearsal — production should discover tags naturally.
+        export OVERRIDE_TAG=v1.42.3
         ./hack/auto-rebase.sh
       credentials:
       - mount_path: /var/run/github-app
