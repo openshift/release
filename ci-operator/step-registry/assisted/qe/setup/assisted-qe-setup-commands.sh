@@ -2,11 +2,9 @@
 set -euo pipefail
 umask 077
 host=${ASSISTED_QE_HOST:?No host lease}
+[[ "$QE_OCP_VERSION" =~ ^[0-9]+\.[0-9]+$ ]]
 [[ "$host" =~ ^[a-zA-Z0-9][a-zA-Z0-9.-]+$ ]]
 [[ "$QE_SSH_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]
-[[ "$QE_RUNNER_REF" =~ ^[0-9a-f]{40}$ ]]
-[[ "$QE_RUNNER_REPO" == https://* ]]
-[[ "$QE_PROFILE" =~ ^ci/prow/profiles/[a-zA-Z0-9_./-]+\.yaml$ && "$QE_PROFILE" != *..* ]]
 # Administrators enable only hosts exclusively handed over from Jenkins.
 grep -Fxq "$host" /var/run/assisted-qe/enabled-hosts
 cat > "${SHARED_DIR}/qe-ssh.sh" <<'HELPER'
@@ -45,6 +43,18 @@ if [[ -f "$work/active.pid" ]]; then
     rm -f "$work/active.pid"
 fi
 STOP
+}
+# Copy only explicitly declared Prow parameters, never the pod's full environment.
+qe_export() {
+    local work name
+    work=$(cat "${SHARED_DIR}/qe-workspace")
+    [[ "$work" =~ ^/home/[a-z_][a-z0-9_-]*/prow-assisted-qe/run\.[[:alnum:]]+$ ]]
+    for name in "$@"; do
+        [[ "$name" =~ ^[A-Z_][A-Z_0-9]*$ ]] || return 1
+        case "$name" in WORKSPACE|HOST|HOME|PATH|QE_SECRETS_DIR) return 1 ;; esac
+    done
+    { for name in "$@"; do printf 'export %s=%q\n' "$name" "${!name}"; done; } |
+        qe_ssh "cat >> '$work/job.env'"
 }
 qe_remote() {
     local phase=$1 duration=$2 work command rc=0
@@ -85,12 +95,9 @@ printf '%s\n' "$work" > "${SHARED_DIR}/qe-workspace"
 {
     printf 'export WORKSPACE=%q\n' "$work"
     printf 'export HOST=%q\n' "$host"
-    printf 'export QE_RUNNER_REPO=%q\n' "$QE_RUNNER_REPO"
-    printf 'export QE_RUNNER_REF=%q\n' "$QE_RUNNER_REF"
-    printf 'export QE_PROFILE=%q\n' "$QE_PROFILE"
+    printf 'export QE_SECRETS_DIR=%q\n' "$work/secrets"
     printf 'export QE_OCP_VERSION=%q\n' "$QE_OCP_VERSION"
     printf 'export OPENSHIFT_RELEASE_IMAGE=%q\n' "${RELEASE_IMAGE_LATEST:?}"
-    printf 'export QE_PUBLISH_RESULTS=%q\n' "$QE_PUBLISH_RESULTS"
     printf 'export JOB_NAME=%q\n' "${JOB_NAME:?}"
     printf 'export BUILD_NUMBER=%q\n' "${BUILD_ID:?}"
     printf 'export BUILD_URL=%q\n' "https://prow.ci.openshift.org/view/gs/test-platform-results-public/logs/${JOB_NAME}/${BUILD_ID}"
@@ -104,24 +111,67 @@ for credential in /var/run/assisted-qe/*; do
     [[ "$name" =~ ^[a-zA-Z0-9_-][a-zA-Z0-9_.-]*$ ]]
     qe_ssh "umask 077; cat > '$work/secrets/$name'" < "$credential"
 done
-qe_remote bootstrap 15m <<'REMOTE'
+qe_remote bootstrap 10m <<'REMOTE'
 sudo -n true
-git clone "$QE_RUNNER_REPO" "$WORKSPACE/ocp-edge-ci"
-git -C "$WORKSPACE/ocp-edge-ci" fetch origin "$QE_RUNNER_REF"
-git -C "$WORKSPACE/ocp-edge-ci" checkout --detach "$QE_RUNNER_REF"
+for tool in git timeout setsid; do command -v "$tool"; done
 python=''
 for candidate in /usr/bin/python3.12 /usr/bin/python3.9 /usr/bin/python3.8 /usr/bin/python3; do
-    if [[ -x "$candidate" ]] && "$candidate" -c 'import sys; sys.exit(sys.version_info < (3, 8))'; then
+    if [[ -x "$candidate" ]] && "$candidate" -c 'import sys; sys.exit(sys.version_info < (3, 6))'; then
         python=$candidate
         break
     fi
 done
-[[ -n "$python" ]] || { echo 'The runner requires Python >= 3.8'; exit 1; }
-"$python" -m venv "$WORKSPACE/runner-venv"
-"$WORKSPACE/runner-venv/bin/pip" install -r "$WORKSPACE/ocp-edge-ci/ci/prow/requirements.txt"
-"$WORKSPACE/runner-venv/bin/python" "$WORKSPACE/ocp-edge-ci/ci/prow/runner.py" init \
-    --profile "$QE_PROFILE" --workspace "$WORKSPACE"
-REMOTE
-qe_remote prepare "$QE_PREPARE_TIMEOUT" <<'REMOTE'
-exec "$WORKSPACE/runner-venv/bin/python" "$WORKSPACE/ocp-edge-ci/ci/prow/runner.py" prepare --workspace "$WORKSPACE"
+[[ -n "$python" ]] || { echo 'Results processing requires Python >= 3.6'; exit 1; }
+printf 'export QE_PYTHON=%q\n' "$python" >> "$WORKSPACE/job.env"
+mkdir -p "$WORKSPACE/results" "$WORKSPACE/public"
+cat > "$WORKSPACE/results.py" <<'PYTHON'
+"""Check JUnit and emit status-only public artifacts; raw output stays internal."""
+from pathlib import Path
+import shutil
+import sys
+import xml.etree.ElementTree as ET
+
+def check(work):
+    reports = sorted((work / 'results').glob('*.xml'))
+    if (work / 'results/failed').exists():
+        raise ValueError('Test command recorded a failure marker')
+    if not reports:
+        raise ValueError('No JUnit reports were produced')
+    executed = 0
+    for report in reports:
+        original = ET.parse(str(report))
+        if original.findall('.//failure') or original.findall('.//error'):
+            raise ValueError('JUnit contains failed tests')
+        for suite in original.iter('testsuite'):
+            if int(suite.get('failures', 0)) or int(suite.get('errors', 0)):
+                raise ValueError('JUnit contains a failed suite')
+        executed += sum(case.find('skipped') is None for case in original.iter('testcase'))
+    if not executed:
+        raise ValueError('No test cases executed')
+
+def publish(work):
+    public = work / 'public'
+    if public.exists():
+        shutil.rmtree(str(public))
+    public.mkdir()
+    for index, report in enumerate(sorted((work / 'results').glob('*.xml'))):
+        original = ET.parse(str(report))
+        suite = ET.Element('testsuite', name='assisted-qe')
+        for number, case in enumerate(original.iter('testcase')):
+            item = ET.SubElement(suite, 'testcase', name='case-{}'.format(number), classname='assisted.qe')
+            for tag in ('failure', 'error', 'skipped'):
+                if case.find(tag) is not None:
+                    ET.SubElement(item, tag, message='See internal host artifacts for details')
+        suite.set('tests', str(len(suite)))
+        for tag, attr in [('failure', 'failures'), ('error', 'errors'), ('skipped', 'skipped')]:
+            suite.set(attr, str(len(suite.findall('testcase/' + tag))))
+        ET.ElementTree(suite).write(str(public / ('junit_{}.xml'.format(index))), encoding='utf-8', xml_declaration=True)
+
+if __name__ == '__main__':
+    try:
+        {'check': check, 'publish': publish}[sys.argv[1]](Path(sys.argv[2]))
+    except (ValueError, OSError, ET.ParseError) as error:
+        print(str(error), file=sys.stderr)
+        sys.exit(1)
+PYTHON
 REMOTE

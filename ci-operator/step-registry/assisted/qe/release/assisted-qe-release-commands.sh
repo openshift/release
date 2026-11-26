@@ -4,10 +4,6 @@ set -euo pipefail
 source "${SHARED_DIR}/qe-ssh.sh"
 qe_stop
 status=0
-qe_remote cleanup "$QE_CLEANUP_TIMEOUT" <<'REMOTE' || status=$?
-[[ -f "$WORKSPACE/.qe/state.json" ]] || exit 0
-exec "$WORKSPACE/runner-venv/bin/python" "$WORKSPACE/ocp-edge-ci/ci/prow/runner.py" cleanup --workspace "$WORKSPACE"
-REMOTE
 work=$(cat "${SHARED_DIR}/qe-workspace")
 [[ "$work" =~ ^/home/[a-z_][a-z0-9_-]*/prow-assisted-qe/run\.[[:alnum:]]+$ ]]
 printf -v command 'bash -s -- %q' "$work"
