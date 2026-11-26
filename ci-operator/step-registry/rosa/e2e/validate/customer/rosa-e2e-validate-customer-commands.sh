@@ -127,6 +127,10 @@ else
 fi
 
 GINKGO_ARGS=("--ginkgo.junit-report=${ARTIFACT_DIR}/junit-rosa-e2e-customer.xml" "--ginkgo.v")
+# CUSTOMER_LABEL_FILTER lets a workflow scope the customer plane to a feature
+# subset without fighting the non-empty LABEL_FILTER default declared in the
+# ref (mirrors the platform step's PLATFORM_LABEL_FILTER).
+LABEL_FILTER="${CUSTOMER_LABEL_FILTER:-${LABEL_FILTER:-}}"
 log "LABEL_FILTER='${LABEL_FILTER:-}'"
 if [[ -n "${LABEL_FILTER:-}" ]]; then
   GINKGO_ARGS+=("--ginkgo.label-filter=${LABEL_FILTER}")
