@@ -20,6 +20,23 @@ sudo podman run -d --rm \
      --name external-squid \
      --dns 127.0.0.1 \
      quay.io/openshifttest/squid-proxy:multiarch
+
+# Wait for the squid proxy to actually accept connections before handing the
+# proxied kubeconfig to the next step: podman run -d returns as soon as the
+# container is created, before squid is listening on the port, which made the
+# first API call of the following step fail with "connection refused".
+for i in $(seq 30); do
+    if (echo > /dev/tcp/127.0.0.1/8213) 2>/dev/null; then
+        echo "squid is accepting connections"
+        break
+    fi
+    if [[ "$i" == "30" ]]; then
+        echo "squid did not start listening on 8213 within 60s"
+        exit 1
+    fi
+    sleep 2
+done
+
 EOF
 
 echo "Adding proxy-url in kubeconfig"

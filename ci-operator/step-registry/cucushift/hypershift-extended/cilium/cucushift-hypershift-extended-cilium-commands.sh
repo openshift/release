@@ -39,6 +39,11 @@ curl --fail --retry 3 -sS -L "https://github.com/cilium/cilium-cli/releases/down
 tar -xzC /tmp/bin/ -f /tmp/cilium-linux-amd64.tar.gz
 chmod +x /tmp/bin/cilium
 
+# Wait for the hosted cluster API to become reachable before querying it. The
+# very first call after cluster creation can still be refused while the proxy
+# or the API server load balancer is converging.
+timeout 10m bash -c 'until oc get network cluster &>/dev/null; do sleep 15; done'
+
 PODCIDR=$(oc get network cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')
 HOSTPREFIX=$(oc get network cluster -o jsonpath='{.spec.clusterNetwork[0].hostPrefix}')
 export PODCIDR=$PODCIDR
