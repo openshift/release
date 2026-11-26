@@ -138,6 +138,42 @@ spec:
         protocol: TCP
 EOF
 
+# Workaround for the 5.1+ https://redhat.atlassian.net/browse/OCPBUGS-147916
+# compatibility-requirements operator blocking CRD creation on Cilium clusters.
+# The operator's NetworkPolicy (allow-ingress-to-webhook) only admits pod identities,
+# so kube-apiserver (host-network) calls to its CRD-validating webhook are dropped and
+# every CRD create fails with a 10s webhook timeout.
+if OCP_RELEASE_VERSION=$(oc adm release info -a "${CLUSTER_PROFILE_DIR}/pull-secret" \
+    "${OPENSHIFT_INSTALL_RELEASE_IMAGE}" -o jsonpath='{.metadata.version}' 2>/dev/null); then
+  OCP_MAJOR=$(echo "${OCP_RELEASE_VERSION}" | cut -d. -f1)
+  OCP_MINOR=$(echo "${OCP_RELEASE_VERSION}" | cut -d. -f2)
+  if [[ "${OCP_MAJOR}" -gt 5 ]] || { [[ "${OCP_MAJOR}" -eq 5 ]] && [[ "${OCP_MINOR}" -ge 1 ]]; }; then
+    echo "Detected OpenShift ${OCP_RELEASE_VERSION}, adding the compatibility-requirements webhook CiliumNetworkPolicy"
+    cat > "${SHARED_DIR}/manifest_cilium-00-network-policy-compatibility-requirements-webhook.yaml" <<EOF
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-kube-apiserver-to-compatibility-webhook
+  namespace: openshift-compatibility-requirements-operator
+spec:
+  endpointSelector:
+    matchLabels:
+      k8s-app: compatibility-requirements-controllers
+  ingress:
+  - fromEntities:
+    - host
+    - remote-node
+    - kube-apiserver
+    toPorts:
+    - ports:
+      - port: "9443"
+        protocol: TCP
+EOF
+  fi
+else
+  echo "WARNING: could not detect the OpenShift version from ${OPENSHIFT_INSTALL_RELEASE_IMAGE}, skipping the compatibility-requirements webhook CiliumNetworkPolicy"
+fi
+
 cat > "${SHARED_DIR}/manifest_cilium-00-scc-privileged.yaml" <<EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
