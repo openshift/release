@@ -118,14 +118,17 @@ terminate_workload() {
   # setsid --wait forwards no signals, so also kill its children (the
   # session-leader bash) or a KILL on the launcher orphans the workload.
   if [[ -n "${workload_pid}" ]] && kill -0 "${workload_pid}" 2>/dev/null; then
-    kill -TERM "${workload_pid}" 2>/dev/null || true
+    # Children first: setsid --wait forwards no signals, and killing the
+    # launcher first reparents the workload bash to init where pkill -P
+    # can no longer find it.  The launcher itself dies last as fallback.
     pkill -TERM -P "${workload_pid}" 2>/dev/null || true
     for ((i = 1; i <= 10; i++)); do
       kill -0 "${workload_pid}" 2>/dev/null || break
       sleep 1
     done
-    kill -KILL "${workload_pid}" 2>/dev/null || true
     pkill -KILL -P "${workload_pid}" 2>/dev/null || true
+    kill -TERM "${workload_pid}" 2>/dev/null || true
+    kill -KILL "${workload_pid}" 2>/dev/null || true
   fi
   termination_complete=1
   return 0
@@ -252,9 +255,9 @@ workload_pid=$!
     done
     kill -KILL -- "-${leader}" 2>/dev/null || true
   else
-    # No published leader: bound the launcher so the wrapper's wait returns.
-    kill -TERM "${workload_pid}" 2>/dev/null || true
+    # No published leader: children first, then the launcher (see above).
     pkill -TERM -P "${workload_pid}" 2>/dev/null || true
+    kill -TERM "${workload_pid}" 2>/dev/null || true
   fi
 ) >/dev/null 2>&1 &
 printf '%s\n' "${wrapper_pid}" > "${owner_file}"
