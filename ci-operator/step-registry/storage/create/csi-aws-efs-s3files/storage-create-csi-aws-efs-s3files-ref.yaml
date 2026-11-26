@@ -1,0 +1,37 @@
+ref:
+  as: storage-create-csi-aws-efs-s3files
+  from: aws-efs-csi-operator-volume-create
+  # inject oc binary
+  cli: latest
+  commands: storage-create-csi-aws-efs-s3files-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: TEST_CSI_DRIVER_MANIFEST
+    documentation: |-
+      The CSI driver manifest to create.  Used by the `openshift-tests` as a
+      manifest for openshift/csi tests. The file must be in ${SHARED_DIR}.
+  - name: TEST_OCP_CSI_DRIVER_MANIFEST
+    default: ""
+    documentation: |-
+      The OCP specific CSI driver manifest to create.  Used by the `openshift-tests` as a
+      manifest for openshift/csi tests. The file must be in ${SHARED_DIR}.
+  - name: ENABLE_LONG_CSI_CERTIFICATION_TESTS
+    documentation: |-
+      Use the long variant of the S3 Files OCP specific manifest (ocp-manifest-long.yaml) when
+      the image provides one. The S3 Files manifests currently have no long variant, so the
+      regular ocp-manifest.yaml is used either way.
+    default: "false"
+  - name: CSI_DRIVER_SECRETS_TIMEOUT
+    documentation: |-
+      Seconds to wait for the EFS CSI driver credential secrets to be provisioned
+      by cloud-credential-operator before the S3 Files volume is created.
+    default: "600"
+  documentation: |-
+    The csi-aws-efs-s3files step creates ClusterCSIDriver and StorageClass for the EFS CSI driver
+    using S3files filesystem.
+    It also creates ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST} and
+    ${TEST_OCP_CSI_DRIVER_MANIFEST}, which is consumed by openshift-e2e-test step to
+    run CSI driver certification suite.
