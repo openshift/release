@@ -32,19 +32,6 @@ function run_command() {
     eval "${CMD}"
 }
 
-# Version comparison: returns 0 (true) if $2 < $1 (i.e. current version is before required)
-function isPreVersion() {
-  local required_ocp_version="$1"
-  local isPre version
-  version=$(oc version -o json | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j["clientVersion"]["gitVersion"])' | cut -d '.' -f1,2)
-  echo "get oc version: ${version}"
-  isPre=0
-  if [ -n "${version}" ] && [ "$(printf '%s\n' "${required_ocp_version}" "${version}" | sort --version-sort | head -n1)" = "${required_ocp_version}" ]; then
-    isPre=1
-  fi
-  return $isPre
-}
-
 function check_signed() {
     local digest algorithm hash_value response try max_retries payload="${1}"
     if [[ "${payload}" =~ "@sha256:" ]]; then
@@ -166,11 +153,12 @@ EOF
 # file:// destination (no docker:// target) = mirror-to-disk mode
 mirrorCmd="${oc_mirror_bin} -c ${image_set_config} file://${oc_mirror_workspace} --v2"
 
-# ref OCPBUGS-56009: payloads >= 4.19 that are unsigned need --ignore-release-signature
+# Latest CGW oc-mirror needs this flag for unsigned payloads regardless of the
+# oc client version (OCPBUGS-56009).
 # Record the decision in SHARED_DIR so the from-disk step can apply the same
 # flag to disk-to-mirror (oc-mirror re-validates signatures from the archive).
 IGNORE_RELEASE_SIGNATURE="false"
-if ! isPreVersion "4.19" && ! check_signed "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" ; then
+if ! check_signed "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" ; then
     mirrorCmd="${mirrorCmd} --ignore-release-signature"
     IGNORE_RELEASE_SIGNATURE="true"
 fi
