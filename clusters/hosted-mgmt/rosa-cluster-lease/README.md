@@ -17,7 +17,7 @@ this uses ConfigMaps as lightweight state tracking for lease management.
 ## ConfigMap labels
 
 - `rosa-cluster-lease/managed: "true"` - managed by the controller
-- `rosa-cluster-lease/status` - `available`, `in-use`, `maintenance`, `error`
+- `rosa-cluster-lease/status` - `available`, `in-use`, `provisioning`, `maintenance`, `error`
 - `rosa-cluster-lease/type` - cluster type (e.g., `classic-sts`)
 - `rosa-cluster-lease/env` - OCM environment (`staging`, `integration`)
 - `rosa-cluster-lease/region` - AWS region
