@@ -1,0 +1,64 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+prowgen:
+  enable_secrets_store_csi_driver: true
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "5.0"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: saas-api-regression0
+  capabilities:
+  - intranet
+  cron: 0 6 * * 3
+  disable_rehearsal: true
+  job_queue_name: assisted-qe
+  max_concurrency: 1
+  restrict_network_access: false
+  steps:
+    env:
+      QE_OCP_VERSION: "5.0"
+      QE_PROFILE: ci/prow/profiles/saas-api-regression0.yaml
+      QE_PUBLISH_RESULTS: "false"
+      QE_RUNNER_REF: bab9a6bcb23f162720caf7bd5f5a1f6200c8d0c5
+      QE_RUNNER_REPO: https://gitlab.cee.redhat.com/dasulin/ocp-edge-ci.git
+    leases:
+    - env: ASSISTED_QE_HOST
+      resource_type: assisted-qe-host
+    workflow: assisted-qe
+  timeout: 18h0m0s
+- as: saas-api-regression1
+  capabilities:
+  - intranet
+  cron: 0 12 * * 3
+  disable_rehearsal: true
+  job_queue_name: assisted-qe
+  max_concurrency: 1
+  restrict_network_access: false
+  steps:
+    env:
+      QE_OCP_VERSION: "5.0"
+      QE_PROFILE: ci/prow/profiles/saas-api-regression1.yaml
+      QE_PUBLISH_RESULTS: "false"
+      QE_RUNNER_REF: bab9a6bcb23f162720caf7bd5f5a1f6200c8d0c5
+      QE_RUNNER_REPO: https://gitlab.cee.redhat.com/dasulin/ocp-edge-ci.git
+    leases:
+    - env: ASSISTED_QE_HOST
+      resource_type: assisted-qe-host
+    workflow: assisted-qe
+  timeout: 18h0m0s
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: assisted-test-infra
+  variant: qe

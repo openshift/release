@@ -1,0 +1,36 @@
+ref:
+  as: assisted-qe-setup
+  from: dev-scripts
+  commands: assisted-qe-setup-commands.sh
+  timeout: 2h
+  grace_period: 2m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  credentials:
+  - collection: assisted-qe
+    group: runner
+    mount_path: /var/run/assisted-qe
+  env:
+  - name: QE_PREPARE_TIMEOUT
+    default: 95m
+    documentation: Host-side deadline. Keep below the step timeout and within the
+      whole-job budget.
+  - name: QE_RUNNER_REPO
+    default: https://gitlab.cee.redhat.com/ocp-edge-qe/ocp-edge-ci.git
+    documentation: Repository containing ci/prow/runner.py, templates and profiles.
+  - name: QE_RUNNER_REF
+    documentation: Reviewed full commit SHA of the runner repository; required.
+  - name: QE_PROFILE
+    documentation: Repository-relative ci/prow/profiles/*.yaml to execute; required.
+  - name: QE_OCP_VERSION
+    documentation: OpenShift major.minor matching releases.latest; required.
+  - name: QE_SSH_USER
+    default: kni
+    documentation: SSH login with /home/<user>, sudo and existing host prerequisites.
+  - name: QE_PUBLISH_RESULTS
+    default: 'false'
+    documentation: Enable adapter-specific internal reporters after comparison/cutover.
+  documentation: Setup phase of the reusable Assisted Installer QE runner; scenario
+    logic lives in the pinned ocp-edge-ci checkout.
