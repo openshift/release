@@ -15,6 +15,7 @@ else
   MGMT_REGION=us-east-1
   MGMT_ZONES="${HYPERSHIFT_ZONES}"
   MGMT_NODE_POOL_REPLICAS="${HYPERSHIFT_NODE_COUNT}"
+  MGMT_SHARED_ISSUER=true
 
   if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
     AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -25,7 +26,10 @@ else
     # and LEASED_RESOURCE is the region. Create the cluster there, so that the
     # lease accounts for it, under the account's own base domain. Zone names
     # differ between accounts, so let the CLI pick the region's first available
-    # zone and put all the nodes in it.
+    # zone and put all the nodes in it. The shared service account issuer has
+    # an IAM OIDC provider only in the HyperShift account, so let the CLI
+    # create a per-cluster issuer and provider instead; the destroy step
+    # deletes the provider together with the cluster's roles.
     if [[ -n "${CLUSTER_PROFILE_SET_NAME:-}" ]]; then
       if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
         DEFAULT_BASE_DOMAIN="$(< "${CLUSTER_PROFILE_DIR}/baseDomain")"
@@ -33,6 +37,7 @@ else
       MGMT_REGION="${LEASED_RESOURCE}"
       MGMT_ZONES=""
       MGMT_NODE_POOL_REPLICAS=$((HYPERSHIFT_NODE_COUNT * 3))
+      MGMT_SHARED_ISSUER=false
     fi
   fi
 fi
@@ -124,8 +129,6 @@ else
     "--region=${MGMT_REGION}"
     "--infra-id=${CLUSTER_NAME}"
     "--base-domain=${DOMAIN}"
-    --oidc-issuer-url=https://hypershift-ci-2-oidc.s3.us-east-1.amazonaws.com/shared-mgmt
-    --sa-token-issuer-private-key-path=/etc/hypershift-ci-jobs-awscreds/serviceaccount-signer.private
     "--instance-type=${HYPERSHIFT_INSTANCE_TYPE}"
     --service-cidr=172.29.0.0/16
     --cluster-cidr=10.124.0.0/14
@@ -139,6 +142,12 @@ else
   )
   if [[ -n "${MGMT_ZONES}" ]]; then
     AWS_CREATE_ARGS+=("--zones=${MGMT_ZONES}")
+  fi
+  if [[ "${MGMT_SHARED_ISSUER}" == "true" ]]; then
+    AWS_CREATE_ARGS+=(
+      --oidc-issuer-url=https://hypershift-ci-2-oidc.s3.us-east-1.amazonaws.com/shared-mgmt
+      --sa-token-issuer-private-key-path=/etc/hypershift-ci-jobs-awscreds/serviceaccount-signer.private
+    )
   fi
 
   if [[ -z "${HYPERSHIFT_MGMT_ADDITIONAL_TRUST_BUNDLE:-}" ]]; then
