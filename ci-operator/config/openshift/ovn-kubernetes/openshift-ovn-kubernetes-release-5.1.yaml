@@ -25,8 +25,7 @@ images:
     to: ovn-kubernetes-microshift
 promotion:
   to:
-  - disabled: true
-    name: "5.1"
+  - name: "5.1"
     namespace: ocp
 releases:
   initial:
@@ -519,6 +518,14 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - always_run: false
+  as: e2e-ibmcloud-ipi-ovn-periodic
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-ibmcloud-ovn
+- always_run: false
   as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
   pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
   steps:
@@ -528,8 +535,27 @@ tests:
       EXTRA_MG_ARGS: --host-network
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
 - always_run: false
+  as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
+  cron: 0 0 */2 * *
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
+      EXTRA_MG_ARGS: --host-network
+    workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
+- always_run: false
   as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
   pipeline_skip_if_only_changed: ^(docs|\.github|contrib|etc|helm)/|\.md$|^(\.gitignore|OWNERS|LICENSE|CODEOWNERS|\.coderabbit\.yml|crd-docs-config\.yaml|mkdocs\.yml|requirements\.txt)$
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "true"
+      EXTRA_MG_ARGS: --host-network
+      GATEWAY_MODE: local
+    workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+- always_run: false
+  as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
+  cron: 0 0 */2 * *
   steps:
     cluster_profile: openshift-org-aws
     env:
