@@ -379,7 +379,124 @@ EOF
 }
 
 REGISTRY_PASSWORD_CONTENT=$(cat "/var/run/vault/mirror-registry/registry_creds_encrypted_htpasswd" | base64 -w0)
-if [[ "${SELF_MANAGED_REGISTRY_CERT}" == "true" ]]; then
+if [[ "${AWS_REGION_OVERWRITE:-}" == "me-west-1" ]]; then
+    # TEMPORARY: me-west-1 region qualification.
+    # The shared mirror-registry certificate carries one SAN per already-qualified
+    # region and has none for me-west-1, so cluster nodes reject the bastion
+    # registry at ec2-*.me-west-1.compute.amazonaws.com:5000, fall back to the
+    # unreachable upstream registry and never pull the payload, which kills
+    # bootstrap. Trusting another CA cannot fix this: the failure is a hostname
+    # mismatch, not an untrusted chain. The bastion's hostname is not knowable
+    # here either, since ignition is rendered before the instance exists and its
+    # public IP is auto-assigned. So mint a throwaway CA and a wildcard server
+    # certificate covering the region, and publish the CA through
+    # ${SHARED_DIR}/additional_trust_bundle, which ipi-conf-mirror appends into
+    # additionalTrustBundle and mirror-images-trust-registry-ca later feeds to
+    # the in-cluster trust store. Drop this branch once the shared certificate
+    # covers me-west-1.
+    echo "me-west-1: generating a self-signed mirror registry certificate"
+    registry_cert_dir="${workdir}/me-west-1-registry-cert"
+    mkdir -p "${registry_cert_dir}"
+
+    openssl req -x509 -newkey rsa:4096 -nodes -sha256 -days 30 \
+        -subj "/CN=me-west-1 CI mirror registry CA" \
+        -addext "basicConstraints=critical,CA:TRUE,pathlen:0" \
+        -addext "keyUsage=critical,keyCertSign,cRLSign" \
+        -keyout "${registry_cert_dir}/ca.key" \
+        -out "${registry_cert_dir}/ca.crt" 2>/dev/null
+
+    openssl req -newkey rsa:4096 -nodes -sha256 \
+        -subj "/CN=*.me-west-1.compute.amazonaws.com" \
+        -keyout "${registry_cert_dir}/server.key" \
+        -out "${registry_cert_dir}/server.csr" 2>/dev/null
+
+    # The registry is reached at the public EC2 DNS name; the private wildcard
+    # is included so the same certificate also covers the private name.
+    cat > "${registry_cert_dir}/server.ext" << 'EOF'
+basicConstraints=CA:FALSE
+keyUsage=critical,digitalSignature,keyEncipherment
+extendedKeyUsage=serverAuth
+subjectAltName=DNS:*.me-west-1.compute.amazonaws.com,DNS:*.me-west-1.compute.internal
+EOF
+
+    openssl x509 -req -sha256 -days 30 \
+        -in "${registry_cert_dir}/server.csr" \
+        -CA "${registry_cert_dir}/ca.crt" \
+        -CAkey "${registry_cert_dir}/ca.key" \
+        -CAcreateserial \
+        -extfile "${registry_cert_dir}/server.ext" \
+        -out "${registry_cert_dir}/server.crt" 2>/dev/null
+
+    openssl x509 -in "${registry_cert_dir}/server.crt" -noout -text |
+        grep -A1 "Subject Alternative Name"
+
+    # Serve the full chain so clients holding only the CA can build a path.
+    REGISTRY_CRT_CONTENT=$(cat "${registry_cert_dir}/server.crt" "${registry_cert_dir}/ca.crt" | base64 -w0)
+    REGISTRY_KEY_CONTENT=$(base64 -w0 < "${registry_cert_dir}/server.key")
+
+    # Appended, never truncated: other steps contribute to the same file.
+    cat "${registry_cert_dir}/ca.crt" >> "${SHARED_DIR}/additional_trust_bundle"
+
+    # Trust this CA on the bastion itself, not just in the cluster.
+    # mirror-images-by-oc-adm-in-bastion runs `oc adm release mirror` over SSH
+    # on this host, and gather/debug steps curl the registry from here too.
+    # Those paths lean on --insecure / -k today, which also suppresses genuine
+    # TLS errors and makes failures hard to read; with the CA in the host trust
+    # store they can validate normally. Ignition can drop the anchor file, but
+    # only update-ca-trust regenerates the consolidated bundles that Go and
+    # curl actually read, so that runs as a oneshot unit. It is ordered before
+    # the registries for determinism only -- nothing Requires it, so a failure
+    # here cannot keep the registries from starting.
+    REGISTRY_CA_CONTENT=$(base64 -w0 < "${registry_cert_dir}/ca.crt")
+
+    ca_trust_unit_file="${workdir}/mirror-registry-ca-trust.service"
+    cat > "${ca_trust_unit_file}" << 'EOF'
+[Unit]
+Description=Trust the me-west-1 CI mirror registry CA
+After=local-fs.target
+Before=poc-registry-5000.service poc-registry-6001.service poc-registry-6002.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/update-ca-trust extract
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # adjust system unit content to ignition format, as done for the registries
+    CA_TRUST_UNIT_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' "${ca_trust_unit_file}" | sed 's/\"/\\"/g')
+
+    ca_trust_ignition_patch=$(mktemp)
+    cat > "${ca_trust_ignition_patch}" << EOF
+{
+  "storage": {
+    "files": [
+      {
+        "path": "/etc/pki/ca-trust/source/anchors/mirror-registry-ca.crt",
+        "contents": {
+          "source": "data:text/plain;base64,${REGISTRY_CA_CONTENT}"
+        },
+        "mode": 420
+      }
+    ]
+  },
+  "systemd": {
+    "units": [
+      {
+        "contents": "${CA_TRUST_UNIT_CONTENT}",
+        "enabled": true,
+        "name": "mirror-registry-ca-trust.service"
+      }
+    ]
+  }
+}
+EOF
+
+    patch_ignition_file "${bastion_ignition_file}" "${ca_trust_ignition_patch}"
+    rm -f "${ca_trust_ignition_patch}"
+elif [[ "${SELF_MANAGED_REGISTRY_CERT}" == "true" ]]; then
     REGISTRY_CRT_CONTENT=$(cat "${CLUSTER_PROFILE_DIR}/mirror_registry_server_domain.crt" | base64 -w0)
     REGISTRY_KEY_CONTENT=$(cat "${CLUSTER_PROFILE_DIR}/mirror_registry_server_domain.pem" | base64 -w0)
 else
