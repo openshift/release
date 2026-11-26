@@ -5,6 +5,10 @@ declare ACM_NAMESPACE="${ACM_NAMESPACE:-ocm}"
 declare MCE_NAMESPACE="${MCE_NAMESPACE:-multicluster-engine}"
 declare HEALTH_CHECK_TIMEOUT="${HEALTH_CHECK_TIMEOUT:-600}"
 
+if [[ -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 log() { echo "[$(date -u +%H:%M:%S)] $*"; }
 
 check_pods_in_namespace() {
