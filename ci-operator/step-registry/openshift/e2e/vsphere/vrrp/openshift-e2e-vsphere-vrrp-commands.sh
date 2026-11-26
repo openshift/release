@@ -64,7 +64,7 @@ api_dns=$(oc config view --minify -o jsonpath='{.clusters[0].cluster.server}' | 
 pinned=(oc "--server=https://$vip:6443" "--tls-server-name=$api_dns")
 "${pinned[@]}" get --raw /readyz >/dev/null
 case "$VRRP_ARM" in
-  stock) critical=0; total=0 ;;
+  stock|wrapper) critical=0; total=0 ;;
   ben) critical=15; total=30 ;;
   long)
     critical=$(oc get pods -A -o json | jq -er '[.items[]|select((.spec.priority//0)>=2000000000 and (.spec.nodeName as $n | $nodes|index($n)!=null))|(.spec.terminationGracePeriodSeconds//30)] | max+30' --argjson nodes "$(printf '%s\n' "${nodes[@]}" | jq -R . | jq -s .)")
@@ -98,12 +98,66 @@ for n in "${nodes[@]}"; do
   if ((critical)); then grep -i kubelet "$ARTIFACT_DIR/$n-inhibitors.txt" | grep -q shutdown || die "Missing shutdown inhibitor on $n"; fi
 done
 wait_healthy
-if [[ $VRRP_PHASE == prepare-upgrade ]]; then
-  # Persist state transitions in the original boot's journal. An oc debug or
-  # watch stream through the API VIP itself can disconnect during handoff.
-  start=$(date +%s)
-  holder > "$ARTIFACT_DIR/initial-holder.txt"
-  read -r -d '' observe <<'OBSERVE' || :
+live_command() {
+  oc get pod -n openshift-vsphere-infra "keepalived-$1" -o json |
+    jq -je '.spec.containers[]|select(.name=="keepalived")|.command[-1]'
+}
+if [[ $VRRP_PHASE == pilot && ( $VRRP_ARM == stock || $VRRP_ARM == wrapper ) ]]; then
+  # Keep each cluster's rendered addresses and image references. Transplant only
+  # the two verified shell edits, not a foreign manifest or an MCO payload.
+  src=https://raw.githubusercontent.com/openshift/machine-config-operator
+  template=templates/common/on-prem/files/keepalived.yaml
+  head=8b31803e2bf42548e25e7a26fcdd4d9fe83c2d94
+  for rev in 4cda875afc1492b907149e53905a39dee717cad4 "$head"; do
+    curl -fsSL --retry 3 "$src/$rev/$template" > "$tmp/$rev"
+  done
+  (cd "$tmp"; sha256sum -c - <<'HASHES'
+eaa462a3472decb26f433c139ccc10e7d86eada163954ce855666f687bbd247e  4cda875afc1492b907149e53905a39dee717cad4
+3d3da3d062829b79d30967c3dea1cba4bb4fa787291c046b01c723dcfc277567  8b31803e2bf42548e25e7a26fcdd4d9fe83c2d94
+HASHES
+  )
+  path=/etc/kubernetes/manifests/keepalived.yaml
+  host "${nodes[0]}" "sudo cat $path" > "$tmp/stock.yaml"
+  live_command "${nodes[0]}" > "$tmp/stock-command"
+  python3 - "$tmp" "$VRRP_ARM" "$path" "$head" <<'PY'
+import base64, hashlib, json, pathlib, re, sys, textwrap
+tmp, arm, path, head = sys.argv[1:]
+tmp = pathlib.Path(tmp)
+versions = [(tmp/r).read_text() for r in ("4cda875afc1492b907149e53905a39dee717cad4", head)]
+def apply(s, indent):
+    for expression in [r"^          sigterm_handler\(\)\n.*?^          \}$", r"^(?:          trap [^\n]+\n)+"]:
+        a,b=[textwrap.indent(textwrap.dedent(re.search(expression,v,re.S|re.M)[0])," "*indent) for v in versions]
+        assert s.count(a)==1, "deployed wrapper does not match the tested baseline"
+        if arm=="wrapper": s=s.replace(a,b)
+    return s.encode()
+manifest=apply((tmp/"stock.yaml").read_text(),6)
+command=apply((tmp/"stock-command").read_text(),0)
+for name,data in [("manifest",manifest),("command",command)]:
+    (tmp/(name+".sha")).write_text(hashlib.sha256(data).hexdigest())
+file={"path":path,"mode":420,"overwrite":True,"contents":{"source":"data:text/plain;base64,"+base64.b64encode(manifest).decode()}}
+mc={"apiVersion":"machineconfiguration.openshift.io/v1","kind":"MachineConfig","metadata":{"name":"99-vrrp-wrapper-confirm","labels":{"machineconfiguration.openshift.io/role":"master"}},"spec":{"config":{"ignition":{"version":"3.4.0"},"storage":{"files":[file]}}}}
+(tmp/"wrapper-mc.json").write_text(json.dumps(mc))
+PY
+  if [[ $VRRP_ARM == wrapper ]]; then
+    oc create -f "$tmp/wrapper-mc.json"
+    deadline=$((SECONDS+3600))
+    until oc get mcp master -o json | jq -e 'any(.status.configuration.source[];.name=="99-vrrp-wrapper-confirm") and .status.configuration.name==.spec.configuration.name' >/dev/null; do
+      ((SECONDS < deadline)) || die "Wrapper MachineConfig did not render"; sleep 10
+    done
+    wait_healthy
+  fi
+fi
+verify_wrapper() {
+  local node=$1 manifest command
+  [[ -s $tmp/command.sha ]] || return 0
+  manifest=$(host "$node" "sha256sum /etc/kubernetes/manifests/keepalived.yaml" | awk '{print $1}')
+  command=$(live_command "$node" | sha256sum | awk '{print $1}')
+  [[ $manifest == "$(<"$tmp/manifest.sha")" && $command == "$(<"$tmp/command.sha")" ]] || return 1
+  printf '%s\t%s\t%s\t%s\n' "$VRRP_ARM" "$node" "$manifest" "$command" >> "$ARTIFACT_DIR/verified-wrappers.tsv"
+}
+# Persist state transitions in the original boot's journal: a stream through
+# the API VIP may disconnect during handoff.
+read -r -d '' observe <<'OBSERVE' || :
 set -eu
 vip=$1
 read -r family table < <(nft -j list ruleset | jq -r '[.nftables[].rule? | select(.comment=="OCP_API_LB_REDIRECT") | [.family,.table]] | unique[] | @tsv' | head -1)
@@ -125,6 +179,9 @@ while :; do
   sleep 0.5
 done
 OBSERVE
+if [[ $VRRP_PHASE == prepare-upgrade ]]; then
+  start=$(date +%s)
+  holder > "$ARTIFACT_DIR/initial-holder.txt"
   for n in "${nodes[@]}"; do
     host "$n" "sudo systemd-run --unit=vrrp-upgrade-observe -p DefaultDependencies=no -p RuntimeMaxSec=4h /bin/bash -c $(printf '%q' "$observe") -- $vip"
     host "$n" "for i in {1..10}; do sudo journalctl -u vrrp-upgrade-observe --since @$start --no-pager -o cat | grep '^vip=.* redirect=present$' && exit 0; sleep 1; done; exit 1" > "$ARTIFACT_DIR/$n-observer-start.txt"
@@ -152,6 +209,8 @@ collect() {
     [[ $peer != "$n" ]] || continue
     oc --request-timeout=20s logs -n openshift-vsphere-infra "$pod" -c keepalived --since-time="$start" --timestamps > "$dir/peer-$peer.log"
   done < "$dir/pods.tsv"
+  host "$n" "sudo journalctl -b ${boot//-/} -o short-iso-precise -u vrrp-pilot-state-$i --no-pager" |
+    grep -E ']: vip=(present|absent) redirect=' > "$dir/old-state.txt"
   for unit in addr nft; do
     host "$n" "sudo journalctl -b ${boot//-/} -o short-iso-precise -u vrrp-pilot-$unit-$i --no-pager" |
       grep -Ei "$vip|6443|9445|delete (table|chain)|Started|Stopped" > "$dir/old-$unit.txt"
@@ -166,7 +225,8 @@ collect() {
   return "$rc"
 }
 for i in 1 2 3; do
-  healthy || die "Unhealthy before trial $i"
+  wait_healthy
+  for node in "${nodes[@]}"; do verify_wrapper "$node" || die "Wrapper identity mismatch on $node"; done
   for node in "${nodes[@]}"; do [[ $(host "$node" 'cat /proc/sys/kernel/random/boot_id') == "${boots[$node]}" ]] || die "Unexpected reboot on $node"; done
   n=$(holder) || die "API VIP ownership ambiguous"
   boot=${boots[$n]}
@@ -200,6 +260,8 @@ for i in 1 2 3; do
   # Capture locally on the departing host: losing the SSH connection is not
   # an address-deletion event. Keep nft output scoped to the API redirect.
   host "$n" "sudo nft -a list ruleset | grep -Ei '9445|6443' " > "$dir/redirect-before.txt"
+  host "$n" "sudo systemd-run --unit=vrrp-pilot-state-$i -p DefaultDependencies=no -p RuntimeMaxSec=20m /bin/bash -c $(printf '%q' "$observe") -- $vip"
+  host "$n" "for j in {1..10}; do sudo journalctl -u vrrp-pilot-state-$i -o cat --no-pager | grep -Fx 'vip=present redirect=present' && exit 0; sleep 1; done; exit 1"
   host "$n" "sudo systemd-run --unit=vrrp-pilot-addr-$i ip -ts monitor address"
   host "$n" "sudo systemd-run --unit=vrrp-pilot-nft-$i stdbuf -oL nft monitor rules"
   host "$n" "systemctl is-active --quiet vrrp-pilot-addr-$i && systemctl is-active --quiet vrrp-pilot-nft-$i"
@@ -227,6 +289,33 @@ for i in 1 2 3; do
   wait_healthy
   holder > "$dir/final-holder.txt" || die "Ambiguous ownership after reboot"
   collect
+  verify_wrapper "$n" || die "Unexpected wrapper on restarted $n"
+  python3 - "$dir" "$n" "$start" "$vip" <<'PY'
+import datetime as dt, pathlib, re, sys, xml.etree.ElementTree as ET
+d=pathlib.Path(sys.argv[1]); node,start,vip=sys.argv[2:]
+t=dt.datetime.fromisoformat(start.replace("Z","+00:00"))
+suite=ET.Element("testsuite",name="vrrp-pilot")
+def check(name,ok,message):
+    c=ET.SubElement(suite,"testcase",name=name)
+    if not ok: ET.SubElement(c,"skipped" if ok is None else "failure",message=message)
+logs="\n".join(p.read_text() for p in d.glob("peer-*.log"))
+kas=(d/"termination.log").read_text()
+check("peer received priority zero", True if re.search(r"_API_0\) Backup received priority 0",logs) else False if re.search(r"_API_0\) Receive advertisement timeout",logs) else None,"peer timeout or missing receipt")
+check("old holder removed API VIP",True if re.search(r"Deleted [^\n]* inet "+re.escape(vip)+r"/32\b",(d/"old-addr.txt").read_text()) else None,"no address deletion visible before recorder stopped")
+states=re.findall(r"]: vip=(present|absent) redirect=(present|absent|unknown)",(d/"old-state.txt").read_text())
+good=("absent","present"); off=("absent","absent")
+ordering=False if ("present","absent") in states else True if good in states and off in states and states.index(good)<states.index(off) else None
+check("VIP disappeared before API redirect", ordering, "observed stale VIP" if ordering is False else "ordering not resolved by samples")
+successes=re.findall(r"I(\d{4} \d\d:\d\d:\d\d\.\d+)\s+\d+ main.go.*Termination finished with exit code 0",kas)
+graceful=any(dt.datetime.strptime(str(t.year)+s,"%Y%m%d %H:%M:%S.%f").replace(tzinfo=dt.timezone.utc)>=t for s in successes)
+last=kas.rstrip("-\n ").split("\n")[-1:] or [""]
+check("departing API server exited gracefully", True if graceful else False if "did not terminate gracefully" in last[0] else None,"non-graceful exit or no trial-specific exit record")
+probe=(d/"external-readyz.log").read_text().splitlines()
+check("external client observed readiness", True if any(l.endswith(" ready") for l in probe) else None,"no successful external probe")
+suite.set("tests",str(len(suite)));suite.set("failures",str(len(suite.findall(".//failure"))));suite.set("skipped",str(len(suite.findall(".//skipped"))))
+ET.ElementTree(suite).write(d/"junit_vrrp.xml",encoding="utf-8",xml_declaration=True)
+if suite.findall(".//failure"): sys.exit("Observed VRRP or API-server regression")
+PY
   if jq -e 'length>0' "$dir/termination-events.json" >/dev/null; then die "NonGracefulTermination during trial $i"; fi
   # A peer timeout is positive evidence; no log entry is never a pass.
   echo "Inspect trial evidence; API server and VIP outcomes must be scored separately."
