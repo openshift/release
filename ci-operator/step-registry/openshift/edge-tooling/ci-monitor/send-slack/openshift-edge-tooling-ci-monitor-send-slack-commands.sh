@@ -139,6 +139,11 @@ if [[ -n "${SIPPY_UNAVAILABLE}" ]]; then
     MESSAGE+="${NL}Sippy data unavailable for: ${SIPPY_UNAVAILABLE}."
 fi
 
+CHAI_STATUS_FILE="${SHARED_DIR}/chai-analysis-status.txt"
+if [[ -r "${CHAI_STATUS_FILE}" ]] && grep -qE '^unavailable([[:space:]]|$)' "${CHAI_STATUS_FILE}"; then
+    MESSAGE+="${NL}:warning: A problem prevented Chai Bot from providing analysis."
+fi
+
 MESSAGE+="${NL}<${DASHBOARD_URL}|View Dashboard> | <${JOB_URL}|Prow Logs> | @openshift-edge-payload-manager"
 
 # ---------------------------------------------------------------------------
