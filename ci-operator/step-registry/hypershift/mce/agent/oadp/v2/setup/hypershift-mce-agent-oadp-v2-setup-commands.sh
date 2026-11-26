@@ -9,6 +9,10 @@ set -x
 # to the hostname being unresolvable. This value is calculated in
 # baremetalds-devscripts-setup-commands.sh as ${EXTERNAL_SUBNET_V4%.*}.1.
 VIRTHOST_IP="192.168.111.1"
+S3_URL="http://${VIRTHOST_IP}:9000"
+if [[ -s "${SHARED_DIR}/minio-endpoint" ]]; then
+  S3_URL="$(<"${SHARED_DIR}/minio-endpoint")"
+fi
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
@@ -20,13 +24,21 @@ fi
 OADP_PLUGIN_IMAGE="${OADP_HYPERSHIFT_PLUGIN_IMAGE:-quay.io/konveyor/hypershift-oadp-plugin:latest}"
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-cat <<EOF > /tmp/miniocred
+# Disable tracing while handling the MinIO credentials.
+set +x
+if [[ -s "${SHARED_DIR}/minio-credentials" ]]; then
+  cp "${SHARED_DIR}/minio-credentials" /tmp/miniocred
+else
+  cat <<EOF > /tmp/miniocred
 [default]
 aws_access_key_id=admin
 aws_secret_access_key=admin123
 EOF
+fi
+chmod 600 /tmp/miniocred
 
 oc create secret generic cloud-credentials -n openshift-adp --from-file cloud=/tmp/miniocred
+set -x
 
 cat <<EOF | oc apply -f -
 apiVersion: oadp.openshift.io/v1alpha1
@@ -81,7 +93,7 @@ spec:
   config:
     region: minio
     s3ForcePathStyle: "true"
-    s3Url: "http://${VIRTHOST_IP}:9000"
+    s3Url: "${S3_URL}"
     insecureSkipTLSVerify: "true"
     profile: default
 EOF
