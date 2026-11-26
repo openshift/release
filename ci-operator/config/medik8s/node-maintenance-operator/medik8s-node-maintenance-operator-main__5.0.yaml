@@ -106,8 +106,10 @@ tests:
       TEST_STEPS: e2e-test
     post:
     - ref: medik8s-analyze-e2e-failure
+    - chain: ipi-aws-post
     test:
     - ref: medik8s-source-build-and-install
+    - ref: ssh-bastion
     - as: e2e-test
       cli: latest
       commands: |
@@ -115,6 +117,16 @@ tests:
 
         : "${ARTIFACT_DIR:?ci-operator must provide ARTIFACT_DIR}"
         exec > >(tee "$ARTIFACT_DIR/e2e-test.log") 2>&1
+
+        # Same pattern as ssh-bastion: OpenSSH requires the random OpenShift UID in /etc/passwd.
+        if ! whoami &> /dev/null; then
+          if [[ -w /etc/passwd ]]; then
+            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+          else
+            echo "/etc/passwd is not writeable, and user matching this uid is not found."
+            exit 1
+          fi
+        fi
 
         export GOPATH=/tmp/nmo-go
         export GOMODCACHE="$GOPATH/pkg/mod"
