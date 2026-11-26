@@ -9,6 +9,7 @@ workflow:
       - ref: openshift-cluster-bot-rbac
       - chain: storage-conf-csi-optional-topolvm
       - ref: interop-tests-deploy-cnv
+      - chain: cucushift-installer-check-cluster-health
     test:
     - ref: cnv-smoke-lvms
     post:
@@ -34,3 +35,8 @@ workflow:
     deploys LVMS for local storage, deploys CNV, and runs CNV smoke tests.
     LVMS is used because TNF clusters lack shared storage; LiveMigration
     is not tested since LVMS does not support RWX volumes.
+    After CNV is deployed, a cluster health check waits for MachineConfigPools
+    and cluster operators to stabilize: CNV's virt-platform-autopilot applies a
+    psi=1 kernel-argument MachineConfig which triggers an MCO rollout that
+    cordons and reboots nodes one at a time, and the smoke tests abort if any
+    node is unschedulable when they start.
