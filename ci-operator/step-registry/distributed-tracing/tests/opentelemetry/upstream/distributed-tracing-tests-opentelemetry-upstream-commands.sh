@@ -184,10 +184,19 @@ oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.m
 
 # The tests are only meaningful if the installed operator is the image built from the PR. The bundle references it
 # through the ci-operator substitution, so fail loudly when the substitution did not apply.
+# For multi-arch images OPERATOR_IMG is a manifest list digest while OLM resolves it to the per-arch member digest
+# in the deployment. Collect all valid digests (the manifest list itself and every per-arch member) so the check
+# works regardless of whether OLM kept the manifest list digest or resolved it.
+valid_digests="${OPERATOR_IMG##*@}"
+if resolved_digest=$(oc image info "${OPERATOR_IMG}" -o json 2>/dev/null | jq -r '.digest // empty' 2>/dev/null) && [[ -n "${resolved_digest}" ]]; then
+  valid_digests+=$'\n'"${resolved_digest}"
+else
+  echo "WARNING: could not resolve OPERATOR_IMG via oc image info; multi-arch digest check may fail"
+fi
 for deployment in "${OPERATOR_DEPLOYMENT}" "${WEBHOOK_DEPLOYMENT}"; do
   installed_image=$(oc -n "${OPERATOR_NAMESPACE}" get deployment "${deployment}" -o jsonpath='{.spec.template.spec.containers[0].image}')
   echo "Image of ${deployment}: ${installed_image}"
-  if [[ "${installed_image##*@}" != "${OPERATOR_IMG##*@}" ]]; then
+  if ! grep -qF "${installed_image##*@}" <<< "${valid_digests}"; then
     echo "ERROR: ${deployment} does not run the operator image built from the PR (${OPERATOR_IMG})."
     exit 1
   fi
