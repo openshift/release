@@ -102,6 +102,10 @@ checkup it selects the virtualization default before CNV imports golden images.
 - Azure creates `checkup-azurefile-nfs` using Azure File CSI with NFS and
   `Premium_LRS`. This configuration is a trial following a golden-image import
   failure caused by a permissions change on the default Azure File class.
+  The Azure job sets the default guest CPU model to `Broadwell` before creating
+  checkup VMs. It verifies that at least two ready KVM workers support that
+  model. A rehearsal on `Standard_D16s_v5` workers mixed Sapphire Rapids and
+  Ice Lake hosts, and the migration target could not match the source host model.
 - GCP runs one shipped checkup on zonal `hyperdisk-balanced`. Three C3
   workers share one zone so the source and destination can attach the same
   RWX Block guest disk during live migration. CDI imports the golden image
@@ -181,15 +185,16 @@ for the checkup, and 2100 seconds for the Job. The current jobs use these budget
 | Input | Cloud job value |
 | --- | --- |
 | `CHECKUP_VMI_TIMEOUT` | AWS `6m`, Azure `12m`, GCP `3m` |
-| `CHECKUP_TIMEOUT` | Azure `30m`, AWS and GCP `10m` |
+| `CHECKUP_TIMEOUT` | Azure `33m`, AWS and GCP `10m` |
 | `CHECKUP_JOB_TIMEOUT_SECONDS` | Azure `2100` (35 minutes), AWS and GCP `900` (15 minutes) |
 | `CHECKUP_POST_GATHER_HOLD_SECONDS` | `7200` (2 hours) |
 
 The [Azure File NFS rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-azure/2125558401814499328)
 passed migration, snapshot, and restore. The first VM started in 5m36s, and the
 hotplug DataVolume became ready in 9m50s. Both exceeded the former three-minute
-VMI timeout. The Azure budgets allow for those copy-backed operations and a
-longer concurrent boot window for all ten VMs.
+VMI timeout. The Azure checkup shares its 33-minute deadline across all checks.
+The earlier checks must finish within 21 minutes for all ten concurrent boots
+to receive the full 12-minute wait.
 
 The first clone of a freshly imported golden image can wait for an EBS snapshot.
 In the initial [AWS ten-VM rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2118584516665675776),

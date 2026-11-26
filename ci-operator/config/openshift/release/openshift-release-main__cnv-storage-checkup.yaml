@@ -77,7 +77,7 @@ tests:
       CHECKUP_SKIP_TEARDOWN: always
       CHECKUP_STORAGE_CLASS: checkup-azurefile-nfs
       CHECKUP_STORAGE_CLASS_PARAMETERS: '{"protocol":"nfs","skuName":"Premium_LRS"}'
-      CHECKUP_TIMEOUT: 30m
+      CHECKUP_TIMEOUT: 33m
       CHECKUP_VMI_TIMEOUT: 12m
       CNV_CATALOG_IMAGE: ""
       CNV_CATALOG_SOURCE: cnv-iib-catalog
@@ -94,6 +94,37 @@ tests:
     - ref: cnv-deploy-cnv
     - ref: cnv-storage-checkup-prepare
     - ref: cnv-storage-checkup-pvc-sources
+    - as: set-azure-checkup-cpu-model
+      cli: latest
+      commands: |
+        set -euo pipefail
+
+        # Workers with the same Azure SKU can expose different host CPU models.
+        cpu_model=Broadwell
+        workers=$(oc --request-timeout=30s get nodes \
+          -l "node-role.kubernetes.io/worker,kubevirt.io/schedulable=true,cpu-model.node.kubevirt.io/${cpu_model}=true" -o json |
+          jq '[.items[] | select(.spec.unschedulable != true
+            and ((.status.allocatable["devices.kubevirt.io/kvm"] // "0") != "0")
+            and all(.spec.taints[]?; .effect != "NoSchedule" and .effect != "NoExecute")
+            and any(.status.conditions[]?; .type == "Ready" and .status == "True"))] | length')
+        if (( workers < 2 )); then
+          echo "Live migration needs two ready KVM workers supporting ${cpu_model}; found ${workers}." >&2
+          exit 1
+        fi
+
+        patch=$(jq -nc --arg model "${cpu_model}" '{spec:{defaultCPUModel:$model}}')
+        oc --request-timeout=30s -n openshift-cnv patch hyperconverged kubevirt-hyperconverged --type=merge -p "${patch}"
+        oc -n openshift-cnv wait kubevirt/kubevirt-kubevirt-hyperconverged \
+          --for="jsonpath={.spec.configuration.cpuModel}=${cpu_model}" --timeout=3m
+      from_image:
+        namespace: ocp
+        name: cli-jq
+        tag: latest
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+      timeout: 5m0s
     workflow: cnv-storage-checkup-azure
   timeout: 5h0m0s
 - as: storage-checkup-gcp
