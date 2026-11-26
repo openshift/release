@@ -24,10 +24,11 @@ workflow:
         # Build pull-secret with bastion mirror registry credentials merged in.
         # The mirror-images-payload step creates new_pull_secret but deletes it
         # after use, so we rebuild it from the vault credentials.
+        # The cli image has no jq, so use sed to inject the auth entry.
         new_pull_secret=$(mktemp)
+        cp "${CLUSTER_PROFILE_DIR}/pull-secret" "${new_pull_secret}"
         registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
-        jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"${registry_cred}\"}}" \
-          '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
+        sed -i "s|\"auths\":{|\"auths\":{\"${MIRROR_REGISTRY_HOST}\":{\"auth\":\"${registry_cred}\"},|" "${new_pull_secret}"
 
         # Mirror OPCT images to the bastion registry so pods inside the
         # disconnected cluster can pull them.
