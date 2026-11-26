@@ -5,6 +5,13 @@ import json
 import yaml
 
 CONFIG = {
+    # MGMT-25680: activate only after all Jenkins users relinquish these hosts.
+    'assisted-qe-host': {
+        'sealusa50.kni.eng.rdu2.dc.redhat.com': 1,
+        'sealusa51.kni.eng.rdu2.dc.redhat.com': 1,
+        'sealusa52.kni.eng.rdu2.dc.redhat.com': 1,
+        'sealusa53.kni.eng.rdu2.dc.redhat.com': 1,
+    },
     'ibmcloud-perfscale-jp-quota-slice': {
         'jp-osa': 10,
     },
