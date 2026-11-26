@@ -1,0 +1,43 @@
+tests:
+  - steps:
+      pre:
+        - as: ci-op-emul--step--0
+          commands: |-
+            shopt -op; shopt -p; printenv
+            set -eux -o pipefail; shopt -s inherit_errexit
+            typeset f=/tmp/test.wait
+            typeset -i e=240
+            echo "${e}" 1> "${f}"
+            while true; do
+                read -r e 0< "${f}" || e=0
+                ((--e >= 0)) || { rm -f "${f}"; break; }
+                echo "${e}" 1> "${f}"
+                sleep 60
+            done
+            true
+          credentials: []
+          env: []
+          resources:
+            limits:
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 200Mi
+          timeout: 24h0m0s
+          from: cli
+      test:
+        - as: ci-op-emul--noop--0
+          commands: "true"
+          from: src
+          resources:
+            requests:
+              cpu: 100m
+              memory: 200Mi
+      post:
+        - as: ci-op-emul--noop--1
+          commands: "true"
+          from: src
+          resources:
+            requests:
+              cpu: 100m
+              memory: 200Mi
