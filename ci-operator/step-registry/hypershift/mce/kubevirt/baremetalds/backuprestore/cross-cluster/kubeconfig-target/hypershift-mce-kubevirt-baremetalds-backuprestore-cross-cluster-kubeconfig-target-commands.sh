@@ -23,10 +23,12 @@ if [[ -n "${MCE_VERSION:-}" && "$(arch)" == x86_64 ]]; then
   download_url="$(oc get ConsoleCLIDownload hcp-cli-download -o json |
     jq -r '.spec.links[] | select(.text == "Download hcp CLI for Linux for x86_64").href')"
   [[ -n "${download_url}" ]] || { echo "MCE hcp CLI download URL is missing" >&2; exit 1; }
-  curl --insecure --fail --location --silent --show-error --output /tmp/hcp.tar.gz "${download_url}"
-  tar -xzf /tmp/hcp.tar.gz -C /tmp hcp
-  chmod +x /tmp/hcp
-  hcp_cli=/tmp/hcp
+  hcp_dir="$(mktemp -d)"
+  curl --insecure --fail --location --silent --show-error \
+    --output "${hcp_dir}/hcp.tar.gz" "${download_url}"
+  tar -xzf "${hcp_dir}/hcp.tar.gz" -C "${hcp_dir}"
+  hcp_cli="${hcp_dir}/hcp"
+  chmod +x "${hcp_cli}"
 fi
 if [[ ! -x "${hcp_cli}" ]]; then
   hcp_cli=/usr/bin/hypershift
