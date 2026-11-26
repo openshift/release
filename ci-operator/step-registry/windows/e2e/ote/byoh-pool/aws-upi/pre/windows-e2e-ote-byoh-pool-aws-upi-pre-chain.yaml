@@ -1,17 +1,42 @@
 chain:
   as: windows-e2e-ote-byoh-pool-aws-upi-pre
   steps:
-  - ref: ipi-install-rbac
-  - chain: ipi-conf-aws
-  - ref: ovn-conf
-  - ref: ovn-conf-hybrid-manifest
-  - chain: upi-install-aws
-  - ref: openshift-windows-setup-wmco-konflux
-  - ref: operatorhub-subscribe
+  - chain: upi-aws-ovn-hybrid-pre
+  - as: install-wmco-from-image
+    cli: latest
+    commands: |
+      set -o errexit
+      set -o nounset
+      set -o pipefail
+      source hack/common.sh
+      # run_WMCO enables debug logging after deploying; not needed for installation.
+      enable_debug_logging() { :; }
+      OSDK=$(get_operator_sdk)
+      retries=0
+      until run_WMCO "${OSDK}"; do
+        if [ "${retries}" -ge 5 ]; then
+          echo "Max operator install retries reached" >&2
+          oc logs -l name=windows-machine-config-operator -n "${WMCO_DEPLOY_NAMESPACE}" --tail=-1 >&2 || true
+          exit 1
+        fi
+        cleanup_WMCO "${OSDK}" || true
+        echo "Failed to deploy operator from ${OPERATOR_IMAGE}, retrying"
+        retries=$((retries + 1))
+        sleep 5
+      done
+      echo "Installed WMCO from ${OPERATOR_IMAGE} built from the revision under test"
+    dependencies:
+    - env: OPERATOR_IMAGE
+      name: windows-machine-config-operator-test
+    from: windows-machine-config-operator-test
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 400Mi
+    timeout: 30m
   - ref: windows-conf-operator
   - ref: aws-windows-ami-discover
   - ref: windows-byoh-node-pool-provision
-  - chain: cucushift-installer-check
   documentation: |-
     AWS UPI OVN setup for the WMCO BYOH OTE suite: install WMCO, provision three
     Terraform-backed BYOH hosts, mark one host disposable, register the hosts, and
