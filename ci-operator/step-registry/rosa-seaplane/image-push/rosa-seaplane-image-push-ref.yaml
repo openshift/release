@@ -35,6 +35,15 @@ ref:
   - name: src
     env: CI_IMAGE_8
   env:
+  - name: ROSA_SEAPLANE_API_CHART_SHA
+    default: ""
+    documentation: |-
+      Optional 40-character rosa-seaplane-api git SHA for Helm
+      targetRevision. When set, image-push writes it to
+      SHARED_DIR/rosa-seaplane-api-chart-sha for provision (same
+      smuggle as IMAGE_TAG). When empty, JOB_SPEC refs/extra_refs for
+      openshift-online/rosa-seaplane-api is used. PULL_PULL_SHA is not
+      used.
   - name: ROSA_REGIONAL_COMPONENTS
     default: ""
     documentation: |-
@@ -44,7 +53,8 @@ ref:
       have 'target' (values file path in rosa-seaplane) and 'override'
       (YAML with IMAGE_REPO/IMAGE_TAG placeholders), which the provision
       step deploys. Per-image tags are written to
-      SHARED_DIR/component-images for the provision step.
+      SHARED_DIR/component-images for the provision step. The api
+      chart SHA is written to SHARED_DIR/rosa-seaplane-api-chart-sha.
       On postsubmits (no PULL_NUMBER) each image is also tagged :latest.
       Example:
         - image: CI_IMAGE_1
@@ -60,4 +70,5 @@ ref:
     Copies CI-built component images to public quay.io repositories so
     that ephemeral EKS clusters can pull them without CI registry
     credentials. Images listed in ROSA_REGIONAL_COMPONENTS are pushed
-    with per-image tag tracking via SHARED_DIR/component-images.
+    with per-image tag tracking via SHARED_DIR/component-images and
+    the api chart SHA via SHARED_DIR/rosa-seaplane-api-chart-sha.

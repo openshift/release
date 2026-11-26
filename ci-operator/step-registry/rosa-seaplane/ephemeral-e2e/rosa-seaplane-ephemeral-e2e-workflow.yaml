@@ -18,8 +18,9 @@ workflow:
     the PR's fork repo and branch via the GitHub API, so test changes in the
     PR are picked up automatically (including from forks). A component can
     also set a child chart's source.targetRevision to PR_SOURCE_SHA in its
-    override so Argo CD deploys the chart from the same rosa-seaplane-api
-    git commit the images were built from (JOB_SPEC refs or extra_refs).
+    override so Argo CD deploys the chart from ROSA_SEAPLANE_API_CHART_SHA
+    (or the SHA image-push wrote to SHARED_DIR, else JOB_SPEC). That is
+    independent of PULL_PULL_SHA.
     When triggered from rosa-seaplane itself, the environment is
     provisioned from the PR's head branch and every step runs the PR's
     code.
@@ -41,6 +42,9 @@ workflow:
 
     For chart changes in the component PR, include
     `seaplane.source.targetRevision: PR_SOURCE_SHA` in the override.
+    Optionally set ROSA_SEAPLANE_API_CHART_SHA to a 40-character api
+    commit; otherwise image-push smuggles the JOB_SPEC api SHA via
+    SHARED_DIR the same way as IMAGE_TAG.
 
     Set OCP_RELEASE_STREAM (e.g. "5.1.0-0.nightly-multi") to run against the
     latest accepted OCP payload of a release controller stream instead of the
