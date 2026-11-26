@@ -29,6 +29,7 @@ VERBOSITY=${VERBOSITY:-1}
 # Internal variables (not configurable via ref.yaml)
 readonly IMAGE_UPDATER_OUTPUT="/tmp/image-updater-output.md"
 readonly IMAGE_UPDATER_OUTPUT_FORMAT="markdown"
+readonly AUTOMATION_REPO_URL="https://github.com/Azure/ARO-HCP.git"
 
 # Logging functions with timestamps and severity levels
 log() { echo "[$(date +%Y-%m-%dT%H:%M:%S%z)] ${*}"; }
@@ -104,10 +105,15 @@ for cmd in "${required_tools[@]}"; do
 done
 debug "precheck: all required tools are present"
 
+# Checkout: refresh the promoted image tree to the base branch
+debug "checkout: refreshing ${REPO_ROOT} to ${GITHUB_REPO_BRANCH}"
+git fetch --quiet "${AUTOMATION_REPO_URL}" "${GITHUB_REPO_BRANCH}" || error "checkout: failed to fetch ${GITHUB_REPO_BRANCH}"
+git checkout --quiet -B image-updater-run FETCH_HEAD || error "checkout: failed to check out ${GITHUB_REPO_BRANCH}"
+
 # Publication: fix the commit this run prepares from.
 BASE_COMMIT="$(git rev-parse HEAD)"
 readonly BASE_COMMIT
-debug "publish: preparing from ${BASE_COMMIT}"
+info "checkout: running ${GITHUB_REPO_BRANCH} at ${BASE_COMMIT}"
 
 # Configuration: Validate GitHub App credentials
 debug "cfg: validating GitHub App credentials"
