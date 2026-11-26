@@ -35,7 +35,9 @@ ref:
       'override' (YAML content to deep-merge), and 'repo' (quay.io
       repository). IMAGE_REPO is substituted from 'repo' and IMAGE_TAG
       from the per-image tag written by the image-push step to
-      SHARED_DIR/component-images.
+      SHARED_DIR/component-images. PR_SOURCE_SHA is substituted from the
+      triggering PR's PULL_PULL_SHA, allowing a component job to select
+      charts from the same PR commit as its image.
       Example:
         - image: CI_IMAGE_1
           repo: quay.io/rrp-dev-ci/platform-api
@@ -46,9 +48,13 @@ ref:
                 image:
                   repository: IMAGE_REPO
                   tag: IMAGE_TAG
+            seaplane:
+              source:
+                targetRevision: PR_SOURCE_SHA
   documentation: |-
     Provisions an ephemeral rosa-seaplane environment. On a rosa-seaplane
     PR the environment, and the e2e and teardown steps after it, use the PR's
     own code; otherwise ROSA_REGIONAL_PLATFORM_REF is used. Components listed
     in ROSA_REGIONAL_COMPONENTS are deep-merged into their target files
-    with IMAGE_REPO/IMAGE_TAG substitution.
+    with IMAGE_REPO/IMAGE_TAG substitution. PR_SOURCE_SHA can pin a child
+    chart to the component PR's source commit.

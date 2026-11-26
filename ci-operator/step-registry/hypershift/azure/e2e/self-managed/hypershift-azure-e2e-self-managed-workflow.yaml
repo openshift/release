@@ -21,19 +21,24 @@ workflow:
     Track HyperShift's development here: https://issues.redhat.com/projects/CNTRLPLANE/summary
   steps:
     post:
-    - chain: hypershift-destroy-nested-management-cluster
+    - ref: hypershift-dump-management-cluster-azure-v2
+    - ref: hypershift-dump-extra
+    - ref: hypershift-destroy-nested-management-cluster-azure-v2
     test:
     - ref: hypershift-azure-run-e2e-self-managed
     pre:
     - ref: ipi-install-rbac
-    - chain: hypershift-setup-nested-management-cluster
-    - ref: hypershift-azure-setup-private-link
-    - ref: hypershift-install
+    - ref: hypershift-setup-nested-management-cluster-azure-v2
+    - ref: hypershift-azure-setup-private-link-v2
+    - ref: hypershift-install-azure-v2-aks-dns
     - ref: hypershift-resolve-nodepool-releases
     env:
       CLOUD_PROVIDER: "Azure"
       HYPERSHIFT_NODE_COUNT: "2"
-      HYPERSHIFT_AZURE_LOCATION: "centralus"
+      HYPERSHIFT_AZURE_LOCATION: "uksouth"
       AZURE_SELF_MANAGED: "true"
+      HYPERSHIFT_BASE_DOMAIN: "hcp-sm-azure.azure.devcluster.openshift.com"
+      # release-4.22 e2e hardcodes this zone for the Azure custom KAS certificate test,
+      # so the install step uses the AKS e2e zone's DNS credentials.
       HYPERSHIFT_EXTERNAL_DNS_DOMAIN: "aks-e2e.hypershift.azure.devcluster.openshift.com"
       HYPERSHIFT_ETCD_STORAGE_CLASS: "managed-csi-premium-v2"

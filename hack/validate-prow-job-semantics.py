@@ -11,6 +11,10 @@ import yaml
 
 
 JOBS_DIR = 'ci-operator/jobs'
+# Hand-written shards can carry this suffix so their basename stays unique
+# across Prow's job-config roots, as required when jobs are also published to
+# EFS (Prow rejects duplicated basenames).
+HANDWRITTEN_SUFFIX = '-handwritten'
 logger = logging.getLogger('validate-prow-job-semantics.py')
 
 # Use C-accelerated YAML loader when available (~7x faster)
@@ -259,6 +263,8 @@ def validate_sharding(path, data):
                     branch = make_regex_filename_label(job["branches"][0])
 
                 file_branch = os.path.basename(path)[len(f'{repo.replace("/", "-")}-'):-len(f'-{job_type}.yaml')]
+                if file_branch.endswith(HANDWRITTEN_SUFFIX):
+                    file_branch = file_branch[:-len(HANDWRITTEN_SUFFIX)]
                 if file_branch != branch:
                     logger.error("%s: job %s runs on branch %s, not %s so it should be in file %s", path, job["name"], branch, file_branch, path.replace(file_branch, branch))
                     out = False

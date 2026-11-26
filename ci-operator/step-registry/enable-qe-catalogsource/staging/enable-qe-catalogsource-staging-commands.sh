@@ -7,7 +7,6 @@ set -o pipefail
 CATALOGSOURCE_NAME="qe-app-registry"
 ICSP_NAME="stage-registry"
 IDMS_NAME="stage-registry-idms"
-ART_SECRET_PATH="/var/run/vault/deploy-konflux-operator-art-image-share/.dockerconfigjson"
 STAGE_REGISTRY_PATH="/var/run/vault/mirror-registry/registry_stage.json"
 
 function set_proxy() {
@@ -74,26 +73,18 @@ function update_global_auth() {
         return 1
     fi
 
-    if [[ ! -f "${ART_SECRET_PATH}" ]]; then
-        echo "!!! quay.io/openshift-art credentials not found at ${ART_SECRET_PATH}"
-        return 1
+    if [[ ! -f "${STAGE_REGISTRY_PATH}" ]]; then
+        echo "WARNING: stage registry credentials not found at ${STAGE_REGISTRY_PATH}, keeping the existing pull-secret"
+        return 0
     fi
 
     new_dockerconfig="/tmp/new-dockerconfigjson"
-    art_auths=$(jq -r '.auths' "${ART_SECRET_PATH}")
-
-    if [[ -f "${STAGE_REGISTRY_PATH}" ]]; then
-        echo "Merging registry.stage.redhat.io credentials..."
-        stage_auth_user=$(jq -r '.user' "${STAGE_REGISTRY_PATH}")
-        stage_auth_password=$(jq -r '.password' "${STAGE_REGISTRY_PATH}")
-        stage_registry_auth=$(echo -n "${stage_auth_user}:${stage_auth_password}" | base64 -w 0)
-        jq --argjson art "${art_auths}" \
-           --argjson stage "{\"registry.stage.redhat.io\": {\"auth\": \"${stage_registry_auth}\"}}" \
-           '.auths |= . + $art + $stage' "/tmp/.dockerconfigjson" > "${new_dockerconfig}"
-    else
-        echo "WARNING: stage registry credentials not found at ${STAGE_REGISTRY_PATH}, merging only ART credentials"
-        jq --argjson art "${art_auths}" '.auths |= . + $art' "/tmp/.dockerconfigjson" > "${new_dockerconfig}"
-    fi
+    echo "Merging registry.stage.redhat.io credentials..."
+    stage_auth_user=$(jq -r '.user' "${STAGE_REGISTRY_PATH}")
+    stage_auth_password=$(jq -r '.password' "${STAGE_REGISTRY_PATH}")
+    stage_registry_auth=$(echo -n "${stage_auth_user}:${stage_auth_password}" | base64 -w 0)
+    jq --argjson stage "{\"registry.stage.redhat.io\": {\"auth\": \"${stage_registry_auth}\"}}" \
+       '.auths |= . + $stage' "/tmp/.dockerconfigjson" > "${new_dockerconfig}"
 
     ret=0
     run_command "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}" || ret=$?

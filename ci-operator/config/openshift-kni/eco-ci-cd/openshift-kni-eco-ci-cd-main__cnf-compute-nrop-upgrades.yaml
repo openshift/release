@@ -1,0 +1,68 @@
+build_root:
+  image_stream_tag:
+    name: eco-ci-cd
+    namespace: telcov10n-ci
+    tag: eco-ci-cd
+prowgen:
+  enable_secrets_store_csi_driver: false
+resources:
+  '*':
+    limits:
+      cpu: 500m
+      memory: 4Gi
+    requests:
+      cpu: 500m
+      memory: 200Mi
+tests:
+- as: e2e-telcov10n-nrop-upgrades-zstream-5-0
+  capabilities:
+  - intranet
+  cron: 0 0 * * 5
+  steps:
+    env:
+      CLUSTER_NAME: kni-qe-135
+      UPGRADE_ENV: prod-stage
+      UPGRADE_TYPE: zstream
+      VERSION: "5.0"
+    workflow: telcov10n-functional-cnf-compute-nrop-upgrades
+- as: e2e-telcov10n-nrop-upgrades-minor-long-5-0-to-5-1
+  capabilities:
+  - intranet
+  cron: 0 0 * * 6
+  steps:
+    env:
+      CLUSTER_NAME: kni-qe-135
+      TO_OCP_VERSION: "5.1"
+      UPGRADE_ENV: prod-stage
+      UPGRADE_TYPE: minor-long
+      VERSION: "5.0"
+    workflow: telcov10n-functional-cnf-compute-nrop-upgrades
+- as: e2e-telcov10n-nrop-upgrades-canary-4-20-to-4-22
+  capabilities:
+  - intranet
+  cron: 0 0 * * 0
+  steps:
+    env:
+      CLUSTER_NAME: kni-qe-135
+      TO_OCP_VERSION: "4.22"
+      UPGRADE_ENV: prod-stage
+      UPGRADE_TYPE: canary
+      VERSION: "4.20"
+    workflow: telcov10n-functional-cnf-compute-nrop-upgrades
+- as: e2e-telcov10n-nrop-upgrades-range-4-18-to-5-0
+  capabilities:
+  - intranet
+  cron: 0 0 * * 1
+  steps:
+    env:
+      CLUSTER_NAME: kni-qe-135
+      TO_OCP_VERSION: "5.0"
+      UPGRADE_ENV: stage-stage
+      UPGRADE_TYPE: range
+      VERSION: "4.18"
+    workflow: telcov10n-functional-cnf-compute-nrop-upgrades
+zz_generated_metadata:
+  branch: main
+  org: openshift-kni
+  repo: eco-ci-cd
+  variant: cnf-compute-nrop-upgrades

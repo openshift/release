@@ -91,6 +91,7 @@ class Config:
         releases.add('4.23')
         releases.add('5.0')
         releases.add('5.1')
+        releases.add('5.2')
 
         return sorted(releases)  # Glob does not provide any guarantees on ordering, so force an order by sorting.
 

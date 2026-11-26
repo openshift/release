@@ -31,6 +31,8 @@ process_inventory() {
         return 1
     fi
 
+    # Inventory values can contain credentials; do not print them in shell traces.
+    set +x
     find "$directory" -type f | while IFS= read -r filename; do
         if [[ $filename == *"secretsync-vault-source-path"* ]]; then
           continue
@@ -38,6 +40,7 @@ process_inventory() {
           echo "$(basename "${filename}")": \'"$(cat "$filename")"\'
         fi
     done > "${dest_file}"
+    set -x
 
     echo "Processing complete. Check \"${dest_file}\""
 }

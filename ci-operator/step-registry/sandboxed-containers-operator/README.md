@@ -1,4 +1,10 @@
-This directory contain the steps, chains and workflows implemented specifically for the Openshift Sandboxed Containers (OSC) jobs.
+# OpenShift Sandboxed Containers Step Registry
+
+This directory contains reusable steps, chains, and workflows for OpenShift
+Sandboxed Containers (OSC) jobs. See the [step-registry contribution guide](CONTRIBUTING.md)
+for the workflow outline and Mermaid step graph. Set job-specific parameter
+overrides per [OSC CI configuration](../../config/openshift/sandboxed-containers-operator/README.md),
+rather than changing shared step defaults here.
 
 ## Steps
 
@@ -235,18 +241,28 @@ Here is the list of chains.
 
 ### sandboxed-containers-operator-pre
 
-The [sandboxed-containers-operator-pre](./pre/) chain wraps the steps that prepare the environment for executing the tests.
-
-This chain is meant to be referenced in the `pre` condition of the workflow.
+The [sandboxed-containers-operator-pre](./pre/) chain runs after cluster
+provisioning in the `pre` phase. It creates configuration ConfigMaps, installs
+OSC and optionally Trustee, optionally updates the Kata RPM, and records job
+metadata.
 
 ### sandboxed-containers-operator-ipi-azure-pre
 
 The [sandboxed-containers-operator-ipi-azure-pre](./ipi/azure-pre/) chain customize [ipi-azure-pre](../ipi/azure/pre/)
 to allow creating the Openshift cluster by default in the **eastus** region of Azure.
 
-## workflows
+## Workflows
 
-Here is the list of workflows.
+The standard OSC e2e workflows for [Azure](./e2e/azure/), [AWS](./e2e/aws/),
+and [ARO](./e2e/aro/) follow the same phase order:
+
+1. **Pre:** Provision the cluster, then run the shared OSC pre chain.
+2. **Test:** Run the [shared test chain](./test/). The sanity step runs by
+   default; if it fails, the chain does not create `${SHARED_DIR}/testsuites_gate`.
+3. **Post:** Run enabled suites only if the gate file exists, then collect
+   must-gather, optionally wait for manual testing (`SLEEP_DURATION`), and
+   deprovision. See the [testsuites README](./testsuites/README.md) for suite
+   enable flags and failure behavior.
 
 ### sandboxed-containers-operator-e2e-azure
 
@@ -375,10 +391,8 @@ Ignore any of the ``expired`` messages from cluster bot, the cluster
 is available to you as long as the workflow pods are running inside
 the ``main build OCP``.
 
-This workflow never installs sandboxed containers operator by itself
-but you can use ``extended-platform-tests`` to mimic what the main
-workflow does, see ``Running extended-platform-tests...`` sections
-for details.
+The `pre` phase installs OSC before the cluster is handed over. To run legacy
+OTP tests manually, see [Running openshift-extended-test manually](#running-openshift-extended-test-manually).
 
 Out of the box you get 2.5h by clusterbot which can be returned
 earlier by ``done`` command, **but** if you needed more and specified
@@ -507,8 +521,8 @@ oc delete --now pods/launch-sandboxed-containers-operator-post-wait
 ### Running openshift-extended-test manually
 
 > **Note:** The `test:` phase of our e2e workflows no longer runs
-> `openshift-extended-test` (OTP) — it only runs the
-> `sandboxed-containers-operator-testsuites-gate` step, and OSC itself is
+> `openshift-extended-test` (OTP) — it runs the shared sanity and gate chain
+> instead. OSC itself is
 > installed earlier by the `pre:` chain, not by an OTP `Operator install`
 > test. The sections below are kept purely as a reference for manually
 > running OTP's `[sig-kata]` suite against a cluster you obtained via
