@@ -10,10 +10,23 @@ else
   AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
   DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
   export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
+  # Empty: the CLI takes the region from the HostedCluster.
+  MGMT_REGION=""
 
   if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
     AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
     DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
+
+    # A cluster profile set (for example openshift-org-aws) leases an account
+    # and a region together; hypershift-setup-nested-management-cluster created
+    # the cluster there. Pass the region explicitly so that the infrastructure
+    # is still cleaned up if the HostedCluster is already gone.
+    if [[ -n "${CLUSTER_PROFILE_SET_NAME:-}" ]]; then
+      if [[ -r "${CLUSTER_PROFILE_DIR}/baseDomain" ]]; then
+        DEFAULT_BASE_DOMAIN="$(< "${CLUSTER_PROFILE_DIR}/baseDomain")"
+      fi
+      MGMT_REGION="${LEASED_RESOURCE}"
+    fi
   fi
 fi
 
@@ -49,6 +62,7 @@ else
     --namespace="${HYPERSHIFT_NAMESPACE}" \
     --infra-id=${CLUSTER_NAME} \
     --base-domain=${DOMAIN} \
+    ${MGMT_REGION:+"--region=${MGMT_REGION}"} \
     --cluster-grace-period 40m || destroy_rc=$?
 fi
 
