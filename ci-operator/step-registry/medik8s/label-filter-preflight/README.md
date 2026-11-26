@@ -37,16 +37,18 @@ pre:
 `tier:fresh-install`, `tier:interop`, disconnected-only paths, etc.).
 
 Those specs must not carry `stability:candidate`. Candidate dailies exclude those
-tiers on purpose. rhwa-system-tests **presubmits** still run default-lane
-candidates (so PRs can gate merge). Stable periodics and medik8s operator jobs
-use `!stability:candidate`. A mislabelled upgrade/interop+candidate combo is a
-docs/review problem, not something these dailies try to cover.
+tiers on purpose. Almost all jobs use `!stability:candidate`. The exception is
+jobs that **select** `tier:preview` (today:
+`e2e-system-tests-sbr-pr-aws-odf-block-per-node`), which intentionally leave
+candidates enabled so preview candidates can still be exercised in PR CI.
+A mislabelled upgrade/interop+candidate combo is a docs/review problem, not
+something these dailies try to cover.
 
 ## Related
 
 - Label constant: `stability:candidate` in `openshift/rhwa-system-tests`
-- Stable periodics / medik8s operator jobs use `!stability:candidate` in
-  `ECO_TEST_LABELS`; rhwa-system-tests presubmits do **not** (PR validation)
+- Presubmits, stable periodics, and medik8s operator jobs use
+  `!stability:candidate`, except preview-selecting jobs
 - On preflight failure, `${SHARED_DIR}/e2e-test-skipped-by-preflight` lets
   `medik8s-analyze-e2e-failure` exit without polling for missing `e2e-test`
   artifacts
