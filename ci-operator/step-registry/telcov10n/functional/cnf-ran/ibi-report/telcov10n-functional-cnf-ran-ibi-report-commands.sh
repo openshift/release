@@ -10,6 +10,26 @@ cleanup() {
   exit "${rc}"
 }
 
+prepare_reporting_checkout() {
+  ECO_CI_CD_DIR=/eco-ci-cd
+  [[ -n "${ECO_CI_CD_FORK_REPO:-}" ]] || return 0
+
+  if [[ ! "${ECO_CI_CD_FORK_REVISION:-}" =~ ^[a-f0-9]{40}$ ]]; then
+    echo "A reviewed full commit SHA is required for the reporting fork." >&2
+    return 1
+  fi
+  ECO_CI_CD_DIR="${TEMP_DIR}/eco-ci-cd"
+  git clone --quiet --depth 1 --branch "${ECO_CI_CD_FORK_BRANCH:-main}" -- \
+    "${ECO_CI_CD_FORK_REPO}" "${ECO_CI_CD_DIR}"
+  if [[ "$(git -C "${ECO_CI_CD_DIR}" rev-parse HEAD)" != "${ECO_CI_CD_FORK_REVISION}" ]]; then
+    echo "The reporting fork branch changed. Review its revision before uploading." >&2
+    return 1
+  fi
+  # Keep the collections installed in the CI image when using the fork checkout.
+  export ANSIBLE_COLLECTIONS_PATH=/eco-ci-cd/collections
+  printf 'IBI reporting revision: %s\n' "${ECO_CI_CD_FORK_REVISION}"
+}
+
 prepare_inventory() {
   local side host suffix index
   mkdir -p "${TEMP_DIR}/inventory/host_vars"
@@ -62,6 +82,7 @@ run_report() {
       "ibi_report_work_dir": "{{ lookup(\"ansible.builtin.env\", \"IBI_REPORT_WORK_DIR\") }}",
       "ibi_report_version": "{{ lookup(\"ansible.builtin.env\", \"IBI_REPORT_VERSION\") }}",
       "ibi_report_launch_name": "{{ lookup(\"ansible.builtin.env\", \"IBI_REPORT_LAUNCH_NAME\") }}",
+      "reporter_launch_name": "{{ lookup(\"ansible.builtin.env\", \"IBI_REPORT_LAUNCH_NAME\") }}-{{ lookup(\"ansible.builtin.env\", \"IBI_REPORT_VERSION\") }}",
       "ibi_report_build_id": "{{ lookup(\"ansible.builtin.env\", \"IBI_REPORT_BUILD_ID\") }}",
       "ibi_report_hub_kubeconfig": "{{ lookup(\"ansible.builtin.env\", \"IBI_REPORT_HUB_KUBECONFIG\") }}"
     }' \
@@ -93,9 +114,10 @@ main() {
   fi
   printf '%s\n' '{"phase":"controller preparation","upload":"not attempted"}' \
     > "${ARTIFACT_DIR}/reportportal/reporting-status.json"
-  cd /eco-ci-cd
   TEMP_DIR=$(mktemp -d /tmp/ibi-reportportal.XXXXXX)
   trap cleanup EXIT
+  prepare_reporting_checkout
+  cd "${ECO_CI_CD_DIR}"
   prepare_inventory
   configure_ansible
   run_report

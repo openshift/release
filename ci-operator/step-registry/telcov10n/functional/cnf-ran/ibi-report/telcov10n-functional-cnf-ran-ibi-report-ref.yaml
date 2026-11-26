@@ -12,6 +12,15 @@ ref:
       cpu: 100m
       memory: 512Mi
   env:
+  - name: ECO_CI_CD_FORK_REPO
+    default: ""
+    documentation: Optional HTTPS eco-ci-cd fork for IBI reporting only. Empty uses the CI image checkout.
+  - name: ECO_CI_CD_FORK_BRANCH
+    default: main
+    documentation: Branch to clone when ECO_CI_CD_FORK_REPO is set.
+  - name: ECO_CI_CD_FORK_REVISION
+    default: ""
+    documentation: Reviewed full commit SHA that the reporting fork branch must match before execution.
   - name: TARGET_CLUSTER_NAME
     default: ""
     documentation: Target hub whose kubeconfig provides metadata to the shared uploader.
@@ -28,10 +37,9 @@ ref:
   documentation: |-
     Collect current-run raw JUnit reports from the seed and target bastions.
     Prefix suites by IBI stage and upload them together to ReportPortal using
-    the existing upload-report.yaml, with the same two XML input sets as PTP.
-    Include the independent IBBF policy gate. Raw copies have distinct filenames
-    and are supplied separately from the labelled Report Portal suites.
-    Preserve the shared uploader's Polarion-first behavior and enable Report Portal.
+    ibi-report.yml and its shared upload-report.yaml from the selected checkout.
+    Include the independent IBBF policy gate and retain the versioned launch name.
+    The temporary reporting fork uses the direct Report Portal uploader.
     Collection or upload errors fail the step; incomplete bundles are not uploaded.
     Completed test failures remain reportable. Keep the shared final verifier
     responsible for deferred Deployment Types and IBBF test failures.
