@@ -82,7 +82,10 @@ tests:
         ssh "${SSHOPTS[@]}" "root@${IP}" "sed -i 's#oc apply -f -#sed -e \"/^  resourceVersion:/d\" -e \"/^  uid:/d\" -e \"/^  creationTimestamp:/d\" | oc apply -f -#g' /root/dev-scripts/setup_capi_e2e.sh"
         : "${RELEASE_IMAGE_LATEST:?ci-operator did not supply the release image}"
         printf -v target_release '%q' "$RELEASE_IMAGE_LATEST"
-        ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts && RELEASE_IMAGE_LATEST=${target_release} make capi_e2e"
+        # baremetalds-devscripts-setup-commands.sh copies the CI profile pull secret to this host path;
+        # the upgradeability test runs on that host, outside this pod and its cluster-profile mount.
+        printf -v remote_registry_auth_file '%q' /root/dev-scripts/pull_secret.json
+        ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts && RELEASE_IMAGE_LATEST=${target_release} REGISTRY_AUTH_FILE=${remote_registry_auth_file} make capi_e2e"
       from: dev-scripts
       resources:
         requests:
@@ -110,7 +113,10 @@ tests:
         ssh "${SSHOPTS[@]}" "root@${IP}" "sed -i 's#oc apply -f -#sed -e \"/^  resourceVersion:/d\" -e \"/^  uid:/d\" -e \"/^  creationTimestamp:/d\" | oc apply -f -#g' /root/dev-scripts/setup_capi_e2e.sh"
         : "${RELEASE_IMAGE_LATEST:?ci-operator did not supply the release image}"
         printf -v target_release '%q' "$RELEASE_IMAGE_LATEST"
-        ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts && RELEASE_IMAGE_LATEST=${target_release} make capi_e2e"
+        # baremetalds-devscripts-setup-commands.sh copies the CI profile pull secret to this host path;
+        # the upgradeability test runs on that host, outside this pod and its cluster-profile mount.
+        printf -v remote_registry_auth_file '%q' /root/dev-scripts/pull_secret.json
+        ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts && RELEASE_IMAGE_LATEST=${target_release} REGISTRY_AUTH_FILE=${remote_registry_auth_file} make capi_e2e"
       from: dev-scripts
       resources:
         requests:
