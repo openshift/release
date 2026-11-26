@@ -137,10 +137,17 @@ DNS_ERROR_PATTERN="no such host|dial tcp: lookup"
 DNS_MAX_OBSERVATIONS=3
 DNS_MAX_ERROR_LINES=20
 DNS_MAX_ERROR_BYTES=8192
+DNS_LINE_TRUNCATION_MARKER='...[line cut at the byte cap]'
 dns_observation_count=0
 dns_errors_observed="no"
 dns_first_observed_at=""
-dns_errors_seen_file=""
+# The lines already written to a snapshot, so that a later poll does not copy them
+# again. A scratch file would add a creation and an append that can each fail on their
+# own, and an append that failed after a snapshot had been written would let the same
+# lines be snapshotted again and spend another observation on them. The number of lines
+# held here is bounded by DNS_MAX_OBSERVATIONS times DNS_MAX_ERROR_LINES, because lines
+# are recorded only for the snapshots that are written.
+dns_errors_seen=""
 dns_limit_logged="no"
 
 # Keep account identifiers out of public artifacts, as the rest of this step does.
@@ -160,9 +167,11 @@ mask_sensitive_output() {
 # Keep resolver infrastructure out of these public artifacts.
 #
 # Names under the Kubernetes internal zone only ever identify infrastructure internals,
-# so both filters below generalise them.
+# so both filters below generalise them. The suffix is matched without regard to case:
+# DNS labels are case-insensitive (RFC 4343) and a resolver or a Go error can spell the
+# name 'SVC.CLUSTER.LOCAL', which a case-sensitive filter would let through.
 redact_internal_names() {
-    sed -E -e 's/[A-Za-z0-9_.-]*\.(svc\.)?cluster\.local\.?/[internal name redacted]/g'
+    sed -E -e 's/[A-Za-z0-9_.-]*\.(svc\.)?cluster\.local\.?/[internal name redacted]/gI'
 }
 
 # dig prints the resolver it used, and the endpoint it could not reach, in its own
@@ -357,13 +366,22 @@ route53_parse() {
 # can carry or satisfy a public delegation, so it is preferred, and the private one is
 # used only when it is all there is.
 #
+# It can also hold several zones of the same name and the same visibility, holding
+# different records. Which of them answers a query is decided by the delegation these
+# bounded reads cannot follow, so no choice between them is made: reading an arbitrary
+# one would risk reporting a missing record or a stale delegation for a zone that is not
+# the one being served. The ambiguity is published instead. Like everything else here
+# this is only as far as the bounded read saw: a second zone of the same name beyond
+# ROUTE53_MAX_ZONES entries is not visible to it and cannot be reported.
+#
 # Sets route53_zone_state to one of:
-#   visible | not-visible | lookup-truncated | lookup-denied | lookup-timed-out |
-#   lookup-failed
+#   visible | not-visible | ambiguous-zone-name | lookup-truncated | lookup-denied |
+#   lookup-timed-out | lookup-failed
 # with route53_zone_id and route53_zone_visibility set when the state is 'visible'.
 # 'not-visible' means the whole remaining list was read and held no such zone;
 # 'lookup-truncated' means the bounded read ended before the list did, so absence was
-# not established.
+# not established; 'ambiguous-zone-name' means more than one zone of that name was
+# visible and this read cannot tell which of them serves it.
 route53_zone_state=""
 route53_zone_id=""
 route53_zone_visibility=""
@@ -371,6 +389,7 @@ route53_lookup_zone() {
     local zone_name="$1"
     local wanted lines name id private truncated
     local public_id="" private_id=""
+    local public_count=0 private_count=0
 
     route53_zone_state="lookup-failed"
     route53_zone_id=""
@@ -389,11 +408,20 @@ route53_lookup_zone() {
         [[ -n "${name}" ]] || continue
         [[ "$(dns_name_key "${name}")" == "${wanted}" ]] || continue
         if [[ "${private}" == "true" ]]; then
+            private_count=$(( private_count + 1 ))
             [[ -n "${private_id}" ]] || private_id="${id##*/}"
         else
+            public_count=$(( public_count + 1 ))
             [[ -n "${public_id}" ]] || public_id="${id##*/}"
         fi
     done <<< "${lines}"
+
+    # Only the visibility that would be used has to be unambiguous: a second private
+    # zone does not make the single public one any less the zone that serves the name.
+    if (( public_count > 1 )) || (( public_count == 0 && private_count > 1 )); then
+        route53_zone_state="ambiguous-zone-name"
+        return 0
+    fi
 
     if [[ -n "${public_id}" && -n "${private_id}" ]]; then
         route53_zone_visibility="public-and-private"
@@ -422,11 +450,18 @@ route53_lookup_zone() {
 # sets, started at the name itself, which the API orders first.
 #
 # Sets route53_record_state to one of:
-#   present | absent | lookup-denied | lookup-timed-out | lookup-failed
+#   present | absent | lookup-truncated | lookup-denied | lookup-timed-out | lookup-failed
 # route53_record_count to the number of matching record sets, route53_record_types to the
 # record types found at that name, route53_record_truncated to whether the bounded read
 # ended before the zone listing did, and route53_record_values to the record values. The
 # values feed the delegation comparison below and are never published.
+#
+# 'absent' is only ever reported for a read that could establish absence. The listing is
+# ordered and starts at the name, not at the type, so a bounded read that ended while
+# still inside that name - ROUTE53_MAX_RECORDS A record sets there, with the NS set
+# behind them - has not seen every record set at it. That read is reported as
+# 'lookup-truncated': "we could not tell" and "there is nothing there" are different
+# findings.
 route53_record_state=""
 route53_record_count=0
 route53_record_types=""
@@ -435,6 +470,7 @@ route53_record_truncated="no"
 route53_lookup_records() {
     local zone_id="$1" record_name="$2" wanted_type="${3:-}"
     local wanted lines name type values truncated
+    local passed_name="no"
 
     route53_record_state="lookup-failed"
     route53_record_count=0
@@ -454,7 +490,13 @@ route53_lookup_records() {
     route53_record_state="absent"
     while IFS=$'\t' read -r name type values; do
         [[ -n "${name}" ]] || continue
-        [[ "$(dns_name_key "${name}")" == "${wanted}" ]] || continue
+        if [[ "$(dns_name_key "${name}")" != "${wanted}" ]]; then
+            # The listing starts at the wanted name and is ordered, so any other name
+            # in the reply sorts after it: every record set at the wanted name has now
+            # been read, whatever the cap did to the rest of the zone.
+            passed_name="yes"
+            continue
+        fi
         # Only a record type from this list is ever published; anything else is counted
         # but reported as OTHER, so an unexpected value cannot reach the artifact.
         case "${type}" in
@@ -470,6 +512,12 @@ route53_lookup_records() {
 
     truncated=$(route53_parse "${ROUTE53_TRUNCATED_FILTER}") || return 0
     [[ "${truncated}" != "yes" ]] || route53_record_truncated="yes"
+    # A read that found nothing and stopped before it had passed the wanted name did
+    # not establish that there is nothing there.
+    if [[ "${route53_record_state}" == "absent" && "${route53_record_truncated}" == "yes" \
+          && "${passed_name}" != "yes" ]]; then
+        route53_record_state="lookup-truncated"
+    fi
     return 0
 }
 
@@ -477,9 +525,17 @@ route53_lookup_records() {
 # Bounded by ROUTE53_MAX_ANCESTORS, and never asking about a single-label name, which is
 # a public suffix rather than a zone of this cluster.
 #
+# When ${2} is 'yes' the caller needs an ancestor that could carry a public delegation,
+# so a private-only ancestor does not end the walk: public and private zones can share a
+# namespace, and a public grandparent may delegate the cluster zone directly over a
+# private-only parent. Such an ancestor is remembered and reported only if the bounded
+# walk reaches its end without a public one, so the walk neither stops on it nor loses
+# it.
+#
 # Sets route53_ancestor_state to one of:
 #   parent-zone-match | ancestor-zone-match | no-visible-match | search-bounded |
-#   not-attempted | lookup-truncated | lookup-denied | lookup-timed-out | lookup-failed
+#   not-attempted | ambiguous-zone-name | lookup-truncated | lookup-denied |
+#   lookup-timed-out | lookup-failed
 # 'search-bounded' says the walk stopped at its own cap, so the ancestors beyond it were
 # never asked about and their absence is not established.
 route53_ancestor_name=""
@@ -488,7 +544,9 @@ route53_ancestor_state="not-attempted"
 route53_ancestor_visibility=""
 route53_find_ancestor_zone() {
     local candidate="$1"
+    local need_public="${2:-no}"
     local steps=0
+    local private_name="" private_id="" private_visibility="" private_state=""
 
     route53_ancestor_name=""
     route53_ancestor_id=""
@@ -497,16 +555,26 @@ route53_find_ancestor_zone() {
 
     while (( steps < ROUTE53_MAX_ANCESTORS )); do
         candidate="${candidate#*.}"
-        if [[ "${candidate}" != *.* ]]; then
-            # Every ancestor that could be a zone has now been read.
-            [[ "${route53_ancestor_state}" == "not-attempted" ]] \
-                || route53_ancestor_state="no-visible-match"
-            return 0
-        fi
+        # Every ancestor that could be a zone has now been read.
+        [[ "${candidate}" == *.* ]] || break
         steps=$(( steps + 1 ))
         route53_lookup_zone "${candidate}"
         case "${route53_zone_state}" in
             visible)
+                if [[ "${need_public}" == "yes" && "${route53_zone_visibility}" == "private" ]]; then
+                    if [[ -z "${private_id}" ]]; then
+                        private_name="${candidate}"
+                        private_id="${route53_zone_id}"
+                        private_visibility="${route53_zone_visibility}"
+                        if (( steps == 1 )); then
+                            private_state="parent-zone-match"
+                        else
+                            private_state="ancestor-zone-match"
+                        fi
+                    fi
+                    route53_ancestor_state="no-visible-match"
+                    continue
+                fi
                 route53_ancestor_name="${candidate}"
                 route53_ancestor_id="${route53_zone_id}"
                 route53_ancestor_visibility="${route53_zone_visibility}"
@@ -521,6 +589,9 @@ route53_find_ancestor_zone() {
                 route53_ancestor_state="no-visible-match"
                 ;;
             *)
+                # A read this viewpoint could not complete says nothing about the
+                # ancestors above it, and naming the private zone below as the ancestor
+                # would hide that this walk stopped on a failure.
                 route53_ancestor_state="${route53_zone_state}"
                 return 0
                 ;;
@@ -532,6 +603,17 @@ route53_find_ancestor_zone() {
         route53_ancestor_state="search-bounded"
     elif [[ "${route53_ancestor_state}" != "not-attempted" ]]; then
         route53_ancestor_state="no-visible-match"
+    fi
+    if [[ -n "${private_id}" ]]; then
+        # No public ancestor was found, so report the private one the walk passed over
+        # rather than nothing. 'search-bounded' is kept as it is: it says a public
+        # ancestor above the cap was never asked about, which the private zone's own
+        # match state would hide.
+        route53_ancestor_name="${private_name}"
+        route53_ancestor_id="${private_id}"
+        route53_ancestor_visibility="${private_visibility}"
+        [[ "${route53_ancestor_state}" == "search-bounded" ]] \
+            || route53_ancestor_state="${private_state}"
     fi
     return 0
 }
@@ -568,11 +650,20 @@ Published fields: only the states and counts below. The API response bodies, the
   values, the nameserver names, the hosted-zone identifiers and the error output of the
   AWS CLI are read by this step and deliberately left out of this public artifact.
 Zone states:        exact-match | parent-zone-match | ancestor-zone-match |
-                    no-visible-match | search-bounded | lookup-truncated |
-                    lookup-denied | lookup-timed-out | lookup-failed | not-attempted
+                    no-visible-match | search-bounded | ambiguous-zone-name |
+                    lookup-truncated | lookup-denied | lookup-timed-out |
+                    lookup-failed | not-attempted
+  'ambiguous-zone-name' means more than one hosted zone of that name was visible and
+  these reads cannot tell which of them serves it, so none of them was read.
+  'search-bounded' means the walk up the ancestors stopped at its own cap. It can
+  still name a zone: a private-only ancestor is reported as the evidence it is, while
+  the public ancestor that could be above the cap was never asked about.
 Zone visibility:    public | private | public-and-private
-Record states:      present | absent | not-checked | lookup-denied | lookup-timed-out |
-                    lookup-failed
+Record states:      present | absent | not-checked | lookup-truncated | lookup-denied |
+                    lookup-timed-out | lookup-failed
+  'absent' is reported only for a read that could establish absence;
+  'lookup-truncated' is a read that ended before it had seen every record set at the
+  name, so it settled nothing.
 Topologies:         delegated-child-zone | parent-zone-only | child-zone-not-visible |
                     undetermined
 Delegation verdict: match | mismatch | not-delegated | not-comparable |
@@ -594,11 +685,15 @@ print_route53_record_line() {
 }
 
 # Emit the Route 53 section of the failure-time DNS diagnostics for ${1}, the cluster's
-# DNS zone. Writes only the states and counts the legend above describes.
+# DNS zone, and ${2}, the API hostname this step reported. Writes only the states and
+# counts the legend above describes.
 print_route53_evidence() {
     local cluster_zone="${1:-}"
+    local api_host="${2:-}"
+    local api_record="" api_host_key="" zone_key=""
     local child_state="" child_id="" child_visibility="" child_public="no"
-    local ancestor_public="no" records_zone_id="" records_zone_label=""
+    local ancestor_public="no" parent_is_delegating_zone="no"
+    local records_zone_id="" records_zone_label=""
     local child_ns="" parent_ns="" child_ns_state="not-checked" parent_ns_state="not-checked"
     local child_ns_count=0 parent_ns_count=0 parent_ns_truncated="no"
     local topology="undetermined" delegation="not-comparable"
@@ -619,6 +714,22 @@ print_route53_evidence() {
     # too many, and would send a public suffix to the API.
     cluster_zone=$(printf '%s' "${cluster_zone}" | sed -e 's/\.*$//')
 
+    # The API record to look for is the name the API URL carries, which is the name the
+    # probe above resolved and the name the client in the install log was trying to
+    # reach. It is not rebuilt from the cluster's own name: a cluster whose name is too
+    # long for a DNS label is given a generated domain prefix, and its records live
+    # under that prefix. Only a hostname made of DNS name characters and lying inside
+    # the zone being read is used, so this cannot send a foreign name to the API or
+    # widen these reads past this run's own zone.
+    api_record="api.${cluster_zone}"
+    if [[ -n "${api_host}" && "${api_host}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+        api_host_key=$(dns_name_key "${api_host}")
+        zone_key=$(dns_name_key "${cluster_zone}")
+        # Reported as the API URL spells it; Route 53 names are case-insensitive and
+        # every comparison below goes through dns_name_key anyway.
+        [[ "${api_host_key}" != *".${zone_key}" ]] || api_record="${api_host%.}"
+    fi
+
     route53_lookup_zone "${cluster_zone}"
     case "${route53_zone_state}" in
         visible)
@@ -629,10 +740,11 @@ print_route53_evidence() {
         not-visible)
             child_state="no-visible-match"
             ;;
-        lookup-truncated)
-            # The bounded read did not settle it, but the ancestor zone and the records
-            # it may hold are a separate question and still worth reading.
-            child_state="lookup-truncated"
+        lookup-truncated|ambiguous-zone-name)
+            # Neither read settled which hosted zone serves the cluster zone, but the
+            # ancestor zone and the records it may hold are a separate question and
+            # still worth reading.
+            child_state="${route53_zone_state}"
             ;;
         *)
             # A read this viewpoint cannot complete will not complete for an ancestor
@@ -650,9 +762,14 @@ print_route53_evidence() {
     # can live directly in the base-domain zone. The nearest visible ancestor is looked
     # for either way - it is where those records would be, and it is also the zone that
     # has to carry the delegation when the cluster zone does have one.
-    route53_find_ancestor_zone "${cluster_zone}"
+    route53_find_ancestor_zone "${cluster_zone}" "${child_public}"
     [[ "${route53_ancestor_visibility}" != "public" && "${route53_ancestor_visibility}" != "public-and-private" ]] \
         || ancestor_public="yes"
+    # Only the zone immediately above the cluster zone can be shown to hold, or not to
+    # hold, its delegation. When the nearest visible ancestor is higher than that, a
+    # zone in between - one this account cannot see, in another account - could hold
+    # the delegation, and a negative read up here establishes nothing about it.
+    [[ "${route53_ancestor_state}" != "parent-zone-match" ]] || parent_is_delegating_zone="yes"
 
     echo "Cluster zone lookup (${cluster_zone}): ${child_state}"
     [[ -z "${child_visibility}" ]] || echo "  zone visibility: ${child_visibility}"
@@ -684,7 +801,8 @@ print_route53_evidence() {
         records_zone_id="${route53_ancestor_id}"
         records_zone_label="the ${route53_ancestor_name} zone"
         if [[ "${child_state}" == "no-visible-match" && "${parent_ns_state}" == "absent" \
-              && "${parent_ns_truncated}" != "yes" ]]; then
+              && "${parent_ns_truncated}" != "yes" \
+              && "${parent_is_delegating_zone}" == "yes" ]]; then
             topology="parent-zone-only"
         elif [[ "${child_state}" == "no-visible-match" && "${parent_ns_state}" == "present" ]]; then
             topology="child-zone-not-visible"
@@ -722,17 +840,23 @@ print_route53_evidence() {
 
     # The API record is the name the install log failed to resolve, so whether it exists
     # at all is the first question this section has to answer.
-    echo "API record (api.${cluster_zone})"
+    echo "API record (${api_record})"
     if [[ -z "${records_zone_id}" ]]; then
         echo "  not-checked; no hosted zone to read it from"
     else
         local api_counts
-        route53_lookup_records "${records_zone_id}" "api.${cluster_zone}"
+        route53_lookup_records "${records_zone_id}" "${api_record}"
         api_counts="in ${records_zone_label}; record sets: ${route53_record_count}"
         [[ -z "${route53_record_types}" ]] \
             || api_counts="${api_counts}, types: ${route53_record_types}"
         print_route53_record_line "${route53_record_state}" "${api_counts}" \
             "${route53_record_truncated}"
+        # When the cluster zone lookup settled nothing, this read came from the
+        # ancestor zone instead, and a hosted zone it did not settle on could hold the
+        # record. Say so rather than let the line above read as a finding.
+        [[ "${child_state}" == "exact-match" || "${child_state}" == "no-visible-match" ]] \
+            || echo "  the cluster zone lookup did not settle (${child_state}), so a" \
+                    "hosted zone holding this record may not have been read"
     fi
 
     echo "Nameservers assigned to the cluster zone"
@@ -776,7 +900,8 @@ print_route53_evidence() {
             delegation="mismatch"
         fi
     elif [[ "${child_ns_state}" == "present" && "${parent_ns_state}" == "absent" \
-            && "${parent_ns_truncated}" != "yes" ]]; then
+            && "${parent_ns_truncated}" != "yes" \
+            && "${parent_is_delegating_zone}" == "yes" ]]; then
         if [[ "${child_public}" != "yes" || "${ancestor_public}" != "yes" ]]; then
             delegation="not-applicable"
         else
@@ -829,20 +954,20 @@ capture_dns_observation() {
 
     dns_lines=$(grep -E "${DNS_ERROR_PATTERN}" <<< "${fetch_output}" || true)
     [[ -n "${dns_lines}" ]] || return 0
+    # Both are recorded as soon as the first matching line is seen, with nothing that
+    # can return in between: the summary at the end of the step must not be able to
+    # report that DNS errors were observed without saying when the first was read.
     dns_errors_observed="yes"
+    observed_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+    [[ -n "${dns_first_observed_at}" ]] || dns_first_observed_at="${observed_at}"
 
-    if [[ -z "${dns_errors_seen_file}" ]]; then
-        dns_errors_seen_file=$(mktemp) || return 0
-    fi
-    if [[ -s "${dns_errors_seen_file}" ]]; then
-        new_dns_lines=$(grep -Fxv -f "${dns_errors_seen_file}" <<< "${dns_lines}" || true)
+    if [[ -n "${dns_errors_seen}" ]]; then
+        new_dns_lines=$(grep -Fxv -f <(printf '%s' "${dns_errors_seen}") <<< "${dns_lines}" || true)
     else
         new_dns_lines="${dns_lines}"
     fi
     [[ -n "${new_dns_lines}" ]] || return 0
 
-    observed_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
-    [[ -n "${dns_first_observed_at}" ]] || dns_first_observed_at="${observed_at}"
     # Past the cap nothing more is written, so nothing more is recorded as seen either:
     # the de-duplication state stops growing with the install log.
     if (( dns_observation_count >= DNS_MAX_OBSERVATIONS )); then
@@ -864,14 +989,29 @@ capture_dns_observation() {
         | mask_sensitive_output | redact_log_addresses | head -c "${DNS_MAX_ERROR_BYTES}" || true)
     # How many of those lines this snapshot keeps whole. Both caps can leave a line
     # out, and the byte cap can end inside one, so only the complete lines counted
-    # here may be recorded as seen below. The filters substitute inside a line and
-    # never add or drop one, so the count applies to the source lines as well.
+    # here may be recorded as seen below, bar the one case handled just after it. The
+    # filters substitute inside a line and never add or drop one, so the count applies
+    # to the source lines as well.
     # Counted from the capped stream rather than from the variable above, which no
     # longer shows whether its last line was terminated.
     saved_dns_lines=$(printf '%s\n' "${new_dns_lines}" | head -n "${DNS_MAX_ERROR_LINES}" \
         | mask_sensitive_output | redact_log_addresses | head -c "${DNS_MAX_ERROR_BYTES}" \
         | tr -cd '\n' | wc -c || true)
     [[ "${saved_dns_lines}" =~ ^[0-9]+$ ]] || saved_dns_lines=0
+
+    # A first line longer than the whole byte cap fills the cap and leaves no complete
+    # line in the snapshot. Nothing would then be recorded as seen, so every later poll
+    # would copy the same fragment again and spend another observation on it, until it
+    # had used all of them and the shorter errors behind it had never been saved. Mark
+    # the excerpt as cut and count the line as kept instead. The cap is still held to,
+    # the marker included. The length test is what distinguishes this from a count that
+    # could not be read, which must keep its old, harmless behaviour.
+    if (( saved_dns_lines == 0 )) && (( ${#capped_dns_lines} >= DNS_MAX_ERROR_BYTES )); then
+        capped_dns_lines=$(printf '%s' "${capped_dns_lines}" \
+            | head -c "$(( DNS_MAX_ERROR_BYTES - ${#DNS_LINE_TRUNCATION_MARKER} ))" || true)
+        capped_dns_lines="${capped_dns_lines}${DNS_LINE_TRUNCATION_MARKER}"
+        saved_dns_lines=1
+    fi
 
     # Build the snapshot in memory, then write it with a single command. The exit
     # status of a redirected group command is the status of its last command only,
@@ -914,11 +1054,14 @@ capture_dns_observation() {
     if [[ "${observation_written}" == "yes" && -f "${observation_file}" && -s "${observation_file}" ]]; then
         dns_observation_count=${observation_index}
         # Only now are these lines recorded as seen, and only the ones this snapshot
-        # kept whole, so a line either cap left out or cut short can still be saved
-        # by a later poll. A write that failed records nothing, so a later poll can
-        # retry the snapshot.
-        printf '%s\n' "${new_dns_lines}" | head -n "${saved_dns_lines}" \
-            >> "${dns_errors_seen_file}"
+        # published, so a line the caps left out can still be saved by a later poll.
+        # A write that failed records nothing, so a later poll can retry the snapshot.
+        # This is a variable assignment and not an append to a file, so it cannot fail
+        # on its own after the snapshot has been written and let these same lines
+        # consume a second observation.
+        if (( saved_dns_lines > 0 )); then
+            dns_errors_seen+="$(printf '%s\n' "${new_dns_lines}" | head -n "${saved_dns_lines}")"$'\n'
+        fi
         log "DNS-related error observed in install-log output; snapshot saved to ${observation_file}"
     else
         rm -f "${observation_file}" 2>/dev/null || true
@@ -1064,6 +1207,7 @@ CLUSTER_PREVIOUS_STATE="claim"
 record_cluster "timers" "status" "claim"
 loop_count=0
 install_complete_seen_at=0
+install_log_checked_at=0
 while true; do
   retry_cmd 3 10 rosa describe cluster -c "${CLUSTER_ID}" -o json > "${cluster_info_json}"
   CLUSTER_STATE=$(cat ${cluster_info_json} | jq -r '.state')
@@ -1105,6 +1249,12 @@ while true; do
       if (( loop_count % 5 == 0 )); then
         log "Checking install logs for fatal errors..."
         install_log_output=$(retry_cmd 3 10 timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
+        # The OCM reconciliation decision further down uses this reading instead of
+        # taking its own, which it used to take at this same point in the poll. That
+        # decision compares an elapsed time against a deadline, and the capture below
+        # must not be able to carry the comparison past that deadline: a cluster that
+        # would have been given one more poll has to still be given it.
+        install_log_checked_at=$(date +"%s")
         # Keep the DNS chronology before the fail-fast path below re-fetches the install
         # log. Bounded and best effort: it adds at most one timeout-bounded DNS probe to
         # this poll, and it does not change the step's exit status or failure criteria.
@@ -1146,7 +1296,7 @@ while true; do
           # Installer completion can precede the OCM state transition by a short period.
           # Measure reconciliation independently from provisioner launch and install duration.
           if [[ "${infra_id_check}" != "null" ]] && echo "${install_log_output}" | grep -Eiq 'install complete!|install completed successfully'; then
-            reconciliation_now=$(date +"%s")
+            reconciliation_now=${install_log_checked_at}
             if (( install_complete_seen_at == 0 )); then
               install_complete_seen_at=${reconciliation_now}
               log "Installer completed while OCM state is still 'installing'; starting the reconciliation timeout."
@@ -1179,7 +1329,6 @@ while true; do
     post_shared_vpc_auto ${cluster_info_json}
   fi
 done
-[[ -z "${dns_errors_seen_file}" ]] || rm -f "${dns_errors_seen_file}"
 cat $cluster_config_file | jq -r '.timers'
 
 if [[ "$FAILED_INSTALL" == "yes" ]]; then
@@ -1242,15 +1391,27 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
       cluster_name=$(jq -r '.name // empty' "${ARTIFACT_DIR}/cluster-description.json" 2>/dev/null || true)
       base_domain=$(jq -r '.dns.base_domain // empty' "${ARTIFACT_DIR}/cluster-description.json" 2>/dev/null || true)
 
-      cluster_zone=""
-      if [[ -n "${cluster_name}" && -n "${base_domain}" ]]; then
-        cluster_zone="${cluster_name}.${base_domain}"
-        echo "Cluster DNS zone: ${cluster_zone}"
-      fi
-
       api_host=""
       if [[ -n "${api_url}" ]]; then
         api_host=$(echo "${api_url}" | sed -e 's|https\?://||' -e 's|:[0-9]*$||')
+      fi
+
+      # The zone a cluster's records live in is named after its domain prefix, and that
+      # prefix is generated rather than taken from the cluster name when the name is too
+      # long for a DNS label. The API hostname carries the prefix, so the zone is taken
+      # from it whenever the API URL is known, and the cluster name is only a fallback.
+      # This zone is what scopes every Route 53 read below, so it is accepted only when
+      # the hostname it comes from is a DNS name and nothing else: a URL that still
+      # carries a path or a userinfo part falls back to the cluster name instead.
+      cluster_zone=""
+      if [[ "${api_host}" == api.*.* && "${api_host}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+        cluster_zone="${api_host#api.}"
+      elif [[ -n "${cluster_name}" && -n "${base_domain}" ]]; then
+        cluster_zone="${cluster_name}.${base_domain}"
+      fi
+      [[ -z "${cluster_zone}" ]] || echo "Cluster DNS zone: ${cluster_zone}"
+
+      if [[ -n "${api_url}" ]]; then
         echo "API URL: ${api_url}"
         echo "API hostname: ${api_host}"
       elif [[ -n "${cluster_zone}" ]]; then
@@ -1271,13 +1432,18 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
 
         # Look up authoritative nameservers for the cluster zone and query them directly
         ns_zone="${cluster_zone:-$(echo "${api_host}" | cut -d. -f2-)}"
+        # One lookup answers both questions below. Asking twice costs a second
+        # timeout-bounded call out of this section's budget and can return two
+        # different answers, leaving a reader unable to tell why the nameserver the
+        # probe used is missing from the list printed above it.
+        ns_answer=$(timeout 10 dig +time=2 +tries=1 NS "${ns_zone}" +short 2>&1 || true)
         echo "=== Authoritative NS lookup for ${ns_zone} (queried from this CI pod) ==="
-        timeout 10 dig +time=2 +tries=1 NS "${ns_zone}" +short 2>&1 | redact_resolver_addresses || true
+        printf '%s\n' "${ns_answer}" | redact_resolver_addresses || true
         echo ""
         # Keep only an answer: when dig cannot reach a resolver it prints a diagnostic
         # line naming that resolver, and this value is echoed into the public artifact.
         # An NS answer is always a host name ending in a dot, so nothing else is taken.
-        auth_ns=$(timeout 10 dig +time=2 +tries=1 NS "${ns_zone}" +short 2>/dev/null \
+        auth_ns=$(printf '%s\n' "${ns_answer}" \
           | grep -E '^[A-Za-z0-9_.-]+\.$' | head -1 || true)
         if [[ -n "${auth_ns}" ]]; then
           # The query uses the answer as it came; the published header does not, in
@@ -1295,7 +1461,7 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
       # record, as states and counts only. See print_route53_evidence above for why the
       # earlier full record-set dump is no longer published.
       if aws sts get-caller-identity &>/dev/null; then
-        print_route53_evidence "${cluster_zone}" || true
+        print_route53_evidence "${cluster_zone}" "${api_host}" || true
       else
         echo "=== Route 53 evidence (as seen from this CI job) ==="
         echo "AWS credentials not available for Route 53 lookup"
