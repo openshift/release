@@ -106,6 +106,15 @@ quay:
         ocp: ["4.22"]
         test: e2e-install
         storage: odf
+      # Dell ECS S3-compatible object storage on the AWS lane. The bucket is
+      # created and deleted with the AWS CLI (quay-deploy-dellecs and
+      # quay-deprovision) using the quay-tests/dellecs credentials; no Terraform.
+      - cron: daily
+        source: nightly
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
+        storage: dellecs
       # Operator-channel upgrade lane: install n-1 (stable-3.17), seed it, OLM-upgrade
       # to n (stable-3.18), then verify/functional Playwright phases. Runs on a
       # stable OCP cluster (see templates/base.yaml.j2). source: nightly selects
@@ -216,6 +225,14 @@ quay:
         ocp: ["5.0"]
         test: e2e-install
         storage: odf
+      # Dell ECS S3-compatible object storage on the AWS lane, same wiring as
+      # the 3.18 dellecs row.
+      - cron: daily
+        source: nightly
+        clouds: [aws]
+        ocp: ["5.0"]
+        test: e2e-install
+        storage: dellecs
       - cron: weekly
         source: nightly
         clouds: [aws]
@@ -319,5 +336,15 @@ quay:
         ocp: ["4.22"]
         test: e2e-install
         storage: odf
+        always_run: false
+        optional: true
+      # Dell ECS storage on PRs. No always_run and no pipeline trigger: the job
+      # is available to every PR but starts only when requested with
+      # /test pull-ci-quay-quay-master-aws-dellecs.
+      - kind: presubmit
+        clouds: [aws]
+        ocp: ["4.22"]
+        test: e2e-install
+        storage: dellecs
         always_run: false
         optional: true
