@@ -1,0 +1,62 @@
+ref:
+  as: openspec-agile-workflow
+  from_image:
+    namespace: oape
+    name: openspec-agent
+    tag: openspec-agent-worker
+  commands: openspec-agile-workflow-commands.sh
+  credentials:
+  - collection: oape-ai-e2e
+    group: oap-lts-codex-sa
+    mount_path: /var/run/codex-openai-api-key
+  env:
+  - name: OPENAI_API_KEY_PATH
+    default: /var/run/codex-openai-api-key/openai_api_key
+    documentation: |-
+      Path to the OpenAI API key mounted from the oap-lts-codex-sa secret.
+      The runner exports it as OPENAI_API_KEY with tracing disabled.
+  - name: CODEX_MODEL
+    default: gpt-5.6-sol
+    documentation: |-
+      Codex model driving the openspec workflow.
+  - name: AGENT_EFFORT
+    default: ""
+    documentation: |-
+      Optional Codex reasoning effort (minimal, low, medium, high, xhigh, max).
+  - name: CODEX_TIMEOUT_INITIAL
+    default: "3600"
+    documentation: |-
+      Budget in seconds for the initial codex exec run.
+  - name: CODEX_TIMEOUT_RESUME
+    default: "1200"
+    documentation: |-
+      Budget in seconds for each codex exec resume round.
+  - name: MAX_RESUME_ROUNDS
+    default: "8"
+    documentation: |-
+      Maximum number of codex exec resume rounds used to push through the
+      workflow approval gates before the step fails.
+  timeout: 4h0m0s
+  resources:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+    limits:
+      memory: 8Gi
+  documentation: |-
+    Runs the openspec agile workflow (/opsx-new -> /opsx-continue ->
+    /opsx-apply) end to end with the OpenAI Codex CLI. The runner forks the
+    target repository with the openshift-app-platform-shift-github-bot token,
+    plans and implements the change on a feature branch, and raises a PR
+    against the upstream repository.
+
+    Requires, in ${SHARED_DIR}:
+    - params.env with JIRA_KEY, TARGET_REPO, CHANGE_NAME, FAST_TRACK and
+      optional MODEL/EFFORT (written by the agile-workflow-input image)
+    - jira-spec.md with the Jira ticket content (the CI agent has no Jira
+      MCP access)
+    - gh-token (minted by openspec-mint-gh-token)
+
+    The target repository must be openspec-bootstrapped (agents.md and
+    harness-evals/constitution.md at its root) and have the GitHub App
+    installed; the run stops with a clear error otherwise.
