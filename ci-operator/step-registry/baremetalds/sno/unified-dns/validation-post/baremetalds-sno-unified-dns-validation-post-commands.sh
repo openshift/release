@@ -1,0 +1,1 @@
+../validation/baremetalds-sno-unified-dns-validation-commands.sh

@@ -1,0 +1,29 @@
+workflow:
+  as: baremetalds-sno-unified-dns
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - chain: baremetalds-ofcir-pre
+    - ref: baremetalds-sno-conf
+    test:
+    - ref: baremetalds-sno-unified-dns-validation
+    - ref: baremetalds-sno-unified-dns-reboot
+    - ref: baremetalds-sno-unified-dns-nm-change
+    - ref: baremetalds-sno-unified-dns-validation-post
+    - ref: baremetalds-sno-test
+    post:
+    - chain: baremetalds-ofcir-post
+  documentation: |-
+    Installs a single-node cluster with dev-scripts and checks SNO unified DNS: the
+    node's CoreDNS (rendered by the MCO under the UnifiedClusterManagedDNSAndLB
+    FeatureGate, dnsmasq gone) answers api, api-int and *.apps and owns the host's
+    resolv.conf (OCPSTRAT-3609 test plan §5.3). The test phase runs the read-only
+    validation, the disruptive MCO-driven reboot (D1) and NetworkManager change (D2),
+    the same validation again, and finally baremetalds-sno-test.
+
+    The install method is chosen by the test, not by this workflow: set
+    DEVSCRIPTS_TARGET (sno_bip for bootstrap-in-place, agent for the agent-based
+    installer) and DEVSCRIPTS_CONFIG, which must enable the feature gate with
+    FEATURE_SET=CustomNoUpgrade and FEATURE_GATES=UnifiedClusterManagedDNSAndLB=true.
+    Agent-installed tests should also set post to the agent-post chain to keep the
+    assisted/agent log gathering.

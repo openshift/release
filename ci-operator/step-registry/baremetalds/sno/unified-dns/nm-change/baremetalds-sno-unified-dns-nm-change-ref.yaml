@@ -1,0 +1,25 @@
+ref:
+  as: baremetalds-sno-unified-dns-nm-change
+  from: tests
+  grace_period: 10m
+  timeout: 30m0s
+  commands: baremetalds-sno-unified-dns-nm-change-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  documentation: |-
+    D2 disruptive check of SNO unified DNS (OCPSTRAT-3609 test plan §5.3):
+    add, then delete, a dummy NetworkManager connection carrying a DNS server
+    and a search domain (a dummy interface, never `nmcli con up` on br-ex).
+    Verifies that NetworkManager's own resolv.conf shows the search domain (so
+    the step cannot pass as a no-op), that the domain is merged into
+    /etc/resolv.conf after the base domain with the node IP still first and
+    rc-manager unmanaged, that deleting the connection removes it again, and
+    that sno-resolv-prepender.service is inactive again within ~1 minute. The
+    connection is removed on exit even if a check fails.
+
+    One JUnit testcase per check is written to
+    ${ARTIFACT_DIR}/junit_sno-unified-dns-nm-change.xml, with evidence under
+    ${ARTIFACT_DIR}/sno-unified-dns-evidence/nm-change/. The full steady-state
+    checks are re-run afterwards by baremetalds-sno-unified-dns-validation-post.
