@@ -66,6 +66,7 @@ for ip in ${IPC_IPV4_ADDRESS} ${IBI_VM_IP}; do
     "\${ssh_node[@]}" "core@\${ip}" 'sudo journalctl -b -1 --no-pager' > "\${node_dir}/journal-previous-boot.log" 2>&1 || true
     "\${ssh_node[@]}" "core@\${ip}" 'ip addr; ip route; sudo nmcli -f all con show --active' > "\${node_dir}/network.txt" 2>&1 || true
     "\${ssh_node[@]}" "core@\${ip}" 'sudo ostree admin status; sudo rpm-ostree status' > "\${node_dir}/ostree.txt" 2>&1 || true
+    "\${ssh_node[@]}" "core@\${ip}" 'df -B1 /boot; sudo ls -la /boot /boot/ostree /boot/loader/entries; sudo du -ab /boot | sort -n | tail -60' > "\${node_dir}/boot.txt" 2>&1 || true
     "\${ssh_node[@]}" "core@\${ip}" 'sudo crictl ps -a' > "\${node_dir}/crictl-ps.txt" 2>&1 || true
     "\${ssh_node[@]}" "core@\${ip}" 'for c in \$(sudo crictl ps -a -q --label io.kubernetes.pod.namespace=openshift-lifecycle-agent); do echo "=== \$c"; sudo crictl logs \$c 2>&1; done' > "\${node_dir}/lca-containers.log" 2>&1 || true
     break
