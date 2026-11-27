@@ -11,6 +11,14 @@ tests:
       # would fail. Keep them disabled here.
       PLAYWRIGHT_BRANDING_E2E: "0"
       PLAYWRIGHT_USE_IMAGE_TESTS: "true"
+{%- if cloud == "gcp" %}
+      # GCP GCS only: the CI-built image's ~30 workers each import the full
+      # Quay app; raise the managed quay-app component above the operator's
+      # 2 CPU default so startup does not run past the startup probe.
+      QUAY_APP_CPU_REQUEST: "4"
+      QUAY_APP_CPU_LIMIT: "6"
+      QUAY_APP_MEMORY: "8Gi"
+{%- endif %}
 {%- if storage == "odf" %}
       SETUP_NOOBAA: "true"
       QUAY_STORAGE_PROVIDER: odf
