@@ -692,7 +692,7 @@ def test_master_presubmit_expands_all_clouds() -> None:
     by_name = {filename: config for _group, filename, config in results}
     tests = by_name[MASTER_NAME]["tests"]
     by_as = {test["as"]: test for test in tests}
-    assert set(by_as) == {"aws-s3", "gcp-gcs", "azure-blob", "aws-odf"}
+    assert set(by_as) == {"aws-s3", "gcp-gcs", "azure-blob", "aws-odf", "aws-dellecs"}
 
     gcp_test = by_as["gcp-gcs"]
     assert gcp_test["optional"] is True
@@ -716,6 +716,25 @@ def test_master_presubmit_expands_all_clouds() -> None:
     ]
     assert odf_test["steps"]["env"]["SETUP_NOOBAA"] == "true"
     assert odf_test["steps"]["env"]["QUAY_STORAGE_PROVIDER"] == "odf"
+
+    dellecs_test = by_as["aws-dellecs"]
+    assert dellecs_test["optional"] is True
+    assert dellecs_test["always_run"] is False
+    assert "pipeline_run_if_changed" not in dellecs_test
+    dellecs_refs = [step["ref"] for step in dellecs_test["steps"]["test"]]
+    assert dellecs_refs == [
+        "merge-stage-registry-credentials",
+        "quay-enable-catalogsource-art",
+        "quay-provisioning-tls",
+        "quay-provisioning-builder",
+        "quay-deploy-mailpit",
+        "quay-deploy-jaeger",
+        "quay-deploy-dellecs",
+        "quay-deploy-custom-image",
+        "quay-test-e2e",
+    ]
+    assert dellecs_test["steps"]["env"]["QUAY_STORAGE_PROVIDER"] == "dellecs"
+    assert "SETUP_NOOBAA" not in dellecs_test["steps"]["env"]
 
 
 def test_mixed_golden_groups_periodic_and_presubmit_into_one_file() -> None:
@@ -1810,6 +1829,23 @@ def test_storage_odf_on_aws_is_allowed() -> None:
     assert cells[0].test_as == "aws-odf-nightly"
 
 
+def test_storage_dellecs_on_aws_is_allowed() -> None:
+    matrix = _matrix_with_job(
+        {
+            "cron": "daily",
+            "source": "nightly",
+            "clouds": ["aws"],
+            "ocp": ["4.22"],
+            "test": "e2e-install",
+            "storage": "dellecs",
+        }
+    )
+    cells = expand_cells(matrix)
+    assert cells[0].storage == "dellecs"
+    assert cells[0].deploy_ref == "quay-deploy-dellecs"
+    assert cells[0].test_as == "aws-dellecs-nightly"
+
+
 def test_storage_explicit_default_matches_absent() -> None:
     absent = _matrix_with_job(
         {"cron": "daily", "source": "nightly", "clouds": ["aws"], "ocp": ["4.22"], "test": "e2e-install"}
@@ -1852,6 +1888,27 @@ def test_odf_storage_renders_install_step_before_deploy_and_sets_env() -> None:
     assert env["QUAY_STORAGE_PROVIDER"] == "odf"
 
 
+def test_dellecs_storage_renders_deploy_and_sets_env() -> None:
+    cell = _phase0_cell(storage_override="dellecs")
+    config = build_config(cell, GENERATOR_DIR / "templates")
+    test = config["tests"][0]
+    assert test["as"] == "aws-dellecs-nightly"
+    refs = [step["ref"] for step in test["steps"]["test"]]
+    assert refs == [
+        "merge-stage-registry-credentials",
+        "quay-enable-catalogsource-art",
+        "quay-provisioning-tls",
+        "quay-provisioning-builder",
+        "quay-deploy-mailpit",
+        "quay-deploy-jaeger",
+        "quay-deploy-dellecs",
+        "quay-test-e2e",
+    ]
+    env = test["steps"]["env"]
+    assert env["QUAY_STORAGE_PROVIDER"] == "dellecs"
+    assert "SETUP_NOOBAA" not in env
+
+
 def test_odf_storage_presubmit_renders_install_before_deploy() -> None:
     cell = _phase0_cell(
         branch="master",
@@ -1891,3 +1948,18 @@ def test_production_odf_row_shares_file_with_s3_sibling() -> None:
     s3_refs = [step["ref"] for step in tests["aws-s3-nightly"]["steps"]["test"]]
     assert "quay-install-odf-operator" not in s3_refs
     assert "SETUP_NOOBAA" not in tests["aws-s3-nightly"]["steps"]["env"]
+
+
+def test_production_dellecs_rows_share_aws_files() -> None:
+    results, _retired = generate_all()
+    by_name = {filename: config for _group, filename, config in results}
+    for filename in (
+        PHASE0_NAME,
+        "quay-quay-redhat-5.0__aws-ocp50-e2e-install.yaml",
+    ):
+        tests = {test["as"]: test for test in by_name[filename]["tests"]}
+        assert "aws-dellecs-nightly" in tests
+        test = tests["aws-dellecs-nightly"]
+        assert {"ref": "quay-deploy-dellecs"} in test["steps"]["test"]
+        assert test["steps"]["env"]["QUAY_STORAGE_PROVIDER"] == "dellecs"
+        assert "SETUP_NOOBAA" not in test["steps"]["env"]

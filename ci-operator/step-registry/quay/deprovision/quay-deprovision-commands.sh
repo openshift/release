@@ -88,6 +88,47 @@ if [[ "$QUAY_STORAGE_PROVIDER" == 'azure' ]]; then
 fi
 
 
+if [[ "$QUAY_STORAGE_PROVIDER" == 'dellecs' ]]; then
+    QUAY_DELLECS_ENDPOINT=$(cat "${SHARED_DIR}/QUAY_DELLECS_ENDPOINT" 2>/dev/null || cat /var/run/quay-qe-dellecs-secret/endpoint)
+    QUAY_DELLECS_REGION=$(cat "${SHARED_DIR}/QUAY_DELLECS_REGION" 2>/dev/null || echo "us-east-1")
+    buckets=()
+    if [[ -s "${SHARED_DIR}/QUAY_DELLECS_BUCKETS" ]]; then
+        mapfile -t buckets < "${SHARED_DIR}/QUAY_DELLECS_BUCKETS"
+    fi
+    if [[ -s "${SHARED_DIR}/QUAY_DELLECS_BUCKET" ]]; then
+        buckets+=("$(cat "${SHARED_DIR}/QUAY_DELLECS_BUCKET")")
+    fi
+    # Deduplicate. Delete every candidate even if its create-bucket call failed:
+    # the server may have created the bucket before returning an error.
+    declare -A seen=()
+    pending=()
+    for bucket in "${buckets[@]}"; do
+        [[ -n "${bucket}" && -z "${seen[${bucket}]:-}" ]] || continue
+        seen["${bucket}"]=1
+        pending+=("${bucket}")
+    done
+
+    if [[ ${#pending[@]} -eq 0 ]]; then
+        echo "No Dell ECS bucket state in ${SHARED_DIR}; nothing to deprovision."
+    else
+        # Do not echo the key material; this script runs without `set -x`.
+        AWS_ACCESS_KEY_ID="$(cat /var/run/quay-qe-dellecs-secret/accesskey)"
+        AWS_SECRET_ACCESS_KEY="$(cat /var/run/quay-qe-dellecs-secret/secretkey)"
+        export AWS_ACCESS_KEY_ID
+        export AWS_SECRET_ACCESS_KEY
+        export AWS_DEFAULT_REGION="${QUAY_DELLECS_REGION}"
+        export AWS_EC2_METADATA_DISABLED=true
+
+        for bucket in "${pending[@]}"; do
+            echo "Start to destroy quay Dell ECS bucket ${bucket} ..."
+            aws --endpoint-url "${QUAY_DELLECS_ENDPOINT}" --region "${QUAY_DELLECS_REGION}" \
+                s3 rm "s3://${bucket}" --recursive || true
+            aws --endpoint-url "${QUAY_DELLECS_ENDPOINT}" --region "${QUAY_DELLECS_REGION}" \
+                s3api delete-bucket --bucket "${bucket}" || true
+        done
+    fi
+fi
+
 if [[ "$QUAY_STORAGE_PROVIDER" == 'aws' ]]; then
     mkdir -p QUAY_AWS && cd QUAY_AWS
     cp ${SHARED_DIR}/terraform.tgz .

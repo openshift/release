@@ -26,7 +26,7 @@ STORAGE_BY_CLOUD = {
 }
 # Storage values a cloud accepts beyond its STORAGE_BY_CLOUD default.
 EXTRA_STORAGE_BY_CLOUD: dict[str, set[str]] = {
-    "aws": {"odf"},
+    "aws": {"odf", "dellecs"},
 }
 DEPLOY_REF_BY_CLOUD = {
     "aws": "quay-deploy-aws-s3",
@@ -38,6 +38,7 @@ DEPLOY_REF_BY_CLOUD = {
 }
 DEPLOY_REF_BY_STORAGE = {
     "odf": "quay-deploy-odf",
+    "dellecs": "quay-deploy-dellecs",
 }
 # Cloud-managed databases for database: true jobs. libvirt has no entry:
 # expand rejects database: true for clouds missing from this map.
