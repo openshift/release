@@ -15,18 +15,25 @@ ref:
     IAM roles. Writes a comprehensive inventory to artifacts for debugging.
 
     Discovery methodology:
-    - Regional resources: Resource Groups Tagging API with kubernetes.io/cluster/${INFRA_ID}=owned
-    - Global resources: Separate us-east-1 query for IAM instance profiles and Route53 zones
-    - IAM roles: Enumeration via list-roles + list-role-tags (Tagging API doesn't return roles)
-    - Error handling: Distinguishes API failures from legitimately empty inventories
+    - Regional resources: Resource Groups Tagging API with kubernetes.io/cluster/${INFRA_ID}=owned filter
+    - Global resources: Partition-aware query (us-east-1 for commercial, us-gov-west-1 for GovCloud,
+      cn-north-1 for China) for IAM instance profiles and Route53 hosted zones
+    - IAM roles: Enumeration via list-roles (pre-filtered by INFRA_ID pattern) + list-role-tags
+      for each candidate (Tagging API doesn't return IAM roles)
+    - Error handling: Distinguishes API failures from legitimately empty inventories; failed
+      regional tagging API calls report errors but allow step to continue
+
+    Resource detail queries:
+    All detail queries include the kubernetes.io/cluster/${INFRA_ID}=owned tag filter to prevent
+    including resources that lost their ownership tag between discovery and detail fetch.
 
     This step automatically discovers and queries details for:
-    - EC2 Instances (with ownership tag filter), EBS Volumes, Network Interfaces
-    - VPCs, Subnets, Security Groups (with cross-account rule details), Route Tables
+    - EC2 Instances, EBS Volumes, Network Interfaces
+    - VPCs, Subnets, Security Groups, Route Tables
     - Internet Gateways, NAT Gateways, Elastic IPs
     - VPC Endpoints, Network ACLs, DHCP Option Sets, VPC Peering Connections
     - Load Balancers (Classic, Application, Network) and Target Groups
-    - S3 Buckets (with GovCloud partition support), KMS Keys (including multi-region config)
+    - S3 Buckets (all AWS partitions), KMS Keys (including multi-region configuration)
     - IAM Roles and Instance Profiles (including permissions boundaries)
     - Route53 Hosted Zones
 
@@ -36,17 +43,24 @@ ref:
     - ${SHARED_DIR}/aws-cluster-describe.json - Copy of JSON for use by subsequent steps
 
     Comprehensive redaction of sensitive data:
-    - Public IPv4 and IPv6 addresses in instances, NAT gateways, Elastic IPs, and ENIs
-    - Public DNS names containing IP addresses
-    - AWS account IDs in resource ARNs, ownership fields, and cross-account security group rules
-    - IAM trust policies (AssumeRolePolicyDocument)
-    - Load balancer and target group account IDs in ARNs
-    - Network interface attachment and association owner IDs
-    - KMS multi-region key ARNs
-    - IAM permissions boundary ARNs
+    - Public IPv4 and IPv6 addresses (instances, NAT gateways, Elastic IPs, ENIs, NLB static IPs)
+    - Public DNS names containing IP addresses (instances and network interfaces)
+    - AWS account IDs in:
+      - Resource ARNs (ELB, target groups, IAM roles, instance profiles, KMS keys)
+      - Ownership fields (VPC, subnet, security group, route table, peering connections)
+      - Cross-account security group rule references (UserIdGroupPairs)
+      - Network interface attachment and association owner IDs
+      - Route table instance owner IDs
+      - Elastic IP network interface owner IDs
+      - KMS multi-region configuration (primary and replica key ARNs)
+      - IAM permissions boundary ARNs
+      - IAM instance profile ARNs
+    - IAM trust policies (AssumeRolePolicyDocument redacted to "REDACTED")
+    - VPC endpoint policy documents (redacted to prevent principal account ID exposure)
+    - Network interface requester IDs (when containing 12-digit account IDs; service aliases preserved)
 
-    Large inventory handling: Uses temporary files to avoid kernel argument size limits,
-    supporting clusters with hundreds of resources.
+    Large inventory handling: Uses temporary files to avoid kernel argument size limits (128KB),
+    supporting clusters with hundreds of resources and large JSON collections.
 
     This step is marked as best_effort and will not fail the test if AWS queries fail.
     It is primarily useful for debugging cluster configuration and verifying resource creation.
