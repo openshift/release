@@ -15,6 +15,35 @@ images:
       RUN ln -s /home/testuser/go/bin/ginkgo /usr/local/bin/ginkgo
     to: eco-gotests
   run_if_changed: x^
+releases:
+  latest:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.21.0-0
+        stream: 4-stable
+        upper: 4.22.0-0
+  ocp-4-21:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.21.0-0
+        stream: 4-stable
+        upper: 4.22.0-0
+  ocp-4-22:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 4.22.0-0
+        stream: 4-stable
+        upper: 4.23.0-0
+  ocp-5-0:
+    prerelease:
+      product: ocp
+      version_bounds:
+        lower: 5.0.0-0
+        stream: 5-stable
+        upper: 5.1.0-0
 resources:
   '*':
     limits:
@@ -23,6 +52,48 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- always_run: false
+  as: kmm-qe-secureboot-2-7-4-21
+  steps:
+    cluster_profile: aws-edge-infra
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ocp-4-21
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AWS_SECUREBOOT_ENABLED: "true"
+      AWS_SECUREBOOT_ENROLL_KMM_CERT: "true"
+      BASE_DOMAIN: ecoeng-edgeinfra-ci.devcluster.openshift.com
+      ECO_TEST_LABELS: module && secureboot
+      KMM_CHANNEL: release-2.7
+    workflow: rh-ecosystem-edge-kmm-ci-qe-secureboot
+- always_run: false
+  as: kmm-qe-secureboot-2-7-4-22
+  steps:
+    cluster_profile: aws-edge-infra
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ocp-4-22
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AWS_SECUREBOOT_ENABLED: "true"
+      AWS_SECUREBOOT_ENROLL_KMM_CERT: "true"
+      BASE_DOMAIN: ecoeng-edgeinfra-ci.devcluster.openshift.com
+      ECO_TEST_LABELS: module && secureboot
+      KMM_CHANNEL: release-2.7
+    workflow: rh-ecosystem-edge-kmm-ci-qe-secureboot
+- always_run: false
+  as: kmm-qe-secureboot-2-7-5-0
+  steps:
+    cluster_profile: aws-edge-infra
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ocp-5-0
+    env:
+      AWS_INSTALL_USE_MINIMAL_PERMISSIONS: "yes"
+      AWS_SECUREBOOT_ENABLED: "true"
+      AWS_SECUREBOOT_ENROLL_KMM_CERT: "true"
+      BASE_DOMAIN: ecoeng-edgeinfra-ci.devcluster.openshift.com
+      ECO_TEST_LABELS: module && secureboot
+      KMM_CHANNEL: release-2.7
+    workflow: rh-ecosystem-edge-kmm-ci-qe-secureboot
 - always_run: false
   as: kmm-qe-smoke-2-5
   cluster_claim:
