@@ -1,0 +1,38 @@
+ref:
+  as: kueue-operator-disconnected-compute-art
+  from: kueue-operator-src
+  commands: kueue-operator-disconnected-compute-art-commands.sh
+  grace_period: 1m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: KUEUE_INDEX_IMAGE_REPO
+      default: "quay.io/redhat-user-workloads/ocp-art-tenant/art-fbc"
+      documentation: |-
+        ART FBC catalog index image repository (no tag). Resolved to a pinned
+        @sha256 digest unless MULTISTAGE_PARAM_OVERRIDE_KUEUE_INDEX_IMAGE is set.
+    - name: KUEUE_INDEX_IMAGE_TAG
+      default: ""
+      documentation: |-
+        Floating tag on KUEUE_INDEX_IMAGE_REPO, naming convention
+        <group>__v<ocp_version>__<component_name> (e.g.
+        kueue-1.5__v4.22__kueue-rhel9-operator). Required unless
+        MULTISTAGE_PARAM_OVERRIDE_KUEUE_INDEX_IMAGE pins a digest.
+    - name: MULTISTAGE_PARAM_OVERRIDE_KUEUE_INDEX_IMAGE
+      default: ""
+      documentation: |-
+        Optional explicit override for the ART FBC index image. When set (e.g.
+        "…@sha256:…") it is used verbatim, letting a run be hard-pinned to a
+        known ART build.
+    - name: KUEUE_OPERATOR_CHANNEL
+      default: "stable-v1.5"
+      documentation: |-
+        FBC channel whose head bundle is mirrored and installed.
+  documentation: |-
+    Resolves the ART FBC for the disconnected e2e job without cluster access:
+    tag -> digest, extract configs/kueue-operator/catalog.yaml, take the channel
+    head bundle and the relatedImages the FBC declares for it, and export the
+    registry.stage.redhat.io references that
+    kueue-operator-disconnected-install-art mirrors.

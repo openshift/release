@@ -56,7 +56,7 @@ function install_oc_mirror () {
         aarch64) ARCH="arm64" ;;
     esac
     echo "[$(timestamp)] Installing the latest oc-mirror client..."
-    run_command "curl -k -fL -o oc-mirror.tar.gz ${CGWURL}/oc-mirror/latest/oc-mirror-rhel9-linux-${ARCH}.tar.gz"
+    run_command "curl -fL -o oc-mirror.tar.gz ${CGWURL}/oc-mirror/latest/oc-mirror-rhel9-linux-${ARCH}.tar.gz"
     run_command "tar -xvzf oc-mirror.tar.gz && chmod +x ./oc-mirror && rm -f oc-mirror.tar.gz"
 }
 
@@ -115,7 +115,7 @@ EOF
     cat ${TMP_DIR}/imageset.yaml
 
     echo "[$(timestamp)] Mirroring the images to the mirror registry..."
-    run_command "./oc-mirror --v2 --config=${TMP_DIR}/imageset.yaml --workspace=file://${TMP_DIR} docker://${MIRROR_REGISTRY_HOST} --log-level=info --retry-times=5 --src-tls-verify=false --dest-tls-verify=false"
+    run_command "./oc-mirror --v2 --config=${TMP_DIR}/imageset.yaml --workspace=file://${TMP_DIR} docker://${MIRROR_REGISTRY_HOST} --log-level=info --retry-times=5 --dest-tls-verify=false"
 
     # Preserve the complete opm manifest list; oc-mirror's platform filtering
     # edits it and fails when preserving the original digests.
