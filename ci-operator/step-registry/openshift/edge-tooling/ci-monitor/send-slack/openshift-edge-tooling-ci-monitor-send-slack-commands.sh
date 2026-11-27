@@ -75,7 +75,7 @@ version_summary() {
 
 # ---------------------------------------------------------------------------
 # Read Sippy counts before choosing the status header.
-# The payload monitor counts every distinct Sippy job/release with at least
+# The monitor counts every distinct Sippy job/release with at least
 # three runs and relative change < -50%, independently of AI target selection.
 # A null count means Sippy data was unavailable for that release.
 # ---------------------------------------------------------------------------
@@ -137,6 +137,11 @@ else
 fi
 if [[ -n "${SIPPY_UNAVAILABLE}" ]]; then
     MESSAGE+="${NL}Sippy data unavailable for: ${SIPPY_UNAVAILABLE}."
+fi
+
+CHAI_STATUS_FILE="${SHARED_DIR}/chai-analysis-status.txt"
+if [[ -r "${CHAI_STATUS_FILE}" ]] && grep -qE '^unavailable([[:space:]]|$)' "${CHAI_STATUS_FILE}"; then
+    MESSAGE+="${NL}:warning: A problem prevented Chai Bot from providing analysis."
 fi
 
 MESSAGE+="${NL}<${DASHBOARD_URL}|View Dashboard> | <${JOB_URL}|Prow Logs> | @openshift-edge-payload-manager"
