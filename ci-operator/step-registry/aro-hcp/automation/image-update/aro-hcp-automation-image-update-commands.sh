@@ -254,6 +254,7 @@ if ! ./tooling/image-updater/image-updater publish \
   --repo . \
   --base "${GITHUB_REPO_BRANCH}" \
   --head-repo "${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}" \
+  --base-commit "${BASE_COMMIT}" \
   --paths-file "${PATHS_FILE}" \
   --body-file "${BODY_FILE}" \
   --title "${GITHUB_PR_TITLE}" \
