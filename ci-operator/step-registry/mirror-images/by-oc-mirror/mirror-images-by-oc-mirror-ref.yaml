@@ -9,6 +9,13 @@ ref:
       cpu: 10m
       memory: 100Mi
   env:
+  - name: USE_OC_MIRROR_IMAGE
+    default: "false"
+    documentation: >-
+      When true, extract /usr/bin/oc-mirror from OC_MIRROR_IMAGE instead of
+      downloading from CGW. Must override steps.dependencies.OC_MIRROR_IMAGE
+      with the desired image; the default cli dependency is unused by default.
+      Existing periodic jobs continue to use CGW unless explicitly enabled.
   - name: CUSTOM_OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
     default: ""
     documentation: "Used to overwrite OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE to a customized payload"
@@ -22,7 +29,12 @@ ref:
     group: mirror-registry
     mount_path: /var/run/vault/mirror-registry
   dependencies:
+  - name: cli
+    env: OC_MIRROR_IMAGE
   - name: "release:latest"
     env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
   documentation: |-
     Mirror release image to local image registry.
+    By default, downloads oc-mirror from CGW, preserving existing periodic behavior.
+    Set USE_OC_MIRROR_IMAGE=true and override steps.dependencies.OC_MIRROR_IMAGE
+    to extract /usr/bin/oc-mirror from the desired image instead.
