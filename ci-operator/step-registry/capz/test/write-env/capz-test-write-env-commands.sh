@@ -19,26 +19,26 @@ fi
 AZURE_CLIENT_ID=""
 AZURE_CLIENT_SECRET=""
 AZURE_TENANT_ID=""
-AZURE_SUBSCRIPTION_ID=""
-CUSTOMER_SUBSCRIPTION="${CUSTOMER_SUBSCRIPTION:-}"
+AZURE_SUBSCRIPTION_ID="${CUSTOMER_SUBSCRIPTION_ID:-}"
 
 if [[ -n "${VAULT_SECRET_PROFILE:-}" && -d "/var/run/aro-hcp-${VAULT_SECRET_PROFILE}" ]]; then
-  CRED_DIR="/var/run/aro-hcp-${VAULT_SECRET_PROFILE}"
-  if [[ -n "${SELECTED_CLUSTER_PROFILE_DIR:-}" ]]; then
-    CRED_DIR="${SELECTED_CLUSTER_PROFILE_DIR}"
+  if [[ ! -f "${SLOT_ENV_FILE}" ]]; then
+    echo "[write-env] ERROR: slot-manager runtime contract not found at ${SLOT_ENV_FILE}" >&2
+    exit 1
   fi
+  : "${CUSTOMER_SUBSCRIPTION_ID:?slot-manager did not export CUSTOMER_SUBSCRIPTION_ID}"
+  : "${SELECTED_CLUSTER_PROFILE_DIR:?slot-manager did not export SELECTED_CLUSTER_PROFILE_DIR}"
+  CRED_DIR="${SELECTED_CLUSTER_PROFILE_DIR}"
   AZURE_CLIENT_ID="$(cat "${CRED_DIR}/client-id")"
   AZURE_CLIENT_SECRET="$(cat "${CRED_DIR}/client-secret")"
   AZURE_TENANT_ID="$(cat "${CRED_DIR}/tenant")"
-  if [[ -s "${CRED_DIR}/subscription-id" ]]; then
-    CUSTOMER_SUBSCRIPTION="$(cat "${CRED_DIR}/subscription-id")"
-  fi
+  AZURE_SUBSCRIPTION_ID="${CUSTOMER_SUBSCRIPTION_ID}"
   echo "[write-env] Credentials resolved from ${CRED_DIR}"
 elif [[ -n "${CLUSTER_PROFILE_DIR:-}" && -f "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json" ]]; then
   AZURE_CLIENT_ID=$(jq -r .clientId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")
   AZURE_CLIENT_SECRET=$(jq -r .clientSecret "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")
   AZURE_TENANT_ID=$(jq -r .tenantId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")
-  CUSTOMER_SUBSCRIPTION=$(jq -r .subscriptionId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")
+  AZURE_SUBSCRIPTION_ID=$(jq -r .subscriptionId "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json")
   echo "[write-env] Credentials resolved from ${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 fi
 
@@ -47,11 +47,11 @@ if [[ -d "${CAPZ_CREDS_DIR}" && -f "${CAPZ_CREDS_DIR}/AZURE_CLIENT_ID" ]]; then
   AZURE_CLIENT_ID=$(cat "${CAPZ_CREDS_DIR}/AZURE_CLIENT_ID")
   AZURE_CLIENT_SECRET=$(cat "${CAPZ_CREDS_DIR}/AZURE_CLIENT_SECRET")
   AZURE_TENANT_ID=$(cat "${CAPZ_CREDS_DIR}/AZURE_TENANT_ID")
-  CUSTOMER_SUBSCRIPTION=$(cat "${CAPZ_CREDS_DIR}/AZURE_SUBSCRIPTION_ID")
+  AZURE_SUBSCRIPTION_ID=$(cat "${CAPZ_CREDS_DIR}/AZURE_SUBSCRIPTION_ID")
   echo "[write-env] Credentials overridden from ${CAPZ_CREDS_DIR}"
 fi
 
-for var in AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_TENANT_ID CUSTOMER_SUBSCRIPTION; do
+for var in AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID; do
   val="${!var}"
   if [[ -z "${val}" || "${val}" == "null" ]]; then
     echo "[write-env] ERROR: ${var} is missing or null" >&2
@@ -64,8 +64,7 @@ az login --service-principal \
   --password "${AZURE_CLIENT_SECRET}" \
   --tenant "${AZURE_TENANT_ID}" \
   --output none
-az account set --subscription "${CUSTOMER_SUBSCRIPTION}"
-AZURE_SUBSCRIPTION_ID="$(az account show --query id --output tsv)"
+az account set --subscription "${AZURE_SUBSCRIPTION_ID}"
 
 # Generate stable identifiers for this job run.
 NAME_PREFIX_FILE="${SHARED_DIR}/name-prefix"
