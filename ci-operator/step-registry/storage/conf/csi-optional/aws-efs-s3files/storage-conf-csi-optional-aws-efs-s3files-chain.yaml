@@ -1,0 +1,30 @@
+chain:
+  as: storage-conf-csi-optional-aws-efs-s3files
+  steps:
+    - ref: optional-operators-subscribe
+    - ref: storage-create-csi-aws-efs-s3files
+    - ref: storage-conf-wait-for-csi-driver
+    - ref: storage-conf-storageclass-set-default-storageclass
+  env:
+  - name: REQUIRED_DEFAULT_STORAGECLASS
+    default: "s3files-sc"
+  - name: CLUSTERCSIDRIVER
+    default: efs.csi.aws.com
+  - name: OO_PACKAGE
+    default: aws-efs-csi-driver-operator
+  - name: OO_CHANNEL
+    default: stable
+  - name: OO_INSTALL_NAMESPACE
+    default : openshift-cluster-csi-drivers
+  - name: OO_TARGET_NAMESPACES
+    default: '!all'
+  - name: TRUECONDITIONS
+    default: AWSEFSDriverControllerServiceControllerAvailable AWSEFSDriverNodeServiceControllerAvailable
+  - name: TEST_CSI_DRIVER_MANIFEST
+    default: manifest-aws-efs-s3files.yaml
+  documentation: |-
+    The storage-conf-csi-optional-aws-efs-s3files step subscribes the aws-efs-csi-driver-operator,
+    marks the ClusterCSIDriver `efs.csi.aws.com` as Managed to install the aws-efs-csi-driver, waits
+    for its credential secrets to be provisioned by cloud-credential-operator, creates an S3 Files
+    file system and its StorageClass, waits for the driver to be fully deployed, and finally sets
+    the default storageclass to the `s3files-sc` storageclass.

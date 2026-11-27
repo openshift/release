@@ -58,6 +58,8 @@ images:
     to: aws-efs-csi-driver-operator
   - dockerfile_path: Dockerfile.create_efs
     to: aws-efs-csi-operator-create-efs
+  - dockerfile_path: Dockerfile.volume_create
+    to: aws-efs-csi-operator-volume-create
   - dockerfile_path: Dockerfile.azure-disk
     to: azure-disk-csi-driver-operator
   - dockerfile_path: Dockerfile.azure-file
@@ -295,6 +297,17 @@ tests:
       OO_CHANNEL: stable
       TEST_SUITE: openshift/csi
     workflow: openshift-e2e-aws-csi-efs
+- as: aws-efs-s3files-operator-e2e
+  optional: true
+  run_if_changed: ^(Dockerfile\.aws-efs|Dockerfile\.volume_create|assets\/overlays\/aws-(efs|s3files)\/.*|cmd\/volume-create\/.*|pkg\/driver\/aws-efs\/.*|pkg\/operator\/.*|pkg\/volumecreate\/.*|test\/e2e\/aws-s3files\/.*)
+  steps:
+    cluster_profile: openshift-org-aws
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      OO_CHANNEL: stable
+      TEST_SUITE: openshift/csi
+    workflow: openshift-e2e-aws-csi-efs-s3files
 - as: aws-efs-single-zone-operator-e2e
   run_if_changed: ^(Dockerfile\.aws-efs|assets\/overlays\/aws-efs\/.*|pkg\/driver\/aws-efs\/.*|pkg\/operator\/.*)
   steps:

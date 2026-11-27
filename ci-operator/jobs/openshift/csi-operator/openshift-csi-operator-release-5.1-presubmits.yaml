@@ -21,6 +21,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-qe
@@ -135,6 +136,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -247,6 +249,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-qe
@@ -346,6 +349,121 @@ presubmits:
     - ^release-5\.1$
     - ^release-5\.1-
     cluster: build09
+    context: ci/prow/aws-efs-s3files-operator-e2e
+    decorate: true
+    decoration_config:
+      sparse_checkout_files:
+      - .ci-operator.yaml
+      - Dockerfile.aws-ebs
+      - Dockerfile.aws-efs
+      - Dockerfile.azure-disk
+      - Dockerfile.azure-file
+      - Dockerfile.create_efs
+      - Dockerfile.gcp-pd
+      - Dockerfile.openstack-cinder
+      - Dockerfile.openstack-manila
+      - Dockerfile.samba
+      - Dockerfile.test
+      - Dockerfile.volume_create
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-csi-operator-release-5.1-aws-efs-s3files-operator-e2e
+    optional: true
+    rerun_command: /test aws-efs-s3files-operator-e2e
+    run_if_changed: ^(Dockerfile\.aws-efs|Dockerfile\.volume_create|assets\/overlays\/aws-(efs|s3files)\/.*|cmd\/volume-create\/.*|pkg\/driver\/aws-efs\/.*|pkg\/operator\/.*|pkg\/volumecreate\/.*|test\/e2e\/aws-s3files\/.*)
+    spec:
+      containers:
+      - args:
+        - --enable-secrets-store-csi-driver=true
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --gsm-config=/etc/gsm-config/gsm-config.yaml
+        - --gsm-credentials-file=/etc/gsm-credentials/key.json
+        - --gsm-project-config=/etc/gsm-config/gsm-project-config.yaml
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=aws-efs-s3files-operator-e2e
+        command:
+        - ci-operator
+        env:
+        - name: HTTP_SERVER_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        image: quay-proxy.ci.openshift.org/openshift/ci:ci_ci-operator_latest
+        imagePullPolicy: Always
+        name: ""
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/gsm-config
+          name: gsm-config
+          readOnly: true
+        - mountPath: /etc/gsm-credentials
+          name: gsm-sa-key
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - configMap:
+          name: gsm-config
+        name: gsm-config
+      - csi:
+          driver: secrets-store.csi.k8s.io
+          readOnly: true
+          volumeAttributes:
+            secretProviderClass: ci-operator-sa-key-spc
+        name: gsm-sa-key
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )aws-efs-s3files-operator-e2e,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-5\.1$
+    - ^release-5\.1-
+    cluster: build09
     context: ci/prow/aws-efs-single-zone-cross-account-operator-e2e
     decorate: true
     decoration_config:
@@ -361,6 +479,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-qe
@@ -474,6 +593,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -587,6 +707,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-qe
@@ -701,6 +822,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-qe
@@ -815,6 +937,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -881,6 +1004,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -947,6 +1071,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -1061,6 +1186,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-qe
@@ -1174,6 +1300,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -1287,6 +1414,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws-eusc
       ci-operator.openshift.io/cloud-cluster-profile: aws-eusc
@@ -1400,6 +1528,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -1512,6 +1641,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -1624,6 +1754,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -1738,6 +1869,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-qe
@@ -1853,6 +1985,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-qe
@@ -1966,6 +2099,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -2079,6 +2213,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -2193,6 +2328,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-qe
@@ -2308,6 +2444,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-qe
@@ -2421,6 +2558,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -2535,6 +2673,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: azure-qe
@@ -2648,6 +2787,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -2761,6 +2901,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -2875,6 +3016,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azurestack
       ci-operator.openshift.io/cloud-cluster-profile: azurestack-dev
@@ -2989,6 +3131,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -3101,6 +3244,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -3213,6 +3357,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -3326,6 +3471,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp-qe
@@ -3439,6 +3585,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -3552,6 +3699,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -3665,6 +3813,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -3778,6 +3927,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -3892,6 +4042,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: openstack-vexxhost
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
@@ -4007,6 +4158,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: openstack-vexxhost
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
@@ -4121,6 +4273,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: openstack-vexxhost
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
@@ -4233,6 +4386,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -4345,6 +4499,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: hypershift-aks
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aks
@@ -4458,6 +4613,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -4571,6 +4727,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: hypershift-aws
       ci-operator.openshift.io/cloud-cluster-profile: hypershift-aws
@@ -4684,6 +4841,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -4869,6 +5027,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -4980,6 +5139,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -5093,6 +5253,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -5207,6 +5368,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-qe
@@ -5321,6 +5483,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws-qe
@@ -5435,6 +5598,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -5548,6 +5712,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -5661,6 +5826,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -5774,6 +5940,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -5887,6 +6054,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -6000,6 +6168,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -6113,6 +6282,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -6226,6 +6396,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-aws
@@ -6339,6 +6510,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -6452,6 +6624,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-gcp
@@ -6565,6 +6738,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci-operator.openshift.io/cloud: azure4
       ci-operator.openshift.io/cloud-cluster-profile: openshift-org-azure
@@ -6678,6 +6852,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -6752,6 +6927,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -6826,6 +7002,7 @@ presubmits:
       - Dockerfile.openstack-manila
       - Dockerfile.samba
       - Dockerfile.test
+      - Dockerfile.volume_create
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
