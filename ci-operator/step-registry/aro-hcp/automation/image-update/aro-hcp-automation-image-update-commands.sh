@@ -129,7 +129,7 @@ fi
 SUMMARY_SRC="/tmp/image-updater-summary-src"
 SUMMARY_BIN="${SUMMARY_SRC}/tooling/image-updater/image-updater"
 git clone --quiet --depth 1 --branch rael/image-updater-summary https://github.com/raelga/ARO-HCP.git "${SUMMARY_SRC}" || error "summary: failed to clone the rehearsal revision"
-go build -C "${SUMMARY_SRC}/tooling/image-updater" -o "${SUMMARY_BIN}" . || error "summary: failed to build the rehearsal binary"
+( cd "${SUMMARY_SRC}/tooling/image-updater" && go build -o "${SUMMARY_BIN}" . ) || error "summary: failed to build the rehearsal binary"
 log "summary: built the rehearsal binary from the branch"
 
 # Configuration: Validate GitHub App credentials
