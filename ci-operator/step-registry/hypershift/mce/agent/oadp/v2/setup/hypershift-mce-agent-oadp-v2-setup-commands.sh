@@ -30,6 +30,36 @@ fi
 S3_URL="$(<"${endpoint_file}")"
 
 oc create secret generic cloud-credentials -n openshift-adp --from-file=cloud="${credentials_file}"
+oc create secret generic rustfs-ca -n openshift-adp --from-file=ca-bundle="${ca_cert_file}"
+
+CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
+
+# Create the BackupStorageLocation before the DataProtectionApplication so the
+# OADP operator aggregates the caCertRef into the velero pod's AWS_CA_BUNDLE
+# on its first reconcile.
+cat <<EOF | oc apply -f -
+apiVersion: velero.io/v1
+kind: BackupStorageLocation
+metadata:
+  name: ${CLUSTER_NAME}
+  namespace: openshift-adp
+spec:
+  provider: aws
+  objectStorage:
+    bucket: oadp-backup
+    prefix: hcp
+    caCertRef:
+      name: rustfs-ca
+      key: ca-bundle
+  credential:
+    name: cloud-credentials
+    key: cloud
+  config:
+    region: minio
+    s3ForcePathStyle: "true"
+    s3Url: "${S3_URL}"
+    profile: default
+EOF
 
 cat <<EOF | oc apply -f -
 apiVersion: oadp.openshift.io/v1alpha1
@@ -63,32 +93,6 @@ oc rollout status deployment/velero -n openshift-adp --timeout=300s
 echo "Waiting for node-agent DaemonSet to be ready..."
 timeout 10m bash -c 'until oc get daemonset/node-agent -n openshift-adp >/dev/null 2>&1; do sleep 5; done'
 oc rollout status daemonset/node-agent -n openshift-adp --timeout=600s
-
-CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
-
-echo "Creating BackupStorageLocation..."
-CA_CERT="$(base64 -w0 < "${ca_cert_file}")"
-cat <<EOF | oc apply -f -
-apiVersion: velero.io/v1
-kind: BackupStorageLocation
-metadata:
-  name: ${CLUSTER_NAME}
-  namespace: openshift-adp
-spec:
-  provider: aws
-  objectStorage:
-    bucket: oadp-backup
-    prefix: hcp
-  credential:
-    name: cloud-credentials
-    key: cloud
-  caCert: ${CA_CERT}
-  config:
-    region: minio
-    s3ForcePathStyle: "true"
-    s3Url: "${S3_URL}"
-    profile: default
-EOF
 
 timeout 5m bash -c "until [[ \$(oc get dataProtectionApplication/dpa-sample -n openshift-adp -o jsonpath='{.status.conditions[?(@.type==\"Reconciled\")].status}' 2>/dev/null) == \"True\" ]]; do sleep 15; done"
 timeout 5m bash -c "until [[ \$(oc get backupStorageLocation/${CLUSTER_NAME} -n openshift-adp -o jsonpath='{.status.phase}' 2>/dev/null) == \"Available\" ]]; do sleep 15; done"
