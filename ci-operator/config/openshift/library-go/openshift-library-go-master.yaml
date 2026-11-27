@@ -1,4 +1,8 @@
 base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v2.15.0
   os:
     name: centos
     namespace: openshift
@@ -27,6 +31,12 @@ resources:
       memory: 8Gi
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
+- as: lint
+  commands: golangci-lint run --verbose --timeout=5m1s
+  container:
+    clone: true
+    from: golangci-lint
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|LICENSE)$
 - as: verify
   commands: |
     make verify -k --warn-undefined-variables
