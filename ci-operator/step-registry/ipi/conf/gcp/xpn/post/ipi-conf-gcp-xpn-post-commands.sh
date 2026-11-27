@@ -58,8 +58,26 @@ function delete_resource_with_retry() {
 # Disable exit-on-error for the deletion section so all resources are attempted
 set +e
 
-delete_resource "firewall-rules ${INSTANCE_PREFIX}" \
-  gcloud compute firewall-rules delete "${INSTANCE_PREFIX}" --quiet
+# Delete every firewall rule attached to this job's network rather than naming
+# them. The pre step creates several, and the installer or CAPG may leave their
+# own behind on a failed run; GCP refuses to delete a network that still holds
+# any firewall rule, so an unnamed leftover would fail the network deletion
+# below and leak the whole VPC.
+FIREWALL_RULES=()
+while IFS= read -r rule; do
+  [[ -n "${rule}" ]] && FIREWALL_RULES+=("${rule}")
+done < <(gcloud compute firewall-rules list \
+  --filter="network=${HOST_PROJECT_NETWORK}" \
+  --format="value(name)")
+
+if [[ ${#FIREWALL_RULES[@]} -eq 0 ]]; then
+  echo "$(date -u --rfc-3339=seconds) - No firewall rules found on network ${HOST_PROJECT_NETWORK}"
+else
+  for rule in "${FIREWALL_RULES[@]}"; do
+    delete_resource "firewall-rule ${rule}" \
+      gcloud compute firewall-rules delete "${rule}" --quiet
+  done
+fi
 
 delete_resource "NAT ${NAT_NAME}" \
   gcloud compute routers nats delete "${NAT_NAME}" --router="${INSTANCE_PREFIX}" --region="${REGION}" --quiet
