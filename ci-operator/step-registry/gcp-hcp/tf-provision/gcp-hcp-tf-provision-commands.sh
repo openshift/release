@@ -149,6 +149,17 @@ fi
 
 log "Template rendered to: ${RENDERED_DIR}"
 
+# The GAR-enabled Terraform root reads this file when configuring its cache.
+# Fail before apply if that root has no matching regional Argo Application.
+if [[ -f "${RENDERED_DIR}/gar-upstream-secret-name" ]]; then
+  if [[ ! -s "${RENDERED_DIR}/gar-upstream-secret-name" ||
+    ! -f "${REPO_ROOT}/argocd/rendered/region/ci/e2e/${REGION}/templates/gecko-gar-access.yaml" ]]; then
+    log "ERROR: GAR requires a Quay secret name and a rendered gecko-gar-access Application for ci/e2e/${REGION}"
+    exit 1
+  fi
+  touch "${SHARED_DIR}/gcp-hcp-gar-expected"
+fi
+
 # --- Write predictable project IDs to SHARED_DIR early ---
 # Project IDs are deterministic from RUN_ID and REGION. Write them now so
 # the cleanup step can find and delete projects even if terraform apply fails
@@ -172,12 +183,6 @@ echo "${SERVICE_PROJECT_ID}" > "${SHARED_DIR}/service-project-id"
 echo "${WORKSPACE_NAME}" > "${SHARED_DIR}/workspace-name"
 echo "${RUN_ID}" > "${SHARED_DIR}/run-id"
 echo "${REGION}" > "${SHARED_DIR}/region"
-
-# The checked-in CI Application is the signal that this infra revision expects
-# GAR. Record it before apply, independently of the Terraform outputs.
-if [[ -f "${REPO_ROOT}/argocd/rendered/region/ci/e2e/${REGION}/templates/gecko-gar-access.yaml" ]]; then
-  touch "${SHARED_DIR}/gcp-hcp-gar-expected"
-fi
 
 log "Early SHARED_DIR outputs written (for cleanup on failure):"
 log "  Region Project:  ${REGION_PROJECT_ID}"
