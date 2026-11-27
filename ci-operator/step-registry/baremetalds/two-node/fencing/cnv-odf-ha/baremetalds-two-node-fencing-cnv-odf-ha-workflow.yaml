@@ -9,6 +9,7 @@ workflow:
       - ref: openshift-cluster-bot-rbac
       - ref: baremetalds-two-node-fencing-odf-install
       - ref: interop-tests-deploy-cnv
+      - chain: cucushift-installer-check-cluster-health
     test:
     - ref: baremetalds-two-node-fencing-cnv-vm-ha
     post:
@@ -36,3 +37,21 @@ workflow:
     enabling live-migration that is not possible with the LVMS-based workflow.
     Requires 64 GiB per node (MASTER_MEMORY=65536) to support ODF + CNV + VM
     failover without memory pressure.
+
+    The interop-tests-deploy-cnv step returns once HyperConverged is
+    Available, which says nothing about a MachineConfig rollout: the
+    hypershift-kubevirt-install step documents that CNV's
+    virt-platform-autopilot creates MachineConfigs (for the psi kernel
+    argument and swap) that make the Machine Config Operator reboot every
+    node of their pool. The last pre step therefore runs the
+    cucushift-installer-check-cluster-health chain. It waits until the
+    MachineConfigPools stop updating without being degraded and the
+    ClusterOperators are available, not progressing and not degraded, each
+    over several consecutive checks a minute apart, and then checks that all
+    nodes are Ready. Each wait is bounded (about 20 minutes for the pools
+    and 40 for the operators), and the step fails when a wait runs out. The
+    aim is to hold the SSH-driven VM HA test, which fences a node, until the
+    pools and operators report a settled state. It is a generic health gate:
+    it does not check that specific MachineConfigs were applied, so a
+    rollout that starts after the pool checks have passed is not caught, and
+    it does not check that the nodes accept SSH.
