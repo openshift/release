@@ -190,27 +190,32 @@ module's .zip, so the build is stopped here instead."""
 _MISSING_FOOTER = """\
 Likely cause:
 - This typically happens with very large dependency repositories when the
-  pinned commit is far from the nearest semver tag: the proxy cannot
-  compute or serve a pseudo-version for a commit with no nearby tag, so
-  the request 404s.
+  pinned commit is far from the nearest semver tag: the proxy derives a
+  pseudo-version's base from the most recent semver tag that is an ancestor
+  of (on or before) the commit, and cannot serve one when no nearby ancestor
+  tag exists, so the request 404s.
 
-How to fix:
-  1. Ask the maintainers of the dependency repository to push a semver
-     tag on (or after) the pinned commit, so a nearby tag exists.
-  2. After the tag is published (allow a few minutes for proxy
-     propagation), update this repo to require the tag instead of the
-     pseudo-version:
-       - plain require:   go get <module>@<new-tag>
-       - replace directive: go mod edit -replace <old>=<target>@<new-tag>
-     then run 'go mod tidy' (and 'go mod vendor' if this repo vendors)
-     to record the change.
-  3. IMPORTANT: 'go mod tidy' alone will NOT swap an existing pinned
-     pseudo-version or replace directive to the new tag. You must set the
-     version explicitly first (step 2).
+How to fix (two options):
 
-Alternatively, simply re-running the build after the tag exists may
-succeed: the original pseudo-version can become resolvable once a nearby
-tag is present on the proxy."""
+Option A -- make the existing pinned pseudo-version resolvable:
+  Ask the maintainers of the dependency repository to push a semver tag on
+  or before the pinned commit (a nearby ancestor tag). A tag after the commit
+  does not affect its pseudo-version. Then simply re-run the build (allow a
+  few minutes for proxy propagation): the original pseudo-version can become
+  resolvable once a nearby ancestor tag is present on the proxy -- no go.mod
+  change needed.
+
+Option B -- switch off the pseudo-version to a real release:
+  Ask the maintainers to push a semver tag that includes the pinned commit
+  (on or after it), then update this repo to require that tag instead of the
+  pseudo-version:
+    - plain require:   go get <module>@<new-tag>
+    - replace directive: go mod edit -replace <old>=<target>@<new-tag>
+  then run 'go mod tidy' (and 'go mod vendor' if this repo vendors) to record
+  the change.
+  IMPORTANT: 'go mod tidy' alone will NOT swap an existing pinned
+  pseudo-version or replace directive to the new tag. You must set the version
+  explicitly first."""
 
 
 # --------------------------------------------------------------------------- #
