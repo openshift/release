@@ -149,14 +149,9 @@ fi
 
 log "Template rendered to: ${RENDERED_DIR}"
 
-# The GAR-enabled Terraform root reads this file when configuring its cache.
-# Fail before apply if that root has no matching regional Argo Application.
+# Record that Terraform may create GAR IAM before apply so teardown can
+# preserve state if cleanup is unverified, including after a partial apply.
 if [[ -f "${RENDERED_DIR}/gar-upstream-secret-name" ]]; then
-  if [[ ! -s "${RENDERED_DIR}/gar-upstream-secret-name" ||
-    ! -f "${REPO_ROOT}/argocd/rendered/region/ci/e2e/${REGION}/templates/gecko-gar-access.yaml" ]]; then
-    log "ERROR: GAR requires a Quay secret name and a rendered gecko-gar-access Application for ci/e2e/${REGION}"
-    exit 1
-  fi
   touch "${SHARED_DIR}/gcp-hcp-gar-expected"
 fi
 
