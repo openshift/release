@@ -115,6 +115,14 @@ BASE_COMMIT="$(git rev-parse HEAD)"
 readonly BASE_COMMIT
 info "checkout: running ${GITHUB_REPO_BRANCH} at ${BASE_COMMIT}"
 
+# Render: reuse the templatize the image already built instead of compiling it again
+PREBUILT_TEMPLATIZE="/opt/app-root/src/github.com/Azure/ARO-HCP/tooling/templatize/templatize-$(uname -m)"
+if [[ -x "${PREBUILT_TEMPLATIZE}" ]]; then
+  cp "${PREBUILT_TEMPLATIZE}" "${REPO_ROOT}/tooling/templatize/templatize-$(uname -m)" || error "render: failed to stage the prebuilt templatize"
+  export TEMPLATIZE_USE_PREBUILT=1
+  info "render: using the prebuilt templatize from the image"
+fi
+
 # Configuration: Validate GitHub App credentials
 debug "cfg: validating GitHub App credentials"
 if [[ ! -f "${GITHUB_APP_ID_PATH}" ]]; then
