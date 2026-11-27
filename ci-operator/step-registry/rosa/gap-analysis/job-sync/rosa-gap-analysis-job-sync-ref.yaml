@@ -1,0 +1,52 @@
+ref:
+  as: rosa-gap-analysis-job-sync
+  from: src
+  grace_period: 1m
+  timeout: 30m
+  commands: rosa-gap-analysis-job-sync-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 1Gi
+  env:
+  - name: GAP_JOB_SYNC_DRY_RUN
+    default: "true"
+    documentation: >-
+      When true (default), the step only logs the PRs it would open and
+      writes a preview artifact. Set to false to open real PRs; requires a
+      GitHub token (GITHUB_TOKEN or GITHUB_TOKEN_PATH).
+  - name: GITHUB_TOKEN_PATH
+    default: /creds-github/token
+    documentation: >-
+      Token file used for PR creation in write mode. Ignored in dry-run.
+  # TODO(ROSAENG-66067, Phase 2): uncomment when DPTP provides the GitHub
+  # token secret, then set GAP_JOB_SYNC_DRY_RUN to "false" in the consuming
+  # config.
+  # credentials:
+  # - namespace: ci
+  #   bundle: gap-analysis-job-sync-github-token
+  #   mount_path: /creds-github
+  documentation: |-
+    Auto-onboards new OCP y-streams into the rosa-gap-analysis periodics
+    (ROSAENG-66067). Reads accepted OCP nightly streams, diffs them against
+    the nightly-X-Y tests defined in openshift/release, and opens ONE PR
+    adding the templated entry for every missing y-stream.
+
+    New majors (x-streams, e.g. 6.0) are skipped with a loud log — major
+    onboarding is manual by design. Older y-streams without jobs are
+    ignored (no backfilling): the accepted API retains nightly streams
+    for long-EOL versions, so only versions newer than the newest tracked
+    minor of each major are onboarded. The step is stateless and idempotent:
+    its only input is the periodics config on main (is the job present?).
+    One run opens one PR, and the PR auto-merges — by the next daily run
+    the job is on main and there is nothing to do.
+
+    Dry-run is the default: it validates detection against live data and
+    writes a would-do preview to
+    ${ARTIFACT_DIR}/rosa-gap-analysis-job-sync-would-do.txt without touching
+    GitHub. Write mode additionally requires git, gh, oc, and a GitHub
+    token; it regenerates the ci-operator/jobs output by running the
+    release repo's generator binaries (determinize-ci-operator,
+    ci-operator-prowgen, sanitize-prow-jobs) directly — extracted from the
+    public ci-public image, since the job image has no container engine and
+    cannot run make update.
