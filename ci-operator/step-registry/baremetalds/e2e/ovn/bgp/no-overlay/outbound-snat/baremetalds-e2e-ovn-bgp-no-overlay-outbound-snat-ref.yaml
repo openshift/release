@@ -1,0 +1,34 @@
+ref:
+  as: baremetalds-e2e-ovn-bgp-no-overlay-outbound-snat
+  from_image:
+    name: cli-jq
+    namespace: ocp
+    tag: latest
+  commands: baremetalds-e2e-ovn-bgp-no-overlay-outbound-snat-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  grace_period: 10m
+  env:
+  - name: NO_OVERLAY_OUTBOUND_SNAT
+    default: "Enabled"
+    documentation: |-
+      Value of defaultNetwork.ovnKubernetesConfig.noOverlayConfig.outboundSNAT the cluster should
+      run with for the tests. This step reconciles the cluster to it, so in practice it only acts
+      when the value is "Disabled".
+
+      Changing outboundSNAT is a supported day 2 operation: CNO hashes it into the ovnkube-node
+      pod template and rolls the DaemonSet.
+  documentation: |-
+    Reconciles outboundSNAT on a cluster installed with the NoOverlay transport to the value the
+    job wants to test with, waits for the ovnkube-node rollout CNO triggers in response, and
+    verifies the change took before the tests run.
+
+    It is a no-op when the cluster already has the requested value, which is the case for every
+    job asking for outboundSNAT=Enabled, so it is safe to keep in the chain for any no-overlay
+    workflow. A workflow asking for Disabled has to have it.
+
+    It has to run after baremetalds-e2e-ovn-bgp-pre, which replaces the install time route
+    reflector with the external FRR container the tests use: the flip to outboundSNAT=Disabled is
+    only safe once the data path the pod sourced traffic will take is the final one.

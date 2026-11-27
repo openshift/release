@@ -1,0 +1,39 @@
+workflow:
+  as: baremetalds-e2e-ovn-bgp-dualstack-lgw-no-overlay
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        # https://issues.redhat.com/browse/OCPBUGS-52194
+        DHCP_LEASE_EXPIRY=0
+      EXTRA_MG_ARGS: --host-network
+    pre:
+      - ref: baremetalds-devscripts-conf-featureset
+      - chain: baremetalds-ofcir-no-overlay-pre
+      - ref: ovn-shared-to-local-gateway-mode-migration
+      - ref: baremetalds-e2e-ovn-bgp-pre
+      - ref: baremetalds-e2e-ovn-debug-enable-console
+    test:
+      - chain: baremetalds-ipi-test
+    post:
+      - ref: baremetalds-e2e-ovn-debug-console-gather
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    This workflow executes the common end-to-end test suite on a cluster provisioned by running
+    dev-scripts on a packet server with both IPv4 and IPv6 enabled, installed with the NoOverlay
+    network transport, and migrated to local gateway mode.
+
+    It differs from baremetalds-e2e-ovn-bgp-dualstack-local-gw in that the cluster is installed
+    with the NoOverlay transport, which is immutable and therefore cannot be patched in after the
+    install the way the rest of the BGP configuration is. The transport requires the NoOverlayMode
+    feature gate, so the job has to ask for a preview feature set.
+
+    The no-overlay configuration is left to the job: set NO_OVERLAY_ROUTING and, when the default
+    of outboundSNAT enabled is not what is wanted, NO_OVERLAY_OUTBOUND_SNAT. The cluster is always
+    installed with outboundSNAT enabled, so a job asking for Disabled needs the post-install step
+    that reaches it and should use baremetalds-e2e-ovn-bgp-dualstack-sgw-no-overlay, which carries
+    that step.
+
+    It does not configure the extra machine network or install kubernetes-nmstate, since the
+    VRF-Lite scenarios that need them are not part of what this workflow is meant to cover.
