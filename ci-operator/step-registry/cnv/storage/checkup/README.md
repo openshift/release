@@ -177,8 +177,8 @@ success and an empty failure reason.
 Timeout inputs accept positive durations in hours, minutes, or seconds. The VMI
 timeout must be shorter than the checkup timeout, which must be shorter than the
 Job deadline. The Job deadline starts when the Job is created. It is
-capped at 2100 seconds to leave at least five minutes for setup and reporting
-within the 40-minute runner timeout. Invalid timeouts and result
+capped at 3000 seconds to leave at least five minutes for setup and reporting
+within the 55-minute runner timeout. Invalid timeouts and result
 expressions are rejected before creating checkup resources. Failed API reads
 retain the last complete result document so that a failing JUnit report can
 still be written.
@@ -190,17 +190,19 @@ for the checkup, and 2100 seconds for the Job. The current jobs use these budget
 
 | Input | Cloud job value |
 | --- | --- |
-| `CHECKUP_VMI_TIMEOUT` | AWS `6m`, Azure `12m`, GCP `3m` |
-| `CHECKUP_TIMEOUT` | Azure `33m`, AWS and GCP `10m` |
-| `CHECKUP_JOB_TIMEOUT_SECONDS` | Azure `2100` (35 minutes), AWS and GCP `900` (15 minutes) |
+| `CHECKUP_VMI_TIMEOUT` | AWS `6m`, Azure `30m`, GCP `3m` |
+| `CHECKUP_TIMEOUT` | Azure `45m`, AWS and GCP `10m` |
+| `CHECKUP_JOB_TIMEOUT_SECONDS` | Azure `3000` (50 minutes), AWS and GCP `900` (15 minutes) |
 | `CHECKUP_POST_GATHER_HOLD_SECONDS` | `7200` (2 hours) |
 
 The [Azure File NFS rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-azure/2125558401814499328)
 passed migration, snapshot, and restore. The first VM started in 5m36s, and the
 hotplug DataVolume became ready in 9m50s. Both exceeded the former three-minute
-VMI timeout. The Azure checkup shares its 33-minute deadline across all checks.
-The earlier checks must finish within 21 minutes for all ten concurrent boots
-to receive the full 12-minute wait.
+VMI timeout. In a [later Azure rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-azure/2125946322094657536),
+all ten boot copies were still progressing when the 12-minute waits expired,
+at 82–95% in the CDI controller logs. Concurrent boot began about 12m16s into
+that checkup. With the new shared 45-minute deadline, earlier checks can take
+up to 15 minutes and still leave all ten boots their 30-minute wait.
 
 The first clone of a freshly imported golden image can wait for an EBS snapshot.
 In the initial [AWS ten-VM rehearsal](https://prow.ci.openshift.org/view/gs/test-platform-results-public/pr-logs/pull/openshift_release/87544/rehearse-87544-periodic-ci-openshift-release-main-cnv-storage-checkup-storage-checkup-aws/2118584516665675776),

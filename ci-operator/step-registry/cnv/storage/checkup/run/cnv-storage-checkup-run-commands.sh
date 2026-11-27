@@ -157,9 +157,9 @@ fail() {
 
 [[ ${CHECKUP_NUM_VMS} =~ ^([1-9]|[1-9][0-9]|100)$ ]] || fail "CHECKUP_NUM_VMS must be between 1 and 100"
 [[ ${CHECKUP_JOB_TIMEOUT_SECONDS} =~ ^[1-9][0-9]*$ ]] || fail "CHECKUP_JOB_TIMEOUT_SECONDS must be a positive integer"
-# Reserve five minutes of the registry step's 40-minute timeout for setup,
+# Reserve five minutes of the registry step's 55-minute timeout for setup,
 # API calls, and reporting after the Job deadline.
-(( CHECKUP_JOB_TIMEOUT_SECONDS <= 2100 )) || fail "CHECKUP_JOB_TIMEOUT_SECONDS must not exceed 2100"
+(( CHECKUP_JOB_TIMEOUT_SECONDS <= 3000 )) || fail "CHECKUP_JOB_TIMEOUT_SECONDS must not exceed 3000"
 
 duration_seconds() {
   jq -ern --arg duration "$1" '
