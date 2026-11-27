@@ -77,8 +77,10 @@ export -f ClusterCAPIOperatorPodsCreated
 function waitForClusterCAPIOperatorPodsReadiness() {
   # OCP >= 4.22: new namespace/deployments structure (see: https://github.com/openshift/cluster-capi-operator/pull/447)
   if ! isOCPVersionLowerThan 4.22; then
-    echo "$(date -u --rfc-3339=seconds) - Wait for openshift-cluster-api-operator components to be ready"
-    waitFor 10m oc wait --all -n "${CAPI_OPERATOR_NAMESPACE}" --for=condition=ready pods
+    # Wait for Deployment rollouts instead of pod readiness: one-shot upgrade
+    # assessment pods report Ready=False (PodCompleted) even after a successful exit.
+    echo "$(date -u --rfc-3339=seconds) - Wait for openshift-cluster-api-operator deployments to roll out"
+    waitFor 10m oc rollout status -n "${CAPI_OPERATOR_NAMESPACE}" deployment
   fi
 
   echo "$(date -u --rfc-3339=seconds) - Wait for openshift-cluster-api components to be ready"
@@ -112,6 +114,10 @@ function execute() {
     fi
 
     echo "$(date -u --rfc-3339=seconds) - Command returned error $ret, retrying..."
+    # Avoid a tight retry loop on immediate failures, such as oc rollout status
+    # after a Deployment exceeds its progress deadline. This pause counts toward
+    # the overall timeout.
+    sleep 1
   done
 }
 export -f execute
