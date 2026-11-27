@@ -1,0 +1,55 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_5.1_base-rhel10:
+    name: "5.1"
+    namespace: ocp
+    tag: base-rhel10
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    from: prevalidation-base-rhel10
+    inputs:
+      prevalidation-base-rhel10:
+        as:
+        - registry.ci.openshift.org/ocp/4.22:base-rhel9
+        - registry.ci.openshift.org/ocp/5.0:base-rhel9
+    to: ironic-rhel10
+promotion:
+  to:
+  - disabled: true
+    name: "5.1"
+    namespace: ocp
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      #NOTE(elfosardo): use ironic repos, cause we're special
+      curl -f --retry 3 --retry-delay 5 --connect-timeout 10 \
+        -o /etc/yum.repos.art/ci/base-5-1-rhel-10-ironic-prevalidation.repo \
+        http://base-5-1-rhel-10-ironic-prevalidation.ocp.svc
+    from: ocp_5.1_base-rhel10
+    to: prevalidation-base-rhel10
+releases:
+  initial:
+    integration:
+      name: "5.1"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "5.1"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-5.1
+  org: openshift
+  repo: ironic-image
+  variant: prevalidation-rhel10

@@ -1,0 +1,34 @@
+base_images:
+  ocp_5.1_base-rhel10:
+    name: "5.1"
+    namespace: ocp
+    tag: base-rhel10
+build_root:
+  from_repository: true
+images:
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    from: ironic-base-rhel10
+    inputs:
+      ironic-base-rhel10:
+        as:
+        - registry.ci.openshift.org/ocp/5.0:base-rhel9
+    to: ironic-rhel10
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl -f --retry 3 --retry-delay 5 --connect-timeout 10 \
+        -o /etc/yum.repos.art/ci/base-5-1-rhel-10-server-ironic.repo \
+        http://base-5-1-rhel-10-server-ironic.ocp.svc
+    from: ocp_5.1_base-rhel10
+    to: ironic-base-rhel10
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: ironic-image
+  variant: rhel10

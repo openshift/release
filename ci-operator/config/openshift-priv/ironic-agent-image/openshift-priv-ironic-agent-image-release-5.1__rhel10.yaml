@@ -1,0 +1,37 @@
+base_images:
+  ocp_5.1_base-rhel10:
+    name: "5.1"
+    namespace: ocp-priv
+    tag: base-rhel10
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/ironic-agent-image
+images:
+  items:
+  - dockerfile_path: Dockerfile.ocp
+    from: ironic-agent-base-rhel10
+    inputs:
+      ironic-agent-base-rhel10:
+        as:
+        - registry.ci.openshift.org/ocp/5.0:base-rhel9
+    to: ironic-agent-rhel10
+prowgen:
+  private: true
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl -f --retry 3 --retry-delay 5 --connect-timeout 10 \
+        -o /etc/yum.repos.art/ci/base-5-1-rhel-10-server-ironic.repo \
+        http://base-5-1-rhel-10-server-ironic.ocp.svc
+    from: ocp_5.1_base-rhel10
+    to: ironic-agent-base-rhel10
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: release-5.1
+  org: openshift-priv
+  repo: ironic-agent-image
+  variant: rhel10
