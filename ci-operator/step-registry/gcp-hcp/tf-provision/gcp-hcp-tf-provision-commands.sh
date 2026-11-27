@@ -173,6 +173,12 @@ echo "${WORKSPACE_NAME}" > "${SHARED_DIR}/workspace-name"
 echo "${RUN_ID}" > "${SHARED_DIR}/run-id"
 echo "${REGION}" > "${SHARED_DIR}/region"
 
+# The checked-in CI Application is the signal that this infra revision expects
+# GAR. Record it before apply, independently of the Terraform outputs.
+if [[ -f "${REPO_ROOT}/argocd/rendered/region/ci/e2e/${REGION}/templates/gecko-gar-access.yaml" ]]; then
+  touch "${SHARED_DIR}/gcp-hcp-gar-expected"
+fi
+
 log "Early SHARED_DIR outputs written (for cleanup on failure):"
 log "  Region Project:  ${REGION_PROJECT_ID}"
 log "  MC Project:      ${MC_PROJECT_ID}"
@@ -415,6 +421,16 @@ fi
 jq -r '.region.value.project_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/region-project-id"
 jq -r '.region.value.cluster_name // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/region-cluster-name"
 jq -r '.region.value.folder_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/region-folder-id"
+
+if [[ -e "${SHARED_DIR}/gcp-hcp-gar-expected" ]]; then
+  if ! gar_repository=$(jq -er '.region.value.quay_repository.name | strings | select(length > 0)' /tmp/tf-outputs.json) ||
+    [[ "${gar_repository}" != "projects/${REGION_PROJECT_ID}/locations/${REGION}/repositories/gcp-hcp-quay" ]]; then
+    log "ERROR: Terraform did not return the expected run-owned Quay GAR repository"
+    exit 1
+  fi
+  printf '%s\n' "${gar_repository}" > "${SHARED_DIR}/gar-quay-repository"
+fi
+
 jq -r '.management_cluster.value.project_id // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-project-id"
 jq -r '.management_cluster.value.cluster_name // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-cluster-name"
 jq -r '.management_cluster.value.cluster_endpoint // empty' /tmp/tf-outputs.json > "${SHARED_DIR}/mc-cluster-endpoint"

@@ -38,7 +38,7 @@ REGION_PROJECT_NUMBER=$(gcloud projects describe "${REGION_PROJECT}" --format='v
 # Format: https://{region}-connectgateway.googleapis.com/v1/projects/{projectNumber}/locations/{region}/gkeMemberships/{clusterName}
 REGION_ENDPOINT="${REGION}-connectgateway.googleapis.com/v1/projects/${REGION_PROJECT_NUMBER}/locations/${REGION}/gkeMemberships/${REGION_CLUSTER_NAME}"
 
-# Get access token (valid for 1 hour - sufficient for CI jobs)
+# Legacy regional checks and management checks use a one-hour token.
 ACCESS_TOKEN=$(gcloud auth print-access-token)
 
 # Connect Gateway uses Google's public TLS certificates (Google Trust Services),
@@ -60,12 +60,24 @@ current-context: region-context
 users:
 - name: gcp-user
   user:
-    token: ACCESS_TOKEN_PLACEHOLDER
 KUBECONFIG_EOF
 
-# Replace placeholders
+if [[ -e "${SHARED_DIR}/gcp-hcp-gar-expected" ]]; then
+  # GAR revocation is checked late in the lifecycle test. Let client-go refresh
+  # the access token from WIF ADC rather than embedding the initial token.
+  cat >> "${SHARED_DIR}/region-kubeconfig" << 'KUBECONFIG_EOF'
+    exec:
+      apiVersion: client.authentication.k8s.io/v1beta1
+      command: gke-gcloud-auth-plugin
+      args:
+      - --use_application_default_credentials
+      interactiveMode: Never
+KUBECONFIG_EOF
+else
+  printf '    token: %s\n' "${ACCESS_TOKEN}" >> "${SHARED_DIR}/region-kubeconfig"
+fi
+
 sed -i "s|REGION_ENDPOINT_PLACEHOLDER|${REGION_ENDPOINT}|g" "${SHARED_DIR}/region-kubeconfig"
-sed -i "s|ACCESS_TOKEN_PLACEHOLDER|${ACCESS_TOKEN}|g" "${SHARED_DIR}/region-kubeconfig"
 
 echo "  Region kubeconfig written (Connect Gateway)"
 echo "  Endpoint: https://${REGION_ENDPOINT}"

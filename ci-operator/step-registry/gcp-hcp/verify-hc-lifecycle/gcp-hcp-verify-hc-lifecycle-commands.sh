@@ -41,6 +41,11 @@ fi
 echo "Configuring gcphcpctl with the WIF credential..."
 export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
 
+if [[ -e "${SHARED_DIR}/gcp-hcp-gar-expected" ]]; then
+  export E2E_REQUIRE_GAR=true
+  export REGION_KUBECONFIG="${SHARED_DIR}/region-kubeconfig"
+fi
+
 # Record the WIF service account for the optional authorization bootstrap.
 # The INT job skips bootstrap and uses this identity for Platform API requests.
 # The WIF auth step also uses it to construct wif-cred.json.
