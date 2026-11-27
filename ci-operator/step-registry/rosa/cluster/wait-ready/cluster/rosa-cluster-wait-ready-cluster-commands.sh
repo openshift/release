@@ -116,6 +116,85 @@ retry_cmd() {
     return ${rc}
 }
 
+# DNS error evidence
+#
+# An install log reaches the artifacts only once this step gives up or hits its crash
+# trap, and that copy may no longer report a DNS error seen earlier in the wait. The
+# first such error is therefore recorded when it is seen, from install-log output this
+# step is already reading, and recorded once.
+#
+# Only the allowlisted facts below are published: when this step read the error, which
+# poll read it, the cluster state at the time, which pattern matched and how many lines
+# matched. No log text, host name, address, cluster identifier or credential is copied
+# into the artifact. Everything here is bounded and best effort: it adds only local text
+# matching to a poll it was already doing, ignores its own failures, and leaves the
+# readiness criteria, fail-fast behaviour, timeouts and exit status untouched.
+DNS_ERROR_PATTERN="no such host|dial tcp: lookup"
+dns_first_error_saved="no"
+
+record_first_dns_error() {
+    local fetch_output="${1:-}" cluster_state="${2:-unknown}" poll="${3:-0}"
+    local matched category
+
+    [[ "${dns_first_error_saved}" == "no" ]] || return 0
+    [[ -n "${fetch_output}" && -n "${ARTIFACT_DIR:-}" && -d "${ARTIFACT_DIR}" ]] || return 0
+
+    matched=$(grep -cE "${DNS_ERROR_PATTERN}" <<< "${fetch_output}" || true)
+    [[ "${matched}" =~ ^[0-9]+$ ]] || return 0
+    (( matched > 0 )) || return 0
+
+    # One category per matching pattern, chosen from a fixed set; never the log text.
+    if grep -qE "no such host" <<< "${fetch_output}"; then
+        category="name-not-resolved"
+    else
+        category="lookup-failed"
+    fi
+
+    {
+        echo "=== First DNS error observed while waiting for the cluster ==="
+        echo "observed-at:    $(date -u '+%Y-%m-%dT%H:%M:%SZ') (UTC, clock of this CI step pod)"
+        echo "observed-by:    rosa-cluster-wait-ready-cluster, install-log health check"
+        echo "poll:           ${poll}"
+        echo "cluster-state:  ${cluster_state}"
+        echo "error-category: ${category}"
+        echo "matching-lines: ${matched}"
+        echo ""
+        echo "Recorded when the error was first seen, because the install log published later"
+        echo "may no longer show it. These fields are the whole record: the matching log text"
+        echo "is deliberately not copied here, and neither is any host name, address or"
+        echo "identifier. The times are when this step read the log, not when the events in it"
+        echo "occurred."
+    } > "${ARTIFACT_DIR}/dns-first-error.txt" 2>/dev/null || return 0
+    dns_first_error_saved="yes"
+    log "First DNS-related error seen in install-log output; summary saved to ${ARTIFACT_DIR}/dns-first-error.txt"
+    return 0
+}
+
+# Resolve ${1} from this CI step pod and report one allowlisted outcome. The lookup is
+# bounded and best effort; its output and its stderr are read only to classify it and
+# are never published.
+dns_probe_outcome() {
+    local host="${1:-}" status=0
+
+    [[ -n "${host}" ]] || { echo "skipped-no-hostname"; return 0; }
+    [[ "${host}" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ && "${host}" == *.* ]] \
+        || { echo "skipped-invalid-hostname"; return 0; }
+    command -v dig >/dev/null 2>&1 || { echo "skipped-no-resolver-tool"; return 0; }
+
+    local answer
+    answer=$(timeout 10 dig +time=2 +tries=1 +short "${host}" 2>/dev/null) || status=$?
+    if (( status == 124 )); then
+        echo "lookup-timed-out"
+    elif (( status != 0 )); then
+        echo "lookup-failed"
+    elif [[ -n "${answer}" ]]; then
+        echo "resolved"
+    else
+        echo "not-resolved"
+    fi
+    return 0
+}
+
 # Record Cluster Configurations
 cluster_config_file="${SHARED_DIR}/cluster-config"
 function record_cluster() {
@@ -294,6 +373,9 @@ while true; do
       if (( loop_count % 5 == 0 )); then
         log "Checking install logs for fatal errors..."
         install_log_output=$(retry_cmd 3 10 timeout 60 rosa logs install -c "${CLUSTER_ID}" 2>&1 || true)
+        # Record the first DNS error from the output just read, before any later fetch
+        # can lose it. Changes nothing about this step.
+        record_first_dns_error "${install_log_output}" "${CLUSTER_STATE}" "${loop_count}" || true
         fatal_pattern=$(echo "${install_log_output}" | grep -E "ProvisionFailed|failed to create|InvalidSubnet|LimitExceeded|QuotaExceeded|InsufficientFreeAddresses|UnauthorizedAccess" || true)
         # Filter known transient errors. The KMS provider x509 error (OCPBUGS-49661) is caused by
         # the admin-kubeconfig CA not trusting the Let's Encrypt CA on ROSA HCP API servers. CAPI
@@ -386,12 +468,13 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
     rosa describe machinepool -c "${CLUSTER_ID}" --machinepool workers -o json > "${ARTIFACT_DIR}/machinepool-workers-describe.json" 2> "${ARTIFACT_DIR}/machinepool-workers-describe.json.stderr" || true
   fi
   # DNS diagnostics: when the failure involves DNS resolution errors ("no such host" or
-  # "dial tcp: lookup"), capture Route 53 record state and resolver output as artifacts.
-  # This helps triage DNS propagation / hosted-zone issues without needing to reproduce.
+  # "dial tcp: lookup"), record the hostname this step was waiting on and the outcome of
+  # one lookup of it from this pod, so a reader can tell what failed to resolve without
+  # reproducing the run. Nothing is queried from a cloud API here.
   dns_pattern_found="no"
-  if [[ -f "${ARTIFACT_DIR}/.install.log" ]] && grep -qE "no such host|dial tcp: lookup" "${ARTIFACT_DIR}/.install.log" 2>/dev/null; then
+  if [[ -f "${ARTIFACT_DIR}/.install.log" ]] && grep -qE "${DNS_ERROR_PATTERN}" "${ARTIFACT_DIR}/.install.log" 2>/dev/null; then
     dns_pattern_found="yes"
-  elif echo "${status_desc}" | grep -qE "no such host|dial tcp: lookup" 2>/dev/null; then
+  elif echo "${status_desc}" | grep -qE "${DNS_ERROR_PATTERN}" 2>/dev/null; then
     dns_pattern_found="yes"
   fi
   if [[ "${dns_pattern_found}" == "yes" ]]; then
@@ -402,7 +485,11 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
       echo "Cluster ID: ${CLUSTER_ID}"
       echo ""
 
-      # Extract API URL and cluster DNS zone from the saved cluster description
+      # Extract the API URL and the cluster DNS zone from the saved cluster description.
+      # Both stay inside this step: the hostname below is what the lookup is run against,
+      # and this file says only whether one could be established and where it came from.
+      # The cluster description is published beside this file for anyone who needs the
+      # names themselves, so repeating them here would add nothing but exposure.
       api_url=$(jq -r '.api.url // empty' "${ARTIFACT_DIR}/cluster-description.json" 2>/dev/null || true)
       cluster_name=$(jq -r '.name // empty' "${ARTIFACT_DIR}/cluster-description.json" 2>/dev/null || true)
       base_domain=$(jq -r '.dns.base_domain // empty' "${ARTIFACT_DIR}/cluster-description.json" 2>/dev/null || true)
@@ -410,69 +497,39 @@ if [[ "$FAILED_INSTALL" == "yes" ]]; then
       cluster_zone=""
       if [[ -n "${cluster_name}" && -n "${base_domain}" ]]; then
         cluster_zone="${cluster_name}.${base_domain}"
-        echo "Cluster DNS zone: ${cluster_zone}"
+        echo "Cluster DNS zone: established (value not published here)"
       fi
 
       api_host=""
       if [[ -n "${api_url}" ]]; then
         api_host=$(echo "${api_url}" | sed -e 's|https\?://||' -e 's|:[0-9]*$||')
-        echo "API URL: ${api_url}"
-        echo "API hostname: ${api_host}"
+        echo "Lookup target: the API hostname from the cluster's API URL (value not published here)"
       elif [[ -n "${cluster_zone}" ]]; then
         api_host="api.${cluster_zone}"
-        echo "API URL not available; derived API hostname: ${api_host}"
+        echo "Lookup target: API URL not available, so the hostname was derived from the"
+        echo "  cluster name and base domain (value not published here)"
       else
-        echo "API URL and cluster DNS zone not available; skipping DNS probes"
+        echo "Lookup target: none. Neither an API URL nor a cluster DNS zone could be"
+        echo "  established, so no hostname was looked up."
       fi
       echo ""
 
-      # Resolve the API hostname via the default resolver (CoreDNS on the management cluster)
+      # Resolve the API hostname from this CI step pod, using whatever resolver
+      # /etc/resolv.conf gives this pod. That is not the resolver the client in the
+      # install log used, and seeing the same resolver service address in two clusters
+      # would not make it the same resolver. The outcome below therefore describes
+      # resolution here, at the time printed, and nothing else: in particular a
+      # "resolved" outcome does not show that the earlier failure has recovered, only
+      # that this pod could resolve the name after the step had already given up.
       if [[ -n "${api_host}" ]]; then
-        echo "=== dig ${api_host} (default resolver) ==="
-        timeout 10 dig +time=2 +tries=1 "${api_host}" 2>&1 || true
-        echo ""
-
-        # Look up authoritative nameservers for the cluster zone and query them directly
-        ns_zone="${cluster_zone:-$(echo "${api_host}" | cut -d. -f2-)}"
-        echo "=== Authoritative NS lookup for ${ns_zone} ==="
-        timeout 10 dig +time=2 +tries=1 NS "${ns_zone}" +short 2>&1 || true
-        echo ""
-        auth_ns=$(timeout 10 dig +time=2 +tries=1 NS "${ns_zone}" +short 2>/dev/null | head -1 || true)
-        if [[ -n "${auth_ns}" ]]; then
-          echo "=== dig @${auth_ns} ${api_host} (authoritative) ==="
-          timeout 10 dig +time=2 +tries=1 "@${auth_ns}" "${api_host}" 2>&1 || true
-          echo ""
-        else
-          echo "No authoritative nameservers found for ${ns_zone}"
-          echo ""
-        fi
-      fi
-
-      # Route 53: dump the hosted-zone record sets for the cluster's DNS name
-      if aws sts get-caller-identity &>/dev/null; then
-        echo "=== Route 53 hosted zone records ==="
-        if [[ -n "${cluster_zone}" ]]; then
-          hz_json=$(aws route53 list-hosted-zones-by-name \
-            --dns-name "${cluster_zone}" \
-            --max-items 1 \
-            --output json 2>/dev/null || true)
-          hz_name=$(echo "${hz_json}" | jq -r '.HostedZones[0].Name // empty' 2>/dev/null || true)
-          hz_id=$(echo "${hz_json}" | jq -r '.HostedZones[0].Id // empty' 2>/dev/null | sed 's|/hostedzone/||' || true)
-          if [[ "${hz_name}" == "${cluster_zone}." ]]; then
-            echo "Hosted zone: ${hz_name} (ID: ${hz_id})"
-            aws route53 list-resource-record-sets \
-              --hosted-zone-id "${hz_id}" \
-              --output json 2>&1 || true
-          else
-            echo "No exact Route 53 hosted zone match for: ${cluster_zone} (closest: ${hz_name:-none})"
-          fi
-        else
-          echo "Cluster DNS zone not available, skipping Route 53 lookup"
-        fi
-        echo ""
-      else
-        echo "=== Route 53 ==="
-        echo "AWS credentials not available for Route 53 lookup"
+        echo "=== DNS probe from this CI step pod ==="
+        echo "probe-time:    $(date -u '+%Y-%m-%dT%H:%M:%SZ') (UTC, clock of this CI step pod)"
+        echo "probe-origin:  the ci-operator step pod running this step on the CI build farm"
+        echo "probe-outcome: $(dns_probe_outcome "${api_host}" 2>/dev/null)"
+        echo "  one of: resolved | not-resolved | lookup-timed-out | lookup-failed |"
+        echo "  skipped-no-hostname | skipped-invalid-hostname | skipped-no-resolver-tool."
+        echo "  The lookup output and its stderr are read only to pick one of these and are"
+        echo "  not published."
         echo ""
       fi
 
