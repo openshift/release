@@ -14,8 +14,11 @@ if [[ ! -d /opt/rustfs ]]; then
   exit 0
 fi
 
-podman rm --force --ignore rustfs >/dev/null
+# Close the firewall port even if removing the container fails.
 firewall-cmd --zone=libvirt --remove-port=9000/tcp || true
-firewall-cmd --remove-port=9000/tcp || true
+if ! podman rm --force --ignore rustfs >/dev/null; then
+  echo "Failed to remove the RustFS container." >&2
+  exit 1
+fi
 rm -rf /opt/rustfs
 HOST

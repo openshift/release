@@ -5,15 +5,6 @@ set -o errexit
 set -o pipefail
 set -x
 
-# Set the IP address of Minio running on virthost to prevent flakes due
-# to the hostname being unresolvable. This value is calculated in
-# baremetalds-devscripts-setup-commands.sh as ${EXTERNAL_SUBNET_V4%.*}.1.
-VIRTHOST_IP="192.168.111.1"
-S3_URL="http://${VIRTHOST_IP}:9000"
-if [[ -s "${SHARED_DIR}/minio-endpoint" ]]; then
-  S3_URL="$(<"${SHARED_DIR}/minio-endpoint")"
-fi
-
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   # Disable xtrace: proxy-conf.sh may export HTTP_PROXY with embedded credentials.
   set +x
@@ -24,21 +15,21 @@ fi
 OADP_PLUGIN_IMAGE="${OADP_HYPERSHIFT_PLUGIN_IMAGE:-quay.io/konveyor/hypershift-oadp-plugin:latest}"
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-# Disable tracing while handling the MinIO credentials.
-set +x
-if [[ -s "${SHARED_DIR}/minio-credentials" ]]; then
-  cp "${SHARED_DIR}/minio-credentials" /tmp/miniocred
-else
-  cat <<EOF > /tmp/miniocred
-[default]
-aws_access_key_id=admin
-aws_secret_access_key=admin123
-EOF
-fi
-chmod 600 /tmp/miniocred
 
-oc create secret generic cloud-credentials -n openshift-adp --from-file cloud=/tmp/miniocred
-set -x
+# The hypershift-oadp-rustfs step provides the S3 endpoint, the job-scoped
+# credentials and the TLS certificate. Require all of them so a missing or
+# partial setup fails here with a clear error instead of a BackupStorageLocation
+# timeout with mismatched settings.
+endpoint_file="${SHARED_DIR}/minio-endpoint"
+credentials_file="${SHARED_DIR}/minio-credentials"
+ca_cert_file="${SHARED_DIR}/rustfs-ca.crt"
+if [[ ! -s "${endpoint_file}" || ! -s "${credentials_file}" || ! -s "${ca_cert_file}" ]]; then
+  echo "RustFS endpoint, credentials or CA certificate missing in ${SHARED_DIR}." >&2
+  exit 1
+fi
+S3_URL="$(<"${endpoint_file}")"
+
+oc create secret generic cloud-credentials -n openshift-adp --from-file=cloud="${credentials_file}"
 
 cat <<EOF | oc apply -f -
 apiVersion: oadp.openshift.io/v1alpha1
@@ -76,6 +67,7 @@ oc rollout status daemonset/node-agent -n openshift-adp --timeout=600s
 CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
 
 echo "Creating BackupStorageLocation..."
+CA_CERT="$(base64 -w0 < "${ca_cert_file}")"
 cat <<EOF | oc apply -f -
 apiVersion: velero.io/v1
 kind: BackupStorageLocation
@@ -90,11 +82,11 @@ spec:
   credential:
     name: cloud-credentials
     key: cloud
+  caCert: ${CA_CERT}
   config:
     region: minio
     s3ForcePathStyle: "true"
     s3Url: "${S3_URL}"
-    insecureSkipTLSVerify: "true"
     profile: default
 EOF
 
