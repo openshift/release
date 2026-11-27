@@ -28,6 +28,12 @@ MAIN_PROMOTION_IGNORE = {
     "openshift-online/ocm-cluster-service",
 }
 
+# #89505 assigns etcd's 5.2 promotion to its development branch. Allow that
+# branch to publish only while all of the repo's default configs are disabled.
+INDEPENDENT_RELEASE_PUBLISHERS = {
+    "ci-operator/config/openshift/etcd/openshift-etcd-release-5.2.yaml",
+}
+
 
 def get_current_release_from_auto_config_brancher():
     """Read current-release from periodic-prow-auto-config-brancher (same source as config-brancher)."""
@@ -118,10 +124,19 @@ def is_promotion_fully_disabled(config_path):
             data = yaml.safe_load(f)
     except (OSError, yaml.YAMLError):
         return False
-    to_list = (data.get("promotion") or {}).get("to") or []
-    if not to_list:
+    if not isinstance(data, dict):
+        return False
+    promotion = data.get("promotion")
+    if promotion is None:
         return True
-    return all(entry.get("disabled") is True for entry in to_list if isinstance(entry, dict))
+    if not isinstance(promotion, dict):
+        return False
+    to_list = promotion.get("to")
+    if to_list is None:
+        return True
+    return isinstance(to_list, list) and all(
+        isinstance(entry, dict) and entry.get("disabled") is True for entry in to_list
+    )
 
 
 def main():
@@ -167,11 +182,14 @@ def main():
                             violations.append((str(rel_path), f"promotes to {namespace}/{name} (main/master must only promote to {allowed_priv})"))
                     continue
                 if in_scope_prow and any(f.endswith(s) for s in release_branch_suffixes):
-                    has_main_or_master = any(
-                        x.endswith("-main.yaml") or x.endswith("-master.yaml") for x in files
-                    )
-                    if has_main_or_master and not is_promotion_fully_disabled(path):
-                        violations.append((str(rel_path), f"release/openshift-{allowed_ocp} config must have promotion disabled (only main/master promote to {allowed_ocp})"))
+                    default_configs = [Path(root) / x for x in files if x.endswith(("-main.yaml", "-master.yaml"))]
+                    if not default_configs or is_promotion_fully_disabled(path):
+                        continue
+                    if rel_path.as_posix() in INDEPENDENT_RELEASE_PUBLISHERS and all(
+                        is_promotion_fully_disabled(default_config) for default_config in default_configs
+                    ):
+                        continue
+                    violations.append((str(rel_path), f"release/openshift-{allowed_ocp} config must have promotion disabled (only main/master promote to {allowed_ocp})"))
 
     if violations:
         print(f"ERROR: Main/master must promote to current release only; release-{allowed_ocp} configs must have promotion disabled.", file=sys.stderr)
