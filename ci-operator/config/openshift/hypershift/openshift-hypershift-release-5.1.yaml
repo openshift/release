@@ -816,19 +816,31 @@ tests:
   capabilities:
   - arm64
   optional: true
+  pipeline_run_if_changed: ^(karpenter-operator/|support/karpenter/|test/e2e/v2/(cmd/destroy-guests/|tests/karpenter_test\.go$|util/karpenter\.go$))
   steps:
     cluster_profile: hypershift-aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:multi-latest
     env:
       ENABLE_STANDALONE_KARPENTER_OPERATOR: "true"
+      HYPERSHIFT_VERIFY_KARPENTER_CLEANUP: "true"
       TECH_PREVIEW_NO_UPGRADE: "true"
       TEST_PLAN: |
         name: autonode-standalone-ko
         platform: aws
         testMatrix:
-          parallel:
+          sequential:
           - name: karpenter
-            variant: karpenter
-            labelFilter: karpenter
+            steps:
+            - name: karpenter-amd64
+              variant: karpenter
+              labelFilter: karpenter-amd64
+            - name: karpenter-arm64
+              variant: karpenter
+              labelFilter: karpenter-arm64
+            - name: karpenter
+              variant: karpenter
+              labelFilter: karpenter && !karpenter-amd64 && !karpenter-arm64
     workflow: hypershift-aws-e2e-v2
 - as: verify-deps
   capabilities:
