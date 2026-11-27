@@ -26,14 +26,24 @@ FBC_IMAGE="$(head -n 1 "${SHARED_DIR}/kueue_index_image")"
 echo "[$(timestamp)] Resolving z-stream upgrade pair from ${FBC_IMAGE} (channel ${CHANNEL})..."
 
 TMP_DIR=$(mktemp -d)
-trap 'rm -rf "${TMP_DIR}"' EXIT
+# The extracted tree is owned/moded by the base image; a non-root pod cannot
+# always remove it, so keep cleanup best-effort.
+trap 'rm -rf "${TMP_DIR}" 2>/dev/null || true' EXIT
 
 # The art-fbc repo is public, so no auth is needed for the pull.
 skopeo copy "docker://${FBC_IMAGE}" "dir:${TMP_DIR}/fbc"
 mkdir -p "${TMP_DIR}/tree"
+# The ART FBC is a full RHEL-based image, not a minimal catalog image. Extract
+# only the catalog (*configs/*) rather than the whole rootfs: a non-root pod
+# cannot overwrite the 0555 root-owned files a later layer restores over an
+# earlier one (e.g. usr/bin/dnf), which makes a full `tar -xf` exit non-zero.
+# --no-same-permissions keeps our files writable so later layers can overwrite
+# them; `|| true` tolerates layers with no configs entry. The "no catalog found"
+# check below is the real guard.
 while read -r layer; do
     [[ -n "${layer}" ]] || continue
-    tar -xf "${TMP_DIR}/fbc/${layer}" -C "${TMP_DIR}/tree"
+    tar -xf "${TMP_DIR}/fbc/${layer}" -C "${TMP_DIR}/tree" \
+        --no-same-owner --no-same-permissions --wildcards '*configs/*' 2>/dev/null || true
 done < <(jq -r '.layers[].digest | sub("^sha256:"; "")' "${TMP_DIR}/fbc/manifest.json")
 
 # opm renders the FBC as catalog.yaml, catalog.yml or catalog.json; yq's default
