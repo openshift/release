@@ -54,6 +54,12 @@ workflow:
           --registry-config="${new_pull_secret}" \
           --insecure=true
 
+        # Persist the merged pull secret (cluster pull-secret + mirror
+        # registry credentials) so the opct-disconnected-run step can
+        # authenticate against the mirror registry for its preflight
+        # image accessibility checks. Removed by that step after use.
+        cp "${new_pull_secret}" "${SHARED_DIR}/opct-pull-secret"
+
         # Inject proxy-conf and mirror registry into the OPCT env script
         cat >> "${SHARED_DIR}/env" <<'ENVEOF'
 
@@ -100,12 +106,24 @@ workflow:
           export SSL_CERT_FILE=/tmp/pki/ca-bundle.crt
         fi
 
+        # Authenticate against the bastion mirror registry with the
+        # merged pull secret persisted by the opct-mirror-images step.
+        # Go registry clients (oc image, opct) honor DOCKER_CONFIG.
+        if [[ -f "${SHARED_DIR}/opct-pull-secret" ]]; then
+          export DOCKER_CONFIG=/tmp/opct-docker
+          mkdir -p "${DOCKER_CONFIG}"
+          cp "${SHARED_DIR}/opct-pull-secret" "${DOCKER_CONFIG}/config.json"
+        else
+          echo "WARN: ${SHARED_DIR}/opct-pull-secret not found, preflight may fail to authenticate to the mirror registry"
+        fi
+
         # Shadow the shared dump_opct_namespace helper with a bounded
         # version: on a disconnected cluster the API is reachable only
         # through the bastion proxy, and an unbounded `oc adm inspect`
         # can hang for hours after an early failure.
         dump_opct_namespace() {
           rc=$?
+          rm -f "${SHARED_DIR}/opct-pull-secret" || true
           if [[ $rc -ne 0 ]]; then
             show_msg "Dumping namespace (bounded to 5m)"
             timeout 300 oc adm inspect ns/opct --dest-dir=/tmp/opct-inspect || true
