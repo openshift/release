@@ -246,6 +246,65 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+- always_run: false
+  as: vsphere-e2e-operator-debug
+  optional: true
+  steps:
+    cluster_profile: vsphere-elastic
+    env:
+      TIMEOUT: +4 hours
+      WINDOWS_SERVER_VERSION: "2025"
+    test:
+    - as: setup-and-hold
+      cli: latest
+      commands: |
+        export KUBE_SSH_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+        export FIPS_ENABLED="${FIPS_ENABLED:-false}"
+        # The leased vSphere resource is a portgroup path, the e2e suite expects the ci-vlan-<id> portgroup name
+        if [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+          vlanid=$(awk -F. '{print $3}' <(echo "${LEASED_RESOURCE}"))
+          export LEASED_RESOURCE="ci-vlan-${vlanid}"
+        fi
+        MIRROR_REGISTRY_FILE="${SHARED_DIR}/mirror_registry_url"
+        if [ -f "${MIRROR_REGISTRY_FILE}" ]; then
+          export MIRROR_REGISTRY_HOST=$(head -n 1 "${MIRROR_REGISTRY_FILE}")
+          echo "Using mirror registry: ${MIRROR_REGISTRY_HOST}"
+        fi
+        setup_rc=0
+        hack/run-ci-e2e-test.sh -t setup-only -s || setup_rc=$?
+        echo "Setup finished with exit code ${setup_rc}"
+        # Hold even when setup fails, a failed setup is when the cluster is most useful.
+        # Hold in this already scheduled pod instead of a separate wait step: a new pod
+        # carries pod-scaler anti-affinity and can stay unschedulable on the ci-test workers.
+        if [[ -n "${PULL_NUMBER:-}" ]]; then
+          echo "Debug hold: touch /tmp/debug.done in this pod to release it early"
+          end=$(date -d "${TIMEOUT}" +%s)
+          while [[ ! -f /tmp/debug.done && $(date +%s) -lt ${end} ]]; do sleep 60; done
+        fi
+        exit ${setup_rc}
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: windows-machine-config-operator-test
+      env:
+      - default: +4 hours
+        documentation: How long the opt-in debug hold keeps the cluster available
+          before the job continues on its own.
+        name: TIMEOUT
+      - default: "2025"
+        documentation: Windows Server version provisioned by the setup step, matching
+          the vsphere-e2e-operator-2025 periodic.
+        name: WINDOWS_SERVER_VERSION
+      - default: "false"
+        documentation: Whether FIPS is enabled on the cluster or not.
+        name: FIPS_ENABLED
+      from: windows-machine-config-operator-test
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+      timeout: 6h0m0s
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
+  timeout: 8h0m0s
 - as: vsphere-e2e-ccm-install
   cron: 38 14 * * 2
   reporter_config:
