@@ -177,6 +177,10 @@ new-repo:
 test-tls-scanner:
 	python3 hack/test_tls_scanner.py
 
+.PHONY: test-azure-api-diag
+test-azure-api-diag:
+	python3 hack/test_azure_api_diag.py
+
 # Use the same local config and registry validation as make jobs.
 validate-step-registry: ci-operator-checkconfig
 
