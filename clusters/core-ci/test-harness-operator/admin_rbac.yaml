@@ -22,6 +22,14 @@ kind: ServiceAccount
 metadata:
   labels:
     ci.openshift.io/gitops-managed: 'true'
+  name: test-harness-cluster-operator
+  namespace: test-harness
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   annotations:
     serviceaccounts.openshift.io/oauth-redirectreference.test-harness-ui: '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"test-harness-ui"}}'
   name: test-harness-ui
@@ -98,6 +106,84 @@ kind: Role
 metadata:
   labels:
     ci.openshift.io/gitops-managed: 'true'
+  name: test-harness-cluster-operator
+  namespace: test-harness
+rules:
+- apiGroups:
+  - harness.testharness.io
+  resources:
+  - clusters
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - harness.testharness.io
+  resources:
+  - clusters/status
+  verbs:
+  - get
+  - update
+  - patch
+- apiGroups:
+  - harness.testharness.io
+  resources:
+  - clusters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
+  - patch
+  - delete
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: test-harness-cluster-operator
+  namespace: test-harness
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: test-harness-cluster-operator
+subjects:
+- kind: ServiceAccount
+  name: test-harness-cluster-operator
+  namespace: test-harness
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
   name: test-harness-ui
   namespace: test-harness
 rules:
@@ -105,6 +191,17 @@ rules:
   - harness.testharness.io
   resources:
   - reliabilitytests
+  - clusters
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - delete
+- apiGroups:
+  - harness.testharness.io
+  resources:
+  - clusterprofiletemplates
   verbs:
   - get
   - list
