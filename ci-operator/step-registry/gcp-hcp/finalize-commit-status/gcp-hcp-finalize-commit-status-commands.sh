@@ -9,6 +9,8 @@ readonly token_path="${GITHUB_TOKEN_PATH:-/etc/github-private/oauth}"
 readonly tested_sha_path="${SHARED_DIR}/gcp-hcp-tested-sha"
 readonly tests_passed_path="${SHARED_DIR}/gcp-hcp-e2e-tests-passed"
 readonly skip_status_path="${SHARED_DIR}/gcp-hcp-skip-commit-status"
+readonly gar_expected_path="${SHARED_DIR}/gcp-hcp-gar-expected"
+readonly gar_cleanup_verified_path="${SHARED_DIR}/gcp-hcp-gar-cleanup-verified"
 
 if [[ -e "${skip_status_path}" ]]; then
   echo "This run does not test a commit of ${target_org}/${target_repo}; skipping the ${status_context} commit status"
@@ -36,12 +38,15 @@ if [[ ! -s "${token_path}" ]]; then
   exit 1
 fi
 
-if [[ -e "${tests_passed_path}" ]]; then
-  state="success"
-  description="GCP HCP platform E2E test passed"
-else
+if [[ ! -e "${tests_passed_path}" ]]; then
   state="failure"
   description="GCP HCP platform E2E test failed"
+elif [[ -e "${gar_expected_path}" && ! -e "${gar_cleanup_verified_path}" ]]; then
+  state="failure"
+  description="GCP HCP platform E2E tests passed, but GAR secret IAM cleanup was not verified"
+else
+  state="success"
+  description="GCP HCP platform E2E test passed"
 fi
 
 readonly target_url="https://prow.ci.openshift.org/prowjob?prowjob=${PROW_JOB_ID}"
