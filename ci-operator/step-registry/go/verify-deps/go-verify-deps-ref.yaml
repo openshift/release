@@ -1,7 +1,8 @@
 ref:
   as: go-verify-deps
   from: src
-  commands: go-verify-deps-commands.sh
+  commands: go-verify-deps-commands.py
+  run_as_script: true
   env:
   - name: COMPAT
     default: ""
@@ -15,6 +16,17 @@ ref:
     default: ""
     documentation: |-
       Set to 'off' if go.work exists, but go mod vendor should be used instead.
+  - name: CHECK_GOPROXY_AVAILABILITY
+    default: "false"
+    documentation: |-
+      Master switch for the Go module proxy availability check (ART-26147).
+      This check is OPT-IN: the default is "false", so it is OFF for all
+      consumers of this shared step. ART-relevant repositories enable it
+      explicitly by setting CHECK_GOPROXY_AVAILABILITY=true on their verify-deps
+      test. When "true", before building, the step verifies that pinned Go module
+      pseudo-versions in go.mod are actually resolvable on the Go module proxy.
+      This catches unavailable commits early with an actionable error instead of
+      an opaque 404 later inside the ART/Konflux hermeto prefetch.
   resources:
     requests:
       cpu: 10m
