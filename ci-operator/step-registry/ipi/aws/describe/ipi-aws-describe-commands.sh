@@ -193,7 +193,6 @@ VOLUMES_JSON=$(aws ec2 describe-volumes \
 if [[ -n "${VPC_IDS}" ]]; then
   echo "Fetching VPC details..."
   VPCS_JSON=$(aws ec2 describe-vpcs \
-      --vpc-ids ${VPC_IDS} \
       --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
       --output json | jq '[
         .Vpcs[] |
@@ -207,7 +206,6 @@ fi
 if [[ -n "${SUBNET_IDS}" ]]; then
   echo "Fetching subnet details..."
   SUBNETS_JSON=$(aws ec2 describe-subnets \
-      --subnet-ids ${SUBNET_IDS} \
       --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
       --output json | jq '[
         .Subnets[] |
@@ -221,7 +219,6 @@ fi
 if [[ -n "${SG_IDS}" ]]; then
   echo "Fetching security group details..."
   SECURITY_GROUPS_JSON=$(aws ec2 describe-security-groups \
-      --group-ids ${SG_IDS} \
       --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
       --output json | jq '[
         .SecurityGroups[] |
@@ -249,7 +246,6 @@ fi
 if [[ -n "${RTB_IDS}" ]]; then
   echo "Fetching route table details..."
   ROUTE_TABLES_JSON=$(aws ec2 describe-route-tables \
-      --route-table-ids ${RTB_IDS} \
       --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
       --output json | jq '[
         .RouteTables[] |
@@ -266,7 +262,6 @@ fi
 if [[ -n "${IGW_IDS}" ]]; then
   echo "Fetching internet gateway details..."
   INTERNET_GATEWAYS_JSON=$(aws ec2 describe-internet-gateways \
-      --internet-gateway-ids ${IGW_IDS} \
       --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
       --output json | jq '.InternetGateways') || INTERNET_GATEWAYS_JSON="[]"
 else
@@ -277,7 +272,6 @@ fi
 if [[ -n "${NAT_IDS}" ]]; then
   echo "Fetching NAT gateway details..."
   NAT_GATEWAYS_JSON=$(aws ec2 describe-nat-gateways \
-      --nat-gateway-ids ${NAT_IDS} \
       --filter "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
       --output json | jq '[
         .NatGateways[] |
@@ -293,7 +287,6 @@ fi
 if [[ -n "${EIP_IDS}" ]]; then
   echo "Fetching Elastic IP details..."
   ELASTIC_IPS_JSON=$(aws ec2 describe-addresses \
-      --allocation-ids ${EIP_IDS} \
       --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
       --output json | jq '[
         .Addresses[] |
@@ -308,7 +301,6 @@ fi
 if [[ -n "${ENI_IDS}" ]]; then
   echo "Fetching network interface details..."
   NETWORK_INTERFACES_JSON=$(aws ec2 describe-network-interfaces \
-      --network-interface-ids ${ENI_IDS} \
       --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
       --output json | jq '[
         .NetworkInterfaces[] |
@@ -349,7 +341,6 @@ fi
 if [[ -n "${VPCE_IDS}" ]]; then
   echo "Fetching VPC endpoint details..."
   VPC_ENDPOINTS_JSON=$(aws ec2 describe-vpc-endpoints \
-      --vpc-endpoint-ids ${VPCE_IDS} \
       --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
       --output json | jq '[
         .VpcEndpoints[] |
@@ -364,7 +355,6 @@ fi
 if [[ -n "${NACL_IDS}" ]]; then
   echo "Fetching network ACL details..."
   NETWORK_ACLS_JSON=$(aws ec2 describe-network-acls \
-      --network-acl-ids ${NACL_IDS} \
       --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
       --output json | jq '[
         .NetworkAcls[] |
@@ -378,7 +368,6 @@ fi
 if [[ -n "${DHCP_IDS}" ]]; then
   echo "Fetching DHCP option set details..."
   DHCP_OPTIONS_JSON=$(aws ec2 describe-dhcp-options \
-      --dhcp-options-ids ${DHCP_IDS} \
       --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
       --output json | jq '[
         .DhcpOptions[] |
@@ -392,7 +381,6 @@ fi
 if [[ -n "${PEERING_IDS}" ]]; then
   echo "Fetching VPC peering connection details..."
   VPC_PEERINGS_JSON=$(aws ec2 describe-vpc-peering-connections \
-      --vpc-peering-connection-ids ${PEERING_IDS} \
       --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
       --output json | jq '[
         .VpcPeeringConnections[] |
