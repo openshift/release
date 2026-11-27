@@ -14,11 +14,6 @@ fi
 # Set environment variables for Ginkgo test
 export REGION_KUBECONFIG="${SHARED_DIR}/region-kubeconfig"
 
-if [[ -e "${SHARED_DIR}/gcp-hcp-gar-expected" ]]; then
-  export E2E_REQUIRE_GAR=true
-  export GOOGLE_APPLICATION_CREDENTIALS="${SHARED_DIR}/wif-cred.json"
-fi
-
 # MC kubeconfig is optional
 if [[ -f "${SHARED_DIR}/mc-kubeconfig" ]]; then
   export MC_KUBECONFIG="${SHARED_DIR}/mc-kubeconfig"
