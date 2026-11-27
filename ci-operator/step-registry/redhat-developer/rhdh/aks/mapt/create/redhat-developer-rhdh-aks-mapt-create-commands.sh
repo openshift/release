@@ -64,7 +64,8 @@ mapt azure aks create \
   --backed-url "azblob://${AZURE_STORAGE_BLOB}/${CORRELATE_MAPT}" \
   --conn-details-output "${SHARED_DIR}" \
   --version "${MAPT_KUBERNETES_VERSION}" \
-  --vmsize "Standard_D4as_v5" \
+  --vmsize "Standard_D4as_v5,Standard_D4s_v5,Standard_D4as_v6" \
+  --workers-desired 1 \
   --spot \
   --spot-eviction-tolerance "low" \
   --spot-excluded-regions "centralindia" \
