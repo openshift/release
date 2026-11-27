@@ -227,7 +227,6 @@ info "summary: preparing the pull request body"
 "${SUMMARY_BIN}" summary \
   --updates "${IMAGE_UPDATER_OUTPUT}" \
   --revision "${BASE_COMMIT}" \
-  --base-commit "${BASE_COMMIT}" \
   --branch "${GITHUB_REPO_BRANCH}" \
   "${SUMMARY_FLAGS[@]}" \
   --body-output "${BODY_TABLE_FILE}" || error "summary: failed to prepare the pull request body"
@@ -255,7 +254,6 @@ if ! ./tooling/image-updater/image-updater publish \
   --repo . \
   --base "${GITHUB_REPO_BRANCH}" \
   --head-repo "${GITHUB_REPO_ORG}/${GITHUB_REPO_NAME}" \
-  --base-commit "${BASE_COMMIT}" \
   --paths-file "${PATHS_FILE}" \
   --body-file "${BODY_FILE}" \
   --title "${GITHUB_PR_TITLE}" \
@@ -284,8 +282,7 @@ if [[ -n "${ARTIFACT_DIR:-}" ]]; then
     --updates "${IMAGE_UPDATER_OUTPUT}" \
     --receipt "${PUBLISH_OUT}" \
     --revision "${BASE_COMMIT}" \
-    --base-commit "${BASE_COMMIT}" \
-    --branch "${GITHUB_REPO_BRANCH}" \
+      --branch "${GITHUB_REPO_BRANCH}" \
     "${SUMMARY_FLAGS[@]}" \
     --output "${ARTIFACT_DIR}/image-updater-summary.html" \
     --json-output "${ARTIFACT_DIR}/image-updater-summary.json" ||
