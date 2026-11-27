@@ -1,4 +1,6 @@
 #!/bin/bash
+# Artifact contents and model/tool output may contain credentials.
+set +x
 set -euo pipefail
 
 echo "=== oc-mirror E2E Failure Analyzer ==="
@@ -147,7 +149,12 @@ emit_session_metrics() {
 # stream its raw tool output to stdout (Prow's build-log.txt is public);
 # only a redacted report/transcript is ever left in ARTIFACT_DIR.
 redact_secrets() {
+  # Squid error mailto links URL-encode URLs and authorization headers. Match
+  # encoded delimiters and token octets without decoding entire log lines,
+  # which would corrupt escaped JSON transcripts.
   sed -E \
+    -e 's#((https?|socks[45]h?)(:|%3A)(/|%2F){2})[^/[:space:]"<>]+(@|%40)#\1[REDACTED-USERINFO]\5#gi' \
+    -e 's#((Basic|Bearer)([[:blank:]]+|(%20|%09|\\t)+|\+))([A-Za-z0-9._~+/-]|%[0-9A-Fa-f]{2})+=*#\1[REDACTED-HTTP-AUTH]#gi' \
     -e 's/AKIA[0-9A-Z]{16}/[REDACTED-AWS-ACCESS-KEY]/g' \
     -e 's/(aws_secret_access_key[" :=]+)[A-Za-z0-9/+=]{40}/\1[REDACTED-AWS-SECRET]/g' \
     -e 's/"private_key": ?"-----BEGIN[^"]*END[^"]*"/"private_key": "[REDACTED-GCP-PRIVATE-KEY]"/g' \
@@ -168,6 +175,11 @@ SYSTEM_PROMPT="IMPORTANT CI CONTEXT:
 - Write the final analysis report to: ${ARTIFACT_DIR}/failure-analysis.md
 - Use --fast mode (do NOT use AskUserQuestion).
 - Do NOT prompt for JIRA export — just write the markdown analysis.
+- Never reproduce credentials, Authorization/Proxy-Authorization values, or
+  credential-bearing URLs in reports, excerpts, or tool commands. URL-encoded
+  and base64-encoded authorization values are still secrets.
+- Suppress sensitive values when inspecting artifacts. Cite artifact paths
+  and line numbers and describe the error instead of forwarding raw excerpts.
 
 OC-MIRROR CONTEXT:
 - This step analyzes e2e jobs that install a disconnected/mirrored OpenShift
