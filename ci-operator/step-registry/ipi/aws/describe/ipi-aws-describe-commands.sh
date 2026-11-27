@@ -204,7 +204,12 @@ fi
 echo "Fetching EBS volume details..."
 VOLUMES_JSON=$(aws ec2 describe-volumes \
     --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
-    --output json | jq '.Volumes') || VOLUMES_JSON="[]"
+    --output json | jq '[
+      .Volumes[] |
+      if .KmsKeyId then
+        .KmsKeyId |= gsub(":[0-9]{12}:"; ":REDACTED:")
+      else . end
+    ]') || VOLUMES_JSON="[]"
 
 # Query VPCs
 if [[ -n "${VPC_IDS}" ]]; then
@@ -292,9 +297,11 @@ if [[ -n "${NAT_IDS}" ]]; then
       --filter "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
       --output json | jq '[
         .NatGateways[] |
-        .NatGatewayAddresses |= map(
-          if .PublicIp then .PublicIp = "REDACTED" else . end
-        )
+        if .NatGatewayAddresses then
+          .NatGatewayAddresses |= map(
+            if .PublicIp then .PublicIp = "REDACTED" else . end
+          )
+        else . end
       ]') || NAT_GATEWAYS_JSON="[]"
 else
   NAT_GATEWAYS_JSON="[]"
@@ -333,6 +340,12 @@ if [[ -n "${ENI_IDS}" ]]; then
             if .PublicIp then .PublicIp = "REDACTED" else . end |
             if .PublicDnsName then .PublicDnsName = "REDACTED" else . end |
             if .IpOwnerId then .IpOwnerId = "REDACTED" else . end
+          )
+        else . end |
+        if .PublicDnsName then .PublicDnsName = "REDACTED" else . end |
+        if .PublicIpDnsNameOptions then
+          .PublicIpDnsNameOptions |= (
+            if .PublicIpv4DnsName then .PublicIpv4DnsName = "REDACTED" else . end
           )
         else . end |
         if .Ipv6Addresses then
