@@ -1,0 +1,49 @@
+ref:
+  as: hypershift-kubevirt-install-target
+  from: upi-installer
+  cli: latest
+  grace_period: 10m
+  # Covers pull secret rollout, CSV, HyperConverged, and node convergence waits.
+  timeout: 2h30m0s
+  env:
+  - name: CNV_SUBSCRIPTION_SOURCE
+    default: "cnv-prerelease-catalog-source"
+    documentation: |
+      subscription source for kubevirt, pre release catalog source by default that
+      can be changed to redhat-operators to install stable version, other values
+      are not accepted.
+  - name: BREW_IMAGE_REGISTRY_USERNAME
+    default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+  - name: BREW_IMAGE_REGISTRY_TOKEN_PATH
+    default: /var/run/cnv-ci-brew-pull-secret/token
+  - name: MGMT_CONVERGENCE_TIMEOUT
+    default: "2700"
+    documentation: |
+      Seconds to wait for the management nodes to finish the MachineConfig rollout
+      triggered by CNV's virt-platform-autopilot. On timeout the step reports
+      MachineConfigPool, node, and MachineConfig diagnostics.
+  - name: MGMT_CONVERGENCE_QUIET_PERIOD
+    default: "300"
+    documentation: |
+      Seconds the management nodes must remain settled before the step succeeds.
+      This must be smaller than MGMT_CONVERGENCE_TIMEOUT.
+  - name: MGMT_AUTOPILOT_MC_SELECTOR
+    default: "platform.kubevirt.io/managed-by=virt-platform-autopilot"
+    documentation: |
+      Label selector for the MachineConfigs created by virt-platform-autopilot.
+      Each applicable MachineConfigPool must apply its configs before the nodes
+      count as settled.
+  commands: hypershift-kubevirt-install-target-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+  - mount_path: /etc/cnv-nightly-pull-credentials
+    group: pullsecret
+    collection: cnv-nightly-channel
+  - mount_path: /var/run/cnv-ci-brew-pull-secret
+    group: cnv-ci-brew-pull-secret
+    collection: cnv-ci-secrets
+  documentation: |-
+    install kubevirt operator.

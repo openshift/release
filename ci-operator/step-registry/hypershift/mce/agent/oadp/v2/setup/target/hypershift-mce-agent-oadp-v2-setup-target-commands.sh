@@ -1,0 +1,1 @@
+../hypershift-mce-agent-oadp-v2-setup-commands.sh

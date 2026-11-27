@@ -1,0 +1,1 @@
+../hypershift-mce-install-commands.sh

@@ -1,0 +1,1 @@
+../hypershift-kubevirt-baremetalds-proxy-commands.sh

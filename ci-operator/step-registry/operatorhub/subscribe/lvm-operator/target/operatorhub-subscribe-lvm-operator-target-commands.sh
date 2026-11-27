@@ -1,0 +1,1 @@
+../operatorhub-subscribe-lvm-operator-commands.sh

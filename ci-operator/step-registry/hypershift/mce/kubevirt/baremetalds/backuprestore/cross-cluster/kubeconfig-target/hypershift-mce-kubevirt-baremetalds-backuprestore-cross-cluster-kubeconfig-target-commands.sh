@@ -1,0 +1,47 @@
+#!/bin/bash
+
+set -euo pipefail
+
+role="$(<"${SHARED_DIR}/ofcir-role")"
+[[ "${role}" == source || "${role}" == target ]] || { echo "Invalid OFCIR role" >&2; exit 1; }
+export KUBECONFIG="${SHARED_DIR}/management_cluster_kubeconfig_${role}"
+if [[ "${role}" == source && ! -s "${KUBECONFIG}" ]]; then
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+fi
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+  # The target MCE CLI download is exposed through the target virthost proxy.
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+cluster_name="$(<"${SHARED_DIR}/cluster-name")"
+cluster_namespace="${E2E_HOSTED_CLUSTER_NAMESPACE:-local-cluster}"
+hcp_cli=/usr/bin/hcp
+
+oc wait --timeout=30m --for=condition=Available --namespace="${cluster_namespace}" \
+  "hostedcluster/${cluster_name}"
+
+if [[ -n "${MCE_VERSION:-}" && "$(arch)" == x86_64 ]]; then
+  download_url="$(oc get ConsoleCLIDownload hcp-cli-download -o json |
+    jq -r '.spec.links[] | select(.text == "Download hcp CLI for Linux for x86_64").href')"
+  [[ -n "${download_url}" ]] || { echo "MCE hcp CLI download URL is missing" >&2; exit 1; }
+  hcp_dir="$(mktemp -d)"
+  curl --insecure --fail --location --silent --show-error \
+    --output "${hcp_dir}/hcp.tar.gz" "${download_url}"
+  tar -xzf "${hcp_dir}/hcp.tar.gz" -C "${hcp_dir}"
+  hcp_cli="${hcp_dir}/hcp"
+  chmod +x "${hcp_cli}"
+fi
+if [[ ! -x "${hcp_cli}" ]]; then
+  hcp_cli=/usr/bin/hypershift
+fi
+
+guest_kubeconfig="${SHARED_DIR}/nested_kubeconfig"
+"${hcp_cli}" create kubeconfig --namespace="${cluster_namespace}" --name="${cluster_name}" > "${guest_kubeconfig}"
+if [[ "${role}" == target ]]; then
+  # The target health check and conformance use the API name retained by the restore.
+  guest_domain="$(<"${SHARED_DIR}/cross-cluster-guest-domain")"
+  guest_cluster="$(oc config view --kubeconfig="${guest_kubeconfig}" -o jsonpath='{.clusters[0].name}')"
+  guest_server="$(oc config view --kubeconfig="${guest_kubeconfig}" -o jsonpath='{.clusters[0].cluster.server}')"
+  guest_server="$(sed -E "s#^https://(\\[[^]]+\\]|[^:/]+)#https://api.${cluster_name}.${guest_domain}#" <<< "${guest_server}")"
+  oc config set-cluster "${guest_cluster}" --kubeconfig="${guest_kubeconfig}" --server="${guest_server}" >/dev/null
+fi
+cp "${guest_kubeconfig}" "${SHARED_DIR}/nested_kubeconfig_${role}"

@@ -43,6 +43,25 @@ trap 'exit_with_failure' ERR
 
 cd
 
+# A job can hold a source and target host at the same time. Keep the original
+# requester name for existing callers without a role.
+# Keep requester construction and role validation in sync with
+# ../release/ofcir-release-commands.sh so teardown finds the lease.
+OFCIR_REQUESTER="${JOB_NAME}/${BUILD_ID}"
+OFCIR_ROLE="${OFCIR_ROLE:-}"
+if [[ -z "${OFCIR_ROLE}" && -f "${SHARED_DIR}/ofcir-role" ]]; then
+    OFCIR_ROLE="$(<"${SHARED_DIR}/ofcir-role")"
+fi
+if [[ -n "${OFCIR_ROLE}" ]]; then
+    if [[ ! "${OFCIR_ROLE}" =~ ^[a-z0-9-]+$ ]]; then
+        exit_with_failure "Invalid OFCIR role"
+    fi
+    OFCIR_REQUESTER="${OFCIR_REQUESTER}-${OFCIR_ROLE}"
+    printf '%s' "${OFCIR_ROLE}" > "${SHARED_DIR}/ofcir-role"
+    # ci-operator only passes top-level files to subsequent steps.
+    CONTEXT_PREFIX="${SHARED_DIR}/ofcir-${OFCIR_ROLE}-"
+fi
+
 echo "Setting up packet-conf.sh"
 cat > "${SHARED_DIR}/packet-conf.sh" <<-EOF
     # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
@@ -86,7 +105,7 @@ function getCIR(){
 
     # ofcir may be unavailable in the cluster(or the ingress machinery), retry
     # we can retry several times, preventing CIR leaking should be done by OFCIR with pool size
-    if ! curl --retry-all-errors --max-time 65 --retry-delay 60 --retry 3 --retry-max-time 370 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o "$CIRFILE" ; then
+    if ! curl --retry-all-errors --max-time 65 --retry-delay 60 --retry 3 --retry-max-time 370 --fail-with-body -kX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$OFCIR_REQUESTER&type=$CIRTYPE" -o "$CIRFILE" ; then
         BODY=$(cat "$CIRFILE")
         set +x
         echo "<==== OFCIR ERROR RESPONSE BODY ====="
@@ -98,6 +117,11 @@ function getCIR(){
 
     NAME=$(jq -r .name < "$CIRFILE")
     echo "Got CIR $NAME"
+    # A lease may already exist if provisioning or the SSH check fails later.
+    if [[ -n "${OFCIR_ROLE}" ]]; then
+        cp "${CIRFILE}" "${CONTEXT_PREFIX}cir"
+        cp "${SHARED_DIR}/packet-conf.sh" "${CONTEXT_PREFIX}packet-conf.sh"
+    fi
 
     # If the node is being provisioned on demand it may take some time to be provisioned
     # wait upto 30 minutes to allow this to happen
@@ -119,6 +143,14 @@ function getCIR(){
         echo ">=============================="
         set -x
         exit_with_failure "Timeout waiting for CI resource provisioning"
+    fi
+
+    # Preserve enough state for cleanup even if a later setup step fails before
+    # the workflow has a chance to save the rest of this cluster's files.
+    if [[ -n "${OFCIR_ROLE}" ]]; then
+        cp "${CIRFILE}" "${CONTEXT_PREFIX}cir"
+        cp "${IPFILE}" "${CONTEXT_PREFIX}server-ip"
+        cp "${PORTFILE}" "${CONTEXT_PREFIX}server-sshport"
     fi
 }
 

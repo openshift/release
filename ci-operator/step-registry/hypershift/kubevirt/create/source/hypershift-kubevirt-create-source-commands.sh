@@ -1,0 +1,1 @@
+../hypershift-kubevirt-create-commands.sh

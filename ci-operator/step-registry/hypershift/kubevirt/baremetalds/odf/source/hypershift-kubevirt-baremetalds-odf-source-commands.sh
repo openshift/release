@@ -1,0 +1,1 @@
+../hypershift-kubevirt-baremetalds-odf-commands.sh

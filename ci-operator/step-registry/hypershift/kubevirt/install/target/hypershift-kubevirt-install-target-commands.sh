@@ -1,0 +1,1 @@
+../hypershift-kubevirt-install-commands.sh

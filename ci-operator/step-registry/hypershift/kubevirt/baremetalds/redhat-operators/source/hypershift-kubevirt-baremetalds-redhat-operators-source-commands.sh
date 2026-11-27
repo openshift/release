@@ -1,0 +1,1 @@
+../hypershift-kubevirt-baremetalds-redhat-operators-commands.sh
