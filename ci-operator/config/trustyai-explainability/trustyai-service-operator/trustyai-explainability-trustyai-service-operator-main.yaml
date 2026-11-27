@@ -57,6 +57,7 @@ tests:
     cluster_profile: aws-opendatahub
     env:
       BASE_DOMAIN: openshift-ci-aws.rhaiseng.com
+      EXPECTED_GROUPS: X25519MLKEM768
       HYPERSHIFT_AWS_REGION: us-west-2
       HYPERSHIFT_NODE_COUNT: "3"
       OPERATOR_NAMESPACE: opendatahub
@@ -167,27 +168,74 @@ tests:
             filename: "data.csv"
             format: "CSV"
           metrics:
-            schedule: "5s"
+            # Python service expects integer seconds (Quarkus accepted "5s").
+            schedule: "5"
             batchSize: 5000
           replicas: 1
         EOF
 
-        # Prefer CR Ready; fall back to Deployment Available for older status shapes.
+        # Prefer CR Ready (PVC + Deployment + Route). On failure, dump operand
+        # logs — the common regression is trustyai-service CrashLoopBackOff
+        # (Python Hypercorn bind) which is invisible from operator logs alone.
+        # Fallback waits for the instance Deployment (label is the CR name).
         if ! oc -n "${TENANT_NAMESPACE}" wait --for=condition=Ready \
           trustyaiservice/tls-scan --timeout=15m; then
           echo "ERROR: TrustyAIService not Ready; collecting diagnostics"
-          oc -n "${TENANT_NAMESPACE}" get trustyaiservice,pods,pvc,deploy,svc,events || true
+          oc -n "${TENANT_NAMESPACE}" get trustyaiservice,pods,pvc,deploy,svc,secret,events || true
           oc -n "${TENANT_NAMESPACE}" get trustyaiservice tls-scan -o yaml || true
+          oc -n "${TENANT_NAMESPACE}" describe deploy/tls-scan || true
+          oc -n "${TENANT_NAMESPACE}" describe pods -l app=tls-scan || true
+          oc -n "${TENANT_NAMESPACE}" logs deploy/tls-scan -c trustyai-service --tail=200 || true
+          oc -n "${TENANT_NAMESPACE}" logs deploy/tls-scan -c trustyai-service --previous --tail=100 || true
+          oc -n "${TENANT_NAMESPACE}" logs deploy/tls-scan -c kube-rbac-proxy --tail=50 || true
+          oc -n "${TENANT_NAMESPACE}" logs deploy/tls-scan -c internal-tls-proxy --tail=50 || true
           oc -n "${OPERATOR_NAMESPACE}" get pods || true
           oc -n "${OPERATOR_NAMESPACE}" logs deploy/trustyai-service-operator-controller-manager --tail=200 || true
           if ! oc -n "${TENANT_NAMESPACE}" wait --for=condition=Available \
-            deployment -l app.kubernetes.io/name=trustyai-service --timeout=5m; then
+            deployment/tls-scan --timeout=5m; then
             exit 1
           fi
+          echo "WARNING: CR Ready still false but deployment/tls-scan is Available; continuing to scan"
         fi
 
         oc -n "${OPERATOR_NAMESPACE}" get pods,svc
         oc -n "${TENANT_NAMESPACE}" get pods,svc
+
+        # Non-vacuous gate: tls-scan-tls is 443->8443 (kube-rbac-proxy); the
+        # scanner uses --all-pods so it also hits container 4443
+        # (internal-tls-proxy). October greens passed with zero TrustyAI TLS
+        # findings because Hypercorn never bound correctly.
+        if ! oc -n "${TENANT_NAMESPACE}" get svc tls-scan-tls >/dev/null 2>&1; then
+          echo "ERROR: missing Service tls-scan-tls; scanner would be vacuous"
+          exit 1
+        fi
+        oc -n "${TENANT_NAMESPACE}" get svc tls-scan-tls -o yaml
+        svc_port="$(oc -n "${TENANT_NAMESPACE}" get svc tls-scan-tls -o jsonpath='{.spec.ports[0].port}')"
+        svc_target="$(oc -n "${TENANT_NAMESPACE}" get svc tls-scan-tls -o jsonpath='{.spec.ports[0].targetPort}')"
+        if [[ "${svc_port}" != "443" || "${svc_target}" != "8443" ]]; then
+          echo "ERROR: tls-scan-tls expected 443->8443, got ${svc_port}->${svc_target}"
+          exit 1
+        fi
+
+        for port in 8443 4443; do
+          echo "Probing https://127.0.0.1:${port}/ via trustyai-service container..."
+          if ! oc -n "${TENANT_NAMESPACE}" exec deploy/tls-scan -c trustyai-service -- \
+            curl -sk --connect-timeout 5 --max-time 15 -o /dev/null -w "%{http_code}\n" \
+            "https://127.0.0.1:${port}/"; then
+            echo "ERROR: no TLS handshake on loopback :${port}; refusing vacuous scan"
+            exit 1
+          fi
+        done
+
+        # Negative control: plain HTTP on the app port must not look like TLS.
+        # If this ever "succeeds" as TLS, the gate is measuring the wrong thing.
+        if oc -n "${TENANT_NAMESPACE}" exec deploy/tls-scan -c trustyai-service -- \
+          curl -sk --connect-timeout 3 --max-time 5 -o /dev/null \
+          "https://127.0.0.1:8081/" 2>/dev/null; then
+          echo "ERROR: plain HTTP :8081 accepted an HTTPS client; TLS probe is unreliable"
+          exit 1
+        fi
+        echo "TLS preflight OK (8443/4443 handshakes; :8081 correctly non-TLS)"
       dependencies:
       - env: OPERATOR_IMAGE
         name: trustyai-service-operator
