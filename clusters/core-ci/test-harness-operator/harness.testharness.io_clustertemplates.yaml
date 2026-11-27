@@ -1,0 +1,91 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.22.0
+  name: clustertemplates.harness.testharness.io
+spec:
+  group: harness.testharness.io
+  names:
+    kind: ClusterTemplate
+    listKind: ClusterTemplateList
+    plural: clustertemplates
+    shortNames:
+    - hct
+    singular: clustertemplate
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .spec.installerImage
+      name: Installer
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          ClusterTemplate is a saved Cluster spec.
+          Creating a Cluster copies this spec. The template is not linked to clusters created from it.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: |-
+              ClusterSpec is the installer image, the install-config, and the cloud credentials Secret.
+              ClusterTemplate stores this same spec. A Cluster copied from a template does not name that template.
+            properties:
+              credentialsSecretRef:
+                description: |-
+                  CredentialsSecretRef references a Secret in the same namespace that holds
+                  the cloud credential files the installer reads from disk.
+                properties:
+                  name:
+                    default: ""
+                    description: |-
+                      Name of the referent.
+                      This field is effectively required, but due to backwards compatibility is
+                      allowed to be empty. Instances of this type with an empty value here are
+                      almost certainly wrong.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
+              installConfig:
+                description: |-
+                  InstallConfig is the OpenShift install configuration for this cluster.
+                  Stored as an untyped object. The installer schema is not valid in a CRD.
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              installerImage:
+                description: InstallerImage is the container image that provides openshift-install.
+                minLength: 1
+                type: string
+            required:
+            - credentialsSecretRef
+            - installConfig
+            - installerImage
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources: {}
