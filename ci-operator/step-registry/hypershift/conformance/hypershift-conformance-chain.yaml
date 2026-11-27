@@ -230,6 +230,18 @@ chain:
       *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
       esac
 
+      # Workaround for the ovn-kubernetes-tests-ext panic on non-OVN clusters:
+      # https://redhat.atlassian.net/browse/OCPBUGS-148123
+      if [[ "${HYPERSHIFT_NETWORK_TYPE:-}" == "Other" ]]; then
+        for NODE in $(oc get nodes -o name); do
+          if oc get "${NODE}" -o jsonpath='{.metadata.annotations.k8s\.ovn\.org/node-primary-ifaddr}' | grep -q ipv4; then
+            continue
+          fi
+          NODE_IP=$(oc get "${NODE}" -o jsonpath='{.status.addresses[?(@.type=="InternalIP")].address}' | awk '{print $1}')
+          oc annotate "${NODE}" k8s.ovn.org/node-primary-ifaddr='{"ipv4":"'"${NODE_IP}"'/32"}'
+        done
+      fi
+
       if [[ "${TEST_SUITE}" == "openshift/conformance/parallel/minimal" ]]; then
         TEST_SKIPS="${TEST_SKIPS:+${TEST_SKIPS}\|}\[Suite:openshift/conformance/parallel\]"
         TEST_SUITE="openshift/conformance/parallel"
@@ -310,6 +322,9 @@ chain:
     - name: HYPERSHIFT_CLUSTER_ROLE
       default: ''
       documentation: Optional management cluster role used to select a role-specific kubeconfig.
+    - name: HYPERSHIFT_NETWORK_TYPE
+      default: ''
+      documentation: Network type of the hosted cluster (e.g. "Other" for bring-your-own CNI).
     - name: TEST_ARGS
       default: ""
       documentation: |-
