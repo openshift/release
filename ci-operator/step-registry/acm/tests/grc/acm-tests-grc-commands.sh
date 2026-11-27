@@ -279,14 +279,27 @@ fi
 # a longer value it prefixes would be redacted on its own and the rest of the
 # longer value would be published. Equal-length values keep collection order.
 _secrets_pattern=""
-while IFS= read -r _val; do
-    _secrets_pattern="${_secrets_pattern:+${_secrets_pattern}|}$(_sed_ere_escape "$_val")"
-done < <(
+# The sorted list is captured before the loop. A failure inside a process
+# substitution is otherwise invisible here, and it would leave the pattern
+# empty or partial and silently disable the value scrub. pipefail is set, so
+# capturing the output also surfaces a failing stage.
+_secrets_sorted=""
+if ! _secrets_sorted="$(
     for ((_val_i = 0; _val_i < ${#_secret_vals[@]}; _val_i++)); do
         printf '%s\t%s\n' "${#_secret_vals[_val_i]}" "${_secret_vals[_val_i]}"
     done | sort -t $'\t' -k1,1nr -s | cut -f2-
-)
+)"; then
+    echo "ERROR: secret value pattern build failed; refusing to run the suite with an incomplete scrub" >&2
+    exit 1
+fi
 unset _val_i
+while IFS= read -r _val; do
+    # A split record can be empty when a collected value ends in a newline. An
+    # empty alternative matches at every position, so it would mangle the
+    # evidence instead of redacting it.
+    [[ -n "${_val}" ]] || continue
+    _secrets_pattern="${_secrets_pattern:+${_secrets_pattern}|}$(_sed_ere_escape "$_val")"
+done <<< "${_secrets_sorted}"
 
 # --- OPP placement snapshot (INTEROP-9711) --------------------------------
 # The GRC suite relabels managedclusters/local-cluster into the global
@@ -724,7 +737,7 @@ if (( _grc_py_rc == 0 )) && [[ -f "${_grc_staging_unscrubbed}" ]]; then
     if [[ -n "${_secrets_pattern}" ]]; then
         # XML-aware value scrub: redact only text and attribute values, not tag names
         if ! _GRC_SECRETS_PATTERN="${_secrets_pattern}" _GRC_STAGING_UNSCRUBBED="${_grc_staging_unscrubbed}" _GRC_STAGING_SCRUBBED="${_grc_staging_scrubbed}" python3 <<'PYEOF_SCRUB' 2>&1 | sed 's/^/[grc-scrub] /'; then
-import os, re, pathlib, xml.etree.ElementTree as ET
+import os, re, sys, pathlib, xml.etree.ElementTree as ET
 pat = os.environ.get("_GRC_SECRETS_PATTERN", "")
 src = os.environ.get("_GRC_STAGING_UNSCRUBBED", "")
 dst = os.environ.get("_GRC_STAGING_SCRUBBED", "")
@@ -735,6 +748,11 @@ try:
 except re.error as e:
     print(f"secret pattern compile failed: {e}", file=sys.stderr)
     raise SystemExit(1)
+# Numeric JUnit attributes (durations and counts) are never free text, so a
+# redaction inside one leaves a carrier that prow cannot parse
+# (time="[REDACTED].5"). Zero a value the pattern matches instead: the digits
+# stay unpublished and the attribute stays a number.
+numeric_attrs = {"time", "tests", "failures", "errors", "skipped"}
 try:
     tree = ET.parse(src)
     root = tree.getroot()
@@ -743,7 +761,11 @@ try:
             v = el.attrib[k]
             nv = rx.sub("[REDACTED]", v)
             if nv != v:
-                el.set(k, nv)
+                if k in numeric_attrs:
+                    print(f"WARNING: secret pattern matched numeric attribute {k}; value zeroed", file=sys.stderr)
+                    el.set(k, "0")
+                else:
+                    el.set(k, nv)
         if el.text:
             el.text = rx.sub("[REDACTED]", el.text)
         if el.tail:
