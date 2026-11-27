@@ -13,9 +13,9 @@ base_images:
     tag: latest
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.26-openshift-4.23
+    name: hi-go
+    namespace: ci
+    tag: 1.27-fips-builder
 releases:
   latest:
     release:
@@ -31,6 +31,8 @@ resources:
 tests:
 - as: lint
   commands: |
+    GOCACHE=$(mktemp -d) || exit $?
+    export GOCACHE
     unset GOFLAGS
     export GOLANGCI_LINT_CACHE=/tmp/golangci-lint
     make lint

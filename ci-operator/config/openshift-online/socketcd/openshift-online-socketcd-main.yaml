@@ -1,8 +1,8 @@
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-9-golang-1.26-openshift-4.23
+    name: hi-go
+    namespace: ci
+    tag: 1.27-fips-builder
 prowgen:
   expose: true
   private: true
@@ -16,6 +16,8 @@ resources:
 tests:
 - as: lint
   commands: |
+    GOCACHE=$(mktemp -d) || exit $?
+    export GOCACHE
     unset GOFLAGS
     export GOLANGCI_LINT_CACHE=/tmp/golangci-lint
     make lint
@@ -23,18 +25,24 @@ tests:
     from: src
 - as: test
   commands: |
+    GOCACHE=$(mktemp -d) || exit $?
+    export GOCACHE
     unset GOFLAGS
     make test
   container:
     from: src
 - as: test-envtest
   commands: |
+    GOCACHE=$(mktemp -d) || exit $?
+    export GOCACHE
     unset GOFLAGS
     make test-envtest
   container:
     from: src
 - as: verify
   commands: |
+    GOCACHE=$(mktemp -d) || exit $?
+    export GOCACHE
     unset GOFLAGS
     make verify
   container:
