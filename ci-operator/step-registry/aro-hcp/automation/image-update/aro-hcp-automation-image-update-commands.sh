@@ -125,6 +125,11 @@ else
   log "render: no prebuilt templatize found, building it from source"
 fi
 
+SUMMARY_FLAGS=()
+if [[ "${TEMPLATIZE_USE_PREBUILT:-0}" = "1" ]]; then
+  SUMMARY_FLAGS+=(--prebuilt)
+fi
+
 # TEMPORARY: rehearse the unreleased summary command from its branch
 SUMMARY_SRC="/tmp/image-updater-summary-src"
 SUMMARY_BIN="${SUMMARY_SRC}/tooling/image-updater/image-updater"
@@ -222,7 +227,9 @@ info "summary: preparing the pull request body"
 "${SUMMARY_BIN}" summary \
   --updates "${IMAGE_UPDATER_OUTPUT}" \
   --revision "${BASE_COMMIT}" \
+  --base-commit "${BASE_COMMIT}" \
   --branch "${GITHUB_REPO_BRANCH}" \
+  "${SUMMARY_FLAGS[@]}" \
   --body-output "${BODY_TABLE_FILE}" || error "summary: failed to prepare the pull request body"
 
 {
@@ -277,7 +284,9 @@ if [[ -n "${ARTIFACT_DIR:-}" ]]; then
     --updates "${IMAGE_UPDATER_OUTPUT}" \
     --receipt "${PUBLISH_OUT}" \
     --revision "${BASE_COMMIT}" \
+    --base-commit "${BASE_COMMIT}" \
     --branch "${GITHUB_REPO_BRANCH}" \
+    "${SUMMARY_FLAGS[@]}" \
     --output "${ARTIFACT_DIR}/image-updater-summary.html" \
     --json-output "${ARTIFACT_DIR}/image-updater-summary.json" ||
     error "summary: failed to render the run summary"
