@@ -87,13 +87,34 @@ workflow:
         extract_opct
 
         # Trust the bastion mirror registry's self-signed CA so preflight
-        # image accessibility checks (oc image info) succeed.
+        # image accessibility checks (oc image info) succeed. The step
+        # container is unprivileged (non-root), so the CA cannot be
+        # installed into /etc/pki; combine it with the system bundle and
+        # point Go tools (oc, opct) at it via SSL_CERT_FILE instead.
+        # In-cluster consumers are already covered by the
+        # mirror-images-trust-registry-ca step (image.config
+        # additionalTrustedCA + nodes' trust bundle).
         if [[ -f "${SHARED_DIR}/additional_trust_bundle" ]]; then
-          cp "${SHARED_DIR}/additional_trust_bundle" /etc/pki/tls/certs/opct-mirror-registry-ca.pem
-          update-ca-trust
+          mkdir -p /tmp/pki
+          cat /etc/pki/tls/certs/ca-bundle.crt "${SHARED_DIR}/additional_trust_bundle" > /tmp/pki/ca-bundle.crt
+          export SSL_CERT_FILE=/tmp/pki/ca-bundle.crt
         fi
 
-        trap 'dump_opct_namespace' EXIT TERM INT
+        # Shadow the shared dump_opct_namespace helper with a bounded
+        # version: on a disconnected cluster the API is reachable only
+        # through the bastion proxy, and an unbounded `oc adm inspect`
+        # can hang for hours after an early failure.
+        dump_opct_namespace() {
+          rc=$?
+          if [[ $rc -ne 0 ]]; then
+            show_msg "Dumping namespace (bounded to 5m)"
+            timeout 300 oc adm inspect ns/opct --dest-dir=/tmp/opct-inspect || true
+            tar cfz "${ARTIFACT_DIR}/oc-inspect-opct.tar.gz" /tmp/opct-inspect || true
+          fi
+          show_msg "Done with code=$rc"
+          exit $rc
+        }
+        trap dump_opct_namespace EXIT TERM INT
 
         MIRROR_REPO="${OPCT_MIRROR_REGISTRY}/opct"
         echo "Running OPCT with disconnected workflow on External platform"
