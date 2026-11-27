@@ -51,8 +51,10 @@ TAGGED_RESOURCES_EXIT_CODE=$?
 set -e
 
 if [[ ${TAGGED_RESOURCES_EXIT_CODE} -ne 0 ]]; then
-  echo "ERROR: Failed to query resource tagging API in region ${AWS_REGION}"
-  echo "${TAGGED_RESOURCES_OUTPUT}"
+  echo "ERROR: Failed to query resource tagging API in region ${AWS_REGION} (exit code: ${TAGGED_RESOURCES_EXIT_CODE})"
+  # Redact account IDs from error message before logging
+  REDACTED_ERROR=$(echo "${TAGGED_RESOURCES_OUTPUT}" | sed -E 's/[0-9]{12}/REDACTED/g')
+  echo "${REDACTED_ERROR}"
   echo "This may indicate missing tag:GetResources permission or API unavailability"
   TAGGED_RESOURCES=""
 else
@@ -83,8 +85,11 @@ GLOBAL_EXIT_CODE=$?
 set -e
 
 if [[ ${GLOBAL_EXIT_CODE} -ne 0 ]]; then
-  echo "WARNING: Failed to query global resources from ${GLOBAL_REGION} (IAM/Route53 may be missing)"
-  echo "${GLOBAL_TAGGED_RESOURCES_OUTPUT}"
+  echo "WARNING: Failed to query global resources from ${GLOBAL_REGION} (exit code: ${GLOBAL_EXIT_CODE})"
+  # Redact account IDs from error message before logging
+  REDACTED_GLOBAL_ERROR=$(echo "${GLOBAL_TAGGED_RESOURCES_OUTPUT}" | sed -E 's/[0-9]{12}/REDACTED/g')
+  echo "${REDACTED_GLOBAL_ERROR}"
+  echo "This may indicate missing permissions or IAM/Route53 resources may be missing from inventory"
   GLOBAL_TAGGED_RESOURCES=""
 else
   GLOBAL_TAGGED_RESOURCES=$(echo "${GLOBAL_TAGGED_RESOURCES_OUTPUT}" | jq -r '.ResourceTagMappingList[] | .ResourceARN' 2>/dev/null) || GLOBAL_TAGGED_RESOURCES=""
@@ -117,8 +122,18 @@ HOSTED_ZONE_IDS=$(echo "${GLOBAL_TAGGED_RESOURCES}" | grep 'route53:::hostedzone
 # To avoid timeout with large role counts, pre-filter by name pattern containing INFRA_ID
 echo "Discovering IAM roles via IAM API..."
 IAM_ROLE_NAMES=""
-ALL_ROLES=$(aws iam list-roles --output json 2>/dev/null | \
-    jq -r --arg infra "${INFRA_ID}" '.Roles[] | select(.RoleName | contains($infra)) | .RoleName' 2>/dev/null) || ALL_ROLES=""
+set +e
+LIST_ROLES_OUTPUT=$(aws iam list-roles --output json 2>&1)
+LIST_ROLES_EXIT=$?
+set -e
+if [[ ${LIST_ROLES_EXIT} -ne 0 ]]; then
+  REDACTED_LIST_ROLES_ERROR=$(echo "${LIST_ROLES_OUTPUT}" | sed -E 's/[0-9]{12}/REDACTED/g')
+  echo "WARNING: Failed to list IAM roles (exit code: ${LIST_ROLES_EXIT}): ${REDACTED_LIST_ROLES_ERROR}"
+  echo "IAM roles will be missing from inventory"
+  ALL_ROLES=""
+else
+  ALL_ROLES=$(echo "${LIST_ROLES_OUTPUT}" | jq -r --arg infra "${INFRA_ID}" '.Roles[] | select(.RoleName | contains($infra)) | .RoleName' 2>/dev/null) || ALL_ROLES=""
+fi
 if [[ -n "${ALL_ROLES}" ]]; then
   ROLE_COUNT=$(echo "${ALL_ROLES}" | wc -l)
   echo "Found ${ROLE_COUNT} roles matching name pattern '${INFRA_ID}', checking tags..."
@@ -126,7 +141,9 @@ if [[ -n "${ALL_ROLES}" ]]; then
     ROLE_TAGS_OUTPUT=$(aws iam list-role-tags --role-name "${role_name}" --output json 2>&1)
     ROLE_TAGS_EXIT=$?
     if [[ ${ROLE_TAGS_EXIT} -ne 0 ]]; then
-      echo "WARNING: Failed to read tags for role ${role_name}: ${ROLE_TAGS_OUTPUT}"
+      # Redact account IDs from error message before logging
+      REDACTED_ROLE_ERROR=$(echo "${ROLE_TAGS_OUTPUT}" | sed -E 's/[0-9]{12}/REDACTED/g')
+      echo "WARNING: Failed to read tags for role ${role_name} (exit code: ${ROLE_TAGS_EXIT}): ${REDACTED_ROLE_ERROR}"
       continue
     fi
     ROLE_TAGS=$(echo "${ROLE_TAGS_OUTPUT}" | jq -r --arg cluster "kubernetes.io/cluster/${INFRA_ID}" --arg value "owned" \
@@ -345,7 +362,10 @@ if [[ -n "${VPCE_IDS}" ]]; then
       --output json | jq '[
         .VpcEndpoints[] |
         .OwnerId = "REDACTED" |
-        if .PolicyDocument then .PolicyDocument = "REDACTED" else . end
+        if .PolicyDocument then .PolicyDocument = "REDACTED" else . end |
+        if .DnsEntries then
+          .DnsEntries |= map(if .HostedZoneId then .HostedZoneId |= gsub(":[0-9]{12}:"; ":REDACTED:") else . end)
+        else . end
       ]') || VPC_ENDPOINTS_JSON="[]"
 else
   VPC_ENDPOINTS_JSON="[]"
@@ -415,7 +435,8 @@ if [[ -n "${LB_V2_ARNS}" ]]; then
           .AvailabilityZones |= map(
             if .LoadBalancerAddresses then
               .LoadBalancerAddresses |= map(
-                if .IpAddress then .IpAddress = "REDACTED" else . end
+                if .IpAddress then .IpAddress = "REDACTED" else . end |
+                if .Ipv6Address then .Ipv6Address = "REDACTED" else . end
               )
             else . end
           )

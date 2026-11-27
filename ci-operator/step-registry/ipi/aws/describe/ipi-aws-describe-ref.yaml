@@ -20,10 +20,13 @@ ref:
       cn-north-1 for China) for IAM instance profiles and Route53 hosted zones
     - IAM roles: Enumeration via list-roles (pre-filtered by INFRA_ID pattern) + list-role-tags
       for each candidate (Tagging API doesn't return IAM roles)
+    - Error handling: API failures are logged with redacted account IDs; failed queries result in
+      empty collections but allow the step to continue
 
     Resource detail queries:
-    All detail queries include the kubernetes.io/cluster/${INFRA_ID}=owned tag filter to prevent
-    including resources that lost their ownership tag between discovery and detail fetch.
+    Most detail queries rely solely on tag filters (not discovered IDs) to avoid issues with stale
+    or deleted resources. EC2 instances use both instance IDs and tag filters for verification.
+    All queries use the kubernetes.io/cluster/${INFRA_ID}=owned tag filter.
 
     This step automatically discovers and queries details for:
     - EC2 Instances, EBS Volumes, Network Interfaces
@@ -53,6 +56,8 @@ ref:
       - KMS multi-region configuration (primary and replica key ARNs)
       - IAM permissions boundary ARNs
       - IAM instance profile ARNs
+      - VPC endpoint DNS entries (hosted zone IDs)
+      - AWS API error messages (using sed pattern: s/[0-9]{12}/REDACTED/g)
     - IAM trust policies (AssumeRolePolicyDocument redacted to "REDACTED")
     - VPC endpoint policy documents (redacted to prevent principal account ID exposure)
     - Network interface requester IDs (when containing 12-digit account IDs; service aliases preserved)
