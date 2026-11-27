@@ -48,6 +48,18 @@ metadata:
 spec:
  manageNodes: false
  monDataDirHostPath: /var/lib/rook
+ # ODF replaces CPU defaults when a CPU request is specified. Keep the CPU limits explicit.
+ resources:
+   mon:
+     requests:
+       cpu: "0"
+     limits:
+       cpu: 999m
+   mgr:
+     requests:
+       cpu: "0"
+     limits:
+       cpu: 1999m
  storageDeviceSets:
  - count: 3
    dataPVCTemplate:
@@ -63,7 +75,11 @@ spec:
    placement: {}
    portable: false
    replica: 1
-   resources: {}
+   resources:
+     requests:
+       cpu: "0"
+     limits:
+       cpu: 1999m
 EOF
 
 oc wait StorageCluster/ocs-storagecluster -n openshift-storage --for=condition=Available --timeout=30m
