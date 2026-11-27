@@ -3,16 +3,16 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.26-openshift-5.0
-  origin_scos-5.1_base-stream10:
-    name: scos-5.1
+  origin_scos-5.2_base-stream10:
+    name: scos-5.2
     namespace: origin
     tag: base-stream10
-  origin_scos-5.1_installer-etcd-artifacts:
-    name: scos-5.1
+  origin_scos-5.2_installer-etcd-artifacts:
+    name: scos-5.2
     namespace: origin
     tag: installer-etcd-artifacts
-  origin_scos-5.1_installer-kube-apiserver-artifacts:
-    name: scos-5.1
+  origin_scos-5.2_installer-kube-apiserver-artifacts:
+    name: scos-5.2
     namespace: origin
     tag: installer-kube-apiserver-artifacts
 build_root:
@@ -28,20 +28,20 @@ images:
     capabilities:
     - intranet
     dockerfile_path: images/installer-artifacts/Dockerfile.rhel
-    from: origin_scos-5.1_base-stream10
+    from: origin_scos-5.2_base-stream10
     inputs:
       ocp_builder_rhel-9-golang-1.26-openshift-5.0:
         as:
         - builder
         - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
-      origin_scos-5.1_installer-etcd-artifacts:
+      origin_scos-5.2_installer-etcd-artifacts:
         as:
         - etcd-artifacts
-        - registry.ci.openshift.org/ocp/4.22:installer-etcd-artifacts
-      origin_scos-5.1_installer-kube-apiserver-artifacts:
+        - registry.ci.openshift.org/ocp/5.0:installer-etcd-artifacts
+      origin_scos-5.2_installer-kube-apiserver-artifacts:
         as:
         - kas-artifacts
-        - registry.ci.openshift.org/ocp/4.22:installer-kube-apiserver-artifacts
+        - registry.ci.openshift.org/ocp/5.0:installer-kube-apiserver-artifacts
     to: installer-artifacts
   - build_args:
     - name: TAGS
@@ -49,30 +49,30 @@ images:
     capabilities:
     - intranet
     dockerfile_path: images/installer/Dockerfile.ci
-    from: origin_scos-5.1_base-stream10
+    from: origin_scos-5.2_base-stream10
     inputs:
       ocp_builder_rhel-9-golang-1.26-openshift-5.0:
         as:
         - builder
         - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22
-      origin_scos-5.1_installer-etcd-artifacts:
+      origin_scos-5.2_installer-etcd-artifacts:
         as:
         - etcd-artifacts
-        - registry.ci.openshift.org/ocp/4.22:installer-etcd-artifacts
-      origin_scos-5.1_installer-kube-apiserver-artifacts:
+        - registry.ci.openshift.org/ocp/5.0:installer-etcd-artifacts
+      origin_scos-5.2_installer-kube-apiserver-artifacts:
         as:
         - kas-artifacts
-        - registry.ci.openshift.org/ocp/4.22:installer-kube-apiserver-artifacts
+        - registry.ci.openshift.org/ocp/5.0:installer-kube-apiserver-artifacts
     to: installer
 promotion:
   to:
-  - name: scos-5.1
+  - name: scos-5.2
     namespace: origin
 releases:
   latest:
     integration:
       include_built_images: true
-      name: scos-5.1
+      name: scos-5.2
       namespace: origin
 resources:
   '*':
