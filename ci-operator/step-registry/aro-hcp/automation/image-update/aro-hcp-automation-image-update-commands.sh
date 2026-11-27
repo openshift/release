@@ -61,7 +61,7 @@ notify() {
   }
 
   # Security: Use silent curl to prevent webhook URL exposure in logs
-  if ! curl -f -s -X POST -H 'Content-type: application/json' \
+  if ! curl -f -s -o /dev/null -X POST -H 'Content-type: application/json' \
     --data "{\"text\":\"${*}\"}" "${webhook_url}" 2>/dev/null; then
     error "slack: failed to send Slack notification"
   fi
@@ -113,14 +113,16 @@ git checkout --quiet -B image-updater-run FETCH_HEAD || error "checkout: failed 
 # Publication: fix the commit this run prepares from.
 BASE_COMMIT="$(git rev-parse HEAD)"
 readonly BASE_COMMIT
-info "checkout: running ${GITHUB_REPO_BRANCH} at ${BASE_COMMIT}"
+log "checkout: running ${GITHUB_REPO_BRANCH} at ${BASE_COMMIT}"
 
 # Render: reuse the templatize the image already built instead of compiling it again
 PREBUILT_TEMPLATIZE="/opt/app-root/src/github.com/Azure/ARO-HCP/tooling/templatize/templatize-$(uname -m)"
 if [[ -x "${PREBUILT_TEMPLATIZE}" ]]; then
   cp "${PREBUILT_TEMPLATIZE}" "${REPO_ROOT}/tooling/templatize/templatize-$(uname -m)" || error "render: failed to stage the prebuilt templatize"
   export TEMPLATIZE_USE_PREBUILT=1
-  info "render: using the prebuilt templatize from the image"
+  log "render: using the prebuilt templatize from the image"
+else
+  log "render: no prebuilt templatize found, building it from source"
 fi
 
 # Configuration: Validate GitHub App credentials
@@ -186,6 +188,7 @@ run make update-helm-fixtures
 # Configuration: Materialize final configuration
 info "image: materializing configuration"
 run make -C config materialize
+log "render: configuration materialized"
 
 # Publication: collect the intended outputs and refuse anything else
 info "publish: collecting the digest outputs"
@@ -249,6 +252,8 @@ if [[ -z "${PR_URL}" ]]; then
   notify "❌ Image digest updater job published without a pull request URL. Please check prow at ${PROW_JOB_URL}"
   error "github: publish returned no pull request URL"
 fi
+
+log "publish: ${PR_URL}"
 
 notify "✅ Image digest update PR ready to review: ${PR_URL}"
 exit 0
