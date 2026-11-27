@@ -28,16 +28,15 @@ fi
 MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
 echo "MIRROR_REGISTRY_HOST: ${MIRROR_REGISTRY_HOST}"
 
-# `install-config.yaml`'s `additionalTrustBundlePolicy: Always` (set by
-# ipi-conf-additional-ca-trust-policy) only adds the CA to the *nodes'*
-# trusted certificate store (see the AdditionalTrustBundlePolicy doc comment
-# in openshift/installer's pkg/types/installconfig.go) — it does not
-# propagate to any cluster-scoped config object. In-cluster consumers that
-# don't run on the host (the image registry's image-stream import
-# controller, the build controller's git/image fetch client) instead read
-# image.config.openshift.io/cluster's spec.additionalTrustedCA, which must
-# be set explicitly. This is the documented procedure for disconnected
-# mirror registries with self-signed certs, see:
+# ipi-conf-mirror writes SHARED_DIR/additional_trust_bundle and includes it
+# in install-config.yaml before installation. The installer and MCO use that
+# bundle for node trust without requiring additionalTrustBundlePolicy: Always.
+# That policy also makes proxy/cluster reference user-ca-bundle when no
+# cluster-wide proxy is configured; it does not configure image-specific trust.
+# Configure image.config.openshift.io/cluster's spec.additionalTrustedCA
+# separately for registry consumers, including image imports and builds.
+# This is the documented procedure for disconnected mirror registries with
+# self-signed certs, see:
 # https://docs.openshift.com/container-platform/4.18/post_installation_configuration/post-install-image-config.html
 #
 # The ConfigMap key uses the registry host with the port-separating colon
