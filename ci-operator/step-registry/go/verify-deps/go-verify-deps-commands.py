@@ -59,6 +59,45 @@ GOPROXY_RETRIES = 5  # probe attempts per module version (absorb proxy propagati
 GOPROXY_RETRY_DELAY_SECONDS = 10  # base backoff per attempt (attempt N waits N times this)
 GOPROXY_DEADLINE_SECONDS = 120  # overall wall-clock budget for the probe loop (0 disables)
 
+# Transient-network retry for the network-touching `go` module operations run by
+# the vendor-consistency flow (``go list -m all``, ``go mod tidy``,
+# ``go [work] vendor``). These absorb transient proxy/network flakes -- e.g. the
+# ART-26147 motivating failure, an HTTP/2 ``INTERNAL_ERROR`` stream reset while
+# reading a module .zip from proxy.golang.org -- without masking deterministic
+# failures (a tidy/vendor diff, a missing module 404/410, a checksum mismatch, or
+# a build/compile error), which are never retried. These are fixed module
+# internals, NOT consumer-facing env knobs: no new go-proxy ref tunable is added
+# (CHECK_GOPROXY_AVAILABILITY stays the only declared one).
+GO_CMD_RETRIES = 4  # total attempts for a network-touching go command (1 try + 3 retries)
+GO_CMD_RETRY_DELAY_SECONDS = 5  # base backoff per attempt (attempt N waits ~N times this, jittered)
+GO_CMD_DEADLINE_SECONDS = 300  # overall wall-clock budget for retrying one command (0 disables)
+
+# Case-insensitive substrings that mark a failed go command's combined output as a
+# transient network/proxy flake worth retrying. A conservative set: deterministic
+# failures (missing module, checksum mismatch, tidy/vendor diff, compile errors)
+# do not contain these.
+_GO_TRANSIENT_SUBSTRINGS = (
+    "internal_error",        # HTTP/2 INTERNAL_ERROR stream reset (the ART-26147 motivating flake)
+    "stream error",          # golang.org/x/net/http2 stream failures
+    "connection reset",
+    "connection refused",
+    "no such host",          # transient DNS resolution failure
+    "i/o timeout",
+    "tls handshake timeout",
+    "unexpected eof",
+    "server misbehaving",    # transient resolver / proxy response
+    "temporary failure",     # e.g. "temporary failure in name resolution"
+    "timeout",               # any other dial/read timeout
+)
+
+# Regex signatures for transient failures that need structure rather than a bare
+# substring: an HTTP 502/503/504 gateway response, and a read error against the Go
+# module proxy (proxy.golang.org or any configured proxy's ``/@v/`` module path).
+_GO_TRANSIENT_PATTERNS = (
+    re.compile(r"\b50[234]\b"),
+    re.compile(r'read\s+"?https?:/+\S*(?:proxy\.golang\.org|/@v/)', re.IGNORECASE),
+)
+
 # Bounded jitter fraction applied to each backoff delay (+/-20%).
 JITTER_FRACTION = 0.2
 # Module-level RNG for backoff jitter. Seed it (``JITTER_RNG.seed(...)``) in tests to make
@@ -1009,6 +1048,61 @@ def _run(cmd: List[str]) -> int:
     return subprocess.run(cmd, check=False).returncode
 
 
+def _is_transient_go_error(output: str) -> bool:
+    """Return whether a failed go command's combined stdout+stderr matches the
+    conservative transient-network signature set (case-insensitive): HTTP/2
+    stream resets, connection reset/refused, DNS failures, i/o or TLS-handshake
+    timeouts, unexpected EOF, HTTP 502/503/504, and read errors against the Go
+    module proxy. ONLY these are retried; deterministic failures (missing module
+    404/410, checksum mismatch, go.mod/go.sum or vendor/ diff, compile errors) do
+    not match and so fail immediately with their original output and exit code."""
+    lowered = output.lower()
+    if any(sig in lowered for sig in _GO_TRANSIENT_SUBSTRINGS):
+        return True
+    return any(pattern.search(output) for pattern in _GO_TRANSIENT_PATTERNS)
+
+
+def _run_go(cmd: List[str]) -> int:
+    """Run a network-touching ``go`` module command (``go list -m all``,
+    ``go mod tidy``, ``go [work] vendor``), retrying ONLY transient network/proxy
+    flakes under a jittered exponential backoff bounded by GO_CMD_DEADLINE_SECONDS.
+
+    The command's combined stdout+stderr is captured so the transient signature
+    can be inspected, then echoed to this process's stdout so nothing is hidden
+    from the job log. The exit code is preserved exactly. A deterministic failure
+    does not match the transient signature and returns immediately -- so the
+    happy-path verification semantics (vendor-correct, tidy-clean,
+    offline-resolvable) are unchanged. Reuses the module's _Budget / _next_backoff
+    / JITTER_RNG backoff machinery; the tuning constants are read via module
+    globals so tests can monkeypatch them."""
+    budget = _Budget(GO_CMD_DEADLINE_SECONDS, time.monotonic())
+    attempt = 0
+    while True:
+        attempt += 1
+        result = subprocess.run(cmd, stdout=subprocess.PIPE,
+                                stderr=subprocess.STDOUT,
+                                universal_newlines=True, check=False)
+        output = result.stdout or ""
+        sys.stdout.write(output)
+        sys.stdout.flush()
+        if result.returncode == 0:
+            return 0
+        if (attempt >= GO_CMD_RETRIES
+                or not _is_transient_go_error(output)
+                or budget.exhausted()):
+            return result.returncode
+        # Reuse the proxy-probe backoff (base * attempt, jittered); no 429
+        # Retry-After applies to a go subprocess, so pass code "000".
+        delay = budget.cap_sleep(
+            _next_backoff(GO_CMD_RETRY_DELAY_SECONDS, attempt, "000", 0.0))
+        print(f"WARNING: '{' '.join(cmd)}' failed with a transient network error "
+              f"(attempt {attempt}/{GO_CMD_RETRIES}); retrying in {delay:.1f}s.")
+        if delay > 0:
+            time.sleep(delay)
+        if budget.exhausted():
+            return result.returncode
+
+
 def _verify_vendor() -> int:  # pylint: disable=too-many-return-statements  # fail-fast: each external step returns its own exit code
     """Run the original vendor/go.mod consistency flow. Returns an exit code."""
     gomod_path = Path("go.mod")
@@ -1031,7 +1125,7 @@ def _verify_vendor() -> int:  # pylint: disable=too-many-return-statements  # fa
 
     if os.environ.get("CHECK_MOD_LIST", "true") == "true":
         print("Checking that all modules can be resolved offline")
-        if _run(["go", "list", "-mod=readonly", "-m", "all"]) != 0:
+        if _run_go(["go", "list", "-mod=readonly", "-m", "all"]) != 0:
             die_modlist()
     else:
         print("Skipping go mod list check")
@@ -1039,7 +1133,7 @@ def _verify_vendor() -> int:  # pylint: disable=too-many-return-statements  # fa
     compat = os.environ.get("COMPAT", "")  # explicit -compat argument for go mod tidy
     print("Checking that vendor/ is correct")
     print(f"Running: go mod tidy {compat}")
-    rc = _run(["go", "mod", "tidy", *compat.split()])
+    rc = _run_go(["go", "mod", "tidy", *compat.split()])
     if rc != 0:
         return rc
 
@@ -1048,7 +1142,7 @@ def _verify_vendor() -> int:  # pylint: disable=too-many-return-statements  # fa
         print('Detected go workspace; using "go work vendor".')
         vendor_mode = "work"
     print(f"Running: go {vendor_mode} vendor")
-    rc = _run(["go", vendor_mode, "vendor"])
+    rc = _run_go(["go", vendor_mode, "vendor"])
     if rc != 0:
         return rc
 

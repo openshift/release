@@ -672,6 +672,129 @@ class CheckAvailabilityTests(unittest.TestCase):  # pylint: disable=too-many-ins
         self.assertEqual(timeouts[0], 5.0)  # first attempt: full remaining budget (< default 15)
 
 
+class RunGoCmdTests(unittest.TestCase):
+    """Exercise _run_go: a transient network flake is retried, a deterministic
+    failure is NOT, exit codes and output are preserved, and the retry budget is
+    honored. subprocess.run and time are stubbed so the tests are hermetic and
+    instant (no `go` binary, no network, no real sleeps)."""
+
+    def setUp(self):
+        self._orig_sub = mod.subprocess.run
+        self._orig_time = mod.time
+        self._orig_retries = mod.GO_CMD_RETRIES
+        self._orig_delay = mod.GO_CMD_RETRY_DELAY_SECONDS
+        self._orig_deadline = mod.GO_CMD_DEADLINE_SECONDS
+        self._orig_rng = mod.JITTER_RNG.getstate()
+        clock = [0.0]
+
+        def fake_sleep(seconds):
+            clock[0] += seconds
+
+        mod.time = types.SimpleNamespace(monotonic=lambda: clock[0], sleep=fake_sleep)
+        mod.JITTER_RNG.seed(0)  # deterministic jitter
+        mod.GO_CMD_RETRIES = 4
+        mod.GO_CMD_RETRY_DELAY_SECONDS = 1
+        mod.GO_CMD_DEADLINE_SECONDS = 300
+
+    def tearDown(self):
+        mod.subprocess.run = self._orig_sub
+        mod.time = self._orig_time
+        mod.GO_CMD_RETRIES = self._orig_retries
+        mod.GO_CMD_RETRY_DELAY_SECONDS = self._orig_delay
+        mod.GO_CMD_DEADLINE_SECONDS = self._orig_deadline
+        mod.JITTER_RNG.setstate(self._orig_rng)
+
+    def _install(self, results):
+        """Stub subprocess.run to return queued (returncode, combined-output)
+        pairs in order (the last repeats), counting invocations."""
+        calls = {"n": 0}
+
+        def fake_run(_cmd, *_a, **_k):
+            idx = min(calls["n"], len(results) - 1)
+            calls["n"] += 1
+            rc, out = results[idx]
+            return types.SimpleNamespace(returncode=rc, stdout=out, stderr="")
+
+        mod.subprocess.run = fake_run
+        return calls
+
+    def _capture(self, cmd):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = mod._run_go(cmd)  # pylint: disable=protected-access
+        return buf.getvalue(), rc
+
+    def test_transient_classifier(self):
+        # A representative transient signature from each family matches; clearly
+        # deterministic failures do not.
+        for text in [
+            'read "https:/proxy.golang.org/@v/v0.27.4.zip": stream error; '
+            "stream ID 17; INTERNAL_ERROR; received from peer",
+            "dial tcp: lookup proxy.golang.org: no such host",
+            "net/http: TLS handshake timeout",
+            "read tcp 10.0.0.1:443: connection reset by peer",
+            "reading https://proxy.golang.org/...: 503 Service Unavailable",
+            "unexpected EOF",
+        ]:
+            self.assertTrue(mod._is_transient_go_error(text), text)  # pylint: disable=protected-access
+        for text in [
+            "go: github.com/foo/bar@v1.2.3: missing go.sum entry",
+            "verifying github.com/foo/bar@v1.2.3: checksum mismatch",
+            "go: github.com/foo/bar@v9.9.9: reading ...: 404 Not Found",
+            "pkg/x/y.go:10:2: undefined: SomeSymbol",
+        ]:
+            self.assertFalse(mod._is_transient_go_error(text), text)  # pylint: disable=protected-access
+
+    def test_transient_retried_then_succeeds(self):
+        # (a) A transient flake on the first attempt is retried and the command
+        # then succeeds: exit 0, two invocations, original error NOT masked.
+        calls = self._install([
+            (1, 'go mod tidy: k8s.io/api@v0.27.4: read '
+                '"https:/proxy.golang.org/@v/v0.27.4.zip": stream error; '
+                "stream ID 17; INTERNAL_ERROR; received from peer"),
+            (0, "ok"),
+        ])
+        out, rc = self._capture(["go", "mod", "tidy"])
+        self.assertEqual(rc, 0, out)
+        self.assertEqual(calls["n"], 2)
+        self.assertIn("INTERNAL_ERROR", out)  # original output preserved
+        self.assertIn("retrying", out)  # retry announced
+
+    def test_transient_exhausts_retries_then_fails(self):
+        # (b) A persistent transient flake is retried up to the cap, then fails
+        # non-zero with the exit code and output preserved.
+        mod.GO_CMD_RETRIES = 3
+        calls = self._install([(1, "dial tcp: connection refused")])
+        out, rc = self._capture(["go", "mod", "tidy"])
+        self.assertEqual(rc, 1, out)
+        self.assertEqual(calls["n"], 3)  # exactly GO_CMD_RETRIES attempts
+        self.assertEqual(out.count("connection refused"), 3)  # every attempt echoed
+
+    def test_deterministic_failure_not_retried(self):
+        # (c) A deterministic (non-network) failure fails immediately: exactly one
+        # invocation, no retry, exit code and output preserved.
+        calls = self._install([
+            (1, "go: github.com/foo/bar@v1.2.3: missing go.sum entry; "
+                "to add it:\n\tgo mod download github.com/foo/bar")])
+        out, rc = self._capture(["go", "mod", "tidy"])
+        self.assertEqual(rc, 1, out)
+        self.assertEqual(calls["n"], 1)  # NOT retried
+        self.assertNotIn("retrying", out)
+        self.assertIn("missing go.sum entry", out)
+
+    def test_deadline_bounds_total_retries(self):
+        # A persistent transient flake under a tight deadline stops retrying once
+        # the wall-clock budget is exhausted, never exceeding the retry cap.
+        mod.GO_CMD_RETRIES = 50
+        mod.GO_CMD_RETRY_DELAY_SECONDS = 10
+        mod.GO_CMD_DEADLINE_SECONDS = 5
+        calls = self._install([(1, "i/o timeout")])
+        out, rc = self._capture(["go", "mod", "tidy"])
+        self.assertEqual(rc, 1, out)
+        self.assertGreaterEqual(calls["n"], 1)
+        self.assertLess(calls["n"], 50)  # the deadline, not the cap, stopped it
+
+
 class MainFlowTests(unittest.TestCase):
     """Exercise main()'s vendor-consistency flow with go/git calls stubbed."""
 
@@ -730,6 +853,31 @@ class MainFlowTests(unittest.TestCase):
         self._stub_subprocess(git_status_rc=0)
         _out, rc = self._capture_main()
         self.assertEqual(rc, 0)
+
+    def test_real_vendor_inconsistency_still_fails(self):
+        # (d) go mod tidy / go vendor succeed, but `git status` reports vendor/
+        # changes: a genuine verification inconsistency must STILL fail (the
+        # general remediation + exit 1), proving the transient-retry wrapper never
+        # masks a real failure.
+        def fake_run(cmd, *_a, **_k):
+            if cmd and cmd[0] == "git":
+                # Clean exit code, but a non-empty porcelain diff => inconsistency.
+                return types.SimpleNamespace(
+                    returncode=0, stdout=" M vendor/modules.txt\n", stderr="")
+            return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+        mod.subprocess.run = fake_run
+        buf = io.StringIO()
+        rc = 0
+        try:
+            with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+                mod.main([])
+        except SystemExit as exc:
+            rc = exc.code if isinstance(exc.code, int) else 1
+        out = buf.getvalue()
+        self.assertEqual(rc, 1, out)
+        self.assertIn("vendor inconsistency", out)
+        self.assertIn("vendor/modules.txt", out)
 
 
 if __name__ == "__main__":
