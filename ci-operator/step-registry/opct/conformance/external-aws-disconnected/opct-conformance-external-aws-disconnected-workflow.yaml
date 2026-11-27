@@ -31,12 +31,12 @@ workflow:
         sed -i "s|\"auths\":{|\"auths\":{\"${MIRROR_REGISTRY_HOST}\":{\"auth\":\"${registry_cred}\"},|" "${new_pull_secret}"
 
         # Mirror OPCT images to the bastion registry so pods inside the
-        # disconnected cluster can pull them. The sonobuoy image is also
-        # mirrored with the versioned tag (v0.57.3, pinned by the OPCT
-        # build's sonobuoy library): `opct run --image-repository` rewrites
-        # the sonobuoy pod image to <repo>/sonobuoy:<version>, not :latest.
+        # disconnected cluster can pull them. The sonobuoy image is mirrored
+        # with the versioned tag (v0.57.3, pinned by the OPCT build's
+        # sonobuoy library): `opct run --image-repository` rewrites the
+        # sonobuoy pod image to <repo>/sonobuoy:<version>, not :latest.
+        # The :latest sonobuoy tag does not exist upstream and is skipped.
         OPCT_IMAGES=(
-          "quay.io/opct/sonobuoy:latest"
           "quay.io/opct/sonobuoy:v0.57.3"
           "quay.io/opct/plugin-artifacts-collector:latest"
           "quay.io/opct/must-gather-monitoring:latest"
@@ -49,21 +49,28 @@ workflow:
             --insecure=true || echo "WARN: failed to mirror ${img}"
         done
 
-        # Mirror custom plugin image (pr-102 build) to the opct/ path
-        # so --image-repository picks it up at the expected location.
+        # Mirror custom plugin image (pr-102 build) to the opct/ path.
+        # Also mirror the :latest tag: `opct run --image-repository`
+        # rewrites the plugin image to <repo>/plugin-openshift-tests:latest
+        # (the --plugins-image flag value is currently clobbered by the
+        # rewrite), so both tags must exist in the mirror.
         PLUGIN_SRC="quay.io/rhn-support-bshaw/plugin-openshift-tests:v0.0.4-opct512"
         PLUGIN_DST="${MIRROR_REGISTRY_HOST}/opct/plugin-openshift-tests:v0.0.4-opct512"
         echo "Mirroring custom plugin ${PLUGIN_SRC} -> ${PLUGIN_DST}"
         oc image mirror "${PLUGIN_SRC}" "${PLUGIN_DST}" \
           --registry-config="${new_pull_secret}" \
           --insecure=true
+        oc image mirror "${PLUGIN_SRC}" "${MIRROR_REGISTRY_HOST}/opct/plugin-openshift-tests:latest" \
+          --registry-config="${new_pull_secret}" \
+          --insecure=true
 
-        # Mirror the custom OPCT build to <mirror>/opct:<cli-version>: the
-        # dedicated-e2e-controller deployment pulls
-        # <image-repository>/opct:<cli-version> (not quay.io) since the
-        # v0.0.2-opct512 controller-image fix.
+        # Mirror the custom OPCT build. The dedicated-e2e-controller
+        # deployment pulls <image-repository>/opct:<cli-version> (not
+        # quay.io) since the v0.0.2-opct512 controller-image fix, and
+        # --image-repository is passed as <mirror>/opct, so the mirror
+        # path is nested: <mirror>/opct/opct:<cli-version>.
         OPCT_SRC="quay.io/rhn-support-bshaw/opct:v0.0.2-opct512"
-        OPCT_DST="${MIRROR_REGISTRY_HOST}/opct:v0.0.2-opct512"
+        OPCT_DST="${MIRROR_REGISTRY_HOST}/opct/opct:v0.0.2-opct512"
         echo "Mirroring custom OPCT ${OPCT_SRC} -> ${OPCT_DST}"
         oc image mirror "${OPCT_SRC}" "${OPCT_DST}" \
           --registry-config="${new_pull_secret}" \
