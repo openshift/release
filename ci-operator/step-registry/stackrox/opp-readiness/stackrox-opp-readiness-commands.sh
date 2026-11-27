@@ -533,13 +533,14 @@ function WaitFor () {
             echo "[readiness] OK: ${description}"
             return 0
         fi
-        _WAITFOR_LAST_RC="${_check_rc}"
         _now=$(date +%s)
         if (( _now >= _deadline )); then
             _waitReason="${_deadlineReason}"
+            _WAITFOR_LAST_RC=3
             echo "[readiness] TIMEOUT after $(( _now - (_deadline - cap) ))s waiting for: ${description} (budget remaining $(_budget_remaining)s)"
             return 1
         fi
+        _WAITFOR_LAST_RC="${_check_rc}"
         rem="$(_budget_remaining)"
         if (( rem <= 0 )); then
             _waitReason="budget-exhausted-while"
@@ -1140,7 +1141,7 @@ _CENTRAL_TLS_ERR="${ARTIFACT_DIR}/central-api-tls.err"
 # failure as a definite negative.
 _central_backend_target() {
     local _slice_json _backend_target _rt_port="${3:-}"
-    _slice_json="$(oc get endpointslices -n "$1" \
+    _slice_json="$(oc --request-timeout="$(_read_timeout_arg)" get endpointslices -n "$1" \
       -l "kubernetes.io/service-name=$2" -o json 2>/dev/null)" || return 2
     _backend_target="$(printf '%s\n' "${_slice_json}" | \
       python3 -c '
@@ -1294,19 +1295,20 @@ if [[ -n "${centralUrl}" ]]; then
     # port, and Bash traces every assignment and curl argument while set -x is
     # on (redirecting curl's stderr does not suppress Bash's own lines). Keep
     # them out of the job log: trace only the fixed-label outcome messages
-    # below, the INTEROP-9647 log-sanitization contract.
-    typeset -i _tlsTraceWasOff=0 _tlsRc=0
+    # below, the INTEROP-9647 log-sanitization contract. The TLS check
+    # participates in the wait/retry discipline so a Central that becomes
+    # ready on the next poll does not fail the job; exhaustion still
+    # records the failed row rather than aborting (step contract).
+    function _CheckCentralApiTLS() { _verify_central_api_tls; }
+    typeset -i _tlsTraceWasOff=0
     [[ $- == *x* ]] || _tlsTraceWasOff=1
     set +x
-    if _verify_central_api_tls; then
-        _tlsRc=0
+    if WaitFor "Central API TLS verification (central-tls CA)" _CheckCentralApiTLS; then
+        (( _tlsTraceWasOff == 0 )) && set -x
     else
-        _tlsRc=$?
-    fi
-    (( _tlsTraceWasOff == 0 )) && set -x
-    if (( _tlsRc != 0 )); then
+        (( _tlsTraceWasOff == 0 )) && set -x
         _add_case "central-api-insecure-tls" failed "TLSVerification" \
-            "Central API certificate not verified against the CA in the central-tls secret (route host outside the certificate DNS names and no verifiable ready backend endpoint); no credential is sent to an unverified server"
+            "Central API certificate not verified against the CA in the central-tls secret (route host outside the certificate DNS names and no verifiable ready backend endpoint); no credential is sent to an unverified server (budget remaining $(_budget_remaining)s)"
         echo "[readiness] FATAL: Central API TLS could not be verified; see ${_CENTRAL_TLS_ERR}" >&2
         exit 1
     fi
