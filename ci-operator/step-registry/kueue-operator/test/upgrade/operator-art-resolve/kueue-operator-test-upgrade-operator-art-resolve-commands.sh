@@ -18,6 +18,17 @@ function timestamp() { date -u --rfc-3339=seconds; }
 
 CHANNEL="${KUEUE_OPERATOR_CHANNEL:-stable-v1.5}"
 
+# kueue-operator-src ships jq/skopeo/git/wget but not yq; fetch the mikefarah yq
+# binary (same approach as the disconnected cert-manager catalog step).
+YQ=/tmp/yq
+ARCH=$(uname -m)
+case "${ARCH}" in
+    x86_64) ARCH=amd64 ;;
+    aarch64) ARCH=arm64 ;;
+esac
+wget -qO "${YQ}" "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${ARCH}"
+chmod +x "${YQ}"
+
 if [[ ! -s "${SHARED_DIR}/kueue_index_image" ]]; then
     echo "ERROR: ${SHARED_DIR}/kueue_index_image is missing or empty; kueue-operator-enable-catalogsource-art must run first"
     exit 1
@@ -66,16 +77,16 @@ if [[ -z "${CATALOG_FILE}" ]]; then
 fi
 echo "Using catalog: ${CATALOG_FILE}"
 
-CHANNEL_ENTRIES=$(yq -N -r "select(.schema == \"olm.channel\" and .name == \"${CHANNEL}\") | .entries[].name" "${CATALOG_FILE}")
+CHANNEL_ENTRIES=$("${YQ}" -N -r "select(.schema == \"olm.channel\" and .name == \"${CHANNEL}\") | .entries[].name" "${CATALOG_FILE}")
 if [[ -z "${CHANNEL_ENTRIES}" ]]; then
     echo "ERROR: channel ${CHANNEL} not found in the ART FBC; available channels:"
-    yq -N -r 'select(.schema == "olm.channel") | .name' "${CATALOG_FILE}"
+    "${YQ}" -N -r 'select(.schema == "olm.channel") | .name' "${CATALOG_FILE}"
     exit 1
 fi
 
 # The channel head is the entry no other entry replaces or skips.
-CHANNEL_REPLACED=$(yq -N -r "select(.schema == \"olm.channel\" and .name == \"${CHANNEL}\") | .entries[] | .replaces // \"\"" "${CATALOG_FILE}")
-CHANNEL_SKIPPED=$(yq -N -r "select(.schema == \"olm.channel\" and .name == \"${CHANNEL}\") | .entries[] | (.skips // [])[]" "${CATALOG_FILE}")
+CHANNEL_REPLACED=$("${YQ}" -N -r "select(.schema == \"olm.channel\" and .name == \"${CHANNEL}\") | .entries[] | .replaces // \"\"" "${CATALOG_FILE}")
+CHANNEL_SKIPPED=$("${YQ}" -N -r "select(.schema == \"olm.channel\" and .name == \"${CHANNEL}\") | .entries[] | (.skips // [])[]" "${CATALOG_FILE}")
 CHANNEL_REFERENCED=$(printf '%s\n%s\n' "${CHANNEL_REPLACED}" "${CHANNEL_SKIPPED}" | sed '/^$/d')
 
 HEAD=$(printf '%s\n' "${CHANNEL_ENTRIES}" | while IFS= read -r name; do
@@ -90,7 +101,7 @@ if [[ "${HEAD_COUNT}" != "1" ]]; then
     exit 1
 fi
 
-PREVIOUS=$(yq -N -r "select(.schema == \"olm.channel\" and .name == \"${CHANNEL}\") | .entries[] | select(.name == \"${HEAD}\") | .replaces // \"\"" "${CATALOG_FILE}")
+PREVIOUS=$("${YQ}" -N -r "select(.schema == \"olm.channel\" and .name == \"${CHANNEL}\") | .entries[] | select(.name == \"${HEAD}\") | .replaces // \"\"" "${CATALOG_FILE}")
 if [[ -z "${PREVIOUS}" ]]; then
     echo "ERROR: channel ${CHANNEL} head ${HEAD} declares no 'replaces'; no previous z-stream to upgrade from"
     exit 1
