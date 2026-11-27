@@ -23,5 +23,26 @@ ref:
     default: ""
     documentation: enable ipv6 stack or not. "" (default) means IPv4 only;
       "DualStackIPv6Primary" or "DualStackIPv4Primary" means enabling IPv6.
+  - name: EC2_ENDPOINT_PEER_REGION
+    default: ""
+    documentation: |-
+      When set to an AWS region, additionally provision a small VPC in that
+      region holding an ec2 interface endpoint, peer it with the disconnected
+      VPC, and publish a private hosted zone so that
+      ec2.<EC2_ENDPOINT_PEER_REGION>.amazonaws.com resolves to that endpoint
+      from inside the cluster.
+
+      Needed in opt-in regions, where machine-api validates the cluster region
+      by calling ec2:DescribeRegions against us-east-1. EC2 is not one of the
+      services AWS has enabled for cross-region PrivateLink, so the endpoint
+      cannot simply be created with ServiceRegion in the cluster's own region.
+
+      Empty (default) leaves the VPC exactly as before.
+  - name: EC2_ENDPOINT_PEER_VPC_CIDR
+    default: "10.190.0.0/16"
+    documentation: |-
+      CIDR block for the peer VPC created by EC2_ENDPOINT_PEER_REGION. Must not
+      overlap the disconnected VPC, the cluster network or the service network.
+      Ignored when EC2_ENDPOINT_PEER_REGION is empty.
   documentation: |-
     Create a disconnected VPC.

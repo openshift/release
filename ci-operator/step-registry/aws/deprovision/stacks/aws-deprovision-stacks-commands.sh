@@ -37,6 +37,41 @@ function cleanup_vpc()
     local vpc_id=$1
     echo "Cleaning up VPC ${vpc_id} dependencies ..."
 
+    # Interface endpoints own requester-managed ENIs that delete-network-interface
+    # cannot remove, so they have to go before the ENI, security group and subnet
+    # sweeps below, or the VPC delete at the end fails and leaks the VPC.
+    local vpce_ids attempt
+    vpce_ids=$(aws --region "$REGION" ec2 describe-vpc-endpoints \
+        --filters "Name=vpc-id,Values=${vpc_id}" \
+        --query "VpcEndpoints[?State!='deleted'].VpcEndpointId" --output text 2>/dev/null)
+    if [[ -n "${vpce_ids}" ]]; then
+        echo "  Deleting VPC endpoints ${vpce_ids} ..."
+        aws --region "$REGION" ec2 delete-vpc-endpoints --vpc-endpoint-ids ${vpce_ids} 2>/dev/null || true
+        for attempt in $(seq 1 30); do
+            vpce_ids=$(aws --region "$REGION" ec2 describe-vpc-endpoints \
+                --filters "Name=vpc-id,Values=${vpc_id}" \
+                --query "VpcEndpoints[?State!='deleted'].VpcEndpointId" --output text 2>/dev/null)
+            if [[ -z "${vpce_ids}" ]]; then
+                break
+            fi
+            sleep 10
+        done
+    fi
+
+    # A VPC cannot be deleted while it is peered, from either side.
+    local pcx_ids pcx_id side
+    pcx_ids=""
+    for side in requester accepter; do
+        pcx_ids="${pcx_ids} $(aws --region "$REGION" ec2 describe-vpc-peering-connections \
+            --filters "Name=${side}-vpc-info.vpc-id,Values=${vpc_id}" \
+            --query "VpcPeeringConnections[?Status.Code!='deleted'].VpcPeeringConnectionId" \
+            --output text 2>/dev/null)"
+    done
+    for pcx_id in ${pcx_ids}; do
+        echo "  Deleting VPC peering connection ${pcx_id} ..."
+        aws --region "$REGION" ec2 delete-vpc-peering-connection --vpc-peering-connection-id "${pcx_id}" 2>/dev/null || true
+    done
+
     local nat_ids
     nat_ids=$(aws --region "$REGION" ec2 describe-nat-gateways \
         --filter "Name=vpc-id,Values=${vpc_id}" \
@@ -153,8 +188,22 @@ function delete_stacks()
 {
     local stack_list=$1
     local rc=0
-    for stack_name in $(tac "${stack_list}"); do
-        echo "Deleting stack ${stack_name} ..."
+    local default_region="${REGION}"
+    local entry stack_name
+    for entry in $(tac "${stack_list}"); do
+        # An entry may be "<region>:<stack-name>" for a stack created outside
+        # the job's own region, such as the cross-region peer VPC that provides
+        # ec2.<region>.amazonaws.com to a disconnected cluster. Bare names use
+        # the job's region, as before. REGION is global, so the helpers called
+        # below pick up the per-stack value.
+        if [[ "${entry}" == *:* ]]; then
+            REGION="${entry%%:*}"
+            stack_name="${entry#*:}"
+        else
+            REGION="${default_region}"
+            stack_name="${entry}"
+        fi
+        echo "Deleting stack ${stack_name} in ${REGION} ..."
         aws --region "$REGION" cloudformation delete-stack --stack-name "${stack_name}" &
         wait "$!"
         aws --region "$REGION" cloudformation wait stack-delete-complete --stack-name "${stack_name}" &
@@ -193,6 +242,7 @@ function delete_stacks()
             rc=1
         fi
     done
+    REGION="${default_region}"
     return $rc
 }
 
