@@ -42,10 +42,13 @@ SUMMARY_FILE="${ARTIFACT_DIR}/aws-cluster-describe.log"
 
 # Discover all resources using Resource Groups Tagging API
 echo "Querying regional tagged resources via Resource Groups Tagging API..."
+# Temporarily disable errexit for command substitution to allow error handling
+set +e
 TAGGED_RESOURCES_OUTPUT=$(aws resourcegroupstaggingapi get-resources \
     --tag-filters "Key=kubernetes.io/cluster/${INFRA_ID},Values=owned" \
     --output json 2>&1)
 TAGGED_RESOURCES_EXIT_CODE=$?
+set -e
 
 if [[ ${TAGGED_RESOURCES_EXIT_CODE} -ne 0 ]]; then
   echo "ERROR: Failed to query resource tagging API in region ${AWS_REGION}"
@@ -59,17 +62,28 @@ else
   fi
 fi
 
-# Query global IAM and Route53 resources from us-east-1
-echo "Querying global IAM and Route53 resources from us-east-1..."
+# Query global IAM and Route53 resources from the partition's global region
+# Determine global region based on partition (us-east-1 for commercial, us-gov-west-1 for GovCloud)
+if [[ "${AWS_REGION}" =~ ^us-gov- ]]; then
+  GLOBAL_REGION="us-gov-west-1"
+elif [[ "${AWS_REGION}" =~ ^cn- ]]; then
+  GLOBAL_REGION="cn-north-1"
+else
+  GLOBAL_REGION="us-east-1"
+fi
+echo "Querying global IAM and Route53 resources from ${GLOBAL_REGION}..."
+# Temporarily disable errexit for command substitution to allow error handling
+set +e
 GLOBAL_TAGGED_RESOURCES_OUTPUT=$(aws resourcegroupstaggingapi get-resources \
-    --region us-east-1 \
+    --region "${GLOBAL_REGION}" \
     --resource-type-filters iam:instance-profile route53:hostedzone \
     --tag-filters "Key=kubernetes.io/cluster/${INFRA_ID},Values=owned" \
     --output json 2>&1)
 GLOBAL_EXIT_CODE=$?
+set -e
 
 if [[ ${GLOBAL_EXIT_CODE} -ne 0 ]]; then
-  echo "WARNING: Failed to query global resources from us-east-1 (IAM/Route53 may be missing)"
+  echo "WARNING: Failed to query global resources from ${GLOBAL_REGION} (IAM/Route53 may be missing)"
   echo "${GLOBAL_TAGGED_RESOURCES_OUTPUT}"
   GLOBAL_TAGGED_RESOURCES=""
 else
@@ -100,13 +114,22 @@ HOSTED_ZONE_IDS=$(echo "${GLOBAL_TAGGED_RESOURCES}" | grep 'route53:::hostedzone
 
 # IAM roles are not returned by GetResources API, and list-roles doesn't return tags
 # Use list-roles to get all role names, then filter by tags using list-role-tags
+# To avoid timeout with large role counts, pre-filter by name pattern containing INFRA_ID
 echo "Discovering IAM roles via IAM API..."
 IAM_ROLE_NAMES=""
-ALL_ROLES=$(aws iam list-roles --output json 2>/dev/null | jq -r '.Roles[].RoleName' 2>/dev/null) || ALL_ROLES=""
+ALL_ROLES=$(aws iam list-roles --output json 2>/dev/null | \
+    jq -r --arg infra "${INFRA_ID}" '.Roles[] | select(.RoleName | contains($infra)) | .RoleName' 2>/dev/null) || ALL_ROLES=""
 if [[ -n "${ALL_ROLES}" ]]; then
+  ROLE_COUNT=$(echo "${ALL_ROLES}" | wc -l)
+  echo "Found ${ROLE_COUNT} roles matching name pattern '${INFRA_ID}', checking tags..."
   for role_name in ${ALL_ROLES}; do
-    ROLE_TAGS=$(aws iam list-role-tags --role-name "${role_name}" --output json 2>/dev/null | \
-        jq -r --arg cluster "kubernetes.io/cluster/${INFRA_ID}" --arg value "owned" \
+    ROLE_TAGS_OUTPUT=$(aws iam list-role-tags --role-name "${role_name}" --output json 2>&1)
+    ROLE_TAGS_EXIT=$?
+    if [[ ${ROLE_TAGS_EXIT} -ne 0 ]]; then
+      echo "WARNING: Failed to read tags for role ${role_name}: ${ROLE_TAGS_OUTPUT}"
+      continue
+    fi
+    ROLE_TAGS=$(echo "${ROLE_TAGS_OUTPUT}" | jq -r --arg cluster "kubernetes.io/cluster/${INFRA_ID}" --arg value "owned" \
         '.Tags[] | select(.Key == $cluster and .Value == $value) | .Key' 2>/dev/null) || ROLE_TAGS=""
     if [[ -n "${ROLE_TAGS}" ]]; then
       IAM_ROLE_NAMES="${IAM_ROLE_NAMES}${role_name} "
@@ -125,8 +148,12 @@ if [[ -n "${EC2_INSTANCE_IDS}" ]]; then
         if .PublicIpAddress then .PublicIpAddress = "REDACTED" else . end |
         if .PublicDnsName then .PublicDnsName = "REDACTED" else . end |
         if .Ipv6Address then .Ipv6Address = "REDACTED" else . end |
+        if .IamInstanceProfile then
+          .IamInstanceProfile.Arn |= gsub(":[0-9]{12}:"; ":REDACTED:")
+        else . end |
         if .NetworkInterfaces then
           .NetworkInterfaces |= map(
+            .OwnerId = "REDACTED" |
             if .Association then
               .Association |= (
                 if .PublicIp then .PublicIp = "REDACTED" else . end |
@@ -156,14 +183,11 @@ else
 fi
 
 # Query EBS volumes
-if [[ -n "${VOLUME_IDS}" ]]; then
-  echo "Fetching EBS volume details..."
-  VOLUMES_JSON=$(aws ec2 describe-volumes \
-      --volume-ids ${VOLUME_IDS} \
-      --output json | jq '.Volumes') || VOLUMES_JSON="[]"
-else
-  VOLUMES_JSON="[]"
-fi
+# Use tag filter instead of volume IDs to handle deleted volumes gracefully
+echo "Fetching EBS volume details..."
+VOLUMES_JSON=$(aws ec2 describe-volumes \
+    --filters "Name=tag:kubernetes.io/cluster/${INFRA_ID},Values=owned" \
+    --output json | jq '.Volumes') || VOLUMES_JSON="[]"
 
 # Query VPCs
 if [[ -n "${VPC_IDS}" ]]; then
@@ -225,7 +249,10 @@ if [[ -n "${RTB_IDS}" ]]; then
       --route-table-ids ${RTB_IDS} \
       --output json | jq '[
         .RouteTables[] |
-        .OwnerId = "REDACTED"
+        .OwnerId = "REDACTED" |
+        if .Routes then
+          .Routes |= map(if .InstanceOwnerId then .InstanceOwnerId = "REDACTED" else . end)
+        else . end
       ]') || ROUTE_TABLES_JSON="[]"
 else
   ROUTE_TABLES_JSON="[]"
@@ -263,7 +290,8 @@ if [[ -n "${EIP_IDS}" ]]; then
       --allocation-ids ${EIP_IDS} \
       --output json | jq '[
         .Addresses[] |
-        if .PublicIp then .PublicIp = "REDACTED" else . end
+        if .PublicIp then .PublicIp = "REDACTED" else . end |
+        if .NetworkInterfaceOwnerId then .NetworkInterfaceOwnerId = "REDACTED" else . end
       ]') || ELASTIC_IPS_JSON="[]"
 else
   ELASTIC_IPS_JSON="[]"
@@ -313,7 +341,8 @@ if [[ -n "${VPCE_IDS}" ]]; then
       --vpc-endpoint-ids ${VPCE_IDS} \
       --output json | jq '[
         .VpcEndpoints[] |
-        .OwnerId = "REDACTED"
+        .OwnerId = "REDACTED" |
+        if .PolicyDocument then .PolicyDocument = "REDACTED" else . end
       ]') || VPC_ENDPOINTS_JSON="[]"
 else
   VPC_ENDPOINTS_JSON="[]"
@@ -371,10 +400,13 @@ LOAD_BALANCERS_JSON=$(aws elb describe-load-balancers --output json 2>/dev/null 
 echo "Fetching application/network load balancers..."
 LB_V2_ARNS=$(echo "${TAGGED_RESOURCES}" | grep 'elasticloadbalancing:[^:]*:[^:]*:loadbalancer/' || true)
 if [[ -n "${LB_V2_ARNS}" ]]; then
+  # Use temp file to avoid 128KB kernel arg limit with large ARN lists
+  LB_ARNS_FILE=$(mktemp)
+  echo "${LB_V2_ARNS}" | jq -R -s 'split("\n") | map(select(length > 0))' > "${LB_ARNS_FILE}"
   LOAD_BALANCERS_V2_JSON=$(aws elbv2 describe-load-balancers --output json 2>/dev/null | \
-      jq --argjson arns "$(echo "${LB_V2_ARNS}" | jq -R -s 'split("\n") | map(select(length > 0))')" '[
+      jq --slurpfile arns "${LB_ARNS_FILE}" '[
         .LoadBalancers[] |
-        select(.LoadBalancerArn as $arn | $arns | index($arn)) |
+        select(.LoadBalancerArn as $arn | $arns[0] | index($arn)) |
         .LoadBalancerArn |= gsub(":[0-9]{12}:"; ":REDACTED:") |
         if .AvailabilityZones then
           .AvailabilityZones |= map(
@@ -386,6 +418,7 @@ if [[ -n "${LB_V2_ARNS}" ]]; then
           )
         else . end
       ]') || LOAD_BALANCERS_V2_JSON="[]"
+  rm -f "${LB_ARNS_FILE}"
 else
   LOAD_BALANCERS_V2_JSON="[]"
 fi
@@ -394,15 +427,19 @@ fi
 echo "Fetching target groups..."
 TG_ARNS=$(echo "${TAGGED_RESOURCES}" | grep 'elasticloadbalancing:[^:]*:[^:]*:targetgroup/' || true)
 if [[ -n "${TG_ARNS}" ]]; then
+  # Use temp file to avoid 128KB kernel arg limit with large ARN lists
+  TG_ARNS_FILE=$(mktemp)
+  echo "${TG_ARNS}" | jq -R -s 'split("\n") | map(select(length > 0))' > "${TG_ARNS_FILE}"
   TARGET_GROUPS_JSON=$(aws elbv2 describe-target-groups --output json 2>/dev/null | \
-      jq --argjson arns "$(echo "${TG_ARNS}" | jq -R -s 'split("\n") | map(select(length > 0))')" '[
+      jq --slurpfile arns "${TG_ARNS_FILE}" '[
         .TargetGroups[] |
-        select(.TargetGroupArn as $arn | $arns | index($arn)) |
+        select(.TargetGroupArn as $arn | $arns[0] | index($arn)) |
         .TargetGroupArn |= gsub(":[0-9]{12}:"; ":REDACTED:") |
         if .LoadBalancerArns then
           .LoadBalancerArns |= map(gsub(":[0-9]{12}:"; ":REDACTED:"))
         else . end
       ]') || TARGET_GROUPS_JSON="[]"
+  rm -f "${TG_ARNS_FILE}"
 else
   TARGET_GROUPS_JSON="[]"
 fi
