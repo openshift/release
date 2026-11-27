@@ -31,9 +31,13 @@ workflow:
         sed -i "s|\"auths\":{|\"auths\":{\"${MIRROR_REGISTRY_HOST}\":{\"auth\":\"${registry_cred}\"},|" "${new_pull_secret}"
 
         # Mirror OPCT images to the bastion registry so pods inside the
-        # disconnected cluster can pull them.
+        # disconnected cluster can pull them. The sonobuoy image is also
+        # mirrored with the versioned tag (v0.57.3, pinned by the OPCT
+        # build's sonobuoy library): `opct run --image-repository` rewrites
+        # the sonobuoy pod image to <repo>/sonobuoy:<version>, not :latest.
         OPCT_IMAGES=(
           "quay.io/opct/sonobuoy:latest"
+          "quay.io/opct/sonobuoy:v0.57.3"
           "quay.io/opct/plugin-artifacts-collector:latest"
           "quay.io/opct/must-gather-monitoring:latest"
         )
@@ -51,6 +55,17 @@ workflow:
         PLUGIN_DST="${MIRROR_REGISTRY_HOST}/opct/plugin-openshift-tests:v0.0.4-opct512"
         echo "Mirroring custom plugin ${PLUGIN_SRC} -> ${PLUGIN_DST}"
         oc image mirror "${PLUGIN_SRC}" "${PLUGIN_DST}" \
+          --registry-config="${new_pull_secret}" \
+          --insecure=true
+
+        # Mirror the custom OPCT build to <mirror>/opct:<cli-version>: the
+        # dedicated-e2e-controller deployment pulls
+        # <image-repository>/opct:<cli-version> (not quay.io) since the
+        # v0.0.2-opct512 controller-image fix.
+        OPCT_SRC="quay.io/rhn-support-bshaw/opct:v0.0.2-opct512"
+        OPCT_DST="${MIRROR_REGISTRY_HOST}/opct:v0.0.2-opct512"
+        echo "Mirroring custom OPCT ${OPCT_SRC} -> ${OPCT_DST}"
+        oc image mirror "${OPCT_SRC}" "${OPCT_DST}" \
           --registry-config="${new_pull_secret}" \
           --insecure=true
 
@@ -164,7 +179,7 @@ workflow:
       MIRROR_IN_BASTION: "yes"
       QE_IMAGES: "false"
       ZONES_COUNT: "2"
-      OPCT_CLI_IMAGE: "quay.io/rhn-support-bshaw/opct:v0.0.1-opct512"
+      OPCT_CLI_IMAGE: "quay.io/rhn-support-bshaw/opct:v0.0.2-opct512"
   documentation: |-
     The OPCT Conformance External AWS Disconnected workflow provisions a
     disconnected AWS cluster with platform type External (using the
