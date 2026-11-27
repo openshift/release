@@ -40,6 +40,9 @@ images:
   - dockerfile_path: images/ci/trustmanager.Dockerfile
     from: base-rhel9
     to: cert-manager-trust-manager
+  - dockerfile_path: images/ci/approverpolicy.Dockerfile
+    from: base-rhel9
+    to: cert-manager-approver-policy
   - dockerfile_path: images/ci/Dockerfile.coverage
     to: cert-manager-operator-coverage
 operator:
@@ -60,13 +63,15 @@ operator:
     with: pipeline:cert-manager-istio-csr
   - pullspec: quay.io/jetstack/trust-manager:.*
     with: pipeline:cert-manager-trust-manager
+  - pullspec: quay.io/jetstack/cert-manager-approver-policy:.*
+    with: pipeline:cert-manager-approver-policy
 releases:
   latest:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.22"
+      version: "5.0"
 resources:
   '*':
     requests:
@@ -107,6 +112,12 @@ tests:
       SCAN_IMAGE: cert-manager-trust-manager
     test:
     - ref: fips-check-image-scan
+- as: fips-image-scan-approver-policy
+  steps:
+    dependencies:
+      SCAN_IMAGE: cert-manager-approver-policy
+    test:
+    - ref: fips-check-image-scan
 - as: e2e-operator
   cluster_claim:
     architecture: amd64
@@ -114,7 +125,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 3h0m0s
-    version: "4.22"
+    version: "5.0"
   skip_if_only_changed: ^(docs/|deploy/|jsonnet/)|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
@@ -150,7 +161,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 3h0m0s
-    version: "4.22"
+    version: "5.0"
   steps:
     post:
     - as: collect-coverage
@@ -208,7 +219,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 3h0m0s
-    version: "4.20"
+    version: "5.0"
   postsubmit: true
   steps:
     post:
@@ -494,7 +505,11 @@ tests:
       SCANNER_MEMORY: 1Gi
       TLS_13_ENABLE_TLS_ADHERENCE: "true"
       TLS_13_TLS_ADHERENCE_POLICY: StrictAllComponents
+    pre:
+    - chain: ipi-aws-pre
     test:
+    - ref: merge-stage-registry-credentials
+    - ref: optional-operators-operator-sdk
     - ref: tls-13
     - as: test-tls-profile
       cli: latest
@@ -529,7 +544,11 @@ tests:
       SCAN_NAMESPACE: cert-manager-operator,cert-manager
       SCANNER_CPU: "1"
       SCANNER_MEMORY: 1Gi
+    pre:
+    - chain: ipi-aws-pre
     test:
+    - ref: merge-stage-registry-credentials
+    - ref: optional-operators-operator-sdk
     - as: deploy-operand
       cli: latest
       commands: make deploy-trust-manager --warn-undefined-variables
