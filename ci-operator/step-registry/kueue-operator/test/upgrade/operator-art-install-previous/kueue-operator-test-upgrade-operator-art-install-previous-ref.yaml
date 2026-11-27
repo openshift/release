@@ -1,0 +1,29 @@
+ref:
+  as: kueue-operator-test-upgrade-operator-art-install-previous
+  from_image:
+    name: cli-jq
+    namespace: ocp
+    tag: latest
+  commands: kueue-operator-test-upgrade-operator-art-install-previous-commands.sh
+  timeout: 900s
+  resources:
+    requests:
+      cpu: 200m
+      memory: 300Mi
+  env:
+  - name: KUEUE_OPERATOR_SOURCE
+    default: "fbc-operator-catalog"
+    documentation: CatalogSource the Subscription installs from (created by kueue-operator-enable-catalogsource-art).
+  - name: KUEUE_OPERATOR_SOURCE_NAMESPACE
+    default: "openshift-marketplace"
+    documentation: Namespace of the KUEUE_OPERATOR_SOURCE CatalogSource.
+  - name: KUEUE_OPERATOR_CHANNEL
+    default: "stable-v1.5"
+    documentation: Subscription channel; its previous z-stream (KUEUE_UPGRADE_FROM_CSV) is installed first.
+  documentation: |-
+    Installs the previous z-stream of the Kueue operator from the ART FBC catalog
+    via an OLM Subscription pinned to startingCSV=${KUEUE_UPGRADE_FROM_CSV} with
+    Manual InstallPlan approval, approves that InstallPlan, waits for the CSV to
+    succeed, and creates the default Kueue CR. Requires KUEUE_UPGRADE_FROM_CSV from
+    kueue-operator-test-upgrade-operator-art-resolve. The in-channel upgrade to the
+    channel head is performed by kueue-operator-test-upgrade-operator-art.

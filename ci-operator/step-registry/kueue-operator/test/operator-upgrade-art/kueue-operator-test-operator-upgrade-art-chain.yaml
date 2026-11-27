@@ -1,0 +1,18 @@
+chain:
+  as: kueue-operator-test-operator-upgrade-art
+  steps:
+  - ref: kueue-operator-test-upgrade-operator-art
+  - as: e2e-kueue
+    cli: latest
+    commands: |
+      source "${SHARED_DIR}/env"
+      make e2e-ci-test
+    from: kueue-operator-src
+    resources:
+      requests:
+        cpu: "4"
+        memory: "4Gi"
+  documentation: |-
+    In-channel (z-stream) Kueue operator upgrade on the ART build: approve the OLM
+    InstallPlan that moves the Subscription to the channel head, then run the
+    downstream kueue e2e test suite to verify the operator works after the upgrade.
