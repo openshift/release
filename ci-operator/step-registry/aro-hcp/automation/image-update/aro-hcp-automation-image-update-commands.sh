@@ -110,11 +110,6 @@ debug "checkout: refreshing ${REPO_ROOT} to ${GITHUB_REPO_BRANCH}"
 git fetch --quiet "${AUTOMATION_REPO_URL}" "${GITHUB_REPO_BRANCH}" || error "checkout: failed to fetch ${GITHUB_REPO_BRANCH}"
 git checkout --quiet -B image-updater-run FETCH_HEAD || error "checkout: failed to check out ${GITHUB_REPO_BRANCH}"
 
-# TEMPORARY: rehearse the unreleased summary command from this revision.
-REHEARSAL_REF="59e76d5d8523536df269e4e84ef082b856bc4401"
-git fetch --quiet https://github.com/raelga/ARO-HCP.git "${REHEARSAL_REF}" || error "checkout: failed to fetch the rehearsal revision"
-git checkout --quiet "${REHEARSAL_REF}" || error "checkout: failed to check out the rehearsal revision"
-
 # Publication: fix the commit this run prepares from.
 BASE_COMMIT="$(git rev-parse HEAD)"
 readonly BASE_COMMIT
@@ -129,6 +124,13 @@ if [[ -x "${PREBUILT_TEMPLATIZE}" ]]; then
 else
   log "render: no prebuilt templatize found, building it from source"
 fi
+
+# TEMPORARY: rehearse the unreleased summary command from its branch
+SUMMARY_SRC="/tmp/image-updater-summary-src"
+SUMMARY_BIN="${SUMMARY_SRC}/tooling/image-updater/image-updater"
+git clone --quiet --depth 1 --branch rael/image-updater-summary https://github.com/raelga/ARO-HCP.git "${SUMMARY_SRC}" || error "summary: failed to clone the rehearsal revision"
+go build -C "${SUMMARY_SRC}/tooling/image-updater" -o "${SUMMARY_BIN}" . || error "summary: failed to build the rehearsal binary"
+log "summary: built the rehearsal binary from the branch"
 
 # Configuration: Validate GitHub App credentials
 debug "cfg: validating GitHub App credentials"
@@ -217,7 +219,7 @@ fi
 
 # Summary: prepare the pull request body from the update results
 info "summary: preparing the pull request body"
-./tooling/image-updater/image-updater summary \
+"${SUMMARY_BIN}" summary \
   --updates "${IMAGE_UPDATER_OUTPUT}" \
   --revision "${BASE_COMMIT}" \
   --branch "${GITHUB_REPO_BRANCH}" \
@@ -271,7 +273,7 @@ log "publish: ${PR_URL}"
 
 # Summary: record the run evidence with the created pull request
 if [[ -n "${ARTIFACT_DIR:-}" ]]; then
-  ./tooling/image-updater/image-updater summary \
+  "${SUMMARY_BIN}" summary \
     --updates "${IMAGE_UPDATER_OUTPUT}" \
     --receipt "${PUBLISH_OUT}" \
     --revision "${BASE_COMMIT}" \
