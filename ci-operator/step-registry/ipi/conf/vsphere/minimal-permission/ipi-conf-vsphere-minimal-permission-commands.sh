@@ -16,7 +16,13 @@ declare vcenter_password_minimal_permission
 
 VCENTER_AUTH_PATH=/var/run/vault/devqe-secrets/secrets.sh
 # shellcheck source=/dev/null
+# Disable tracing while sourcing: the vault file defines credential variables
+# and bash -x would print them into the build log.
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
 source "${VCENTER_AUTH_PATH}"
+# Restore previous tracing state
+$WAS_TRACING && set -x
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH="${SHARED_DIR}/permission-user.yaml.patch"

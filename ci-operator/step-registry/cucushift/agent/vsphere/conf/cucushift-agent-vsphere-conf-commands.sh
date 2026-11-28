@@ -95,6 +95,9 @@ rm ${pull_secret_path}
 version=$(/tmp/openshift-install version | grep 'openshift-install' | awk '{print $2}' | cut -d '.' -f 1,2 --output-delimiter='')
 # Add vSphere credentials if the version is 4.15 or more
 if [[ "${version}" -ge "415" ]]; then
+  # Disable tracing due to vCenter credential handling in the here-string below
+  [[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+  set +x
   yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "${SHARED_DIR}/install-config.yaml" - <<<"
 platform:
   vsphere:
@@ -118,6 +121,8 @@ platform:
       password: ${GOVC_PASSWORD}
       user: ${GOVC_USERNAME}
 "
+  # Restore previous tracing state
+  $WAS_TRACING && set -x
 fi
 
 if [ "${MASTERS}" -eq 1 ]; then

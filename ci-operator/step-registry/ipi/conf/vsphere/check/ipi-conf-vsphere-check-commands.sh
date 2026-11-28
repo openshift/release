@@ -82,6 +82,12 @@ EOF
 fi
 
 vc_info='{"vcenters":[]}'
+
+# Disable tracing for the remainder of this script: vCenter credentials are
+# sourced and expanded and bash -x would print them into the build log.
+[[ $- == *x* ]] && WAS_TRACING=true || WAS_TRACING=false
+set +x
+
 for vcenter in $vsphere_urls; do
   vsphere_url="${vcenter}"
   source /var/run/vault/vsphere-ibmcloud-config/load-vsphere-env-config.sh
@@ -104,6 +110,10 @@ for vcenter in $vsphere_urls; do
 
   echo "$(date -u --rfc-3339=seconds) - Creating govc.sh file..."
   cat >>"${SHARED_DIR}/govc.sh" <<EOF
+# Suspend xtrace while this file is sourced: it exports credentials and
+# bash -x would print the expanded values into the build log.
+[[ \$- == *x* ]] && _GOVC_WAS_TRACING=true || _GOVC_WAS_TRACING=false
+set +x
 export GOVC_URL="${vsphere_url}"
 export GOVC_USERNAME="${vsphere_user}"
 export GOVC_PASSWORD="${vsphere_password}"
@@ -111,6 +121,7 @@ export GOVC_INSECURE=1
 export GOVC_DATACENTER="${vsphere_datacenter}"
 export GOVC_DATASTORE="${vsphere_datastore}"
 export GOVC_RESOURCE_POOL=${vsphere_resource_pool}
+if \$_GOVC_WAS_TRACING; then set -x; fi
 EOF
 
   echo "$(date -u --rfc-3339=seconds) - Creating vsphere_context.sh file..."
