@@ -94,8 +94,11 @@ if ! kubectl config view > /dev/null 2>&1; then
 fi
 
 echo "Verifying cluster connectivity..."
-if ! kubectl cluster-info > /dev/null 2>&1; then
+if ! cluster_info_output=$(kubectl cluster-info 2>&1); then
   echo "Error: Cannot connect to cluster."
+  echo "kubectl cluster-info output: ${cluster_info_output}"
+  echo "AWS identity used for the cluster token:"
+  aws sts get-caller-identity || echo "aws sts get-caller-identity failed"
   exit 1
 fi
 
