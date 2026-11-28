@@ -14,6 +14,13 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 source "${SHARED_DIR}/init-fn.sh" || true
 
+# Register bootstrap error handler so early control-plane failures collect
+# bootstrap logs (routed through bastion in disconnected mode).
+if type collect_bootstrap_error_handler &>/dev/null; then
+  trap collect_bootstrap_error_handler EXIT
+fi
+
+
 function wait_for_masters() {
   log "0/ wait_for_masters()"
   set +e

@@ -50,6 +50,12 @@ else
   echo "Using baseDomain from default,value: ${BASE_DOMAIN}"
 fi
 
+# Setting the SSH Keys
+log "Generating ephemeral SSH keypair for bootstrap gather"
+ssh-keygen -t ed25519 -N '' -C 'pext-gather' -f "${SHARED_DIR}/gather-sshkey" -q
+chmod 0600 "${SHARED_DIR}/gather-sshkey"
+gather_pub=$(<"${SHARED_DIR}/gather-sshkey.pub")
+
 #
 # Patch the install-config.yaml
 #
@@ -70,6 +76,8 @@ controlPlane:
   architecture: amd64
 publish: External
 pullSecret: '$(cat ${REGISTRY_AUTH_FILE} | awk -v ORS= -v OFS= '{$1=$1}1')'
+sshKey: |
+  ${gather_pub}
 EOF
 
 log "Patching install-config.yaml"

@@ -137,45 +137,97 @@ COMPUTE_STACK_NAME_PREFIX=${CLUSTER_NAME}-compute
 
 # Create s3 bucket for bootstrap and proxy ignition configs
 aws s3 mb s3://"${INFRA_STACK_NAME}"
+# Track for cleanup by aws-deprovision-s3buckets
+echo "s3://${INFRA_STACK_NAME}" >> "${SHARED_DIR}/to_be_removed_s3_bucket_list"
 
-echo "==================="
-echo "CREATING STACK: VPC"
-echo "==================="
+if [[ "${DISCONNECTED_INSTALL:-no}" == "yes" ]]; then
+  echo "============================================="
+  echo "DISCONNECTED: consuming precreated VPC"
+  echo "============================================="
 
-log "Creating VPC Stack..."
+  log "Reading VPC info from SHARED_DIR (created by aws-provision-vpc-disconnected)..."
 
-# If we are using a proxy, create a 'black-hole' private subnet vpc TODO
-# For now this is just a placeholder...
-cf_params_vpc=${ARTIFACT_DIR}/cf_params_vpc.json
-add_param_to_json AvailabilityZoneCount 2 "${cf_params_vpc}"
-add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_vpc}"
+  if [[ -f "${SHARED_DIR}/vpc_info.json" ]]; then
+    VPC_ID="$(jq -r '.vpc_id' "${SHARED_DIR}/vpc_info.json")"
+    # Read private subnets from vpc_info.json (array of objects with .ids[].private)
+    PRIVATE_SUBNET_0="$(jq -r '.subnets[0].ids[0].private' "${SHARED_DIR}/vpc_info.json")"
+    PRIVATE_SUBNET_1="$(jq -r '.subnets[1].ids[0].private // empty' "${SHARED_DIR}/vpc_info.json")"
+    PUBLIC_SUBNET_0="$(jq -r '.subnets[0].ids[0].public' "${SHARED_DIR}/vpc_info.json")"
+    PUBLIC_SUBNET_1="$(jq -r '.subnets[1].ids[0].public // empty' "${SHARED_DIR}/vpc_info.json")"
+  elif [[ -f "${SHARED_DIR}/vpc_id" ]]; then
+    VPC_ID="$(<"${SHARED_DIR}/vpc_id")"
+    # Subnet files use single-quoted JSON arrays: ['subnet-1','subnet-2']
+    PRIVATE_SUBNET_0="$(sed "s/'/\"/g" "${SHARED_DIR}/private_subnet_ids" | jq -r '.[0]')"
+    PRIVATE_SUBNET_1="$(sed "s/'/\"/g" "${SHARED_DIR}/private_subnet_ids" | jq -r '.[1] // empty')"
+    PUBLIC_SUBNET_0="$(sed "s/'/\"/g" "${SHARED_DIR}/public_subnet_ids" | jq -r '.[0]')"
+    PUBLIC_SUBNET_1="$(sed "s/'/\"/g" "${SHARED_DIR}/public_subnet_ids" | jq -r '.[1] // empty')"
+  else
+    log "ERROR: No VPC info found in SHARED_DIR for disconnected mode"
+    exit 1
+  fi
 
-cat "${cf_params_vpc}"
+  # Fall back to first subnet when only one AZ is available.
+  # Per-node placement (Master2Subnet, worker Subnet) may reuse an AZ.
+  PRIVATE_SUBNET_1="${PRIVATE_SUBNET_1:-${PRIVATE_SUBNET_0}}"
+  PRIVATE_SUBNET_2="${PRIVATE_SUBNET_0}"
+  PUBLIC_SUBNET_1="${PUBLIC_SUBNET_1:-${PUBLIC_SUBNET_0}}"
 
-echo "${VPC_STACK_NAME}" >> "${NEW_STACKS}"
-aws cloudformation create-stack  --stack-name "${VPC_STACK_NAME}" \
-  --template-body "$(cat "${TEMPLTE_DEST}/01_vpc.yaml")" \
-  --tags "${TAGS}" \
-  --parameters "file://${cf_params_vpc}" &
-wait "$!"
+  # Build the comma-separated subnet lists for CF parameters (NLBs, etc.).
+  # NLBs require unique subnet IDs — deduplicate when a single AZ is used.
+  if [[ "${PRIVATE_SUBNET_0}" == "${PRIVATE_SUBNET_1}" ]]; then
+    PRIVATE_SUBNETS="\"${PRIVATE_SUBNET_0}\""
+  else
+    PRIVATE_SUBNETS="\"${PRIVATE_SUBNET_0},${PRIVATE_SUBNET_1}\""
+  fi
+  if [[ "${PUBLIC_SUBNET_0}" == "${PUBLIC_SUBNET_1}" ]]; then
+    PUBLIC_SUBNETS="\"${PUBLIC_SUBNET_0}\""
+  else
+    PUBLIC_SUBNETS="\"${PUBLIC_SUBNET_0},${PUBLIC_SUBNET_1}\""
+  fi
 
-aws cloudformation wait stack-create-complete --stack-name "${VPC_STACK_NAME}" &
-wait "$!"
+  log "VPC_ID=${VPC_ID}"
+  log "PRIVATE_SUBNETS=${PRIVATE_SUBNETS}"
+  log "PUBLIC_SUBNETS=${PUBLIC_SUBNETS}"
+else
+  echo "==================="
+  echo "CREATING STACK: VPC"
+  echo "==================="
 
-VPC_JSON="$(aws cloudformation describe-stacks --stack-name "${VPC_STACK_NAME}" \
-  --query 'Stacks[].Outputs[]' --output json)"
-VPC_ID="$(echo "${VPC_JSON}" | jq -r '.[] | select(.OutputKey == "VpcId").OutputValue')"
-PRIVATE_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PrivateSubnetIds").OutputValue')"  # explicitly keeping wrapping quotes
-PRIVATE_SUBNET_0="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f1)"
-PRIVATE_SUBNET_1="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f2)"
-# PRIVATE_SUBNET_2="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f3)"
-PRIVATE_SUBNET_2="$PRIVATE_SUBNET_0"
-PUBLIC_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PublicSubnetIds").OutputValue')"  # explicitly keeping wrapping quotes
+  log "Creating VPC Stack..."
 
-# Adapt step aws-provision-tags-for-byo-vpc, which is required by Ingress operator testing.
-echo ${VPC_ID} > "${SHARED_DIR}/vpc_id"
-echo ${VPC_JSON} | jq -c '[.[] | select(.OutputKey=="PrivateSubnetIds") | .OutputValue | split(",")[]]' | sed "s/\"/'/g" > "${SHARED_DIR}/private_subnet_ids"
-echo ${VPC_JSON} | jq -c '[.[] | select(.OutputKey=="PublicSubnetIds") | .OutputValue | split(",")[]]' | sed "s/\"/'/g" > "${SHARED_DIR}/public_subnet_ids"
+  # If we are using a proxy, create a 'black-hole' private subnet vpc TODO
+  # For now this is just a placeholder...
+  cf_params_vpc=${ARTIFACT_DIR}/cf_params_vpc.json
+  add_param_to_json AvailabilityZoneCount 2 "${cf_params_vpc}"
+  add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_vpc}"
+
+  cat "${cf_params_vpc}"
+
+  echo "${VPC_STACK_NAME}" >> "${NEW_STACKS}"
+  aws cloudformation create-stack  --stack-name "${VPC_STACK_NAME}" \
+    --template-body "$(cat "${TEMPLTE_DEST}/01_vpc.yaml")" \
+    --tags "${TAGS}" \
+    --parameters "file://${cf_params_vpc}" &
+  wait "$!"
+
+  aws cloudformation wait stack-create-complete --stack-name "${VPC_STACK_NAME}" &
+  wait "$!"
+
+  VPC_JSON="$(aws cloudformation describe-stacks --stack-name "${VPC_STACK_NAME}" \
+    --query 'Stacks[].Outputs[]' --output json)"
+  VPC_ID="$(echo "${VPC_JSON}" | jq -r '.[] | select(.OutputKey == "VpcId").OutputValue')"
+  PRIVATE_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PrivateSubnetIds").OutputValue')"  # explicitly keeping wrapping quotes
+  PRIVATE_SUBNET_0="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f1)"
+  PRIVATE_SUBNET_1="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f2)"
+  # PRIVATE_SUBNET_2="$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g' | cut -d, -f3)"
+  PRIVATE_SUBNET_2="$PRIVATE_SUBNET_0"
+  PUBLIC_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PublicSubnetIds").OutputValue')"  # explicitly keeping wrapping quotes
+
+  # Adapt step aws-provision-tags-for-byo-vpc, which is required by Ingress operator testing.
+  echo ${VPC_ID} > "${SHARED_DIR}/vpc_id"
+  echo ${VPC_JSON} | jq -c '[.[] | select(.OutputKey=="PrivateSubnetIds") | .OutputValue | split(",")[]]' | sed "s/\"/'/g" > "${SHARED_DIR}/private_subnet_ids"
+  echo ${VPC_JSON} | jq -c '[.[] | select(.OutputKey=="PublicSubnetIds") | .OutputValue | split(",")[]]' | sed "s/\"/'/g" > "${SHARED_DIR}/public_subnet_ids"
+fi
 
 echo "====================="
 echo "CREATING STACK: INFRA"
@@ -215,6 +267,9 @@ INTERNAL_SERVICE_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.Out
 INGRESS_HTTP_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "IngressHTTPTargetGroupArn").OutputValue')"
 INGRESS_HTTPS_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "IngressHTTPSTargetGroupArn").OutputValue')"
 PRIVATE_HOSTED_ZONE="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "PrivateHostedZoneId").OutputValue')"
+
+# Ingress routing for disconnected is configured after workers are deployed
+# (see end of script) because target groups require worker IPs.
 
 echo "========================="
 echo "CREATING STACK: SECURITY"
@@ -262,7 +317,20 @@ cf_params_bootstrap=${ARTIFACT_DIR}/cf_params_bootstrap.json
 add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_bootstrap}"
 add_param_to_json RhcosAmi "${RHCOS_AMI}" "${cf_params_bootstrap}"
 add_param_to_json VpcId "${VPC_ID}" "${cf_params_bootstrap}"
-add_param_to_json PublicSubnet "$(echo ${PUBLIC_SUBNETS%%,*} | sed 's/"//g')" "${cf_params_bootstrap}"
+
+# In disconnected mode, place bootstrap on a private subnet so it cannot
+# reach the internet and must pull images exclusively from the mirror
+# registry.  The CF template's "PublicSubnet" parameter is just a subnet ID
+# regardless of the subnet's actual routing — placing the instance in a
+# private subnet with no NAT gateway enforces network isolation.  Bootstrap
+# accesses S3 for its ignition via the VPC S3 endpoint and communicates with
+# NLB targets over the VPC-internal network.
+if [[ "${DISCONNECTED_INSTALL:-no}" == "yes" ]]; then
+  add_param_to_json PublicSubnet "${PRIVATE_SUBNET_0}" "${cf_params_bootstrap}"
+else
+  add_param_to_json PublicSubnet "$(echo ${PUBLIC_SUBNETS%%,*} | sed 's/"//g')" "${cf_params_bootstrap}"
+fi
+
 add_param_to_json MasterSecurityGroupId "${MASTER_SECURITY_GROUP}" "${cf_params_bootstrap}"
 add_param_to_json BootstrapIgnitionLocation "${S3_BOOTSTRAP_URI}" "${cf_params_bootstrap}"
 add_param_to_json RegisterNlbIpTargetsLambdaArn "${NLB_IP_TARGETS_LAMBDA}" "${cf_params_bootstrap}"
@@ -285,8 +353,15 @@ wait "$!"
 aws cloudformation wait stack-create-complete --stack-name "${BOOTSTRAP_STACK_NAME}" &
 wait "$!"
 
-BOOTSTRAP_IP="$(aws cloudformation describe-stacks --stack-name "${BOOTSTRAP_STACK_NAME}" \
-  --query 'Stacks[].Outputs[?OutputKey == `BootstrapPublicIp`].OutputValue' --output text)"
+# In disconnected mode the bootstrap is on a private subnet and has no
+# public IP.  Use the private IP for gather and SSH (via bastion proxy).
+if [[ "${DISCONNECTED_INSTALL:-no}" == "yes" ]]; then
+  BOOTSTRAP_IP="$(aws cloudformation describe-stacks --stack-name "${BOOTSTRAP_STACK_NAME}" \
+    --query 'Stacks[].Outputs[?OutputKey == `BootstrapPrivateIp`].OutputValue' --output text)"
+else
+  BOOTSTRAP_IP="$(aws cloudformation describe-stacks --stack-name "${BOOTSTRAP_STACK_NAME}" \
+    --query 'Stacks[].Outputs[?OutputKey == `BootstrapPublicIp`].OutputValue' --output text)"
+fi
 GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
 
 echo "$BOOTSTRAP_STACK_NAME" > "${SHARED_DIR}"/STACK_NAME_BOOTSTRAP
@@ -386,3 +461,100 @@ echo -e "control-plane: ${CONTROL_PLANE_0_IP} ${CONTROL_PLANE_1_IP} ${CONTROL_PL
 echo -e "compute: ${COMPUTE_0_IP} ${COMPUTE_1_IP} ${COMPUTE_2_IP}"
 
 echo "${GATHER_BOOTSTRAP_ARGS}" > "${SHARED_DIR}"/GATHER_BOOTSTRAP_ARGS
+
+if [[ "${DISCONNECTED_INSTALL:-no}" == "yes" ]]; then
+  # In disconnected mode, the CF template's private-zone *.apps record
+  # points to the external NLB (public subnets).  Nodes on private subnets
+  # without NAT cannot reach public NLB IPs, so ingress health checks fail.
+  # Fix: create new internal ingress target groups on the internal NLB,
+  # register worker IPs, add listeners, and update the *.apps DNS record
+  # in the private hosted zone. AWS NLB target groups can only belong to
+  # one load balancer, so we cannot reuse the external NLB's target groups.
+  INTERNAL_NLB_ARN="$(aws elbv2 describe-load-balancers \
+    --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].LoadBalancerArn" \
+    --output text)"
+  INTERNAL_NLB_HZ="$(aws elbv2 describe-load-balancers \
+    --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].CanonicalHostedZoneId" \
+    --output text)"
+  INTERNAL_NLB_DNS="$(aws elbv2 describe-load-balancers \
+    --query "LoadBalancers[?contains(LoadBalancerName, '${INFRA_ID}-int')].DNSName" \
+    --output text)"
+
+  if [[ -n "${INTERNAL_NLB_ARN}" ]]; then
+    log "Creating internal ingress target groups and listeners"
+    INGRESS_SETUP_FAILED=""
+
+    INT_HTTP_TG_ARN="$(aws elbv2 create-target-group \
+      --name "${INFRA_ID:0:20}-int-http" \
+      --protocol TCP --port 80 \
+      --vpc-id "${VPC_ID}" \
+      --target-type ip \
+      --health-check-protocol TCP \
+      --health-check-port 80 \
+      --query 'TargetGroups[0].TargetGroupArn' --output text)" || INGRESS_SETUP_FAILED="http-tg"
+    # Track immediately so cleanup can delete on partial failure
+    if [[ -n "${INT_HTTP_TG_ARN}" ]] && [[ "${INT_HTTP_TG_ARN}" != "None" ]]; then
+      echo "${INT_HTTP_TG_ARN}" >> "${SHARED_DIR}/disconnected_tg_arns"
+    fi
+
+    INT_HTTPS_TG_ARN="$(aws elbv2 create-target-group \
+      --name "${INFRA_ID:0:20}-int-https" \
+      --protocol TCP --port 443 \
+      --vpc-id "${VPC_ID}" \
+      --target-type ip \
+      --health-check-protocol TCP \
+      --health-check-port 443 \
+      --query 'TargetGroups[0].TargetGroupArn' --output text)" || INGRESS_SETUP_FAILED="https-tg"
+    if [[ -n "${INT_HTTPS_TG_ARN}" ]] && [[ "${INT_HTTPS_TG_ARN}" != "None" ]]; then
+      echo "${INT_HTTPS_TG_ARN}" >> "${SHARED_DIR}/disconnected_tg_arns"
+    fi
+
+    if [[ -n "${INGRESS_SETUP_FAILED}" ]]; then
+      log "ERROR: Failed to create internal ingress target group (${INGRESS_SETUP_FAILED}); disconnected ingress will not work"
+    else
+      # Register worker IPs to internal target groups
+      # shellcheck disable=SC2153
+      for WORKER_IP in ${COMPUTE_0_IP} ${COMPUTE_1_IP} ${COMPUTE_2_IP}; do
+        aws elbv2 register-targets --target-group-arn "${INT_HTTP_TG_ARN}" \
+          --targets "Id=${WORKER_IP}" || INGRESS_SETUP_FAILED="register"
+        aws elbv2 register-targets --target-group-arn "${INT_HTTPS_TG_ARN}" \
+          --targets "Id=${WORKER_IP}" || INGRESS_SETUP_FAILED="register"
+      done
+
+      # Add listeners on internal NLB
+      aws elbv2 create-listener \
+        --load-balancer-arn "${INTERNAL_NLB_ARN}" \
+        --protocol TCP --port 80 \
+        --default-actions "Type=forward,TargetGroupArn=${INT_HTTP_TG_ARN}" || INGRESS_SETUP_FAILED="listener-80"
+      aws elbv2 create-listener \
+        --load-balancer-arn "${INTERNAL_NLB_ARN}" \
+        --protocol TCP --port 443 \
+        --default-actions "Type=forward,TargetGroupArn=${INT_HTTPS_TG_ARN}" || INGRESS_SETUP_FAILED="listener-443"
+
+      log "Updating *.apps in private hosted zone to internal NLB"
+      aws route53 change-resource-record-sets \
+        --hosted-zone-id "${PRIVATE_HOSTED_ZONE}" \
+        --change-batch "{
+          \"Changes\": [{
+            \"Action\": \"UPSERT\",
+            \"ResourceRecordSet\": {
+              \"Name\": \"*.apps.${CLUSTER_NAME}.${base_domain}\",
+              \"Type\": \"A\",
+              \"AliasTarget\": {
+                \"HostedZoneId\": \"${INTERNAL_NLB_HZ}\",
+                \"DNSName\": \"${INTERNAL_NLB_DNS}\",
+                \"EvaluateTargetHealth\": false
+              }
+            }
+          }]
+        }" || INGRESS_SETUP_FAILED="dns"
+      if [[ -n "${INGRESS_SETUP_FAILED}" ]]; then
+        log "ERROR: Disconnected ingress setup incomplete (failed at: ${INGRESS_SETUP_FAILED})"
+      else
+        log "Internal ingress routing configured for disconnected"
+      fi
+    fi  # end TG creation success
+  else
+    log "WARNING: Could not find internal NLB; *.apps may be unreachable from private subnets"
+  fi
+fi
