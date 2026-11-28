@@ -39,7 +39,7 @@ case "${ARCH}" in
     x86_64) ARCH=amd64 ;;
     aarch64) ARCH=arm64 ;;
 esac
-curl -kfL -o oc-mirror.tar.gz "https://openshift-mirror-list.ci-systems.workers.dev/pub/cgw/oc-mirror/latest/oc-mirror-rhel9-linux-${ARCH}.tar.gz"
+curl -fL -o oc-mirror.tar.gz "https://openshift-mirror-list.ci-systems.workers.dev/pub/cgw/oc-mirror/latest/oc-mirror-rhel9-linux-${ARCH}.tar.gz"
 tar -xzf oc-mirror.tar.gz
 chmod +x oc-mirror
 
@@ -56,10 +56,10 @@ mirror:
 EOF
 env -u REGISTRY_AUTH_FILE ./oc-mirror --v2 --config=imageset.yaml \
     --workspace="file://${TMP_DIR}" "docker://${MIRROR_REGISTRY_HOST}" \
-    --log-level=info --retry-times=5 --src-tls-verify=false --dest-tls-verify=false
+    --log-level=info --retry-times=5 --dest-tls-verify=false
 
 OUTPUT_DIR="${TMP_DIR}/working-dir/cluster-resources"
-curl -kfL -o yq "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${ARCH}"
+curl -fL -o yq "https://github.com/mikefarah/yq/releases/latest/download/yq_linux_${ARCH}"
 chmod +x yq
 export CATSRC_NAME
 ./yq eval '.metadata.name = strenv(CATSRC_NAME)' -i "${OUTPUT_DIR}"/cs-*.yaml
