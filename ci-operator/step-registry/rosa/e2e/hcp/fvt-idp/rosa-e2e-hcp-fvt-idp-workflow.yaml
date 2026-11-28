@@ -1,0 +1,42 @@
+workflow:
+  as: rosa-e2e-hcp-fvt-idp
+  steps:
+    env:
+      CHANNEL_GROUP: stable
+      REPLICAS: "3"
+    pre:
+    - chain: rosa-e2e-hcp-rosa-cli-provision
+    - ref: rosa-cluster-wait-ready-hosted-cp
+    - ref: rosa-cluster-wait-ready-nodes
+    test:
+    - chain: rosa-e2e-ocm-fvt-validate-customer-idp
+    post:
+    - chain: rosa-cluster-deprovision
+      best_effort: true
+    - chain: rosa-sts-oidc-config-delete
+      best_effort: true
+    - ref: rosa-e2e-cleanup-vpc
+      best_effort: true
+    - ref: aws-deprovision-stacks
+      best_effort: true
+    - chain: rosa-gather-hcp-diagnostics
+      best_effort: true
+  documentation: |-
+    ROSAENG-67780 (HCP row): the rosa-CLI HCP provisioner head
+    (rosa-e2e-hcp-rosa-cli-provision, which publishes the SHARED_DIR contract
+    — cluster-id, kubeconfig, cluster-metadata.json) feeding the FVT
+    IDP-variant validation tail (rosa-e2e-ocm-fvt-validate-customer-idp),
+    which runs the customer-facing FVT IDP cases
+    (hcp_identity_providers_test.go in rosa-backend-tests cases/cms/) against
+    the composed cluster. Teardown stays with the workflow post steps, never
+    the FVT harness.
+
+    Deliberately no rosa-backplane-login: FVT's reach is customer-vantage
+    only (ROSAENG-308 architecture), the head's kubeconfig already satisfies
+    the customer-plane contract, and the platform-plane tail is not part of
+    this workflow — so it runs without corp-network reachability
+    requirements.
+
+    The job must provide OCM_FVT_JOB_NAME selecting an FVT profile whose case
+    set includes the HCP IDP variants (DRAFT: to be confirmed with CS/OCM QE,
+    see the chain documentation).
