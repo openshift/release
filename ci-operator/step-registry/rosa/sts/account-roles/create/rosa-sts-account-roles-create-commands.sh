@@ -31,18 +31,70 @@ read_profile_file() {
 }
 
 # Log in
+LOGIN_WAS_TRACING=false
+case $- in *x*) LOGIN_WAS_TRACING=true ;; esac
+# Disable tracing due to credential and login response handling.
+set +x
+login_environment=unknown
+case "${OCM_LOGIN_ENV}" in
+  production|staging|integration) login_environment=${OCM_LOGIN_ENV} ;;
+esac
+login_diagnostics="${ARTIFACT_DIR}/rosa-sts-account-roles-login.jsonl"
+mkdir -p "${ARTIFACT_DIR}"
+: > "${login_diagnostics}"
+login_attempt=0
+login_max_attempts=3
+login_diagnostic() {
+  printf '{"event":"%s","timestamp_utc":"%s","environment":"%s","attempt":%d,"max_attempts":%d,"cli_exit_code":%s,"class":"%s","endpoint":"unknown","http_status":"unknown"}\n' \
+    "$1" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${login_environment}" \
+    "${login_attempt}" "${login_max_attempts}" "$2" "$3" >> "${login_diagnostics}"
+}
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
 ROSA_TOKEN=$(read_profile_file "ocm-token")
 if [[ -n "${SSO_CLIENT_ID}" && -n "${SSO_CLIENT_SECRET}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with SSO credentials"
-  rosa login --env "${OCM_LOGIN_ENV}" --client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}"
+  login_args=(--client-id "${SSO_CLIENT_ID}" --client-secret "${SSO_CLIENT_SECRET}")
 elif [[ -n "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_ENV} with offline token"
-  rosa login --env "${OCM_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+  login_args=(--token "${ROSA_TOKEN}")
 else
+  login_diagnostic start null started
+  login_diagnostic result null missing_credentials
   echo "Cannot login! You need to securely supply SSO credentials or an ocm-token!"
   exit 1
+fi
+for ((login_attempt=1; login_attempt<=login_max_attempts; login_attempt++)); do
+  login_diagnostic start null started
+  if login_output=$(rosa login --env "${OCM_LOGIN_ENV}" "${login_args[@]}" 2>&1); then
+    login_status=0
+    login_class=success
+  else
+    login_status=$?
+    case "${login_output,,}" in
+      *invalid_client*|*invalid_grant*|*unauthorized*|*forbidden*|*'invalid token'*|*'token expired'*|*'expired token'*)
+        login_class=auth_rejected ;;
+      *"expected response content type 'application/json' but received 'text/html'"*)
+        login_class=json_html_mismatch ;;
+      *'tls handshake timeout'*|*'i/o timeout'*|*'connection reset by peer'*)
+        login_class=transport_candidate ;;
+      *) login_class=unknown ;;
+    esac
+  fi
+  unset login_output
+  login_diagnostic result "${login_status}" "${login_class}"
+  printf 'ROSA login attempt %d/%d: %s (CLI exit %d; endpoint/http_status unknown)\n' \
+    "${login_attempt}" "${login_max_attempts}" "${login_class}" "${login_status}"
+  if [[ "${login_status}" -eq 0 ]]; then
+    break
+  fi
+  if [[ "${login_attempt}" -eq "${login_max_attempts}" ||
+        ( "${login_class}" != json_html_mismatch && "${login_class}" != transport_candidate ) ]]; then
+    exit "${login_status}"
+  fi
+  sleep "$((login_attempt * 10))"
+done
+unset SSO_CLIENT_ID SSO_CLIENT_SECRET ROSA_TOKEN login_args
+if [[ "${LOGIN_WAS_TRACING}" == true ]]; then
+  set -x
 fi
 AWS_ACCOUNT_ID=$(rosa whoami --output json | jq -r '."AWS Account ID"')
 AWS_ACCOUNT_ID_MASK=$(echo "${AWS_ACCOUNT_ID:0:4}***")
