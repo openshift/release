@@ -99,6 +99,7 @@ class Cell:
     ocp_channel: str = "stable"
     # A job's `variant:`; replaces the derived variant in the filename and job name.
     variant_override: str | None = None
+    auth_mode: str | None = None
 
     @property
     def upgrade_from_nodot(self) -> str:
@@ -205,8 +206,9 @@ class Cell:
             return SCENARIO_AS_BY_TEST[self.test]
         # No arch suffix: a non-amd64 arch is already in the variant, which
         # Prow puts ahead of `as` in the job name. database: true inserts the
-        # cloud DB kind (rds/postgres) before source; fips and dualstack still
-        # suffix. Filename/variant are unchanged, so sibling rows share one file.
+        # cloud DB kind (rds/postgres) before source; fips, dualstack, then
+        # auth_mode still suffix. Filename/variant are unchanged, so sibling
+        # rows share one file.
         parts = [self.cloud, self.storage]
         if self.database:
             parts.append(self.database_kind)
@@ -215,7 +217,9 @@ class Cell:
         base = "-".join(parts)
         if self.fips:
             base = f"{base}-fips"
-        return f"{base}-dualstack" if self.dualstack else base
+        if self.dualstack:
+            base = f"{base}-dualstack"
+        return f"{base}-{self.auth_mode}" if self.auth_mode else base
 
     @property
     def filename(self) -> str:
@@ -254,6 +258,7 @@ class Cell:
             "sts": self.sts,
             "ocp_channel": self.ocp_channel,
             "dualstack": self.dualstack,
+            "auth_mode": self.auth_mode,
         }
         if self.quay_version is not None:
             ctx["quay_version"] = self.quay_version

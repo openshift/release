@@ -95,7 +95,9 @@ JOB_KEYS = {
     "sts",
     "database",
     "variant",
+    "auth_mode",
 }
+AUTH_MODES = ("ldap",)
 ALLOWED_ARCHES = {"amd64", "arm64", "s390x"}
 TRIGGER_FIELDS = (
     "always_run",
@@ -439,6 +441,19 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
             dualstack = _job_bool_field(job, "dualstack", where) or False
             if dualstack and clouds != ["aws"]:
                 raise ValueError(f"{where}.dualstack is only valid for clouds: [aws]")
+            auth_mode = _job_str_field(job, "auth_mode", where)
+            if auth_mode is not None:
+                if auth_mode not in AUTH_MODES:
+                    raise ValueError(f"{where}.auth_mode must be one of {AUTH_MODES}")
+                if test != "e2e-install" or kind != "periodic":
+                    raise ValueError(
+                        f"{where}.auth_mode is only valid for test: e2e-install, kind: periodic"
+                    )
+                # Only quay-deploy-aws-s3 merges the IdP auth config fragment.
+                if any((storage or STORAGE_BY_CLOUD.get(cloud)) != "s3" for cloud in clouds):
+                    raise ValueError(f"{where}.auth_mode requires s3 storage")
+                if dualstack:
+                    raise ValueError(f"{where}.auth_mode and dualstack cannot be combined")
             cron_raw = job.get("cron")
             source_raw = job.get("source")
             if kind == "periodic":
@@ -567,6 +582,7 @@ def expand_cells(matrix: YamlMap) -> list[Cell]:
                         database=database,
                         ocp_channel=ocp_channel or "stable",
                         variant_override=variant,
+                        auth_mode=auth_mode,
                     )
                 )
     return cells
