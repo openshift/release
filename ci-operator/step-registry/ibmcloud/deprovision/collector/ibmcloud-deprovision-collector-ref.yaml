@@ -1,0 +1,34 @@
+ref:
+  as: ibmcloud-deprovision-collector
+  from_image:
+    namespace: ocp
+    name: "4.18"
+    tag: upi-installer
+  grace_period: 10m
+  timeout: 4h0m0s
+  commands: ibmcloud-deprovision-collector-commands.sh
+  env:
+  - name: CLUSTER_TTL
+    default: "24 hours ago"
+    documentation: |-
+      Clusters whose VPC was created before this threshold are deprovisioned.
+      Accepts any value valid for GNU date --date.
+  - name: REGIONS_TO_SWEEP
+    default: "us-east eu-gb"
+    documentation: |-
+      Space-separated list of IBM Cloud regions to sweep for leaked clusters.
+  - name: BASE_DOMAIN
+    default: "ci-ibmcloud.devcluster.openshift.com"
+    documentation: |-
+      Base domain used for CIS DNS record cleanup.
+  resources:
+    requests:
+      cpu: "1"
+      memory: 600Mi
+  documentation: |-
+    Garbage-collects leaked IBM Cloud clusters in CI by scanning for VPCs
+    matching the CI naming convention (ci-op-*, ci-ln-*) that are older than
+    CLUSTER_TTL. Performs resource-by-resource ibmcloud CLI cleanup in dependency
+    order: instances, load balancers, subnets, public gateways, VPCs, images,
+    volumes, COS instances, CIS DNS records, and resource groups. Intended for
+    periodic use with the ibmcloud cluster_profile.
