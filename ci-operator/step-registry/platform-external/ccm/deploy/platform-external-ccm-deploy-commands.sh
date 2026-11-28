@@ -18,6 +18,17 @@ test -f "${SHARED_DIR}/deploy.env" && source "${SHARED_DIR}/deploy.env"
 
 source "${SHARED_DIR}/init-fn.sh" || true
 
+if [[ "${PLATFORM_EXTERNAL_CCM_ENABLED-}" != "yes" ]]; then
+  log "Skipping CCM setup. PLATFORM_EXTERNAL_CCM_ENABLED not enabled in this job: [PLATFORM_EXTERNAL_CCM_ENABLED=${PLATFORM_EXTERNAL_CCM_ENABLED}]"
+  exit 0
+fi
+
+# In disconnected environments, route API requests through the bastion proxy.
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 log "Starting CCM setup"
 
 log "Collecting current cluster state"
@@ -30,11 +41,6 @@ oc get nodes
 
 log "Pods:"
 oc get pods -A
-
-if [[ "${PLATFORM_EXTERNAL_CCM_ENABLED-}" != "yes" ]]; then
-  log "Ignoring CCM Installation setup. PLATFORM_EXTERNAL_CCM_ENABLED!=yes [${PLATFORM_EXTERNAL_CCM_ENABLED}]"
-  exit 0
-fi
 
 source ${SHARED_DIR}/ccm.env
 

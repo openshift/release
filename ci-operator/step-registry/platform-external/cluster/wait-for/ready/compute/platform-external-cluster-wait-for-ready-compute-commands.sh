@@ -15,6 +15,12 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 source "${SHARED_DIR}/init-fn.sh" || true
 install_jq
 
+# In disconnected environments, route API requests through the bastion proxy.
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 function wait_for_workers() {
   all_approved_offset=0
   all_approved_limit=10

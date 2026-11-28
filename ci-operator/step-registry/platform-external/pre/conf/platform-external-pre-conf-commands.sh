@@ -72,6 +72,22 @@ publish: External
 pullSecret: '$(cat ${REGISTRY_AUTH_FILE} | awk -v ORS= -v OFS= '{$1=$1}1')'
 EOF
 
+#  Patching SSH keys when disconnected - using pipeline-generated keys
+#
+if [[ "${DISCONNECTED_INSTALL:-no}" == "yes" ]]; then
+  log "Retrieving generated ephemeral SSH keypair for bootstrap gather (disconnected)"
+  gather_pub=$(<"${SHARED_DIR}/gather-sshkey.pub")
+
+  log "Appending ephemeral gather pubkey to install-config sshKey"
+  existing_key=$(yq4 '.sshKey' "${CONFIG}")
+
+  cat >> "${PATCH}" << EOF
+sshKey: |
+  ${existing_key}
+  ${gather_pub}
+EOF
+fi
+
 log "Patching install-config.yaml"
 yq4 eval-all --inplace '. as $item ireduce ({}; . *+ $item)' "${CONFIG}" "${PATCH}"
 
