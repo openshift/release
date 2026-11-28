@@ -104,10 +104,10 @@ _junit_emit() {
     <property name="first_signature_poll" value="${_junit_first_signature_poll}"/>
     <property name="final_class" value="${_esc_class}"/>
   </properties>
-  <testcase name="predicate-selftest" classname="lp-interop.OPP.${_jn}" time="0">
+  <testcase name="predicate-selftest" classname="interop-opp-wait-mcp" time="0">
     ${_st_fx}
   </testcase>
-  <testcase name="${_jn}" classname="lp-interop.OPP.${_jn}" time="${_jd}">
+  <testcase name="${_jn}" classname="interop-opp-wait-mcp" time="${_jd}">
     ${_fx}
   </testcase>
 </testsuite>
