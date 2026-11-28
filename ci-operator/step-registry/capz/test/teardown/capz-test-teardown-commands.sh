@@ -27,5 +27,7 @@ fi
 # Teardown: Safety net cleanup (post step - always runs)
 # Cleans up Azure resources created by the test suite (workload cluster, resource groups).
 # The management cluster itself is deprovisioned by aks-deprovision.
+# Preserve the persistent CI identity; prefix matching can otherwise select it.
+export CLEANUP_EXCLUDED_AD_APP_IDS="6c35b111-a695-4e3d-9f16-229c34bbe53d"
 FORCE=1 make clean-azure
 FORCE=1 CS_CLUSTER_NAME="${WORKLOAD_CLUSTER_NAME:-capz-tests}" make clean-azure
