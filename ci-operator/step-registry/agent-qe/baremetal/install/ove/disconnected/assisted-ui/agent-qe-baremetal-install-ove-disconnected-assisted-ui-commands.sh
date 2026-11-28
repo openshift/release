@@ -55,6 +55,9 @@ fi
 cp "/tmp/kubeconfig" "${SHARED_DIR}/kubeconfig"
 cp "/tmp/kubeadmin-password" "${SHARED_DIR}/kubeadmin-password"
 
+cp "/tmp/kubeconfig" "${ARTIFACT_DIR}/kubeconfig"
+cp "/tmp/kubeadmin-password" "${ARTIFACT_DIR}/kubeadmin-password"
+
 export KUBECONFIG=/tmp/kubeconfig
 
 echo "Checking cluster installation progress by verifying all cluster operators are available and stable."
@@ -64,3 +67,6 @@ oc adm wait-for-stable-cluster --minimum-stable-period=1m --timeout=105m
 # Add proxy config in this step and leave conformance test step untouched
 echo "Adding proxy-url in kubeconfig for e2e conformance tests"
 sed -i "/- cluster/ a\    proxy-url: ${proxy}" "${SHARED_DIR}"/kubeconfig
+
+# wait for change to be propagated to $SHARED_DIR
+sleep 120
