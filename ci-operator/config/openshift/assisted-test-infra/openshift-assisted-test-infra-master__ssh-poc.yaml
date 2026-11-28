@@ -1,0 +1,59 @@
+base_images:
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+prowgen:
+  enable_secrets_store_csi_driver: true
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: ssh-hostname
+  capabilities:
+  - intranet
+  optional: true
+  restrict_network_access: false
+  steps:
+    test:
+    - as: ssh-hostname
+      commands: |
+        set -euo pipefail
+        umask 077
+        creds=/var/run/assisted-ssh-poc
+        test -s "${creds}/ssh_private_key" || { echo "Missing ssh_private_key" >&2; exit 1; }
+        # The CI build pod cannot resolve sealusa50's internal DNS name.
+        host=10.6.48.13
+        expected_host_key=SHA256:XmNRjYn4RUWNKTLA4Hhr0XKqAnPr74qhHx0Ju38Yks0
+        key=$(mktemp)
+        known_hosts=$(mktemp)
+        trap 'rm -f "${key}" "${known_hosts}"' EXIT
+        cp "${creds}/ssh_private_key" "${key}"
+        chmod 600 "${key}"
+        timeout 30s ssh-keyscan -T 15 -t ed25519 "${host}" > "${known_hosts}"
+        actual_host_key=$(ssh-keygen -lf "${known_hosts}" -E sha256 | awk '{print $2}')
+        test "${actual_host_key}" = "${expected_host_key}" || { echo "SSH host key mismatch" >&2; exit 1; }
+        timeout 90s ssh -F /dev/null -T -i "${key}" \
+          -o BatchMode=yes -o ConnectTimeout=20 \
+          -o StrictHostKeyChecking=yes \
+          -o "UserKnownHostsFile=${known_hosts}" \
+          "kni@${host}" hostname
+      credentials:
+      - collection: edge-group
+        group: assisted-installer-ci-qe
+        mount_path: /var/run/assisted-ssh-poc
+      from: dev-scripts
+      grace_period: 30s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+  timeout: 10m0s
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: assisted-test-infra
+  variant: ssh-poc
