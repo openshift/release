@@ -8,6 +8,7 @@ SSH_ARGS="-i ${CLUSTER_PROFILE_DIR}/jh_priv_ssh_key -oStrictHostKeyChecking=no -
 jumphost=$(cat ${CLUSTER_PROFILE_DIR}/address)
 bastion=$(cat ${CLUSTER_PROFILE_DIR}/bastion 2>/dev/null || cat ${SHARED_DIR}/bastion)
 build_id="${BUILD_ID:-unknown}"
+results_dir="${RESULTS_DIR:-browbeat/results}"
 nfs_host=$(cat ${CLUSTER_PROFILE_DIR}/nfs_host)
 nfs_path=$(cat ${CLUSTER_PROFILE_DIR}/nfs_path)
 
@@ -27,7 +28,7 @@ ssh root@${bastion} "
   else
     mount -t nfs \"${nfs_host}:${nfs_path}\" /mnt/
   fi
-  cd browbeat/results
+  cd ${results_dir}
   mkdir -p /mnt/${build_id}
   cp -rf * /mnt/${build_id}
   umount /mnt
