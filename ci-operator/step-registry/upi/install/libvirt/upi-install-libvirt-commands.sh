@@ -20,6 +20,47 @@ function leaseLookup () {
   echo "$lookup"
 }
 
+# Convert capacity strings like 120G / 120Gi / 60g to an integer GiB value.
+function capacity_to_gib () {
+  local raw="${1:-}"
+  local num
+  num="$(echo "${raw}" | tr -d '[:space:]' | sed -E 's/([0-9]+).*/\1/')"
+  if [[ -z "${num}" || ! "${num}" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: could not parse disk capacity '${raw}' as GiB" >&2
+    return 1
+  fi
+  echo "${num}"
+}
+
+# Agent TNA floors (OCP docs: 2 vCPU / 8 GiB RAM / 50 GB disk for arbiter).
+# Assisted-service has-min-valid-disks applies the control-plane disk floor to
+# arbiter hosts in practice (60G failed validation; 120G passed on IBM Z agent).
+readonly ARBITER_MIN_MEMORY_MIB=8192
+readonly ARBITER_MIN_VCPUS=2
+readonly ARBITER_MIN_DISK_GIB=120
+
+function validate_arbiter_resources () {
+  local memory_mib="${1}"
+  local vcpus="${2}"
+  local disk_capacity="${3}"
+  local disk_gib
+  disk_gib="$(capacity_to_gib "${disk_capacity}")"
+
+  if [[ "${memory_mib}" -lt "${ARBITER_MIN_MEMORY_MIB}" ]]; then
+    echo "ERROR: ARBITER_MEMORY=${memory_mib} MiB is below the TNA minimum of ${ARBITER_MIN_MEMORY_MIB} MiB" >&2
+    exit 1
+  fi
+  if [[ "${vcpus}" -lt "${ARBITER_MIN_VCPUS}" ]]; then
+    echo "ERROR: ARBITER_VCPUS=${vcpus} is below the TNA minimum of ${ARBITER_MIN_VCPUS}" >&2
+    exit 1
+  fi
+  if [[ "${disk_gib}" -lt "${ARBITER_MIN_DISK_GIB}" ]]; then
+    echo "ERROR: ARBITER_VOLUME_CAPACITY=${disk_capacity} (${disk_gib} GiB) is below the agent has-min-valid-disks floor of ${ARBITER_MIN_DISK_GIB} GiB (docs list 50G, but assisted-service rejected 60G; 120G is confirmed)" >&2
+    exit 1
+  fi
+  echo "Arbiter resources OK: memory=${memory_mib} MiB (>=${ARBITER_MIN_MEMORY_MIB}), vcpus=${vcpus} (>=${ARBITER_MIN_VCPUS}), disk=${disk_capacity} (>=${ARBITER_MIN_DISK_GIB} GiB)"
+}
+
 # ensure hostname can be found
 HOSTNAME="$(leaseLookup 'hostname')"
 if [[ -z "${HOSTNAME}" ]]; then
@@ -256,6 +297,23 @@ else
   ${VIRSH} pool-start ${POOL_NAME}
 fi
 
+# Align LIBVIRT_IMAGE_PATH with the pool's real target. Existing pools on OZ hosts
+# often use /home/libvirt/openshift-images while the step default is
+# /var/lib/libvirt/openshift-images. Domain templates reference file paths under
+# LIBVIRT_IMAGE_PATH, so a mismatch causes "Path ... is not accessible".
+POOL_TARGET="$(${VIRSH} pool-dumpxml "${POOL_NAME}" | sed -n 's|.*<path>\([^<]*\)</path>.*|\1|p' | head -n1)"
+if [[ -z "${POOL_TARGET}" ]]; then
+  echo "ERROR: Could not resolve target path for libvirt pool ${POOL_NAME}" >&2
+  ${VIRSH} pool-dumpxml "${POOL_NAME}" || true
+  exit 1
+fi
+if [[ "${LIBVIRT_IMAGE_PATH}" != "${POOL_TARGET}" ]]; then
+  echo "Updating LIBVIRT_IMAGE_PATH from '${LIBVIRT_IMAGE_PATH}' to pool target '${POOL_TARGET}'"
+  LIBVIRT_IMAGE_PATH="${POOL_TARGET}"
+else
+  echo "LIBVIRT_IMAGE_PATH matches pool target: ${LIBVIRT_IMAGE_PATH}"
+fi
+
 # Move the install config to the install directory
 echo "Move the install config to the install directory..."
 cp ${SHARED_DIR}/install-config.yaml ${INSTALL_DIR}
@@ -460,7 +518,11 @@ if [ "${INSTALLER_TYPE}" == "default" ]; then
   ${OCPINSTALL} create ignition-configs --dir ${INSTALL_DIR}
 
   # Create ignition volumes and upload the ignition configs
-  for IGNITION_TYPE in bootstrap master worker; do
+  IGNITION_TYPES=(bootstrap master worker)
+  if [[ "${ARBITER_COUNT:-0}" -gt 0 ]] && [[ -f "${INSTALL_DIR}/arbiter.ign" ]]; then
+    IGNITION_TYPES+=(arbiter)
+  fi
+  for IGNITION_TYPE in "${IGNITION_TYPES[@]}"; do
     NAME=${LEASED_RESOURCE}-${IGNITION_TYPE}-ignition-volume
 
     echo "Creating ${IGNITION_TYPE} ignition volume..."
@@ -487,7 +549,7 @@ save_credentials
 restart_nodes () {
   echo "Starting node monitor to restart nodes post-install."
   GUESTS_RESTARTED=0
-  TOTAL_GUESTS=$((${CONTROL_COUNT:-0} + ${COMPUTE_COUNT:-0}))
+  TOTAL_GUESTS=$((${CONTROL_COUNT:-0} + ${COMPUTE_COUNT:-0} + ${ARBITER_COUNT:-0}))
   while [ $GUESTS_RESTARTED -lt $TOTAL_GUESTS ]
   do
      INSTALLED=$(${VIRSH} list --all | grep "${LEASED_RESOURCE}" | grep "shut off" | awk -F' ' '{print $2}' || true)
@@ -574,6 +636,31 @@ create_node () {
      --format qcow2 \
      --capacity ${VOLUME_CAPACITY}
 
+    # Resolve the real volume path (pool target may differ from LIBVIRT_IMAGE_PATH default)
+    # and regenerate domain XML so <disk>/<kernel>/<initrd> paths exist on the hypervisor.
+    ACTUAL_QCOW_PATH="$(${VIRSH} vol-path --pool "${POOL_NAME}" "${QCOW_NAME}")"
+    if [[ -z "${ACTUAL_QCOW_PATH}" ]]; then
+      echo "ERROR: Failed to resolve path for volume ${QCOW_NAME} in pool ${POOL_NAME}" >&2
+      ${VIRSH} vol-list --pool "${POOL_NAME}" || true
+      exit 1
+    fi
+    export QCOW_PATH="$(dirname "${ACTUAL_QCOW_PATH}")"
+    export QCOW_NAME="$(basename "${ACTUAL_QCOW_PATH}")"
+    # Boot artifacts live in the same pool/dir on agent installs.
+    if [[ -n "${KERNEL_NAME:-}" ]]; then
+      ACTUAL_KERNEL_PATH="$(${VIRSH} vol-path --pool "${POOL_NAME}" "${KERNEL_NAME}" || true)"
+      if [[ -n "${ACTUAL_KERNEL_PATH}" ]]; then
+        export BOOT_ARTIFACTS_PATH="$(dirname "${ACTUAL_KERNEL_PATH}")"
+      else
+        export BOOT_ARTIFACTS_PATH="${QCOW_PATH}"
+      fi
+    else
+      export BOOT_ARTIFACTS_PATH="${QCOW_PATH}"
+    fi
+    echo "Using hypervisor disk path ${ACTUAL_QCOW_PATH} (BOOT_ARTIFACTS_PATH=${BOOT_ARTIFACTS_PATH})"
+    envsubst < ${CLUSTER_PROFILE_DIR}/domain-install-template.xml > ${INSTALL_DIR}/"${NAME}-install.xml"
+    envsubst < ${CLUSTER_PROFILE_DIR}/domain-template.xml > ${INSTALL_DIR}/"${NAME}.xml"
+
     # Start the domain
     ${VIRSH} define ${INSTALL_DIR}/"${NAME}-install.xml"
     ${VIRSH} start "${DOMAIN_NAME}"
@@ -652,6 +739,32 @@ for (( i=0; i<=${CONTROL_COUNT}-1; i++ )); do
   MAC_ADDRESS=$(leaseLookup "control-plane[$i].mac")
   create_node ${NODE} ${MAC_ADDRESS} master
 done
+
+# Create arbiter nodes for Two-Node with Arbiter (TNA).
+# Reuse control-plane lease slots after the masters (control-plane[CONTROL_COUNT + i]).
+ARBITER_COUNT="${ARBITER_COUNT:-0}"
+if [[ "${ARBITER_COUNT}" -gt 0 ]]; then
+  SAVED_DOMAIN_MEMORY="${DOMAIN_MEMORY}"
+  SAVED_DOMAIN_VCPUS="${DOMAIN_VCPUS}"
+  SAVED_VOLUME_CAPACITY="${VOLUME_CAPACITY}"
+  # Prefer explicit ARBITER_VOLUME_CAPACITY; otherwise reuse master VOLUME_CAPACITY
+  # so agent jobs that set 120G for masters do not silently under-size the arbiter.
+  DOMAIN_MEMORY="${ARBITER_MEMORY:-8192}"
+  DOMAIN_VCPUS="${ARBITER_VCPUS:-2}"
+  VOLUME_CAPACITY="${ARBITER_VOLUME_CAPACITY:-${SAVED_VOLUME_CAPACITY:-120G}}"
+  validate_arbiter_resources "${DOMAIN_MEMORY}" "${DOMAIN_VCPUS}" "${VOLUME_CAPACITY}"
+  for (( i=0; i<ARBITER_COUNT; i++ )); do
+    lease_idx=$((CONTROL_COUNT + i))
+    NODE="${LEASED_RESOURCE}-arbiter-${i}"
+    echo "Creating ${NODE} node (arbiter)..."
+    MAC_ADDRESS=$(leaseLookup "control-plane[${lease_idx}].mac")
+    # Agent installs ignore ignition type; default UPI uses arbiter.ign when present.
+    create_node ${NODE} ${MAC_ADDRESS} arbiter
+  done
+  DOMAIN_MEMORY="${SAVED_DOMAIN_MEMORY}"
+  DOMAIN_VCPUS="${SAVED_DOMAIN_VCPUS}"
+  VOLUME_CAPACITY="${SAVED_VOLUME_CAPACITY}"
+fi
 
 # Create the compute nodes.
 for (( i=0; i<=${COMPUTE_COUNT}-1; i++ )); do
