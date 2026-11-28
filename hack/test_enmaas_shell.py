@@ -1,0 +1,490 @@
+#!/usr/bin/env python3
+
+import json
+from pathlib import Path
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+import unittest
+from unittest import mock
+
+
+ROOT = Path(__file__).resolve().parents[1]
+STEPS = ROOT / "ci-operator/step-registry/enmaas"
+BUILD_ID = "1234567890123456789"
+STUB = r'''
+import json
+import os
+from pathlib import Path
+import sys
+
+command = Path(sys.argv[0]).stem
+args = sys.argv[1:]
+if command == "oc":
+    request_timeouts = [arg for arg in args if arg.startswith("--request-timeout=")]
+    if "rollout" in args or "wait" in args:
+        assert request_timeouts == ["--request-timeout=" + os.environ["VERIFY_TIMEOUT"]]
+    args = [arg for arg in args if not arg.startswith("--request-timeout=")]
+scenario = os.environ.get("SCENARIO", "normal")
+directory = Path(os.environ["SHARED_DIR"])
+action = " ".join(args if command == "oc" else args[:2])
+with (directory / "calls").open("a") as stream:
+    stream.write(json.dumps([command, action]) + "\n")
+
+def fail(code):
+    print(f"An error occurred ({code}) when calling the operation", file=sys.stderr)
+    sys.exit(254)
+
+def count(name):
+    path = directory / name
+    value = int(path.read_text()) + 1 if path.exists() else 1
+    path.write_text(str(value))
+    return value
+
+if command == "openssl":
+    print("synthetic-placeholder")
+elif command == "jq":
+    assert args == ["-r", ".[]"]
+    print("\n".join(json.load(sys.stdin)))
+elif command == "oc":
+    if args[0] == "apply":
+        sys.stdin.read()
+    elif args[:2] == ["get", "subscription"]:
+        if scenario == "csv-transient" and args[2] == "cloudnative-pg" and count("cnpg-subscriptions") < 2:
+            sys.exit(17)
+        print("installed.v1" if scenario != "csv-unset" else "")
+    elif args[:2] == ["get", "csv"]:
+        if args[2] == "-n":
+            print("clusterserviceversion.operators.coreos.com/cloudnative-pg.old\n"
+                  "clusterserviceversion.operators.coreos.com/cloudnative-pg.new")
+        else:
+            assert args[2] == "installed.v1", args
+            print("Succeeded")
+    elif args[:2] == ["get", "deployments"]:
+        if scenario == "list-error":
+            print("synthetic deployment lookup failure", file=sys.stderr)
+            sys.exit(17)
+        namespace = args[args.index("-n") + 1]
+        if namespace != "enmaas":
+            print("prometheus\t\t\ngrafana\t\t")
+        elif scenario == "api-absent":
+            print("praxis\t\t")
+        elif scenario == "api-empty":
+            pass
+        elif scenario == "api-legacy":
+            print("enmaas-api\t\t\npraxis\t\t")
+        elif scenario.startswith("api-label-"):
+            print("synthetic-api\t" + scenario[len("api-label-"):] + "\t\npraxis\t\t")
+        elif scenario.startswith("api-template-"):
+            print("synthetic-api\t\t" + scenario[len("api-template-"):] + "\npraxis\t\t")
+        else:
+            print("maas-api\t\t\npraxis\t\t")
+    elif "rollout" in args or "wait" in args:
+        if "rollout" in args and scenario == "rollout-failures" and args[2] in (
+                "deployment/maas-api", "deployment/grafana"):
+            print("synthetic progress deadline exceeded", file=sys.stderr)
+            sys.exit(8)
+        if "wait" in args and scenario == "operator-error":
+            sys.exit(15)
+    elif args[:2] == ["get", "pvc"]:
+        if scenario == "pvc-error":
+            print("synthetic lookup failure", file=sys.stderr)
+            sys.exit(17)
+        if scenario == "pvc-pending":
+            print("synthetic-pvc\tPending")
+        elif scenario == "pvc-bound":
+            print("synthetic-pvc\tBound")
+    elif "route" in args or "routes" in args:
+        if "route" in args and scenario == "route-error":
+            sys.exit(16)
+    elif "get" in args and ("statefulsets" in args or "pods" in args):
+        pass
+    else:
+        sys.exit(99)
+elif command == "aws":
+    if scenario == "auth":
+        fail("AccessDenied")
+    if action == "rds create-db-subnet-group":
+        assert (directory / "rds-subnet-group").read_text().strip() == "enmaas-ci-" + os.environ["BUILD_ID"] + "-subnet-group"
+        if scenario == "lost-create":
+            fail("RequestTimeout")
+        print("synthetic-network-metadata")
+    elif action == "ec2 describe-vpcs":
+        print("10.0.0.0/16")
+    elif action == "ec2 create-security-group":
+        if "--tag-specifications" in args:
+            build_id = os.environ["BUILD_ID"]
+            assert args[args.index("--tag-specifications") + 1] == (
+                "ResourceType=security-group,Tags=["
+                f"{{Key=Name,Value=enmaas-ci-{build_id}-rds-sg}},"
+                f"{{Key=EnMaaS,Value=ci}},{{Key=BuildID,Value={build_id}}}]")
+            if scenario == "sg-tag-failure":
+                fail("UnauthorizedOperation")
+        else:
+            assert scenario == "sg-tag-failure"
+        print("sg-synthetic")
+    elif action == "ec2 create-tags":
+        assert scenario == "sg-tag-failure"
+        fail("UnauthorizedOperation")
+    elif action in ("ec2 authorize-security-group-ingress", "rds create-db-instance"):
+        print("synthetic-network-metadata")
+    elif action == "rds wait":
+        assert args[2] == "db-instance-available"
+    elif action == "rds describe-db-instances":
+        query = args[args.index("--query") + 1]
+        if query.endswith("Endpoint.Address"):
+            print("synthetic.internal.invalid")
+        elif query.endswith("Endpoint.Port"):
+            print(5432)
+        elif scenario == "absent":
+            fail("DBInstanceNotFound")
+        elif query.endswith("DBInstanceArn"):
+            print("arn:aws:rds:synthetic:instance")
+        elif scenario == "timeout" or (scenario == "deleting" and count("polls") < 2):
+            print("deleting")
+        else:
+            fail("DBInstanceNotFound")
+    elif action == "rds describe-db-subnet-groups":
+        if scenario == "absent":
+            fail("DBSubnetGroupNotFoundFault")
+        print("arn:aws:rds:synthetic:subnet")
+    elif action in ("rds list-tags-for-resource", "ec2 describe-security-groups"):
+        if scenario == "ownership-query-error":
+            fail("AccessDenied")
+        if scenario == "absent":
+            fail("InvalidGroup.NotFound")
+        print("other-run" if scenario == "mismatch" else os.environ["BUILD_ID"])
+    elif action in ("rds delete-db-instance", "rds delete-db-subnet-group", "ec2 delete-security-group"):
+        if scenario == "delete-absent":
+            fail({"rds delete-db-instance": "DBInstanceNotFound",
+                  "rds delete-db-subnet-group": "DBSubnetGroupNotFoundFault",
+                  "ec2 delete-security-group": "InvalidGroup.NotFound"}[action])
+        if scenario == "dependency" and action == "ec2 delete-security-group" and count("deletes") < 2:
+            fail("DependencyViolation")
+        if scenario == "throttled" and count("throttles") < 2:
+            fail("ThrottlingException")
+        print("synthetic-network-metadata")
+    else:
+        sys.exit(99)
+else:
+    sys.exit(99)
+'''
+
+
+def write_stub(path, source):
+    path.with_name(path.name + ".py").write_text(source, encoding="utf-8")
+    path.write_text('#!/bin/sh\nexec ' + shlex.quote(sys.executable) + ' "${0}.py" "$@"\n', encoding="utf-8")
+    path.chmod(0o755)
+
+
+class EnmaasShellFixture(unittest.TestCase):
+    def setUp(self):
+        self.directory = Path(tempfile.mkdtemp(prefix="enmaas shell "))
+        self.addCleanup(shutil.rmtree, self.directory)
+        self.bin = self.directory / "bin"
+        self.bin.mkdir()
+        for command in ("aws", "oc", "openssl", "jq"):
+            write_stub(self.bin / command, STUB)
+        self.environment = {
+            "PATH": str(self.bin) + ":/usr/local/bin:/usr/bin:/bin", "HOME": str(self.directory),
+            "SHARED_DIR": str(self.directory), "CLUSTER_PROFILE_DIR": str(self.directory),
+            "BUILD_ID": BUILD_ID, "VERIFY_TIMEOUT": "1s", "RDS_INSTANCE_CLASS": "db.t3.micro",
+            "RDS_ENGINE_VERSION": "16", "RDS_ALLOCATED_STORAGE": "20", "RDS_MASTER_USERNAME": "synthetic",
+            "RDS_DB_NAME": "synthetic", "AWS_EC2_METADATA_DISABLED": "true",
+        }
+
+    def run_step(self, name, scenario="normal", source=None):
+        if source is None:
+            source = (STEPS / name / f"enmaas-{name}-commands.sh").read_text(encoding="utf-8")
+        prefix = 'set -eu\nsleep() { SECONDS=$((SECONDS + $1)); }; export -f sleep\n'
+        return subprocess.run(["bash", "-c", prefix + source], env={**self.environment, "SCENARIO": scenario},
+                              capture_output=True, text=True, check=False, timeout=15)
+
+    def recorded_resources(self):
+        for name, value in (("instance-id", "synthetic"), ("subnet-group", "synthetic"),
+                            ("security-group-id", "sg-synthetic")):
+            (self.directory / f"rds-{name}").write_text(value, encoding="utf-8")
+
+    def calls(self):
+        path = self.directory / "calls"
+        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()] if path.exists() else []
+
+
+class EnmaasShellTests(EnmaasShellFixture):
+    def test_clone_credentials_scoped_and_never_persisted_or_traced(self):
+        token = self.directory / "token"
+        token.write_text("synthetic-credential-placeholder", encoding="utf-8")
+        global_config = self.directory / "gitconfig"
+        global_config.write_text("[user]\n\tname = unchanged\n", encoding="utf-8")
+        self.environment.update(TEST_TOKEN_FILE=str(token),
+                                GIT_CONFIG_GLOBAL=str(global_config), GIT_CONFIG_NOSYSTEM="1",
+                                GIT_TERMINAL_PROMPT="0")
+        stub = r'''
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+arguments = sys.argv[1:]
+assert "clone" in arguments
+configuration = arguments[:arguments.index("clone")]
+token = Path(os.environ["TEST_TOKEN_FILE"]).read_text()
+assert all(token not in argument for argument in arguments)
+assert configuration[:2] == ["-c", "credential.helper="]
+assert "credential.useHttpPath=true" in configuration
+key = "credential.https://github.com/redhat-et/EnMaaS-opps.git.helper="
+helper = next(argument[len(key):] for argument in configuration if argument.startswith(key))
+result = subprocess.run(["/bin/sh", "-c", helper[1:] + " get"], capture_output=True,
+                        text=True, check=False)
+assert result.returncode == 0
+assert token in result.stdout
+assert token not in result.stderr
+'''
+        write_stub(self.bin / "git", stub)
+        source = (STEPS / "deploy/enmaas-deploy-commands.sh").read_text(encoding="utf-8")
+        source = source.split('cd "${WORK_DIR}/EnMaaS-opps"', 1)[0]
+        source = source.replace('WORK_DIR=$(mktemp -d)', 'WORK_DIR="$SHARED_DIR"')
+        source = source.replace('"/secret/enmaas/token"', '"$TEST_TOKEN_FILE"')
+        source = source.replace('cat /secret/enmaas/token', 'cat "$TEST_TOKEN_FILE"')
+        self.environment["ENMAAS_BRANCH"] = "synthetic"
+        result = self.run_step("deploy", source="set -x\n" + source)
+        self.assertEqual(result.returncode, 0, "scoped Git credential checks failed")
+        self.assertNotIn(token.read_text(encoding="utf-8"), result.stdout + result.stderr)
+        self.assertEqual(global_config.read_text(encoding="utf-8"), "[user]\n\tname = unchanged\n")
+
+    def test_stub_interpreter_path_with_spaces_preserves_arguments_and_stdin(self):
+        interpreter = self.directory / "python runner's path"
+        interpreter.symlink_to(sys.executable)
+        source = 'import json, sys; print(json.dumps([sys.executable, sys.argv[1:], sys.stdin.read()]))'
+        for command in ("oc", "git"):
+            with self.subTest(command=command):
+                with mock.patch.object(sys, "executable", str(interpreter)):
+                    write_stub(self.bin / command, source)
+                arguments = ["two words", "$(not-executed)", "quote'argument"]
+                result = subprocess.run([str(self.bin / command), *arguments], env=self.environment,
+                                        input="synthetic stdin", capture_output=True, text=True,
+                                        check=False, timeout=15)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout), [str(interpreter), arguments, "synthetic stdin"])
+
+    def test_cleanup_ownership_mismatch_never_deletes(self):
+        self.recorded_resources()
+        result = self.run_step("deprovision-rds", "mismatch")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("delete-", str(self.calls()))
+        self.assertEqual(result.stdout.count("mismatch"), 3)
+
+    def test_cleanup_exact_not_found_and_auth_failure(self):
+        self.recorded_resources()
+        for scenario, expected in (("absent", 0), ("delete-absent", 0), ("auth", 1),
+                                   ("ownership-query-error", 1)):
+            with self.subTest(scenario=scenario):
+                (self.directory / "calls").unlink(missing_ok=True)
+                result = self.run_step("deprovision-rds", scenario)
+                self.assertEqual(result.returncode, expected, result.stdout)
+                if expected:
+                    self.assertNotIn("delete-", str(self.calls()))
+                    self.assertIn("AccessDenied", result.stdout)
+
+    def test_cleanup_retries_dependencies_transients_and_deletion(self):
+        self.recorded_resources()
+        for scenario, counter in (("dependency", "deletes"), ("throttled", "throttles"), ("deleting", "polls")):
+            with self.subTest(scenario=scenario):
+                result = self.run_step("deprovision-rds", scenario)
+                self.assertEqual(result.returncode, 0, result.stdout)
+                self.assertGreaterEqual(int((self.directory / counter).read_text(encoding="utf-8")), 2)
+                self.assertNotIn("synthetic-network-metadata", result.stdout)
+
+    def test_cleanup_deadline_expires_without_real_sleep(self):
+        self.recorded_resources()
+        source = (STEPS / "deprovision-rds/enmaas-deprovision-rds-commands.sh").read_text(encoding="utf-8")
+        result = self.run_step("deprovision-rds", "timeout", source.replace("SECONDS + 2400", "SECONDS + 2"))
+        self.assertEqual(result.returncode, 1)
+        self.assertNotIn("delete-db-subnet-group", str(self.calls()))
+
+    def test_missing_resource_files_and_invalid_build_never_delete(self):
+        result = self.run_step("deprovision-rds")
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(self.calls(), [])
+        self.recorded_resources()
+        self.environment["BUILD_ID"] = "123-invalid"
+        result = self.run_step("deprovision-rds")
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(self.calls(), [])
+
+    def test_provision_records_intended_name_and_rejects_invalid_build(self):
+        (self.directory / "vpc_id").write_text("vpc-synthetic", encoding="utf-8")
+        (self.directory / "private_subnet_ids").write_text("['subnet-synthetic']", encoding="utf-8")
+        result = self.run_step("provision-rds", "lost-create")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertTrue((self.directory / "rds-subnet-group").exists())
+        self.environment["BUILD_ID"] = "invalid/id"
+        (self.directory / "calls").unlink()
+        result = self.run_step("provision-rds")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.calls(), [])
+
+    def test_provision_suppresses_endpoint_network_and_raw_responses(self):
+        (self.directory / "vpc_id").write_text("vpc-synthetic", encoding="utf-8")
+        (self.directory / "private_subnet_ids").write_text("['subnet-synthetic']", encoding="utf-8")
+        result = self.run_step("provision-rds")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for value in ("synthetic.internal.invalid", "vpc-synthetic", "sg-synthetic", "10.0.0.0/16",
+                      "synthetic-network-metadata", "synthetic-placeholder"):
+            self.assertNotIn(value, result.stdout + result.stderr)
+
+    def test_security_group_created_with_exact_tags_without_separate_tag_call(self):
+        (self.directory / "vpc_id").write_text("vpc-synthetic", encoding="utf-8")
+        (self.directory / "private_subnet_ids").write_text("['subnet-synthetic']", encoding="utf-8")
+        result = self.run_step("provision-rds")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.directory / "rds-security-group-id").read_text(encoding="utf-8").strip(),
+                         "sg-synthetic")
+        actions = [action for command, action in self.calls() if command == "aws"]
+        self.assertNotIn("ec2 create-tags", actions)
+        self.assertIn("ec2 authorize-security-group-ingress", actions)
+        self.assertIn("rds create-db-instance", actions)
+
+    def test_security_group_tag_failure_stops_before_ingress_and_database(self):
+        (self.directory / "vpc_id").write_text("vpc-synthetic", encoding="utf-8")
+        (self.directory / "private_subnet_ids").write_text("['subnet-synthetic']", encoding="utf-8")
+        result = self.run_step("provision-rds", "sg-tag-failure")
+        self.assertEqual(result.returncode, 254)
+        self.assertIn("UnauthorizedOperation", result.stderr)
+        self.assertFalse((self.directory / "rds-security-group-id").exists())
+        actions = [action for command, action in self.calls() if command == "aws"]
+        self.assertIn("ec2 create-security-group", actions)
+        for action in ("ec2 create-tags", "ec2 authorize-security-group-ingress", "rds create-db-instance"):
+            self.assertNotIn(action, actions)
+
+class EnmaasVerificationTests(EnmaasShellFixture):
+    def test_installed_csv_not_grep_and_bounded_unset_status(self):
+        result = self.run_step("install-operators")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        source = (STEPS / "install-operators/enmaas-install-operators-commands.sh").read_text(encoding="utf-8")
+        result = self.run_step("install-operators", "csv-unset", source.replace("TIMEOUT=600", "TIMEOUT=2"))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("Timed out", result.stdout)
+
+    def test_installed_csv_transient_query_recovers(self):
+        result = self.run_step("install-operators", "csv-transient")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_cnpg_retried()
+
+    def assert_cnpg_retried(self):
+        target = ["oc", "get subscription cloudnative-pg -n openshift-operators -o jsonpath={.status.installedCSV}"]
+        self.assertGreaterEqual(self.calls().count(target), 2)
+
+    def test_transient_csv_assertion_rejects_false_ready_mutation(self):
+        source = (STEPS / "install-operators/enmaas-install-operators-commands.sh").read_text(encoding="utf-8")
+        source = source.replace("if operator_ready openshift-operators cloudnative-pg; then",
+                                "if ! operator_ready openshift-operators cloudnative-pg; then")
+        result = self.run_step("install-operators", "csv-transient", source)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(any("get subscription openshift-cert-manager-operator " in action
+                            for command, action in self.calls()))
+        with self.assertRaises(AssertionError):
+            self.assert_cnpg_retried()
+
+    def test_pvc_error_not_empty_success(self):
+        for scenario, expected in (("normal", 0), ("pvc-error", 17)):
+            with self.subTest(scenario=scenario):
+                result = self.run_step("verify", scenario)
+                self.assertEqual(result.returncode, expected, result.stderr)
+                if expected:
+                    self.assertIn("synthetic lookup failure", result.stderr)
+                    self.assertNotIn("No PVCs found", result.stdout)
+                else:
+                    self.assertIn("No PVCs found", result.stdout)
+
+    def test_verify_collects_rollout_failures_in_both_namespaces(self):
+        result = self.run_step("verify", "rollout-failures")
+        self.assertEqual(result.returncode, 8, result.stderr)
+        self.assertIn("Rollout failed: enmaas/deployment/maas-api", result.stdout)
+        self.assertIn("Rollout failed: enmaas-monitoring/deployment/grafana", result.stdout)
+        calls = [action for command, action in self.calls() if command == "oc"]
+        self.assertEqual(len([action for action in calls if action.startswith("rollout status ")]), 4)
+        self.assertTrue(any(action.startswith("get pvc ") for action in calls))
+        self.assertTrue(any("get route gateway-enmaas" in action for action in calls))
+        self.assertTrue(any(" wait " in action for action in calls))
+        self.assertIn("synthetic progress deadline exceeded", result.stderr)
+        self.assertNotIn("verification complete.", result.stdout)
+        self.assertFalse(any("secret" in action or "--output=json" in action for action in calls))
+
+    def test_verify_preserves_required_lookup_and_health_failures(self):
+        for scenario, expected in (("normal", 0), ("pvc-bound", 0), ("pvc-pending", 1),
+                                   ("list-error", 17), ("operator-error", 15), ("route-error", 16)):
+            with self.subTest(scenario=scenario):
+                (self.directory / "calls").unlink(missing_ok=True)
+                result = self.run_step("verify", scenario)
+                self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+                calls = [action for command, action in self.calls() if command == "oc"]
+                self.assertTrue(any("get route gateway-enmaas" in action for action in calls))
+                if scenario == "list-error":
+                    self.assertIn("Failed to list deployments in namespace enmaas-monitoring", result.stdout)
+                    self.assertNotIn("No deployments found", result.stdout)
+
+    def test_verify_requires_known_api_identity_and_still_checks_other_workloads(self):
+        for scenario in ("api-absent", "api-empty", "normal", "api-legacy",
+                         "api-label-maas-api", "api-label-enmaas-api",
+                         "api-template-maas-api", "api-template-enmaas-api"):
+            with self.subTest(scenario=scenario):
+                (self.directory / "calls").unlink(missing_ok=True)
+                result = self.run_step("verify", scenario)
+                missing = scenario in ("api-absent", "api-empty")
+                self.assertEqual(result.returncode, 1 if missing else 0, result.stdout + result.stderr)
+                calls = [action for command, action in self.calls() if command == "oc"]
+                expected_rollouts = 2 if scenario == "api-empty" else 3 if missing else 4
+                self.assertEqual(sum(action.startswith("rollout status ") for action in calls), expected_rollouts)
+                self.assertTrue(any(action.startswith("rollout status deployment/grafana ") for action in calls))
+                self.assertTrue(any("get route gateway-enmaas" in action for action in calls))
+                if scenario == "api-absent":
+                    self.assertIn("No API deployment found", result.stdout)
+                    self.assertTrue(any(action.startswith("rollout status deployment/praxis ") for action in calls))
+                elif not missing:
+                    self.assertNotIn("No API deployment found", result.stdout)
+
+    def test_stub_rejects_missing_duplicate_or_wrong_watch_request_timeout(self):
+        for command in (["rollout", "status", "deployment/maas-api"],
+                        ["-n", "enmaas", "wait", "cluster.postgresql.cnpg.io/aigateway-pg"]):
+            for flags in ([], ["--request-timeout="], ["--request-timeout=2s"],
+                          ["--request-timeout=1s", "--request-timeout=1s"]):
+                with self.subTest(command=command, flags=flags):
+                    result = subprocess.run([str(self.bin / "oc"), *flags, *command],
+                                            env=self.environment, capture_output=True, text=True,
+                                            check=False, timeout=15)
+                    self.assertNotEqual(result.returncode, 0)
+        source = (STEPS / "verify/enmaas-verify-commands.sh").read_text(encoding="utf-8")
+        mutant = source.replace(' oc --request-timeout="${request_timeout}" "$@"', ' oc "$@"')
+        self.assertNotEqual(mutant, source)
+        result = self.run_step("verify", source=mutant)
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_verify_deadline_fails_without_unbounded_requests(self):
+        source = (STEPS / "verify/enmaas-verify-commands.sh").read_text(encoding="utf-8")
+        self.assertIn('request_timeout=30s', source)
+        self.assertIn('timeout --kill-after=5s "${remaining}s" oc --request-timeout="${request_timeout}"', source)
+        result = self.run_step("verify", source=source.replace("SECONDS + 1800", "SECONDS - 1"))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("deadline", result.stderr)
+        self.assertIn("skipped deployment inventory in enmaas.", result.stderr)
+        self.assertIn("skipped deployment inventory in enmaas-monitoring.", result.stderr)
+        self.assertEqual(self.calls(), [])
+
+    def test_deadline_diagnostic_does_not_include_command_arguments(self):
+        source = (STEPS / "verify/enmaas-verify-commands.sh").read_text(encoding="utf-8")
+        source = source.split("declare -A DEPLOYMENTS", 1)[0] + '''
+DEADLINE=$((SECONDS - 1))
+verify_oc "synthetic metadata check" get "synthetic-argument-not-for-logs"
+'''
+        result = self.run_step("verify", source=source)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("skipped synthetic metadata check", result.stderr)
+        self.assertNotIn("synthetic-argument-not-for-logs", result.stdout + result.stderr)
+        self.assertEqual(self.calls(), [])
+
+
+if __name__ == "__main__":
+    unittest.main()

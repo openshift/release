@@ -177,6 +177,14 @@ new-repo:
 test-tls-scanner:
 	python3 hack/test_tls_scanner.py
 
+.PHONY: test-enmaas-deployment
+test-enmaas-deployment:
+	python3 hack/test_enmaas_placement.py
+	python3 hack/test_enmaas_shell.py
+	python3 hack/test_enmaas_vertex.py
+	python3 hack/test_enmaas_exporter.py
+	python3 hack/test_enmaas_exporter_cli.py
+
 # Use the same local config and registry validation as make jobs.
 validate-step-registry: ci-operator-checkconfig
 
