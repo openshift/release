@@ -712,6 +712,18 @@ HEALTHY=0
 PROVISIONING=0
 UNHEALTHY=0
 RECOVERED=0
+# Retry sleeps the whole run may spend waiting for dedicated-admins RBAC to
+# propagate, shared by every cluster below. One propagation window is 12 probes
+# 15s apart, so 11 sleeps, and the run gets one window in total rather than one
+# per cluster -- that is what keeps the run inside its 15m cron period however
+# many clusters are lagging. Every sleep is charged here whatever the cluster
+# goes on to answer, so one that recovers on its last attempt costs the run as
+# much as one that stays broken. What is left over carries forward: a later
+# cluster retries only while the allowance holds out, getting a full window
+# while it is untouched, fewer attempts once an earlier cluster has partly
+# spent it, and a single probe once it is exhausted. A cluster that answers
+# "yes" on its first probe never sleeps and so never charges the budget.
+RBAC_RETRY_BUDGET_REMAINING=11
 
 for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
     CM=$(echo "${ACTUAL_CMS}" | jq ".items[${i}]")
@@ -972,23 +984,54 @@ for i in $(seq 0 $((ACTUAL_COUNT - 1))); do
     # RBAC smoke test: verify dedicated-admins group permissions are propagated.
     # This catches broken rbac-permissions-operator before clusters are leased,
     # preventing e2e test timeouts waiting for permissions that never arrive.
+    #
+    # A freshly provisioned cluster can reach OCM "ready" before the SyncSet that
+    # carries the dedicated-admins RBAC has landed, so a single "no" does not
+    # prove the cluster is broken. Re-probe over the same propagation window the
+    # rosa-cluster-validate-rbac step uses (12 attempts, 15s apart) before
+    # classifying the cluster. A single probe is enough when the cluster is
+    # already labelled error -- it is classified, so waiting buys the run
+    # nothing, and one that recovered answers "yes" on the first probe.
+    # Otherwise the cluster retries for as long as the run's shared sleep
+    # allowance lasts, which is one more attempt than the sleeps still left in
+    # it, down to a single probe once it is exhausted.
+    RBAC_RETRY_INTERVAL=15
+    if [[ "${STATUS}" == "error" ]]; then
+        RBAC_MAX_ATTEMPTS=1
+    else
+        RBAC_MAX_ATTEMPTS=$((RBAC_RETRY_BUDGET_REMAINING + 1))
+    fi
     RBAC_KUBECONFIG=$(mktemp)
     trap 'rm -f "${RBAC_KUBECONFIG}"' EXIT
     RBAC_CHECK_FAILED=false
     if ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/credentials" 2>/dev/null \
         | jq -r '.kubeconfig // empty' > "${RBAC_KUBECONFIG}" 2>/dev/null \
         && [[ -s "${RBAC_KUBECONFIG}" ]]; then
-        RBAC_RESULT=$(oc auth can-i create configmaps \
-            --as=dedicated-admin-check --as-group=dedicated-admins \
-            -n dedicated-admin \
-            --request-timeout=30s \
-            --kubeconfig="${RBAC_KUBECONFIG}" 2>&1) || true
-        if [[ "${RBAC_RESULT}" == "no" ]]; then
-            log "UNHEALTHY: ${CM_NAME} RBAC check failed - dedicated-admins cannot create configmaps"
-            RBAC_CHECK_FAILED=true
-        elif [[ "${RBAC_RESULT}" != "yes" ]]; then
-            log "WARNING: ${CM_NAME} RBAC check inconclusive (connectivity issue?), skipping"
-        fi
+        RBAC_ATTEMPT=0
+        RBAC_STARTED=${SECONDS}
+        while true; do
+            RBAC_ATTEMPT=$((RBAC_ATTEMPT + 1))
+            RBAC_RESULT=$(oc auth can-i create configmaps \
+                --as=dedicated-admin-check --as-group=dedicated-admins \
+                -n dedicated-admin \
+                --request-timeout=30s \
+                --kubeconfig="${RBAC_KUBECONFIG}" 2>&1) || true
+            if [[ "${RBAC_RESULT}" == "yes" ]]; then
+                break
+            fi
+            if [[ "${RBAC_RESULT}" != "no" ]]; then
+                log "WARNING: ${CM_NAME} RBAC check inconclusive (connectivity issue?), skipping"
+                break
+            fi
+            if [[ "${RBAC_ATTEMPT}" -ge "${RBAC_MAX_ATTEMPTS}" ]]; then
+                log "UNHEALTHY: ${CM_NAME} RBAC check failed - dedicated-admins cannot create configmaps after ${RBAC_ATTEMPT} attempt(s) over $((SECONDS - RBAC_STARTED))s"
+                RBAC_CHECK_FAILED=true
+                break
+            fi
+            log "${CM_NAME} RBAC check returned 'no' (attempt ${RBAC_ATTEMPT}/${RBAC_MAX_ATTEMPTS}), dedicated-admins RBAC may still be propagating, retrying in ${RBAC_RETRY_INTERVAL}s"
+            RBAC_RETRY_BUDGET_REMAINING=$((RBAC_RETRY_BUDGET_REMAINING - 1))
+            sleep "${RBAC_RETRY_INTERVAL}"
+        done
     else
         log "WARNING: ${CM_NAME} could not retrieve cluster kubeconfig for RBAC check, skipping"
     fi
