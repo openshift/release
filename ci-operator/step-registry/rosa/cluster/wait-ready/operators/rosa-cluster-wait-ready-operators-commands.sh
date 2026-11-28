@@ -334,6 +334,14 @@ fi
 if [[ -z "${check_failed}" ]]; then
   log "All cluster operators are Available, not Progressing, and not Degraded"
 
+  # Publish the install-phase end marker consumed by the gather-extra step when
+  # it builds job_metrics.json. Written only once the cluster operators have
+  # settled, so the recorded install phase ends where the cluster is usable.
+  # Deliberately not written on the failure path below: a partial install has no
+  # meaningful end time, and the generator already copes with the marker missing.
+  # Never allow a marker write to fail the step.
+  date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_END" || :
+
   # Optionally clear the ClusterVersion channel so the CVO does not attempt to retrieve
   # updates. CI clusters on nightly payloads have no valid update graph, causing the CVO
   # retrieval timestamp to go stale. After ~1h the CannotRetrieveUpdatesSRE alert fires,

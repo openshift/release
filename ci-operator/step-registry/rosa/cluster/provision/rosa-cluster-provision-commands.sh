@@ -880,6 +880,12 @@ fi
 # Record installation start time
 record_cluster "timers" "global_start" "$(date +'%s')"
 
+# Publish the install-phase start marker consumed by the gather-extra step when
+# it builds job_metrics.json. Without it the metrics generator cannot compute an
+# install or overall duration and silently drops every query that needs one.
+# Never allow a marker write to fail the provisioning step.
+date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_START" || :
+
 # Provision cluster
 cmd="rosa create cluster -y \
 ${STS_SWITCH} \
