@@ -624,6 +624,10 @@ WaitMigrationSucceeded() {
 
     deadline=$((SECONDS + $(ParseOcWaitDurationSeconds "${MTV_HS_MIGRATION_TIMEOUT}")))
 
+    # Fail fast if ApplyMigration never created the CR (avoids hours of NotFound polls).
+    # Explicit return: JStep runs this on the LHS of || so errexit is disabled in the body.
+    MgmtOc get "migration/${migName}" -n "${MTV_NAMESPACE}" -o name >/dev/null || return 1
+
     while (( SECONDS < deadline )); do
         succeededStatus="$(MgmtOc get "migration/${migName}" -n "${MTV_NAMESPACE}" \
             -o jsonpath='{.status.conditions[?(@.type=="Succeeded")].status}' || true)"
@@ -674,6 +678,8 @@ VerifyAllVmsMigrated() {
 
 # ----------------------------- JUnit helpers ----------------------------------
 
+# On failure, exit the enclosing subshell (do not return): with an ERR trap set,
+# a non-zero return from a function does not reliably stop later steps under set -e.
 JStep() {
     typeset name="${1:?}"; shift
     typeset -i t0=$SECONDS rc=0
@@ -681,11 +687,11 @@ JStep() {
     typeset -i elapsed=$(( SECONDS - t0 ))
     if (( rc == 0 )); then
         printf 'PASS\t%s\t%d\t\n' "${name}" "${elapsed}" >> "${junitFile}"
-    else
-        printf 'FAIL\t%s\t%d\tFailed (rc=%d); see diagnostics in hub-spoke-migration-diagnostics/\n' \
-            "${name}" "${elapsed}" "${rc}" >> "${junitFile}"
+        return 0
     fi
-    return "${rc}"
+    printf 'FAIL\t%s\t%d\tFailed (rc=%d); see diagnostics in hub-spoke-migration-diagnostics/\n' \
+        "${name}" "${elapsed}" "${rc}" >> "${junitFile}"
+    exit "${rc}"
 }
 
 # XmlEscape — replace XML special characters for attribute/text values.

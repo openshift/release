@@ -47,6 +47,7 @@ resources:
       memory: 400Mi
 tests:
 - as: cr--2spoke-mig--aws
+  cluster: build06
   cron: 30 14 * * *
   reporter_config:
     channel: '#forum-p2p-cspi'
@@ -103,7 +104,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-p2p","ipi-aws-p2p","mpiit-acm-virt","mpiit_product2product","mpiit_virt"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: vshakya@redhat.com
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA","mpiit_p2p"]'
-      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8652
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9490
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       LP_QE__CR__TS_NAME__PFX__ACM: lp-interop--ACM--ACM+Virt
@@ -161,7 +162,18 @@ tests:
     - chain: p2p-cclm-bidir-migration-test
   timeout: 15h0m0s
 - as: cr--hub-spoke-mig--aws
+  cluster: build06
   cron: 0 12 * * *
+  reporter_config:
+    channel: '#forum-p2p-cspi'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+      ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+      Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
+      {{end}}'
   steps:
     cluster_profile: aws-cspi-qe
     dependencies:
@@ -211,7 +223,7 @@ tests:
       FIREWATCH_DEFAULT_JIRA_ADDITIONAL_LABELS: '["4.22-p2p","ipi-aws-p2p","mpiit-acm-virt","mpiit_product2product","mpiit_virt","hub-spoke"]'
       FIREWATCH_DEFAULT_JIRA_ASSIGNEE: vshakya@redhat.com
       FIREWATCH_DEFAULT_JIRA_COMPONENT: '["QA","mpiit_p2p"]'
-      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-8652
+      FIREWATCH_DEFAULT_JIRA_EPIC: INTEROP-9490
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPINTEROP
       FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
       LP_QE__CR__TS_NAME__PFX__ACM: lp-interop--ACM--ACM+Virt

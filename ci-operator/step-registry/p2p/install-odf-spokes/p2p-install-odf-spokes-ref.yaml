@@ -14,8 +14,9 @@ ref:
     Reads spoke cluster names and kubeconfigs from ${SHARED_DIR} (managed-cluster-names and
     managed-cluster-kubeconfig-N files from acm-interop-p2p-cluster-install). Installs ODF in
     parallel on each spoke: Subscription, StorageCluster (balanced profile with virtualization
-    StorageClass), waits for CephCluster and NooBaa Ready, then sets default StorageClass and
-    VolumeSnapshotClass for VM/CCLM workloads.
+    StorageClass), waits for StorageCluster and NooBaa Ready (with mon PVC AZ diversity
+    remediation for gp3-csi WaitForFirstConsumer collisions), asserts Ready before success,
+    then sets default StorageClass and VolumeSnapshotClass for VM/CCLM workloads.
 
     Requires ocs-storagecluster-ceph-rbd-virtualization on spokes before p2p-mtv-create-migration-maps.
     Hub kubeconfig is not used; each spoke is targeted via --kubeconfig.
@@ -72,3 +73,13 @@ ref:
   - name: ODF_STORAGECLUSTER_POLL_TIMEOUT_SECONDS
     default: "2700"
     documentation: Max seconds to wait for StorageCluster and NooBaa Ready (45 min). Spoke ODF installs finish in under 16 minutes; 45 min is the stuck-install cap. Spokes install in parallel.
+  - name: ODF_MON_AZ_STUCK_SECONDS
+    default: "600"
+    documentation: |-
+      Seconds that a mon PVC AZ collision (duplicate AZ among Bound mon PVCs plus at least
+      one Pending mon PVC) may persist before a one-shot remediation. gp3-csi is
+      WaitForFirstConsumer; Rook mon canaries can bind two mons into one AZ and leave the
+      third Pending forever without this recovery.
+  - name: ODF_MON_AZ_POLL_INTERVAL_SECONDS
+    default: "30"
+    documentation: Sleep between StorageCluster Ready / mon PVC AZ diversity polls.

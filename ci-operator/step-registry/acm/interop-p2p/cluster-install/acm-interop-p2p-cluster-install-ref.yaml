@@ -83,10 +83,16 @@ ref:
   - name: OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY
     default: ""
     documentation: |-
-      When set to "true", patches each spoke's ClusterVersion to mark the
-      'openshift' ClusterImagePolicy as unmanaged after provisioning.
-      Required for nightly builds which are not Sigstore-signed. Set at
-      the job level for jobs that upgrade spokes to nightly images.
+      When set to "true":
+        1) Spoke ClusterImageSet uses the hub ClusterVersion release image
+           (unsigned nightly) instead of a catalog GA image set.
+        2) ClusterDeployment.provisioning.installerEnv passes
+           OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY=true into
+           Hive/openshift-install so masters can pull unsigned
+           quay.io/openshift-release-dev/ocp-v*.0-art-dev images during
+           bootstrap (avoids "A signature was required, but no signature exists").
+        3) After provision, marks spoke 'openshift' ClusterImagePolicy unmanaged.
+      Set at the job level for nightly ACM+Virt / interop jobs (same env as hub IPI).
       See OCPBUGS-114622.
   - name: ACM_SPOKE_PULL_SECRET_FILE
     default: "config.json"
@@ -142,8 +148,9 @@ ref:
       ACM_SPOKE_INSTALL_ATTEMPTS_LIMIT  - maximum Hive install attempts (default: 3; one initial attempt and two retries)
       ACM_SPOKE_CLUSTER_INITIAL_VERSION - OCP minor version for ClusterImageSet
       ACM_SPOKE_CLUSTER_COUNT           - number of spoke clusters (default: 1, max: 3)
-      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY - when true, spoke uses hub
-                                    payload ClusterImageSet and ClusterImagePolicy unmanaged
+      OPENSHIFT_INSTALL_EXPERIMENTAL_DISABLE_IMAGE_POLICY - when true: hub payload
+                                    ClusterImageSet, Hive installerEnv opt-out for
+                                    unsigned nightlies, and post-provision CIP unmanaged
       MANAGED_CLUSTER_LEASED_RESOURCE   - space-separated AWS regions (one per cluster)
       SHARED_DIR                        - cross-step shared directory
       CLUSTER_PROFILE_DIR               - cluster profile with AWS creds and SSH keys
