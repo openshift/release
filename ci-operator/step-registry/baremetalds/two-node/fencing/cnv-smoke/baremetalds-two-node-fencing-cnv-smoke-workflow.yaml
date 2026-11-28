@@ -9,6 +9,7 @@ workflow:
       - ref: openshift-cluster-bot-rbac
       - chain: storage-conf-csi-optional-topolvm
       - ref: interop-tests-deploy-cnv
+      - chain: cucushift-installer-check-cluster-health
     test:
     - ref: cnv-smoke-lvms
     post:
@@ -25,14 +26,17 @@ workflow:
         VM_EXTRADISKS_LIST="vda vdb"
         VM_EXTRADISKS_SIZE=100G
       LVM_OPERATOR_SUB_SOURCE: "lvm-catalogsource"
-      LVM_OPERATOR_SUB_CHANNEL: "stable-4.22"
       LVM_CATALOG_SOURCE: "lvm-catalogsource"
-      MULTISTAGE_PARAM_OVERRIDE_LVM_INDEX_IMAGE: "quay.io/redhat-user-workloads/logical-volume-manag-tenant/lvm-operator-catalog:v4.22"
       LVM_OPERATOR_SUB_INSTALL_NAMESPACE: "openshift-lvm-storage"
       LVM_CLUSTER_TOLERATE_MASTER: "true"
-      CNV_VERSION: "4.22"
+      CNV_VERSION: "5.0"
   documentation: |-
     This workflow provisions a Two Node OpenShift with Fencing (TNF) cluster,
     deploys LVMS for local storage, deploys CNV, and runs CNV smoke tests.
     LVMS is used because TNF clusters lack shared storage; LiveMigration
     is not tested since LVMS does not support RWX volumes.
+    After CNV is deployed, a cluster health check waits for MachineConfigPools
+    and cluster operators to stabilize: CNV's virt-platform-autopilot applies a
+    psi=1 kernel-argument MachineConfig which triggers an MCO rollout that
+    cordons and reboots nodes one at a time, and the smoke tests abort if any
+    node is unschedulable when they start.
