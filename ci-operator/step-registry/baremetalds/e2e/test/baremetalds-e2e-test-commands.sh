@@ -16,6 +16,16 @@ unset KUBECONFIG
 oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
 export KUBECONFIG=$KUBECONFIG_BAK
 
+# Debug-only hold (see the DNM PR): keep the installed cluster available
+# for interactive use instead of running the suite. Sleeps within the
+# step's 5h timeout, then exits so the job tears down cleanly.
+if [[ "${HOLD_FOR_DEBUG:-false}" == "true" ]]; then
+    echo "HOLD_FOR_DEBUG: sleeping for 4h30m, cluster is available for interactive use"
+    sleep 4h 30m
+    echo "HOLD_FOR_DEBUG: done, exiting"
+    exit 0
+fi
+
 # Starting in 4.21, we will aggressively retry test failures only in
 # presubmits to determine if a failure is a flake or legitimate. This is
 # to reduce the number of retests on PR's.
