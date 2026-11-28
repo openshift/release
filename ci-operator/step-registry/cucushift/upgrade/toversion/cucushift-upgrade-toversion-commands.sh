@@ -454,6 +454,20 @@ export UPGRADE_FAILURE_TYPE="overall"
 # The cases are from existing general checkpoints enabled implicitly in upgrade step, which may be a possible UPGRADE_FAILURE_TYPE
 export IMPLICIT_ENABLED_CASES=""
 
+# If a prior step (e.g. pre-OCP-30087) already triggered the upgrade,
+# skip target discovery and just monitor the in-progress upgrade.
+_progressing=$(oc get clusterversion version -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}')
+_history_count=$(oc get clusterversion version -o json | jq '.status.history | length')
+if [[ "${_progressing}" == "True" ]] && (( _history_count > 1 )); then
+    TARGET_VERSION=$(oc get clusterversion version -o jsonpath='{.status.history[0].version}')
+    TARGET=$(oc get clusterversion version -o jsonpath='{.status.desired.image}')
+    export TARGET_VERSION TARGET
+    echo "Upgrade to ${TARGET_VERSION} already in progress, monitoring..."
+    check_upgrade_status
+    check_history
+    exit 0
+fi
+
 x_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f1 -d. )
 y_ver=$( echo "${DUMMY_TARGET_VERSION}" | cut -f2 -d. )
 ver="${x_ver}.${y_ver}"
