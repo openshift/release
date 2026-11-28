@@ -12,9 +12,21 @@ umask 077
 typeset -i stepStartBudget=0
 stepStartBudget=$(date +%s)
 typeset -i stepDeadline=$(( stepStartBudget + 115 * 60 ))
-# Longest single compliance pass (the oc wait timeout below), so a pass is
-# only started when a full pass still fits inside the step budget.
-typeset -i compliancePassBudget=$(( 40 * 60 ))
+# Bounded oc get helper: cap blocking calls by remaining step budget with 120s reserve for JUnit/diagnostics (thread PRRT_kwDOBHvUUM65TpMM)
+_oc_get_bounded() {
+  typeset -i _now
+  _now=$(date +%s)
+  typeset -i _remain=$(( stepDeadline - _now - 120 ))
+  (( _remain < 10 )) && _remain=10
+  timeout "${_remain}s" oc "$@"
+}
+_oc_get_json_bounded() {
+  typeset -i _now
+  _now=$(date +%s)
+  typeset -i _remain=$(( stepDeadline - _now - 120 ))
+  (( _remain < 10 )) && _remain=10
+  timeout "${_remain}s" oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}'
+}
 
 # --- JUnit carrier ---------------------------------------------------
 # Every assertion this step performs is reported as one JUnit testcase.
@@ -134,14 +146,27 @@ _propagate_junit () {
     cp "${junitFile}" "${SHARED_DIR}/" || true
 }
 
+# Install minimal JUnit trap before helper download: truncated download would exit via set -e before full EXIT trap, leaving no report
+trap '{( set +e; GenerateJunit; _propagate_junit; true )}' EXIT
 # Load ExitTrap library for JUnit XML post-processing at script level
 # (must be loaded before trap can fire to avoid secondary errors).
-eval "$(
-    typeset -a _fURL=()
-    type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
-    "${_fURL[@]}" \
-        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-)"
+typeset _etHelperScript=""
+typeset -i _etHelperRc=0
+typeset -a _fURL=()
+type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
+typeset _etHelperStderr=""
+_etHelperStderr=$(mktemp)
+_etHelperScript="$("${_fURL[@]}" https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh 2>"${_etHelperStderr}")" || _etHelperRc=$?
+if (( _etHelperRc == 0 )) && [[ -n "${_etHelperScript}" ]]; then
+    eval "${_etHelperScript}"
+else
+    echo "WARNING: ExitTrap helper download failed (rc=${_etHelperRc}); JUnit will be raw only" >&2
+fi
+rm -f "${_etHelperStderr}"
+# Validate helper download completeness: truncated download exits via set -e but minimal trap already installed
+if ! type -t ExitTrap--PostProcessPrep 1>/dev/null; then
+    echo "WARNING: ExitTrap helper download incomplete; JUnit will be raw only" >&2
+fi
 
 # Post-process the JUnit XML for Component Readiness routing.  This runs from
 # the EXIT trap, which clears errexit first, so the helper is called
@@ -225,6 +250,10 @@ PinSubscriptionChannel () {
 # skipped with no failure row.  Record the failure, then exit as before.
 typeset -i deployStart=0
 deployStart=$(date +%s)
+if ! oc create namespace policies --dry-run=client -o yaml | oc apply -f - 1>/dev/null; then
+  RecordResult "openshift-plus-policy-set-deployed" "failed" "failed to create namespace policies" "$(( $(date +%s) - deployStart ))"
+  exit 1
+fi
 if ! echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus; then
   RecordResult "openshift-plus-policy-set-deployed" "failed" "deploy.sh returned a nonzero status; the openshift-plus policy set was not submitted" "$(( $(date +%s) - deployStart ))"
   exit 1
@@ -238,13 +267,42 @@ typeset -i policyGateStart=0
 policyGateStart=$(date +%s)
 typeset policyCountJson=''
 typeset -i policyCountRc=0
-until policyCountJson="$(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || policyCountRc=$?; (( policyCountRc != 0 )) && { printf '%s\n' "Error: failed to query policies (rc=${policyCountRc})" >&2; RecordResult "failed-policies-query" "failed" "oc get policies query failed with exit code ${policyCountRc}" "$(( $(date +%s) - policyGateStart ))"; exit 1; }; (( policyCountJson >= expectedMinPolicies )); do
-  ((SECONDS > pollDeadline)) && {
+while true; do
+  typeset -i _pollRemain=$(( pollDeadline - SECONDS ))
+  typeset -i _stepRemain=$(( stepDeadline - $(date +%s) - 120 ))
+  (( _pollRemain < 10 )) && _pollRemain=10
+  (( _stepRemain < 10 )) && _stepRemain=10
+  typeset -i _queryTimeout=${_pollRemain}
+  (( _queryTimeout > _stepRemain )) && _queryTimeout=${_stepRemain}
+  policyCountRc=0
+  policyCountJson="$(timeout "${_queryTimeout}s" oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || policyCountRc=$?
+  if (( policyCountRc != 0 )); then
+    printf '%s\n' "Error: failed to query policies (rc=${policyCountRc})" >&2
+    RecordResult "openshift-plus-policy-set-deployed" "failed" "failed to query policies in namespace policies (rc=${policyCountRc})" "$(( $(date +%s) - policyGateStart ))"
+    exit 1
+  fi
+  if (( SECONDS > pollDeadline )); then
     printf '%s\n' "Error: fewer than ${expectedMinPolicies} policies after 10 minutes" >&2
     RecordResult "openshift-plus-policy-set-deployed" "failed" "Fewer than ${expectedMinPolicies} policies in namespace policies after 10 minutes" "$(( $(date +%s) - policyGateStart ))"
     exit 1
-  }
-  sleep 5
+  fi
+  if (( policyCountJson >= expectedMinPolicies )); then
+    break
+  fi
+  if (( SECONDS > pollDeadline )); then
+    printf '%s\n' "Error: fewer than ${expectedMinPolicies} policies after 10 minutes" >&2
+    RecordResult "openshift-plus-policy-set-deployed" "failed" "Fewer than ${expectedMinPolicies} policies in namespace policies after 10 minutes" "$(( $(date +%s) - policyGateStart ))"
+    exit 1
+  fi
+  typeset -i _gateSleepRemain=$(( stepDeadline - $(date +%s) - 30 ))
+  if (( _gateSleepRemain <= 0 )); then
+    printf '%s\n' "Error: step budget exhausted during policy gate" >&2
+    RecordResult "openshift-plus-policy-set-deployed" "failed" "step budget exhausted during policy gate" "$(( $(date +%s) - policyGateStart ))"
+    exit 1
+  fi
+  typeset -i _gateSleep=5
+  (( _gateSleep > _gateSleepRemain )) && _gateSleep=${_gateSleepRemain}
+  sleep "${_gateSleep}"
 done
 RecordResult "openshift-plus-policy-set-deployed" "passed" "" "$(( $(date +%s) - policyGateStart ))"
 
@@ -293,7 +351,7 @@ placementStart=$(date +%s)
 if oc wait "placement/placement-openshift-plus-clusters" -n policies \
     --for=create --timeout=300s 1>/dev/null; then
   if oc patch placement placement-openshift-plus-clusters -n policies --type json \
-    -p '[{"op":"test","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1/key","value":"local-cluster"},{"op":"remove","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1"}]'; then
+    -p '[{"op":"test","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1/key","value":"local-cluster"},{"op":"test","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1/operator","value":"NotIn"},{"op":"test","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1/values","value":["true"]},{"op":"remove","path":"/spec/predicates/0/requiredClusterSelector/labelSelector/matchExpressions/1"}]'; then
     RecordResult "local-cluster-placement-predicate-removed" "passed" "" "$(( $(date +%s) - placementStart ))"
   else
     printf '%s\n' "Warning: could not remove local-cluster NotIn predicate from placement (continuing with upstream default)" >&2
@@ -305,18 +363,26 @@ else
 fi
 
 # Wait for Quay registry to be ready (checks operator-deployed Quay)
-typeset -a quayNamespacesArr=(quay openshift-quay quay-enterprise local-quay)
+typeset quayPrimaryNs="local-quay"
+typeset -a quayOtherNamespacesArr=(quay openshift-quay quay-enterprise)
 typeset quayFound=false
 typeset -i quayStart=0
 quayStart=$(date +%s)
+typeset -i quayDeadline=$(( quayStart + 600 ))
 typeset ns=''
-for ns in "${quayNamespacesArr[@]}"; do
-  # Branch on the query's exit status: an API or RBAC failure must not read
-  # as "no QuayRegistry in this namespace".  Only the CRD-absent and
-  # empty-list answers are expected, and those stay quiet.
+typeset -i quayOutOfScopeTotal=0
+# Poll for QuayRegistry with bounded deadline: policy-install-quay depends on odf-status, so registry may appear after initial scan
+typeset _quayPollInterval=10
+while (( $(date +%s) < quayDeadline )) && (( $(date +%s) < stepDeadline - 120 )) && [[ "${quayFound}" == "false" ]]; do
+  # Check only the intended namespace for success; other namespaces are out of scope
+  ns="${quayPrimaryNs}"
   typeset quayJson="" quayQueryErr=""
   typeset -i quayQueryRc=0
-  quayJson="$(oc get quayregistry -n "${ns}" -o json 2>&1)" || quayQueryRc=$?
+  typeset -i _quayRemainDiscovery=$(( quayDeadline - $(date +%s) ))
+  typeset -i _quayRemainStep=$(( stepDeadline - $(date +%s) - 120 ))
+  typeset -i _quayRemain=$(( _quayRemainDiscovery < _quayRemainStep ? _quayRemainDiscovery : _quayRemainStep ))
+  if (( _quayRemain <= 0 )); then break; fi
+  quayJson="$(timeout "${_quayRemain}s" oc get quayregistry -n "${ns}" --request-timeout="${_quayRemain}s" -o json 2>&1)" || quayQueryRc=$?
   if (( quayQueryRc != 0 )); then
     quayQueryErr="${quayJson}"
     if [[ "${quayQueryErr}" == *"doesn't have a resource type"* || "${quayQueryErr}" == *"No resources found"* ]]; then
@@ -324,40 +390,106 @@ for ns in "${quayNamespacesArr[@]}"; do
     else
       printf '%s\n' "Warning: could not query QuayRegistry in namespace ${ns} (rc=${quayQueryRc}): ${quayQueryErr}" >&2
     fi
-    continue
-  fi
-  typeset -i quayItemCount=0
-  if ! quayItemCount="$(printf '%s' "${quayJson}" | jq '.items | length')"; then
-    printf '%s\n' "Warning: could not count QuayRegistry objects in namespace ${ns}; skipping it" >&2
-    continue
-  fi
-  if (( quayItemCount > 0 )); then
-    : "Found Quay Operator deployment in namespace ${ns}, waiting for ready condition"
-    if ! oc wait quayregistry --all -n "${ns}" \
-      --for condition=Available=True \
-      --timeout=10m; then
-      RecordResult "quay-registry-available" "failed" "QuayRegistry in namespace ${ns} did not become Available within 10 minutes" "$(( $(date +%s) - quayStart ))"
-      oc get quayregistry --all -n "${ns}" --ignore-not-found -o yaml
-      oc describe quayregistry --all -n "${ns}"
-      exit 1
+  else
+    typeset -i quayItemCount=0
+    if ! quayItemCount="$(printf '%s' "${quayJson}" | jq '.items | length')"; then
+      printf '%s\n' "Warning: could not count QuayRegistry objects in namespace ${ns}; skipping it" >&2
+    elif (( quayItemCount > 0 )); then
+      : "Found Quay Operator deployment in namespace ${ns}, waiting for ready condition"
+      typeset quayName=""
+      quayName="$(printf '%s' "${quayJson}" | jq -r '[.items[] | select(.metadata.name=="registry")][0].metadata.name // empty')" || quayName=""
+      if [[ -z "${quayName}" ]]; then
+        printf '%s\n' "Warning: could not determine QuayRegistry name in namespace ${ns}; skipping it" >&2
+      else
+        # Recompute the remaining budget here: the read above spent part of it,
+        # so the wait must not reuse the pre-read figure.
+        typeset -i _quayWaitDiscovery=$(( quayDeadline - $(date +%s) ))
+        typeset -i _quayWaitStep=$(( stepDeadline - $(date +%s) - 120 ))
+        typeset -i _quayWaitRemain=$(( _quayWaitDiscovery < _quayWaitStep ? _quayWaitDiscovery : _quayWaitStep ))
+        if (( _quayWaitRemain <= 0 )); then
+          printf '%s\n' "Warning: no remaining budget to wait for QuayRegistry/${quayName} in ${ns}" >&2
+          break
+        fi
+        typeset -i _quayWaitTimeout=$(( _quayWaitRemain < 600 ? _quayWaitRemain : 600 ))
+        # Bound the whole call, not only the condition poll: kubectl wait
+        # applies --timeout to condition evaluation while the initial resource
+        # lookup runs outside it, so a stalled lookup can outlast the budget
+        # and push the failure row and the JUnit report past the step timeout.
+        # The wrapper's own exit is non-zero, which is the signal the failure
+        # path below keys on, and it caps the call short of the reserve.
+        if ! timeout "${_quayWaitRemain}s" oc wait "quayregistry/${quayName}" -n "${ns}" \
+          --for condition=Available=True \
+          --timeout="${_quayWaitTimeout}s"; then
+          RecordResult "quay-registry-available" "failed" "QuayRegistry/${quayName} in namespace ${ns} did not become Available within ${_quayWaitTimeout}s" "$(( $(date +%s) - quayStart ))"
+          typeset -i _quayDiagDeadline=$(( stepDeadline - 30 ))
+          typeset -i _quayDiagRemain=$(( _quayDiagDeadline - $(date +%s) ))
+          if (( _quayDiagRemain > 0 )); then
+            typeset -i _quayDiagTimeout=$(( _quayDiagRemain < 60 ? _quayDiagRemain : 60 ))
+            timeout "${_quayDiagTimeout}s" oc get quayregistry -n "${ns}" --ignore-not-found -o yaml || true
+            _quayDiagRemain=$(( _quayDiagDeadline - $(date +%s) ))
+            if (( _quayDiagRemain > 0 )); then
+              _quayDiagTimeout=$(( _quayDiagRemain < 60 ? _quayDiagRemain : 60 ))
+              timeout "${_quayDiagTimeout}s" oc describe quayregistry -n "${ns}" || true
+            fi
+          fi
+          exit 1
+        else
+          RecordResult "quay-registry-available" "passed" "" "$(( $(date +%s) - quayStart ))"
+          quayFound=true
+        fi
+      fi
     fi
-    RecordResult "quay-registry-available" "passed" "" "$(( $(date +%s) - quayStart ))"
-    quayFound=true
-    break
+  fi
+  # Out-of-scope check: count registries in other namespaces for diagnostic only, without raw identifiers
+  if [[ "${quayFound}" == "false" ]]; then
+    typeset -i quayOutOfScopeInPass=0
+    for ns in "${quayOtherNamespacesArr[@]}"; do
+      typeset outJson="" outRc=0 outCount=0
+      typeset -i _quayRemainDiscovery=$(( quayDeadline - $(date +%s) ))
+      typeset -i _quayRemainStep=$(( stepDeadline - $(date +%s) - 120 ))
+      typeset -i _quayRemain=$(( _quayRemainDiscovery < _quayRemainStep ? _quayRemainDiscovery : _quayRemainStep ))
+      if (( _quayRemain <= 0 )); then break; fi
+      outJson="$(timeout "${_quayRemain}s" oc get quayregistry -n "${ns}" --request-timeout="${_quayRemain}s" -o json 2>&1)" || outRc=$?
+      if (( outRc != 0 )); then
+        continue
+      fi
+      if ! outCount="$(printf '%s' "${outJson}" | jq '.items | length' 2>/dev/null)"; then
+        continue
+      fi
+      if (( outCount > 0 )); then
+        quayOutOfScopeInPass=$((quayOutOfScopeInPass + outCount))
+      fi
+    done
+    if (( quayOutOfScopeInPass > 0 )); then
+      quayOutOfScopeTotal=$((quayOutOfScopeTotal + quayOutOfScopeInPass))
+      printf '%s\n' "Note: found ${quayOutOfScopeInPass} out-of-scope QuayRegistry object(s) in other namespaces (not satisfying check in ${quayPrimaryNs})" >&2
+    fi
+  fi
+  # Poll interval if no registry found in this pass and neither budget is exhausted
+  if [[ "${quayFound}" == "false" ]] && (( $(date +%s) < quayDeadline )) && (( $(date +%s) < stepDeadline - 120 )); then
+    typeset -i _quaySleep=$(( quayDeadline - $(date +%s) ))
+    typeset -i _quaySleepStep=$(( stepDeadline - $(date +%s) - 120 ))
+    (( _quaySleepStep < _quaySleep )) && _quaySleep=${_quaySleepStep}
+    (( _quayPollInterval < _quaySleep )) && _quaySleep=${_quayPollInterval}
+    if (( _quaySleep > 0 )); then sleep "${_quaySleep}"; fi
   fi
 done
 if [[ "${quayFound}" == "false" ]]; then
-  printf '%s\n' "Warning: no QuayRegistry found in namespaces: ${quayNamespacesArr[*]}" >&2
-  RecordResult "quay-registry-available" "skipped" "No QuayRegistry found in namespaces: ${quayNamespacesArr[*]}" "$(( $(date +%s) - quayStart ))"
+  if (( quayOutOfScopeTotal > 0 )); then
+    printf '%s\n' "Warning: no QuayRegistry found in intended namespace ${quayPrimaryNs} (found ${quayOutOfScopeTotal} out-of-scope object(s) in other namespaces)" >&2
+  else
+    printf '%s\n' "Warning: no QuayRegistry found in namespace ${quayPrimaryNs}" >&2
+  fi
+  RecordResult "quay-registry-available" "skipped" "No QuayRegistry found in namespace ${quayPrimaryNs}" "$(( $(date +%s) - quayStart ))"
 fi
-
 # ── LPC_LP_OPP__ACM_PS__SKIP_POLICIES handling ──────────────────────────────────────────
 # LPC_LP_OPP__ACM_PS__SKIP_POLICIES: comma-separated policy names to exclude
 # from the compliance wait.  Empty (default) means wait for ALL policies.
 # Non-existent policy names produce a warning, not a failure.
 typeset -a skipPoliciesArr=()
 if [[ -n "${LPC_LP_OPP__ACM_PS__SKIP_POLICIES}" ]]; then
-  IFS=',' read -ra _skipRawArr <<< "${LPC_LP_OPP__ACM_PS__SKIP_POLICIES}"
+  typeset _skipNormalized="${LPC_LP_OPP__ACM_PS__SKIP_POLICIES//$'\n'/','}"
+  IFS=',' read -ra _skipRawArr <<< "${_skipNormalized}"
   for _skipEntry in "${_skipRawArr[@]}"; do
     # Trim surrounding whitespace: an untrimmed entry ("a, b" yields " b")
     # would never match a policy name and would silently skip nothing.
@@ -391,12 +523,14 @@ fi
 # as fixed strings (not regexes) so a name containing regex metacharacters
 # cannot widen the match to unrelated policies.
 FilterSkippedPolicies () {
-  typeset line='' p='' skip=false
+  typeset line='' p='' skip=false bare='' pbare=''
   while IFS= read -r line; do
     [[ -z "${line}" ]] && continue
+    bare="${line##*/}"
     skip=false
     for p in "${skipPoliciesArr[@]}"; do
-      [[ "${line}" == */"${p}" ]] && { skip=true; break; }
+      pbare="${p##*/}"
+      [[ "${bare}" == "${pbare}" ]] && { skip=true; break; }
     done
     [[ "${skip}" == false ]] && printf '%s\n' "${line}"
   done
@@ -414,7 +548,7 @@ if (( ${#skipPoliciesArr[@]} > 0 )); then
     return 1
   }
   typeset allPolicies=""
-  allPolicies="$(oc get policies -n policies -o name)" || true
+  allPolicies="$(_oc_get_bounded get policies -n policies -o name)" || true
   for p in "${skipPoliciesArr[@]}"; do
     if ! PolicyExists "${p}" <<< "${allPolicies}"; then
       printf '[%s] WARNING: policy "%s" from LPC_LP_OPP__ACM_PS__SKIP_POLICIES not found in cluster (ignoring)\n' \
@@ -449,7 +583,7 @@ typeset -i complianceStableCount=0
 PolicyNameSet () {
   typeset namesJson=''
   typeset -i namesRc=0
-  namesJson="$(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}')" || namesRc=$?
+  namesJson="$(_oc_get_bounded get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}')" || namesRc=$?
   if (( namesRc != 0 )) || [[ -z "${namesJson}" ]]; then
     printf '[%s] ERROR: failed to read the policy name set (rc=%d)\n' \
       "$(date -u +%FT%TZ)" "${namesRc}" >&2
@@ -463,7 +597,7 @@ PolicyNameSet () {
 PolicyCount () {
   typeset countJson=''
   typeset -i countRc=0
-  countJson="$(oc get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || countRc=$?
+  countJson="$(_oc_get_bounded get policies -n policies -o jsonpath-as-json='{.items[*].metadata.name}' | jq 'length')" || countRc=$?
   if (( countRc != 0 )) || [[ -z "${countJson}" ]]; then
     return 1
   fi
@@ -525,7 +659,11 @@ ReadStablePolicySet () {
 # stall-below-final-size race.
 ExpectedPolicyNames () {
   typeset setsJson=''
-  setsJson="$(oc get policysets.policy.open-cluster-management.io -n policies -o json)" || return 1
+  typeset -i _ep_now
+  _ep_now=$(date +%s)
+  typeset -i _ep_remain=$(( stepDeadline - _ep_now - 120 ))
+  (( _ep_remain < 10 )) && _ep_remain=10
+  setsJson="$(timeout "${_ep_remain}s" oc get policysets.policy.open-cluster-management.io -n policies -o json)" || return 1
   if [[ -z "${setsJson}" ]]; then
     return 1
   fi
@@ -562,7 +700,13 @@ ExpectedPolicyNamesRetry () {
     if (( try < 3 )); then
       printf '[%s] WARNING: could not read PolicySet membership %s (attempt %d/3), retrying\n' \
         "$(date -u +%FT%TZ)" "${phase}" "${try}" >&2
-      sleep 10
+      typeset -i _retryNow=0
+      _retryNow=$(date +%s)
+      if (( _retryNow + 10 > stepDeadline - 30 )); then
+        printf '[%s] WARNING: not enough time for retry sleep before step deadline, skipping sleep\n' "$(date -u +%FT%TZ)" >&2
+      else
+        sleep 10
+      fi
     fi
   done
   printf '[%s] ERROR: could not read PolicySet membership %s (rc=%d)\n' \
@@ -629,9 +773,12 @@ while :; do
   # the JUnit report never runs.
   typeset -i passNow=0
   passNow=$(date +%s)
-  if (( passNow + compliancePassBudget > stepDeadline )); then
-    printf '[%s] ERROR: no time left in the step budget for another compliance pass\n' \
-      "$(date -u +%FT%TZ)" >&2
+  typeset -i _remainingBudget=$(( stepDeadline - passNow - 120 ))
+  typeset -i _minPassBudget=$(( (compliancePollTarget - 1) * compliancePollIntervalSeconds ))
+  (( _minPassBudget < 60 )) && _minPassBudget=60
+  if (( _remainingBudget < _minPassBudget )); then
+    printf '[%s] ERROR: no time left in the step budget for another compliance pass (remaining %ds)\n' \
+      "$(date -u +%FT%TZ)" "${_remainingBudget}" >&2
     RecordResult "policies-compliant" "failed" "Compliance wait stopped after $(( (passNow - complianceStart) / 60 )) minutes: the step time budget was exhausted before the policy set stabilized${missingExpectedNote}${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
     exit 1
   fi
@@ -652,6 +799,7 @@ while :; do
   # a policy replaced by another during the pass leaves the count unchanged
   # while the replacement policy was never waited on.  Capture the identities
   # so the post-pass comparison can tell an unchanged set from a swap.
+  typeset complianceWaitSet=''
   if ! prevSet="$(PolicyNameSet)"; then
     RecordResult "policies-compliant" "failed" "Failed to read the policy name set before the compliance pass; the set the wait covers is unknown${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
     exit 1
@@ -661,7 +809,7 @@ while :; do
   if (( ${#skipPoliciesArr[@]} > 0 )); then
     # Fetch the full policy list first: fail hard if oc cannot reach the cluster
     typeset policyList=""
-    policyList="$(oc get policies -n policies -o name)" || {
+    policyList="$(_oc_get_bounded get policies -n policies -o name)" || {
       printf '[%s] ERROR: failed to list policies in namespace "policies"\n' \
         "$(date -u +%FT%TZ)" >&2
       RecordResult "policies-compliant" "failed" "Failed to list policies in namespace policies" "$(( $(date +%s) - complianceStart ))"
@@ -672,14 +820,33 @@ while :; do
 
     if (( ${#applyPoliciesArr[@]} > 0 )); then
       : "Waiting for ${#applyPoliciesArr[@]} non-skipped polic(ies) to become Compliant…"
+      typeset -i _waitNow=0
+      _waitNow=$(date +%s)
+      _remainingBudget=$(( stepDeadline - _waitNow - 120 ))
+      (( _remainingBudget < 10 )) && _remainingBudget=10
+      typeset -i _waitTimeout=${_remainingBudget}
+      (( _waitTimeout > 2400 )) && _waitTimeout=2400
       if ! oc wait -n policies \
         --for jsonpath='{.status.compliant}'=Compliant \
-        --timeout=40m "${applyPoliciesArr[@]}"; then
+        --timeout="${_waitTimeout}s" "${applyPoliciesArr[@]}"; then
         printf '%s\n' "Non-skipped policies failed to become compliant:" >&2
         RecordResult "policies-compliant" "failed" "Non-skipped policies failed to become compliant within 40 minutes${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
-        oc get policies -n policies --ignore-not-found | FilterSkippedPolicies
-        oc get policies -n policies --ignore-not-found -o yaml
-        oc describe policies -n policies
+        typeset -i _diagDeadline=$(( stepDeadline - 30 ))
+        typeset -i _diagRemain=$(( _diagDeadline - $(date +%s) ))
+        if (( _diagRemain > 0 )); then
+          typeset -i _t=$(( _diagRemain < 30 ? _diagRemain : 30 ))
+          timeout "${_t}s" oc get policies -n policies --ignore-not-found | FilterSkippedPolicies || true
+          _diagRemain=$(( _diagDeadline - $(date +%s) ))
+          if (( _diagRemain > 0 )); then
+            _t=$(( _diagRemain < 60 ? _diagRemain : 60 ))
+            timeout "${_t}s" oc get policies -n policies --ignore-not-found -o yaml || true
+          fi
+          _diagRemain=$(( _diagDeadline - $(date +%s) ))
+          if (( _diagRemain > 0 )); then
+            _t=$(( _diagRemain < 60 ? _diagRemain : 60 ))
+            timeout "${_t}s" oc describe policies -n policies || true
+          fi
+        fi
         exit 1
       fi
     else
@@ -688,18 +855,46 @@ while :; do
     fi
   else
     : "No policies to skip: waiting for ALL policies to become Compliant…"
+    typeset -i _waitNow=0
+    _waitNow=$(date +%s)
+    _remainingBudget=$(( stepDeadline - _waitNow - 120 ))
+    (( _remainingBudget < 10 )) && _remainingBudget=10
+    typeset -i _waitTimeout=${_remainingBudget}
+    (( _waitTimeout > 2400 )) && _waitTimeout=2400
     if ! oc wait policies --all -n policies \
       --for jsonpath='{.status.compliant}'=Compliant \
-      --timeout=40m; then
+      --timeout="${_waitTimeout}s"; then
       printf '%s\n' "Policies failed to become compliant:" >&2
       RecordResult "policies-compliant" "failed" "Policies failed to become compliant within 40 minutes" "$(( $(date +%s) - complianceStart ))"
-      oc get policies -n policies --ignore-not-found
-      oc get policies -n policies --ignore-not-found -o yaml
-      oc describe policies -n policies
+      typeset -i _diagDeadline=$(( stepDeadline - 30 ))
+      typeset -i _diagRemain=$(( _diagDeadline - $(date +%s) ))
+      if (( _diagRemain > 0 )); then
+        typeset -i _t=$(( _diagRemain < 30 ? _diagRemain : 30 ))
+        timeout "${_t}s" oc get policies -n policies --ignore-not-found || true
+        _diagRemain=$(( _diagDeadline - $(date +%s) ))
+        if (( _diagRemain > 0 )); then
+          _t=$(( _diagRemain < 60 ? _diagRemain : 60 ))
+          timeout "${_t}s" oc get policies -n policies --ignore-not-found -o yaml || true
+        fi
+        _diagRemain=$(( _diagDeadline - $(date +%s) ))
+        if (( _diagRemain > 0 )); then
+          _t=$(( _diagRemain < 60 ? _diagRemain : 60 ))
+          timeout "${_t}s" oc describe policies -n policies || true
+        fi
+      fi
       exit 1
     fi
   fi
 
+  # Verify wait-received names vs current set: if policy replaced during pass, count unchanged but replacement never waited (thread PRRT_kwDOBHvUUM65TpMc)
+  if [[ "${complianceAllSkipped}" != "true" ]]; then
+    # Capture wait set: for --all it's prevSet, for filtered it's applyPoliciesArr
+    if (( ${#skipPoliciesArr[@]} > 0 )); then
+      complianceWaitSet="$(printf '%s\n' "${applyPoliciesArr[@]}" | sed 's|.*/||' | LC_ALL=C sort)"
+    else
+      complianceWaitSet="${prevSet}"
+    fi
+  fi
   # Count after the pass.  A failed query is not a stable count: fail the
   # row, so a broken API cannot record a pass for a policy set that was
   # never observed.
@@ -730,12 +925,39 @@ while :; do
     RecordResult "policies-compliant" "failed" "Could not observe a stable policy set after the compliance pass (rc=${passStableRc}): the set may still be growing, so compliance cannot be accepted${complianceSkipNote}" "$(( $(date +%s) - complianceStart ))"
     exit 1
   fi
+
+  # Swap detection: if wait set differs from stable set, replacement occurred without wait (PRRT_kwDOBHvUUM65TpMc)
+  if [[ -n "${complianceWaitSet}" && -n "${complianceStableSet}" ]]; then
+    typeset _waitSetSorted _stableSorted _prevFilteredForSwap
+    _waitSetSorted="$(printf '%s\n' "${complianceWaitSet}" | LC_ALL=C sort)"
+    if (( ${#skipPoliciesArr[@]} > 0 )); then
+      _stableSorted="$(printf '%s\n' "${complianceStableSet}" | FilterSkippedPolicies | LC_ALL=C sort)"
+      _prevFilteredForSwap="$(printf '%s\n' "${prevSet}" | FilterSkippedPolicies | LC_ALL=C sort)"
+    else
+      _stableSorted="$(printf '%s\n' "${complianceStableSet}" | LC_ALL=C sort)"
+      _prevFilteredForSwap="${prevSet}"
+    fi
+    if [[ "${_waitSetSorted}" != "${_stableSorted}" ]] && [[ "${_waitSetSorted}" != "${_prevFilteredForSwap}" ]]; then
+      : "Wait set differs from stable set after pass (swap detected); re-running wait"
+      policyCount="${complianceStableCount}"
+      continue
+    fi
+  fi
+
   if [[ "${complianceStableSet}" != "${prevSet}" ]] || (( complianceStableCount != prevCount )); then
     : "Policy set changed while proving stability (${prevCount} -> ${complianceStableCount} policies, or the names differ from the set the pass covered); re-running the compliance wait"
     policyCount="${complianceStableCount}"
     continue
   fi
   policyCount="${complianceStableCount}"
+  if [[ "${complianceAllSkipped}" == "true" ]]; then
+    typeset _filteredStableForSkipped=""
+    _filteredStableForSkipped="$(printf '%s\n' "${complianceStableSet}" | FilterSkippedPolicies)"
+    if [[ -n "${_filteredStableForSkipped}" ]]; then
+      : "Stability window shows non-skipped policy present; re-running wait"
+      continue
+    fi
+  fi
   # The membership the coverage check uses was read before the pass, so a
   # PolicySet applied during the pass is not in it: its policies could stay
   # absent through the stability window and the row would be accepted with them
@@ -752,7 +974,12 @@ while :; do
   # The gate is complete only when the set is stable, covers the names the
   # pass covered, and carries every policy the applied PolicySets list.
   typeset missingPolicies=''
-  missingPolicies="$(MissingExpectedPolicies "${expectedPolicies}" "${complianceStableSet}")" || missingPolicies=''
+  typeset -i _mpRc=0
+  missingPolicies="$(MissingExpectedPolicies "${expectedPolicies}" "${complianceStableSet}")" || _mpRc=$?
+  if (( _mpRc != 0 )); then
+    RecordResult "policies-compliant" "failed" "Could not compare expected PolicySet membership with current set (comparison failed with exit ${_mpRc})" "$(( $(date +%s) - complianceStart ))"
+    exit 1
+  fi
   if [[ -n "${missingPolicies}" ]]; then
     : "Policy set stable at ${complianceStableCount} policies but incomplete: $(printf '%s\n' "${missingPolicies}" | wc -l) expected polic(ies) absent ($(printf '%s' "${missingPolicies}" | tr '\n' ' ')); re-running the compliance wait"
     missingExpectedNote="; the set stayed stable at ${complianceStableCount} policies without $(printf '%s\n' "${missingPolicies}" | wc -l) expected polic(ies): $(printf '%s' "${missingPolicies}" | tr '\n' ' ')"

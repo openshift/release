@@ -15,9 +15,28 @@ shopt -s inherit_errexit
 #     fixtures extracted from real runs
 #   - JUnit properties on pass and fail
 #
+# PR-B (behavior changes, INTEROP-9646): progress predicate rewritten
+#   (per-pool updated-count trend; no extension while Degraded; sustained
+#   pinned-updated oscillation vetoes extension); stability requires the
+#   Updated/Updating condition tokens and observedGeneration==generation;
+#   non-self-healing ENOSPC Degraded fails fast after 2 unchanged polls;
+#   5 consecutive oc failures classify cluster-api-unreachable; the
+#   maxUnavailable SUT-mutating patch is removed (serialized 9-machine
+#   rollout measured ~21 min << 5400s budget).
+#
 # Budget arithmetic (must hold; step timeout 6300s, grace_period 5m0s):
-#   self-terminating path: settle 90 + max wait 5400 + collection <= 120
-#     + health gate <= 60  =>  <= 5670s, leaving >= 630s headroom
+#   phase 0 (predicate + trap self-test, before the wait): <= 270s
+#     (<= 90s to reach the child's poll loop, <= 180s child deadline when
+#     the TERM lands late enough that the child self-terminates)
+#   poll-deadline path (no health gate): settle <= 90 + wait <= 5400 +
+#     final state reads <= 55 (ocb get 10 + classification read 45) +
+#     collection <= 120  =>  <= 5665s
+#   converged path (no timeout classification): settle <= 90 + wait <= 5400
+#     + health gate <= 90 (two 45s bounded fetches) + gate-failure
+#     diagnostics <= 20 (two ocb gets) + collection <= 120  =>  <= 5720s
+#   the two paths are exclusive: phase 0 plus the larger one => <= 5990s,
+#   leaving >= 310s before the step timeout, so neither path reaches the
+#   SIGTERM/SIGKILL grace window.
 #   step-timeout path: only 300s remain between SIGTERM and SIGKILL, so the
 #     failure-path collector is watchdog-bounded (timeout 120) and the xtrace
 #     copy is truncated (tail -c 5M) before scrubbing.
@@ -38,18 +57,40 @@ _opp_cleanup() {
   set +x 2>/dev/null
   if [[ ${_jrc} -ne 0 && -n "${ARTIFACT_DIR:-}" && -s "${_xtrace_log}" ]]; then
     local _scrub="/tmp/xtrace-scrub-$$.log"
-    tail -c 5242880 "${_xtrace_log}" > "${_scrub}" 2>/dev/null || true
-    # Scrub credentials before copying
-    sed -i -E \
-      -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
-      -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
-      -e 's/password=[^ &]+/password=[REDACTED]/g' \
-      -e 's/token=[^ &]+/token=[REDACTED]/g' \
-      -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
-      "${_scrub}" 2>/dev/null || true
-    cp "${_scrub}" "${ARTIFACT_DIR}/" 2>/dev/null || true
+    local _scrubrc=0 _trace_state=""
+    # tail -c cuts at a byte offset that can fall between a key and its
+    # value (after `token=` or `Bearer `); the partial first line would
+    # begin with a bare credential fragment no sed pattern can match.
+    # Drop it before scrubbing (preflight review).
+    # Fail closed (CodeRabbit review 5810009192): a failed truncation leaves
+    # a partial UNSCRUBBED file, so it is dropped and nothing is published.
+    if tail -c 5242880 "${_xtrace_log}" 2>/dev/null | tail -n +2 > "${_scrub}"; then
+      # Scrub credentials before copying. The status is checked, not
+      # discarded: a failed scrub leaves the credentials in place, so it
+      # must drop the trace rather than publish it.
+      sed -i -E \
+        -e 's/(password|token|secret|key|credential)=[^ ]*/\1=REDACTED/gi' \
+        -e 's/Bearer [A-Za-z0-9._~+\/=-]+/Bearer [REDACTED]/g' \
+        -e 's/password=[^ &]+/password=[REDACTED]/g' \
+        -e 's/token=[^ &]+/token=[REDACTED]/g' \
+        -e 's|://[^:@/]*:[^:@/]*@|://[REDACTED]:[REDACTED]@|g' \
+        "${_scrub}" || _scrubrc=$?
+      if (( _scrubrc != 0 )); then
+        _trace_state="DROPPED: scrub failed (rc=${_scrubrc}), no trace published"
+      elif [[ ! -s "${_scrub}" ]]; then
+        _trace_state="DROPPED: scrub produced an empty file, no trace published"
+      elif cp "${_scrub}" "${ARTIFACT_DIR}/"; then
+        _trace_state="saved to artifacts (scrubbed)"
+      else
+        _scrubrc=$?
+        _trace_state="DROPPED: copy to artifacts failed (rc=${_scrubrc}), no trace published"
+      fi
+    else
+      _scrubrc=$?
+      _trace_state="DROPPED: truncation failed (rc=${_scrubrc}), no trace published"
+    fi
     rm -f "${_scrub}" 2>/dev/null || true
-    echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_jrc})"
+    echo ">>> TRACE: xtrace log ${_trace_state} (exit code ${_jrc})"
   fi
 }
 
@@ -66,6 +107,9 @@ typeset -i _jrc_set=0  # initialized here - before the trap and before env
 _junit_class=""
 _junit_reason=""
 _junit_selftest="not-run"
+_junit_classifierselftest="not-run"
+_junit_enospcselftest="not-run"
+_junit_trapselftest="not-run"
 _junit_emit() {
   # Emit a JUnit XML result for the wait-mcp step and propagate
   # it to SHARED_DIR/junit so downstream steps can aggregate results.
@@ -78,6 +122,19 @@ _junit_emit() {
   local _jn="wait-mcp"
   local _jf="${ARTIFACT_DIR:-/tmp}/junit_lp-interop--OPP--${_jn}.xml"
   local _fc=0 _fx=""
+  # A self-test failure always exits 2, so it only ever rides the main
+  # failure element as a note - never a second <failure> child (JUnit
+  # consumers expect at most one failure element per testcase, and the
+  # suite count must stay failures<=tests; preflight review).
+  local _st_failed=""
+  if [[ "${_junit_selftest}" == "fail" ]]; then _st_failed="predicate"; fi
+  if [[ "${_junit_classifierselftest}" == "fail" ]]; then _st_failed="${_st_failed:+${_st_failed}+}classifier"; fi
+  if [[ "${_junit_enospcselftest}" == "fail" ]]; then _st_failed="${_st_failed:+${_st_failed}+}enospc-streak"; fi
+  if [[ "${_junit_trapselftest}" == "fail" ]]; then _st_failed="${_st_failed:+${_st_failed}+}trap"; fi
+  local _st_note=""
+  if [[ -n "${_st_failed}" ]]; then
+    _st_note=" Offline ${_st_failed} self-test failed; step semantics are not the reviewed ones."
+  fi
   # XML-escape via sed: bash >= 5.2 patsub_replacement expands a bare & in
   # ${var//pat/repl} to the matched text (breaking &lt; into <lt;), and older
   # bash keeps a backslash literally - sed's \& is unambiguous everywhere.
@@ -87,27 +144,29 @@ _junit_emit() {
   _esc_class=$(printf '%s' "${_junit_class}" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g' -e 's/"/\&quot;/g')
   if (( _jr != 0 )); then
     _fc=1
-    _fx="<failure message=\"${_jn} exited with code ${_jr}${_esc_class:+: ${_esc_class}}\" type=\"StepFailure\">${_jn} exited with code ${_jr}.${_esc_reason:+ Verbatim condition: ${_esc_reason}}</failure>"
+    _fx="<failure message=\"${_jn} exited with code ${_jr}${_esc_class:+: ${_esc_class}}\" reason=\"${_esc_reason}\" type=\"StepFailure\">${_jn} exited with code ${_jr}.${_esc_reason:+ Verbatim condition: ${_esc_reason}}${_st_note}</failure>"
   fi
-  local _st_fc=0 _st_fx=""
-  if [[ "${_junit_selftest}" == "fail" ]]; then
-    _st_fc=1
-    _st_fx="<failure message=\"predicate self-test failed\" type=\"SelfTestFailure\">Offline predicate self-test failed; step semantics are not the reviewed ones.</failure>"
-  fi
+  # Self-test verdicts are suite PROPERTIES, not testcases: the
+  # skip-ratio gate aggregates tests= across suites, and a meta-test
+  # (harness self-check, never skipped) would dilute skipped/total and
+  # could mask a threshold breach (preflight review). A self-test
+  # failure still fails the suite: it increments failures= and rides
+  # the main testcase's failure element, and the step exits 2.
   cat > "${_jf}" <<JUNITEOF || true
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="lp-interop--OPP--${_jn}" tests="2" failures="$((_fc + _st_fc))" errors="0" skipped="0" time="${_jd}">
+<testsuite name="lp-interop--OPP--${_jn}" tests="1" failures="${_fc}" errors="0" skipped="0" time="${_jd}">
   <properties>
     <property name="polls" value="${_junit_polls}"/>
     <property name="extensions" value="${extensionsApplied}"/>
     <property name="mcp_wait_seconds" value="${_jd}"/>
     <property name="first_signature_poll" value="${_junit_first_signature_poll}"/>
+    <property name="predicate_selftest" value="${_junit_selftest}"/>
+    <property name="classifier_selftest" value="${_junit_classifierselftest}"/>
+    <property name="enospc_streak_selftest" value="${_junit_enospcselftest}"/>
+    <property name="trap_selftest" value="${_junit_trapselftest}"/>
     <property name="final_class" value="${_esc_class}"/>
   </properties>
-  <testcase name="predicate-selftest" classname="lp-interop.OPP.${_jn}" time="0">
-    ${_st_fx}
-  </testcase>
-  <testcase name="${_jn}" classname="lp-interop.OPP.${_jn}" time="${_jd}">
+  <testcase name="${_jn}" classname="interop-opp-wait-mcp" time="${_jd}">
     ${_fx}
   </testcase>
 </testsuite>
@@ -123,7 +182,7 @@ JUNITEOF
 # precedent: capture the code first, set +e/+u, emit and bundle each guarded,
 # single trailing exit).
 trap '_rc=$?; if (( ! _jrc_set )); then _jrc=${_rc}; _jrc_set=1; fi; set +e; set +u; _junit_emit "${_jrc}"; _opp_cleanup; exit "${_jrc}"' EXIT
-trap '_jrc=143; _jrc_set=1; exit 143' TERM INT
+trap '_junit_class="step-terminated-sigterm"; _junit_reason="terminated by SIGTERM (step timeout)"; _jrc=143; _jrc_set=1; exit 143' TERM INT
 
 # --- Bounded oc wrapper for diagnostic/failure-path calls: never hangs,
 #     never fails the step by itself (callers that need exit status use the
@@ -138,9 +197,18 @@ echo ">>> PHASE: initialization"
 #     value exits 2 with a message instead of an arithmetic error) ---
 _opp_validate_int() {
   local _name="${1}" _raw="${2}" _min="${3}"
-  if ! [[ "${_raw}" =~ ^[0-9]+$ ]] || (( _raw < _min )); then
+  # Leading zeros are rejected (not normalized): bash arithmetic reads
+  # 010 as octal 8 and errors on 08, so a digit-only regex alone would
+  # accept values the typeset -i assignments then misread (preflight
+  # review: reject leading zeros except bare "0").
+  # Digit count is capped at nine: bash arithmetic is 64-bit signed, so
+  # oversized digit strings wrap silently (18446744073709551617 wraps
+  # to 1 and would pass the _min check; INT64_MAX overflows the
+  # deadline arithmetic). Largest default here is 5400, so nine digits
+  # is far beyond every legitimate value.
+  if ! [[ "${_raw}" =~ ^(0|[1-9][0-9]*)$ ]] || (( ${#_raw} > 9 )) || (( 10#${_raw} < _min )); then
     echo "FAILURE CLASS: Invalid step input" >&2
-    echo "env ${_name} must be an integer >= ${_min} (got '${_raw}')" >&2
+    echo "env ${_name} must be an integer >= ${_min} and < 10^9 (got '${_raw}')" >&2
     exit 2
   fi
 }
@@ -151,6 +219,8 @@ _opp_validate_int MCP_CONSECUTIVE_CHECKS "${MCP_CONSECUTIVE_CHECKS:-3}" 2
 _opp_validate_int MCP_SETTLE_DELAY "${MCP_SETTLE_DELAY:-90}" 0
 _opp_validate_int MCP_MAX_UNAVAILABLE "${MCP_MAX_UNAVAILABLE:-3}" 1
 _opp_validate_int MCP_POLL_INTERVAL "${MCP_POLL_INTERVAL:-30}" 10
+_opp_validate_int MCP_PINNED_UPDATED_POLLS "${MCP_PINNED_UPDATED_POLLS:-120}" 1
+_opp_validate_int MCP_RENDER_CHURN_LIMIT "${MCP_RENDER_CHURN_LIMIT:-5}" 1
 
 typeset -ri mcpWaitTimeout="${MCP_WAIT_TIMEOUT:-3600}"
 typeset -ri progressExtension="${MCP_WAIT_PROGRESS_EXTENSION:-1200}"
@@ -159,26 +229,159 @@ typeset -ri consecutiveRequired="${MCP_CONSECUTIVE_CHECKS:-3}"
 typeset -ri settleDelay="${MCP_SETTLE_DELAY:-90}"
 typeset -ri maxUnavailable="${MCP_MAX_UNAVAILABLE:-3}"
 typeset -ri pollInterval="${MCP_POLL_INTERVAL:-30}"
+typeset -ri pinnedUpdatedPolls="${MCP_PINNED_UPDATED_POLLS:-120}"
+typeset -ri renderChurnLimit="${MCP_RENDER_CHURN_LIMIT:-5}"
 typeset -a readyHistory=()
+typeset -a updatedHistory=()
+typeset -a machineCountHistory=()
+typeset -i _renderChurnCount=0
+typeset _lastGenPrint=""
+# ENOSPC signature bookkeeping (PRRT_kwDOBHvUUM65on19): one consecutive-poll
+# count per DISTINCT ENOSPC signature, keyed by the verbatim condition line.
+# A single selected condition cannot carry this: when two pools carry ENOSPC
+# conditions and the order they appear in the poll changes, the selected line
+# changes with it and a persistent signature never accumulates a streak.
+typeset -A _enospcStreaks=()
+typeset -i _enospcStreakHit=0
+typeset -i _enospcHitStreak=0
+typeset _enospcHitSignature=""
+typeset -i _bundleCollected=0
+typeset -i _vetoStreakHit=0
 typeset -i extensionsApplied=0
 typeset -i pollsSinceLastExtension=0
 typeset -ri extensionCheckInterval=5
 typeset -i _junit_polls=0
 typeset -i _junit_first_signature_poll=-1
 
-function IsReadyCountProgressing () {
-    # Check if the MCP ready count is trending upward over the last 6 polls.
-    # (Byte-identical extraction target for the offline self-test below.)
+function IsMcpProgressing () {
+    # Progress predicate (INTEROP-9646): per-pool trend over the trailing
+    # window, evaluated on the parallel per-poll histories.
+    #  1. no extension while any pool is Degraded (all three failing runs
+    #     were extended while Degraded=True, burning 60 min of lane quota);
+    #  2. updated-machine count rising monotonically within the window
+    #     (the histories are cluster-wide sums over the non-paused pools,
+    #     not per-pool series: a pool's drop can cancel another's gain);
+    #  3. sustained cycling vetoes extension: the pool not ready for >=
+    #     MCP_PINNED_UPDATED_POLLS consecutive polls without Degraded means
+    #     the rollout is cycling (re-rendering and re-rebooting), not
+    #     progressing (run 2115458776726245376: 179 polls, ready 4-8). The
+    #     veto sets _vetoStreakHit for the poll loop's fail-fast exit;
+    #  4. ready count recovering within the window with bounded regression
+    #     (a healthy rolling update dips by up to maxUnavailable reboots),
+    #     and no single-poll updated-machine drop beyond that same bound.
+    _vetoStreakHit=0
+    # Optional args pin the phase-0 self-test to the reviewed default
+    # thresholds regardless of runtime env tuning (fixture verdicts must
+    # depend on predicate logic, not job configuration).
+    typeset -i _pinnedPolls="${1:-${pinnedUpdatedPolls}}"
+    typeset -i _maxUnavail="${2:-${maxUnavailable}}"
     typeset -i len=${#readyHistory[@]}
     (( len < 3 )) && return 1
     typeset -i windowStart=$(( len > 6 ? len - 6 : 0 ))
-    typeset -i first=${readyHistory[windowStart]}
-    typeset -i last=${readyHistory[len - 1]}
-    typeset -i decreases=0
-    for (( i = windowStart + 1; i < len; ++i )); do
-        (( readyHistory[i] < readyHistory[i-1] )) && (( ++decreases )) || true
+    typeset -i i
+    for (( i = windowStart; i < len; ++i )); do
+        (( degradedHistory[i] )) && return 1
     done
-    if (( last > first && decreases <= 1 )); then
+    typeset -i notReadyStreak=0
+    for (( i = len - 1; i >= 0; --i )); do
+        # The streak is the PINNED-UPDATED cycling mode (MCP_PINNED_
+        # UPDATED_POLLS): the totals are cluster-wide sums over the non-paused
+        # pools, so the streak means "every reported machine is updated and
+        # the cluster is still not fully ready". A poll where any machine is
+        # not updated TERMINATES the streak (a still-updating rollout is a
+        # different failure mode, not cycling). Ready oscillating below
+        # machineCount with all machines updated is run 2's mode. Degraded
+        # polls are SKIPPED (not counted, not terminating) so a transient
+        # Degraded blip does not reset the cycling counter that run 2's
+        # evidence pinned.
+        if (( degradedHistory[i] )); then
+            # PRRT_kwDOBHvUUM65TpM1: reset clean-poll streak on JSON parse failure
+            consecutivePasses=0
+            continue
+        fi
+        if (( updatedHistory[i] != machineCountHistory[i] )); then
+            break
+        fi
+        if (( readyHistory[i] < machineCountHistory[i] )); then
+            (( ++notReadyStreak ))
+        else
+            break
+        fi
+    done
+    # Sustained-cycling veto (preflight-review note): at default cadence
+    # the maxTimeout cap already bounds extensions before this threshold
+    # is reached, so the veto's value is FAIL-FAST, not extension denial -
+    # the poll loop reads _vetoStreakHit and exits with
+    # mcp-rollout-not-converging instead of polling to the deadline.
+    # The veto is computed BEFORE the rising-updated clause so a pool that
+    # cycled not-ready for the streak while its machine count grew
+    # (updated tracking machineCount) cannot mask the veto behind a
+    # rising window (preflight review: apply the veto before returning
+    # progress).
+    if (( notReadyStreak >= _pinnedPolls )); then
+        _vetoStreakHit=1
+    fi
+    typeset -i first=${updatedHistory[windowStart]}
+    typeset -i last=${updatedHistory[len - 1]}
+    if (( last > first )); then
+        typeset -i _hasDip=0 _lastDip=-1
+        for (( i = windowStart + 1; i < len; ++i )); do
+            # PRRT_kwDOBHvUUM65Mrk3: a single-poll updated dip inside the
+            # concurrent-reboot bound is a healthy rolling update, not a state
+            # regression: tolerate a bounded dip and let the ready-recovery
+            # check below decide. A dip beyond the bound, or a dip whose ready
+            # count also falls, still rejects the window.
+            if (( updatedHistory[i] < updatedHistory[i-1] )); then
+                _hasDip=1
+                _lastDip=i
+                (( updatedHistory[i-1] - updatedHistory[i] > _maxUnavail )) && return 1
+                (( readyHistory[i] < readyHistory[i-1] )) && return 1
+            fi
+        done
+        if (( _hasDip )); then
+            # When the updated trend has a dip, require ready to recover
+            # (not fall) at or after the dip; a dip with a ready fall or
+            # no ready recovery resets the streak.
+            typeset -i _recovered=0
+            for (( i = _lastDip + 1; i < len; ++i )); do
+                if (( readyHistory[i] > readyHistory[_lastDip] )); then
+                    _recovered=1
+                    break
+                fi
+            done
+            (( _recovered )) || return 1
+        fi
+        (( _vetoStreakHit )) && return 1
+        return 0
+    fi
+    (( _vetoStreakHit )) && return 1
+    # The tolerated bound covers the updated-machine count too (deep review:
+    # this branch returned success for an unbounded updated regression while
+    # the ready count climbed). The rising branch above already rejects every
+    # decrease, so the bound only has to guard this branch: machines losing
+    # the updated state by more than the concurrent-reboot bound is a
+    # re-render or a state regression, not convergence.
+    typeset -i maxUpdDrop=0 _udrop=0
+    for (( i = windowStart + 1; i < len; ++i )); do
+        (( _udrop = updatedHistory[i-1] - updatedHistory[i] )) || true
+        (( _udrop > maxUpdDrop )) && maxUpdDrop=${_udrop} || true
+    done
+    if (( maxUpdDrop > _maxUnavail )); then
+        return 1
+    fi
+    # Ready-count recovery within the window with bounded regression: the
+    # bound is the maximum single-poll drop (machines concurrently
+    # unavailable, mirroring MCO maxUnavailable), not the number of polls
+    # containing a drop - a single 9 -> 0 collapse is one event but an
+    # unbounded regression (preflight review: bound by magnitude).
+    first=${readyHistory[windowStart]}
+    last=${readyHistory[len - 1]}
+    typeset -i maxDrop=0 _drop=0
+    for (( i = windowStart + 1; i < len; ++i )); do
+        (( _drop = readyHistory[i-1] - readyHistory[i] )) || true
+        (( _drop > maxDrop )) && maxDrop=${_drop} || true
+    done
+    if (( last > first && maxDrop <= _maxUnavail )); then
         return 0
     fi
     return 1
@@ -187,14 +390,15 @@ function IsReadyCountProgressing () {
 # --- Offline predicate self-test (phase 0) ---------------------------------
 # Fixtures are per-poll records (ready, updated, degraded) extracted from
 # real runs' interop-opp-wait-mcp build logs (prow, ocp-4.22 CR full-stack):
-#   run1-pinned-enospc      2115277579970678784  Degraded pinned, ENOSPC
+#   run1-pinned-enoscp      2115277579970678784  Degraded pinned, ENOSPC
 #   run2-sawtooth           2115458776726245376  updated=9/9, ready sawtooth
-#   run3-pinned-enospc      2115639973800579072  Degraded pinned, ENOSPC
+#   run3-pinned-enoscp      2115639973800579072  Degraded pinned, ENOSPC
 #   green-control           2115096361434091520  converged after churn
-# This test PINS THE CURRENT PREDICATE: a failure means the extraction or a
-# refactor changed step semantics. (The current predicate grants a progress
-# extension on all four series - including both Degraded-pinned runs and the
-# sawtooth - which is the defect PR-B fixes; the expectations flip there.)
+# The self-test evaluates IsMcpProgressing at each fixture's FINAL poll
+# (the verdict the step would reach at timeout) and pins the flipped
+# expectations of the rewritten predicate: no extension for the two
+# Degraded-pinned runs (degraded gate) or the sustained sawtooth
+# (pinned-updated veto); progress still detected for the green control.
 
 __fixture_run1_pinned_enoscp () {
   # provenance: run 2115277579970678784 (prow ocp-4.22 CR full-stack), artifact
@@ -203,6 +407,15 @@ __fixture_run1_pinned_enoscp () {
 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8
 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8
 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8)
+  FIX_UPDATED=(9 9 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8
+  8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8
+  8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8
+  8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8)
+  FIX_DEGRADED=(0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+  1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+  1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+  1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)
+  FIX_MACHINECOUNT=9
 }
 __fixture_run2_sawtooth_unconverged () {
   # provenance: run 2115458776726245376 (prow ocp-4.22 CR full-stack), artifact
@@ -211,6 +424,15 @@ __fixture_run2_sawtooth_unconverged () {
 4 5 4 4 4 4 4 4 5 8 8 8 8 8 8 8 8 8 7 6 5 4 4 4 4 4 4 4 4 5 7 7 7 4 4 4 4 4 4 4 4 5 6 6 6 4 4 4
 4 4 4 4 4 5 5 6 7 5 4 4 4 4 4 4 4 4 6 6 7 7 5 4 4 4 4 4 4 4 4 6 6 6 4 4 4 4 4 4 4 4 4 5 7 6 5 5
 5 4 4 4 4 4 4 5 6 7 6 4 5 4 4 4 4 4 4 4 6 6 6 6 4 5 4 4 4 4 4 4 5 5 6)
+  FIX_UPDATED=(9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9
+  9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9
+  9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 8 9 9 9 9 9 9 9 9 9 9 9 8 9 9 9 9 9 9 9 9 9 9
+  9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9)
+  FIX_DEGRADED=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0
+  0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
+  FIX_MACHINECOUNT=9
 }
 __fixture_run3_pinned_enoscp () {
   # provenance: run 2115639973800579072 (prow ocp-4.22 CR full-stack), artifact
@@ -219,46 +441,500 @@ __fixture_run3_pinned_enoscp () {
 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8
 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8
 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8)
+  FIX_UPDATED=(9 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8
+  8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8
+  8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8
+  8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8 8)
+  FIX_DEGRADED=(0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+  1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+  1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1
+  1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)
+  FIX_MACHINECOUNT=9
 }
 __fixture_green_control () {
   # provenance: run 2115096361434091520 (prow ocp-4.22 CR full-stack), artifact
   # interop-opp-wait-mcp/build-log.txt; per-poll worker readyMachineCount
   FIX_READY=(8 8 7 7 7 7 6 6 6 6 6 6 6 7 7 6 6 6 6 4 4 5 4 4 5 5 6 6 6 7 8 4 4 4 5 4 4 4 4 4 4 5 6 8 8 8 8)
+  FIX_UPDATED=(9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9 9)
+  FIX_DEGRADED=(0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0)
+  FIX_MACHINECOUNT=9
 }
 
-WaitMcpSelfTest () {
-  # Runs the CURRENT IsReadyCountProgressing over each fixture with
-  # any-window extension semantics (the loop evaluates the predicate every
-  # extensionCheckInterval polls on the growing history). Expected verdicts
-  # record the current behavior: extension granted on all four fixtures.
-  local _fixture _expected _got _fail=0
-  for _fixture in run1_pinned_enoscp run2_sawtooth_unconverged run3_pinned_enoscp green_control; do
+__fixture_converged_all_clean () {
+  # provenance: build 2124500195990310912 mcps.yaml converged 3/3 and 12/12, no Available condition, recorded under .local/ticket-review-convergence/INTEROP-9723-2026-11-22/repro/mcps.yaml
+  FIX_MCP_JSON='{"apiVersion":"v1","kind":"List","items":[{"metadata":{"name":"master","generation":2,"uid":"9cb2d720-68c0-456e-b30e-3bb6b4762fd7"},"spec":{"paused":false},"status":{"conditions":[{"type":"Degraded","status":"False"},{"type":"Updated","status":"True"},{"type":"Updating","status":"False"},{"type":"RenderDegraded","status":"False"},{"type":"NodeDegraded","status":"False"},{"type":"PinnedImageSetsDegraded","status":"False"}],"machineCount":3,"readyMachineCount":3,"updatedMachineCount":3,"unavailableMachineCount":0,"observedGeneration":2}},{"metadata":{"name":"worker","generation":2,"uid":"09c0c55d-e04b-4901-a448-f8b69d96a97f"},"spec":{"paused":false},"status":{"conditions":[{"type":"Degraded","status":"False"},{"type":"Updated","status":"True"},{"type":"Updating","status":"False"},{"type":"RenderDegraded","status":"False"},{"type":"NodeDegraded","status":"False"},{"type":"PinnedImageSetsDegraded","status":"False"}],"machineCount":12,"readyMachineCount":12,"updatedMachineCount":12,"unavailableMachineCount":0,"observedGeneration":2}}]}'
+  # mutation: reinstating the Available conjunct flips poll to UNSTABLE (no Available condition present, parent treated Unknown as not True)
+  FIX_EXPECTED_POLL="STABLE"
+  FIX_EXPECTED_TERMINAL="STABLE"
+}
+
+__fixture_converged_degraded () {
+  # edge: converged counts but Degraded=True on worker, must stay UNSTABLE and DEGRADED
+  FIX_MCP_JSON='{"apiVersion":"v1","kind":"List","items":[{"metadata":{"name":"master","generation":2,"uid":"9cb2d720-68c0-456e-b30e-3bb6b4762fd7"},"spec":{"paused":false},"status":{"conditions":[{"type":"Degraded","status":"False"},{"type":"Updated","status":"True"},{"type":"Updating","status":"False"}],"machineCount":3,"readyMachineCount":3,"updatedMachineCount":3,"unavailableMachineCount":0,"observedGeneration":2}},{"metadata":{"name":"worker","generation":2,"uid":"09c0c55d-e04b-4901-a448-f8b69d96a97f"},"spec":{"paused":false},"status":{"conditions":[{"type":"Degraded","status":"True"},{"type":"Updated","status":"True"},{"type":"Updating","status":"False"}],"machineCount":12,"readyMachineCount":12,"updatedMachineCount":12,"unavailableMachineCount":0,"observedGeneration":2}}]}'
+  # mutation: making the converged STABLE check win before the DEGRADED arm flips terminal to STABLE (must stay DEGRADED)
+  FIX_EXPECTED_POLL="UNSTABLE"
+  FIX_EXPECTED_TERMINAL="DEGRADED"
+}
+
+__fixture_converged_unknown_conditions () {
+  # edge: converged counts but Updating and Degraded Unknown, must stay UNSTABLE (Unknown is not clean)
+  FIX_MCP_JSON='{"apiVersion":"v1","kind":"List","items":[{"metadata":{"name":"master","generation":2,"uid":"9cb2d720-68c0-456e-b30e-3bb6b4762fd7"},"spec":{"paused":false},"status":{"conditions":[{"type":"Degraded","status":"Unknown"},{"type":"Updated","status":"True"},{"type":"Updating","status":"Unknown"}],"machineCount":3,"readyMachineCount":3,"updatedMachineCount":3,"unavailableMachineCount":0,"observedGeneration":2}},{"metadata":{"name":"worker","generation":2,"uid":"09c0c55d-e04b-4901-a448-f8b69d96a97f"},"spec":{"paused":false},"status":{"conditions":[{"type":"Degraded","status":"Unknown"},{"type":"Updated","status":"True"},{"type":"Updating","status":"Unknown"}],"machineCount":12,"readyMachineCount":12,"updatedMachineCount":12,"unavailableMachineCount":0,"observedGeneration":2}}]}'
+  # mutation: allowing Unknown for Updating or Degraded to count as clean would flip poll to STABLE (must stay UNSTABLE)
+  FIX_EXPECTED_POLL="UNSTABLE"
+  FIX_EXPECTED_TERMINAL="UNKNOWN"
+}
+
+WaitMcpClassifierSelfTest () {
+  typeset _fixture _got_poll _got_term; typeset -i _fail=0
+  for _fixture in converged_all_clean converged_degraded converged_unknown_conditions; do
     "__fixture_${_fixture}"
-    _expected="GRANTED"
-    _got="NOT-GRANTED"
-    local -a _hist=()
-    local _v
-    for _v in "${FIX_READY[@]}"; do
-      _hist+=("${_v}")
-      local -a _win=("${_hist[@]:$((${#_hist[@]} > 6 ? ${#_hist[@]} - 6 : 0))}")
-      readyHistory=("${_win[@]}")
-      if IsReadyCountProgressing; then _got="GRANTED"; break; fi
-    done
-    echo ">>> selftest: ${_fixture}: extension=${_got} (pinned: ${_expected})"
-    [[ "${_got}" == "${_expected}" ]] || _fail=1
+    # drift guard: this poll classifier mirrors the production poll loop classifier (see STABLE/UNSTABLE python block in the poll loop); keep both in sync (both require Updating and Degraded explicitly False, rejecting Unknown)
+    # copy is deliberate; guard fails the selftest on divergence (no shared function in this push)
+    _got_poll="$(echo "${FIX_MCP_JSON}" | python3 /dev/fd/3 3<<'PY'
+import sys, json
+data = json.load(sys.stdin)
+issues = []
+total_ready = 0
+total_updated = 0
+total_machine = 0
+any_degraded = 0
+gen_parts = []
+for mcp in data.get('items', []):
+    name = mcp['metadata']['name']
+    paused = mcp.get('spec', {}).get('paused', False)
+    if paused:
+        continue
+    conditions = {c['type']: c['status'] for c in mcp.get('status', {}).get('conditions', [])}
+    updating = conditions.get('Updating', 'Unknown')
+    degraded = conditions.get('Degraded', 'Unknown')
+    updated_cond = conditions.get('Updated', 'Unknown')
+    status = mcp.get('status', {})
+    ready = status.get('readyMachineCount', 0)
+    total = status.get('machineCount', 0)
+    updated = status.get('updatedMachineCount', 0)
+    unavailable = status.get('unavailableMachineCount', 0)
+    generation = mcp['metadata'].get('generation', 0)
+    observed = status.get('observedGeneration', -1)
+    uid = mcp['metadata'].get('uid', '')
+    gen_parts.append(f'{name}={generation} uid={uid}')
+    total_ready += ready
+    total_updated += updated
+    total_machine += total
+    if degraded == 'True':
+        any_degraded = 1
+    if (updating != 'False' or degraded != 'False' or updated_cond != 'True'
+            or unavailable > 0 or ready != total or updated != total
+            or observed != generation):
+        issues.append(f'{name}: Updating={updating} Updated={updated_cond} Degraded={degraded} ready={ready}/{total} updated={updated}/{total} unavailable={unavailable} gen={generation}/obs={observed}')
+if issues:
+    print('UNSTABLE|' + '; '.join(issues).replace('|', '/') + '|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|' + str(any_degraded) + '|' + ';'.join(sorted(gen_parts)))
+else:
+    print('STABLE|all non-paused MCPs healthy|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|0|' + ';'.join(sorted(gen_parts)))
+PY
+)" || _got_poll="UNSTABLE|python parse error|0|0|0|0|"
+    _got_poll="$(echo "${_got_poll}" | cut -d'|' -f1)"
+    _got_term="$(ClassifyMcpState "${FIX_MCP_JSON}")"
+    echo ">>> selftest: ${_fixture}: poll=${_got_poll} (pinned: ${FIX_EXPECTED_POLL}) terminal=${_got_term} (pinned: ${FIX_EXPECTED_TERMINAL})"
+    [[ "${_got_poll}" == "${FIX_EXPECTED_POLL}" ]] || _fail=1
+    [[ "${_got_term}" == "${FIX_EXPECTED_TERMINAL}" ]] || _fail=1
   done
-  readyHistory=()
   return "${_fail}"
 }
 
-if WaitMcpSelfTest; then
-  _junit_selftest="pass"
-  echo ">>> PHASE 0: predicate self-test passed (current behavior pinned)"
-else
+WaitMcpSelfTest () {
+  # Evaluates the CURRENT IsMcpProgressing at each fixture's final poll.
+  # Expected verdicts (PR-B, flipped from the PR-A pins):
+  #   run1/run3 (Degraded pinned)     -> NOT-PROGRESSING (degraded gate)
+  #   run2 (sustained sawtooth)       -> NOT-PROGRESSING (pinned-updated veto)
+  #   green-control (recovers)        -> PROGRESSING
+  local _fixture _expected _got _fail=0
+  for _fixture in run1_pinned_enoscp run2_sawtooth_unconverged run3_pinned_enoscp green_control; do
+    "__fixture_${_fixture}"
+    case "${_fixture}" in
+      green_control) _expected="PROGRESSING" ;;
+      *) _expected="NOT-PROGRESSING" ;;
+    esac
+    readyHistory=("${FIX_READY[@]}")
+    updatedHistory=("${FIX_UPDATED[@]}")
+    degradedHistory=("${FIX_DEGRADED[@]}")
+    machineCountHistory=()
+    local _v
+    for _v in "${FIX_UPDATED[@]}"; do machineCountHistory+=("${FIX_MACHINECOUNT}"); done
+    if IsMcpProgressing 120 3; then _got="PROGRESSING"; else _got="NOT-PROGRESSING"; fi
+    echo ">>> selftest: ${_fixture}: ${_got} (pinned: ${_expected})"
+    [[ "${_got}" == "${_expected}" ]] || _fail=1
+  done
+  readyHistory=() ; updatedHistory=() ; degradedHistory=() ; machineCountHistory=()
+  return "${_fail}"
+}
+
+WaitMcpTrapSelfTest () {
+  # Fork the REAL script (byte-identical copy under a distinct basename so
+  # the child's xtrace log does not collide with this process's) against a
+  # mock oc, send it SIGTERM once it reaches the health-gate poll loop, and
+  # assert the TERM contract end to end: exit code 143, a JUnit failure
+  # carrying the reason, the scrubbed xtrace bundle in artifacts, and the
+  # trap's synchronous work completing well inside the 300s step-timeout
+  # grace. Runs on every execution (phase 0) - a mid-step termination is
+  # not parameterizable into a pj-rehearse rehearsal, so the per-run
+  # self-test is the standing evidence for the termination path (the
+  # acceptance criterion's one-shot rehearsal is superseded by this).
+  # Harness setup failures (mktemp/copy - environmental, not a semantics
+  # break) warn and continue: the step still runs, the JUnit property
+  # records trap_selftest=warn. Contract failures (child ran but the TERM
+  # path misbehaved) fail the step (exit 2) - preflight review split.
+  local _tt_dir _cpid _crc=0 _w _t0 _t1
+  _tt_dir="$(mktemp -d /tmp/wmcp-termtest.XXXXXX)" || { echo "trap self-test: mktemp failed (environmental); continuing" >&2; _junit_trapselftest="warn"; return 0; }
+  mkdir -p "${_tt_dir}/shared" "${_tt_dir}/artifacts" "${_tt_dir}/mockbin"
+  # Mock oc: a worker MCP mid-rollout (Updating, not Degraded, not
+  # converged) so the child stays in the poll loop; everything else
+  # answers an empty List. The child never touches a real cluster.
+  cat > "${_tt_dir}/mockbin/oc" <<'MOCKEOF'
+#!/bin/bash
+case "$*" in
+  *"get mcp -o json"*)
+    cat <<'JSONEOF'
+{"apiVersion":"v1","items":[{"apiVersion":"machineconfiguration.openshift.io/v1","kind":"MachineConfigPool","metadata":{"name":"worker","generation":3},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"False","reason":"AsExpected"},{"type":"Updated","status":"False","reason":"test"},{"type":"Updating","status":"True","reason":"test"}],"degradedMachineCount":0,"machineCount":9,"observedGeneration":3,"readyMachineCount":7,"unavailableMachineCount":2,"updatedMachineCount":7}}],"kind":"List"}
+JSONEOF
+    ;;
+  *) echo '{"apiVersion":"v1","items":[],"kind":"List"}' ;;
+esac
+MOCKEOF
+  chmod +x "${_tt_dir}/mockbin/oc"
+  # $0 must resolve to this file (ref sets run_as_script so it is
+  # executed directly, not via bash -c); validate the copy carries this
+  # script's marker so an invocation-semantics change degrades to warn,
+  # never to silently testing the wrong file (preflight review).
+  local _src
+  _src="$(readlink -f "${0}" 2>/dev/null)" || _src="${0}"
+  cp "${_src}" "${_tt_dir}/wmcp-term-child.sh" || { echo "trap self-test: copy failed (environmental); continuing" >&2; rm -rf "${_tt_dir}"; _junit_trapselftest="warn"; return 0; }
+  if ! grep -q "WaitMcpTrapSelfTest" "${_tt_dir}/wmcp-term-child.sh" 2>/dev/null; then
+    echo "trap self-test: script path resolved to ${_src}, which is not this script (invocation semantics?); continuing" >&2
+    rm -rf "${_tt_dir}"
+    _junit_trapselftest="warn"
+    return 0
+  fi
+  # Child: real script, mock API on PATH, tight poll cadence, short
+  # deadline so a missed signal still self-terminates, child-mode env so
+  # its own phase 0 does not fork another trap test (recursion guard).
+  WAIT_MCP_SELFTEST_CHILD=1 PATH="${_tt_dir}/mockbin:${PATH}" \
+    SHARED_DIR="${_tt_dir}/shared" ARTIFACT_DIR="${_tt_dir}/artifacts" \
+    KUBECONFIG="${_tt_dir}/kubeconfig" MCP_SETTLE_DELAY=0 MCP_POLL_INTERVAL=10 \
+    MCP_WAIT_TIMEOUT=120 MCP_WAIT_MAX_TIMEOUT=180 \
+    bash "${_tt_dir}/wmcp-term-child.sh" > "${_tt_dir}/child.log" 2>&1 &
+  _cpid=$!
+  _w=0
+  while (( _w < 90 )); do
+    grep -q "Polling MCPs for up to" "${_tt_dir}/child.log" 2>/dev/null && break
+    # bail out early if the child died before reaching the poll loop
+    kill -0 "${_cpid}" 2>/dev/null || break
+    sleep 1
+    (( _w++ )) || true
+  done
+  if ! grep -q "Polling MCPs for up to" "${_tt_dir}/child.log" 2>/dev/null; then
+    # Slow child startup is environmental (the child re-runs phase 0 under
+    # the step's 200m CPU request), not a TERM-contract break: warn and
+    # continue (preflight review). The parent already passed the same
+    # phase-0 the child runs, so an early child death is environmental too.
+    echo "trap self-test: child never reached the poll loop within ${_w}s (slow start - environmental); continuing" >&2
+    tail -20 "${_tt_dir}/child.log" >&2
+    kill -9 "${_cpid}" 2>/dev/null || true
+    wait "${_cpid}" 2>/dev/null || true
+    rm -rf "${_tt_dir}"
+    _junit_trapselftest="warn"
+    return 0
+  fi
+  _t0=$(date +%s)
+  kill -TERM "${_cpid}" 2>/dev/null || true
+  typeset -i _termDeadline=$(( SECONDS + 10 ))
+  while kill -0 "${_cpid}" 2>/dev/null && (( SECONDS < _termDeadline )); do sleep 0.5; done
+  if kill -0 "${_cpid}" 2>/dev/null; then kill -KILL "${_cpid}" 2>/dev/null || true; fi
+  wait "${_cpid}" 2>/dev/null || _crc=$?
+  _t1=$(date +%s)
+  local _ok=0
+  # 1. exit code 143 (TERM recorded by the handler, not a shell default)
+  (( _crc == 143 )) || { echo "trap self-test: expected exit 143, got ${_crc}" >&2; _ok=1; }
+  # 2. JUnit failure carrying the TERM reason
+  python3 - "${_tt_dir}/artifacts/junit_lp-interop--OPP--wait-mcp.xml" <<'PYEOF' || _ok=1
+import sys, xml.etree.ElementTree as ET
+try:
+    root = ET.parse(sys.argv[1]).getroot()
+    tc = {c.get("name"): c for c in root.findall("testcase")}["wait-mcp"]
+    f = tc.find("failure")
+    assert f is not None, "no failure element"
+    # PRRT_kwDOBHvUUM65on1z: separate TERM reason vs exit code (check reason field)
+    assert "143" in (f.get("message") or ""), f"failure message: {f.get('message')}"
+    assert "TERM" in (f.get("message") or "") or "TERM" in (f.get("reason") or "") or "TERM" in (f.text or ""), f"failure message: {f.get('message')} reason: {f.get('reason')} text: {f.text}"
+except Exception as e:
+    print(f"trap self-test: JUnit assertion failed: {e}", file=sys.stderr)
+    sys.exit(1)
+PYEOF
+  # 3. scrubbed xtrace bundle landed in artifacts (the never-uploaded
+  #    bundle from the original defect)
+  ls "${_tt_dir}/artifacts"/xtrace-scrub-*.log >/dev/null 2>&1 || {
+    echo "trap self-test: no xtrace-scrub-*.log in artifacts" >&2; _ok=1; }
+  # 4. TERM-to-exit well inside the 300s grace (includes bash deferring
+  #    the trap behind a <=10s foreground sleep; the trap's own work is
+  #    sub-second)
+  (( (_t1 - _t0) < 60 )) || { echo "trap self-test: TERM-to-exit took $((_t1 - _t0))s (budget 60s)" >&2; _ok=1; }
+  if (( _ok )); then tail -20 "${_tt_dir}/child.log" >&2; fi
+  rm -rf "${_tt_dir}"
+  (( _ok == 0 ))
+}
+
+
+function ClassifyMcpState () {
+    # Classify the MCP timeout as DEGRADED, UPDATING, STABLE, or UNKNOWN from the JSON state.
+    # precedence: DEGRADED, then UPDATING, then STABLE, then UNKNOWN
+    typeset json="${1}"
+    echo "${json}" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+items = [m for m in data.get('items', []) if not m.get('spec', {}).get('paused', False)]
+degraded = any(
+    {c['type']: c['status'] for c in m.get('status', {}).get('conditions', [])}.get('Degraded') == 'True'
+    for m in items
+)
+updating = any(
+    {c['type']: c['status'] for c in m.get('status', {}).get('conditions', [])}.get('Updating') == 'True'
+    for m in items
+)
+# Converged check: all pools have Updated=True, Updating=False, Degraded=False, counts congruent, observedGeneration == generation, unavailable 0
+stable = False
+if items:
+    stable = True
+    for m in items:
+        conds = {c['type']: c['status'] for c in m.get('status', {}).get('conditions', [])}
+        st = m.get('status', {})
+        if (conds.get('Updating') != 'False' or conds.get('Degraded') != 'False' or conds.get('Updated') != 'True'
+                or st.get('unavailableMachineCount', 0) > 0
+                or st.get('readyMachineCount', 0) != st.get('machineCount', 0)
+                or st.get('updatedMachineCount', 0) != st.get('machineCount', 0)
+                or st.get('observedGeneration', -1) != m['metadata'].get('generation', 0)):
+            stable = False
+            break
+if degraded:
+    print('DEGRADED')
+elif updating:
+    print('UPDATING')
+elif stable:
+    print('STABLE')
+else:
+    print('UNKNOWN')
+" 2>/dev/null || echo "UNKNOWN"
+    true
+}
+
+function EnospcSignatures () {
+    # Print every DISTINCT ENOSPC-matching Degraded/NodeDegraded condition
+    # line from the given MCP JSON, sorted, one per line, or nothing. Never
+    # fails. Same line format and same signature regex as
+    # FirstDegradedCondition: that helper answers "which one condition do I
+    # report", this one answers "which signatures does this poll carry", and
+    # the streak comparison needs the set, not one member of it
+    # (PRRT_kwDOBHvUUM65on19).
+    echo "${1}" | timeout 10s python3 -c "
+import re, sys, json
+enospc = re.compile(r'no space left on device|disk full|could not write image pull secret')
+seen = set()
+data = json.load(sys.stdin)
+for m in data.get('items', []):
+    if m.get('spec', {}).get('paused', False):
+        continue
+    name = m['metadata']['name']
+    for c in m.get('status', {}).get('conditions', []):
+        if c.get('type') in ('Degraded', 'NodeDegraded') and c.get('status') == 'True':
+            line = f'{name}: {c.get(\"type\")} reason={c.get(\"reason\")!r} message={c.get(\"message\")!r}'
+            if enospc.search(line):
+                seen.add(line)
+for line in sorted(seen):
+    print(line)
+" 2>/dev/null || true
+    true
+}
+
+function ResetEnospcStreaks () {
+    # End every ENOSPC streak. A non-Degraded poll, an oc failure and a status
+    # parse error all mean the signature is not demonstrably continuous, so a
+    # one-poll blip can never reach the 2-poll fail-fast.
+    _enospcStreaks=()
+    _enospcStreakHit=0
+    _enospcHitStreak=0
+    _enospcHitSignature=""
+    true
+}
+
+function UpdateEnospcStreaks () {
+    # Advance the per-signature ENOSPC streaks by one Degraded poll
+    # (PRRT_kwDOBHvUUM65on19). This poll's distinct signature set is compared
+    # with the previous poll's: a signature present now increments its own
+    # consecutive-poll count, a signature absent now is dropped, and a poll
+    # carrying no ENOSPC signature clears every streak. The comparison is over
+    # sets, so pool ordering is irrelevant and a persistent signature reaches
+    # the fail-fast even when the first ENOSPC match moves between polls.
+    # Sets _enospcStreakHit (1 when some signature reached 2),
+    # _enospcHitSignature (that signature, verbatim) and _enospcHitStreak (its
+    # count). Never fails. Must run in the caller's shell, not in a command
+    # substitution: it mutates the streak map.
+    typeset _sigs="" _sig=""
+    typeset -A _next=()
+    typeset -i _n=0
+    typeset _hit=""
+    _enospcStreakHit=0
+    _enospcHitStreak=0
+    _enospcHitSignature=""
+    _sigs="$(EnospcSignatures "${1}")"
+    if [[ -z "${_sigs}" ]]; then
+        ResetEnospcStreaks
+        return 0
+    fi
+    # Sorted order (EnospcSignatures sorts) keeps the reported hit
+    # deterministic when two signatures reach the threshold on the same poll.
+    while IFS= read -r _sig; do
+        if [[ -z "${_sig}" ]]; then
+            continue
+        fi
+        _n=$(( ${_enospcStreaks["${_sig}"]:-0} + 1 ))
+        _next["${_sig}"]=${_n}
+        if (( _n >= 2 )) && [[ -z "${_hit}" ]]; then
+            _hit="${_sig}"
+            _enospcHitStreak=${_n}
+        fi
+    done <<< "${_sigs}"
+    # Rewrite the map from this poll's signatures only: the absent ones are
+    # gone, the carried ones keep their new count.
+    _enospcStreaks=()
+    for _sig in "${!_next[@]}"; do
+        _enospcStreaks["${_sig}"]=${_next["${_sig}"]}
+    done
+    if [[ -n "${_hit}" ]]; then
+        _enospcStreakHit=1
+        _enospcHitSignature="${_hit}"
+    fi
+    true
+}
+
+WaitMcpEnospcStreakSelfTest () {
+  # Offline pin for the ENOSPC streak comparison (PRRT_kwDOBHvUUM65on19),
+  # evaluated against UpdateEnospcStreaks at the poll loop's own call shape
+  # (no cluster, no clock):
+  #   order swap     two pools carry distinct ENOSPC signatures and their
+  #                  poll order swaps between two consecutive polls: the
+  #                  fail-fast must still fire (the pre-change single
+  #                  selection reset the streak here)
+  #   single blip    a signature present on one poll and absent on the next
+  #                  must not fire it
+  #   reset          a non-Degraded poll between two identical ENOSPC polls
+  #                  must not fire it either
+  # Dormant by design: this change adds no runtime self-test to the step (no
+  # phase 0 wiring); the offline review harness runs this function.
+  local _pollSwap1 _pollSwap2 _pollBlip1 _pollBlip2 _fail=0
+  local _gotHit="" _gotStreak=0 _case=""
+  # master and worker carry different ENOSPC messages, so the two signatures
+  # are distinct; only their order in the list changes between polls.
+  _pollSwap1='{"items":[{"metadata":{"name":"master"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeDegraded","message":"writing blob: no space left on device"}]}},{"metadata":{"name":"worker"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeDegraded","message":"could not write image pull secret: disk full"}]}}]}'
+  _pollSwap2='{"items":[{"metadata":{"name":"worker"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeDegraded","message":"could not write image pull secret: disk full"}]}},{"metadata":{"name":"master"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeDegraded","message":"writing blob: no space left on device"}]}}]}'
+  _pollBlip1='{"items":[{"metadata":{"name":"worker"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeDegraded","message":"writing blob: no space left on device"}]}}]}'
+  # second poll is Degraded but carries no ENOSPC signature at all
+  _pollBlip2='{"items":[{"metadata":{"name":"worker"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeFilesystemError","message":"unit kubelet.service entered failed state"}]}}]}'
+
+  ResetEnospcStreaks
+  UpdateEnospcStreaks "${_pollSwap1}"
+  UpdateEnospcStreaks "${_pollSwap2}"
+  _gotHit="${_enospcHitSignature}"
+  _gotStreak=${_enospcHitStreak}
+  _case="order swap (two ENOSPC pools, order reversed between polls)"
+  if [[ -n "${_gotHit}" ]] && (( _gotStreak >= 2 )) && (( _enospcStreakHit == 1 )); then
+    echo ">>> selftest: enospc-streak ${_case}: HIT streak=${_gotStreak} signature=${_gotHit}"
+  else
+    echo ">>> selftest: enospc-streak ${_case}: NO HIT or flag unset (streak=${_gotStreak}, flag=${_enospcStreakHit}) -- FAIL"
+    _fail=1
+  fi
+
+  ResetEnospcStreaks
+  UpdateEnospcStreaks "${_pollBlip1}"
+  local -i _blipFirstHit=${_enospcStreakHit}
+  UpdateEnospcStreaks "${_pollBlip2}"
+  _case="single blip (signature present one poll, absent the next)"
+  if (( _blipFirstHit == 0 )) && (( _enospcStreakHit == 0 )) && (( ${#_enospcStreaks[@]} == 0 )); then
+    echo ">>> selftest: enospc-streak ${_case}: NO HIT -- PASS"
+  else
+    echo ">>> selftest: enospc-streak ${_case}: HIT or stale streak (streaks=${#_enospcStreaks[@]}) -- FAIL"
+    _fail=1
+  fi
+
+  ResetEnospcStreaks
+  UpdateEnospcStreaks "${_pollBlip1}"
+  ResetEnospcStreaks
+  UpdateEnospcStreaks "${_pollBlip1}"
+  _case="reset between polls (non-Degraded poll breaks the run)"
+  if (( _enospcStreakHit == 0 )); then
+    echo ">>> selftest: enospc-streak ${_case}: NO HIT -- PASS"
+  else
+    echo ">>> selftest: enospc-streak ${_case}: HIT -- FAIL"
+    _fail=1
+  fi
+
+  # A new ENOSPC condition (master) appears FIRST on the second poll while
+  # the persistent one (worker) keeps its streak: the hit must name worker,
+  # and the JUnit reason follows the hit, not the poll's first condition.
+  ResetEnospcStreaks
+  UpdateEnospcStreaks "${_pollBlip1}"
+  _pollNewFirst='{"items":[{"metadata":{"name":"master"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeDegraded","message":"writing blob: no space left on device"}]}},{"metadata":{"name":"worker"},"spec":{},"status":{"conditions":[{"type":"Degraded","status":"True","reason":"NodeDegraded","message":"writing blob: no space left on device"}]}}]}'
+  UpdateEnospcStreaks "${_pollNewFirst}"
+  _case="new signature first (persistent worker behind a new master on poll 2)"
+  if (( _enospcStreakHit == 1 )) && [[ "${_enospcHitSignature}" == *"worker"* ]]; then
+    echo ">>> selftest: enospc-streak ${_case}: HIT names the persistent signature -- PASS"
+  else
+    echo ">>> selftest: enospc-streak ${_case}: HIT names '${_enospcHitSignature}' (flag=${_enospcStreakHit}) -- FAIL"
+    _fail=1
+  fi
+
+  ResetEnospcStreaks
+  return "${_fail}"
+}
+
+if ! WaitMcpSelfTest; then
   _junit_selftest="fail"
   echo "FAILURE CLASS: Invalid step input" >&2
-  echo "predicate self-test failed: extracted IsReadyCountProgressing does not reproduce its pinned behavior" >&2
+  echo "predicate self-test failed: IsMcpProgressing does not reproduce its pinned behavior" >&2
   exit 2
+fi
+_junit_selftest="pass"
+echo ">>> PHASE 0: predicate self-test passed (rewritten predicate pinned)"
+if ! WaitMcpClassifierSelfTest; then
+  _junit_classifierselftest="fail"
+  echo "FAILURE CLASS: Invalid step input" >&2
+  echo "classifier self-test failed: ClassifyMcpState does not reproduce its pinned behavior" >&2
+  exit 2
+fi
+_junit_classifierselftest="pass"
+echo ">>> PHASE 0: classifier self-test passed (converged STABLE, degraded DEGRADED pinned)"
+if ! WaitMcpEnospcStreakSelfTest; then
+  _junit_enospcselftest="fail"
+  echo "FAILURE CLASS: Invalid step input" >&2
+  echo "enospc-streak self-test failed: UpdateEnospcStreaks does not reproduce its pinned behavior" >&2
+  exit 2
+fi
+_junit_enospcselftest="pass"
+echo ">>> PHASE 0: enospc-streak self-test passed (order swap fires, single blip and reset do not)"
+if [[ -z "${WAIT_MCP_SELFTEST_CHILD:-}" ]]; then
+  if WaitMcpTrapSelfTest; then
+    # keep a warn verdict set inside the harness-failure paths
+    [[ "${_junit_trapselftest}" == "warn" ]] || _junit_trapselftest="pass"
+    if [[ "${_junit_trapselftest}" == "pass" ]]; then
+        echo ">>> PHASE 0: trap self-test passed (TERM -> 143, JUnit reason, xtrace bundle, bounded grace)"
+    else
+        echo ">>> PHASE 0: trap self-test did not pass (result: ${_junit_trapselftest})"
+    fi
+  else
+    _junit_trapselftest="fail"
+    echo "FAILURE CLASS: Invalid step input" >&2
+    echo "trap self-test failed: TERM contract (exit 143, JUnit reason, xtrace bundle, bounded grace) not reproduced" >&2
+    exit 2
+  fi
+else
+  _junit_trapselftest="skip"
 fi
 
 function EmitMcpConditions () {
@@ -278,31 +954,181 @@ for m in data.get('items', []):
 }
 
 function FirstDegradedCondition () {
-    # Echo the first Degraded/NodeDegraded condition message (verbatim) from
-    # the given MCP JSON, or nothing. Never fails.
+    # Echo one Degraded/NodeDegraded condition message (verbatim) from the
+    # given MCP JSON, or nothing. Never fails. A condition carrying the
+    # non-self-healing ENOSPC signature wins over plain pool order: an
+    # unrelated Degraded reason on an earlier pool must not mask a worker's
+    # persistent ENOSPC signature and turn the documented
+    # storage-capacity-enospc class (and its in-loop fail-fast) into
+    # mcp-degraded. The signature is the same one both call sites test.
     echo "${1}" | timeout 10s python3 -c "
-import sys, json
+import re, sys, json
+enospc = re.compile(r'no space left on device|disk full|could not write image pull secret')
+lines = []
 data = json.load(sys.stdin)
 for m in data.get('items', []):
     if m.get('spec', {}).get('paused', False):
         continue
     for c in m.get('status', {}).get('conditions', []):
         if c.get('type') in ('Degraded', 'NodeDegraded') and c.get('status') == 'True':
-            print(f'{m[\"metadata\"][\"name\"]}: {c.get(\"type\")} reason={c.get(\"reason\")!r} message={c.get(\"message\")!r}')
-            sys.exit(0)
-sys.exit(1)
+            lines.append(f'{m[\"metadata\"][\"name\"]}: {c.get(\"type\")} reason={c.get(\"reason\")!r} message={c.get(\"message\")!r}')
+if not lines:
+    sys.exit(1)
+for line in lines:
+    if enospc.search(line):
+        print(line)
+        sys.exit(0)
+print(lines[0])
 " 2>/dev/null || true
     true
 }
 
+function CollectFailureBundle () {
+    # Bounded, idempotent failure-path evidence collection (INTEROP-9646):
+    # everything attribution needs without a must-gather - the FIPS lane
+    # has none. Watchdog 120s, per-call 10s, big objects redirected to
+    # files (never echoed under set -x), so the whole path fits the 5m
+    # termination grace with the 60s self-terminating headroom.
+    (( _bundleCollected )) && return 0
+    _bundleCollected=1
+    [[ -n "${ARTIFACT_DIR:-}" ]] || return 0
+    set +x 2>/dev/null
+    # Policy artifacts are SECRET-REDACTED on the way out (preflight
+    # review): policy-templates can embed Secret objects whose
+    # data/stringData would otherwise land in the public artifact
+    # bucket; fromSecret references (names only) are kept.
+    local _redact
+    _redact="$(mktemp /tmp/wmcp-redact.XXXXXX.py)" || _redact=""
+    if [[ -n "${_redact}" ]]; then
+      cat > "${_redact}" <<'REDACTEOF'
+import sys, json
+
+def redact(o):
+    if isinstance(o, dict):
+        out = {}
+        for k, v in o.items():
+            if k in ("data", "stringData") and isinstance(v, dict):
+                out[k] = {ik: "REDACTED" for ik in v}
+            elif k == "object-templates-raw" and isinstance(v, str):
+                # Embedded manifests as a raw string (ConfigurationPolicy
+                # spec, or a Policy embedding one): a Secret manifest inside
+                # the string bypasses the dict walker, so the whole raw
+                # template is replaced (preflight review).
+                out[k] = "REDACTED (raw object templates)"
+            elif k.endswith("last-applied-configuration") and isinstance(v, str):
+                # oc-apply annotations carry the full applied object as a
+                # JSON string - including any embedded Secret data; the
+                # whole annotation is replaced (preflight review).
+                out[k] = "REDACTED (last-applied-configuration)"
+            elif k == "properties" and "diff" in str(v).lower():
+                out[k] = "REDACTED (policy diff)"
+            else:
+                out[k] = redact(v)
+        return out
+    if isinstance(o, list):
+        return [redact(x) for x in o]
+    return o
+
+json.dump(redact(json.load(sys.stdin)), sys.stdout, indent=1)
+REDACTEOF
+    fi
+    # Every query records its own exit status next to the artifacts: pipefail
+    # makes a failing fetch or a failing redactor visible, and the status file
+    # is what the report below reads. A nonempty artifact alone does not prove
+    # the query completed, so the status is reported even when the file has
+    # content.
+    timeout 120s bash -c '
+      set -o pipefail
+      _status="'"${ARTIFACT_DIR}"'/query-status.txt"
+      : > "${_status}" || true
+      _rc=0
+      oc --request-timeout=10s get machines -A -o yaml > "'"${ARTIFACT_DIR}"'/machines.yaml" 2>/dev/null || _rc=$?
+      printf "machines %s\n" "${_rc}" >> "${_status}" || true
+      _rc=0
+      oc --request-timeout=10s get machinesets -A -o yaml > "'"${ARTIFACT_DIR}"'/machinesets.yaml" 2>/dev/null || _rc=$?
+      printf "machinesets %s\n" "${_rc}" >> "${_status}" || true
+      if [ -n "'"${_redact}"'" ]; then
+        _rc=0
+        oc --request-timeout=10s get configurationpolicies.policy.open-cluster-management.io -A -o json 2>/dev/null | python3 "'"${_redact}"'" > "'"${ARTIFACT_DIR}"'/configurationpolicies.yaml" || _rc=$?
+        printf "configurationpolicies %s\n" "${_rc}" >> "${_status}" || true
+        _rc=0
+        oc --request-timeout=10s get policies.policy.open-cluster-management.io -A -o json 2>/dev/null | python3 "'"${_redact}"'" > "'"${ARTIFACT_DIR}"'/policies.yaml" || _rc=$?
+        printf "policies %s\n" "${_rc}" >> "${_status}" || true
+      else
+        echo "redactor unavailable: policies/configurationpolicies SKIPPED (fail closed - templates can embed Secret data)" > "'"${ARTIFACT_DIR}"'/policies.yaml"
+        printf "configurationpolicies %s\n" "not-verified" >> "${_status}" || true
+        printf "policies %s\n" "not-verified" >> "${_status}" || true
+      fi
+      _rc=0
+      oc --request-timeout=10s get kubeletconfigs.machineconfiguration.openshift.io -A -o yaml > "'"${ARTIFACT_DIR}"'/kubeletconfigs.yaml" 2>/dev/null || _rc=$?
+      printf "kubeletconfigs %s\n" "${_rc}" >> "${_status}" || true
+      _rc=0
+      oc --request-timeout=10s get mcp -o yaml > "'"${ARTIFACT_DIR}"'/mcps.yaml" 2>/dev/null || _rc=$?
+      printf "mcps %s\n" "${_rc}" >> "${_status}" || true
+      _rc=0
+      oc --request-timeout=10s get nodes -o json > "'"${ARTIFACT_DIR}"'/nodes.json" 2>/dev/null || _rc=$?
+      printf "nodes %s\n" "${_rc}" >> "${_status}" || true
+    ' || true
+    # PRRT_kwDOBHvUUM65on13: every expected artifact is named, the redactor
+    # state is recorded, and an artifact with no output turns the closing line
+    # into a partial-collection report. The reported failure class is not
+    # touched here: collection never decides the class.
+    # The per-query exit status captured above is reported too: an artifact
+    # that has content after a failed fetch or a failed redaction is not
+    # evidence that the query succeeded, so a nonzero or unrecorded status
+    # also makes the report partial.
+    typeset _redactor_state="available"
+    typeset _missing=""
+    typeset _failed=""
+    typeset _query_status="${ARTIFACT_DIR}/query-status.txt"
+    if [[ -n "${_redact}" ]]; then
+        rm -f "${_redact}"
+    else
+        _redactor_state="unavailable, policies/configurationpolicies not captured"
+    fi
+    for _q in machines machinesets policies configurationpolicies kubeletconfigs mcps nodes; do
+        typeset _q_rc=""
+        _q_rc="$(awk -v q="${_q}" '$1 == q { rc = $2 } END { if (rc != "") print rc }' "${_query_status}" 2>/dev/null)" || _q_rc=""
+        [[ -n "${_q_rc}" ]] || _q_rc="no-status"
+        if [[ "${_q_rc}" != "0" ]]; then
+            _failed="${_failed} ${_q}(${_q_rc})"
+            echo ">>> evidence query ${_q} reported exit status ${_q_rc}; the artifact at ${ARTIFACT_DIR}/${_q}.* is not complete evidence (tokenized error)" >&2
+        fi
+        if [[ ! -s "${ARTIFACT_DIR}/${_q}.yaml" && ! -s "${ARTIFACT_DIR}/${_q}.json" ]]; then
+            _missing="${_missing} ${_q}"
+            echo ">>> evidence query ${_q} produced no output (failed or skipped: check ${ARTIFACT_DIR}/${_q}.*, tokenized error)" >&2
+        fi
+    done
+    if [[ -z "${_missing}" && -z "${_failed}" ]]; then
+        echo ">>> failure bundle collected to ${ARTIFACT_DIR} (machines, machinesets, policies [secret-redacted], configurationpolicies [secret-redacted], kubeletconfigs, mcps, nodes; redactor ${_redactor_state}; every query exited 0, per-query status in ${_query_status}); the reported failure class is unchanged"
+    else
+        echo ">>> failure bundle PARTIALLY collected to ${ARTIFACT_DIR}; queries with no output:${_missing:- none}; queries with a nonzero or unrecorded exit status:${_failed:- none}; per-query status in ${_query_status} (redactor ${_redactor_state}); the reported failure class is unchanged" >&2
+    fi
+    set -x 2>/dev/null || true
+    return 0
+}
+
 function AssertClusterHealthy () {
     # Verify ClusterOperators and nodes are healthy before declaring MCP success.
+    # Both fetches are bounded by the remaining wait budget so the collection
+    # window is preserved: each timeout is capped at the time left before the
+    # deadline (minimum 1s when time remains, skipped when past deadline).
     typeset -i failures=0
 
     echo ""
     echo "=== ClusterOperator health gate ==="
     typeset coJson=""
-    if ! coJson="$(oc get clusteroperators -o json --request-timeout=30s 2>/dev/null)"; then
+    typeset -i _hg_remaining=$(( deadline - SECONDS ))
+    typeset -i _hg_timeout=45 _hg_req_timeout=30
+    if (( _hg_remaining <= 0 )); then
+        _hg_timeout=1; _hg_req_timeout=1
+    else
+        (( _hg_timeout > _hg_remaining )) && _hg_timeout=${_hg_remaining}
+        (( _hg_req_timeout > _hg_remaining )) && _hg_req_timeout=${_hg_remaining}
+        (( _hg_timeout < 1 )) && _hg_timeout=1
+        (( _hg_req_timeout < 1 )) && _hg_req_timeout=1
+    fi
+    if ! coJson="$(timeout "${_hg_timeout}s" oc get clusteroperators -o json --request-timeout="${_hg_req_timeout}s" 2>/dev/null)"; then
         echo "WARNING: Failed to fetch ClusterOperators"
         (( ++failures )) || true
     else
@@ -334,7 +1160,17 @@ if issues:
     echo ""
     echo "=== Node readiness gate ==="
     typeset notReady=""
-    notReady="$(oc get nodes -o json --request-timeout=30s 2>/dev/null | python3 -c "
+    _hg_remaining=$(( deadline - SECONDS ))
+    _hg_timeout=45; _hg_req_timeout=30
+    if (( _hg_remaining <= 0 )); then
+        _hg_timeout=1; _hg_req_timeout=1
+    else
+        (( _hg_timeout > _hg_remaining )) && _hg_timeout=${_hg_remaining}
+        (( _hg_req_timeout > _hg_remaining )) && _hg_req_timeout=${_hg_remaining}
+        (( _hg_timeout < 1 )) && _hg_timeout=1
+        (( _hg_req_timeout < 1 )) && _hg_req_timeout=1
+    fi
+    notReady="$(timeout "${_hg_timeout}s" oc get nodes -o json --request-timeout="${_hg_req_timeout}s" 2>/dev/null | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 bad = []
@@ -367,40 +1203,15 @@ if bad:
     return 0
 }
 
-function ClassifyMcpState () {
-    # Classify the MCP timeout as DEGRADED, UPDATING, or UNKNOWN from the JSON state.
-    typeset json="${1}"
-    echo "${json}" | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-items = [m for m in data.get('items', []) if not m.get('spec', {}).get('paused', False)]
-degraded = any(
-    {c['type']: c['status'] for c in m.get('status', {}).get('conditions', [])}.get('Degraded') == 'True'
-    for m in items
-)
-updating = any(
-    {c['type']: c['status'] for c in m.get('status', {}).get('conditions', [])}.get('Updating') == 'True'
-    for m in items
-)
-if degraded:
-    print('DEGRADED')
-elif updating:
-    print('UPDATING')
-else:
-    print('UNKNOWN')
-" 2>/dev/null || echo "UNKNOWN"
-    true
-}
 
 echo "Waiting ${settleDelay}s for MachineConfig rendering to propagate..."
 sleep "${settleDelay}"
 
-echo "Patching worker MCP maxUnavailable=${maxUnavailable} to parallelize node rollout..."
-if oc patch machineconfigpool worker --type merge -p "{\"spec\":{\"maxUnavailable\": ${maxUnavailable}}}" --request-timeout=10s 2>/dev/null; then
-    echo "Worker MCP maxUnavailable set to ${maxUnavailable}"
-else
-    echo "WARNING: Failed to patch maxUnavailable (may not have permission or MCP may not exist)"
-fi
+# INTEROP-9646: the maxUnavailable=3 patch mutated the SUT and was never
+# reverted (run 2115639973800579072: Degraded onset 75s after the patch,
+# ready sawtooth 4/9 while it was in effect). Removed; the serialized
+# 9-machine rollout measures ~21 min, well inside the 5400s budget.
+echo "Not patching worker MCP maxUnavailable (SUT mutation removed; serialized rollout measured ~21 min)"
 
 echo "MachineConfigs created since cluster install:"
 typeset mcList=''
@@ -417,12 +1228,25 @@ typeset -i consecutivePasses=0
 typeset -i consecutiveFailures=0
 typeset -i currentPollInterval=${pollInterval}
 
+# Sleep no longer than the wait budget allows: a poll interval that starts one
+# second before the deadline would otherwise hold the failure classification
+# back for the whole interval, so the timeout is reported late and the
+# diagnostics that explain it are delayed with it.
+_bounded_sleep() {
+  typeset -i _want="${1:-0}" _left
+  _left=$(( deadline - SECONDS ))
+  (( _left < 0 )) && _left=0
+  (( _want > _left )) && _want=${_left}
+  (( _want > 0 )) && sleep "${_want}"
+  return 0
+}
+
 echo "Polling MCPs for up to ${effectiveTimeout}s (need ${consecutiveRequired} consecutive clean polls)..."
 echo "Progress-based extension: +${progressExtension}s per detection, max total ${maxTimeout}s"
 
 while (( SECONDS < deadline )); do
     typeset -i remaining=$(( deadline - SECONDS ))
-    (( remaining < 5 )) && remaining=5
+    (( remaining < 1 )) && remaining=1
     # Cap the in-loop call at 60s: a hung apiserver must be distinguishable
     # from a slow rollout instead of consuming the whole remaining deadline.
     (( remaining > 60 )) && remaining=60
@@ -437,18 +1261,30 @@ while (( SECONDS < deadline )); do
         currentPollInterval=$(( pollInterval * (2 ** backoffExponent) ))
         (( currentPollInterval > 120 )) && currentPollInterval=120
         echo "WARNING: oc get mcp failed (attempt ${consecutiveFailures}), backing off to ${currentPollInterval}s"
+        if (( consecutiveFailures >= 5 )); then
+            echo "FAILURE CLASS: cluster-api-unreachable"
+            echo "oc get mcp failed ${consecutiveFailures} consecutive times; cluster API unreachable from the step"
+            _junit_class="cluster-api-unreachable"
+            CollectFailureBundle
+            exit 1
+        fi
         consecutivePasses=0
-        sleep "${currentPollInterval}"
+        ResetEnospcStreaks
+        _bounded_sleep "${currentPollInterval}"
         continue
     fi
 
     (( _junit_polls += 1 )) || true
     typeset statusLine=""
-    statusLine="$(echo "${mcpJson}" | python3 -c "
+    statusLine="$(echo "${mcpJson}" | python3 /dev/fd/3 3<<'PY' 2>/dev/null
 import sys, json
 data = json.load(sys.stdin)
 issues = []
 total_ready = 0
+total_updated = 0
+total_machine = 0
+any_degraded = 0
+gen_parts = []
 for mcp in data.get('items', []):
     name = mcp['metadata']['name']
     paused = mcp.get('spec', {}).get('paused', False)
@@ -457,35 +1293,116 @@ for mcp in data.get('items', []):
     conditions = {c['type']: c['status'] for c in mcp.get('status', {}).get('conditions', [])}
     updating = conditions.get('Updating', 'Unknown')
     degraded = conditions.get('Degraded', 'Unknown')
+    updated_cond = conditions.get('Updated', 'Unknown')
     status = mcp.get('status', {})
     ready = status.get('readyMachineCount', 0)
     total = status.get('machineCount', 0)
     updated = status.get('updatedMachineCount', 0)
     unavailable = status.get('unavailableMachineCount', 0)
+    generation = mcp['metadata'].get('generation', 0)
+    observed = status.get('observedGeneration', -1)
+    # Per-pool generation fingerprint (sorted name=gen pairs), not a sum:
+    # a replaced pool (one removed, another created, both generation 1)
+    # keeps the sum unchanged and would hide the churn (preflight review).
+    uid = mcp['metadata'].get('uid', '')
+    gen_parts.append(f'{name}={generation} uid={uid}') # PRRT_kwDOBHvUUM65Uiuk: include UID in fingerprint
     total_ready += ready
-    if updating == 'True' or degraded == 'True' or unavailable > 0 or ready != total or updated != total:
-        issues.append(f'{name}: Updating={updating} Degraded={degraded} ready={ready}/{total} updated={updated}/{total} unavailable={unavailable}')
+    total_updated += updated
+    total_machine += total
+    if degraded == 'True':
+        any_degraded = 1
+    # Stability requires the condition tokens (Updating and Degraded explicitly False, not Unknown) AND count congruence AND the
+    # observed generation catching up (render churn resets stability).
+    if (updating != 'False' or degraded != 'False' or updated_cond != 'True'
+            or unavailable > 0 or ready != total or updated != total
+            or observed != generation):
+        issues.append(f'{name}: Updating={updating} Updated={updated_cond} Degraded={degraded} ready={ready}/{total} updated={updated}/{total} unavailable={unavailable} gen={generation}/obs={observed}')
 if issues:
-    print('UNSTABLE|' + '; '.join(issues) + '|' + str(total_ready))
+    print('UNSTABLE|' + '; '.join(issues).replace('|', '/') + '|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|' + str(any_degraded) + '|' + ';'.join(sorted(gen_parts)))
 else:
-    print('STABLE|all non-paused MCPs healthy|' + str(total_ready))
-" 2>/dev/null)" || statusLine="UNSTABLE|python parse error|0"
+    print('STABLE|all non-paused MCPs healthy|' + str(total_ready) + '|' + str(total_updated) + '|' + str(total_machine) + '|0|' + ';'.join(sorted(gen_parts)))
+PY
+)" || statusLine="UNSTABLE|python parse error|0|0|0|0|"
 
-    typeset statusKey="${statusLine%%|*}"
-    typeset remainder="${statusLine#*|}"
-    typeset statusDetail="${remainder%|*}"
-    typeset -i totalReady=0
-    totalReady="${remainder##*|}" 2>/dev/null || totalReady=0
+    # statusLine = KEY|detail|ready|updated|machine|degraded|genPrint
+    typeset statusKey="" statusDetail=""
+    typeset _rReady="" _rUpdated="" _rMachine="" _degField="" genPrint=""
+    IFS='|' read -r statusKey statusDetail _rReady _rUpdated _rMachine _degField genPrint <<< "${statusLine}"
+    # Reject parse failures before they change histories or fingerprint.
+    # A parse error inserts zero counts and erases the last valid generation
+    # fingerprint; preserve the last valid fingerprint so the next valid
+    # generation change can still reset the window, and do not record zero
+    # counts as a history sample.
+    if [[ "${statusDetail}" == "python parse error" ]]; then
+        echo "WARNING: MCP status parse error; retaining last valid generation fingerprint" >&2
+        consecutivePasses=0
+        ResetEnospcStreaks
+        continue
+    fi
+    # Validate as plain strings first: a typeset -i target evaluates its input
+    # arithmetically during `read` (so "1+1" becomes 2, the digit check would
+    # pass afterwards, and a non-numeric word aborts the step with an unbound
+    # variable under set -u). Defaults are applied only after the check.
+    typeset -i totalReady=0 totalUpdated=0 totalMachine=0 anyDegraded=0
+    [[ "${_rReady}" =~ ^[0-9]{1,9}$ ]] && totalReady=$(( 10#${_rReady} ))
+    [[ "${_rUpdated}" =~ ^[0-9]{1,9}$ ]] && totalUpdated=$(( 10#${_rUpdated} ))
+    [[ "${_rMachine}" =~ ^[0-9]{1,9}$ ]] && totalMachine=$(( 10#${_rMachine} ))
+    [[ "${_degField}" =~ ^[01]$ ]] && anyDegraded=$(( _degField ))
+    # Window reset on desired-config change (render churn); count churn runs.
+    # genPrint is the sorted per-pool name=gen fingerprint: a replaced pool
+    # changes it even when a numeric sum would not (preflight review).
+    # PRRT_kwDOBHvUUM65yNGt: eligibility change should reset streak. The
+    # streak reset is unconditional (an eligibility change that empties the
+    # fingerprint still resets); the churn COUNTER keeps the previous-fingerprint
+    # guard so the baseline poll and paused-pool gaps are not counted as churn
+    # (preflight deep review: the first valid fingerprint is a baseline, not a
+    # change, and an empty fingerprint is not a re-render).
+    if [[ "${genPrint}" != "${_lastGenPrint}" ]]; then consecutivePasses=0; fi
+    if [[ -n "${_lastGenPrint}" && "${genPrint}" != "${_lastGenPrint}" ]]; then
+        (( ++_renderChurnCount )) || true
+        echo "Render churn detected (generations ${_lastGenPrint} -> ${genPrint}, churn #${_renderChurnCount}); resetting trend window"
+        readyHistory=()
+        updatedHistory=()
+        machineCountHistory=()
+        degradedHistory=()
+        consecutivePasses=0
+    fi
+    _lastGenPrint="${genPrint}"
     readyHistory+=("${totalReady}")
+    updatedHistory+=("${totalUpdated}")
+    machineCountHistory+=("${totalMachine}")
+    degradedHistory+=("${anyDegraded}")
     typeset -i elapsed=$(( SECONDS - startSeconds ))
+
+    # Non-Degraded poll (clean or merely updating): reset every ENOSPC
+    # signature streak so only consecutive Degraded polls count, and drop the
+    # captured condition so a later timeout or health-gate failure is never
+    # reported with a condition the cluster no longer has. The reset must also
+    # run on clean polls, which never reach the UNSTABLE branch below
+    # (preflight review).
+    if (( ! anyDegraded )); then
+        ResetEnospcStreaks
+        _junit_reason=""
+    fi
 
     if [[ "${statusKey}" == "STABLE" ]]; then
         (( consecutivePasses += 1 )) || true
         echo "Clean poll ${consecutivePasses}/${consecutiveRequired} at ${elapsed}s: ${statusDetail}"
         if (( consecutivePasses >= consecutiveRequired )); then
             echo "MCPs stable after ${elapsed}s (${consecutiveRequired} consecutive clean polls)"
-            AssertClusterHealthy
-            exit $?
+            # `|| _hgrc=$?` keeps a nonzero gate verdict from tripping
+            # errexit before the bundle collection runs (deep-review
+            # catch: bare `_hgrc=$?` never executes under set -e).
+            _hgrc=0
+            AssertClusterHealthy || _hgrc=$?
+            if (( _hgrc != 0 )); then
+                # The cluster converged but the health gate failed: the
+                # bundle is the attribution for that verdict, so collect
+                # before exiting (preflight review: the doc lists the
+                # health gate among bundle-collecting paths).
+                CollectFailureBundle
+            fi
+            exit ${_hgrc}
         fi
     else
         if (( consecutivePasses > 0 )); then
@@ -495,24 +1412,65 @@ else:
         (( pollsSinceLastExtension += 1 )) || true
         echo "Waiting at ${elapsed}/${effectiveTimeout}s: ${statusDetail}"
 
-        # Capture the first Degraded sighting verbatim (no extra oc calls;
+        # Capture every Degraded sighting verbatim (no extra oc calls;
         # the poll JSON is already in hand) so the JUnit failure body and
-        # the log carry the decisive condition text.
-        if (( _junit_first_signature_poll < 0 )) && [[ "${statusDetail}" == *"Degraded=True"* ]]; then
-            _junit_first_signature_poll=${_junit_polls}
-            echo ">>> First Degraded sighting at poll ${_junit_polls} (${elapsed}s); conditions verbatim:"
-            EmitMcpConditions "${mcpJson}"
-            typeset _firstDeg=""
-            _firstDeg="$(FirstDegradedCondition "${mcpJson}")"
-            if [[ -n "${_firstDeg}" ]]; then
-            _junit_reason="${_firstDeg}"
+        # the log carry the decisive condition text, and fail fast on a
+        # non-self-healing ENOSPC signature (>= 2 consecutive polls with
+        # the same condition message) instead of burning the 5400s budget.
+        if (( anyDegraded )); then
+            if (( _junit_first_signature_poll < 0 )); then
+                _junit_first_signature_poll=${_junit_polls}
+                echo ">>> First Degraded sighting at poll ${_junit_polls} (${elapsed}s); conditions verbatim:"
+                EmitMcpConditions "${mcpJson}"
+            fi
+            typeset _degCond=""
+            _degCond="$(FirstDegradedCondition "${mcpJson}")"
+            # Reporting keeps the single selected condition (the JUnit
+            # failure body reads it as the reason); the fail-fast below is
+            # decided on the whole ENOSPC signature set instead.
+            if [[ -n "${_degCond}" ]]; then
+                _junit_reason="${_degCond}"
+            fi
+            # Per-signature streaks (PRRT_kwDOBHvUUM65on19): a persistent
+            # signature is detected by comparing adjacent polls' signature
+            # sets, so two Degraded pools whose poll order swaps cannot reset
+            # it, and a poll carrying no signature clears every streak.
+            UpdateEnospcStreaks "${mcpJson}"
+            if (( _enospcStreakHit )); then
+                # JUnit names the signature the streak confirmed, not the
+                # condition FirstDegradedCondition happened to select this
+                # poll: a newly appeared ENOSPC condition listed ahead of the
+                # persistent one must not become the reported reason.
+                _junit_reason="${_enospcHitSignature}"
+                echo "FAILURE CLASS: storage-capacity-enospc"
+                echo "Non-self-healing ENOSPC signature persisted ${_enospcHitStreak} consecutive polls (poll ${_junit_polls}, ${elapsed}s): ${_enospcHitSignature}; failing fast instead of exhausting ${effectiveTimeout}s"
+                _junit_class="storage-capacity-enospc"
+                CollectFailureBundle
+                exit 1
             fi
         fi
 
+        # Cycling veto is evaluated on every unstable poll, independent of
+        # the extension cadence: a rollout that never reaches the 5-poll
+        # extension check must still take the fail-fast path. IsMcpProgressing
+        # populates _vetoStreakHit, so evaluate it first, then decide on
+        # extension at its own cadence.
+        typeset -i _isProgressing=0
+        if IsMcpProgressing; then _isProgressing=1; fi
+        if (( _vetoStreakHit )); then
+            # Sustained-cycling fail-fast: the veto's purpose (the
+            # maxTimeout cap already bounds extensions; without this
+            # exit the cycling pool would poll to the deadline).
+            echo "FAILURE CLASS: mcp-rollout-not-converging"
+            echo "sustained cycling: ${pinnedUpdatedPolls} consecutive not-ready polls without Degraded (rollout re-rendering/re-rebooting, not progressing)"
+            _junit_class="mcp-rollout-not-converging"
+            CollectFailureBundle
+            exit 1
+        fi
         # Progress-based timeout extension: if MCPs are making progress,
         # extend the deadline to avoid timing out on slow-but-healthy rollouts.
         if (( pollsSinceLastExtension >= extensionCheckInterval )); then
-            if IsReadyCountProgressing; then
+            if (( _isProgressing )); then
                 typeset -i proposedDeadline=$(( deadline + progressExtension ))
                 typeset -i maxDeadline=$(( startSeconds + maxTimeout ))
                 if (( proposedDeadline > maxDeadline )); then
@@ -526,17 +1484,17 @@ else:
                     pollsSinceLastExtension=0
                     echo "Progress detected: extending deadline by ${appliedExtension}s (total wait now ${effectiveTimeout}s/${maxTimeout}s max, extension #${extensionsApplied})"
                 else
-                    echo "Progress detected but max timeout ${maxTimeout}s would be exceeded — no further extensions"
+                    echo "Progress detected but max timeout ${maxTimeout}s would be exceeded; no further extensions"
                 fi
             fi
         fi
     fi
 
-    sleep "${currentPollInterval}"
+    _bounded_sleep "${currentPollInterval}"
 done
 
 typeset -i elapsed=$(( SECONDS - startSeconds ))
-echo "MCPs did not stabilize within ${elapsed}s — classifying timeout..."
+echo "MCPs did not stabilize within ${elapsed}s; classifying timeout..."
 if (( extensionsApplied > 0 )); then
     echo "Deadline was extended ${extensionsApplied} time(s) due to detected progress (initial timeout: ${mcpWaitTimeout}s, effective: ${effectiveTimeout}s)"
 fi
@@ -547,36 +1505,78 @@ echo ""
 
 typeset classification="UNKNOWN"
 typeset finalJson=""
-if finalJson="$(oc get mcp -o json --request-timeout=30s 2>/dev/null)"; then
+typeset -i _cls_remaining=$(( deadline - SECONDS ))
+typeset -i _cls_timeout=45 _cls_req_timeout=30
+if (( _cls_remaining <= 0 )); then
+    _cls_timeout=1; _cls_req_timeout=1
+else
+    (( _cls_timeout > _cls_remaining )) && _cls_timeout=${_cls_remaining}
+    (( _cls_req_timeout > _cls_remaining )) && _cls_req_timeout=${_cls_remaining}
+    (( _cls_timeout < 1 )) && _cls_timeout=1
+    (( _cls_req_timeout < 1 )) && _cls_req_timeout=1
+fi
+if finalJson="$(timeout "${_cls_timeout}s" oc get mcp -o json --request-timeout="${_cls_req_timeout}s" 2>/dev/null)"; then
     classification="$(ClassifyMcpState "${finalJson}")"
 fi
 
+CollectFailureBundle
+# Render churn is orthogonal to the final condition state: a churning
+# pool is Updating=True (or Degraded) while it re-renders, so the state
+# branches below would otherwise misattribute it (preflight review:
+# the churn check in the UNKNOWN branch was unreachable). The churn
+# count is the mechanism; the branch diagnostics (conditions verbatim,
+# node dumps) are already captured per-poll and in the bundle.
+if (( _renderChurnCount >= renderChurnLimit )); then
+    echo "FAILURE CLASS: mcp-render-churn"
+    echo "MachineConfig generation changed ${_renderChurnCount} times during the wait (limit ${renderChurnLimit}); the pool is being re-rendered faster than it can converge (final state: ${classification})"
+    _junit_class="mcp-render-churn"
+    echo "Ready count trend: ${readyHistory[*]}"
+    exit 1
+fi
 case "${classification}" in
     DEGRADED)
-        echo "FAILURE CLASS: Product interop failure"
+        # Classify from the FINAL state, not from a polling-time capture: a
+        # transient condition (a one-poll ENOSPC blip) can clear while the pool
+        # stays Degraded for an unrelated reason, and the polled text would
+        # otherwise decide the failure class. The polled reason is kept only as
+        # a fallback when the final JSON yields no Degraded condition.
+        typeset _finalReason=""
+        _finalReason="$(FirstDegradedCondition "${finalJson}")"
+        if [[ -n "${_finalReason}" ]]; then
+            _junit_reason="${_finalReason}"
+        fi
+        if [[ -n "${_junit_reason}" && "${_junit_reason}" =~ (no\ space\ left\ on\ device|disk\ full|could\ not\ write\ image\ pull\ secret) ]]; then
+            echo "FAILURE CLASS: storage-capacity-enospc"
+            _junit_class="storage-capacity-enospc"
+        else
+            echo "FAILURE CLASS: mcp-degraded"
+            _junit_class="mcp-degraded"
+        fi
         echo "One or more MCPs have Degraded=True; conditions verbatim:"
         echo ""
         EmitMcpConditions "${finalJson}"
-        if [[ -z "${_junit_reason}" && -n "${finalJson}" ]]; then
-            _junit_reason="$(FirstDegradedCondition "${finalJson}")"
-        fi
-        _junit_class="DEGRADED"
         echo ""
         ocb get nodes -o wide
         exit 1
         ;;
     UPDATING)
         echo "Ready count trend: ${readyHistory[*]}"
-        if IsReadyCountProgressing; then
-            echo "FAILURE CLASS: Infrastructure timeout"
-            echo "MCP rollout is healthy (Degraded=False, ready count increasing) but too slow for the ${effectiveTimeout}s timeout"
-            _junit_class="UPDATING-progressing"
+        if IsMcpProgressing; then
+            echo "FAILURE CLASS: mcp-deadline-exceeded"
+            echo "MCP rollout is healthy (Degraded=False, progressing) but too slow for the ${effectiveTimeout}s timeout"
+            _junit_class="mcp-deadline-exceeded"
             AssertClusterHealthy || true
             exit 1
         else
-            echo "FAILURE CLASS: Potential interop issue"
-            echo "MCP is updating but ready count is not progressing — nodes may be cycling"
-            _junit_class="UPDATING-oscillating"
+            if (( ${#updatedHistory[@]} > 0 )) && (( updatedHistory[${#updatedHistory[@]}-1] == machineCountHistory[${#machineCountHistory[@]}-1] )); then
+                echo "FAILURE CLASS: mcp-rollout-not-converging"
+                echo "All machines updated (updated==machineCount) but the pool never went ready; ready count oscillated without Degraded: cycling, not progressing"
+                _junit_class="mcp-rollout-not-converging"
+            else
+                echo "FAILURE CLASS: UPDATING-oscillating"
+                echo "MCP is updating but neither updated nor ready counts are progressing: nodes may be cycling"
+                _junit_class="UPDATING-oscillating"
+            fi
             echo ""
             ocb get nodes -o wide
             typeset mcpWorkerDesc=''
@@ -585,8 +1585,16 @@ case "${classification}" in
             exit 1
         fi
         ;;
+    STABLE)
+        echo "FAILURE CLASS: STABLE"
+        echo "MCPs are converged at timeout but the consecutive clean poll gate was not reached"
+        _junit_class="STABLE"
+        echo "Ready count trend: ${readyHistory[*]}"
+        exit 1
+        ;;
     *)
-        echo "FAILURE CLASS: Unknown timeout"
+        echo "FAILURE CLASS: UNKNOWN"
+        echo "Wait ended in a state the classifier does not name (see the MCP ready count trend below)"
         _junit_class="UNKNOWN"
         echo "Ready count trend: ${readyHistory[*]}"
         exit 1

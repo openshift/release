@@ -56,6 +56,191 @@ typeset sourceVersion=""
 typeset -i sourceMinorVersion=0
 typeset isForceUpdate="false"
 
+# ---------------------------------------------------------------------------
+# OPP operator pod readiness predicate (INTEROP-9672).
+#
+# Single-shot CVO upgrade artifacts -- installer-N / installer-N-retry-N pods
+# -- exit (often to Error) once their upgrade batch completes and are not OPP
+# operator workload. They must not count against readiness: the 5.0 and 5.1
+# upgrade lanes failed ValidateOppOperators on exactly these pods while CVO,
+# ClusterOperators and MachineConfigPools were all healthy.
+#
+# The exclusion is keyed to the CVO artifacts' structural naming - a numeric
+# batch id, an optional -retry-N, and the node hostname (installer-N
+# [-retry-N]-ip-<host>) - NOT to the bare installer-/bootstrap- prefix: a
+# genuinely failing OPP pod that merely starts with those words (e.g.
+# installer-quay-helper) must stay visible to readiness. Bootstrap pods
+# follow the same tightened shape when they carry it; a bootstrap-named pod
+# without the hostname suffix stays visible.
+# ---------------------------------------------------------------------------
+function NotReadyOppPods () {
+    # $1: `oc get pods --no-headers` output; prints the not-ready lines.
+    #
+    # `oc get pods --no-headers` columns: NAME READY STATUS RESTARTS AGE.
+    # The decision is made from those columns, never from a row-wide word
+    # match: STATUS `Running` alone does not mean ready, so a pod whose READY
+    # count is short (0/1 with a failing readiness probe, 1/2 with a
+    # crash-looping sidecar) must stay visible to the readiness check.
+    # Completed/Succeeded rows are terminated work, not failure.
+    # The CVO single-shot artifact exclusions (installer-N, bootstrap-N,
+    # optional -retry-N, -ip-<node hostname>) are name-column only.
+    awk '
+        $1 ~ /^installer-[0-9]+(-retry-[0-9]+)?-ip-/ { next }
+        $1 ~ /^bootstrap-[0-9]+(-retry-[0-9]+)?-ip-/ { next }
+        $3 == "Completed" || $3 == "Succeeded" { next }
+        $3 == "Running" && split($2, ready, "/") == 2 \
+            && ready[1] + 0 == ready[2] + 0 && ready[2] + 0 > 0 { next }
+        { print }
+    ' <<< "$1"
+}
+
+# --- Offline predicate self-test (phase 0) ----------------------------------
+# Pins the readiness predicate on fixtures so a later edit that changes the
+# step semantics reports a FATAL log line and a failing JUnit row instead of
+# silently re-reding or re-greening lanes. The installer/bootstrap lines
+# reproduce the observed not-ready shape (numeric batch id, optional -retry-N,
+# the -ip-<node hostname> suffix); the node hostnames are synthetic
+# example.internal names, not the ones seen in those lanes, so no internal
+# hostname is published here or traced below. Control lines are synthetic
+# inputs too.
+# shellcheck disable=SC2317  # invoked from Main
+function PredicateSelfTest () {
+    # BASH-3: typeset, not the non-POSIX `local` builtin, and initialised at
+    # declaration so `set -u` cannot trip on a partially assigned set.
+    typeset fixture='' expected='' got=''
+    typeset -i failures=0
+
+    fixture="installer-2-ip-10-0-0-11.example.internal                                 0/1   Error       0     65m
+installer-2-retry-1-ip-10-0-0-11.example.internal                         0/1   Error       0     64m
+installer-2-retry-2-ip-10-0-0-11.example.internal                         0/1   Error       0     63m
+installer-3-ip-10-0-0-12.example.internal                                 0/1   Error       0     58m
+installer-3-retry-1-ip-10-0-0-12.example.internal                         0/1   Error       0     57m
+installer-3-retry-2-ip-10-0-0-12.example.internal                         0/1   Error       0     56m"
+    expected=""
+    got="$(NotReadyOppPods "${fixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: installer-only fixture must filter to empty; got:"
+        echo "${got}"
+        (( failures += 1 ))
+    fi
+
+    fixture="cluster-version-operator-864d9f7c5-abcde      1/1     Running            0     65m
+bootstrap-1234567-deploy-pod                 0/1     Completed         0     58m
+quay-operator-v4-9d8f7c6b5-x2k9l              0/1     CrashLoopBackOff   6     12m
+rhacs-operator-controller-7f6d8b9c-pqrst      1/1     Running            0     60m
+installer-3-ip-10-0-0-12.example.internal     0/1   Error       0     58m
+installer-quay-helper-7c4d8e9f2-abcde         0/1     CrashLoopBackOff   3     21m
+bootstrap-controller-5f8d2c6b9-pqrst          0/1     Error             2     9m"
+    expected="quay-operator-v4-9d8f7c6b5-x2k9l              0/1     CrashLoopBackOff   6     12m
+installer-quay-helper-7c4d8e9f2-abcde         0/1     CrashLoopBackOff   3     21m
+bootstrap-controller-5f8d2c6b9-pqrst          0/1     Error             2     9m"
+    got="$(NotReadyOppPods "${fixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: mixed fixture must keep the CrashLoopBackOff line and the similarly-named OPP pods; got:"
+        echo "${got}"
+        (( failures += 1 ))
+    fi
+
+    # Readiness case: STATUS `Running` is not proof of readiness. A pod whose
+    # READY count is short (failing readiness probe, crash-looping sidecar)
+    # must remain visible; only a fully ready x/y Running pod is filtered.
+    fixture="rhacs-operator-controller-7f6d8b9c-k2wqz      0/1     Running     0     12m
+rhacs-operator-controller-7f6d8b9c-t9m4c      1/2     Running     3     20m
+rhacs-operator-controller-7f6d8b9c-r5v8d      2/2     Running     0     60m"
+    expected="rhacs-operator-controller-7f6d8b9c-k2wqz      0/1     Running     0     12m
+rhacs-operator-controller-7f6d8b9c-t9m4c      1/2     Running     3     20m"
+    got="$(NotReadyOppPods "${fixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: partially ready Running pods must stay visible and a fully ready Running pod must be filtered; got:"
+        echo "${got}"
+        (( failures += 1 ))
+    fi
+
+    # Selection case: the Subscription names the CSV OLM is converging to, so the
+    # superseded CSV that still reports Succeeded must not be selected.
+    typeset _tab=$'\t'
+    typeset _csvFixture='' _subFixture=''
+    _csvFixture="$(printf 'ocm\trhacs-operator.v4.9.0\tSucceeded\nocm\trhacs-operator.v4.10.0\tInstalling')"
+    _subFixture="$(printf 'ocm\trhacs-operator\trhacs-operator.v4.10.0\trhacs-operator.v4.9.0')"
+    expected="rhacs-operator.v4.10.0${_tab}Installing"
+    got="$(_select_target_csv 'rhacs-operator' "${_csvFixture}" "${_subFixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: subscription-selected CSV must win over superseded Succeeded; expected '${expected}' got '${got}'"
+        (( failures += 1 ))
+    fi
+
+    # Cross-namespace case: the CSV listing is cluster-wide and holds a
+    # same-named CSV in another namespace that reports the wrong phase. Only
+    # the CSV in the Subscription's namespace may supply the phase.
+    typeset _csvCross=""
+    _csvCross="$(printf 'other\trhacs-operator.v4.10.0\tSucceeded\nocm\trhacs-operator.v4.10.0\tInstalling')"
+    _subFixture="$(printf 'ocm\trhacs-operator\trhacs-operator.v4.10.0\trhacs-operator.v4.9.0')"
+    expected="rhacs-operator.v4.10.0${_tab}Installing"
+    got="$(_select_target_csv 'rhacs-operator' "${_csvCross}" "${_subFixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: a same-named CSV in another namespace must not supply the phase; expected '${expected}' got '${got}'"
+        (( failures += 1 ))
+    fi
+
+    # Cross-namespace absence: the Subscription's namespace holds no such CSV,
+    # so the name match elsewhere must not stand in for it.
+    _csvCross="$(printf 'other\trhacs-operator.v4.10.0\tSucceeded')"
+    expected="rhacs-operator.v4.10.0${_tab}TargetAbsent"
+    got="$(_select_target_csv 'rhacs-operator' "${_csvCross}" "${_subFixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: a missing namespaced target must report TargetAbsent; expected '${expected}' got '${got}'"
+        (( failures += 1 ))
+    fi
+
+    # Fallback case 1: no Subscription read (empty listing) keeps the prefix match.
+    expected="rhacs-operator.v4.9.0${_tab}Succeeded"
+    got="$(_select_target_csv 'rhacs-operator' "${_csvFixture}" '')"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: empty subscription list must fall back to prefix match; expected '${expected}' got '${got}'"
+        (( failures += 1 ))
+    fi
+
+    # Named-but-absent case: the Subscription names a CSV that a successful CSV
+    # listing does not hold. That is not the same as an unreadable Subscription:
+    # the named CSV must be reported as TargetAbsent instead of its superseded
+    # predecessor standing in for it, or the settle and the final validation
+    # both accept a target OLM has not published yet.
+    _subFixture="$(printf 'ocm\trhacs-operator\trhacs-operator.v4.11.9\trhacs-operator.v4.11.9')"
+    expected="rhacs-operator.v4.11.9${_tab}TargetAbsent"
+    got="$(_select_target_csv 'rhacs-operator' "${_csvFixture}" "${_subFixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: a named CSV absent from the listing must report TargetAbsent, not the superseded CSV; expected '${expected}' got '${got}'"
+        (( failures += 1 ))
+    fi
+
+    # Fallback case 3: the CSV listing was not read (empty), so the named CSV
+    # cannot be called absent: nothing is reported and both callers classify
+    # the operator as unsettled.
+    expected=""
+    got="$(_select_target_csv 'rhacs-operator' '' "${_subFixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: an unreadable CSV listing must report nothing; expected '' got '${got}'"
+        (( failures += 1 ))
+    fi
+
+    # Fallback case 4: the Subscription listing was read but holds no row for
+    # this operator, so nothing names a target and the prefix match still
+    # applies.
+    _subFixture="$(printf 'ocm\tquay-operator\tquay-operator.v3.8.7\tquay-operator.v3.8.7')"
+    expected="rhacs-operator.v4.9.0${_tab}Succeeded"
+    got="$(_select_target_csv 'rhacs-operator' "${_csvFixture}" "${_subFixture}")"
+    if [[ "${got}" != "${expected}" ]]; then
+        echo "selftest FAIL: a Subscription naming another operator must keep the prefix match; expected '${expected}' got '${got}'"
+        (( failures += 1 ))
+    fi
+
+    if (( failures > 0 )); then
+        echo "FATAL: pod-readiness predicate self-test failed; step semantics are not the reviewed ones."
+        return 1
+    fi
+    echo ">>> selftest: pod-readiness predicate OK (installer/bootstrap excluded, real failures kept, partially ready Running pods kept, subscription CSV selection OK (target present, named-but-absent TargetAbsent, cross-namespace name collision, unreadable listing, foreign Subscription))"
+}
+
 function DebugOnExit () {
     if (( exitCode != 0 )); then
         echo "### DEBUG: Upgrade failure diagnostics ###"
@@ -391,27 +576,171 @@ function ValidatePlatformHealth () {
     true
 }
 
+# Print "<name>\t<phase>" for the CSV the operator's Subscription is converging
+# to. The Subscription status.currentCSV (installedCSV as a fallback) names that
+# CSV, and the Subscription's namespace names where to look for it: the CSV
+# listing is cluster-wide, so the matched CSV must sit in that namespace or a
+# same-named CSV elsewhere supplies the phase. A superseded CSV that still
+# reports Succeeded cannot stand in for a target that is still Installing.
+# When no Subscription names a CSV, or the
+# Subscription listing came back empty (the read failed), the first name-prefix
+# match is used, which keeps the previous behavior as a fallback. When the
+# listing was read and a naming Subscription's CSV is not in the CSV listing,
+# the named CSV is reported with the pseudo-phase TargetAbsent: OLM has not
+# published that CSV yet, so its predecessor's Succeeded phase must not stand in
+# for it. TargetAbsent is not a phase a CSV can report, so both callers treat
+# the operator as unsettled. Exit status stays 0: the output is read in an
+# assignment under `set -e`, where a non-zero status would abort the caller.
+# shellcheck disable=SC2317  # invoked from SettleOppOperatorCsvs and ValidateOppOperators
+function _select_target_csv () {
+    typeset _selOp="${1}" _csvList="${2}" _subList="${3}"
+    typeset _want='' _wantNs='' _hit=''
+    if [[ -n "${_subList}" ]]; then
+        # Namespace and CSV name travel together: the CSV listing is
+        # cluster-wide, so a name-only match can select a same-named CSV from
+        # another namespace and adopt its phase for this operator.
+        _want="$(awk -F'\t' -v op="${_selOp}" '
+            $3 != "" && index($3, op) == 1 { printf "%s\t%s", $1, $3; exit }
+            $4 != "" && index($4, op) == 1 { printf "%s\t%s", $1, $4; exit }
+        ' <<< "${_subList}")"
+    fi
+    if [[ -n "${_want}" ]]; then
+        _wantNs="${_want%%$'\t'*}"
+        _want="${_want#*$'\t'}"
+        _hit="$(awk -F'\t' -v want="${_want}" -v wantNs="${_wantNs}" \
+            '$1 == wantNs && $2 == want { printf "%s\t%s", $2, $3; exit }' <<< "${_csvList}")"
+        if [[ -n "${_hit}" ]]; then
+            printf '%s' "${_hit}"
+            return 0
+        fi
+        if [[ -n "${_csvList}" ]]; then
+            printf '%s\t%s' "${_want}" 'TargetAbsent'
+            return 0
+        fi
+    fi
+    awk -F'\t' -v op="${_selOp}" 'index($2, op) == 1 { printf "%s\t%s", $2, $3; exit }' <<< "${_csvList}"
+}
+
+function SettleOppOperatorCsvs () {
+    # Best-effort bounded settle for the operators this step validates.
+    # The previous form slept a fixed 300s unconditionally: 5 minutes of wall
+    # clock on every run, including the runs where every CSV had already
+    # reported a terminal phase, and it could not distinguish a converged
+    # operator from one stuck mid-Replacing.  Poll the requested operators
+    # only (an `oc wait --all` would block on unrelated CSVs that are
+    # legitimately Replacing), require the same phase on two consecutive
+    # reads, and never fail: ValidateOppOperators makes the verdict.
+    typeset -i window="${1:-300}"
+    typeset -i deadline=$((SECONDS + window))
+    typeset -a settleOpsArr=()
+    IFS=',' read -ra settleOpsArr <<< "${OPP_OPERATORS}"
+    typeset -A settlePrevMap=()
+    typeset -i stableCount=0
+    typeset -i elapsed=0
+    typeset settleCsvs='' settleSubs='' settleOp='' settlePhase='' settleObs=''
+    while (( SECONDS < deadline )); do
+        typeset -i _remaining=$(( deadline - SECONDS ))
+        (( _remaining <= 0 )) && break
+        settleCsvs="$(oc get csv -A --request-timeout="${_remaining}s" -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.phase}}{{end}}{{"\n"}}{{end}}' 2>/dev/null || true)"
+        # Recompute the budget before the second read: the CSV listing above
+        # spent part of it, so two reads must not each claim the whole window
+        # and outlast the deadline the loop checks only at the top.
+        _remaining=$(( deadline - SECONDS ))
+        if (( _remaining <= 0 )); then
+            : "Settle budget exhausted after the CSV listing; the Subscription read is skipped"
+            break
+        fi
+        settleSubs="$(oc get subscriptions.operators.coreos.com -A --request-timeout="${_remaining}s" -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.currentCSV}}{{"\t"}}{{.installedCSV}}{{end}}{{"\n"}}{{end}}' 2>/dev/null || true)"
+        stableCount=0
+        for settleOp in "${settleOpsArr[@]}"; do
+            # PRRT_kwDOBHvUUM65RJot: require consecutive identical currentCSV
+            # observations (2x). The observation is the CSV name and its phase,
+            # so two different matching CSVs that both report Succeeded on
+            # successive reads are a name change, not a stable CSV.
+            settleObs="$(_select_target_csv "${settleOp}" "${settleCsvs}" "${settleSubs}")"
+            settlePhase="${settleObs#*$'\t'}"
+            typeset _prevObs="${settlePrevMap[${settleOp}]:-}"
+            if [[ "${_prevObs}" != "${settleObs}" ]]; then
+                echo "CSV observation changed ${_prevObs:-none} -> ${settleObs:-none}, resetting consecutive" >&2
+            fi
+            # TargetAbsent (the Subscription names a CSV the listing does not
+            # hold yet) is not terminal, so the window keeps running.
+            # Only a terminal phase counts as settled: a CSV stuck in
+            # Replacing/InstallReady must keep the full window (that is the
+            # convergence tolerance the fixed sleep provided), while a CSV
+            # already reporting Succeeded/Failed shortens the settle.
+            if [[ "${settlePhase}" == "Succeeded" || "${settlePhase}" == "Failed" ]]; then
+                if [[ "${_prevObs}" == "${settleObs}" ]]; then
+                    (( stableCount += 1 ))
+                fi
+            fi
+            settlePrevMap["${settleOp}"]="${settleObs}"
+        done
+        if (( stableCount == ${#settleOpsArr[@]} )); then
+            elapsed=$(( window - (deadline - SECONDS) ))
+            : "Operator CSVs stable after ${elapsed}s of the ${window}s settle window"
+            # PRRT_kwDOBHvUUM65Mrko: a terminal CSV phase does not prove the
+            # operator pods are Ready (Running 0/1 during a rollout), and
+            # ValidateOppOperators runs straight after this window. Check the
+            # same namespaces ValidateOppOperators checks, derived from the
+            # CSV listing read above, with the same not-ready predicate. A
+            # failed pod list keeps the window open (fail closed); the final
+            # verdict stays with ValidateOppOperators.
+            typeset -i _podsOk=1
+            typeset _podNs='' _podList='' _notReady=''
+            for _podNs in $(awk -F'\t' -v ops="${OPP_OPERATORS}" 'BEGIN{n=split(ops,arr,",")} {for(i=1;i<=n;i++) if(index($2,arr[i])==1){ns[$1]=1;break}} END{for(k in ns) print k}' <<< "${settleCsvs}"); do
+                if ! _podList="$(oc get pods -n "${_podNs}" --no-headers --request-timeout=15s 2>/dev/null)"; then
+                    echo "Pod list failed in ${_podNs}, continuing settle" >&2
+                    _podsOk=0
+                    continue
+                fi
+                _notReady="$(NotReadyOppPods "${_podList}")"
+                if [[ -n "${_notReady}" ]]; then
+                    echo "Non-ready pods in ${_podNs}, continuing settle" >&2
+                    _podsOk=0
+                fi
+            done
+            if (( _podsOk == 1 )); then
+                return 0
+            fi
+        fi
+        typeset -i _sleepFor=15
+        _remaining=$(( deadline - SECONDS ))
+        (( _sleepFor > _remaining )) && _sleepFor=${_remaining}
+        (( _sleepFor > 0 )) && sleep "${_sleepFor}"
+    done
+    : "Operator CSV settle window (${window}s) expired; validating the phases as read"
+    return 0
+}
+
 function ValidateOppOperators () {
     echo ">>> PHASE: Validating OPP operators"
     : "Validating OPP operator health"
     typeset -a operatorsArr=()
     IFS=',' read -ra operatorsArr <<< "${OPP_OPERATORS}"
 
-    : "Waiting 5 minutes for operator settling"
-    sleep 300
+    SettleOppOperatorCsvs 300
 
     typeset allCsvsJson=""
+    typeset allSubsJson=""
     typeset -i failCount=0
-    allCsvsJson="$(oc get csv -A -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.phase}}{{end}}{{"\n"}}{{end}}')" || {
+    allCsvsJson="$(oc get csv -A --request-timeout=120s -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.phase}}{{end}}{{"\n"}}{{end}}' 2>/dev/null || true)" || {
         : "Failed to retrieve CSVs"
         return 1
     }
+    allSubsJson="$(oc get subscriptions.operators.coreos.com -A --request-timeout=120s -o go-template='{{range .items}}{{.metadata.namespace}}{{"\t"}}{{.metadata.name}}{{"\t"}}{{with .status}}{{.currentCSV}}{{"\t"}}{{.installedCSV}}{{end}}{{"\n"}}{{end}}' 2>/dev/null || true)"
 
-    typeset phase="" op=""
+    typeset phase="" op="" targetCsv=""
     for op in "${operatorsArr[@]}"; do
-        phase="$(awk -F'\t' -v op="${op}" 'index($2, op) == 1 {print $3; exit}' <<< "${allCsvsJson}")"
+        targetCsv="$(_select_target_csv "${op}" "${allCsvsJson}" "${allSubsJson}")"
+        phase="${targetCsv#*$'\t'}"
         if [[ -z "${phase}" ]]; then
             : "CSV not found for operator: ${op}"
+            (( failCount += 1 ))
+            continue
+        fi
+        if [[ "${phase}" == 'TargetAbsent' ]]; then
+            : "Operator ${op}: Subscription names ${targetCsv%%$'\t'*} which the CSV listing does not hold; not settled"
             (( failCount += 1 ))
             continue
         fi
@@ -438,7 +767,7 @@ function ValidateOppOperators () {
             (( failCount += 1 ))
             continue
         fi
-        notReady="$(awk '!/Completed/ && !/Running/ && !/Succeeded/' <<< "${podList}")"
+        notReady="$(NotReadyOppPods "${podList}")"
         if [[ -n "${notReady}" ]]; then
             : "WARNING: Non-running pods in ${ns}:"
             echo "${notReady}"
@@ -458,6 +787,14 @@ function ValidateOppOperators () {
 }
 
 function Main () {
+    echo ">>> PHASE: phase 0 - offline predicate self-test"
+    # xtrace stays off around the self-test: the trace log is copied to
+    # ARTIFACT_DIR when the step fails, and fixture content must not ride
+    # along in it.
+    set +x
+    PredicateSelfTest
+    set -x
+
     if [[ -f "${SHARED_DIR}/kubeconfig" ]]; then
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
     fi
@@ -498,7 +835,7 @@ SUITE_NAME="${SUITE_NAME:-ocp-upgrade}"
 # --- JUnit wrapper ---
 # shellcheck disable=SC2317  # invoked via trap
 WriteJunit() {
-  local rc=${1:-0}
+  typeset rc=${1:-0}
   TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   JUNIT_FILE="${ARTIFACT_DIR}/junit_${SUITE_NAME}.xml"
   if [[ $rc -eq 0 ]]; then

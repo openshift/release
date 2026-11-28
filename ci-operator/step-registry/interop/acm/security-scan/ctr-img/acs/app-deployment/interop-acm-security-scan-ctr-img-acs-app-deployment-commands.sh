@@ -15,10 +15,55 @@ umask 077
 # shellcheck disable=SC2317
 _propagate_junit () {
     [[ -n "${SHARED_DIR:-}" ]] || return 0
-    if [[ -s "${SHARED_DIR}/${mergedJunitFile}" ]]; then
+    if python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null; then
         return 0
     fi
-    cp "${junitFile}" "${SHARED_DIR}/" || true
+    if [[ -s "${ARTIFACT_DIR}/${mergedJunitFile}" ]] && python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${ARTIFACT_DIR}/${mergedJunitFile}" 2>/dev/null; then
+        if cp "${ARTIFACT_DIR}/${mergedJunitFile}" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null; then
+            return 0
+        fi
+        if cp "${ARTIFACT_DIR}/${mergedJunitFile}" "${SHARED_DIR}/" 2>/dev/null; then
+            return 0
+        fi
+    fi
+    if [[ -s "${junitFile}" ]]; then
+        if [[ -n "${LP_QE__CR__TS_NAME__PFX__ACM:-}" ]]; then
+            if python3 -c "
+import xml.etree.ElementTree as ET, os, sys
+pfx=os.environ.get('LP_QE__CR__TS_NAME__PFX__ACM','')
+src=sys.argv[1]
+dst=sys.argv[2]
+try:
+    t=ET.parse(src)
+    r=t.getroot()
+    for ts in r.findall('.//testsuite'):
+        n=ts.get('name','')
+        if n and not n.startswith(pfx):
+            ts.set('name', f'{pfx}--{n}')
+    t.write(dst, encoding='utf-8', xml_declaration=True)
+except Exception:
+    import shutil; shutil.copy(src, dst)
+" "${junitFile}" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null; then
+                if python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null; then
+                    return 0
+                fi
+            fi
+            if cp "${junitFile}" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null; then
+                return 0
+            fi
+            if cp "${junitFile}" "${SHARED_DIR}/" 2>/dev/null; then
+                return 0
+            fi
+        else
+            if cp "${junitFile}" "${SHARED_DIR}/" 2>/dev/null; then
+                return 0
+            fi
+            if cp "${junitFile}" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null; then
+                return 0
+            fi
+        fi
+    fi
+    return 1
 }
 
 # Suite naming for the JUnit post-processing library: compose its suite-name
@@ -172,6 +217,14 @@ EOF
 </testsuites>
 EOF
 
+    typeset -i _expectedTests=${#allTestCasesArr[@]}
+    typeset -i _actualTests=0
+    _actualTests=$(python3 -c 'import sys, xml.etree.ElementTree as ET; print(len(ET.parse(sys.argv[1]).getroot().findall(".//testcase")))' "${junitFile}" 2>/dev/null) || _actualTests=-1
+    if (( _actualTests != _expectedTests )); then
+        echo "ERROR: JUnit report at ${junitFile} has ${_actualTests} testcase elements, expected ${_expectedTests}" >&2
+        return 1
+    fi
+
     : "JUnit XML generated at: ${junitFile}"
     cat "${junitFile}"
     true
@@ -190,22 +243,30 @@ function RunTestCase1 () {
     chmod +x /tmp/jq || return 1
 
     # Clone and deploy
+    # Pin clones to immutable SHAs (thread PRRT_kwDOBHvUUM65TpMh) - vetted SHAs verified via ls-remote 2026-11-20
+    typeset POLICY_COLLECTION_SHA="6d80aff5dda558516fced50640d028bce8dd2341"
+    typeset GRC_DEMO_SHA="2066dc9f5f545dd7f2e2b9eb43ef26aeac8917f4"
     git clone --depth 1 https://github.com/stolostron/policy-collection.git || return 1
+    ( cd policy-collection && git fetch --depth 1 origin "${POLICY_COLLECTION_SHA}" && git checkout "${POLICY_COLLECTION_SHA}" ) || return 1
+    # Pre-clone grc-demo at pinned SHA and use local checkout for deploy.sh
+    if ! git clone https://github.com/gparvin/grc-demo.git /tmp/grc-demo; then return 1; fi
+    ( cd /tmp/grc-demo && git fetch --depth 1 origin "${GRC_DEMO_SHA}" && git checkout "${GRC_DEMO_SHA}" ) || return 1
+    if [[ "$(cd /tmp/grc-demo && git rev-parse HEAD)" != "${GRC_DEMO_SHA}" ]]; then echo "ERROR: grc-demo SHA mismatch" >&2; return 1; fi
     cd policy-collection/deploy/ || return 1
-    echo 'y' | ./deploy.sh -p httpd-example -n policies -u https://github.com/gparvin/grc-demo.git -a e2e-opp || return 1
+    if ! echo 'y' | ./deploy.sh -p httpd-example -n policies -u file:///tmp/grc-demo -a e2e-opp; then
+      return 1
+    fi
 
     # Wait for the e2e-opp namespace the policy deployment creates
     # (Best Practices: `oc wait --for=create` instead of a fixed sleep;
     # plain condition waits fail fast on NotFound).
-    oc wait namespace/e2e-opp --for=create --timeout=5m || return 1
-
-    # The policies create the BuildConfig and the Deployment after the
-    # namespace: await their creation before using them.  Without this,
-    # `oc start-build` has no BuildConfig to start, and the condition wait
-    # below fails fast on a Deployment that does not exist yet (same Best
-    # Practice as the namespace wait above).
-    oc wait buildconfig/httpd-example -n e2e-opp --for=create --timeout=10m || return 1
-    oc wait deployment/httpd-example -n e2e-opp --for=create --timeout=10m || return 1
+    typeset -i _createDeadline=$(( SECONDS + 900 ))
+    typeset -i _waitRemain=$(( _createDeadline - SECONDS ))
+    (( _waitRemain > 0 )) && oc wait namespace/e2e-opp --for=create --timeout="${_waitRemain}s" || return 1
+    _waitRemain=$(( _createDeadline - SECONDS ))
+    (( _waitRemain > 0 )) && oc wait buildconfig/httpd-example -n e2e-opp --for=create --timeout="${_waitRemain}s" || return 1
+    _waitRemain=$(( _createDeadline - SECONDS ))
+    (( _waitRemain > 0 )) && oc wait deployment/httpd-example -n e2e-opp --for=create --timeout="${_waitRemain}s" || return 1
 
     # RunTestCase1 executes under an if condition, so errexit is suspended
     # here: every failure must return explicitly.
@@ -420,6 +481,12 @@ AcsListMatchingImages () {
     typeset -a tlsOpts=( "$@" )
     typeset -i pageLimit=1000
     typeset -i pageCap=100
+    typeset -i _acsRetry=0
+    typeset _acsLastErr=""  # sanitized error token for 401 retry (thread PRRT_kwDOBHvUUM65RJn1)
+    typeset _acsErrFile="${ARTIFACT_DIR:-/tmp}/acs-curl.err"
+    typeset _acsFailKind='error'
+    # Deadline is shared with caller when acsDeadline is set; reserve 60s for report
+    typeset -i _acsDeadlineLocal=${acsDeadline:-0}
     typeset -i page=0
     typeset -i offset=0
     typeset -i pageRecords=0
@@ -437,6 +504,14 @@ AcsListMatchingImages () {
     while :; do
         if (( page >= pageCap )); then
             fetchRc=1
+            _acsFailKind='page-cap'
+            break
+        fi
+        # A page request can block for its whole --max-time, so stop before the
+        # shared budget is exhausted and let the caller read a failed listing.
+        if (( _acsDeadlineLocal > 0 )) && (( SECONDS + 60 >= _acsDeadlineLocal )); then
+            fetchRc=1
+            _acsFailKind='deadline'
             break
         fi
         offset=$(( page * pageLimit ))
@@ -447,7 +522,8 @@ AcsListMatchingImages () {
             set +x
             curl -fsSL "${tlsOpts[@]}" --connect-timeout 15 --max-time 60 \
                 --config <(printf 'user = "admin:%s"\n' "$(cat "${passFile}")") \
-                "https://${host}/v1/images?pagination.limit=${pageLimit}&pagination.offset=${offset}"
+                "https://${host}/v1/images?pagination.limit=${pageLimit}&pagination.offset=${offset}" \
+                2>"${_acsErrFile}"
         )" || { fetchRc=$?; break; }
         pageRecords=$(printf '%s' "${pageJson}" | /tmp/jq '.images | length') || { fetchRc=1; break; }
         pageMatches=$(printf '%s' "${pageJson}" | /tmp/jq --arg repo "${repo}" \
@@ -462,7 +538,23 @@ AcsListMatchingImages () {
         fi
         page+=1
     done
-    (( fetchRc == 0 )) || return "${fetchRc}"
+    if (( fetchRc != 0 )); then
+        set +x
+        if [[ "${_acsFailKind}" == 'error' && -s "${_acsErrFile}" ]]; then
+            case "$(cat "${_acsErrFile}")" in
+                *401*|*nauthorized*)            _acsFailKind='unauthorized' ;;
+                *403*|*orbidden*)               _acsFailKind='forbidden' ;;
+                *404*|*NotFound*)               _acsFailKind='not-found' ;;
+                *"timed out"*|*imeout*)         _acsFailKind='timeout' ;;
+                *"Failed to connect"*|*"Could not resolve"*) _acsFailKind='transport' ;;
+            esac
+        fi
+        printf '%s\n' "${_acsFailKind}" > "${ARTIFACT_DIR:-/tmp}/acs-err.log" 2>/dev/null || true
+        rm -f "${_acsErrFile}"
+        set -x
+        return "${fetchRc}"
+    fi
+    rm -f "${_acsErrFile}"
     printf '%s\n' "${matches}"
 }
 
@@ -473,6 +565,8 @@ function RunTestCase2 () {
     : "====== Test Case 2: Test ACS Integration ======"
     : "NOTE: Waiting for ACS to scan the httpd-example image built in Test Case 1."
     acsFailureMsg='ACS integration test failed'
+    typeset _acsQueryToken=''
+    typeset -i _acsListOk=0
 
     # Fetch ACS credentials.  The admin password is written to an
     # ephemeral file inside a subshell with xtrace disabled (Best
@@ -491,10 +585,15 @@ function RunTestCase2 () {
         echo "ERROR: Secret stackrox/sensor-tls carries no acs-host value" >&2
         return 1
     fi
+    if [[ "${acsHost}" == *"*"* ]] || [[ "${acsHost}" =~ [[:space:]] ]]; then
+        echo "ERROR: ACS host value contains unexpected characters, refusing to use" >&2
+        return 1
+    fi
+    typeset -i _credRc=0
     ( set +x
       oc get secret -n stackrox central-htpasswd -o json | /tmp/jq -r '.data.password' | base64 -d >"${acsPassFile}"
-    ) || true
-    if [[ ! -s "${acsPassFile}" ]]; then
+    ) || _credRc=$?
+    if (( _credRc != 0 )) || [[ ! -s "${acsPassFile}" ]]; then
         echo "ERROR: Could not read the ACS admin password from secret stackrox/central-htpasswd" >&2
         return 1
     fi
@@ -645,6 +744,7 @@ def lastn($d): split("/") | .[-$d:] | join("/");
     fi
     typeset -a acsTlsOpts=( --cacert "${acsCaFile}" )
 
+    typeset -i acsDeadline=$(( SECONDS + 600 ))
     typeset -i retries=10
     typeset -i retryInterval=30
     typeset isImageFound=false
@@ -659,10 +759,47 @@ def lastn($d): split("/") | .[-$d:] | join("/");
         # The listing is paged inside the helper: one request answers at most
         # 1000 records, so a single unpaginated query misses the image in a
         # large registry.  A failed listing is retried like an empty answer.
+        typeset -i _acsTry=0 _acsQueryOk=0
         httpdImageJson='[]'
-        httpdImageJson="$(AcsListMatchingImages "${acsHost}" "${acsPassFile}" "${jqFilter}" \
-            "${deployedRepo}" "${deployedRepoDepth}" "${deployedDigest}" "${acsTlsOpts[@]}")" \
-            || httpdImageJson='[]'
+        for _acsTry in 1 2 3; do
+            if httpdImageJson="$(AcsListMatchingImages "${acsHost}" "${acsPassFile}" "${jqFilter}" \
+                "${deployedRepo}" "${deployedRepoDepth}" "${deployedDigest}" "${acsTlsOpts[@]}")"; then
+                _acsQueryOk=1
+                # A successful listing clears the failure category and records
+                # that a list worked: the message on exhaustion has to describe
+                # this run, not a transient failure a later attempt recovered
+                # from. A category set by a failed attempt stays until the next
+                # success, so the retry loop keeps it while it still applies.
+                _acsQueryToken=''
+                _acsListOk=1
+                break
+            else
+                typeset _acsErr=""
+                _acsErr=$(cat "${ARTIFACT_DIR:-/tmp}/acs-err.log" 2>/dev/null || echo unknown)
+                _acsQueryToken="${_acsErr:-unknown}"
+                if [[ "${_acsErr}" == 'unauthorized' || "${_acsErr}" == 'forbidden' ]]; then
+                    echo "ACS query failed (${_acsErr}), retry ${_acsTry}/3" >&2
+                    sleep $(( _acsTry * 2 ))
+                    continue
+                else
+                    httpdImageJson='__QUERY_FAILED__'
+                    break
+                fi
+            fi
+        done
+        # If all retries exhausted without success, mark as query failure not empty
+        if (( _acsQueryOk == 0 )) && [[ "${httpdImageJson}" != '__QUERY_FAILED__' ]]; then
+            httpdImageJson='__QUERY_FAILED__'
+        fi
+        if [[ "${httpdImageJson}" == '__QUERY_FAILED__' ]]; then
+            echo "ACS query failed after ${_acsTry} attempts, treating as transient not empty" >&2
+            typeset -i _acsFailSleep=${retryInterval}
+            typeset -i _acsFailRemain=$(( acsDeadline - SECONDS ))
+            (( _acsFailRemain > 0 )) || _acsFailRemain=0
+            (( _acsFailSleep > _acsFailRemain )) && _acsFailSleep=${_acsFailRemain}
+            (( _acsFailSleep > 0 )) && sleep "${_acsFailSleep}"
+            continue
+        fi
         # Read the record only out of a single-element answer.  Two or more
         # matching records are named and retried instead of being read: jq
         # would otherwise concatenate their fields, and a record whose cves is
@@ -691,7 +828,14 @@ def lastn($d): split("/") | .[-$d:] | join("/");
             fi
         fi
 
-        [ "${attempt}" -lt "${retries}" ] && sleep "${retryInterval}"
+        if (( SECONDS >= acsDeadline )); then break; fi
+        if [[ "${attempt}" -lt "${retries}" ]]; then
+            typeset -i _acsRemain=$(( acsDeadline - SECONDS ))
+            (( _acsRemain <= 0 )) && break
+            typeset -i _acsSleep=${retryInterval}
+            (( _acsSleep > _acsRemain )) && _acsSleep=${_acsRemain}
+            sleep "${_acsSleep}"
+        fi
     done
 
     rm -f "${acsPassFile}" /tmp/acs-ingress-ca.crt /tmp/acs-central-ca.crt
@@ -702,8 +846,10 @@ def lastn($d): split("/") | .[-$d:] | join("/");
         # never happened, and the row has to say which one it was.
         if (( multiMatchCount > 1 )); then
             acsFailureMsg="ACS returned ${multiMatchCount} matching records for ${deployedRepo} after $((retries * retryInterval))s; the check accepts exactly one record"
-            printf '%s\n' "ERROR: ${acsFailureMsg}" >&2
+        elif [[ -n "${_acsQueryToken}" ]] && (( _acsListOk == 0 )); then
+            acsFailureMsg="ACS could not be queried after $((retries * retryInterval))s (failure category: ${_acsQueryToken}); no scan result is established"
         fi
+        printf '%s\n' "ERROR: ${acsFailureMsg}" >&2
         return 1
     fi
 
@@ -715,12 +861,21 @@ def lastn($d): split("/") | .[-$d:] | join("/");
 ################################################################################
 # Load ExitTrap library for Component Readiness JUnit remapping
 # Per Best Practices: Use exact pattern from library documentation.
-eval "$(
+typeset _exitTrapHelper=""
+typeset -i _exitTrapDlRc=0
+_exitTrapHelper="$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
-        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-)"
+        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+)" || _exitTrapDlRc=$?
+if (( _exitTrapDlRc != 0 )); then
+    printf '%s\n' "WARNING: failed to download ExitTrap helper (rc=${_exitTrapDlRc})" >&2
+elif [[ -z "${_exitTrapHelper}" ]]; then
+    printf '%s\n' "WARNING: ExitTrap helper download returned empty body" >&2
+else
+    eval "${_exitTrapHelper}"
+fi
 
 # Post-process the JUnit XML for Component Readiness routing.  This runs from
 # the EXIT trap, which clears errexit first, so the helper is called unguarded:
@@ -749,15 +904,48 @@ PostProcessJunit () {
 # Integrates existing GenerateJunitXml function with ExitTrap library
 # errexit is off inside the trap so one failing report step cannot skip the
 # rest, and the credential file is removed here so it does not survive an
-# early return.
-trap '{(
+# early return. Both status carriers are declared at file scope: a `typeset`
+# inside the quoted trap body is invisible to shellcheck (SC2154) and, with an
+# early `exit`, would meet an unset variable under `set -u`.
+typeset -i _trapExit=0
+typeset -i _genRc=0
+typeset -i _propRc=0
+typeset -i _trapFail=0
+trap '{
+    _trapExit=$?
     set +e
-    GenerateJunitXml
+    _genRc=0
+    _propRc=0
+    _trapFail=0
+    GenerateJunitXml || _genRc=$?
+    if (( _genRc != 0 )); then
+        echo "ERROR: JUnit report generation failed at ${junitFile} (rc=${_genRc})" >&2
+        _trapFail=1
+    elif [[ ! -s "${junitFile}" ]] || ! python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${junitFile}" 2>/dev/null; then
+        echo "ERROR: JUnit report missing or invalid at ${junitFile}" >&2
+        _trapFail=1
+    fi
     PostProcessJunit
-    _propagate_junit
+    _propagate_junit || _propRc=$?
+    if (( _propRc != 0 )); then
+        echo "ERROR: failed to publish JUnit report to SHARED_DIR" >&2
+        _trapFail=1
+    fi
+    if [[ -n "${SHARED_DIR:-}" ]]; then
+        if ! python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${SHARED_DIR}/${mergedJunitFile}" 2>/dev/null && ! python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${SHARED_DIR}/$(basename "${junitFile}")" 2>/dev/null; then
+            echo "ERROR: JUnit report not present in SHARED_DIR" >&2
+            _trapFail=1
+        fi
+    fi
     rm -f /tmp/acs-admin-password
+    if (( _trapFail != 0 )) && (( _trapExit == 0 )); then
+        exit 1
+    fi
+    if (( _trapExit != 0 )); then
+        exit "${_trapExit}"
+    fi
     true
-)}' EXIT
+}' EXIT
 
 ################################################################################
 # Pre-flight Checks
@@ -814,7 +1002,7 @@ elif [[ -z "${getOutput}" ]]; then
 fi
 
 : "QuayIntegration quay found"
-oc get quayintegration quay -o yaml --ignore-not-found
+oc get quayintegration quay -o yaml --ignore-not-found || true
 
 ################################################################################
 # Execute Test Cases
@@ -831,7 +1019,42 @@ if RunTestCase1; then
     # Run Test Case 2 (ACS Integration)
     typeset -i case2Start=0
     case2Start=$(date +%s)
-    if RunTestCase2; then
+    typeset scCheck=""
+    typeset -i scCheckRc=0
+    # Capture stderr privately with set +x and tokenize to fixed category (thread PRRT_kwDOBHvUUM65ui1S)
+    typeset _scErrToken="ok"
+    scCheck=$( ( set +x; oc get securedcluster -A --ignore-not-found -o name 2>"${ARTIFACT_DIR:-/tmp}/sc-err.log" ) ) || scCheckRc=$?
+    if (( scCheckRc != 0 )); then
+      typeset _scErrRaw=""
+      _scErrRaw=$(cat "${ARTIFACT_DIR:-/tmp}/sc-err.log" 2>/dev/null || echo unknown)
+      # Tokenize to fixed categories, emit only token+rc
+      if [[ "${_scErrRaw}" == *"NotFound"* || "${_scErrRaw}" == *"the server doesn't have a resource type"* ]]; then
+        _scErrToken="notfound"
+      elif [[ "${_scErrRaw}" == *"Forbidden"* || "${_scErrRaw}" == *"forbidden"* ]]; then
+        _scErrToken="forbidden"
+      else
+        _scErrToken="error"
+      fi
+      # Overwrite raw log with tokenized version to avoid secret leakage
+      printf '%s\n' "${_scErrToken} rc=${scCheckRc}" > "${ARTIFACT_DIR:-/tmp}/sc-err.log"
+    fi
+    if (( scCheckRc != 0 )); then
+        typeset _scErr=""
+        _scErr=$(cat "${ARTIFACT_DIR:-/tmp}/sc-err.log" 2>/dev/null) || true
+        [[ -n "${_scErr}" ]] || _scErr="${_scErrToken:-unknown}"
+        if [[ "${_scErr}" == *"notfound"* ]] || [[ "${_scErrToken}" == "notfound" ]]; then
+            RecordTestResult "test-acs-integration" "skipped" "No SecuredCluster found; skipping ACS case (CRD not served)" "0"
+            : "Skipping ACS case: SecuredCluster CRD not served"
+        else
+            typeset -i case2Duration=0
+            case2Duration=$(( $(date +%s) - case2Start ))
+            RecordTestResult "test-acs-integration" "failed" "Failed to list SecuredCluster (rc=${scCheckRc} token=${_scErrToken})" "${case2Duration}"
+            : "Test Case 2 (Test ACS Integration) Result: FAILED lookup"
+        fi
+    elif [[ -z "${scCheck}" ]]; then
+        RecordTestResult "test-acs-integration" "skipped" "No SecuredCluster found; skipping ACS case" "0"
+        : "Skipping ACS case: no SecuredCluster exists"
+    elif RunTestCase2; then
         typeset -i case2Duration=0
         case2Duration=$(( $(date +%s) - case2Start ))
         RecordTestResult "test-acs-integration" "passed" "" "${case2Duration}"

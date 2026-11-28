@@ -147,7 +147,7 @@ print(len(json.load(sys.stdin).get('items',[])))
     true
 }
 
-function GetQuayAuth () {
+function GetQuayAuthOnce () {
     QUAY_USER=""
     QUAY_PASSWORD=""
     QUAY_TOKEN=""
@@ -200,6 +200,49 @@ function GetQuayAuth () {
     echo "ERROR: Could not obtain Quay credentials from any source" >&2
     export QUAY_USER QUAY_PASSWORD QUAY_TOKEN
     return 1
+}
+
+function _quay_cred_present () {
+    # Any usable credential ends the wait: quayadmin token, quayadmin password
+    # or the quaydevel password. Each read is bounded, so a stalled API call
+    # cannot outlive the budget.
+    if oc get secret quayadmin -n "${QUAY_NS}" --ignore-not-found \
+         --request-timeout=5s -o jsonpath='{.data.token}{.data.password}' 2>/dev/null | grep -q .; then
+        return 0
+    fi
+    if oc get secret quaydevel -n "${QUAY_NS}" --ignore-not-found \
+         --request-timeout=5s -o jsonpath='{.data.password}' 2>/dev/null | grep -q .; then
+        return 0
+    fi
+    return 1
+}
+
+function GetQuayAuth () {
+    typeset -i authBudgetSeconds=600
+    typeset -i authDeadline=0
+    typeset -i authPollInterval=5
+    typeset -i authRemain=0 authSleep=0
+    if _quay_cred_present; then
+        : "existing Quay credential present, skipping wait"
+    else
+        authDeadline=$(( $(date +%s) + authBudgetSeconds ))
+        while (( $(date +%s) < authDeadline )); do
+            if _quay_cred_present; then
+                echo "INFO: a Quay credential appeared while waiting"
+                break
+            fi
+            authRemain=$(( authDeadline - $(date +%s) ))
+            if (( authRemain <= 0 )); then
+                break
+            fi
+            authSleep=$(( authPollInterval < authRemain ? authPollInterval : authRemain ))
+            sleep "${authSleep}"
+        done
+        if (( $(date +%s) >= authDeadline )); then
+            echo "WARN: no Quay credential appeared within $(( authBudgetSeconds / 60 ))m; falling back to the other credential sources" >&2
+        fi
+    fi
+    GetQuayAuthOnce
 }
 
 function PreflightCheck () {

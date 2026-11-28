@@ -186,7 +186,7 @@ function CheckOppCompatibility () {
     typeset ocpKey="${1}"
     typeset compatSpec="${OPP_COMPAT[${ocpKey}]:-}"
     typeset allCsvs
-    typeset failed=0
+    typeset unverifiable=0 belowFloor=0
 
     allCsvs="$(oc get csv -A --no-headers)" || {
         : "Failed to retrieve CSVs"
@@ -201,6 +201,36 @@ function CheckOppCompatibility () {
         return 0
     fi
 
+    # Post-upgrade floor enforcement contract (PRRT_kwDOBHvUUM65TpMz):
+    # export the resolved floors for the target minor so interop-opp-smoke
+    # can fail operators that remain below floor after the product upgrades.
+    # Without SHARED_DIR there is nowhere to write, so the gate stays inert
+    # (interop-opp-smoke skips it when the file is absent). With SHARED_DIR
+    # set, a failed write is a failed check: the contract would otherwise be
+    # claimed while unenforceable, so it logs one ERROR line naming the
+    # reason, records a fail row, and reds the pre-flight (exit 3).
+    if [[ -n "${SHARED_DIR:-}" ]]; then
+        typeset -i _floorsWriteRc=0
+        # Redirect stderr before stdout so a failed open does not also leak the
+        # shell's own "No such file or directory" line: the ERROR line below is
+        # the deliberate signal that the gate is inactive this run.
+        {
+            echo "# OPP_COMPAT floors for target OCP ${ocpKey} (written by interop-opp-preflight)"
+            typeset _floorEntry
+            for _floorEntry in ${compatSpec}; do
+                printf '%s=%s\n' "${_floorEntry%%:*}" "${_floorEntry##*:}"
+            done
+        } 2>/dev/null > "${SHARED_DIR}/opp-compat-floors.env" || _floorsWriteRc=$?
+        if (( _floorsWriteRc != 0 )); then
+            # The post-upgrade floor gate cannot run without the exported
+            # floors, so a failed export is a failed check: the lane must
+            # not pass while the floor contract it claims is unenforceable.
+            echo "ERROR: could not write ${SHARED_DIR}/opp-compat-floors.env (rc=${_floorsWriteRc}); the interop-opp-smoke post-upgrade floor gate stays inactive this run" >&2
+            AppendCheck "opp_compatibility_matrix" "fail" "floors export to ${SHARED_DIR}/opp-compat-floors.env failed (rc=${_floorsWriteRc}); post-upgrade floor enforcement cannot run"
+            (( CHECKS_FAILED += 1 ))
+        fi
+    fi
+
     typeset details=""
     for entry in ${compatSpec}; do
         typeset opPrefix="${entry%%:*}"
@@ -208,7 +238,11 @@ function CheckOppCompatibility () {
 
         # If OPP_OPERATORS is set, only check operators listed in it
         if [[ -n "${OPP_OPERATORS:-}" ]]; then
-            if ! echo ",${OPP_OPERATORS}," | grep -q ",${opPrefix},"; then
+            # Exact membership test: the previous `grep -q ",${opPrefix},"`
+            # built a regex from environment-derived text, the same lookup
+            # this function stops doing for the CSV row below, so a `.` or
+            # `[` inside an operator prefix matched more than itself.
+            if [[ ",${OPP_OPERATORS}," != *",${opPrefix},"* ]]; then
                 : "INFO: ${opPrefix}: Skipping (not in OPP_OPERATORS)"
                 details="${details}${opPrefix}: skipped (not in OPP_OPERATORS); "
                 continue
@@ -220,20 +254,40 @@ function CheckOppCompatibility () {
         minMinor="${minVersion##*.}"
 
         typeset csvLine csvName installedVersion
-        csvLine="$(echo "${allCsvs}" | grep "${opPrefix}" | head -1)" || true
+        # Match the CSV name column only: a bare substring match on the whole
+        # row can select an unrelated CSV (namespace, display name, or REPLACES
+        # column), which would hide a missing operator CSV. Same prefix rule as
+        # interop-opp-smoke.
+        csvLine="$(awk -v prefix="${opPrefix}" '($2 == prefix || index($2, prefix ".") == 1) {print; exit}' <<< "${allCsvs}")"
         if [[ -z "${csvLine}" ]]; then
             : "Operator not found: ${opPrefix}"
             details="${details}${opPrefix}: NOT INSTALLED; "
-            (( failed += 1 ))
+            (( unverifiable += 1 ))  # missing CSV is a hard failure, not a floor question
             continue
         fi
 
         csvName="$(echo "${csvLine}" | awk '{print $2}')"
-        installedVersion="$(echo "${csvName}" | grep -oE '[0-9]+\.[0-9]+' | head -1)" || true
+        # CSV names are `<package>.v<major>.<minor>.<patch>[-suffix]`. Anchor
+        # on that shape: taking the first `M.N` token anywhere in the name
+        # read `foo-3.1-operator.v1.2.3` as 3.1 and produced a wrong floor
+        # verdict. The bash regex also drops the `grep -o | head -1` pair,
+        # whose SIGPIPE under `set -o pipefail` needed the trailing `|| true`.
+        installedVersion=""
+        if [[ "${csvName}" =~ \.v([0-9]+)\.([0-9]+) ]]; then
+            installedVersion="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+        else
+            # Read version from CSV spec.version instead of inferring from name without .v
+            typeset csvNs csvSpecVersion
+            csvNs="$(echo "${csvLine}" | awk '{print $1}')"
+            csvSpecVersion="$(oc get csv "${csvName}" -n "${csvNs}" -o jsonpath='{.spec.version}' 2>/dev/null || echo "")"
+            if [[ "${csvSpecVersion}" =~ ^([0-9]+)\.([0-9]+) ]]; then
+                installedVersion="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+            fi
+        fi
         if [[ -z "${installedVersion}" ]]; then
             : "Operator ${opPrefix}: could not parse version from CSV ${csvName}"
             details="${details}${opPrefix}: version unparseable from ${csvName}; "
-            (( failed += 1 ))
+            (( unverifiable += 1 ))
             continue
         fi
 
@@ -244,17 +298,38 @@ function CheckOppCompatibility () {
         if (( instMajor < minMajor || (instMajor == minMajor && instMinor < minMinor) )); then
             : "Operator ${opPrefix} version ${installedVersion} is below minimum ${minVersion} for OCP ${ocpKey}"
             details="${details}${opPrefix}: ${installedVersion} < ${minVersion} (INCOMPATIBLE); "
-            (( failed += 1 ))
+            (( belowFloor += 1 ))
         else
             : "Operator ${opPrefix}: version ${installedVersion} >= ${minVersion} (OK)"
             details="${details}${opPrefix}: ${installedVersion} >= ${minVersion} (OK); "
         fi
     done
 
-    if (( failed > 0 )); then
-        : "${failed} operator(s) failed compatibility check"
+    if (( unverifiable > 0 )); then
+        # A missing CSV or an unparseable version is not a floor question: the
+        # operator could not be verified at all. Keep these fatal.
+        : "${unverifiable} operator(s) missing or unparseable against the compatibility matrix"
         AppendCheck "opp_compatibility_matrix" "fail" "${details}"
         (( CHECKS_FAILED += 1 ))
+    elif (( belowFloor > 0 )); then
+        # Informational at pre-flight, not a gate. The OPP_COMPAT floors for
+        # the target OCP minor describe the post-upgrade operator set: the
+        # upgrade lanes intentionally install below the target floor
+        # (rhacs-operator 4.10 via the versioned channel, openshift/release#87865)
+        # and the product-upgrade steps move the operators forward mid-run.
+        # The post-upgrade state is enforced where it is observable: the
+        # product-upgrade steps require forward progress (no downgrades, no
+        # no-forward-path upgrades) and interop-opp-smoke fails any operator
+        # this lane upgraded that still sits below the exported floor
+        # (PRRT_kwDOBHvUUM65TpMz; the exported floors file above is that
+        # contract). Pre-flight itself stays informational because gating
+        # here reds every upgrade lane on the pre-upgrade baseline.
+        # (first seen after #87865 + #87963 combined).
+        : "${belowFloor} operator(s) below the target-version compatibility floor (pre-upgrade baseline)"
+        AppendCheck "opp_compatibility_matrix" "warn" "${details}"
+        if [[ -n "${belowFloor}" ]]; then
+            echo "WARN: operator below target floor ${ocpKey}; the post-upgrade floor is enforced by interop-opp-smoke for operators upgraded this run (floors exported to opp-compat-floors.env in SHARED_DIR)" > "${ARTIFACT_DIR}/compat-floor-preflight-warn.txt" 2>/dev/null || true
+        fi
     else
         : "All OPP operators are compatible with OCP ${ocpKey}"
         AppendCheck "opp_compatibility_matrix" "pass" "${details}"
@@ -512,5 +587,5 @@ JEOF
   fi
 }
 
-trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}; EXIT_CODE=${_jrc}; DebugOnExit; WriteJunit ${_jrc}; exit 0' EXIT
+trap '_jrc=$?; set +e; _opp_cleanup ${_jrc}; EXIT_CODE=${_jrc}; DebugOnExit; WriteJunit ${_jrc}; exit "${_jrc}"' EXIT
 Main "$@"

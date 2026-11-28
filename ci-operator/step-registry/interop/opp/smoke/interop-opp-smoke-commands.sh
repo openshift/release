@@ -9,7 +9,7 @@ set -x
 
 # shellcheck disable=SC2154
 _opp_cleanup() {
-  _exit_code=$?
+  _exit_code="${1:-$?}"
   set +x 2>/dev/null
   # Scrub credentials before copying
   sed -i -E \
@@ -23,6 +23,7 @@ _opp_cleanup() {
     cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
+  rm -rf "${_opp_smoke_tmp:-}" 2>/dev/null || true
 }
 trap '_opp_cleanup' EXIT
 
@@ -59,6 +60,8 @@ OPP_OPERATORS="${OPP_OPERATORS:-advanced-cluster-management,rhacs-operator,odf-o
 SMOKE_SETTLE_SECONDS="${SMOKE_SETTLE_SECONDS:-120}"
 
 typeset junitFile="${ARTIFACT_DIR}/junit_opp_smoke.xml"
+# Scratch space for oc stderr captures (CRD-absence classification).
+_opp_smoke_tmp="$(mktemp -d)"
 
 # Accumulators for JUnit generation
 typeset -a tcNamesArr=()
@@ -112,6 +115,14 @@ WriteJunit() {
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
         echo "<testsuite name=\"lp-interop--OPP--smoke\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        # Effective configuration in the JUnit carrier: the lane-level
+        # OPP_OPERATORS override has been observed not reaching this step
+        # (runs 2118373032635404288 / 2118380423871467520 checked operators
+        # outside the configured list); publish what actually ran.
+        echo "  <properties>"
+        echo "    <property name=\"opp_operators\" value=\"$(XmlEscape "${OPP_OPERATORS}")\"/>"
+        echo "    <property name=\"smoke_settle_seconds\" value=\"$(XmlEscape "${SMOKE_SETTLE_SECONDS}")\"/>"
+        echo "  </properties>"
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
             name="$(XmlEscape "${tcNamesArr[$i]}")"
@@ -150,7 +161,35 @@ _propagate_junit () {
     done
 }
 
-trap '_jrc=$?; set +e; _opp_cleanup; CollectExitArtifacts; _propagate_junit; exit 0' EXIT
+# shellcheck disable=SC2154  # _jrc is assigned at trap entry in the same string
+trap '_jrc=$?; set +e; _opp_cleanup "${_jrc}"; CollectExitArtifacts; _propagate_junit; exit "${_jrc}"' EXIT
+
+ApiEndpointState() {
+    # Prints served, absent, or unknown for an API endpoint path. The probe
+    # is a direct `oc get --raw`, which bypasses the RESTMapper: a 404 here
+    # distinguishes an endpoint the server genuinely does not serve from the
+    # partial-discovery artifact that also produces
+    # "the server doesn't have a resource type" while the resource is
+    # actually served. Every caller treats unknown as failure, so an
+    # unusable probe can never turn a red lane green.
+    typeset path="${1:-}"
+    typeset raw=""
+    if [[ -z "${path}" ]]; then
+        echo unknown
+        return 0
+    fi
+    raw="$(oc get --raw "${path}" 2>&1)" || true
+    if printf '%s' "${raw}" | grep -q '"versions"\|"groupVersion"\|"resources"'; then
+        echo served
+        return 0
+    fi
+    if printf '%s' "${raw}" | grep -qi '404 page not found\|could not find the requested resource'; then
+        echo absent
+        return 0
+    fi
+    echo unknown
+    return 0
+}
 
 # ---------------------------------------------------------------------------
 # Test 1: cluster-health
@@ -255,13 +294,23 @@ TestOppOperators() {
         op="$(echo "${op}" | xargs)"  # trim whitespace
         : "Checking operator: ${op}"
 
-        # Find CSV matching this operator prefix
+        # Find CSV matching this operator. The name must be the exact
+        # package or the package plus a dot-delimited suffix (the same rule
+        # as interop-opp-preflight): a bare startswith($prefix) also matched
+        # a different operator sharing the prefix (for example
+        # rhacs-operator-canary), which could satisfy the phase check and
+        # the post-upgrade floor with the wrong CSV. The jq array + `first`
+        # form is pipefail-safe: `jq | head -1` raced SIGPIPE under
+        # `set -o pipefail` and surfaced as spurious "Failed to query CSVs"
+        # on healthy clusters (INTEROP-9670).
         typeset csvInfo=""
         if ! csvInfo="$(oc get csv --all-namespaces -o json | jq -r --arg prefix "${op}" '
-            .items[]
-            | select(.metadata.name | startswith($prefix))
-            | "\(.metadata.namespace)/\(.metadata.name)/\(.status.phase)"
-        ' | head -1)"; then
+            [ .items[]
+              | select(.metadata.name == $prefix or (.metadata.name | startswith($prefix + ".")))
+              | select(.status.reason != "Copied")
+              | "\(.metadata.namespace)/\(.metadata.name)/\(.status.phase)" ]
+            | first // empty
+        ')"; then
             typeset apiMsg="Failed to query CSVs for ${op}"
             : "FAIL: ${apiMsg}"
             if [[ -n "${failMsg}" ]]; then failMsg="${failMsg}; ${apiMsg}"; else failMsg="${apiMsg}"; fi
@@ -294,6 +343,83 @@ TestOppOperators() {
             fi
         else
             : "PASS: CSV ${csvName} phase=Succeeded"
+        fi
+
+        # Post-upgrade compatibility floor (PRRT_kwDOBHvUUM65TpMz): an
+        # operator this lane upgraded (interop-opp-product-upgrade-* writes
+        # ${SHARED_DIR}/<key>-upgraded-version on success) must not remain
+        # below the OPP_COMPAT floor for the target OCP minor, which
+        # interop-opp-preflight exports to ${SHARED_DIR}/opp-compat-floors.env.
+        # Install lanes carry no upgrade marker and lanes without a matrix
+        # entry carry no floors file, so the gate is inert there. An operator
+        # with no usable floor row is traced, not failed (the phase check
+        # above already owns presence); a CSV version that cannot be
+        # determined while a floor row applies fails, because an unreadable
+        # version must never satisfy the gate.
+        if [[ "${csvPhase}" == "Succeeded" && -n "${SHARED_DIR:-}" && -f "${SHARED_DIR}/opp-compat-floors.env" ]]; then
+            typeset floorVersion="" floorMajor="" floorMinor=""
+            floorVersion="$(awk -F= -v op="${op}" '$1 == op {print $2; exit}' "${SHARED_DIR}/opp-compat-floors.env" 2>/dev/null)" || floorVersion=""
+            # The floor file is M.N by construction; parse defensively so a
+            # truncated or hand-edited row reads as "no floor", never as a
+            # silent pass against a bogus 0.0.
+            if [[ "${floorVersion}" =~ ^([0-9]+)\.([0-9]+) ]]; then
+                floorMajor="${BASH_REMATCH[1]}"
+                floorMinor="${BASH_REMATCH[2]}"
+            else
+                : "INFO: ${op}: no usable OPP_COMPAT floor row (found '${floorVersion}'); post-upgrade floor not checked"
+            fi
+            if [[ -n "${floorMajor}" ]]; then
+                typeset upgradeKey=""
+                case "${op}" in
+                    rhacs-operator) upgradeKey="acs" ;;
+                    advanced-cluster-management) upgradeKey="acm" ;;
+                    odf-operator) upgradeKey="odf" ;;
+                    quay-operator) upgradeKey="quay" ;;
+                    *) upgradeKey="${op}" ;;
+                esac
+                if [[ -f "${SHARED_DIR}/${upgradeKey}-upgraded-version" ]]; then
+                    typeset csvMajor="" csvMinor="" csvSpecVersion=""
+                    if [[ "${csvName}" =~ \.v([0-9]+)\.([0-9]+) ]]; then
+                        csvMajor="${BASH_REMATCH[1]}"
+                        csvMinor="${BASH_REMATCH[2]}"
+                    else
+                        # Same fallback as interop-opp-preflight: a CSV name
+                        # without the .vM.N shape still carries spec.version.
+                        csvSpecVersion="$(oc get csv "${csvName}" -n "${csvNs}" -o jsonpath='{.spec.version}' 2>/dev/null)" || csvSpecVersion=""
+                        if [[ "${csvSpecVersion}" =~ ^([0-9]+)\.([0-9]+) ]]; then
+                            csvMajor="${BASH_REMATCH[1]}"
+                            csvMinor="${BASH_REMATCH[2]}"
+                        fi
+                    fi
+                    if [[ -n "${csvMajor}" ]]; then
+                        if (( csvMajor < floorMajor || (csvMajor == floorMajor && csvMinor < floorMinor) )); then
+                            typeset upgradedVersion=""
+                            upgradedVersion="$(cat "${SHARED_DIR}/${upgradeKey}-upgraded-version" 2>/dev/null)" || upgradedVersion=""
+                            typeset floorMsg="CSV ${csvName} version ${csvMajor}.${csvMinor} is below the post-upgrade floor ${floorVersion} (OPP_COMPAT; upgraded this run to ${upgradedVersion:-unknown})"
+                            : "FAIL: ${floorMsg}"
+                            if [[ -n "${failMsg}" ]]; then
+                                failMsg="${failMsg}; ${floorMsg}"
+                            else
+                                failMsg="${floorMsg}"
+                            fi
+                        else
+                            : "PASS: ${op} ${csvMajor}.${csvMinor} meets post-upgrade floor ${floorVersion}"
+                        fi
+                    else
+                        # The floor check is applicable (upgrade marker plus a
+                        # floor row), so an undeterminable version is a
+                        # failure, not a trace: a CSV whose version cannot be
+                        # read must not silently pass the gate.
+                        typeset floorVerMsg="post-upgrade floor ${floorVersion} applies to ${op} but the version of CSV ${csvName} could not be determined (name shape and spec.version both unparsable)"
+                        : "FAIL: ${floorVerMsg}"
+                        if [[ -n "${failMsg}" ]]; then
+                            failMsg="${failMsg}; ${floorVerMsg}"
+                        else
+                            failMsg="${floorVerMsg}"
+                        fi
+                    fi
+                fi
+            fi
         fi
 
         # Check pods are Ready in the operator namespace (with settling window)
@@ -349,9 +475,34 @@ TestAcmConnectivity() {
     fi
     typeset failMsg=""
 
-    # Check if ManagedCluster resources exist
+    # Check if ManagedCluster resources exist. A resource type the API
+    # server does not serve is a skip, not a failure (INTEROP-9670).
     typeset -i mcCount=0
-    if ! mcCount=$(oc get managedclusters -o json | jq '.items | length'); then
+    if ! mcCount="$(oc get managedclusters -o json 2>"${_opp_smoke_tmp}/mc.err" | jq '.items | length')"; then
+        if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/mc.err"; then
+            # A resource-type error alone does not prove the API is absent:
+            # partial discovery produces the same message while the group is
+            # served. Skip only when a direct group-endpoint probe confirms
+            # the group is not served; a served group or an unusable probe
+            # is a failure.
+            typeset _mcGroupState=""
+            _mcGroupState="$(ApiEndpointState "/apis/cluster.open-cluster-management.io")"
+            case "${_mcGroupState}" in
+                absent)
+                    : "SKIP: managedclusters API group not served by this cluster"
+                    AddResult "acm-connectivity" "skip" "managedclusters API group not served by this cluster"
+                    return
+                    ;;
+                served)
+                    AddResult "acm-connectivity" "fail" "ManagedClusters lookup failed although the API group is served (partial discovery?): $(head -c 300 "${_opp_smoke_tmp}/mc.err")"
+                    return
+                    ;;
+                *)
+                    AddResult "acm-connectivity" "fail" "Failed to query ManagedClusters and could not confirm the API group state"
+                    return
+                    ;;
+            esac
+        fi
         AddResult "acm-connectivity" "fail" "Failed to query ManagedClusters"
         return
     fi
@@ -402,12 +553,38 @@ TestAcsSensors() {
     fi
     typeset failMsg=""
 
-    # Check SecuredCluster CR status first
+    # Check SecuredCluster CR status first. A resource type the API server
+    # does not serve is a skip; the jq array + `first` form keeps the query
+    # pipefail-safe (INTEROP-9670).
     typeset scStatus=""
-    if ! scStatus="$(oc get securedclusters.platform.stackrox.io --all-namespaces -o json | jq -r '
-        .items[]
-        | "\(.metadata.namespace)/\(.metadata.name)/\(.status.conditions // [] | map(select(.type=="Deployed" or .type=="Initialized")) | map(.status) | join(","))"
-    ' | head -1)"; then
+    if ! scStatus="$(oc get securedclusters.platform.stackrox.io --all-namespaces -o json 2>"${_opp_smoke_tmp}/sc.err" | jq -r '
+        [ .items[]
+          | "\(.metadata.namespace)/\(.metadata.name)/\(.status.conditions // [] | map(select(.type=="Deployed" or .type=="Initialized")) | map(.status) | join(","))" ]
+        | first // empty
+    ')"; then
+        if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/sc.err"; then
+            # Same rule as the managedclusters branch above: the
+            # resource-type message can come from partial discovery while
+            # the CRD-backed group is served. Skip only on a confirmed
+            # absent group endpoint; served or unknown is a failure.
+            typeset _scGroupState=""
+            _scGroupState="$(ApiEndpointState "/apis/platform.stackrox.io")"
+            case "${_scGroupState}" in
+                absent)
+                    : "SKIP: securedclusters API group not served by this cluster"
+                    AddResult "acs-sensors" "skip" "securedclusters API group not served by this cluster"
+                    return
+                    ;;
+                served)
+                    AddResult "acs-sensors" "fail" "SecuredCluster lookup failed although the API group is served (partial discovery?): $(head -c 300 "${_opp_smoke_tmp}/sc.err")"
+                    return
+                    ;;
+                *)
+                    AddResult "acs-sensors" "fail" "Failed to query SecuredCluster resources and could not confirm the API group state"
+                    return
+                    ;;
+            esac
+        fi
         AddResult "acs-sensors" "fail" "Failed to query SecuredCluster resources"
         return
     fi
@@ -419,11 +596,41 @@ TestAcsSensors() {
         scConds="$(echo "${scStatus}" | cut -d/ -f3)"
         : "SecuredCluster ${scName} in ${scNs}: conditions=${scConds}"
 
-        # Verify sensor pods are Running in the SecuredCluster namespace
+        # Verify sensor pods are Running in the SecuredCluster namespace.
+        # A failed query is classified separately from an empty list: the
+        # previous `|| true` collapsed an API error and a genuinely empty
+        # result into the same "No sensor pods found" verdict, which is the
+        # masked failure the SecuredCluster query above already avoids.
         typeset sensorStatus=""
-        sensorStatus="$(oc get pods -n "${scNs}" -l app=sensor -o json | jq -r '
+        if ! sensorStatus="$(oc get pods -n "${scNs}" -l app=sensor -o json 2>"${_opp_smoke_tmp}/sensor.err" | jq -r '
             .items[] | "\(.metadata.name):\(.status.phase)"
-        ')" || true
+        ')"; then
+            if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/sensor.err"; then
+                # Confirm absence with the direct core-API probe (the same
+                # rule as the two branches above): the old
+                # `oc api-resources` confirmation shared discovery with the
+                # failing lookup, so a partial discovery result could skip
+                # the sensor check while pods are served.
+                typeset _coreState=""
+                _coreState="$(ApiEndpointState "/api/v1")"
+                case "${_coreState}" in
+                    absent)
+                        AddResult "acs-sensors" "skip" "pods resource not served by this cluster"
+                        return
+                        ;;
+                    served)
+                        AddResult "acs-sensors" "fail" "Failed to query sensor pods in ${scNs} although the core API is served (partial discovery?): $(head -c 300 "${_opp_smoke_tmp}/sensor.err")"
+                        return
+                        ;;
+                    *)
+                        AddResult "acs-sensors" "fail" "Failed to query sensor pods in ${scNs} and could not confirm the core API state"
+                        return
+                        ;;
+                esac
+            fi
+            AddResult "acs-sensors" "fail" "Failed to query sensor pods in ${scNs}"
+            return
+        fi
 
         if [[ -z "${sensorStatus}" ]]; then
             failMsg="No sensor pods found in ${scNs}"
@@ -441,10 +648,22 @@ TestAcsSensors() {
     else
         # No SecuredCluster CR; check if ACS operator is even installed
         typeset acsCsv=""
-        acsCsv="$(oc get csv --all-namespaces -o json | jq -r '
-            .items[] | select(.metadata.name | startswith("rhacs-operator")) | .metadata.name
-        ' | head -1)" || true
-
+        typeset -i _acsCsvRc=0
+        # Same identity rule as the opp-operators CSV match above: the exact
+        # package or the package plus a dot-delimited suffix, so a CSV such as
+        # rhacs-operator-canary does not read as the ACS operator.
+        acsCsv="$(oc get csv --all-namespaces -o json 2>"${_opp_smoke_tmp}/acs-csv.err" | jq -r '
+            [ .items[] | select(.metadata.name == "rhacs-operator" or (.metadata.name | startswith("rhacs-operator."))) | .metadata.name ] | first // empty
+        ')" || _acsCsvRc=$?
+        if (( _acsCsvRc != 0 )); then
+            if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/acs-csv.err" 2>/dev/null; then
+                : "SKIP: csvs CRD not served"
+                AddResult "acs-sensors" "skip" "csvs CRD not served by this cluster"
+                return
+            fi
+            AddResult "acs-sensors" "fail" "Failed to query CSVs for ACS operator"
+            return
+        fi
         if [[ -z "${acsCsv}" ]]; then
             : "SKIP: ACS operator not installed"
             AddResult "acs-sensors" "skip" "ACS operator not installed"
@@ -482,11 +701,12 @@ TestQuayPull() {
     typeset quayRoute=""
     set +x  # suppress xtrace — route hostnames are sensitive
     if ! quayRoute="$(oc get routes --all-namespaces -o json | jq -r '
-        .items[]
-        | select(.metadata.name | test("quay"; "i"))
-        | select(.spec.host | test("quay"; "i"))
-        | .spec.host
-    ' | head -1)"; then
+        [ .items[]
+          | select(.metadata.name | test("quay"; "i"))
+          | select(.spec.host | test("quay"; "i"))
+          | .spec.host ]
+        | first // empty
+    ')"; then
         : "Route query failed, trying QuayRegistry CR..."
     fi
     set -x
@@ -494,7 +714,7 @@ TestQuayPull() {
     if [[ -z "${quayRoute}" ]]; then
         # Try looking for QuayRegistry CR to find the route
         set +x  # suppress xtrace — registry endpoint URLs are sensitive
-        if ! quayRoute="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json | jq -r '
+        if ! quayRoute="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json 2>"${_opp_smoke_tmp}/qr.err" | jq -r '
             .items[0].status.registryEndpoint // empty
         ' | sed 's|^https://||')"; then
             : "QuayRegistry CR query failed"
@@ -503,28 +723,91 @@ TestQuayPull() {
     fi
 
     if [[ -z "${quayRoute}" ]]; then
-        # Check if Quay operator is even installed
-        typeset quayCsv=""
-        if ! quayCsv="$(oc get csv --all-namespaces -o json | jq -r '
-            .items[] | select(.metadata.name | startswith("quay-operator")) | .metadata.name
-        ' | head -1)"; then
-            AddResult "quay-pull" "fail" "Failed to query CSVs for Quay operator"
+        # Distinguish "no QuayRegistry CR deployed on this lane" (operator-
+        # only install: nothing to pull - skip) from "registry deployed but
+        # route missing" (genuine failure) (INTEROP-9670).
+        typeset -i qrCount=0
+        typeset qrJson2=""
+        # PRRT_kwDOBHvUUM65RJop: use second read for reconciled endpoint after status propagation
+        sleep 1
+        set +x
+        typeset -i qr2Rc=0
+        qrJson2="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json 2>"${_opp_smoke_tmp}/qr2.err")" || qr2Rc=$?
+        if (( qr2Rc != 0 )); then
+            if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/qr2.err" 2>/dev/null; then
+                typeset _qrConfirmOut=""
+                typeset -i _qrConfirmRc=0
+                _qrConfirmOut="$(oc api-resources --api-group=quay.redhat.com -o name 2>&1)" || _qrConfirmRc=$?
+                if (( _qrConfirmRc != 0 )); then
+                    set -x
+                    AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources: $(cat "${_opp_smoke_tmp}/qr2.err")"
+                    return
+                fi
+                if printf '%s' "${_qrConfirmOut}" | grep -qw "quayregistries"; then
+                    set -x
+                    AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources: $(cat "${_opp_smoke_tmp}/qr2.err")"
+                    return
+                fi
+                qrJson2='{"items":[]}'
+                qrCount=0
+            else
+                set -x
+                AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources"
+                return
+            fi
+        elif ! qrCount="$(printf '%s' "${qrJson2}" | jq '.items | length')"; then
+            set -x
+            AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources"
             return
         fi
 
-        if [[ -z "${quayCsv}" ]]; then
-            : "SKIP: Quay operator not installed"
-            AddResult "quay-pull" "skip" "Quay operator not installed"
+        # Re-extract endpoint from the same snapshot to keep endpoint and presence consistent (PRRT 4622731202)
+        typeset freshEndpoint=""
+        freshEndpoint="$(printf '%s' "${qrJson2}" | jq -r '.items[0].status.registryEndpoint // empty' 2>/dev/null | sed 's|^https://||')" || freshEndpoint=""
+        set +x  # suppress xtrace: the registry hostname is sensitive
+        if [[ -n "${freshEndpoint}" ]]; then
+            quayRoute="${freshEndpoint}"
+        fi
+        set -x
+        if [[ -z "${quayRoute}" ]]; then
+            if (( qrCount == 0 )); then
+                # Check if Quay operator is even installed
+                typeset quayCsv=""
+                # Same identity rule as the opp-operators CSV match above.
+                if ! quayCsv="$(oc get csv --all-namespaces -o json | jq -r '
+                [ .items[] | select(.metadata.name == "quay-operator" or (.metadata.name | startswith("quay-operator."))) | .metadata.name ] | first // empty
+            ')"; then
+                    AddResult "quay-pull" "fail" "Failed to query CSVs for Quay operator"
+                    return
+                fi
+
+                if [[ -z "${quayCsv}" ]]; then
+                    : "SKIP: Quay operator not installed"
+                    AddResult "quay-pull" "skip" "Quay operator not installed"
+                    return
+                fi
+
+                failMsg="Quay operator installed but no QuayRegistry CR deployed on this lane"
+                : "SKIP: ${failMsg}"
+                AddResult "quay-pull" "skip" "${failMsg}"
+                return
+            fi
+
+            failMsg="QuayRegistry present but no registry route found"
+            : "FAIL: ${failMsg}"
+            AddResult "quay-pull" "fail" "${failMsg}"
             return
         fi
+    fi
 
-        failMsg="Quay operator installed but no registry route found"
+    if [[ -z "${quayRoute}" ]]; then
+        failMsg="QuayRegistry present but no registry route found"
         : "FAIL: ${failMsg}"
         AddResult "quay-pull" "fail" "${failMsg}"
         return
     fi
 
-    : "Found Quay route: ${quayRoute}"
+    : "Found Quay registry route"
 
     # Attempt to pull the Quay health endpoint (API check instead of image pull
     # since we may not have registry credentials configured)
@@ -536,9 +819,9 @@ TestQuayPull() {
     set -x
 
     if [[ "${httpCode}" =~ ^(200|401|403)$ ]]; then
-        : "PASS: Quay registry responding (HTTP ${httpCode}) at ${quayRoute}"
+        : "PASS: Quay registry responding (HTTP ${httpCode})"
     else
-        failMsg="Quay registry unreachable at ${quayRoute} (HTTP ${httpCode:-timeout})"
+        failMsg="Quay registry unreachable (HTTP ${httpCode:-timeout})"
         : "FAIL: ${failMsg}"
     fi
 

@@ -16,7 +16,7 @@ _opp_cleanup() {
   set +x
   # Credential hygiene: these files must not survive the step, on the
   # success and the failure path alike.
-  rm -f /tmp/quay-auth.json /tmp/quay-cookies.txt "${acsPassFile:-/tmp/acs-admin-password}" /tmp/acs-ingress-ca.crt /tmp/acs-central-ca.crt
+  rm -f /tmp/quay-auth.json /tmp/quay-cookies.txt "${acsPassFile:-/tmp/acs-admin-password}" /tmp/acs-ingress-ca.crt /tmp/acs-central-ca.crt /tmp/quay-push.digest
   rm -rf /tmp/quay-ca-candidates
   # Scrub credentials before copying
   sed -i -E \
@@ -40,9 +40,75 @@ _opp_trap_handler() {
   typeset exitCode=$?
   set +e
   _opp_cleanup "${exitCode}"
-  type -t GenerateJunit >/dev/null && GenerateJunit
+  typeset _genRc=0
+  type -t GenerateJunit >/dev/null && GenerateJunit || _genRc=$?
   type -t _propagate_junit >/dev/null && _propagate_junit
   type -t PostProcessJunit >/dev/null && PostProcessJunit
+  # Validate the report the routing mode actually consumes, on every exit path.
+  typeset _sharedMerged="${SHARED_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml"
+  typeset _localMerged="${ARTIFACT_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml"
+  typeset _rawJunitToRemove=''
+  typeset -i _mergedValid=0
+  if [[ -n "${SHARED_DIR:-}" && -s "${_sharedMerged}" ]] \
+      && python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${_sharedMerged}" 2>/dev/null; then
+      _mergedValid=1
+      if [[ -n "${LP_QE__CR__TS_NAME__PFX__QUAY:-}" ]] \
+          && ! python3 -c "
+import sys, xml.etree.ElementTree as ET
+root = ET.parse(sys.argv[1]).getroot()
+names = [ts.get('name', '') for ts in root.iter('testsuite')]
+sys.exit(0 if names and all(n.startswith(sys.argv[2]) for n in names) else 1)
+" "${_sharedMerged}" "${LP_QE__CR__TS_NAME__PFX__QUAY}--" 2>/dev/null; then
+          _mergedValid=0
+      fi
+  fi
+  # A merged report that survived this run's initialization removal is the
+  # earlier run's file unless this run's merge replaced it: the survivor only
+  # counts when it was written after this run started.
+  if [[ "${_staleMergedSurvived:-false}" == "true" ]] \
+      && (( _mergedValid == 1 )) \
+      && [[ -e "${_sharedMerged}" ]]; then
+      typeset -i _mergedMtime=0
+      _mergedMtime="$(stat -c %Y "${_sharedMerged}" 2>/dev/null || echo 0)"
+      if (( _mergedMtime <= ${suiteStart:-0} )); then
+          _mergedValid=0
+      fi
+  fi
+  # A merge that did not validate must not sit in the reporter glob.
+  if (( _mergedValid == 0 )) && [[ -e "${_sharedMerged}" ]]; then
+      rm -f "${_sharedMerged}"
+      # A read-only SHARED_DIR can keep both the removal and this run's merge
+      # from replacing the earlier report; overwriting the file itself needs
+      # only file write permission, not directory write, and leaves the
+      # reporter this run's raw report instead of the earlier verdict.
+      if [[ "${_staleMergedSurvived:-false}" == "true" ]] \
+          && [[ -e "${_sharedMerged}" ]] && [[ -s "${junitFile:-}" ]]; then
+          cp -f "${junitFile}" "${_sharedMerged}" 2>/dev/null || true
+      fi
+  fi
+  if (( _genRc != 0 && exitCode == 0 )); then
+      echo "ERROR: JUnit report generation failed for otherwise successful run" >&2
+      exit 1
+  fi
+  if (( exitCode == 0 )); then
+      if [[ -n "${LP_QE__CR__TS_NAME__PFX__QUAY:-}" ]]; then
+          if (( _mergedValid == 0 )); then
+              echo "ERROR: LP_QE__CR__TS_NAME__PFX__QUAY is set but ${_sharedMerged} is missing, invalid, or does not carry the component prefix; the run would report green with no routable JUnit" >&2
+              exit 1
+          fi
+      elif (( _mergedValid == 0 )) \
+          && ! python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${junitFile}" 2>/dev/null \
+          && ! python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "${_localMerged}" 2>/dev/null; then
+          echo "ERROR: no valid JUnit report in ${junitFile}, ${_sharedMerged} or ${_localMerged} for successful run" >&2
+          exit 1
+      fi
+  fi
+  if (( _mergedValid == 1 )); then
+      _rawJunitToRemove="${SHARED_DIR}/$(basename "${junitFile}")"
+  fi
+  if [[ -n "${_rawJunitToRemove}" ]]; then
+      rm -f "${_rawJunitToRemove}"
+  fi
   true
 }
 trap '_opp_trap_handler' EXIT
@@ -55,6 +121,21 @@ mkdir -p "${ARTIFACT_DIR}"
 # post-processing renames the suite with the template composed below and
 # merges this file into junit--interop-quay-smoke-acs-odf-registry.xml.
 typeset junitFile="${ARTIFACT_DIR}/junit_interop-quay-smoke-acs-odf-registry.xml"
+
+# A merged report from an earlier run must not survive into the reporting glob:
+# SHARED_DIR outlives this pod, and the post-processing merge can return without
+# replacing the file (no XML found, or a failing yq copy), which would leave the
+# earlier report to be harvested as this run's result. Removing it during
+# initialization means a run that publishes nothing reports nothing, instead of
+# the previous run's verdict. A removal that fails is not survivable either: the
+# check after the test table below fails the run closed, so the EXIT trap can
+# never accept a stale report this run could not clear.
+rm -f "${SHARED_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml" 2>/dev/null || true
+typeset _staleMergedReport="${SHARED_DIR:-/tmp}/junit--interop-quay-smoke-acs-odf-registry.xml"
+# The survivor flag is what the EXIT trap keys on: a report the removal could
+# not clear is only routable when this run's merge replaced it afterwards.
+typeset _staleMergedSurvived=false
+[[ -e "${_staleMergedReport}" ]] && _staleMergedSurvived=true
 
 # Suite naming for the JUnit post-processing library: compose its suite-name
 # template from the component-suffixed prefix variable the consuming job sets.
@@ -75,6 +156,10 @@ imageTag="${BUILD_ID:-$(date +%s)}"
 # subshell with xtrace disabled, read by the ACS helpers through
 # process-substitution curl configs, removed in Main.
 typeset acsPassFile='/tmp/acs-admin-password'
+
+EscapeForCurlUser() {
+    sed 's/\\/\\\\/g; s/"/\\"/g'
+}
 
 typeset -A testStatus=()
 typeset -A testDuration=()
@@ -123,7 +208,8 @@ function GenerateJunit () {
         [[ "${testStatus[${t}]}" == "skipped" ]] && skipped=$((skipped + 1))
     done
 
-    cat > "${junitFile}" <<EOF
+    typeset _junitTmp="${junitFile}.tmp"
+    cat > "${_junitTmp}" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <testsuites>
   <testsuite name="interop-quay-smoke-acs-odf-registry" tests="${total}" failures="${failures}" errors="0" skipped="${skipped}" time="${elapsed}">
@@ -136,37 +222,71 @@ EOF
         escapedMsg="$(printf '%s' "${testFailureMsg[${t}]}" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g; s/"/\&quot;/g')"
 
         if [[ "${testStatus[${t}]}" == "failed" ]]; then
-            echo "    <testcase name=\"${escapedName}\" classname=\"interop-quay-smoke-acs-odf-registry\" time=\"${testDuration[${t}]}\"><failure message=\"${escapedMsg}\"><![CDATA[${testFailureMsg[${t}]}]]></failure></testcase>" >> "${junitFile}"
+            typeset safeFailure="${testFailureMsg[${t}]//]]>/]]]]><![CDATA[>}"
+            echo "    <testcase name=\"${escapedName}\" classname=\"interop-quay-smoke-acs-odf-registry\" time=\"${testDuration[${t}]}\"><failure message=\"${escapedMsg}\"><![CDATA[${safeFailure}]]></failure></testcase>" >> "${_junitTmp}"
         elif [[ "${testStatus[${t}]}" == "skipped" ]]; then
-            echo "    <testcase name=\"${escapedName}\" classname=\"interop-quay-smoke-acs-odf-registry\" time=\"${testDuration[${t}]}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${junitFile}"
+            echo "    <testcase name=\"${escapedName}\" classname=\"interop-quay-smoke-acs-odf-registry\" time=\"${testDuration[${t}]}\"><skipped message=\"${escapedMsg}\"/></testcase>" >> "${_junitTmp}"
         else
-            echo "    <testcase name=\"${escapedName}\" classname=\"interop-quay-smoke-acs-odf-registry\" time=\"${testDuration[${t}]}\"/>" >> "${junitFile}"
+            echo "    <testcase name=\"${escapedName}\" classname=\"interop-quay-smoke-acs-odf-registry\" time=\"${testDuration[${t}]}\"/>" >> "${_junitTmp}"
         fi
     done
 
-    cat >> "${junitFile}" <<'EOF'
+    cat >> "${_junitTmp}" <<'EOF'
   </testsuite>
 </testsuites>
 EOF
-    cat "${junitFile}"
-    true
+    if python3 -c "
+import sys, xml.etree.ElementTree as ET
+root = ET.parse(sys.argv[1]).getroot()
+if len(root.findall('.//testcase')) != int(sys.argv[2]):
+    sys.exit(1)
+" "${_junitTmp}" "${total}" 2>/dev/null; then
+        if ! mv -f "${_junitTmp}" "${junitFile}"; then
+            echo "ERROR: failed to move JUnit report from ${_junitTmp} to ${junitFile}" >&2
+            rm -f "${_junitTmp}"
+            if (( failures == 0 )); then
+                echo "ERROR: required JUnit artifact not produced for successful run" >&2
+            fi
+            return 1
+        fi
+        cat "${junitFile}"
+    else
+        echo "ERROR: JUnit report at ${_junitTmp} is invalid or incomplete" >&2
+        rm -f "${_junitTmp}"
+        if (( failures == 0 )); then
+            echo "ERROR: required JUnit artifact not produced for successful run" >&2
+            return 1
+        fi
+    fi
 }
 
 # shellcheck disable=SC2317
 _propagate_junit () {
     [[ -n "${SHARED_DIR:-}" ]] || return 0
-    mkdir -p "${SHARED_DIR}/junit"
-    find "${ARTIFACT_DIR:-}" -name '*.xml' -exec cp {} "${SHARED_DIR}/junit/" \; || true
+    cp "${junitFile}" "${SHARED_DIR}/" 2>/dev/null || true
+    find "${ARTIFACT_DIR:-}" -name '*.xml' -exec cp {} "${SHARED_DIR}/" \; 2>/dev/null || true
 }
 
 # Load ExitTrap library for JUnit XML post-processing at script level
 # (must be loaded before trap can fire to avoid secondary errors).
-eval "$(
+typeset _exitTrapHelper=""
+typeset -i _exitTrapDlRc=0
+if ! _exitTrapHelper="$(
     typeset -a _fURL=()
     type -t wget 1>/dev/null && _fURL=(wget -nv -O-) || _fURL=(curl -fsSL)
     "${_fURL[@]}" \
-        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/refs/heads/main/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
-)"
+        https://raw.githubusercontent.com/RedHatQE/OpenShift-LP-QE--Tools/2420b542141e9009f29ce02551244ebc43ed7060/libs/bash/ci-operator/interop/common/ExitTrap--PostProcessPrep.sh
+)"; then
+    _exitTrapDlRc=$?
+    printf '%s\n' "WARNING: failed to download ExitTrap helper (rc=${_exitTrapDlRc})" >&2
+elif [[ -z "${_exitTrapHelper}" ]]; then
+    printf '%s\n' "WARNING: ExitTrap helper download returned empty body" >&2
+else
+    # Pin transitive dependency: the helper at 2420b542 fetches EnsureReqs.sh from refs/heads/main (moving branch)
+    # Replace with commit-qualified raw URL so the pin fully controls the supply chain
+    _exitTrapHelper="${_exitTrapHelper//refs\/heads\/main/2420b542141e9009f29ce02551244ebc43ed7060}"
+    eval "${_exitTrapHelper}"
+fi
 
 # Post-process the JUnit XML for Component Readiness routing.  Guarded on
 # purpose: this runs from the EXIT trap, and an unloaded helper (download
@@ -177,9 +297,17 @@ eval "$(
 # (lowercase junit prefix required) and collides with other steps in
 # shared storage.
 PostProcessJunit () {
+    typeset -i _junitPreSize=0
+    [[ -f "${junitFile}" ]] && _junitPreSize=$(wc -c < "${junitFile}" 2>/dev/null || echo 0)
     if type -t ExitTrap--PostProcessPrep 1>/dev/null; then
-        ExitTrap--PostProcessPrep junit--interop-quay-smoke-acs-odf-registry.xml ||
-            echo "WARNING: junit post-processing failed" >&2
+        ExitTrap--PostProcessPrep junit--interop-quay-smoke-acs-odf-registry.xml
+        typeset -i _junitRc=$?
+        if (( _junitRc != 0 )); then
+            echo "WARNING: junit post-processing failed (rc=${_junitRc})" >&2
+            if (( _junitPreSize > 0 )) && [[ ! -s "${junitFile}" ]]; then
+                echo "WARNING: post-processing removed raw report, size was ${_junitPreSize}" >&2
+            fi
+        fi
     else
         echo "WARNING: ExitTrap--PostProcessPrep not available, skipping junit remapping" >&2
     fi
@@ -203,8 +331,8 @@ function DiscoverQuay () {
     fi
 
     typeset registryJson="" discoverErr=""
-    if ! registryJson="$(oc get quayregistry --all-namespaces -o json 2>&1)"; then
-        discoverErr="${registryJson}"
+    if ! registryJson="$(oc get quayregistry --all-namespaces -o json 2>"${ARTIFACT_DIR:-/tmp}/quayregistry-err.log")"; then
+        discoverErr="$(cat "${ARTIFACT_DIR:-/tmp}/quayregistry-err.log" 2>/dev/null || echo "oc get failed")"
         echo "ERROR: Failed to query QuayRegistry: ${discoverErr}" >&2
         return 2
     fi
@@ -227,7 +355,10 @@ print(len(json.load(sys.stdin).get('items',[])))
     fi
 
     QUAY_NS="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['namespace'])")"
-    QUAY_REGISTRY="$(oc get quayregistry -n "${QUAY_NS}" -o jsonpath='{.items[0].metadata.name}')"
+    QUAY_REGISTRY="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['name'])")"
+    QUAY_UID="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print(json.load(sys.stdin)['items'][0]['metadata']['uid'])")"
+    QUAY_CONFIG_BUNDLE="$(printf '%s' "${registryJson}" | python3 -c "import sys,json; print((json.load(sys.stdin)['items'][0].get('spec') or {}).get('configBundleSecret') or '')")"
+
     QUAY_HOST="$(oc get quayregistry -n "${QUAY_NS}" "${QUAY_REGISTRY}" -o jsonpath='{.status.registryEndpoint}')"
     QUAY_HOST="${QUAY_HOST#https://}"
     if [[ -z "${QUAY_HOST}" ]]; then
@@ -236,7 +367,7 @@ print(len(json.load(sys.stdin).get('items',[])))
         # not deployed), so the caller fails instead of reporting a skip.
         return 2
     fi
-    export QUAY_NS QUAY_REGISTRY QUAY_HOST
+    export QUAY_NS QUAY_REGISTRY QUAY_HOST QUAY_UID QUAY_CONFIG_BUNDLE
     true
 }
 
@@ -247,6 +378,7 @@ print(len(json.load(sys.stdin).get('items',[])))
 # anchor for every credential-bearing request; see ResolveQuayTlsTrust.  The
 # pushed image is still verified by pulling it back.
 typeset QUAY_USER='' QUAY_PASSWORD='' QUAY_TOKEN=''
+typeset QUAY_CONFIG_BUNDLE=''
 function GetQuayAuth () {
     # Quay credentials are exported for downstream use in the current
     # shell (Best Practices exception for variables needed downstream);
@@ -284,23 +416,116 @@ function GetQuayAuth () {
 
     if [[ "${authOk}" == false ]]; then
         typeset initPassword=''
-        initPassword="$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(20)))")"
+        # Durable restricted storage: SHARED_DIR survives a new CI pod while /tmp does not;
+        # fallback to /tmp only when SHARED_DIR is absent (e.g. local runs). Directory is
+        # 0700 and file is 0600 (umask 077 plus explicit chmod).
+        typeset quayInitPassFile="${SHARED_DIR:-/tmp}/quay-init-password"
+        if [[ -n "${SHARED_DIR:-}" ]]; then
+            mkdir -p "${SHARED_DIR}" 2>/dev/null || true
+            chmod 0700 "${SHARED_DIR}" 2>/dev/null || true
+        fi
+        if [[ -s "${quayInitPassFile}" ]]; then
+            initPassword="$(cat "${quayInitPassFile}")"
+            chmod 600 "${quayInitPassFile}" || true
+            echo "INFO: reusing persisted Quay init password from prior attempt" >&2
+        else
+            initPassword="$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(20)))")"
+            printf '%s' "${initPassword}" > "${quayInitPassFile}"
+            chmod 600 "${quayInitPassFile}"
+        fi
         typeset initResult=''
+        typeset initBody=''
+        typeset initHttp=''
         # The payload is built by json.dumps and piped in via stdin, so the
         # generated password is safely escaped and never part of any argv.
-        initResult="$(printf '%s' "${initPassword}" | python3 -c "
+        # no -L: the generated password is in the POST body, so a redirect on
+        # this endpoint must not be followed.  -f still fails the call on an
+        # HTTP error, and the retry loop reads a redirect body as a failure.
+        # PRRT_kwDOBHvUUM65TpNF: single init request with bounded retry
+        typeset -i _initTry=0
+        typeset _alreadyExists=false
+        for _initTry in 1 2 3; do
+            typeset initRaw=''
+            initRaw="$(printf '%s' "${initPassword}" | python3 -c "
 import json, sys
 print(json.dumps({'username': 'quayadmin', 'password': sys.stdin.read().strip(), 'email': 'quayadmin@example.com', 'access_token': True}))
-" | curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" \
-                -H "Content-Type: application/json" \
-                -d @-)" || initResult=""
+" | curl -sS -w '\n%{http_code}' "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/user/initialize" \
+                    -H "Content-Type: application/json" \
+                    -d @- 2>&1)" || true
+            initHttp="$(printf '%s' "${initRaw}" | tail -n1)"
+            initBody="$(printf '%s' "${initRaw}" | sed '$d')"
+            if [[ "${initHttp}" =~ ^2[0-9]{2}$ && -n "${initBody}" ]]; then
+                initResult="${initBody}"
+                break
+            fi
+            if printf '%s' "${initBody}" | grep -qi "already exists\|user exists\|non-empty database\|Cannot initialize user"; then
+                _alreadyExists=true
+                initResult="${initBody}"
+                break
+            fi
+            if (( _initTry < 3 )); then
+                sleep $(( _initTry * 2 ))
+            fi
+        done
+        if [[ "${_alreadyExists}" == true ]]; then
+            echo "INFO: user already exists, attempting login with persisted password" >&2
+            typeset _loginCsrf=''
+            _loginCsrf="$(curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 "https://${QUAY_HOST}/csrf_token" -c /tmp/quay-cookies.txt 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('csrf_token',''))")" || _loginCsrf=""
+            if [[ -n "${_loginCsrf}" ]]; then
+                typeset _loginResult=''
+                _loginResult="$(QUAY_USER_FALLBACK="quayadmin" QUAY_PASS_FILE="${quayInitPassFile}" python3 -c "
+import json, os
+print(json.dumps({'username': os.environ['QUAY_USER_FALLBACK'], 'password': open(os.environ['QUAY_PASS_FILE']).read().strip()}))
+" | curl -sS "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST "https://${QUAY_HOST}/api/v1/signin" \
+                    -H "Content-Type: application/json" \
+                    -H "X-CSRF-Token: ${_loginCsrf}" \
+                    -b /tmp/quay-cookies.txt -c /tmp/quay-cookies.txt \
+                    -d @- 2>&1)" || _loginResult=""
+                typeset _loginOk=''
+                _loginOk="$(printf '%s' "${_loginResult}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('success',''))" 2>/dev/null)" || _loginOk=""
+                if [[ "${_loginOk}" == "True" ]]; then
+                    QUAY_USER="quayadmin"
+                    QUAY_PASSWORD="${initPassword}"
+                    authOk=true
+                    echo "INFO: recovered Quay admin via login with persisted password after user exists" >&2
+                fi
+            fi
+            if [[ "${authOk}" == false ]]; then
+                echo "WARNING: login with persisted password failed; init response: ${initBody:0:200}" >&2
+            fi
+        else
+            QUAY_TOKEN="$(printf '%s' "${initResult}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null)" || QUAY_TOKEN=""
+            if [[ -n "${QUAY_TOKEN}" ]]; then
+                QUAY_USER="quayadmin"
+                QUAY_PASSWORD="${initPassword}"
+                authOk=true
+                echo "INFO: Quay admin user initialized via /api/v1/user/initialize" >&2
+            fi
+        fi
+    fi
 
-        QUAY_TOKEN="$(printf '%s' "${initResult}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))")" || QUAY_TOKEN=""
-        if [[ -n "${QUAY_TOKEN}" ]]; then
-            QUAY_USER="quayadmin"
-            QUAY_PASSWORD="${initPassword}"
-            authOk=true
-            echo "INFO: Quay admin user initialized via /api/v1/user/initialize" >&2
+    if [[ "${authOk}" == true ]]; then
+        rm -f "${quayInitPassFile}" || true
+    else
+        # Retain the credential when the outcome is uncertain (lost response): /tmp does
+        # not survive a new CI pod and the previous code deleted the file when authOk
+        # stayed false after timeouts. Only a definitive failure (init returned an error
+        # body that is not a timeout/transport loss) removes the persisted password.
+        typeset _quayOutcomeUncertain=false
+        if [[ "${_alreadyExists:-false}" == false ]]; then
+            # No definitive server response: empty body/http or transport error means the
+            # account may have been created but the response was lost.
+            if [[ -z "${initBody:-}" && -z "${initHttp:-}" ]] || [[ "${initHttp:-}" == "000" ]] || [[ "${initHttp:-}" == "" ]]; then
+                _quayOutcomeUncertain=true
+            fi
+        fi
+        if [[ "${_quayOutcomeUncertain}" == true ]]; then
+            echo "INFO: retaining persisted Quay init password for recovery on next invocation (outcome uncertain)" >&2
+        else
+            if [[ -f "${quayInitPassFile}" ]]; then
+                echo "INFO: removing persisted Quay init password after definitive auth failure; a new invocation will generate a fresh password" >&2
+                rm -f "${quayInitPassFile}" || true
+            fi
         fi
     fi
 
@@ -312,6 +537,104 @@ print(json.dumps({'username': 'quayadmin', 'password': sys.stdin.read().strip(),
     fi
     echo "ERROR: Could not obtain Quay credentials from any source" >&2
     return 1
+}
+
+# Self-test for credential recovery across two invocations: the first invocation
+# loses the initialize response (transport timeout, empty http), the persisted
+# password must survive in restricted durable storage and be reused on the
+# second invocation to recover via login; validates that /tmp is not used and
+# that the file is retained when the outcome is uncertain.
+QuayInitRecoverySelfTest() {
+    typeset _testTmp="${SHARED_DIR:-/tmp}/quay-selftest-$$"
+    mkdir -p "${_testTmp}" 2>/dev/null || true
+    chmod 0700 "${_testTmp}" 2>/dev/null || true
+    typeset _origShared="${SHARED_DIR:-}"
+    export SHARED_DIR="${_testTmp}"
+    typeset _origQuayHost="${QUAY_HOST:-}"
+    export QUAY_HOST="quay-test.example.com"
+    typeset _origNs="${QUAY_NS:-}"
+    export QUAY_NS="test-ns"
+    # Mock oc to report no existing secrets (so GetQuayAuth enters init path)
+    oc() { return 1; }
+    export -f oc
+    # First invocation: curl for initialize returns empty (lost response)
+    curl() {
+        if [[ "$*" == *"/api/v1/user/initialize"* ]]; then
+            printf ''
+            return 0
+        fi
+        return 1
+    }
+    export -f curl
+    typeset _firstPassFile="${SHARED_DIR}/quay-init-password"
+    rm -f "${_firstPassFile}" || true
+    # Stub QUAY_HOST and quayTlsOpts for the test
+    quayTlsOpts=()
+    # Disable tracing for the test
+    set +x
+    GetQuayAuth || true
+    typeset _firstExists=false
+    [[ -s "${_firstPassFile}" ]] && _firstExists=true
+    typeset _firstPw=""
+    [[ "${_firstExists}" == true ]] && _firstPw="$(cat "${_firstPassFile}")"
+    # Second invocation: simulate Quay now reports user exists, and answer the
+    # signin only for the bootstrap credentials the first invocation persisted.
+    # The stub reads the request body because GetQuayAuth assigns QUAY_PASSWORD
+    # from its own variable, not from the request: a stub that answered success
+    # unconditionally could not catch a producer that sends a different
+    # password, and a failed recovery would still look like a pass.
+    typeset _firstBootstrapPw="${_firstPw}"
+    curl() {
+        if [[ "$*" == *"/api/v1/user/initialize"* ]]; then
+            printf '{"message":"user already exists"}\n409'
+            return 0
+        fi
+        if [[ "$*" == *"/csrf_token"* ]]; then
+            printf '{"csrf_token":"test-csrf"}'
+            return 0
+        fi
+        if [[ "$*" == *"/api/v1/signin"* ]]; then
+            if _QUAY_SELFTEST_BOOT="${_firstBootstrapPw}" python3 -c "
+import json, os, sys
+try:
+    body = json.load(sys.stdin)
+except Exception:
+    sys.exit(1)
+ok = body.get('username') == 'quayadmin' and body.get('password') == os.environ['_QUAY_SELFTEST_BOOT']
+sys.exit(0 if ok else 1)
+"; then
+                printf '{"success": true}'
+            else
+                printf '{"success": false}'
+            fi
+            return 0
+        fi
+        return 1
+    }
+    export -f curl
+    typeset -i _secondRc=0
+    GetQuayAuth || _secondRc=$?
+    typeset _secondPw="${QUAY_PASSWORD:-}"
+    # Restore
+    SHARED_DIR="${_origShared}"
+    QUAY_HOST="${_origQuayHost}"
+    QUAY_NS="${_origNs}"
+    unset -f oc curl
+    rm -rf "${_testTmp}" || true
+    if [[ "${_firstExists}" != true ]]; then
+        echo "SELF-TEST FAIL: first invocation did not retain password file in durable storage" >&2
+        return 1
+    fi
+    if [[ "${_firstPw}" != "${_secondPw}" ]]; then
+        echo "SELF-TEST FAIL: second invocation did not reuse persisted password (first:${_firstPw:0:4}.. second:${_secondPw:0:4}..)" >&2
+        return 1
+    fi
+    if (( _secondRc != 0 )); then
+        echo "SELF-TEST FAIL: second invocation did not recover credentials (rc=${_secondRc}); the signin did not accept the persisted bootstrap credentials" >&2
+        return 1
+    fi
+    echo "SELF-TEST PASS: credential recovered across two invocations via durable storage" >&2
+    return 0
 }
 
 # Quay route TLS trust.  Every credential-bearing request in this step runs
@@ -358,8 +681,15 @@ for r in items:
     # route, so the route carries no certificate and only these payloads can
     # verify it; each candidate is proved against the endpoint below, so
     # widening the sources cannot admit an anchor that does not fit.
+    # Every candidate is also tied to this QuayRegistry, not just to the
+    # cluster: a secret reaches the candidate set only when the operator owns
+    # it, when it is the configured bundle secret, or (label fallback) when
+    # its ownerReferences name this QuayRegistry.  An app=quay label alone is
+    # not evidence of association: a certificate published for some other
+    # registry can verify nothing here, and admitting it would let an
+    # unrelated anchor stand in for this registry's trust.
     oc get secrets -n "${QUAY_NS}" -o json | \
-        QUAY_OWNER="${QUAY_REGISTRY}" CA_DIR="${quayCaDir}" python3 -c "
+        QUAY_OWNER="${QUAY_REGISTRY}" QUAY_OWNER_UID="${QUAY_UID:-}" QUAY_BUNDLE_SECRET="${QUAY_CONFIG_BUNDLE:-}" CA_DIR="${quayCaDir}" python3 -c "
 import base64, json, os, sys
 
 try:
@@ -368,6 +698,7 @@ except Exception:
     items = []
 
 owner = os.environ['QUAY_OWNER']
+owner_uid = os.environ.get('QUAY_OWNER_UID') or ''
 ca_dir = os.environ['CA_DIR']
 counts = {'20-owned': 0, '25-ssl': 0}
 
@@ -379,20 +710,86 @@ def write(prefix, payload):
         fh.write(payload)
 
 
+bundle = os.environ.get('QUAY_BUNDLE_SECRET') or ''
+
+def is_owned(refs):
+    # Ownership means the QuayRegistry itself owns the secret: kind and uid
+    # together, because a uid alone does not say which object kind stamped
+    # the reference (PRRT_kwDOBHvUUM65MrmC).
+    for r in refs:
+        if owner_uid and r.get('kind') == 'QuayRegistry' and r.get('uid') == owner_uid:
+            return True
+    return False
+
+
+def is_associated(refs):
+    # Association for the label fallback below: an owner of kind
+    # QuayRegistry that names the selected registry, matched by uid when
+    # the caller has one (a name match with a different uid can refer to a
+    # previous registry recreated under the same name, and a successful
+    # TLS probe does not establish authorization for the current one), and
+    # by name only when no uid is available to verify against.  With a uid
+    # available this is the same evidence ownership requires, so the
+    # fallback only serves the uid-unavailable corner; any other owner
+    # kind, a different name and a missing ownerReferences list all mean
+    # unassociated.
+    for r in refs:
+        if r.get('kind') != 'QuayRegistry':
+            continue
+        if owner_uid:
+            if r.get('uid') == owner_uid:
+                return True
+        elif r.get('name') == owner:
+            return True
+    return False
+
+# Primary: secrets owned by selected QuayRegistry (uid match) or the config bundle secret
 for s in items:
-    refs = (s.get('metadata') or {}).get('ownerReferences') or []
-    owned = any((r.get('name') or '') == owner for r in refs)
+    meta = s.get('metadata') or {}
+    refs = meta.get('ownerReferences') or []
+    owned = is_owned(refs)
     data = s.get('data') or {}
-    if not owned:
+    from_bundle = bool(bundle) and meta.get('name') == bundle
+    if not owned and not from_bundle:
+        continue
+    if owned:
+        for key in ('ca.crt', 'tls.crt'):
+            if data.get(key):
+                write('20-owned', base64.b64decode(data[key]))
         if data.get('ssl.cert'):
             write('25-ssl', base64.b64decode(data['ssl.cert']))
-        continue
-    for key in ('ca.crt', 'tls.crt'):
-        if data.get(key):
-            write('20-owned', base64.b64decode(data[key]))
-    if data.get('ssl.cert'):
+    elif from_bundle:
+        if data.get('ssl.cert'):
+            write('25-ssl', base64.b64decode(data['ssl.cert']))
+        if data.get('ca.crt'):
+            write('20-owned', base64.b64decode(data['ca.crt']))
+
+# Fallback: only when no owned candidate exists, and only for a secret that
+# is both labelled app=quay and associated with the selected QuayRegistry by
+# an ownerReference of kind QuayRegistry that matches the registry by uid
+# when one is available (name only in the uid-unavailable corner).  The
+# label says which product wrote the secret; the ownerReference says which
+# registry it belongs to, so a labelled secret with no such owner is not
+# admitted.  When nothing remains the caller's
+# no-candidate path fails closed before any credential is sent, which is the
+# intended direction: a probe-verified anchor that belongs to another
+# registry is not this registry's trust.
+if counts['20-owned'] == 0 and counts['25-ssl'] == 0:
+    fallback_used = False
+    for s in items:
+        meta = s.get('metadata') or {}
+        data = s.get('data') or {}
+        if not data.get('ssl.cert'):
+            continue
+        if (meta.get('labels') or {}).get('app') != 'quay':
+            continue
+        if not is_associated(meta.get('ownerReferences') or []):
+            continue
         write('25-ssl', base64.b64decode(data['ssl.cert']))
-" || true
+        fallback_used = True
+    if fallback_used:
+        print('WARNING: no owned Quay TLS secret found for %s (uid %s); falling back to app=quay labelled secrets owner-referenced to that QuayRegistry (kind QuayRegistry, uid match when available; label-only and name-only secrets are not admitted)' % (owner, owner_uid), file=sys.stderr)
+" || { _rc=$?; echo "WARNING: Quay TLS trust candidate extraction failed (python rc=${_rc})" >&2; }
 
     # The ingress CA signs route certificates that no operator issued.
     typeset ingressCa=''
@@ -427,6 +824,177 @@ for s in items:
     fi
     quayTlsOpts=( --cacert "${quayCaFile}" )
     : "INFO: Quay route TLS verified against ${quayCaFile}"
+    return 0
+}
+
+# Offline pin for the label-fallback association rule
+# (PRRT_kwDOBHvUUM65MrmC).  ResolveQuayTlsTrust runs against a stub oc that
+# serves a fixed secret list and a stub curl whose probe verifies only the
+# candidate prefixes a case admits, so the assertion is about which secrets
+# become candidates, not about any real certificate:
+#   associated fallback  an app=quay labelled secret owner-referenced to this
+#                        QuayRegistry by kind plus uid is admitted when no
+#                        owned ca.crt/tls.crt candidate exists
+#   label only           an app=quay labelled secret with no such owner is
+#                        refused, and the function fails closed even though
+#                        the probe would have verified it
+#   owned preference     an owned candidate still wins over a labelled
+#                        associated one
+# Dormant by design, like the other self-tests here: this change adds no call
+# in Main.  The offline review harness runs this function.
+QuayTlsFallbackSelfTest() {
+    typeset _origHost="${QUAY_HOST:-}" _origNs="${QUAY_NS:-}"
+    typeset _origReg="${QUAY_REGISTRY:-}" _origUid="${QUAY_UID:-}"
+    typeset _origBundle="${QUAY_CONFIG_BUNDLE:-}" _origCaFile="${quayCaFile:-}"
+    typeset _xtraceOn=false
+    if [[ "${-}" == *x* ]]; then
+        _xtraceOn=true
+    fi
+    set +x
+    export QUAY_HOST="quay-test.example.com"
+    export QUAY_NS="test-ns"
+    export QUAY_REGISTRY="quay-registry"
+    export QUAY_UID="11111111-2222-3333-4444-555555555555"
+    export QUAY_CONFIG_BUNDLE=""
+    typeset -i _failures=0
+    typeset _b64=''
+    _b64="$(printf 'STUB-CERT' | base64 | tr -d '\n')"
+    typeset _selftestSecrets='' _selftestAdmit=''
+
+    # Stub cluster: no matching route, no ingress CA, the fixed secret list.
+    oc() {
+        case "$*" in
+            *"get routes"*) printf '%s' '{"items":[]}' ;;
+            *"get secrets"*) printf '%s' "${_selftestSecrets}" ;;
+            *) return 1 ;;
+        esac
+    }
+    # Stub probe: verifies only the candidate prefixes the case lists in
+    # _selftestAdmit, nothing else.  A case that expects a refusal lists the
+    # prefix the fallback would have produced, so the refusal is about
+    # admission, not about the probe.
+    curl() {
+        typeset _p=''
+        for _p in ${_selftestAdmit}; do
+            if [[ -n "${_p}" && "$*" == *"--cacert "*"${_p}"* ]]; then
+                printf '200'
+                return 0
+            fi
+        done
+        printf '000'
+    }
+    export -f oc curl
+
+    # With a uid available there is no positive fallback case to pin: a
+    # kind QuayRegistry ownerReference matching the uid is ownership, the
+    # primary loop already reads such a secret's payloads, and everything
+    # short of that evidence is refused. The refusal cases below and the
+    # uid-unavailable corner at the end are the fallback's whole behavior.
+
+    # Path 2: the same secret with no ownerReference at all, and with an
+    # ownerReference to a different registry uid; both must be refused.
+    typeset _labelOnly=''
+    _selftestSecrets="$(printf '{"items":[{"metadata":{"name":"quay-registry-ssl","labels":{"app":"quay"},"data":{"ssl.cert":"%s"}}}]}' "${_b64}")"
+    quayCaFile=''
+    typeset -i _path2Rc=0
+    ResolveQuayTlsTrust || _path2Rc=$?
+    typeset -i _path2Ssl=0
+    _path2Ssl="$(find "${quayCaDir}" -maxdepth 1 -name '25-ssl-*.pem' 2>/dev/null | wc -l)"
+    if (( _path2Rc != 0 )) && (( _path2Ssl == 0 )) && [[ -z "${quayCaFile}" ]]; then
+        echo "SELF-TEST PASS: an app=quay labelled secret with no ownerReference is refused and the function fails closed" >&2
+    else
+        echo "SELF-TEST FAIL: a label-only app=quay secret was admitted (rc=${_path2Rc}, ssl candidates=${_path2Ssl}, anchor=${quayCaFile})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+    # Name match with a different uid: the owner may refer to a previous
+    # registry recreated under the same name, and a successful probe does
+    # not establish authorization for the current one, so it is refused.
+    _labelOnly="$(printf '{"items":[{"metadata":{"name":"quay-registry-ssl","labels":{"app":"quay"},"ownerReferences":[{"kind":"QuayRegistry","name":"quay-registry","uid":"99999999-8888-7777-6666-555555555555"}]},"data":{"ssl.cert":"%s"}}]}' "${_b64}")"
+    # A wrong-kind ownerReference carrying the SELECTED registry uid must not
+    # enter the primary candidate set either: kind and uid are checked
+    # together (it carries ca.crt so only the primary path could admit it).
+    _wrongKind="$(printf '{"items":[{"metadata":{"name":"quay-registry-tls","ownerReferences":[{"kind":"Deployment","name":"quay-registry","uid":"%s"}]},"data":{"ca.crt":"%s"}}]}' "${QUAY_UID}" "${_b64}")"
+    _selftestSecrets="${_wrongKind}"
+    _selftestAdmit='20-owned- 25-ssl-'
+    quayCaFile=''
+    typeset -i _path2cRc=0
+    ResolveQuayTlsTrust || _path2cRc=$?
+    typeset -i _path2cOwned=0
+    _path2cOwned="$(find "${quayCaDir}" -maxdepth 1 -name '20-owned-*.pem' 2>/dev/null | wc -l)"
+    if (( _path2cRc != 0 )) && (( _path2cOwned == 0 )); then
+        echo "SELF-TEST PASS: a wrong-kind ownerReference with the selected uid is refused by the primary path" >&2
+    else
+        echo "SELF-TEST FAIL: a wrong-kind ownerReference with the selected uid entered the primary path (rc=${_path2cRc}, owned=${_path2cOwned})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+    _selftestSecrets="${_labelOnly}"
+    quayCaFile=''
+    typeset -i _path2bRc=0
+    ResolveQuayTlsTrust || _path2bRc=$?
+    typeset -i _path2bSsl=0
+    _path2bSsl="$(find "${quayCaDir}" -maxdepth 1 -name '25-ssl-*.pem' 2>/dev/null | wc -l)"
+    if (( _path2bRc != 0 )) && (( _path2bSsl == 0 )); then
+        echo "SELF-TEST PASS: a QuayRegistry ownerReference with the registry name but a different uid is refused" >&2
+    else
+        echo "SELF-TEST FAIL: a QuayRegistry ownerReference with a different uid was admitted (rc=${_path2bRc}, ssl candidates=${_path2bSsl})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+
+    # Path 3: an owned ca.crt candidate exists, so the fallback never runs and
+    # the owned candidate is the anchor even though the labelled ssl.cert
+    # candidate verifies the probe too (both prefixes admitted).
+    _selftestAdmit='20-owned- 25-ssl-'
+    _selftestSecrets="$(printf '{"items":[{"metadata":{"name":"quay-registry-tls","ownerReferences":[{"kind":"QuayRegistry","name":"quay-registry","uid":"%s"}]},"data":{"ca.crt":"%s"}},{"metadata":{"name":"quay-registry-ssl","labels":{"app":"quay"},"ownerReferences":[{"kind":"QuayRegistry","name":"quay-registry","uid":"%s"}]},"data":{"ssl.cert":"%s"}}]}' "${QUAY_UID}" "${_b64}" "${QUAY_UID}" "${_b64}")"
+    quayCaFile=''
+    typeset -i _path3Rc=0
+    ResolveQuayTlsTrust || _path3Rc=$?
+    typeset -i _path3Owned=0
+    _path3Owned="$(find "${quayCaDir}" -maxdepth 1 -name '20-owned-*.pem' 2>/dev/null | wc -l)"
+    if (( _path3Rc == 0 )) && [[ "${quayCaFile}" == *"/20-owned-"* ]] && (( _path3Owned >= 1 )); then
+        echo "SELF-TEST PASS: an owner-referenced ca.crt candidate is preferred over the labelled ssl.cert candidate" >&2
+    else
+        echo "SELF-TEST FAIL: owned-candidate preference changed (rc=${_path3Rc}, anchor=${quayCaFile}, owned candidates=${_path3Owned})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+
+    # Path 4: the uid-unavailable corner.  No uid to verify against, so a
+    # kind QuayRegistry ownerReference naming the registry is the only
+    # association evidence there is, and the fallback admits it.
+    _selftestAdmit='25-ssl-'
+    _selftestSecrets="$(printf '{"items":[{"metadata":{"name":"quay-registry-ssl","labels":{"app":"quay"},"ownerReferences":[{"kind":"QuayRegistry","name":"quay-registry"}]},"data":{"ssl.cert":"%s"}}]}' "${_b64}")"
+    QUAY_UID=""
+    quayCaFile=''
+    typeset -i _path4Rc=0
+    ResolveQuayTlsTrust || _path4Rc=$?
+    typeset -i _path4Ssl=0
+    _path4Ssl="$(find "${quayCaDir}" -maxdepth 1 -name '25-ssl-*.pem' 2>/dev/null | wc -l)"
+    if (( _path4Rc == 0 )) && (( _path4Ssl == 1 )) && [[ "${quayCaFile}" == *"/25-ssl-"* ]]; then
+        echo "SELF-TEST PASS: with no uid available the fallback admits the kind-and-name associated secret" >&2
+    else
+        echo "SELF-TEST FAIL: the uid-unavailable corner did not admit the associated secret (rc=${_path4Rc}, ssl=${_path4Ssl}, anchor=${quayCaFile})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+    QUAY_UID="${_origUid}"
+
+    # Restore.
+    unset -f oc curl
+    rm -rf "${quayCaDir}" || true
+    QUAY_HOST="${_origHost}"
+    QUAY_NS="${_origNs}"
+    QUAY_REGISTRY="${_origReg}"
+    QUAY_UID="${_origUid}"
+    QUAY_CONFIG_BUNDLE="${_origBundle}"
+    quayCaFile="${_origCaFile}"
+    quayTlsOpts=()
+    if [[ "${_xtraceOn}" == true ]]; then
+        set -x
+    fi
+
+    if (( _failures > 0 )); then
+        echo "SELF-TEST FAIL: ${_failures} Quay TLS label-fallback path(s) did not behave as specified" >&2
+        return 1
+    fi
+    echo "SELF-TEST PASS: the label fallback admits only secrets owner-referenced to the selected QuayRegistry" >&2
     return 0
 }
 
@@ -476,10 +1044,13 @@ function CreateTestOrg () {
             # (the variables are exported above), and piped in via stdin, so
             # the password appears in neither the helper's argv nor the curl
             # command line.
+            # no -L: the password and the X-CSRF-Token header are on this POST,
+            # so a redirect must not be followed; -f fails the call on an HTTP
+            # error, and a redirect body is not a signin success.
             signinResult="$(python3 -c "
 import json, os
 print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['QUAY_PASSWORD']}))
-" | curl -fsSL "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 -X POST "https://${QUAY_HOST}/api/v1/signin" \
+" | curl -fsS "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 30 -X POST "https://${QUAY_HOST}/api/v1/signin" \
                 -H "Content-Type: application/json" \
                 -H "X-CSRF-Token: ${csrf}" \
                 -b "${cookieFile}" -c "${cookieFile}" \
@@ -537,7 +1108,8 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
         # session cookie and the CSRF token refreshed for that session,
         # otherwise this request goes out with an empty bearer header and the
         # push below has no organization.
-        orgRaw="$(curl -sSL --fail-with-body "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
+        # no -L: the CSRF token must not follow a redirect, and %{http_code} must report the initial response
+        orgRaw="$(curl -sS --fail-with-body "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
             -w '\n%{http_code}' \
             "https://${QUAY_HOST}/api/v1/organization/" \
             -b "${cookieFile}" \
@@ -546,7 +1118,8 @@ print(json.dumps({'username': os.environ['QUAY_USER'], 'password': os.environ['Q
     else
         # The bearer token is handed to curl through a process-substitution
         # config, so it never appears in the curl argv.
-        orgRaw="$(curl -sSL --fail-with-body "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
+        # no -L: the CSRF token must not follow a redirect, and %{http_code} must report the initial response
+        orgRaw="$(curl -sS --fail-with-body "${quayTlsOpts[@]}" --connect-timeout 15 --max-time 60 -X POST \
             -w '\n%{http_code}' \
             "https://${QUAY_HOST}/api/v1/organization/" \
             --config <(printf 'header = "Authorization: Bearer %s"\n' "${QUAY_TOKEN}") \
@@ -618,6 +1191,7 @@ function RunPushPull () {
     if ! ( set +x
            [[ -n "${QUAY_TOKEN}" || -n "${QUAY_PASSWORD}" ]]
          ); then
+        # PRRT_kwDOBHvUUM65LZ3W: first list empty should still bound wait for claim
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "No valid Quay authentication token or password available" "${elapsed}"
         return 1
@@ -630,11 +1204,16 @@ function RunPushPull () {
       else
           registryAuth="$(printf '%s' "${QUAY_USER}:${QUAY_PASSWORD}" | base64 -w0)"
       fi
+      rm -f "${authFile}"
       printf '{"auths":{"%s":{"auth":"%s"}}}\n' "${QUAY_HOST}" "${registryAuth}" >"${authFile}"
+      chmod 600 "${authFile}"
     true )
 
+    typeset digestFile='/tmp/quay-push.digest'
+    rm -f "${digestFile}"
     if ! SSL_CERT_FILE="${quayCaFile}" skopeo copy --dest-tls-verify=true \
         --dest-authfile="${authFile}" \
+        --digestfile "${digestFile}" \
         docker://registry.access.redhat.com/ubi9-minimal:latest \
         "docker://${pushTarget}" 2>&1; then
         elapsed=$(( $(date +%s) - start ))
@@ -646,11 +1225,41 @@ function RunPushPull () {
     # `skopeo inspect` stops at the manifest, so a registry that serves
     # manifests but cannot return a layer blob from object storage would
     # still pass.  Copy the image into a local dir transport instead.
+    # PRRT_kwDOBHvUUM65TpNJ: pull by digest not tag to avoid TOCTOU; digest from push digestfile preferred
     typeset pullDir='/tmp/quay-pull-verify'
     rm -rf "${pullDir}"
+    typeset imageDigest=""
+    if [[ -s "${digestFile}" ]]; then
+        imageDigest="$(cat "${digestFile}")"
+        imageDigest="${imageDigest%% *}"
+        imageDigest="$(printf '%s' "${imageDigest}" | tr -d '[:space:]')"
+    fi
+    # Fallback to inspect only when push did not record a digest; residual race: tag may have been replaced between push and inspect
+    typeset inspectJson=''
+    typeset -i inspectRc=0
+    if [[ -z "${imageDigest}" ]]; then
+        inspectJson=$(SSL_CERT_FILE="${quayCaFile}" skopeo inspect --authfile="${authFile}" "docker://${pushTarget}" 2>/dev/null) || inspectRc=$?
+        if (( inspectRc == 0 )); then
+            imageDigest=$(printf '%s' "${inspectJson}" | python3 -c "import sys,json; print(json.load(sys.stdin).get('Digest',''))") || imageDigest=""
+        fi
+    fi
+    if [[ -z "${imageDigest}" ]]; then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "Could not determine image digest after push (skopeo inspect exit ${inspectRc}, digest '${imageDigest:-empty}')" "${elapsed}"
+        return 1
+    fi
+    # Strip only the final tag segment (after last slash) when constructing repo@digest; preserves registry port
+    typeset repoPart="${pushTarget}"
+    if [[ "${pushTarget##*/}" == *":"* ]]; then
+        repoPart="${pushTarget%:*}"
+    fi
+    typeset pushTargetDigest="${repoPart}@${imageDigest}"
+    # Publish digest-anchored pullspec for ACS scan and polling
+    typeset -g quayImageDigest="${imageDigest}"
+    typeset -g quayPushTargetDigest="${pushTargetDigest}"
     if ! SSL_CERT_FILE="${quayCaFile}" skopeo copy --src-tls-verify=true \
         --src-authfile="${authFile}" \
-        "docker://${pushTarget}" \
+        "docker://${pushTargetDigest}" \
         "dir:${pullDir}"; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "Image layers not pullable from Quay after push" "${elapsed}"
@@ -684,9 +1293,10 @@ function RunOdfStorageCheck () {
     fi
 
     typeset obcJson=''
-    if ! obcJson=$(oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>&1); then
+    # PRRT_kwDOBHvUUM65LZ3O: claim owner check before name match to avoid hijacking
+    if ! obcJson=$(oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>"${ARTIFACT_DIR:-/tmp}/obc-err.log"); then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "Failed to list ObjectBucketClaims in namespace ${QUAY_NS}: ${obcJson}" "${elapsed}"
+        RecordResult "${testName}" "failed" "Failed to list ObjectBucketClaims in namespace ${QUAY_NS}: $(cat "${ARTIFACT_DIR:-/tmp}/obc-err.log" 2>/dev/null || echo "oc get failed")" "${elapsed}"
         return 1
     fi
 
@@ -699,29 +1309,43 @@ function RunOdfStorageCheck () {
     typeset -i obcPickRc=0
     quayObc=$(printf '%s' "${obcJson}" | \
         python3 -c "
-import sys, json, os
-registry = os.environ.get('QUAY_REGISTRY', '')
-data = json.load(sys.stdin)
-owned = []
-hinted = []
-for item in data.get('items', []):
-    meta = item.get('metadata') or {}
-    name = meta.get('name') or ''
-    if not name:
-        continue
-    refs = [r for r in (meta.get('ownerReferences') or [])
-            if r.get('kind') == 'QuayRegistry']
-    bound = ((item.get('status') or {}).get('phase') == 'Bound')
-    if any(r.get('name') == registry for r in refs if registry):
-        owned.append((0 if bound else 1, name))
-    elif registry and name.startswith(registry + '-'):
-        hinted.append((0 if bound else 1, name))
-pick = sorted(owned) or sorted(hinted)
-if pick:
-    print(pick[0][1])
-    sys.exit(0)
-sys.exit(1)
-" 2>&1) || obcPickRc=$?
+import sys, json, os, traceback
+try:
+    registry = os.environ.get('QUAY_REGISTRY', '')
+    uid = os.environ.get('QUAY_UID', '')
+
+    def owned_by_this(r):
+        # Name alone matches a deleted and recreated registry; the uid pins the
+        # owner when both sides carry one.
+        if not registry or (r.get('name') or '') != registry:
+            return False
+        ref_uid = r.get('uid') or ''
+        return not (uid and ref_uid) or ref_uid == uid
+
+    data = json.load(sys.stdin)
+    owned = []
+    hinted = []
+    for item in data.get('items', []):
+        meta = item.get('metadata') or {}
+        name = meta.get('name') or ''
+        if not name:
+            continue
+        refs = [r for r in (meta.get('ownerReferences') or []) if r.get('kind') == 'QuayRegistry']
+        bound = ((item.get('status') or {}).get('phase') == 'Bound')
+        if any(owned_by_this(r) for r in refs):
+            owned.append((0 if bound else 1, name))
+        elif registry and (name == registry or name.startswith(registry + '-')):
+            if not any(r.get('kind') == 'QuayRegistry' and not owned_by_this(r) for r in (meta.get('ownerReferences') or [])):
+                hinted.append((0 if bound else 1, name))
+    pick = sorted(owned) or sorted(hinted)
+    if pick:
+        print(pick[0][1])
+        sys.exit(0)
+    sys.exit(1)
+except Exception:
+    traceback.print_exc()
+    sys.exit(2)
+") || obcPickRc=$?
 
     if (( obcPickRc != 0 && obcPickRc != 1 )); then
         elapsed=$(( $(date +%s) - start ))
@@ -729,9 +1353,86 @@ sys.exit(1)
         return 1
     fi
     if [[ -z "${quayObc}" ]]; then
-        elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "No ObjectBucketClaim found in Quay namespace ${QUAY_NS}" "${elapsed}"
-        return 1
+        # NooBaa may still be provisioning the claim; wait for it to appear before failing
+        typeset -i _claimDeadline=$(( $(date +%s) + 300 ))
+        typeset -i _obcListErr=0
+        typeset -i _obcPickErr=0
+        typeset _obcListMsg=""
+        while true; do
+            typeset -i _pickRc=0
+            quayObc=$(printf '%s' "${obcJson}" | python3 -c "
+import sys, json, os, traceback
+try:
+    registry = os.environ.get('QUAY_REGISTRY', '')
+    uid = os.environ.get('QUAY_UID', '')
+
+    def owned_by_this(r):
+        # Name alone matches a deleted and recreated registry; the uid pins the
+        # owner when both sides carry one.
+        if not registry or (r.get('name') or '') != registry:
+            return False
+        ref_uid = r.get('uid') or ''
+        return not (uid and ref_uid) or ref_uid == uid
+
+    data = json.load(sys.stdin)
+    owned = []
+    hinted = []
+    for item in data.get('items', []):
+        meta = item.get('metadata') or {}
+        name = meta.get('name') or ''
+        if not name:
+            continue
+        refs = [r for r in (meta.get('ownerReferences') or []) if r.get('kind') == 'QuayRegistry']
+        bound = ((item.get('status') or {}).get('phase') == 'Bound')
+        if any(owned_by_this(r) for r in refs):
+            owned.append((0 if bound else 1, name))
+        elif registry and (name == registry or name.startswith(registry + '-')):
+            if not any(r.get('kind') == 'QuayRegistry' and not owned_by_this(r) for r in (meta.get('ownerReferences') or [])):
+                hinted.append((0 if bound else 1, name))
+    pick = sorted(owned) or sorted(hinted)
+    if pick:
+        print(pick[0][1])
+        sys.exit(0)
+    sys.exit(1)
+except Exception:
+    traceback.print_exc()
+    sys.exit(2)
+") || _pickRc=$?
+            if (( _pickRc == 0 )); then
+                break
+            elif (( _pickRc == 1 )); then
+                (( $(date +%s) >= _claimDeadline )) && break
+                sleep 5
+                typeset -i _obcRetryRc=0
+                typeset -i _claimRemain=$(( _claimDeadline - $(date +%s) ))
+                (( _claimRemain > 0 )) || _claimRemain=1
+                # PRRT_kwDOBHvUUM65ui2G: refreshed OBC list bounded by remaining claim budget; capture real rc not negated
+                obcJson=$(timeout "${_claimRemain}s" oc get objectbucketclaim -n "${QUAY_NS}" -o json 2>"${ARTIFACT_DIR:-/tmp}/obc-err.log")
+                _obcRetryRc=$?
+                if (( _obcRetryRc != 0 )); then
+                    _obcListErr=${_obcRetryRc}
+                    _obcListMsg="$(cat "${ARTIFACT_DIR:-/tmp}/obc-err.log" 2>/dev/null || echo "oc get failed")"
+                    quayObc=""
+                    break
+                fi
+                continue
+            else
+                _obcPickErr=${_pickRc}
+                quayObc=""
+                break
+            fi
+        done
+        if [[ -z "${quayObc}" ]]; then
+            elapsed=$(( $(date +%s) - start ))
+            if (( _obcListErr != 0 )); then
+                RecordResult "${testName}" "failed" "ObjectBucketClaim list query failed in namespace ${QUAY_NS} (exit ${_obcListErr}: ${_obcListMsg:0:500})" "${elapsed}"
+            elif (( _obcPickErr != 0 && _obcPickErr != 1 )); then
+                RecordResult "${testName}" "failed" "ObjectBucketClaim selector failed in namespace ${QUAY_NS} (helper exit ${_obcPickErr}: ${quayObc:0:200})" "${elapsed}"
+            else
+                RecordResult "${testName}" "failed" "No ObjectBucketClaim found in Quay namespace ${QUAY_NS} after 300s timeout (selector exit 1)" "${elapsed}"
+            fi
+            return 1
+        fi
     fi
 
     if ! oc wait "objectbucketclaim/${quayObc}" -n "${QUAY_NS}" \
@@ -745,9 +1446,9 @@ sys.exit(1)
     fi
 
     typeset obJson=''
-    if ! obJson=$(oc get objectbucket -o json 2>&1); then
+    if ! obJson=$(oc get objectbucket -o json 2>"${ARTIFACT_DIR:-/tmp}/ob-err.log"); then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "Failed to list ObjectBuckets: ${obJson}" "${elapsed}"
+        RecordResult "${testName}" "failed" "Failed to list ObjectBuckets: $(cat "${ARTIFACT_DIR:-/tmp}/ob-err.log" 2>/dev/null || echo "oc get failed")" "${elapsed}"
         return 1
     fi
 
@@ -759,16 +1460,25 @@ import sys, json
 obc_name, obc_ns = sys.argv[1], sys.argv[2]
 data = json.load(sys.stdin)
 for item in data.get('items', []):
-    ref = item.get('spec', {}).get('claimRef', {})
+    ref = item.get('spec', {}).get('claimRef')
+    if ref is None:
+        continue
     if ref.get('name') == obc_name and ref.get('namespace') == obc_ns:
         print(item['metadata']['name'])
         sys.exit(0)
 sys.exit(1)
-" "${quayObc}" "${QUAY_NS}" 2>&1) || obPickRc=$?
+" "${quayObc}" "${QUAY_NS}" 2>"${ARTIFACT_DIR:-/tmp}/ob-pick-err.log") || obPickRc=$?
 
     if (( obPickRc != 0 && obPickRc != 1 )); then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "Could not resolve the ObjectBucket for Quay OBC ${quayObc} (helper exited ${obPickRc}: ${obName})" "${elapsed}"
+        typeset _obPickErr=""
+        _obPickErr=$(cat "${ARTIFACT_DIR:-/tmp}/ob-pick-err.log" 2>/dev/null || echo "${obName}")
+        RecordResult "${testName}" "failed" "Could not resolve the ObjectBucket for Quay OBC ${quayObc} (helper exited ${obPickRc}: ${_obPickErr:0:200})" "${elapsed}"
+        return 1
+    fi
+    if [[ -s "${ARTIFACT_DIR:-/tmp}/ob-pick-err.log" ]]; then
+        elapsed=$(( $(date +%s) - start ))
+        RecordResult "${testName}" "failed" "ObjectBucket lookup produced stderr for Quay OBC ${quayObc}" "${elapsed}"
         return 1
     fi
     if [[ -z "${obName}" ]]; then
@@ -778,17 +1488,18 @@ sys.exit(1)
     fi
 
     typeset pvcJson=''
-    if ! pvcJson=$(oc get pvc -n "${QUAY_NS}" -o json 2>&1); then
+    if ! pvcJson=$(oc get pvc -n "${QUAY_NS}" -o json 2>"${ARTIFACT_DIR:-/tmp}/pvc-err.log"); then
         elapsed=$(( $(date +%s) - start ))
-        RecordResult "${testName}" "failed" "Failed to list PVCs: ${pvcJson}" "${elapsed}"
+        RecordResult "${testName}" "failed" "Failed to list PVCs: $(cat "${ARTIFACT_DIR:-/tmp}/pvc-err.log" 2>/dev/null || echo "oc get failed")" "${elapsed}"
         return 1
     fi
 
     typeset unboundPvcs=''
     unboundPvcs=$(printf '%s' "${pvcJson}" | python3 -c "
-import sys, json
+import sys, json, os
 data = json.load(sys.stdin)
-items = [i for i in data.get('items', []) if 'quay' in i['metadata'].get('name','').lower()]
+quay_uid = os.environ.get('QUAY_UID', '')
+items = [i for i in data.get('items', []) if any(o.get('uid')==quay_uid for o in i.get('metadata',{}).get('ownerReferences',[]))] # PRRT_kwDOBHvUUM65Mrmi: PVC via ownerReference with QUAY_UID
 unbound = [i['metadata']['name'] for i in items if i.get('status', {}).get('phase') != 'Bound']
 print(' '.join(unbound))
 ") || { elapsed=$(( $(date +%s) - start )); RecordResult "${testName}" "failed" "PVC filter script error" "${elapsed}"; return 1; }
@@ -816,7 +1527,7 @@ function RegisterQuayInAcs () {
     ( set +x
       typeset response=''
       if ! response=$(curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 60 \
-          --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+          --config <(printf 'user = "admin:%s"\n' "$(EscapeForCurlUser < "${acsPassFile}")") \
           "https://${acsHost}/v1/imageintegrations"); then
           echo "ERROR: Failed to query ACS image integrations" >&2
           exit 1
@@ -827,8 +1538,25 @@ function RegisterQuayInAcs () {
 import sys, json, os
 host = os.environ['QUAY_HOST']
 data = json.load(sys.stdin)
+def _norm(ep):
+    ep = (ep or '').strip()
+    scheme = ''
+    if '://' in ep:
+        scheme, ep = ep.split('://', 1)
+        scheme = scheme.lower()
+    ep = ep.rstrip('/')
+    host_part = ep.split('/', 1)[0]
+    rest = ep[len(host_part):]
+    if ':' in host_part:
+        h, p = host_part.rsplit(':', 1)
+        if p == '443' and scheme in ('https', ''):
+            host_part = h
+            ep = host_part + rest
+    return ep.lower()
+hostNorm = _norm(host)
 for i in data.get('integrations', []):
-    if host in i.get('docker', {}).get('endpoint', ''):
+    ep = i.get('docker', {}).get('endpoint', '')
+    if _norm(ep) == hostNorm:
         print(i['id'])
         sys.exit(0)
 sys.exit(1)
@@ -862,7 +1590,11 @@ payload = {
         'endpoint': os.environ['QUAY_HOST'],
         'username': os.environ['QUAY_REG_USER'],
         'password': os.environ['QUAY_REG_PASSWORD'],
-        'insecure': True
+        # PRRT_kwDOBHvUUM65MrnB: keep TLS verification enabled; Central's own
+        # configured trust (spec.tls.additionalCAs) is confirmed before
+        # registration (PRRT_kwDOBHvUUM67E3SE), so no CA material rides the
+        # payload and no insecure integration is created either way
+        'insecure': False
     },
     'skipTestIntegration': True
 }
@@ -873,7 +1605,7 @@ print(json.dumps(payload))
       regCode=$(printf '%s' "${regPayload}" | curl -s "${acsTlsOpts[@]}" -o /dev/null -w '%{http_code}' \
           --connect-timeout 15 --max-time 60 \
           -X POST "https://${acsHost}/v1/imageintegrations" \
-          --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+          --config <(printf 'user = "admin:%s"\n' "$(EscapeForCurlUser < "${acsPassFile}")") \
           -H "Content-Type: application/json" \
           -d @-) || regCode="000"
       if [[ "${regCode}" != 2* ]]; then
@@ -902,7 +1634,7 @@ print(json.dumps(payload))
       scanCode=$(curl -s "${acsTlsOpts[@]}" -o /dev/null -w '%{http_code}' \
           --connect-timeout 15 --max-time 60 \
           -X POST "https://${acsHost}/v1/images/scan" \
-          --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
+          --config <(printf 'user = "admin:%s"\n' "$(EscapeForCurlUser < "${acsPassFile}")") \
           -H "Content-Type: application/json" \
           -d "${scanPayload}") || scanCode="000"
       if [[ "${scanCode}" != 2* ]]; then
@@ -912,6 +1644,231 @@ print(json.dumps(payload))
 
       : "INFO: Requested ACS scan for pushed image"
     )
+}
+
+# Central's own trust configuration decides whether a TLS-verified scan can
+# reach the Quay registry: Central and Scanner fetch the image, this step does
+# not, so an anchor that only this step holds leaves the scan failing on the
+# certificate while registration succeeds.  The Central CR is the single read
+# of that configuration, and every additionalCA it carries is proved against
+# the Quay endpoint with the same probe semantics ResolveQuayTlsTrust uses
+# (any HTTP status other than 000 means the endpoint answered under that
+# anchor).  When none of them verifies the route the caller fails the scan
+# check before RegisterQuayInAcs runs, so no Quay credential is sent and no
+# image integration is created.  The caller declares centralTrustReason, which
+# the failure branches below fill in (dynamic scoping, as acsTlsOpts is).
+function ConfirmCentralTrustsQuay () {
+    typeset centralJson=''
+    typeset -i centralRc=0
+    centralJson="$(oc get central -n stackrox -o json 2>/dev/null)" || centralRc=$?
+
+    # Owner-only directory: the PEM payloads come from a cluster object and
+    # live only long enough to be used as curl trust anchors.
+    typeset trustDir=''
+    trustDir="$(mktemp -d)" || trustDir=''
+    if [[ -z "${trustDir}" ]]; then
+        centralTrustReason="Central's trust configuration could not be read from the Central CR in namespace stackrox (no writable temporary directory for the CA probe); no Quay integration was created"
+        echo "ERROR: ${centralTrustReason}" >&2
+        return 1
+    fi
+    chmod 0700 "${trustDir}" 2>/dev/null || true
+
+    # One file per configured CA.  A cluster object is data, never script: the
+    # payload is written to a file and handed to curl as a trust anchor, and
+    # the helper only reports how the read went.  Exit 3 is an unparseable
+    # response, exit 4 is no Central item: both are read failures, not "Central
+    # trusts nothing", so they must not read as an absent additionalCAs list.
+    typeset -i parseRc=0
+    if (( centralRc == 0 )) && [[ -n "${centralJson}" ]]; then
+        printf '%s' "${centralJson}" | CA_DIR="${trustDir}" python3 -c "
+import json, os, sys
+
+try:
+    data = json.load(sys.stdin)
+except Exception:
+    sys.exit(3)
+
+items = data.get('items') or []
+if not items:
+    sys.exit(4)
+
+spec = items[0].get('spec') or {}
+# The Centrals CRD (platform.stackrox.io) nests additionalCAs under the
+# top-level spec.tls, not under spec.central.
+tls = spec.get('tls') or {}
+count = 0
+for ca in (tls.get('additionalCAs') or []):
+    content = (ca or {}).get('content') or ''
+    if not content.strip():
+        continue
+    count += 1
+    with open(os.path.join(os.environ['CA_DIR'], 'central-ca-%02d.pem' % count), 'w') as fh:
+        fh.write(content)
+        if not content.endswith('\n'):
+            fh.write('\n')
+" 2>/dev/null || parseRc=$?
+    fi
+
+    if (( centralRc != 0 )) || [[ -z "${centralJson}" ]] || (( parseRc != 0 )); then
+        rm -rf "${trustDir}"
+        centralTrustReason="Central's trust configuration could not be read from the Central CR in namespace stackrox (oc rc=${centralRc}, helper rc=${parseRc}); no Quay integration was created"
+        echo "ERROR: ${centralTrustReason}" >&2
+        return 1
+    fi
+
+    typeset caFile=''
+    typeset verifyingCa=''
+    typeset probe=''
+    for caFile in "${trustDir}"/*.pem; do
+        [[ -f "${caFile}" ]] || continue
+        probe="$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 15 --max-time 30 --cacert "${caFile}" "https://${QUAY_HOST}/v2/")" || probe='000'
+        if [[ -n "${probe}" && "${probe}" != '000' ]]; then
+            verifyingCa="${caFile}"
+            break
+        fi
+    done
+    rm -rf "${trustDir}"
+
+    if [[ -n "${verifyingCa}" ]]; then
+        echo "INFO: Central's configured trust verifies the Quay endpoint at ${QUAY_HOST} (spec.tls.additionalCAs, Central CR in namespace stackrox)" >&2
+        return 0
+    fi
+    centralTrustReason="Central's additionalCAs do not verify the Quay route certificate for ${QUAY_HOST}; a TLS-verified scan would fail on the certificate.  Add the Quay registry CA to the Central CR (spec.tls.additionalCAs) before the scan can rely on verification; no Quay integration was created"
+    echo "ERROR: ${centralTrustReason}" >&2
+    return 1
+}
+
+# Self-test for the Central trust guard: proves that an additionalCA which
+# verifies the Quay endpoint lets the flow reach registration, and that a CA
+# which does not verify it, an empty additionalCAs list, or an unreadable
+# Central CR fails before any registration call is made.  oc and curl are
+# function stubs, so the paths need no cluster and no network, and each path
+# runs the same order the scan runs (guard, then registration).
+CentralTrustSelfTest() {
+    typeset _origQuayHost="${QUAY_HOST:-}"
+    typeset _xtraceOn=false
+    if [[ "${-}" == *x* ]]; then
+        _xtraceOn=true
+    fi
+    set +x
+    export QUAY_HOST="quay-test.example.com"
+    typeset _centralWithCa='{"items":[{"metadata":{"name":"stackrox-central-services","namespace":"stackrox"},"spec":{"tls":{"additionalCAs":[{"name":"quay-ca","content":"-----BEGIN CERTIFICATE-----\nSTUB\n-----END CERTIFICATE-----"}]}}}]}'
+    typeset _centralNoCa='{"items":[{"metadata":{"name":"stackrox-central-services","namespace":"stackrox"},"spec":{}}]}'
+    typeset -i _regCalls=0
+    typeset -i _failures=0
+
+    # Stub registration: records that the guarded sequence reached it.  The
+    # real function is captured and restored, so running this self-test in the
+    # script's own shell leaves RegisterQuayInAcs intact afterwards.
+    typeset _origRegisterDef=''
+    _origRegisterDef="$(declare -f RegisterQuayInAcs)"
+    RegisterQuayInAcs() { _regCalls=$(( _regCalls + 1 )); return 0; }
+    # The order RunAcsScan uses: the guard gates the registration call.
+    _centralTrustSequence() {
+        typeset centralTrustReason=''
+        if ! ConfirmCentralTrustsQuay; then
+            return 1
+        fi
+        RegisterQuayInAcs "acs.test"
+        return 0
+    }
+
+    # Path 1: a configured CA verifies the Quay endpoint, registration runs.
+    oc() { printf '%s' "${_centralWithCa}"; }
+    curl() { printf '200'; }
+    export -f oc curl
+    _regCalls=0
+    typeset _path1Reached=false
+    if _centralTrustSequence; then
+        if (( _regCalls == 1 )); then
+            _path1Reached=true
+        fi
+    fi
+    if [[ "${_path1Reached}" == true ]]; then
+        echo "SELF-TEST PASS: a verified Central additionalCA lets the scan reach registration" >&2
+    else
+        echo "SELF-TEST FAIL: a verified Central additionalCA did not reach registration (registration calls: ${_regCalls})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+
+    # Path 2: the configured CA does not verify the endpoint, no registration.
+    curl() { printf '000'; }
+    export -f curl
+    _regCalls=0
+    typeset _path2Blocked=false
+    if _centralTrustSequence; then
+        : "guard passed unexpectedly"
+    else
+        if (( _regCalls == 0 )); then
+            _path2Blocked=true
+        fi
+    fi
+    if [[ "${_path2Blocked}" == true ]]; then
+        echo "SELF-TEST PASS: an additionalCA that fails the probe blocks registration" >&2
+    else
+        echo "SELF-TEST FAIL: an additionalCA that fails the probe did not block registration (registration calls: ${_regCalls})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+
+    # Path 3: no additionalCAs configured, no registration (the probe answers,
+    # so the failure is the empty trust list, not an unreachable endpoint).
+    oc() { printf '%s' "${_centralNoCa}"; }
+    curl() { printf '200'; }
+    export -f oc curl
+    _regCalls=0
+    typeset _path3Blocked=false
+    if _centralTrustSequence; then
+        : "guard passed unexpectedly"
+    else
+        if (( _regCalls == 0 )); then
+            _path3Blocked=true
+        fi
+    fi
+    if [[ "${_path3Blocked}" == true ]]; then
+        echo "SELF-TEST PASS: an empty additionalCAs list blocks registration" >&2
+    else
+        echo "SELF-TEST FAIL: an empty additionalCAs list did not block registration (registration calls: ${_regCalls})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+
+    # Path 4: the Central CR cannot be read, no registration.
+    oc() { return 1; }
+    curl() { printf '200'; }
+    export -f oc curl
+    _regCalls=0
+    typeset _path4Blocked=false
+    if _centralTrustSequence; then
+        : "guard passed unexpectedly"
+    else
+        if (( _regCalls == 0 )); then
+            _path4Blocked=true
+        fi
+    fi
+    if [[ "${_path4Blocked}" == true ]]; then
+        echo "SELF-TEST PASS: an unreadable Central CR blocks registration" >&2
+    else
+        echo "SELF-TEST FAIL: an unreadable Central CR did not block registration (registration calls: ${_regCalls})" >&2
+        _failures=$(( _failures + 1 ))
+    fi
+
+    # Restore the shell the self-test borrowed: no stubs (the real
+    # RegisterQuayInAcs definition comes back from its captured body), the
+    # original host, and tracing as it was found.
+    unset -f oc curl RegisterQuayInAcs _centralTrustSequence
+    if [[ -n "${_origRegisterDef}" ]]; then
+        eval "${_origRegisterDef}"
+    fi
+    QUAY_HOST="${_origQuayHost}"
+    if [[ "${_xtraceOn}" == true ]]; then
+        set -x
+    fi
+
+    if (( _failures > 0 )); then
+        echo "SELF-TEST FAIL: ${_failures} Central trust guard path(s) did not behave as specified" >&2
+        return 1
+    fi
+    echo "SELF-TEST PASS: Central trust guard gates registration on Central's own configured trust" >&2
+    return 0
 }
 
 function RunAcsScan () {
@@ -952,6 +1909,18 @@ function RunAcsScan () {
     fi
 
     typeset pushTarget="${QUAY_HOST}/interop-smoke-test/ubi-smoke:${imageTag}"
+    # Digest-anchored pullspec for ACS scan and polling; tag kept only as display label
+    typeset acsScanTarget="${pushTarget}"
+    typeset acsDigest="${quayImageDigest:-}"
+    if [[ -n "${quayPushTargetDigest:-}" ]]; then
+        acsScanTarget="${quayPushTargetDigest}"
+    elif [[ -n "${acsDigest}" ]]; then
+        typeset _acsRepo="${pushTarget}"
+        if [[ "${pushTarget##*/}" == *":"* ]]; then
+            _acsRepo="${pushTarget%:*}"
+        fi
+        acsScanTarget="${_acsRepo}@${acsDigest}"
+    fi
 
     # TLS verification for the ACS Central API.  The admin credential, and the
     # Quay credential carried in the registration body, are only ever sent
@@ -1002,30 +1971,51 @@ function RunAcsScan () {
     fi
     typeset -a acsTlsOpts=( --cacert "${acsCaFile}" )
 
+    # Central and Scanner fetch the image, this step does not, so this step's
+    # own anchor does not make the scan work: Central's configured trust is
+    # confirmed before the Quay credential reaches an image integration
+    # (PRRT_kwDOBHvUUM67E3SE).  A guard failure records the scan check failed
+    # and returns here, so no integration is created for a scan that would
+    # fail on the certificate.  The reason is taken from the guard, which
+    # fills centralTrustReason in on every failure path.
+    typeset centralTrustReason=''
+    if ! ConfirmCentralTrustsQuay; then
+        elapsed=$(( $(date +%s) - start ))
+        typeset blockedReason="${centralTrustReason:-Central trust could not be confirmed}"
+        RecordResult "${testName}" "failed" "ACS scan blocked: ${blockedReason}" "${elapsed}"
+        rm -f "${acsPassFile}" /tmp/acs-ingress-ca.crt /tmp/acs-central-ca.crt
+        return 1
+    fi
+
     if ! RegisterQuayInAcs "${acsHost}"; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "Failed to register Quay in ACS" "${elapsed}"
         return 1
     fi
-    if ! RequestAcsScan "${acsHost}" "${pushTarget}"; then
+    if ! RequestAcsScan "${acsHost}" "${quayPushTargetDigest:-${acsScanTarget}}"; then
         elapsed=$(( $(date +%s) - start ))
         RecordResult "${testName}" "failed" "ACS scan request failed" "${elapsed}"
         return 1
     fi
 
+    typeset -i acsDeadline=$(( SECONDS + 600 ))
     typeset -i attempts=0 maxAttempts=40 retryInterval=15
     typeset -i waitMinutes=$(( maxAttempts * retryInterval / 60 ))
     typeset -i answeredAttempts=0
     typeset lastQueryError=''
 
-    while (( attempts < maxAttempts )); do
+    while (( attempts < maxAttempts && SECONDS < acsDeadline )); do
         typeset scanResult='' scanErrFile='/tmp/acs-query.err'
         typeset -i scanRc=0
+        typeset -i _acsRemain=$(( acsDeadline - SECONDS ))
+        (( _acsRemain <= 5 )) && break
+        typeset -i _acsMaxTime=30
+        (( _acsMaxTime > _acsRemain - 5 )) && _acsMaxTime=$(( _acsRemain - 5 ))
         scanResult="$(
             set +x
-            curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time 30 \
-                --config <(printf 'user = "admin:%s"\n' "$(cat "${acsPassFile}")") \
-                "https://${acsHost}/v1/images?query=Image:${pushTarget}" 2>"${scanErrFile}"
+            curl -fsSL "${acsTlsOpts[@]}" --connect-timeout 15 --max-time "${_acsMaxTime}" \
+                --config <(printf 'user = "admin:%s"\n' "$(EscapeForCurlUser < "${acsPassFile}")") \
+                "https://${acsHost}/v1/images?query=Image:${quayPushTargetDigest:-${acsScanTarget}}" 2>"${scanErrFile}"
         )" || scanRc=$?
 
         # The helper answers 0 (image present), 1 (image absent) or anything
@@ -1036,13 +2026,30 @@ function RunAcsScan () {
         typeset -i parseRc=2
         if (( scanRc == 0 )); then
             parseRc=0
-            printf '%s' "${scanResult}" | python3 -c "
-import sys, json
+            printf '%s' "${scanResult}" | QUAY_IMAGE_DIGEST="${acsDigest}" python3 -c "
+import sys, json, os
 try:
     data = json.load(sys.stdin)
 except Exception:
     sys.exit(2)
-sys.exit(0 if data.get('images') else 1)
+images = data.get('images') or []
+if not images:
+    sys.exit(1)
+digest = os.environ.get('QUAY_IMAGE_DIGEST', '')
+if digest:
+    for img in images:
+        if img.get('id') == digest:
+            sys.exit(0)
+        if digest in (img.get('name') or ''):
+            sys.exit(0)
+        meta = img.get('metadata') or {}
+        v1 = (meta.get('v1') or {}) if isinstance(meta, dict) else {}
+        if v1.get('digest') == digest or v1.get('imageDigest') == digest:
+            sys.exit(0)
+        if digest in str(img):
+            sys.exit(0)
+    sys.exit(1)
+sys.exit(0)
 " || parseRc=$?
         fi
 
@@ -1069,7 +2076,7 @@ sys.exit(0 if data.get('images') else 1)
         fi
 
         if (( attempts % 4 == 3 )); then
-            RequestAcsScan "${acsHost}" "${pushTarget}" || true
+            RequestAcsScan "${acsHost}" "${quayPushTargetDigest:-${acsScanTarget}}" || true
         fi
 
         attempts=$((attempts + 1))
@@ -1120,17 +2127,17 @@ function Main () {
         done
         exit 1
     fi
-    if ! GetQuayAuth; then
-        for t in "${allTests[@]}"; do
-            RecordResult "${t}" "failed" "Quay credential retrieval failed"
-        done
-        exit 1
-    fi
     if ! PreflightCheck; then
         echo "FATAL: Quay not reachable; skipping all tests" >&2
         RecordResult "${testNamePushPull}" "failed" "Quay registry discovery endpoint not reachable"
         RecordResult "${testNameOdf}" "skipped" "Skipped: Quay preflight (discovery endpoint) failed"
         RecordResult "${testNameAcs}" "skipped" "Skipped: Quay preflight (discovery endpoint) failed"
+        exit 1
+    fi
+    if ! GetQuayAuth; then
+        for t in "${allTests[@]}"; do
+            RecordResult "${t}" "failed" "Quay credential retrieval failed"
+        done
         exit 1
     fi
     # The organization request is what makes the push target writable, so a
@@ -1154,6 +2161,18 @@ function Main () {
 
     exit "${status}"
 }
+
+# Fail closed on an uncleared stale report, after every reporting function is
+# defined: the failure rows are recorded here, the EXIT trap writes them to the
+# raw report in ARTIFACT_DIR, and the trap's stale-survivor rule keeps the
+# earlier report out of the reporter glob even when it cannot be removed.
+if [[ "${_staleMergedSurvived}" == "true" ]]; then
+    echo "FATAL: the merged report from an earlier run is still present at ${_staleMergedReport} and could not be removed; refusing to let the EXIT trap route it as this run's result" >&2
+    for t in "${allTests[@]}"; do
+        RecordResult "${t}" "failed" "stale merged report from an earlier run could not be removed from ${SHARED_DIR:-/tmp}; this run's result cannot be published safely"
+    done
+    exit 1
+fi
 
 Main "$@"
 
