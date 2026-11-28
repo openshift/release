@@ -60,12 +60,24 @@ KONFLUX_MIRRORS_MARKER="${SHARED_DIR}/konflux-mirrors-applied"
 
 OC_RETRY_COUNT=${OC_RETRY_COUNT:-3}
 OC_RETRY_INTERVAL=${OC_RETRY_INTERVAL:-20}
+# KataConfig readiness budget in seconds. DaemonSet mode (HyperShift hosted
+# clusters) performs no node reboots, so jobs against hosted clusters can set
+# this much lower (~1800) instead of burning the 2h default on failure.
+KATACONFIG_TIMEOUT=${KATACONFIG_TIMEOUT:-7200}
 
 
 # Early exit if installation disabled
 if [[ "${OSC_INSTALL}" != "true" ]]; then
   echo ">>> Skipping OSC operator installation (OSC_INSTALL=${OSC_INSTALL})"
   exit 0
+fi
+
+# HyperShift hosted cluster detection: controlPlaneTopology == External means
+# the control plane is hosted; there is no MCO and no MachineConfigPool.
+IS_HCP=false
+if [[ "$(oc get infrastructure cluster -o jsonpath='{.status.controlPlaneTopology}' 2>/dev/null)" == "External" ]]; then
+  IS_HCP=true
+  echo ">>> Running on a HyperShift hosted cluster (controlPlaneTopology=External)"
 fi
 
 # Verify helm is available (pre-installed in base image)
@@ -223,6 +235,13 @@ function oc_with_retry() {
 }
 
 function mirror_konflux() {
+  if [[ "${IS_HCP}" == "true" ]]; then
+    echo ">>> WARNING: HyperShift hosted cluster - skipping konflux mirror sets"
+    echo ">>> WARNING: IDMS/ITMS objects are not reconciled by MCO on a hosted cluster;"
+    echo ">>> WARNING: hosted-cluster mirroring must come from HostedCluster.spec.imageContentSources"
+    return 0
+  fi
+
   echo ">>> Create mirror for konflux images"
   oc_with_retry oc apply -f "https://raw.githubusercontent.com/openshift/sandboxed-containers-operator/refs/heads/devel/.tekton/images-mirror-set.yaml"
   oc_with_retry oc apply -f "https://raw.githubusercontent.com/openshift/trustee-fbc/refs/heads/main/.tekton/images-mirror-set.yaml"
@@ -379,9 +398,12 @@ function render_osc_operator_chart() {
   # set with a narrower copy that covers neither the per-release osc-*-vN-M
   # repositories nor every component, breaking digest pulls for the bundle and
   # operands. Keep the mirrors already on the cluster.
-  if [[ -f "${KONFLUX_MIRRORS_MARKER}" ]]; then
+  if [[ -f "${KONFLUX_MIRRORS_MARKER}" || "${IS_HCP}" == "true" ]]; then
     helm_args+=("--set" "dev.createMirrorSets=false")
     echo ">>> Helm: dev.createMirrorSets=false (konflux mirror sets already applied)" >&2
+  fi
+  if [[ "${IS_HCP}" == "true" ]]; then
+    echo ">>> Helm: dev.createMirrorSets=false forced - IDMS is dead state on a hosted cluster" >&2
   fi
 
   if [[ "${CATALOG_SOURCE_NAME}" == "redhat-operators" ]]; then
@@ -823,10 +845,10 @@ function wait_for_kataconfig() {
   kataconfig_name=$(oc get kataconfig -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
   echo ">>> KataConfig name: ${kataconfig_name}"
 
-  # Wait for KataConfig InProgress condition to be False (7200s / 2h)
-  if ! wait_until "KataConfig ready (InProgress=False)" 7200 30 \
+  # Wait for KataConfig InProgress condition to be False
+  if ! wait_until "KataConfig ready (InProgress=False)" "${KATACONFIG_TIMEOUT}" 30 \
     "[[ \"\$(oc get kataconfig '${kataconfig_name}' -o jsonpath='{.status.conditions[?(@.type==\"InProgress\")].status}' 2>/dev/null)\" == \"False\" ]]"; then
-    echo ">>> ERROR: KataConfig not ready after 2 hours"
+    echo ">>> ERROR: KataConfig not ready after ${KATACONFIG_TIMEOUT}s"
     oc get kataconfig "${kataconfig_name}" -o yaml || true
     oc get nodes || true
     oc get mcp || true
