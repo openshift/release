@@ -1170,7 +1170,7 @@ if (( cclmStepRc != 0 )); then
     DumpDiagnostics "${hubToSpokeTargetNs:-${_fwdVmNs:-${MTV_HS_HUB_VM_NAMESPACE}}}" \
                     "${spokeToHubTargetNs:-${_revVmNs:-${MTV_HS_SPOKE_VM_NAMESPACE}}}"
     if [[ "${isCclmDebugMode}" == 'true' ]]; then
-        : "WARNING: p2p-mtv-execute-hub-spoke-migration failed (rc=${cclmStepRc}); not failing job (debug mode)"
+        : "WARNING: interop-acm-cclm-acm-virt-bundle-hub-spoke failed (rc=${cclmStepRc}); not failing job (debug mode)"
     else
         exit "${cclmStepRc}"
     fi

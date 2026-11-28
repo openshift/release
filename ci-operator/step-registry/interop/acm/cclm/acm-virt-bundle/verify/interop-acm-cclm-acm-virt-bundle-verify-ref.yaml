@@ -1,7 +1,7 @@
 ref:
-  as: p2p-mtv-verify-migration-return
+  as: interop-acm-cclm-acm-virt-bundle-verify
   from: cli-with-ssh
-  commands: p2p-mtv-verify-migration-return-commands.sh
+  commands: interop-acm-cclm-acm-virt-bundle-verify-commands.sh
   timeout: 15m0s
   grace_period: 10m0s
   resources:
@@ -9,8 +9,7 @@ ref:
       cpu: 100m
       memory: 200Mi
   documentation: |-
-    Return-leg companion to p2p-mtv-verify-migration. Same checks, reversed spokes
-    (spoke-2 source, spoke-1 destination) after p2p-mtv-execute-live-migration-return.
+    Verify post-migration VM state produced by interop-acm-cclm-acm-virt-bundle-execute.
 
     Checks performed (each recorded as a JUnit test case; all are hard failures):
     1. Destination VMIs Running
@@ -25,14 +24,15 @@ ref:
     virtctl is downloaded from the destination cluster's CNV cli-download route; the step
     runs from the cli-with-ssh image (cli + openssh-clients).
 
-    Writes ${ARTIFACT_DIR}/junit_cclm_migration_verify_return.xml; diagnostics under
-    mtv-migration-verify-return-diagnostics/.
+    Writes ${ARTIFACT_DIR}/junit_cclm_migration_verify.xml (suffix applied when
+    MTV_MIGRATION_SUFFIX is set); diagnostics under mtv-migration-verify-diagnostics/.
   env:
   - name: MTV_TEST_VM_COUNT
     default: "1"
     documentation: |-
-      Number of VMs to verify after the return migration.
-      Must match MTV_TEST_VM_COUNT used on the forward leg.
+      Number of VMs to verify after migration.
+      Must match the value used in interop-acm-cclm-acm-virt-bundle-execute and
+      p2p-create-migration-test-vm.
   - name: MTV_TEST_VM_NAME
     default: "test-vm-1"
     documentation: VM name to verify (single-VM path; ignored when MTV_TEST_VM_COUNT>1).
@@ -43,22 +43,22 @@ ref:
       Must match P2P_HS_SPOKE_VM_PREFIX in p2p-create-cclm-test-vms.
   - name: MTV_TEST_VM_NAMESPACE
     default: "vm-migration-test"
-    documentation: Source namespace of the migrated VM on spoke-2 (used to check source VMIM).
+    documentation: Source namespace of the migrated VM (used to check source VMIM).
   - name: MTV_TEST_VM_TARGET_NAMESPACE
     default: ""
-    documentation: Destination namespace on spoke-1. Empty uses MTV_TEST_VM_NAMESPACE.
+    documentation: Destination namespace on the destination spoke. Empty uses MTV_TEST_VM_NAMESPACE.
   - name: MTV_SOURCE_SPOKE_INDEX
-    default: "2"
-    documentation: 1-based SHARED_DIR kubeconfig index for the return-leg source spoke (spoke-2).
-  - name: MTV_DEST_SPOKE_INDEX
     default: "1"
-    documentation: 1-based SHARED_DIR kubeconfig index for the return-leg destination spoke (spoke-1).
+    documentation: 1-based SHARED_DIR kubeconfig index for the source spoke.
+  - name: MTV_DEST_SPOKE_INDEX
+    default: "2"
+    documentation: 1-based SHARED_DIR kubeconfig index for the destination spoke.
   - name: MTV_SOURCE_SPOKE_KUBECONFIG
     default: ""
-    documentation: Optional explicit source spoke kubeconfig path. Defaults to SHARED_DIR index 2.
+    documentation: Optional explicit source spoke kubeconfig path. Defaults to SHARED_DIR index.
   - name: MTV_DEST_SPOKE_KUBECONFIG
     default: ""
-    documentation: Optional explicit destination spoke kubeconfig path. Defaults to SHARED_DIR index 1.
+    documentation: Optional explicit destination spoke kubeconfig path. Defaults to SHARED_DIR index.
   - name: MTV_CNV_NAMESPACE
     default: "openshift-cnv"
     documentation: OpenShift Virtualization namespace on spokes (used for diagnostics).
@@ -83,8 +83,10 @@ ref:
       guest images without the cloud-init SSH key; the checks are recorded as
       SKIPPED in JUnit instead of FAILED.
   - name: MTV_MIGRATION_SUFFIX
-    default: "-return"
-    documentation: Suffix applied to artifact names (JUnit XML, diagnostics dir).
+    default: ""
+    documentation: |-
+      Suffix applied to artifact names (JUnit XML, diagnostics dir). Empty for the
+      forward leg; set to "-return" when this step verifies the return migration.
   - name: MTV_PROVIDER_NAMESPACE
     default: "mtv-integrations"
     documentation: |-
@@ -92,11 +94,11 @@ ref:
       ACM's mtv-integrations namespace, kept separate from the MTV operator install
       namespace (openshift-mtv).
   - name: MTV_PLAN_NAME
-    default: "cclm-plan-return"
-    documentation: Return Plan metadata.name on the hub (used for diagnostics).
+    default: "cclm-plan"
+    documentation: Plan metadata.name on the hub (used for diagnostics).
   - name: MTV_MIGRATION_NAME
-    default: "cclm-run-return"
-    documentation: Return Migration metadata.name on the hub (used for diagnostics).
+    default: "cclm-run-1"
+    documentation: Migration metadata.name on the hub (used for diagnostics).
   - name: MTV_VM_SSH_WAIT_SECONDS
     default: "600"
     documentation: |-
