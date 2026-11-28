@@ -14,8 +14,13 @@ ref:
   - name: MARKETPLACE_DRY_RUN
     default: "true"
     documentation: Must be true. This step only logs a preview and never invokes the generator.
+  credentials:
+  - collection: rosa-marketplace-release-generator
+    group: rosa-marketplace-stage
+    mount_path: /etc/rosa-marketplace-stage
   documentation: |-
     Reads the missing ROSA y-stream produced by rosa-marketplace-release-detect
-    and logs a staging-only preview. It never invokes the generator or accesses
-    AWS, refuses production and live publication, and treats detector wait
-    states as successful no-ops.
+    and verifies the mounted staging IAM identity and read access before logging
+    a staging-only preview. Missing credentials warn in dry-run mode. It never
+    invokes the generator or publishes, refuses production and live publication,
+    and treats detector wait states as successful no-ops after the read checks.
