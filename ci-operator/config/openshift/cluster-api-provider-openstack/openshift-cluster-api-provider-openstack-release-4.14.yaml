@@ -3,6 +3,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: base
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: latest
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -95,6 +99,12 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-openstack-ipi
+- as: verify-commits
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-release-4.14}
+  container:
+    from: commitchecker
+  optional: true
 zz_generated_metadata:
   branch: release-4.14
   org: openshift
