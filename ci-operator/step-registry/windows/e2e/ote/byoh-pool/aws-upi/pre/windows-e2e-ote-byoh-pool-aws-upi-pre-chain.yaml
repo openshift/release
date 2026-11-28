@@ -6,6 +6,34 @@ chain:
   - ref: ovn-conf
   - ref: ovn-conf-hybrid-manifest
   - chain: upi-install-aws
+  - as: wait-for-olm-ready
+    commands: |
+      if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+        source "${SHARED_DIR}/proxy-conf.sh"
+      fi
+      deadline=$(( $(date +%s) + 2400 ))
+      until oc get crd clusterserviceversions.operators.coreos.com >/dev/null 2>&1; do
+        if [ "$(date +%s)" -ge "${deadline}" ]; then
+          echo "ERROR: clusterserviceversions CRD did not appear within 40m" >&2
+          oc get clusteroperators >&2 || true
+          exit 1
+        fi
+        sleep 10
+      done
+      for co in olm marketplace; do
+        if ! oc wait --for=condition=Available "clusteroperator/${co}" --timeout=15m; then
+          echo "ERROR: clusteroperator/${co} did not become Available" >&2
+          oc get "clusteroperator/${co}" -o yaml >&2 || true
+          exit 1
+        fi
+      done
+      echo "OLM is ready for the WMCO subscription"
+    from: cli
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 45m
   - ref: openshift-windows-setup-wmco-konflux
   - ref: operatorhub-subscribe
   - ref: windows-conf-operator
