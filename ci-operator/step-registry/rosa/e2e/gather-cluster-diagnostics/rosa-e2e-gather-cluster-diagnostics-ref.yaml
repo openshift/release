@@ -34,10 +34,18 @@ ref:
     documentation: |-
       ocm-backplane CLI version to install (no v prefix).
   documentation: |-
-    Collects cluster-level diagnostics (oauth-apiserver logs, etcd logs,
-    pod status snapshots) from OSD/ROSA test clusters after test execution.
-    Writes output to ARTIFACT_DIR/cluster-diagnostics/ for post-mortem
-    analysis of oauth-apiserver HTTP 500 errors and etcd race conditions.
-    Reads cluster ID from SHARED_DIR/cluster-id. Exits 0 on all failures
-    so it never blocks job completion when used with best_effort: true.
-    Requires cs-qe-credentials for OCM/backplane login.
+    Collects allowlisted CMS cluster, status and live-resource observations before
+    attempting guest access. Uses existing OCM authentication and API permissions;
+    no cloud queries, management-cluster login, elevation or new credentials.
+    Rejects malformed or ambiguous shared IDs. If IDs are absent, requires the
+    FVT run-bound recording handoff. A name lookup must match its immutable ID,
+    exactly one exact-name API result, and creation within the run window.
+    Name-only identity without immutable proof is explicitly unsupported.
+    Writes collection-outcome.json even when identity, access, APIs or tools are
+    unavailable. Operator logs are unsupported without a predefined authorized
+    access path. Does not infer a root cause from missing observations.
+    Guest oauth-apiserver/etcd logs are summarized as fixed signal counts;
+    only allowlisted status/condition values are published, never raw responses,
+    messages, specs, credentials, event text or resource identifiers.
+    Each command has a deadline and output cap, with a 450-second total budget.
+    Exits 0 on all failures and does not change test status or cluster cleanup.
