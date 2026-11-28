@@ -1,0 +1,62 @@
+ref:
+  as: azure-il6-provision-subnets
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-il6-provision-subnets-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: AZURE_IL6_RESOURCE_GROUP
+    default: "CI-Azure-IL6-DoNotDelete"
+    documentation: |-
+      The pre-provisioned, permanent resource group holding the VNet. Referenced in install-config
+      ONLY as platform.azure.networkResourceGroupName.
+  - name: AZURE_IL6_VNET_NAME
+    default: "RHOCP-CI-AzureIL6-virtual-network"
+    documentation: |-
+      The pre-provisioned VNet to install into. This step adds subnets to it; it never creates or
+      deletes the VNet itself.
+  - name: AZURE_IL6_VNET_CIDR
+    default: "10.10.0.0/16"
+    documentation: |-
+      The VNet's address space, written to install-config as networking.machineNetwork[0].cidr.
+      Must match the real VNet -- the generic azure-provision-vnet default of 10.0.0.0/16 is wrong
+      for this environment.
+  documentation: |-
+    Creates the control-plane and compute subnets for an Azure IL6 cluster INSIDE a pre-existing,
+    shared VNet, and emits the install-config patches that point the installer at them.
+
+    This exists instead of azure-provision-vnet because that step runs 'az network vnet create'
+    unconditionally, which would collide with the emulator-provisioned VNet.
+
+    Two resource groups are in play and the split is the whole safety model:
+
+      ${SHARED_DIR}/resourcegroup   a per-run group created by azure-provision-resourcegroup. The
+                                    NSG created here, and everything azure-provision-bastionhost
+                                    creates, go in it. Deleted wholesale at teardown by
+                                    azure-deprovision-resourcegroup.
+
+      AZURE_IL6_RESOURCE_GROUP      the shared, permanent group. Holds the VNet, the VPN gateway
+                                    and the IPsec tunnels to the emulator. CI never creates or
+                                    deletes it, and it reaches install-config only as
+                                    platform.azure.networkResourceGroupName.
+
+    Only the two subnets land in the shared group, because a subnet is a child resource of the
+    VNet and cannot live anywhere else. They are the only thing
+    azure-il6-deprovision-resources has to clean up by name.
+
+    This step therefore asserts, before creating anything, that ${SHARED_DIR}/resourcegroup does
+    not name the shared group -- azure-deprovision-resourcegroup deletes every group listed there,
+    and that would take the emulator environment with it -- and that the per-run group is in the
+    same region as the VNet, since a NIC cannot attach to a subnet in another region and the
+    bastion VM inherits its location from its resource group.
+
+    Outputs:
+      ${SHARED_DIR}/customer_vnet_subnets.yaml  consumed by ipi-conf-azure-provisionednetwork
+      ${SHARED_DIR}/network_machinecidr.yaml    consumed by ipi-conf-azure-provisionednetwork
+      ${SHARED_DIR}/azure_il6_subnet_prefix     consumed by azure-il6-deprovision-resources

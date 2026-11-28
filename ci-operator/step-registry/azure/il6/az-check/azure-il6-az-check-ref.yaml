@@ -1,0 +1,70 @@
+ref:
+  as: azure-il6-az-check
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  grace_period: 10m
+  commands: azure-il6-az-check-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: AZURE_CLI_IMAGE
+    default: mcr.microsoft.com/azure-cli:latest
+  - name: AZURE_IL6_ARM_ENDPOINT
+    default: https://management.azure.microsoft.scloud
+  - name: AZURE_IL6_CLOUD_LABEL
+    default: SHIFT
+    documentation: |-
+      Local az cloud label, per the SHIFT article. This is CLI-local configuration and is not the
+      SDK cloudName an install-config would use.
+  - name: AZURE_IL6_CLUSTER_REGION
+    default: ussecwest
+    documentation: |-
+      The emulated IL6 region, set as the az default location. Deliberately NOT named
+      AZURE_IL6_REGION: azure-il6-check-prereqs already uses that name for the commercial region
+      the resource group physically lives in (westus2), and one job carrying the same variable
+      name with two opposite meanings is a trap. The emulator relabels westus2 as ussecwest rather
+      than hosting a region of its own.
+  - name: AZURE_IL6_RESOURCE_GROUP
+    default: CI-Azure-IL6-DoNotDelete
+    documentation: |-
+      The shared, permanent resource group. Checked explicitly because the emulator fronts the
+      whole commercial subscription, so this is the only group the job can meaningfully assert
+      anything about.
+  - name: AZURE_IL6_VNET_NAME
+    default: RHOCP-CI-AzureIL6-virtual-network
+    documentation: |-
+      The emulator-provisioned VNet. Asserted by name so an empty Microsoft.Network response
+      cannot pass as a successful enumeration.
+  documentation: |-
+    Runs the SHIFT "Configuring the AZ CLI" procedure on the bastion and verifies that az can
+    actually drive the emulated IL6 ARM endpoint.
+
+    Requires azure-il6-bastion-setup to have run first: az needs the emulator CA, and the az
+    container needs --network host to reach the split resolver on the bastion's loopback.
+
+    The sequence is az cloud register / az cloud set / az configure --defaults location /
+    az login --service-principal / az group list / typed Network and Compute reads.
+
+    Two things this step is deliberately careful about, because earlier versions passed for the
+    wrong reasons:
+
+      A successful 'az login' is not evidence of WHICH plane answered it. If the cloud
+      registration failed, az stays on AzureCloud, where the same principal authenticates
+      happily -- so the step reads back environmentName and the active resourceManager endpoint
+      and refuses to run the later checks unless the endpoint really is the emulated one.
+
+      'az network vnet list' exits 0 with an empty table. Testing the return code alone would
+      report success for an emulated ARM that answered with nothing, so the typed queries assert
+      on content: the VNet must come back by name, and Compute must return the bastion.
+
+    The login deliberately uses the commercial azure-qe principal from the cluster profile.
+    Whether the emulator honours it is one of the questions this step exists to answer.
+
+    'az resource list' is run as a NON-FATAL probe. It returns Bad Request for every resource
+    group tried, so Microsoft.Resources/resources appears to be unimplemented on the emulated
+    plane. Nothing in the install path uses it, and the result is logged rather than gated so the
+    gap stays visible to the emulator team.

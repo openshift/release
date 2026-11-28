@@ -1,0 +1,147 @@
+chain:
+  as: cucushift-installer-rehearse-azure-il6-ipi-disconnected-provision
+  steps:
+  # --- commercial Azure plane: preflight and the resources CI owns -------------------------
+  - ref: azure-il6-check-prereqs
+  # A throwaway group for everything the run owns, so teardown is one 'az group delete' rather
+  # than a prefix sweep through the shared fixture. Runs after the preflight so a broken fixture
+  # still fails before anything is created.
+  - ref: azure-provision-resourcegroup
+  - ref: azure-il6-provision-subnets
+  - chain: azure-provision-bastionhost
+  - ref: azure-il6-bastion-setup
+  # --- mirroring: the bastion has its own public IP and pulls from the internet ------------
+  - ref: openshift-cluster-bot-rbac
+  - chain: mirror-images-by-oc-adm
+  - ref: azure-il6-check-mirror-dns
+  # --- install-config ----------------------------------------------------------------------
+  - chain: ipi-conf-azure
+  - ref: ipi-conf-azure-provisionednetwork
+  - ref: ipi-conf-mirror
+  - ref: ipi-conf-azureil6
+  - ref: ipi-conf-additional-ca-azureil6
+  # --- install: must run on the bastion, *.microsoft.scloud is not reachable from a CI pod --
+  - ref: ipi-install-install-in-bastion
+  - ref: azure-il6-private-custom-dns
+  - ref: bastion-dnsmasq
+  - ref: proxy-config-generate
+  - ref: ipi-install-times-collection
+  - ref: nodes-readiness
+  - ref: enable-qe-catalogsource-disconnected
+  - ref: mirror-images-tag-images
+  - ref: set-sample-operator-disconnected
+  - chain: cucushift-installer-check
+  - ref: cucushift-installer-check-user-provisioned-dns
+  env:
+  # The shared, emulator-provisioned resource group and VNet. Everything this job creates goes
+  # inside them; neither is ever created or deleted by CI. Override these to move the job to a
+  # different emulator fixture.
+  - name: AZURE_IL6_RESOURCE_GROUP
+    default: "CI-Azure-IL6-DoNotDelete"
+  - name: AZURE_IL6_VNET_NAME
+    default: "RHOCP-CI-AzureIL6-virtual-network"
+  - name: AZURE_IL6_VNET_CIDR
+    default: "10.10.0.0/16"
+  # azure-provision-bastionhost takes the VNet under this generic name, which is what puts the
+  # bastion inside the VNet that has the IPsec tunnels.
+  - name: VNET_NAME
+    default: "RHOCP-CI-AzureIL6-virtual-network"
+  # ...but NOT in that VNet's resource group. RESOURCE_GROUP is deliberately left empty so
+  # azure-provision-bastionhost falls back to ${SHARED_DIR}/resourcegroup, the per-run group
+  # azure-provision-resourcegroup just created. VNET_RESOURCE_GROUP then tells it where to find
+  # the VNet, and the bastion's NIC is bound to the subnet by resource ID across the two groups.
+  #
+  # An earlier revision pointed RESOURCE_GROUP at the shared group. That put the bastion VM, its
+  # NIC, public IP, disks, image, storage account and a private DNS zone inside a permanent
+  # fixture, left teardown matching each of them by name prefix, and aimed an installer-facing
+  # variable at a group that is never empty.
+  - name: RESOURCE_GROUP
+    default: ""
+  - name: VNET_RESOURCE_GROUP
+    default: "CI-Azure-IL6-DoNotDelete"
+  - name: CUSTOM_AZURE_REGION
+    default: "westus2"
+    documentation: |-
+      The region azure-provision-resourcegroup creates the per-run group in. Must be the shared
+      VNet's region: the bastion VM inherits its location from its resource group, and a NIC
+      cannot attach to a subnet in another region. azure-il6-provision-subnets asserts this
+      rather than letting it surface as an opaque Azure error.
+  - name: AZURE_VNET_ADDRESS_PREFIXES
+    default: "10.10.0.0/16"
+  - name: BASTION_VM_SIZE
+    default: "Standard_D4s_v3"
+    documentation: |-
+      The bastion runs the mirror registry, dnsmasq, openshift-install and a podman-hosted az CLI,
+      so the 1-vCPU default is not enough.
+  - name: PUBLISH
+    default: "Internal"
+    documentation: |-
+      There is no public DNS on the emulated IL6 plane and no inbound path to the cluster from the
+      internet, so the API and ingress endpoints must be internal-only.
+  - name: OUTBOUND_TYPE
+    default: "UserDefinedRouting"
+    documentation: |-
+      Outbound from the cluster subnets is whatever the emulator's VNet route table provides. The
+      installer must not try to create its own outbound load balancer.
+  - name: USER_PROVISIONED_DNS
+    default: "yes"
+    documentation: |-
+      The emulated plane has no Azure Private DNS zone service to create api-int records in, so
+      the cluster is installed with userProvisionedDNS and dnsmasq on the bastion answers instead.
+  - name: ENALBE_DNSMASQ_METHOD
+    default: "systemd-service"
+    documentation: |-
+      Spelling matches the upstream bastion-dnsmasq ref, which has this typo in the variable name.
+
+      Must be systemd-service, not NetworkManager. azure-il6-bastion-setup already runs the
+      standalone dnsmasq service, bound to 127.0.0.1:53, to provide the split-horizon resolver
+      the bastion needs before it can pull anything. The NetworkManager method would start a
+      SECOND dnsmasq for the same port, which cannot bind -- so the api/api-int records would
+      silently never be served. systemd-service drops its records into /etc/dnsmasq.d alongside
+      the split config and reuses the one running instance.
+  - name: MIRROR_IN_BASTION
+    default: "yes"
+    documentation: |-
+      Mirror from the bastion, not the CI pod. The bastion is the only host with both internet
+      egress (for quay.io) and a route to the cluster subnets.
+  - name: REGISTER_MIRROR_REGISTRY_DNS
+    default: "yes"
+  documentation: |-
+    Installs a disconnected OpenShift cluster on an EMULATED Azure IL6 environment, provided by a
+    third-party emulator (SHIFT / Applied Insight), inside a pre-existing resource group and VNet.
+
+    Two network planes are in play and the split drives the whole chain:
+
+      commercial Azure   management.azure.com, westus2, the azure-qe service principal.
+                         Reachable from a CI pod. Owns the resource group, the VNet, the VPN
+                         gateway, the bastion, and the subnets this chain creates.
+
+      emulated IL6       https://management.azure.microsoft.scloud, ussecwest, the same azure-qe
+                         service principal -- the emulator fronts the same subscription and
+                         relabels westus2 as ussecwest. NOT resolvable or routable from a CI pod,
+                         only from inside the VNet across the IPsec tunnels. Owns the cluster.
+
+    Consequently every step that touches IL6 ARM runs on the bastion over SSH:
+    ipi-install-install-in-bastion for the install, and azure-il6-private-custom-dns for the load
+    balancer lookup that feeds dnsmasq.
+
+    Three resource groups are in play, and keeping them straight is the safety model:
+
+      CI-Azure-IL6-DoNotDelete   permanent, holds infrastructure CI cannot recreate: the VNet, a
+                                 VPN gateway and two configured IPsec tunnels. Reaches
+                                 install-config only as networkResourceGroupName. The only thing
+                                 the run puts in it is two subnets, because a subnet is a child
+                                 resource of the VNet.
+
+      ${NAMESPACE}-${UNIQUE_HASH}-rg
+                                 created per run by azure-provision-resourcegroup. The bastion
+                                 and everything around it live here, and the group is deleted
+                                 wholesale at teardown.
+
+      ${infraID}-rg              created by the installer for the cluster itself, on the emulated
+                                 plane, and destroyed by 'openshift-install destroy'. The
+                                 installer requires the group it is given to be empty, which is
+                                 why neither of the groups above may ever become
+                                 platform.azure.resourceGroupName -- ipi-conf-azureil6 asserts it.
+
+    See azure-il6-deprovision-resources and azure-il6-restore-vnet-dns for the teardown side.

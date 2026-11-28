@@ -1,0 +1,36 @@
+workflow:
+  as: cucushift-installer-rehearse-azure-il6-ipi-disconnected
+  steps:
+    pre:
+      - chain: cucushift-installer-rehearse-azure-il6-ipi-disconnected-provision
+    post:
+      - chain: cucushift-installer-rehearse-azure-il6-ipi-disconnected-deprovision
+  documentation: |-
+    Provisions and deprovisions a disconnected OpenShift cluster on an EMULATED Azure IL6
+    environment (SHIFT / Applied Insight emulator), allowing job authors to inject their own
+    end-to-end test logic.
+
+    Deliberately carries no ReportPortal steps. The consumer is a presubmit in the
+    openshift/installer config, not an openshift-tests-private periodic, and
+    send-results-to-reportportal needs the openshift-qe Vault collection to post results QE
+    reporting has no reason to receive. A later periodic that does want them can wrap this
+    workflow rather than this workflow assuming them.
+
+    The cluster is installed into a pre-existing, permanent resource group and VNet that carry the
+    IPsec tunnels to the emulator. All modifications should be made to the
+    `cucushift-installer-rehearse-azure-il6-ipi-disconnected-{provision,deprovision}` chains so
+    that other workflows can extend this one without backporting changes.
+
+    Uses the azure-qe cluster profile, and only that. An earlier design assumed the emulated plane
+    needed its own service principal from a separate Vault collection; it does not. The emulator
+    fronts the same subscription, so the azure-qe principal authenticates on both planes, and the
+    emulator's CA chain is fetched onto the bastion by azure-il6-bastion-setup rather than mounted.
+
+    This workflow must not be run concurrently with itself. The emulator is one fixture -- one
+    resource group, one VNet, one pair of IPsec tunnels -- and the job rewrites that VNet's
+    dnsServers, which is a single value, so two runs would take it from each other. The cluster
+    profile's own lease does not cover this: it is a region-wide quota slice, not this group.
+
+    Serialisation is a single-slot azure-il6-quota-slice boskos lease, added to the test's
+    `leases:` once that resource type exists in core-ci. Until then, trigger this job one run at a
+    time.
