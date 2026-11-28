@@ -205,7 +205,15 @@ Resources:
     Properties:
       ImageId: !Ref Ami
       IamInstanceProfile: !Ref ProxyInstanceProfile
-      InstanceType: "m5.xlarge"
+      InstanceType: "${PROXY_INSTANCE_TYPE}"
+      BlockDeviceMappings:
+      # Manually copied FCOS AMIs (used in regions where FCOS publishes no
+      # image) carry an ephemeral0 instance-store mapping on /dev/xvdb. Nitro
+      # instance types with no instance store reject that at launch ("Invalid
+      # number of ephemeral devices"), and the proxy does not need instance
+      # store, so suppress it. No-op for AMIs without it.
+      - DeviceName: /dev/xvdb
+        NoDevice: {}
       NetworkInterfaces:
       - AssociatePublicIpAddress: "true"
         DeviceIndex: "0"
@@ -246,14 +254,36 @@ REGION="$(yq-go r "${CONFIG}" 'platform.aws.region')"
 echo Using region: ${REGION}
 test -n "${REGION}"
 
-curl -L -o /tmp/fcos-stable.json https://builds.coreos.fedoraproject.org/streams/stable.json
-AMI=$(jq -r .architectures.x86_64.images.aws.regions[\"${REGION}\"].image < /tmp/fcos-stable.json)
-if [ -z "${AMI}" ]; then
-  echo "Missing AMI in region: ${REGION}" 1>&2
-  exit 1
+if [[ "${REGION}" == "me-west-1" ]]; then
+  # TEMPORARY: me-west-1 region qualification.
+  # Fedora CoreOS stable publishes no AMI in me-west-1, so use a manual
+  # x86_64 copy of the us-east-1 stable image in the QE account. Drop this
+  # branch once FCOS publishes me-west-1 images or the qualification jobs
+  # are retired.
+  AMI="ami-0e378c5cd6ddaef0f"
+  echo "Using pinned FCOS AMI in ${REGION}: ${AMI}"
+else
+  curl -L -o /tmp/fcos-stable.json https://builds.coreos.fedoraproject.org/streams/stable.json
+  AMI=$(jq -r ".architectures.x86_64.images.aws.regions[\"${REGION}\"].image // \"\"" < /tmp/fcos-stable.json)
+  if [ -z "${AMI}" ]; then
+    echo "Missing AMI in region: ${REGION}" 1>&2
+    exit 1
+  fi
+  RELEASE=$(jq -r ".architectures.x86_64.images.aws.regions[\"${REGION}\"].release // \"unknown\"" < /tmp/fcos-stable.json)
+  echo "Using FCOS ${RELEASE} AMI: ${AMI}"
 fi
-RELEASE=$(jq -r .architectures.x86_64.images.aws.regions[\"${REGION}\"].release < /tmp/fcos-stable.json)
-echo "Using FCOS ${RELEASE} AMI: ${AMI}"
+
+PROXY_INSTANCE_TYPE="m5.xlarge"
+if [[ "${REGION}" == "me-west-1" ]]; then
+  # TEMPORARY: me-west-1 region qualification.
+  # The manually copied FCOS AMI used in me-west-1 declares an ephemeral0
+  # instance-store mapping, which Nitro instance types without instance store
+  # reject at launch ("Invalid number of ephemeral devices"), so use an
+  # instance-store-capable type. Drop this branch together with the pinned AMI
+  # above.
+  PROXY_INSTANCE_TYPE="i4i.large"
+fi
+echo "Using proxy instance type: ${PROXY_INSTANCE_TYPE}"
 
 ssh_pub_key=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 

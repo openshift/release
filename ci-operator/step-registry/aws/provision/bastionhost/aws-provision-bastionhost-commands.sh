@@ -14,7 +14,7 @@ trap 'if [[ "$?" == 0 ]]; then EXIT_CODE=0; fi; echo "${EXIT_CODE}" > "${SHARED_
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-REGION=${REGION:-$LEASED_RESOURCE}
+REGION=${AWS_REGION_OVERWRITE:-${REGION:-$LEASED_RESOURCE}}
 
 function save_stack_events_to_artifacts()
 {
@@ -105,6 +105,13 @@ if [[ "${BASTION_HOST_AMI}" == "" ]]; then
     if [[ "${REGION}" == "eusc-de-east-1" ]]; then
       ami_id="ami-0e43802c8b4ad242e"
     fi
+  elif [[ "${REGION}" == "me-west-1" ]]; then
+    # TEMPORARY: me-west-1 region qualification.
+    # Fedora CoreOS stable publishes no AMI in me-west-1, so use a manual
+    # x86_64 copy of the us-east-1 stable image in the QE account. Drop this
+    # branch once FCOS publishes me-west-1 images or the qualification jobs
+    # are retired.
+    ami_id="ami-0e378c5cd6ddaef0f"
   else
     if [[ "${CLUSTER_TYPE}" == "aws-usgov" ]]; then
         bastion_image_list_url="https://raw.githubusercontent.com/openshift/installer/release-4.18/data/data/coreos/rhcos.json"
@@ -150,6 +157,10 @@ BastionHostInstanceType="t2.medium"
 # there is no t2.medium instance type in us-gov-east-1 region
 if [[ "${REGION}" == "us-gov-east-1" ]]; then
     BastionHostInstanceType="t3a.medium"
+# me-west-1 bastion runs a manually copied FCOS AMI that includes an ephemeral0
+# instance store, so it requires an instance-store-capable instance type
+elif [[ "${REGION}" == "me-west-1" ]]; then
+    BastionHostInstanceType="i4i.large"
 # EUSC bastion AMI includes ephemeral0 instance store, requires instance-store-capable instance type
 elif [[ "${REGION}" == "eusc-de-east-1" ]]; then
     # EUSC supports m6id (6th gen) but not m5d (5th gen) instance types
@@ -380,10 +391,17 @@ Resources:
       BlockDeviceMappings:
         !If
           - "UseIgnition"
+          # Manually copied FCOS AMIs (used in regions where FCOS publishes no
+          # image) carry an ephemeral0 instance-store mapping on /dev/xvdb.
+          # Nitro instance types with no instance store reject that at launch
+          # ("Invalid number of ephemeral devices"), and the bastion does not
+          # need instance store, so suppress it. No-op for AMIs without it.
           - - DeviceName: /dev/xvda
               Ebs:
                 VolumeSize: "500"
                 VolumeType: gp2
+            - DeviceName: /dev/xvdb
+              NoDevice: {}
           - - DeviceName: /dev/sda1
               Ebs:
                 VolumeSize: "500"

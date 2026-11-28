@@ -11,8 +11,18 @@ ref:
       cpu: 10m
       memory: 100Mi
   env:
+  - default: ""
+    documentation: When set, overrides LEASED_RESOURCE as the AWS region. Used for
+      region qualification rehearsals.
+    name: AWS_REGION_OVERWRITE
   - name: REGION
     default: ""
     documentation: Use a specific AWS region, overriding the LEASED_RESOURCE environment variable in the cluster_profile.
   documentation: |-
     Delete AWS CloudFormation stacks, e.g, apps dns stack, bastion host stack, vpc stack.
+
+    Stacks are read from ${SHARED_DIR}/to_be_removed_cf_stack_list and deleted in
+    reverse order. An entry is normally a bare stack name, deleted in the job's own
+    region. An entry of the form "<region>:<stack-name>" is deleted in that region
+    instead, for stacks created outside the job's region such as the cross-region
+    peer VPC that serves ec2.<region>.amazonaws.com to a disconnected cluster.

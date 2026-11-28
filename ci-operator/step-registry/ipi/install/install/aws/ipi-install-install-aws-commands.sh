@@ -256,7 +256,7 @@ function create_ingress_dns_record() {
     # Create CloudFormation stack
     local APPS_DNS_STACK_NAME="${CLUSTER_NAME}-apps-dns"
     echo "${APPS_DNS_STACK_NAME}" >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
-    local REGION="${LEASED_RESOURCE}"
+    local REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 
     if [ "${CLUSTER_TYPE}" == "aws" ] || [ "${CLUSTER_TYPE}" == "aws-arm64" ]; then
         local router_lb_hostzone_id

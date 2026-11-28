@@ -28,7 +28,7 @@ rm /tmp/pull-secret
 set -x
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
   source_region=$(jq -r ".\"${REGION}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
   REGION=$source_region

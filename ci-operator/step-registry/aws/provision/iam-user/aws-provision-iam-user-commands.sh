@@ -25,7 +25,7 @@ else
 	unset AWS_CONFIG_FILE || true
 	echo "Using static credentials from ${AWS_SHARED_CREDENTIALS_FILE}"
 fi
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 function run_command() {

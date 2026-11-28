@@ -17,13 +17,34 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
 
-REGION="${LEASED_RESOURCE}"
+REGION="${AWS_REGION_OVERWRITE:-${LEASED_RESOURCE}}"
+
+# Stacks created by this step, as "<region>/<stack-name>" entries, so that the
+# exit trap dumps events for every one of them and not only the last.
+CREATED_STACKS=""
 
 function save_stack_events_to_artifacts()
 {
   set +o errexit
-  aws --region ${REGION} cloudformation describe-stack-events --stack-name ${STACK_NAME} --output json > "${ARTIFACT_DIR}/stack-events-${STACK_NAME}.json"
+  local entry stack_region stack_name
+  for entry in ${CREATED_STACKS}; do
+    stack_region="${entry%%/*}"
+    stack_name="${entry#*/}"
+    aws --region "${stack_region}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json > "${ARTIFACT_DIR}/stack-events-${stack_name}.json"
+  done
   set -o errexit
+}
+
+# Record a stack for event collection and for teardown by aws-deprovision-stacks.
+function register_stack()
+{
+  local stack_region="$1" stack_name="$2"
+  CREATED_STACKS="${CREATED_STACKS} ${stack_region}/${stack_name}"
+  if [[ "${stack_region}" == "${REGION}" ]]; then
+    echo "${stack_name}" >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
+  else
+    echo "${stack_region}:${stack_name}" >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
+  fi
 }
 
 function aws_add_param_to_json() {
@@ -527,7 +548,7 @@ then
 fi
 
 STACK_NAME="${NAMESPACE}-${UNIQUE_HASH}-vpc"
-echo ${STACK_NAME} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
+register_stack "${REGION}" "${STACK_NAME}"
 
 vpc_params="${ARTIFACT_DIR}/vpc_params.json"
 
@@ -678,3 +699,324 @@ do
 done
 cp $vpc_info_json $ARTIFACT_DIR/
 cat $vpc_info_json | jq
+
+# ---------------------------------------------------------------------------
+# Cross-region EC2 API resolution
+#
+# machine-api validates the cluster's region with ec2:DescribeRegions against
+# us-east-1, because an opt-in region cannot be queried through its own
+# endpoint until it is known to be enabled. In a disconnected VPC that call has
+# nowhere to go: the local interface endpoint only serves ${REGION}, and EC2 is
+# not one of the services AWS has enabled for cross-region PrivateLink, so a
+# ServiceRegion endpoint is not available either.
+#
+# Instead stand up a small VPC in the peer region holding an ordinary ec2
+# interface endpoint, peer it with the disconnected VPC, and publish a private
+# hosted zone so ec2.<peer-region>.amazonaws.com resolves to that endpoint's
+# addresses from inside the cluster. The endpoint serves the real AWS
+# certificate for that name, so TLS and SigV4 both validate unchanged, and no
+# egress to the internet is introduced.
+# ---------------------------------------------------------------------------
+
+if [[ -n "${EC2_ENDPOINT_PEER_REGION}" && "${EC2_ENDPOINT_PEER_REGION}" != "${REGION}" ]]; then
+  PEER_REGION="${EC2_ENDPOINT_PEER_REGION}"
+  PEER_VPC_CIDR="${EC2_ENDPOINT_PEER_VPC_CIDR}"
+  PEER_SERVICE_NAME="ec2.${PEER_REGION}.amazonaws.com"
+
+  echo "Provisioning a peer VPC in ${PEER_REGION} so ${PEER_SERVICE_NAME} resolves inside the disconnected VPC"
+
+  # Only some AZs offer the ec2 interface endpoint, and which ones differ per
+  # account, so pick from the service's own list rather than from GetAZs.
+  peer_azs=$(aws --region "${PEER_REGION}" ec2 describe-vpc-endpoint-services \
+    --service-names "com.amazonaws.${PEER_REGION}.ec2" \
+    --query 'ServiceDetails[0].AvailabilityZones' --output text)
+  read -r peer_az1 peer_az2 _ <<< "${peer_azs}" || true
+  if [[ -z "${peer_az1:-}" || -z "${peer_az2:-}" ]]; then
+    echo "Expected at least two availability zones offering com.amazonaws.${PEER_REGION}.ec2, got: ${peer_azs}"
+    exit 1
+  fi
+  echo "Peer endpoint availability zones: ${peer_az1} ${peer_az2}"
+
+  peer_tpl="/tmp/ec2_peer_vpc_tpl.yaml"
+  cat > ${peer_tpl} << 'EOF'
+AWSTemplateFormatVersion: 2010-09-09
+Description: Created by aws-provision-vpc-disconnected (cross-region EC2 endpoint)
+
+Parameters:
+  VpcCidr:
+    Type: String
+    Description: CIDR block for the peer VPC.
+  AvailabilityZone1:
+    Type: String
+  AvailabilityZone2:
+    Type: String
+  PeerVpcId:
+    Type: String
+    Description: ID of the disconnected VPC to peer with.
+  PeerVpcCidr:
+    Type: String
+    Description: CIDR block of the disconnected VPC.
+  PeerRegion:
+    Type: String
+    Description: Region of the disconnected VPC.
+
+Resources:
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      CidrBlock: !Ref VpcCidr
+      Tags:
+      - Key: Name
+        Value: !Join [ "-", [ !Ref "AWS::StackName", "cf" ] ]
+  Subnet1:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 2, 8]]
+      AvailabilityZone: !Ref AvailabilityZone1
+  Subnet2:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 2, 8]]
+      AvailabilityZone: !Ref AvailabilityZone2
+  RouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+  Subnet1RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref Subnet1
+      RouteTableId: !Ref RouteTable
+  Subnet2RouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref Subnet2
+      RouteTableId: !Ref RouteTable
+  EndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Cross-region EC2 endpoint security group
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 443
+        ToPort: 443
+        CidrIp: !Ref PeerVpcCidr
+      VpcId: !Ref VPC
+  ec2Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: false
+      VpcEndpointType: Interface
+      SecurityGroupIds:
+      - !Ref EndpointSecurityGroup
+      SubnetIds:
+      - !Ref Subnet1
+      - !Ref Subnet2
+      ServiceName: !Join
+      - ''
+      - - com.amazonaws.
+        - !Ref 'AWS::Region'
+        - .ec2
+      VpcId: !Ref VPC
+  VpcPeeringConnection:
+    Type: AWS::EC2::VPCPeeringConnection
+    Properties:
+      VpcId: !Ref VPC
+      PeerVpcId: !Ref PeerVpcId
+      PeerRegion: !Ref PeerRegion
+      Tags:
+      - Key: Name
+        Value: !Join [ "-", [ !Ref "AWS::StackName", "pcx" ] ]
+
+Outputs:
+  VpcId:
+    Description: ID of the peer VPC.
+    Value: !Ref VPC
+  RouteTableId:
+    Description: Route table serving the endpoint subnets.
+    Value: !Ref RouteTable
+  VpcPeeringConnectionId:
+    Description: Peering connection to the disconnected VPC.
+    Value: !Ref VpcPeeringConnection
+  EndpointNetworkInterfaceIds:
+    Description: ENIs backing the cross-region ec2 interface endpoint.
+    Value: !Join [ ",", !GetAtt ec2Endpoint.NetworkInterfaceIds ]
+EOF
+
+  PEER_STACK_NAME="${NAMESPACE}-${UNIQUE_HASH}-ec2-peer"
+  register_stack "${PEER_REGION}" "${PEER_STACK_NAME}"
+
+  peer_params="${ARTIFACT_DIR}/ec2_peer_vpc_params.json"
+  aws_add_param_to_json "VpcCidr" "${PEER_VPC_CIDR}" "${peer_params}"
+  aws_add_param_to_json "AvailabilityZone1" "${peer_az1}" "${peer_params}"
+  aws_add_param_to_json "AvailabilityZone2" "${peer_az2}" "${peer_params}"
+  aws_add_param_to_json "PeerVpcId" "${VpcId}" "${peer_params}"
+  aws_add_param_to_json "PeerVpcCidr" "${VpcIpv4CidrBlock}" "${peer_params}"
+  aws_add_param_to_json "PeerRegion" "${REGION}" "${peer_params}"
+
+  aws --region "${PEER_REGION}" cloudformation create-stack \
+    --stack-name "${PEER_STACK_NAME}" \
+    --template-body "$(cat ${peer_tpl})" \
+    --tags "${TAGS}" \
+    --parameters file://${peer_params} &
+  wait "$!"
+  echo "Created peer stack"
+
+  aws --region "${PEER_REGION}" cloudformation wait stack-create-complete --stack-name "${PEER_STACK_NAME}" &
+  wait "$!"
+  echo "Waited for peer stack"
+
+  peer_stack_output="${SHARED_DIR}/ec2_peer_vpc_stack_output"
+  aws --region "${PEER_REGION}" cloudformation describe-stacks --stack-name "${PEER_STACK_NAME}" > "${peer_stack_output}"
+  cp "${peer_stack_output}" "${ARTIFACT_DIR}/"
+
+  function peer_stack_output_value() {
+    jq -r --arg k "$1" '.Stacks[].Outputs[] | select(.OutputKey==$k) | .OutputValue' "${peer_stack_output}"
+  }
+
+  PeerVpcId=$(peer_stack_output_value "VpcId")
+  PeerRouteTableId=$(peer_stack_output_value "RouteTableId")
+  PcxId=$(peer_stack_output_value "VpcPeeringConnectionId")
+  EndpointEniIds=$(peer_stack_output_value "EndpointNetworkInterfaceIds" | tr ',' ' ')
+  echo "PeerVpcId: ${PeerVpcId}"
+  echo "VpcPeeringConnectionId: ${PcxId}"
+
+  # Same-account peering requests are normally auto-accepted, but that is not
+  # guaranteed across regions. Accept from the accepter's region if needed, and
+  # only lay down routes once the connection is actually active.
+  pcx_state=""
+  for _ in $(seq 1 40); do
+    pcx_state=$(aws --region "${PEER_REGION}" ec2 describe-vpc-peering-connections \
+      --vpc-peering-connection-ids "${PcxId}" \
+      --query 'VpcPeeringConnections[0].Status.Code' --output text)
+    [[ "${pcx_state}" == "active" ]] && break
+    if [[ "${pcx_state}" == "pending-acceptance" ]]; then
+      echo "Accepting peering connection ${PcxId} in ${REGION}"
+      aws --region "${REGION}" ec2 accept-vpc-peering-connection \
+        --vpc-peering-connection-id "${PcxId}" > /dev/null || true
+    fi
+    sleep 15
+  done
+  if [[ "${pcx_state}" != "active" ]]; then
+    echo "Peering connection ${PcxId} did not become active, last state: ${pcx_state}"
+    exit 1
+  fi
+  echo "Peering connection ${PcxId} is active"
+
+  # The routes go into their own stacks rather than being created with
+  # ec2 create-route. Nothing is then created out of band, and because
+  # aws-deprovision-stacks deletes in reverse order the routes are removed
+  # before the peering connection they point at.
+  function create_routes_stack() {
+    local stack_region="$1" stack_name="$2" destination_cidr="$3"
+    shift 3
+    local route_table_ids=("$@")
+    local tpl rtb_id idx=0
+    tpl=$(mktemp)
+    {
+      echo "AWSTemplateFormatVersion: 2010-09-09"
+      echo "Description: Created by aws-provision-vpc-disconnected (peering routes)"
+      echo ""
+      echo "Resources:"
+      for rtb_id in "${route_table_ids[@]}"; do
+        idx=$((idx+1))
+        echo "  Route${idx}:"
+        echo "    Type: AWS::EC2::Route"
+        echo "    Properties:"
+        echo "      RouteTableId: ${rtb_id}"
+        echo "      DestinationCidrBlock: ${destination_cidr}"
+        echo "      VpcPeeringConnectionId: ${PcxId}"
+      done
+    } > "${tpl}"
+    cp "${tpl}" "${ARTIFACT_DIR}/${stack_name}-template.yaml"
+
+    register_stack "${stack_region}" "${stack_name}"
+    aws --region "${stack_region}" cloudformation create-stack \
+      --stack-name "${stack_name}" \
+      --template-body "$(cat ${tpl})" \
+      --tags "${TAGS}" &
+    wait "$!"
+    aws --region "${stack_region}" cloudformation wait stack-create-complete --stack-name "${stack_name}" &
+    wait "$!"
+    echo "Routed ${destination_cidr} via ${PcxId} in ${stack_region}: ${route_table_ids[*]}"
+  }
+
+  # Return path in the peer region.
+  create_routes_stack "${PEER_REGION}" "${NAMESPACE}-${UNIQUE_HASH}-ec2-peer-routes" \
+    "${VpcIpv4CidrBlock}" "${PeerRouteTableId}"
+
+  # Forward path from every subnet of the disconnected VPC. The public route
+  # table is included so the bastion resolves the name the same way the nodes
+  # do; the private hosted zone below applies to the whole VPC.
+  local_route_table_ids=("${PublicRouteTableId}")
+  while read -r rtb_id; do
+    if [[ -n "${rtb_id}" ]]; then
+      local_route_table_ids+=("${rtb_id}")
+    fi
+  done < <(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="PrivateRouteTableIds") | .OutputValue' "${SHARED_DIR}/vpc_stack_output" | tr ',' '\n' | cut -d= -f2)
+
+  create_routes_stack "${REGION}" "${NAMESPACE}-${UNIQUE_HASH}-ec2-peer-local-routes" \
+    "${PEER_VPC_CIDR}" "${local_route_table_ids[@]}"
+
+  # Private DNS is disabled on the peer endpoint, so publish the name ourselves
+  # against the endpoint's addresses.
+  endpoint_ips=$(aws --region "${PEER_REGION}" ec2 describe-network-interfaces \
+    --network-interface-ids ${EndpointEniIds} \
+    --query 'NetworkInterfaces[].PrivateIpAddress' --output text)
+  if [[ -z "${endpoint_ips}" ]]; then
+    echo "Could not determine the addresses of the ${PEER_SERVICE_NAME} endpoint"
+    exit 1
+  fi
+  echo "Endpoint addresses for ${PEER_SERVICE_NAME}: ${endpoint_ips}"
+
+  phz_tpl="/tmp/ec2_peer_phz_tpl.yaml"
+  {
+    echo "AWSTemplateFormatVersion: 2010-09-09"
+    echo "Description: Created by aws-provision-vpc-disconnected (private zone for ${PEER_SERVICE_NAME})"
+    echo ""
+    echo "Resources:"
+    echo "  HostedZone:"
+    echo "    Type: AWS::Route53::HostedZone"
+    echo "    Properties:"
+    echo "      Name: ${PEER_SERVICE_NAME}."
+    echo "      HostedZoneConfig:"
+    echo "        Comment: Resolves ${PEER_SERVICE_NAME} to a peered interface endpoint"
+    echo "      VPCs:"
+    echo "      - VPCId: ${VpcId}"
+    echo "        VPCRegion: ${REGION}"
+    echo "  Record:"
+    echo "    Type: AWS::Route53::RecordSet"
+    echo "    Properties:"
+    echo "      HostedZoneId: !Ref HostedZone"
+    echo "      Name: ${PEER_SERVICE_NAME}."
+    echo "      Type: A"
+    echo "      TTL: 60"
+    echo "      ResourceRecords:"
+    for endpoint_ip in ${endpoint_ips}; do
+      echo "      - ${endpoint_ip}"
+    done
+    echo ""
+    echo "Outputs:"
+    echo "  HostedZoneId:"
+    echo "    Value: !Ref HostedZone"
+  } > ${phz_tpl}
+  cp ${phz_tpl} "${ARTIFACT_DIR}/"
+
+  PHZ_STACK_NAME="${NAMESPACE}-${UNIQUE_HASH}-ec2-peer-phz"
+  register_stack "${REGION}" "${PHZ_STACK_NAME}"
+
+  aws --region "${REGION}" cloudformation create-stack \
+    --stack-name "${PHZ_STACK_NAME}" \
+    --template-body "$(cat ${phz_tpl})" \
+    --tags "${TAGS}" &
+  wait "$!"
+  echo "Created private hosted zone stack"
+
+  aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${PHZ_STACK_NAME}" &
+  wait "$!"
+  echo "${PEER_SERVICE_NAME} now resolves to ${endpoint_ips} inside ${VpcId}"
+fi
