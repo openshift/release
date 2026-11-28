@@ -75,10 +75,11 @@ if 'openshift' not in provider['ClientIDList']:
 
 run_id = uuid.uuid4().hex[:16]
 name = 'quay-sts-' + run_id
+second_role = name + '-b'
 state = dict(account=provider_account, region=region, cluster_uid=cluster_uid,
-             run_id=run_id, namespace=name, bucket=name, role=name,
+             run_id=run_id, namespace=name, bucket=name, role=name, second_role=second_role,
              namespace_created=False, bucket_created=False, role_created=False,
-             provider_arn=provider_arn)
+             second_role_created=False, provider_arn=provider_arn)
 save(state)
 
 namespace = json.loads(subprocess.check_output(
@@ -107,32 +108,40 @@ trust = {'Version': '2012-10-17', 'Statement': [{'Effect': 'Allow',
     'Principal': {'Federated': provider_arn}, 'Action': 'sts:AssumeRoleWithWebIdentity',
     'Condition': {'StringEquals': {claim_prefix + ':aud': 'openshift',
         claim_prefix + ':sub': f'system:serviceaccount:{name}:sts-cco-quay-app'}}}]}
-role_args = dict(RoleName=name, AssumeRolePolicyDocument=json.dumps(trust), Tags=tags)
 boundary = os.environ.get('QUAY_STS_PERMISSIONS_BOUNDARY', '')
-if boundary:
-    if not boundary.startswith(f'arn:{partition}:iam::{provider_account}:policy/'):
-        raise RuntimeError('Permissions boundary must be a policy in the cluster AWS account')
-    role_args['PermissionsBoundary'] = boundary
-role = iam.create_role(**role_args)
-state['role_created'] = True
-state['role_arn'] = role['Role']['Arn']
-save(state)
+if boundary and not boundary.startswith(f'arn:{partition}:iam::{provider_account}:policy/'):
+    raise RuntimeError('Permissions boundary must be a policy in the cluster AWS account')
 
 bucket_arn = f'arn:{partition}:s3:::{name}'
 policy = {'Version': '2012-10-17', 'Statement': [
     {'Effect': 'Allow', 'Action': ['s3:ListBucket', 's3:GetBucketLocation', 's3:ListBucketMultipartUploads'], 'Resource': bucket_arn},
     {'Effect': 'Allow', 'Action': ['s3:GetObject', 's3:PutObject', 's3:DeleteObject', 's3:AbortMultipartUpload', 's3:ListMultipartUploadParts'], 'Resource': bucket_arn + '/*'}]}
-for attempt in range(1, 11):
-    try:
-        iam.put_role_policy(
-            RoleName=name, PolicyName='quay-sts-bucket', PolicyDocument=json.dumps(policy))
-        break
-    except ClientError as error:
-        if error.response['Error']['Code'] != 'NoSuchEntity' or attempt == 10:
-            raise
-        time.sleep(attempt)
+
+
+def create_bucket_role(role_name, created_key, arn_key):
+    role_args = dict(RoleName=role_name, AssumeRolePolicyDocument=json.dumps(trust), Tags=tags)
+    if boundary:
+        role_args['PermissionsBoundary'] = boundary
+    role = iam.create_role(**role_args)
+    state[created_key] = True
+    state[arn_key] = role['Role']['Arn']
+    save(state)
+    for attempt in range(1, 11):
+        try:
+            iam.put_role_policy(
+                RoleName=role_name, PolicyName='quay-sts-bucket', PolicyDocument=json.dumps(policy))
+            break
+        except ClientError as error:
+            if error.response['Error']['Code'] != 'NoSuchEntity' or attempt == 10:
+                raise
+            time.sleep(attempt)
+
+
+create_bucket_role(name, 'role_created', 'role_arn')
+create_bucket_role(second_role, 'second_role_created', 'second_role_arn')
 for key, value in {'STS_TEST_NAMESPACE': name, 'STS_S3_BUCKET': name,
-                   'STS_S3_REGION': region, 'STS_ROLE_ARN': state['role_arn']}.items():
+                   'STS_S3_REGION': region, 'STS_ROLE_ARN': state['role_arn'],
+                   'STS_SECOND_ROLE_ARN': state['second_role_arn']}.items():
     (STATE_PATH.parent / key).write_text(value)
 print('Prepared run-owned Quay STS resources')
 PYTHON
