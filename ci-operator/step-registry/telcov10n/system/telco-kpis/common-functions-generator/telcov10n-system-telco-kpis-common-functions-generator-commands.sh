@@ -15,6 +15,23 @@ export ANSIBLE_REMOTE_TMP=/tmp/.ansible/tmp
 MOUNTED_HOST_INVENTORY="/var/host_variables"
 MOUNTED_GROUP_INVENTORY="/var/group_variables"
 
+# Hubs hosted on the hv4 hypervisor; every other hub uses helix117.
+HV4_HUBS="dev-kpi-05 dev-kpi-06 dev-kpi-07 dev-kpi-08"
+
+# select_hypervisor_host_vars <hub_cluster>
+# Returns the mounted host_vars directory for the hub's hypervisor.
+select_hypervisor_host_vars() {
+    local hub_cluster="$1"
+    local candidate
+    for candidate in ${HV4_HUBS}; do
+        if [[ "${hub_cluster}" == "${candidate}" ]]; then
+            echo "${MOUNTED_HOST_INVENTORY}/common/hypervisor-hv4"
+            return 0
+        fi
+    done
+    echo "${MOUNTED_HOST_INVENTORY}/common/hypervisor-helix117"
+}
+
 # ----------------------------------------------------------------------
 # apply_gangway_overrides
 #
@@ -462,9 +479,11 @@ setup_ansible_inventory() {
 
     # Process hypervisor host variables so plays targeting [hypervisor] can resolve the real IP.
     # No setup_direct_ssh here — group_vars/hypervisors provides the SSH key.
-    if [[ -d "${MOUNTED_HOST_INVENTORY}/common/hypervisor" ]]; then
-        echo "Process hypervisor host inventory"
-        process_inventory "${MOUNTED_HOST_INVENTORY}/common/hypervisor" \
+    local hypervisor_host_vars
+    hypervisor_host_vars=$(select_hypervisor_host_vars "${hub_cluster}")
+    if [[ -d "${hypervisor_host_vars}" ]]; then
+        echo "Process hypervisor host inventory: ${hypervisor_host_vars}"
+        process_inventory "${hypervisor_host_vars}" \
             /eco-ci-cd/inventories/ocp-deployment/host_vars/hypervisor
     fi
 
@@ -546,9 +565,11 @@ setup_infra_inventory() {
     echo "Create host_vars directory"
     mkdir -p "${infra_inv}/host_vars"
 
-    if [[ -d "${MOUNTED_HOST_INVENTORY}/common/hypervisor" ]]; then
-        echo "Process hypervisor host inventory"
-        process_inventory "${MOUNTED_HOST_INVENTORY}/common/hypervisor" \
+    local hypervisor_host_vars
+    hypervisor_host_vars=$(select_hypervisor_host_vars "${hub_cluster}")
+    if [[ -d "${hypervisor_host_vars}" ]]; then
+        echo "Process hypervisor host inventory: ${hypervisor_host_vars}"
+        process_inventory "${hypervisor_host_vars}" \
             "${infra_inv}/host_vars/hypervisor"
     fi
 

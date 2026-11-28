@@ -10,7 +10,11 @@ ref:
   env:
     - name: HUB_CLUSTER
       default: "kni-qe-70"
-      documentation: Hub cluster name to deploy (dev-kpi-01, dev-kpi-02, dev-kpi-03, dev-kpi-04, kni-qe-70, kni-qe-71)
+      documentation: |-
+        Hub cluster name to deploy. Supported values:
+        dev-kpi-01, dev-kpi-02, dev-kpi-03, dev-kpi-04 (helix117 hypervisor),
+        dev-kpi-05, dev-kpi-06, dev-kpi-07, dev-kpi-08 (hv4 hypervisor),
+        kni-qe-70, kni-qe-71 (helix117 hypervisor)
     - name: MULTISTAGE_PARAM_OVERRIDE_HUB_CLUSTER
       default: ""
       documentation: |-
@@ -63,10 +67,15 @@ ref:
         Release resolution precedence: hub_lockdown_uri > ocp_release_image > version.
         Values are exported as uppercase env vars.
   credentials:
-    # Common hypervisor host variables (needed for Virtual Control Plane play in deploy-ocp-sno.yml)
+    # Hypervisor: helix117 (default for all hubs except dev-kpi-05..08)
+    # Needed for the Virtual Control Plane play in deploy-ocp-sno.yml.
     - namespace: test-credentials
       name: telcov10n-ansible-hypervisors-helix117
-      mount_path: /var/host_variables/common/hypervisor
+      mount_path: /var/host_variables/common/hypervisor-helix117
+    # Hypervisor: hv4 (used by dev-kpi-05..08 hubs)
+    - namespace: test-credentials
+      name: telcov10n-ansible-hypervisors-hv4
+      mount_path: /var/host_variables/common/hypervisor-hv4
 
     # Common group variables
     - namespace: test-credentials
@@ -228,6 +237,58 @@ ref:
     - namespace: test-credentials
       name: telcov10n-ansible-group-dev-kpi-04-nodes
       mount_path: /var/group_variables/dev-kpi-04/nodes
+    # Hub dev-kpi-05 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-05-bastion
+      mount_path: /var/host_variables/dev-kpi-05/bastion
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-05-master0
+      mount_path: /var/host_variables/dev-kpi-05/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-05-masters
+      mount_path: /var/group_variables/dev-kpi-05/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-05-nodes
+      mount_path: /var/group_variables/dev-kpi-05/nodes
+    # Hub dev-kpi-06 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-06-bastion
+      mount_path: /var/host_variables/dev-kpi-06/bastion
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-06-master0
+      mount_path: /var/host_variables/dev-kpi-06/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-06-masters
+      mount_path: /var/group_variables/dev-kpi-06/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-06-nodes
+      mount_path: /var/group_variables/dev-kpi-06/nodes
+    # Hub dev-kpi-07 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-07-bastion
+      mount_path: /var/host_variables/dev-kpi-07/bastion
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-07-master0
+      mount_path: /var/host_variables/dev-kpi-07/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-07-masters
+      mount_path: /var/group_variables/dev-kpi-07/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-07-nodes
+      mount_path: /var/group_variables/dev-kpi-07/nodes
+    # Hub dev-kpi-08 credentials
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-08-bastion
+      mount_path: /var/host_variables/dev-kpi-08/bastion
+    - namespace: test-credentials
+      name: telcov10n-ansible-dev-kpi-08-master0
+      mount_path: /var/host_variables/dev-kpi-08/master0
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-08-masters
+      mount_path: /var/group_variables/dev-kpi-08/masters
+    - namespace: test-credentials
+      name: telcov10n-ansible-group-dev-kpi-08-nodes
+      mount_path: /var/group_variables/dev-kpi-08/nodes
   documentation: |-
     Deploy Single Node OpenShift (SNO) hub cluster using assisted installer.
     Creates hub cluster that will manage spoke deployments via ZTP.
