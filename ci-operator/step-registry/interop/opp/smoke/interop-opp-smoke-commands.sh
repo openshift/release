@@ -23,6 +23,7 @@ _opp_cleanup() {
     cp "${_xtrace_log}" "${ARTIFACT_DIR}/" 2>/dev/null || true
     echo ">>> TRACE: xtrace log saved to artifacts (exit code ${_exit_code})"
   fi
+  rm -rf "${_opp_smoke_tmp:-}" 2>/dev/null || true
 }
 trap '_opp_cleanup' EXIT
 
@@ -54,11 +55,14 @@ fi
 # TestGrid.
 # ---------------------------------------------------------------------------
 
-# NOTE: OPP_OPERATORS and SMOKE_SETTLE_SECONDS may be set via workflow env (naming deviates from OPP__ convention)
-OPP_OPERATORS="${OPP_OPERATORS:-advanced-cluster-management,rhacs-operator,odf-operator,quay-operator}"
-SMOKE_SETTLE_SECONDS="${SMOKE_SETTLE_SECONDS:-120}"
+# Step-config-declared variables (CIOP-4 double-underscore names). Values live
+# only in the step ref YAML (CIOP-5.3: no script-side defaults).
+: "${INTEROP__OPP__SMOKE__OPERATORS:?}"
+: "${INTEROP__OPP__SMOKE__SETTLE_SECONDS:?}"
 
 typeset junitFile="${ARTIFACT_DIR}/junit_opp_smoke.xml"
+# Scratch space for oc stderr captures (CRD-absence classification).
+_opp_smoke_tmp="$(mktemp -d)"
 
 # Accumulators for JUnit generation
 typeset -a tcNamesArr=()
@@ -112,6 +116,13 @@ WriteJunit() {
     {
         echo '<?xml version="1.0" encoding="UTF-8"?>'
         echo "<testsuite name=\"lp-interop--OPP--smoke\" tests=\"${total}\" failures=\"${failCount}\" skipped=\"${skipCount}\">"
+        # Effective configuration in the JUnit carrier: publish what actually ran.
+        # Lane overrides must use the CIOP-4 names asserted above; the pre-rename
+        # OPP_OPERATORS and SMOKE_SETTLE_SECONDS no longer reach this step.
+        echo "  <properties>"
+        echo "    <property name=\"opp_operators\" value=\"$(XmlEscape "${INTEROP__OPP__SMOKE__OPERATORS}")\"/>"
+        echo "    <property name=\"smoke_settle_seconds\" value=\"$(XmlEscape "${INTEROP__OPP__SMOKE__SETTLE_SECONDS}")\"/>"
+        echo "  </properties>"
         for i in "${!tcNamesArr[@]}"; do
             typeset name=""
             name="$(XmlEscape "${tcNamesArr[$i]}")"
@@ -250,18 +261,22 @@ TestOppOperators() {
     typeset failMsg=""
 
     typeset -a operatorsArr=()
-    IFS=',' read -ra operatorsArr <<< "${OPP_OPERATORS}"
+    IFS=',' read -ra operatorsArr <<< "${INTEROP__OPP__SMOKE__OPERATORS}"
     for op in "${operatorsArr[@]}"; do
         op="$(echo "${op}" | xargs)"  # trim whitespace
         : "Checking operator: ${op}"
 
-        # Find CSV matching this operator prefix
+        # Find CSV matching this operator prefix. The jq array + `first`
+        # form is pipefail-safe: `jq | head -1` raced SIGPIPE under
+        # `set -o pipefail` and surfaced as spurious "Failed to query CSVs"
+        # on healthy clusters (INTEROP-9670).
         typeset csvInfo=""
         if ! csvInfo="$(oc get csv --all-namespaces -o json | jq -r --arg prefix "${op}" '
-            .items[]
-            | select(.metadata.name | startswith($prefix))
-            | "\(.metadata.namespace)/\(.metadata.name)/\(.status.phase)"
-        ' | head -1)"; then
+            [ .items[]
+              | select(.metadata.name | startswith($prefix))
+              | "\(.metadata.namespace)/\(.metadata.name)/\(.status.phase)" ]
+            | first // empty
+        ')"; then
             typeset apiMsg="Failed to query CSVs for ${op}"
             : "FAIL: ${apiMsg}"
             if [[ -n "${failMsg}" ]]; then failMsg="${failMsg}; ${apiMsg}"; else failMsg="${apiMsg}"; fi
@@ -297,8 +312,8 @@ TestOppOperators() {
         fi
 
         # Check pods are Ready in the operator namespace (with settling window)
-        : "Waiting ${SMOKE_SETTLE_SECONDS}s settling window for pods in ${csvNs}..."
-        sleep "${SMOKE_SETTLE_SECONDS}"
+        : "Waiting ${INTEROP__OPP__SMOKE__SETTLE_SECONDS}s settling window for pods in ${csvNs}..."
+        sleep "${INTEROP__OPP__SMOKE__SETTLE_SECONDS}"
 
         typeset notReadyPods=""
         if ! notReadyPods="$(oc get pods -n "${csvNs}" -o json | jq -r '
@@ -349,9 +364,15 @@ TestAcmConnectivity() {
     fi
     typeset failMsg=""
 
-    # Check if ManagedCluster resources exist
+    # Check if ManagedCluster resources exist. A resource type the API
+    # server does not serve is a skip, not a failure (INTEROP-9670).
     typeset -i mcCount=0
-    if ! mcCount=$(oc get managedclusters -o json | jq '.items | length'); then
+    if ! mcCount="$(oc get managedclusters -o json 2>"${_opp_smoke_tmp}/mc.err" | jq '.items | length')"; then
+        if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/mc.err"; then
+            : "SKIP: managedclusters CRD not served by this cluster"
+            AddResult "acm-connectivity" "skip" "managedclusters CRD not served by this cluster"
+            return
+        fi
         AddResult "acm-connectivity" "fail" "Failed to query ManagedClusters"
         return
     fi
@@ -402,12 +423,20 @@ TestAcsSensors() {
     fi
     typeset failMsg=""
 
-    # Check SecuredCluster CR status first
+    # Check SecuredCluster CR status first. A resource type the API server
+    # does not serve is a skip; the jq array + `first` form keeps the query
+    # pipefail-safe (INTEROP-9670).
     typeset scStatus=""
-    if ! scStatus="$(oc get securedclusters.platform.stackrox.io --all-namespaces -o json | jq -r '
-        .items[]
-        | "\(.metadata.namespace)/\(.metadata.name)/\(.status.conditions // [] | map(select(.type=="Deployed" or .type=="Initialized")) | map(.status) | join(","))"
-    ' | head -1)"; then
+    if ! scStatus="$(oc get securedclusters.platform.stackrox.io --all-namespaces -o json 2>"${_opp_smoke_tmp}/sc.err" | jq -r '
+        [ .items[]
+          | "\(.metadata.namespace)/\(.metadata.name)/\(.status.conditions // [] | map(select(.type=="Deployed" or .type=="Initialized")) | map(.status) | join(","))" ]
+        | first // empty
+    ')"; then
+        if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/sc.err"; then
+            : "SKIP: securedclusters CRD not served by this cluster"
+            AddResult "acs-sensors" "skip" "securedclusters CRD not served by this cluster"
+            return
+        fi
         AddResult "acs-sensors" "fail" "Failed to query SecuredCluster resources"
         return
     fi
@@ -419,11 +448,22 @@ TestAcsSensors() {
         scConds="$(echo "${scStatus}" | cut -d/ -f3)"
         : "SecuredCluster ${scName} in ${scNs}: conditions=${scConds}"
 
-        # Verify sensor pods are Running in the SecuredCluster namespace
+        # Verify sensor pods are Running in the SecuredCluster namespace.
+        # A failed query is classified separately from an empty list: the
+        # previous `|| true` collapsed an API error and a genuinely empty
+        # result into the same "No sensor pods found" verdict, which is the
+        # masked failure the SecuredCluster query above already avoids.
         typeset sensorStatus=""
-        sensorStatus="$(oc get pods -n "${scNs}" -l app=sensor -o json | jq -r '
+        if ! sensorStatus="$(oc get pods -n "${scNs}" -l app=sensor -o json 2>"${_opp_smoke_tmp}/sensor.err" | jq -r '
             .items[] | "\(.metadata.name):\(.status.phase)"
-        ')" || true
+        ')"; then
+            if grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/sensor.err"; then
+                AddResult "acs-sensors" "skip" "pods resource not served by this cluster"
+                return
+            fi
+            AddResult "acs-sensors" "fail" "Failed to query sensor pods in ${scNs}"
+            return
+        fi
 
         if [[ -z "${sensorStatus}" ]]; then
             failMsg="No sensor pods found in ${scNs}"
@@ -441,9 +481,12 @@ TestAcsSensors() {
     else
         # No SecuredCluster CR; check if ACS operator is even installed
         typeset acsCsv=""
-        acsCsv="$(oc get csv --all-namespaces -o json | jq -r '
-            .items[] | select(.metadata.name | startswith("rhacs-operator")) | .metadata.name
-        ' | head -1)" || true
+        if ! acsCsv="$(oc get csv --all-namespaces -o json | jq -r '
+            [ .items[] | select(.metadata.name | startswith("rhacs-operator")) | .metadata.name ] | first // empty
+        ')"; then
+            AddResult "acs-sensors" "fail" "Failed to query CSVs for ACS operator"
+            return
+        fi
 
         if [[ -z "${acsCsv}" ]]; then
             : "SKIP: ACS operator not installed"
@@ -482,11 +525,12 @@ TestQuayPull() {
     typeset quayRoute=""
     set +x  # suppress xtrace — route hostnames are sensitive
     if ! quayRoute="$(oc get routes --all-namespaces -o json | jq -r '
-        .items[]
-        | select(.metadata.name | test("quay"; "i"))
-        | select(.spec.host | test("quay"; "i"))
-        | .spec.host
-    ' | head -1)"; then
+        [ .items[]
+          | select(.metadata.name | test("quay"; "i"))
+          | select(.spec.host | test("quay"; "i"))
+          | .spec.host ]
+        | first // empty
+    ')"; then
         : "Route query failed, trying QuayRegistry CR..."
     fi
     set -x
@@ -494,7 +538,7 @@ TestQuayPull() {
     if [[ -z "${quayRoute}" ]]; then
         # Try looking for QuayRegistry CR to find the route
         set +x  # suppress xtrace — registry endpoint URLs are sensitive
-        if ! quayRoute="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json | jq -r '
+        if ! quayRoute="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json 2>"${_opp_smoke_tmp}/qr.err" | jq -r '
             .items[0].status.registryEndpoint // empty
         ' | sed 's|^https://||')"; then
             : "QuayRegistry CR query failed"
@@ -503,22 +547,41 @@ TestQuayPull() {
     fi
 
     if [[ -z "${quayRoute}" ]]; then
-        # Check if Quay operator is even installed
-        typeset quayCsv=""
-        if ! quayCsv="$(oc get csv --all-namespaces -o json | jq -r '
-            .items[] | select(.metadata.name | startswith("quay-operator")) | .metadata.name
-        ' | head -1)"; then
-            AddResult "quay-pull" "fail" "Failed to query CSVs for Quay operator"
+        # Distinguish "no QuayRegistry CR deployed on this lane" (operator-
+        # only install: nothing to pull - skip) from "registry deployed but
+        # route missing" (genuine failure) (INTEROP-9670).
+        typeset -i qrCount=0
+        if ! qrCount="$(oc get quayregistries.quay.redhat.com --all-namespaces -o json 2>"${_opp_smoke_tmp}/qr.err" | jq '.items | length')"; then
+            if ! grep -q "the server doesn't have a resource type" "${_opp_smoke_tmp}/qr.err"; then
+                AddResult "quay-pull" "fail" "Failed to query QuayRegistry resources"
+                return
+            fi
+            qrCount=0
+        fi
+
+        if (( qrCount == 0 )); then
+            # Check if Quay operator is even installed
+            typeset quayCsv=""
+            if ! quayCsv="$(oc get csv --all-namespaces -o json | jq -r '
+                [ .items[] | select(.metadata.name | startswith("quay-operator")) | .metadata.name ] | first // empty
+            ')"; then
+                AddResult "quay-pull" "fail" "Failed to query CSVs for Quay operator"
+                return
+            fi
+
+            if [[ -z "${quayCsv}" ]]; then
+                : "SKIP: Quay operator not installed"
+                AddResult "quay-pull" "skip" "Quay operator not installed"
+                return
+            fi
+
+            failMsg="Quay operator installed but no QuayRegistry CR deployed on this lane"
+            : "SKIP: ${failMsg}"
+            AddResult "quay-pull" "skip" "${failMsg}"
             return
         fi
 
-        if [[ -z "${quayCsv}" ]]; then
-            : "SKIP: Quay operator not installed"
-            AddResult "quay-pull" "skip" "Quay operator not installed"
-            return
-        fi
-
-        failMsg="Quay operator installed but no registry route found"
+        failMsg="QuayRegistry present but no registry route found"
         : "FAIL: ${failMsg}"
         AddResult "quay-pull" "fail" "${failMsg}"
         return
@@ -559,8 +622,8 @@ Main() {
     fi
 
     echo ">>> PHASE: OPP Smoke Tests starting"
-    : "Operators: ${OPP_OPERATORS}"
-    : "Settle window: ${SMOKE_SETTLE_SECONDS}s"
+    : "Operators: ${INTEROP__OPP__SMOKE__OPERATORS}"
+    : "Settle window: ${INTEROP__OPP__SMOKE__SETTLE_SECONDS}s"
     : "Artifacts dir: ${ARTIFACT_DIR}"
 
     TestClusterHealth      || true
