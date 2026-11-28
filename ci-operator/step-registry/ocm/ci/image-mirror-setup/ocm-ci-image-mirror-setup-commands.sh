@@ -108,51 +108,7 @@ if [[ -z "$IMAGE_TAG" ]]; then
 fi
 log "INFO Image tag is $IMAGE_TAG"
 
-# Setup registry credentials
-REGISTRY_TOKEN_FILE="$SECRETS_PATH/$REGISTRY_SECRET/$REGISTRY_SECRET_FILE"
-
-if [[ ! -r "$REGISTRY_TOKEN_FILE" ]]; then
-    log "ERROR Registry secret file not found: $REGISTRY_TOKEN_FILE"
-    exit 1
-fi
-
-config_file="$HOME/.docker/config.json"
-base64 -d <"$REGISTRY_TOKEN_FILE" >"$config_file" || {
-    log "ERROR Could not base64 decode registry secret file"
-    log "      From: $REGISTRY_TOKEN_FILE"
-    log "      To  : $config_file"
-}
-
-# Build destination image reference
-DESTINATION_IMAGE_REF="$REGISTRY_HOST/$REGISTRY_ORG/$IMAGE_REPO:$IMAGE_TAG"
-
-log "INFO Mirroring Image"
-log "     From: $SOURCE_IMAGE_REF"
-log "     To  : $DESTINATION_IMAGE_REF"
-
-mirror_log="${ARTIFACT_DIR}/oc-mirror-output.log"
-
-for i in {1..6}; do
-    if ! oc image mirror --keep-manifest-list=true "$SOURCE_IMAGE_REF" "$DESTINATION_IMAGE_REF" 1>${mirror_log}; then
-        log "ERROR Unable to mirror image"
-    fi
-
-    # The stdout output of `oc image mirror` is:
-    # <sha> <image-repo>:<tag>
-    # If it's empty, it's probable nothing was mirrored
-    if [[ -n "$(cat ${mirror_log})" ]]; then
-        break
-    fi
-
-    log "WARN Nothing mirrored: oc image mirror log is empty."
-
-    if [[ "${i}" == "6" ]]; then
-        log "ERROR failed to complete mirroring"
-        exit 1
-    fi
-
-    log "INFO Retrying (${i} of 5) ..."
-    sleep 60
-done
-
-log "INFO Mirroring complete."
+# Later steps run in a separate container. ci-operator only shares files in SHARED_DIR.
+printf '%s' "$IMAGE_REPO" > "${SHARED_DIR}/IMAGE_REPO"
+printf '%s' "$IMAGE_TAG" > "${SHARED_DIR}/IMAGE_TAG"
+log "INFO Wrote IMAGE_REPO and IMAGE_TAG to SHARED_DIR"
