@@ -1,0 +1,38 @@
+workflow:
+  as: kit-it
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: kit-infra-aws-ec2
+    test:
+    - ref: kit-it-demo
+    post:
+    - ref: aws-deprovision-stacks
+  documentation: |-
+    Integration testing flow for kit
+    (https://github.com/openshift-eng/kubernetes-integration-testing) on a
+    standalone AWS EC2 host.
+
+    pre: kit-infra-aws-ec2 provisions the host (Ubuntu 24.04 LTS with
+    rootless Podman and its API socket, the kit CLI and kubectl) and
+    exports ${SHARED_DIR}/public_address and ${SHARED_DIR}/ssh_user.
+    test: kit-it-demo runs the kit README quickstart; when the run
+    provides a release image (RELEASE_IMAGE_LATEST) it deploys the MCO
+    from it through the README deployment plan and asserts its health,
+    otherwise it exercises the basic cluster lifecycle. post:
+    aws-deprovision-stacks removes the CloudFormation stack.
+
+    Requires an AWS cluster_profile (for example openshift-org-aws)
+    providing ${CLUSTER_PROFILE_DIR}/.awscred and the SSH key pair.
+
+    Consumers extend the flow with their own test steps. Note that a test
+    list in the consumer configuration replaces the workflow's test chain,
+    so keep the demo in the list to run it before the consumer steps on
+    the same host:
+
+      steps:
+        cluster_profile: openshift-org-aws
+        workflow: kit-it
+        test:
+        - ref: kit-it-demo
+        - ref: <consumer-test-step>
