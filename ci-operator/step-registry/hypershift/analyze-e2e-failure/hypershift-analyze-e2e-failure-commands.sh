@@ -30,7 +30,15 @@ run_claude_metered() {
   local out_file="$1"; shift
   local raw rc=0 timeout_cmd=()
   raw="$(mktemp)"
-  [ -n "${CLAUDE_TIMEOUT:-}" ] && timeout_cmd=(timeout "${CLAUDE_TIMEOUT}")
+  # Bound the run so it cannot hold the job's lease for the whole step timeout.
+  # Skip the wrapper rather than fail the step if coreutils' timeout is absent.
+  if [ -n "${CLAUDE_TIMEOUT:-}" ]; then
+    if command -v timeout >/dev/null 2>&1; then
+      timeout_cmd=(timeout "${CLAUDE_TIMEOUT}")
+    else
+      echo "WARNING: CLAUDE_TIMEOUT=${CLAUDE_TIMEOUT} set but 'timeout' not found; running unbounded" >&2
+    fi
+  fi
   "${timeout_cmd[@]}" agentic-ci run \
     --backend local \
     --harness claude-code \
@@ -81,15 +89,29 @@ ARTIFACTS_BASE="${GCSWEB_BASE}/${GCS_BUCKET_PATH}/artifacts/${JOB_NAME_SHORT}"
 # The test step's sidecar uploads artifacts to GCS asynchronously.
 # Artifacts may not be available yet when this post-step starts,
 # so we need to poll until they appear.
-
+#
+# Keep this wait short. ci-operator wraps the whole multi-stage test in a lease
+# (pkg/steps/lease.go acquires before `pre` and releases after the last `post`
+# step), so every second spent here holds the job's cluster-profile quota slice
+# -- an AWS slice out of a pool of 30 -- and keeps it away from another job.
+#
+# The poll only needs to cover the gap between the test step's pod terminating
+# and its sidecar finishing the upload, which is seconds. The case it must not
+# pay full price for is a job that failed in `pre`: the test step never ran,
+# finished.json will never appear, and the old 600s ceiling was burned in full
+# before exiting without any analysis. That is the common case exactly when the
+# AWS pool is already exhausted, so the old value fed the contention it was
+# caught in. Nothing distinguishes "not uploaded yet" from "never ran" -- a
+# step's build-log.txt and finished.json are uploaded together when it ends,
+# and no started.json is written per step -- so the wait is simply bounded.
 # Known test step names used by workflows that include this analyzer.
 TEST_STEPS="hypershift-aws-run-e2e-nested hypershift-azure-run-e2e hypershift-azure-run-e2e-self-managed"
 
 echo "Waiting for test step artifacts in GCS..."
 FAILURE_DETECTED=false
 FAILED_STEP=""
-MAX_WAIT=600  # 10 minutes max wait for sidecar to upload finished.json
-POLL_INTERVAL=15
+MAX_WAIT=120  # 2 minutes; the upload takes seconds, see the note above
+POLL_INTERVAL=10
 WAITED=0
 
 while [[ $WAITED -lt $MAX_WAIT ]]; do
@@ -112,7 +134,9 @@ while [[ $WAITED -lt $MAX_WAIT ]]; do
 done
 
 if [[ "$FAILURE_DETECTED" == "false" ]]; then
-  echo "Timed out waiting for test step artifacts after ${WAITED}s — skipping analysis."
+  echo "No finished.json for any of [${TEST_STEPS}] after ${WAITED}s — skipping analysis."
+  echo "This is expected when the job failed before the test phase (so the test step never ran),"
+  echo "and when the test step is not one this analyzer knows about."
   exit 0
 fi
 

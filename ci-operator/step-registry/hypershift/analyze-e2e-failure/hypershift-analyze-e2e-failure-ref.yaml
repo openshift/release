@@ -3,7 +3,11 @@ ref:
   from: claude-ai-helpers
   best_effort: true
   commands: hypershift-analyze-e2e-failure-commands.sh
-  timeout: 30m0s
+  # The job's cluster-profile lease is held until the last post step finishes,
+  # so this step's ceiling is lease time taken from the pool. The budget is
+  # 2m of waiting for artifacts plus CLAUDE_TIMEOUT for the analysis itself,
+  # which fits inside 20m with room for image pull and the git clone.
+  timeout: 20m0s
   grace_period: 30s
   env:
   - name: CLAUDE_CODE_USE_VERTEX
@@ -26,6 +30,13 @@ ref:
     default: "claude-opus-4-6"
     documentation: |-
       Claude model to use for test failure analysis.
+  - name: CLAUDE_TIMEOUT
+    default: "15m"
+    documentation: |-
+      Wall-clock ceiling for the analysis run, as a `timeout` duration.
+      Bounded because the job's cluster-profile lease is held until this
+      post step finishes. A run cut off here still exits 0: the step is
+      best_effort and only the analysis report is lost.
   resources:
     requests:
       cpu: 100m
