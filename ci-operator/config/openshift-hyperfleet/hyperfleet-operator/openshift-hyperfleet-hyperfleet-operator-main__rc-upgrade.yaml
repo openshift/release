@@ -1,0 +1,48 @@
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.26-openshift-4.23 AS go-builder
+      FROM registry.ci.openshift.org/ci/nested-podman@sha256:bb58be3e12f647268c1db834de02b8c23f2aa4164b0b7acdef31a6ddd170e728
+      USER root
+      COPY --from=go-builder /usr/lib/golang /usr/local/go
+      ENV PATH="/usr/local/go/bin:${PATH}"
+      RUN dnf install -y ca-certificates curl git jq make python3 python3-pyyaml && dnf clean all
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: rc-olm-upgrade
+  capabilities:
+  - nested-podman
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.22"
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#hyperfleet-e2e-status'
+    job_states_to_report:
+    - success
+    - failure
+    - error
+    report_template: |-
+      {{if eq .Status.State "success"}}:white_check_mark:{{else}}:x:{{end}} *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+      Build: #{{.Status.BuildID}}
+      Details: <{{.Status.URL}}|View logs> · <https://prow.ci.openshift.org/job-history/gs/test-platform-results-public/logs/{{.Spec.Job}}|View history>
+  steps:
+    test:
+    - ref: openshift-hyperfleet-operator-upgrade-test
+    workflow: generic-claim
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-hyperfleet
+  repo: hyperfleet-operator
+  variant: rc-upgrade
