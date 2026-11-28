@@ -3,6 +3,10 @@ base_images:
     name: cli-operator-sdk
     namespace: ocp
     tag: v1.30.0
+  golang:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.23-openshift-4.19
   must-gather:
     name: "4.15"
     namespace: ocp
@@ -24,7 +28,7 @@ images:
       RUN microdnf install -y make git python3 python3-pip nodejs npm
       RUN pip3 install pre-commit
 
-      COPY --from=root:current /usr/lib/golang /usr/local/go
+      COPY --from=golang /usr/lib/golang /usr/local/go
       ENV PATH=$PATH:/usr/local/go/bin
 
       ENV GOPATH=/tmp/go
@@ -42,9 +46,9 @@ images:
           chmod -R 777 /.cache
     from: ubi_minimal
     inputs:
-      root:
+      golang:
         as:
-        - root:current
+        - golang
     to: lvms-pre-commit
   - dockerfile_path: Dockerfile
     from: ubi_minimal
