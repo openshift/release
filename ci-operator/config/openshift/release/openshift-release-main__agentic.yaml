@@ -25,7 +25,7 @@ images:
       USER root
       RUN dnf install -y 'dnf-command(config-manager)' && \
           dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo && \
-          dnf install -y podman fuse-overlayfs shadow-utils openssl python3-pip python3.12 python3.12-pip jq make git gh && \
+          dnf install -y podman fuse-overlayfs shadow-utils openssl python3-pip python3.12 python3.12-pip jq make git gh util-linux && \
           dnf clean all
       RUN useradd --create-home --uid 1000 --gid 0 vscode && \
           git config --system --add safe.directory /workspace && \
@@ -38,6 +38,20 @@ images:
           chmod +rx /entrypoint.sh
       RUN mkdir -p /workspace && chgrp 0 /workspace && chmod g=u /workspace
       COPY --from=ai-helpers /opt/ai-helpers /opt/ai-helpers
+      ARG CODEX_VERSION=0.149.0
+      RUN case "$(uname -m)" in \
+            x86_64) CODEX_ARCH=x86_64; CODEX_SHA256=1c08ba262820b78d49ea7a93f326b6b430b72e5fe46830e433edef12e5123244 ;; \
+            aarch64) CODEX_ARCH=aarch64; CODEX_SHA256=dac03e4db966e94f7083b9eb9f95d8b40da9d568fd2fdbb6885b0ea7d5b0d97f ;; \
+            *) echo "Unsupported architecture" >&2; exit 1 ;; \
+          esac && \
+          curl -fsSL --retry 3 --retry-delay 5 \
+            "https://github.com/openai/codex/releases/download/rust-v${CODEX_VERSION}/codex-package-${CODEX_ARCH}-unknown-linux-musl.tar.gz" \
+            -o /tmp/codex.tar.gz && \
+          echo "${CODEX_SHA256}  /tmp/codex.tar.gz" | sha256sum -c - && \
+          mkdir -p /opt/codex && \
+          tar -xzf /tmp/codex.tar.gz -C /opt/codex && \
+          unlink /tmp/codex.tar.gz && \
+          /opt/codex/bin/codex --version
       RUN mkdir -p /home/vscode/.claude/plugins
       COPY --from=ai-helpers /home/claude/.claude/plugins/known_marketplaces.json /home/vscode/.claude/plugins/known_marketplaces.json
       RUN chgrp -R 0 /opt/ai-helpers /home/vscode/.claude && chmod -R g=u /opt/ai-helpers /home/vscode/.claude
