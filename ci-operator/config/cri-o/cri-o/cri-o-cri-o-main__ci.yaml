@@ -50,6 +50,30 @@ tests:
   steps:
     cluster_profile: openshift-org-gcp
     workflow: cri-o-rhel-critest
+- always_run: false
+  as: rhel-critest-jobs2-wif
+  cluster: build07
+  optional: true
+  restrict_network_access: true
+  steps:
+    cluster_profile: openshift-org-aws
+    env:
+      CRIO_JOBS2_WIF: "true"
+      IMAGE_FAMILY: crio-setup
+      IMAGE_PROJECT: openshift-node-devel
+    leases:
+    - env: JOBS2_INSTALL_SLOT
+      resource_type: openshift-org-gcp--gcp-openshift-gce-devel-ci-2--install-quota-slice
+    post:
+    - ref: cri-o-gather
+    - ref: gcp-crio-wif-cleanup
+    pre:
+    - ref: gcp-crio-wif-prepare
+    - ref: gcp-crio-provision-vpc
+    - ref: gcp-crio-provision-buildhost
+    test:
+    - ref: cri-o-common-test
+    - ref: cri-o-rhel-critest-test
 - as: rhel-e2e
   steps:
     cluster_profile: openshift-org-gcp
