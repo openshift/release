@@ -1,0 +1,34 @@
+ref:
+  as: hypershift-kubevirt-localnet-ipecho
+  from: cli
+  grace_period: 1m0s
+  timeout: 10m0s
+  commands: hypershift-kubevirt-localnet-ipecho-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    PLACEHOLDER - currently a no-op.
+
+    Reserved for deploying an IP-echo service that guest-cluster pods can reach,
+    so EgressIP tests can verify the source address their traffic leaves with.
+
+    The previous implementation lived inside hypershift-kubevirt-create and put a
+    pod on the management cluster attached to the guest localnet via its own NAD.
+    That is unworkable: ovnkube-control-plane rejects a second NAD for an OVN
+    network that already has one ("CNI config does not match that of network
+    <physnet>"), and Multus namespaceIsolation forbids referencing the original
+    NAD from another namespace. Pods therefore never got an OVN annotation and
+    stalled in ContainerCreating.
+
+    The agreed direction is to run the echo service on the bastion, which removes
+    the NAD, namespace, PodSecurity and scheduling concerns entirely and matches
+    the existing pattern in openshift-qe/egress-ip-bastion-echo-deploy (agnhost
+    netexec, /clientip). That ref needs generalising for baremetalds, where the
+    bastion is found via ${SHARED_DIR}/packet-conf.sh rather than
+    bastion_public_address, and no cloud security group needs opening.
+
+    Revisit when the VLAN workflows land, so one ref covers multinet-localnet,
+    secondary-localnet and the VLAN topologies. The VLAN case additionally needs
+    a VLAN subinterface on the bastion before the service starts.

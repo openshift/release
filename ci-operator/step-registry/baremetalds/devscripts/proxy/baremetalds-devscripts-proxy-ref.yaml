@@ -11,5 +11,18 @@ ref:
   - name: CLUSTERTYPE
     default: virt
     documentation: Type of environment to run CI test on "virt" or "baremetal"
+  - name: PROXY_ALLOWED_DST_CIDRS
+    default: ""
+    documentation: |-
+      Space-separated CIDRs the proxy may be asked to reach by address, e.g.
+      "192.168.111.0/24". The squid config's existing "cluster" acl matches on
+      dstdomain only, so a destination given as a bare IP never matches it and is
+      refused by "http_access deny all" with 403 Forbidden. Set this when a step
+      has to reach something on a dev-scripts network that has no DNS name -- a
+      HostedCluster API endpoint on a MetalLB address, for instance.
+
+      Empty by default: lanes that do not set it get byte-identical squid config.
+      Only ports already in allowed_ssl_ports (443, 5000, 6443) are reachable
+      regardless, so this widens destinations, not ports.
   documentation: |-
     Installs and configures a squid proxy server for use with dev-scripts.

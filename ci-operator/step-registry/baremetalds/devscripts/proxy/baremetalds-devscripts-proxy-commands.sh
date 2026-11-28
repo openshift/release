@@ -10,6 +10,26 @@ echo "************ baremetalds devscripts proxy command ************"
 # shellcheck disable=SC1090
 source "${SHARED_DIR}/packet-conf.sh"
 
+# Optional destination ACL, by IP rather than by domain.
+#
+# The "cluster" acl below is dstdomain-only, so a bare address never matches it
+# and "http_access deny all" rejects the CONNECT with 403 Forbidden. That is a
+# problem for anything addressed by IP on the dev-scripts networks -- notably a
+# HostedCluster API endpoint on a MetalLB address, which has no DNS name. Steps
+# that need it would otherwise have to append the address to this file and
+# restart squid themselves, which only works for steps that run after the
+# address exists and leaves earlier steps unable to reach it at all.
+#
+# Empty by default, so lanes that do not set it get byte-identical squid config.
+PROXY_DST_ACL=""
+PROXY_DST_ALLOW=""
+if [[ -n "${PROXY_ALLOWED_DST_CIDRS:-}" ]]; then
+  PROXY_DST_ACL="acl cluster_net dst ${PROXY_ALLOWED_DST_CIDRS}"
+  PROXY_DST_ALLOW="http_access allow CONNECT cluster_net
+http_access allow safe_http_port safe_http_methods cluster_net"
+  echo "Allowing proxied access to: ${PROXY_ALLOWED_DST_CIDRS}"
+fi
+
 # Setup a squid proxy for accessing the cluster
 # shellcheck disable=SC2087 # We need $CLUSTERTYPE in the here doc to expand locally
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
@@ -35,6 +55,7 @@ sudo systemctl restart sshd
 # Setup squid proxy for accessing cluster
 cat <<SQUID>\$HOME/squid.conf
 acl cluster dstdomain .metalkube.org .test-infra-cluster.redhat.com .ocpci.eng.rdu2.redhat.com .p1.openshiftapps.com sso.redhat.com
+${PROXY_DST_ACL}
 
 acl allowed_ssl_ports port 443 5000 6443
 acl CONNECT method CONNECT
@@ -44,6 +65,7 @@ acl safe_http_methods method GET HEAD
 http_access deny CONNECT !allowed_ssl_ports
 http_access allow CONNECT cluster
 http_access allow safe_http_port safe_http_methods cluster
+${PROXY_DST_ALLOW}
 http_access deny all
 
 http_port 8213
