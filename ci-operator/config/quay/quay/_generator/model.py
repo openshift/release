@@ -19,6 +19,7 @@ STORAGE_BY_CLOUD = {
     "aws": "s3",
     "gcp": "gcs",
     "azure": "blob",
+    "ibmcloud": "cos",
     "libvirt": "s3",
     # True AWS bare metal: metal workers with the same external S3 registry
     # storage as the aws lane (see templates/clouds/aws-metal.yaml.j2).
@@ -32,6 +33,7 @@ DEPLOY_REF_BY_CLOUD = {
     "aws": "quay-deploy-aws-s3",
     "gcp": "quay-deploy-gcp-gcs",
     "azure": "quay-deploy-azure-blob",
+    "ibmcloud": "quay-deploy-ibmcloud-cos",
     "libvirt": "quay-deploy-aws-s3",
     # True AWS bare metal reuses the aws lane's deploy step unchanged.
     "aws-metal": "quay-deploy-aws-s3",

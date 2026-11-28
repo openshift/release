@@ -16,6 +16,7 @@ ocp_base_domain_name=$(oc get dns/cluster -o jsonpath="{.spec.baseDomain}")
 # subject CN exceeds OpenSSL's 64-character CN limit. Keep the subject short;
 # the complete route names belong in SANs.
 quay_cn_wildcard_name="apps."$ocp_base_domain_name
+quay_tls_ca_common_name="quay-ca"
 quay_tls_common_name="quay"
 quay_route_name="quay.${quay_cn_wildcard_name}"
 quay_builder_route="${QUAYREGISTRY}-quay-builder-${QUAYNAMESPACE}.${quay_cn_wildcard_name}"
@@ -45,7 +46,7 @@ EOF
 #Create custom tls/ssl file
 function create_cert() {
     openssl genrsa -out "$temp_dir"/rootCA.key 2048
-    openssl req -x509 -new -nodes -key "$temp_dir"/rootCA.key -sha256 -days 1024 -out "$temp_dir"/rootCA.pem -subj "/C=US/ST=North Carolina/L=Raleigh/O=Quay team/OU=Quay QE Team/CN=${quay_cn_wildcard_name}"
+    openssl req -x509 -new -nodes -key "$temp_dir"/rootCA.key -sha256 -days 1024 -out "$temp_dir"/rootCA.pem -subj "/C=US/ST=North Carolina/L=Raleigh/O=Quay team/OU=Quay QE Team/CN=${quay_tls_ca_common_name}"
     openssl genrsa -out "$temp_dir"/ssl.key 2048
     openssl req -new -key "$temp_dir"/ssl.key -out "$temp_dir"/ssl.csr -subj "/C=US/ST=North Carolina/L=Raleigh/O=Quay team/OU=Quay QE Team/CN=${quay_tls_common_name}"
     openssl x509 -req -in "$temp_dir"/ssl.csr -CA "$temp_dir"/rootCA.pem -CAkey "$temp_dir"/rootCA.key -CAcreateserial -out "$temp_dir"/ssl.cert -days 356 -extensions v3_req -extfile "$temp_dir"/openssl.cnf
