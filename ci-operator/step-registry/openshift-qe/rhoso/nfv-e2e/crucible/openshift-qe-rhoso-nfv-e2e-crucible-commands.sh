@@ -88,43 +88,62 @@ workspace="$5"
 log_file="$6"
 workload_pid=''
 termination_complete=0
+alarm_pid=''
+pid_file="${log_file}.pid"
+timeout_flag="${log_file}.timeout"
+owner_file="${log_file}.owner"
+wrapper_pid=$$
 
 terminate_workload() {
-  [[ -n "${workload_pid}" ]] || {
-    termination_complete=1
-    return 0
-  }
-  if ! kill -0 -- "-${workload_pid}" 2>/dev/null; then
-    termination_complete=1
-    return 0
+  # The workload runs in its own session, so only the leader PID it publishes
+  # through pid_file owns the killable process group; the launcher PID lives
+  # in this shell's group and must never be group-signalled.
+  local leader=''
+  leader=$(cat -- "${pid_file}" 2>/dev/null || :)
+  if [[ -n "${leader}" ]] && kill -0 -- "-${leader}" 2>/dev/null; then
+    kill -TERM -- "-${leader}" 2>/dev/null || true
+    for ((i = 1; i <= 60; i++)); do
+      kill -0 -- "-${leader}" 2>/dev/null || { termination_complete=1; return 0; }
+      sleep 1
+    done
+    kill -KILL -- "-${leader}" 2>/dev/null || true
+    for ((i = 1; i <= 5; i++)); do
+      kill -0 -- "-${leader}" 2>/dev/null || { termination_complete=1; return 0; }
+      sleep 1
+    done
+    echo 'NFV_E2E_TERMINATION=failed' >&2
+    return 1
   fi
-  kill -TERM -- "-${workload_pid}" 2>/dev/null || true
-  for ((i = 1; i <= 60; i++)); do
-    kill -0 -- "-${workload_pid}" 2>/dev/null || {
-      termination_complete=1
-      return 0
-    }
-    sleep 1
-  done
-  kill -KILL -- "-${workload_pid}" 2>/dev/null || true
-  for ((i = 1; i <= 5; i++)); do
-    kill -0 -- "-${workload_pid}" 2>/dev/null || {
-      termination_complete=1
-      return 0
-    }
-    sleep 1
-  done
-  echo 'NFV_E2E_TERMINATION=failed' >&2
-  return 1
+  # The workload never published a leader: bound the launcher process alone.
+  # setsid --wait forwards no signals, so also kill its children (the
+  # session-leader bash) or a KILL on the launcher orphans the workload.
+  if [[ -n "${workload_pid}" ]] && kill -0 "${workload_pid}" 2>/dev/null; then
+    # Children first: setsid --wait forwards no signals, and killing the
+    # launcher first reparents the workload bash to init where pkill -P
+    # can no longer find it.  The launcher itself dies last as fallback.
+    pkill -TERM -P "${workload_pid}" 2>/dev/null || true
+    for ((i = 1; i <= 10; i++)); do
+      kill -0 "${workload_pid}" 2>/dev/null || break
+      sleep 1
+    done
+    pkill -KILL -P "${workload_pid}" 2>/dev/null || true
+    kill -TERM "${workload_pid}" 2>/dev/null || true
+    kill -KILL "${workload_pid}" 2>/dev/null || true
+  fi
+  termination_complete=1
+  return 0
 }
 
 cleanup() {
   status=$?
   trap - EXIT HUP TERM INT
+  if [[ -n "${alarm_pid}" ]]; then
+    kill -KILL "${alarm_pid}" 2>/dev/null || true
+  fi
   if (( termination_complete == 0 )); then
     terminate_workload || status=1
   fi
-  rm -f -- "${log_file}" || true
+  rm -f -- "${log_file}" "${pid_file}" "${timeout_flag}" "${owner_file}" || true
   exit "${status}"
 }
 
@@ -144,13 +163,17 @@ if ! tmp_log=$(mktemp "${log_file}.XXXXXX") ||
   echo 'NFV_E2E_LOG_SETUP=failed'
   exit 1
 fi
-
+rm -f -- "${pid_file}" "${timeout_flag}" "${owner_file}" || true
 if ! cd -- "${workspace}"; then
   echo 'NFV_E2E_WORKSPACE=unavailable'
   exit 1
 fi
 
-setsid bash -s -- "${scenario}" "${timeout_crucible}" "${edpm_host}" "${frame_sizes}" "${log_file}" <<'WORKLOAD' &
+# --fork --wait makes setsid always fork and always wait for the workload, so
+# $! stays alive exactly as long as the workload and propagates its exit
+# status.  A bare setsid forks only when the caller is a process-group
+# leader, which leaves the tracked PID's meaning dependent on context.
+setsid --fork --wait bash -s -- "${scenario}" "${timeout_crucible}" "${edpm_host}" "${frame_sizes}" "${log_file}" "${pid_file}" "${owner_file}" <<'WORKLOAD' &
 set -o errexit
 set -o nounset
 set -o pipefail
@@ -160,6 +183,24 @@ timeout_crucible="$2"
 edpm_host="$3"
 frame_sizes="$4"
 log_file="$5"
+pid_file="$6"
+owner_file="$7"
+
+# Owner handshake: wait until the wrapper confirms it is still alive before
+# starting anything.  If the wrapper died first (uncatchable kill between
+# launch and this point), exit without starting so no orphaned workload runs.
+for ((i = 1; i <= 300; i++)); do
+  [[ -f "${owner_file}" ]] && break
+  sleep 0.1
+done
+if [[ ! -f "${owner_file}" ]]; then
+  printf 'NFV_E2E_OWNER_LOST=1\n' >&2
+  exit 125
+fi
+
+# The workload bash is the session leader setsid created, so $$ is also the
+# process-group ID every watchdog signal must target.
+printf '%s\n' "$$" > "${pid_file}"
 
 set +o errexit
 make e2e-crucible \
@@ -190,20 +231,53 @@ exit "${workload_status}"
 WORKLOAD
 workload_pid=$!
 
-deadline=$((SECONDS + timeout_crucible))
-while kill -0 -- "-${workload_pid}" 2>/dev/null; do
-  if (( SECONDS >= deadline )); then
-    terminate_workload || exit 1
-    printf 'NFV_E2E_TERMINAL=1\nNFV_E2E_WORKLOAD_EXIT=124\nNFV_E2E_FILTER_EXIT=unknown\nNFV_E2E_CAPTURE_EXIT=unknown\n'
-    exit 124
+# Independent deadline alarm: a separate process enforces TIMEOUT_CRUCIBLE so
+# a stalled workload pipeline, a survivor holding the output pipe, or a
+# wedged wrapper loop cannot keep this step alive past its bound.  Output and
+# error are discarded so neither the alarm nor its sleep can hold the SSH
+# session channel open.
+(
+  sleep "${timeout_crucible}"
+  # Launcher liveness: the setsid --wait launcher lives exactly as long as
+  # the workload, so it stands down only when the workload truly ended.
+  # Checking the wrapper instead would stand down after a mid-run wrapper
+  # kill and leave an orphaned workload unbounded on the shared host.
+  if ! kill -0 "${workload_pid}" 2>/dev/null; then
+    exit 0
   fi
-  sleep 1
-done
+  : > "${timeout_flag}"
+  leader=$(cat -- "${pid_file}" 2>/dev/null || :)
+  if [[ -n "${leader}" ]]; then
+    kill -TERM -- "-${leader}" 2>/dev/null || true
+    for ((i = 1; i <= 65; i++)); do
+      kill -0 -- "-${leader}" 2>/dev/null || break
+      sleep 1
+    done
+    kill -KILL -- "-${leader}" 2>/dev/null || true
+  else
+    # No published leader: children first, then the launcher (see above).
+    pkill -TERM -P "${workload_pid}" 2>/dev/null || true
+    kill -TERM "${workload_pid}" 2>/dev/null || true
+  fi
+) >/dev/null 2>&1 &
+printf '%s\n' "${wrapper_pid}" > "${owner_file}"
+alarm_pid=$!
 
 set +o errexit
 wait "${workload_pid}"
 workload_status=$?
+# KILL, not TERM: bash defers TERM while the alarm waits on its sleep, but
+# KILL reaps the alarm at once and leaves only an fd-less orphan sleep.
+kill -KILL "${alarm_pid}" 2>/dev/null || true
+wait "${alarm_pid}" 2>/dev/null || true
 set -o errexit
+
+if [[ -f "${timeout_flag}" ]]; then
+  printf 'NFV_E2E_TERMINAL=1\nNFV_E2E_WORKLOAD_EXIT=124\nNFV_E2E_FILTER_EXIT=unknown\nNFV_E2E_CAPTURE_EXIT=unknown\n'
+  rm -f -- "${owner_file}" || true
+  exit 124
+fi
+rm -f -- "${owner_file}" || true
 exit "${workload_status}"
 INNER
 REMOTE
