@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Step-ref defaults are normally injected by ci-operator; keep the script usable
+# standalone without leaving empty quantities in the QuayRegistry CR.
+QUAY_APP_CPU_REQUEST="${QUAY_APP_CPU_REQUEST:-2}"
+QUAY_APP_CPU_LIMIT="${QUAY_APP_CPU_LIMIT:-2}"
+QUAY_APP_MEMORY="${QUAY_APP_MEMORY:-8Gi}"
+
 command -v yq >/dev/null || { echo "yq not found in image ci/quay-deploy-tools; refusing to download at runtime" >&2; exit 1; }
 
 if [ "${MAP_TESTS}" = "true" ]; then
@@ -470,6 +476,14 @@ spec:
     managed: false
   - kind: quay
     managed: true
+    overrides:
+      resources:
+        requests:
+          cpu: "${QUAY_APP_CPU_REQUEST}"
+          memory: "${QUAY_APP_MEMORY}"
+        limits:
+          cpu: "${QUAY_APP_CPU_LIMIT}"
+          memory: "${QUAY_APP_MEMORY}"
   - kind: mirror
     managed: true
   - kind: clair

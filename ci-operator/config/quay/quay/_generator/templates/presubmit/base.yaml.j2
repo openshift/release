@@ -10,7 +10,12 @@ build_root:
     tag: rhel-9-release-golang-1.25-openshift-{{ ocp_version }}
 images:
   items:
-  - dockerfile_path: Dockerfile
+  # Build the presubmit test image the same way ART builds the shipped product.
+  # The upstream Dockerfile uses the ubi9/python-312-minimal SCL Python, whose
+  # app imports are ~1.8x slower than the RPM python3.12 runtime in
+  # Dockerfile.downstream; that pushed quay-app startup past the operator's
+  # 150s startupProbe budget and made the custom-image swap flaky.
+  - dockerfile_path: Dockerfile.downstream
     to: quay-server
 {% if arch != "amd64" %}
     capabilities: [arm64]

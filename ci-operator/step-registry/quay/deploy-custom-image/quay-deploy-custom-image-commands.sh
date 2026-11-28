@@ -4,6 +4,7 @@ set -euo pipefail
 set -x
 
 NAMESPACE="quay-enterprise"
+QUAY_STARTUP_PROBE_FAILURE_THRESHOLD="${QUAY_STARTUP_PROBE_FAILURE_THRESHOLD:-20}"
 ARTIFACT_DIR=${ARTIFACT_DIR:=/tmp/artifacts}
 mkdir -p "${ARTIFACT_DIR}"
 
@@ -136,12 +137,19 @@ $WAS_TRACING && set -x
 # the new image runs alembic migrations before starting (the operator default
 # skips them). One strategic patch: containers/env merge by name, so this
 # targets quay-app without needing its current env list.
+# Widen the operator's startup probe (default 10 failures x 15s = 150s). The
+# CI-built image's ~30 workers each import the full Quay app while the
+# operator's 2 CPU default is in force until the resources override lands, and
+# a ~140s startup leaves no margin before kubelet kills the container
+# mid-import. The strategic merge keeps the probe's httpGet/timeout/period.
 PATCH=$(cat <<EOF
-{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"ci-registry-pull-secret"}],"containers":[{"name":"quay-app","image":"${QUAY_CI_IMAGE}","env":[{"name":"QUAYENTRY","value":"registry"}]}]}}}}
+{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"ci-registry-pull-secret"}],"containers":[{"name":"quay-app","image":"${QUAY_CI_IMAGE}","env":[{"name":"QUAYENTRY","value":"registry"}],"startupProbe":{"failureThreshold":${QUAY_STARTUP_PROBE_FAILURE_THRESHOLD}}}]}}}}
 EOF
 )
 oc -n "${NAMESPACE}" patch "deployment/${QUAY_DEPLOY}" --type=strategic -p "${PATCH}"
-echo "Deployment patched: imagePullSecrets, image, QUAYENTRY=registry"
+echo "Deployment patched: imagePullSecrets, image, QUAYENTRY=registry, startupProbe.failureThreshold=${QUAY_STARTUP_PROBE_FAILURE_THRESHOLD}"
+echo "quay-app resources: $(oc -n "${NAMESPACE}" get "deployment/${QUAY_DEPLOY}" -o jsonpath='{.spec.template.spec.containers[0].resources}')"
+echo "quay-app startupProbe: $(oc -n "${NAMESPACE}" get "deployment/${QUAY_DEPLOY}" -o jsonpath='{.spec.template.spec.containers[0].startupProbe}')"
 
 # Wait for rollout
 echo "Waiting for rollout of deployment/${QUAY_DEPLOY}..."

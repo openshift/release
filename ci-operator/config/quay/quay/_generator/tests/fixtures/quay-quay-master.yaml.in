@@ -22,7 +22,7 @@ build_root:
     tag: rhel-9-release-golang-1.25-openshift-4.22
 images:
   items:
-  - dockerfile_path: Dockerfile
+  - dockerfile_path: Dockerfile.downstream
     to: quay-server
   - dockerfile_path: web/Containerfile.playwright
     to: quay-playwright-runner
@@ -50,7 +50,7 @@ tests:
 - always_run: false
   as: aws-s3
   optional: true
-  pipeline_run_if_changed: ^(?:requirements(?:-build)?\.txt|constraints\.txt|pyproject\.toml|(?:_init|active_migration|app|config|path_converters|registry|web)\.py|alembic\.ini|quay-entrypoint\.sh|conf/init/(?:d_validate_config_bundle\.sh|data_migration\.py|runmigration\.sh)|config-tool/(?:go\.mod|go\.sum|(?:cmd/config-tool|commands|pkg/lib)/.*)|(?:data|endpoints|util/config)/.*|web/playwright(?:\.config\.ts|/.*))$
+  pipeline_run_if_changed: ^(?:requirements(?:-build)?\.txt|constraints\.txt|pyproject\.toml|(?:_init|active_migration|app|config|path_converters|registry|web)\.py|alembic\.ini|quay-entrypoint\.sh|conf/init/(?:d_validate_config_bundle\.sh|data_migration\.py|runmigration\.sh)|config-tool/(?:go\.mod|go\.sum|(?:cmd/config-tool|commands|pkg/lib)/.*)|(?:data|endpoints|util/config)/.*|web/playwright(?:\.config\.ts|/.*)|Dockerfile\.downstream)$
   steps:
     cluster_profile: aws-quay-qe
     dependencies:
@@ -107,7 +107,7 @@ tests:
 - always_run: false
   as: gcp-gcs
   optional: true
-  pipeline_run_if_changed: ^(?:requirements(?:-build)?\.txt|constraints\.txt|pyproject\.toml|(?:_init|active_migration|app|config|path_converters|registry|web)\.py|alembic\.ini|quay-entrypoint\.sh|conf/init/(?:d_validate_config_bundle\.sh|data_migration\.py|runmigration\.sh)|config-tool/(?:go\.mod|go\.sum|(?:cmd/config-tool|commands|pkg/lib)/.*)|(?:data|endpoints|util/config)/.*|web/playwright(?:\.config\.ts|/.*))$
+  pipeline_run_if_changed: ^(?:requirements(?:-build)?\.txt|constraints\.txt|pyproject\.toml|(?:_init|active_migration|app|config|path_converters|registry|web)\.py|alembic\.ini|quay-entrypoint\.sh|conf/init/(?:d_validate_config_bundle\.sh|data_migration\.py|runmigration\.sh)|config-tool/(?:go\.mod|go\.sum|(?:cmd/config-tool|commands|pkg/lib)/.*)|(?:data|endpoints|util/config)/.*|web/playwright(?:\.config\.ts|/.*)|Dockerfile\.downstream)$
   steps:
     cluster_profile: gcp-quay-qe
     dependencies:
@@ -121,6 +121,9 @@ tests:
         and loads architecture filter with mirror configuration|loads existing architecture filter from saved mirror configuration|image
         build context carries the baked classifier artifact path|Nginx 502 error page when backend is unreachable'
       PLAYWRIGHT_USE_IMAGE_TESTS: "true"
+      QUAY_APP_CPU_LIMIT: "6"
+      QUAY_APP_CPU_REQUEST: "4"
+      QUAY_APP_MEMORY: 8Gi
       QUAY_EXTRA_CONFIG: |
         FEATURE_PROGRAMMATIC_BOOTSTRAP: false
         FEATURE_USER_METADATA: true
@@ -163,7 +166,7 @@ tests:
 - always_run: false
   as: azure-blob
   optional: true
-  pipeline_run_if_changed: ^(?:requirements(?:-build)?\.txt|constraints\.txt|pyproject\.toml|(?:_init|active_migration|app|config|path_converters|registry|web)\.py|alembic\.ini|quay-entrypoint\.sh|conf/init/(?:d_validate_config_bundle\.sh|data_migration\.py|runmigration\.sh)|config-tool/(?:go\.mod|go\.sum|(?:cmd/config-tool|commands|pkg/lib)/.*)|(?:data|endpoints|util/config)/.*|web/playwright(?:\.config\.ts|/.*))$
+  pipeline_run_if_changed: ^(?:requirements(?:-build)?\.txt|constraints\.txt|pyproject\.toml|(?:_init|active_migration|app|config|path_converters|registry|web)\.py|alembic\.ini|quay-entrypoint\.sh|conf/init/(?:d_validate_config_bundle\.sh|data_migration\.py|runmigration\.sh)|config-tool/(?:go\.mod|go\.sum|(?:cmd/config-tool|commands|pkg/lib)/.*)|(?:data|endpoints|util/config)/.*|web/playwright(?:\.config\.ts|/.*)|Dockerfile\.downstream)$
   steps:
     cluster_profile: azure-quay-qe
     dependencies:
