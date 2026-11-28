@@ -1,0 +1,179 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
+    openshift.io/description: Automation ServiceAccounts for CAPCE ASSERT testing platform
+    openshift.io/display-name: CAPCE ASSERT
+  name: capce
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: image-puller
+  namespace: capce
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: capce-image-puller-ocp
+  namespace: ocp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: capce
+    name: image-puller
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: capce-image-puller-console
+  namespace: openshift-console
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: capce
+    name: image-puller
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: capce-image-puller-olm
+  namespace: openshift-operator-lifecycle-manager
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: capce
+    name: image-puller
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: capce-image-puller-mco
+  namespace: openshift-machine-config-operator
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: capce
+    name: image-puller
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: capce-image-puller-mapi
+  namespace: openshift-machine-api-operator
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: capce
+    name: image-puller
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: capce-image-puller-cvo
+  namespace: openshift-cluster-version-operator
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: capce
+    name: image-puller
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: capce-image-puller-apiserver
+  namespace: openshift-apiserver
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: capce
+    name: image-puller
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: capce-image-puller-kube-apiserver
+  namespace: openshift-kube-apiserver-operator
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: capce
+    name: image-puller
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: capce-image-puller-mce
+  namespace: multicluster-engine
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: capce
+    name: image-puller
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: 'true'
+  name: capce-admins-binding
+  namespace: capce
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: capce-assert-ocp-pull-token
+    namespace: capce
