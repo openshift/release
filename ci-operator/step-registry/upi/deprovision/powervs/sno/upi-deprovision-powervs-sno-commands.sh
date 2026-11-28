@@ -3,9 +3,20 @@
 set -x
 set +e
 
-CLUSTER_NAME="cicd-$(printf $PROW_JOB_ID|sha256sum|cut -c-10)"
-POWERVS_VSI_NAME="${CLUSTER_NAME}-worker"
-BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
+CLUSTER_NAME="lease01sno"
+POWERVS_VSI_NAME="lease01sno-worker"
+BASTION_CI_SCRIPTS_DIR="/tmp/lease01sno-config"
+#CLUSTER_NAME="cicd-$(printf $PROW_JOB_ID|sha256sum|cut -c-10)"
+#POWERVS_VSI_NAME="${CLUSTER_NAME}-worker"
+#BASTION_CI_SCRIPTS_DIR="/tmp/${CLUSTER_NAME}-config"
+CREDENTIALS_PATH="/etc/sno-power-credentials"
+
+set +x
+read -r IBMCLOUD_API_KEY < /etc/sno-power-credentials/POWERVS_SNO_ibmcloud-api-key
+export IBMCLOUD_API_KEY
+BASTION="$(<"${CREDENTIALS_PATH}/POWERVS_SNO_ibmcloud-bastion")"
+export BASTION
+
 
 if [ -f "${SHARED_DIR}/kubeconfig" ]; then
   echo "Test cluster accessiblity"
@@ -43,7 +54,7 @@ export PATH=$PATH:/tmp/bin
 
 # IBM cloud login
 ibmcloud config --check-version=false
-echo | ibmcloud login --apikey @"/etc/sno-power-credentials/.powercreds" --no-region
+echo | ibmcloud login --apikey "${IBMCLOUD_API_KEY}" --no-region
 
 # Installing required ibmcloud plugins
 echo "$(date) Installing required ibmcloud plugins"
