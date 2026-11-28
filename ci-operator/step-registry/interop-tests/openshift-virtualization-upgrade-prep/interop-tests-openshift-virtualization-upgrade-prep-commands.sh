@@ -179,8 +179,45 @@ Cnv__WaitRhelBootImportCronsUpToDate() {
 
     for cronName in "${bootCrons[@]}"; do
         oc wait DataImportCron -n "${dvNamespace}" "${cronName}" \
-            --for=condition=UpToDate --timeout="${waitTimeout}"
+            --for=condition=UpToDate --timeout="${waitTimeout}" || {
+            Cnv__DumpBootImportCronFailureDiagnostics "${dvNamespace}" "${cronName}"
+            exit 1
+        }
     done
+    true
+}
+
+# Captures the state needed to root-cause a stuck boot-image DataImportCron:
+# the cron's own conditions, related DataVolume/DataSource/importer pod state
+# (including termination details and logs), and namespace Events — none of
+# which are captured by this step's generic on-failure trap (see trap EXIT).
+Cnv__DumpBootImportCronFailureDiagnostics() {
+    typeset dvNamespace="${1:?}"; (($#)) && shift
+    typeset cronName="${1:?}"; (($#)) && shift
+
+    oc get dataimportcron "${cronName}" -n "${dvNamespace}" -o yaml \
+        > "${ARTIFACT_DIR}/cnv-dataimportcron-${cronName}-on-failure.yaml" 2>&1 || true
+    oc get datavolume -n "${dvNamespace}" -o yaml \
+        > "${ARTIFACT_DIR}/cnv-datavolumes-on-failure.yaml" 2>&1 || true
+    oc get datasource -n "${dvNamespace}" -o yaml \
+        > "${ARTIFACT_DIR}/cnv-datasources-on-failure.yaml" 2>&1 || true
+    oc get pods -n "${dvNamespace}" -o yaml \
+        > "${ARTIFACT_DIR}/cnv-boot-image-pods-on-failure.yaml" 2>&1 || true
+    oc get events -n "${dvNamespace}" --sort-by='.lastTimestamp' \
+        > "${ARTIFACT_DIR}/cnv-boot-image-events-on-failure.txt" 2>&1 || true
+
+    # Capture importer pod logs (current + previous) — best-effort, bounded.
+    typeset podName
+    while read -r podName; do
+        [[ -z "${podName}" ]] && continue
+        oc logs "${podName}" -n "${dvNamespace}" --tail=500 \
+            > "${ARTIFACT_DIR}/cnv-importer-log-${podName}.txt" 2>&1 || true
+        oc logs "${podName}" -n "${dvNamespace}" --previous --tail=200 \
+            >> "${ARTIFACT_DIR}/cnv-importer-log-${podName}.txt" 2>&1 || true
+    done < <(
+        oc get pods -n "${dvNamespace}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' \
+            | grep -E 'importer' || true
+    )
     true
 }
 
@@ -516,7 +553,11 @@ PrepareCnvOlmForUpgradeTest() {
     typeset -r ns="openshift-cnv"
     typeset -r subApi="subscription.operators.coreos.com/hco-operatorhub"
     typeset -i maxHops=10
-    typeset -i planPollMax=180  # seconds to wait for OLM to create/update a plan
+    # 10 min — OLM can briefly report ResolutionFailed/ConstraintsNotSatisfiable
+    # right after an intermediate CSV installs, while the previous CSV is still
+    # being garbage-collected. 180s was observed to be too short to ride out
+    # that transient window during N+2 (multi-hop) upgrades.
+    typeset -i planPollMax=600
     typeset -i planPollInt=10
     typeset -i csvInstallMax=1800  # 30 min per intermediate CSV install
     typeset -i csvInstallInt=30
