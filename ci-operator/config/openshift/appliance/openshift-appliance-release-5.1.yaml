@@ -52,6 +52,18 @@ tests:
   container:
     from: test-bin
   run_if_changed: ^(cmd/.*|data/.*|hack/.*|pkg/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum)$
+- as: integration-tests
+  run_if_changed: ^(cmd|data|internal|pkg|tests|vendor)/|^(Dockerfile\..*|Makefile|go\.mod|go\.sum)$
+  steps:
+    test:
+    - as: integration-tests
+      commands: |
+        make integration-test
+      from: test-bin
+      resources:
+        requests:
+          cpu: "2"
+          memory: 4Gi
 - always_run: false
   as: e2e-agent-compact-ipv4-iso-no-registry
   capabilities:
