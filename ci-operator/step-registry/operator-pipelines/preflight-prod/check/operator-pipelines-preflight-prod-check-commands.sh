@@ -23,6 +23,9 @@
 rc=$([ "${ASSET_TYPE}" == "container" ] || [ "${ASSET_TYPE}" == "operator" ]; echo $?)
 [ "$rc" -ne 0 ] && { echo "ERR An incorrect asset type was provided. Expecting 'container' or 'operator'."; exit 1 ;}
 
+# Install tar if needed
+microdnf install -y tar
+
 # Go to a temporary directory to write
 WORKDIR=$(mktemp -d)
 cd "${WORKDIR}" || exit 2
