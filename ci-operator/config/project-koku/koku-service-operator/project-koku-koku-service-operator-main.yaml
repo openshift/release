@@ -14,7 +14,9 @@ build_root:
     tag: rhel-9-release-golang-1.26-openshift-4.23
 images:
   items:
-  - dockerfile_path: Dockerfile
+  - additional_architectures:
+    - arm64
+    dockerfile_path: Dockerfile
     to: koku-service-operator
   - dockerfile_literal: |-
       FROM src
@@ -33,7 +35,9 @@ images:
       USER 65532
     from: src
     to: koku-service-operator-e2e
-  - dockerfile_literal: |-
+  - additional_architectures:
+    - arm64
+    dockerfile_literal: |-
       FROM bundle AS bundle
       FROM builder AS builder
       USER 0
@@ -74,6 +78,12 @@ operator:
   - pullspec: quay.io/project-koku/koku-service-operator:v0.0.1
     with: pipeline:koku-service-operator
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.22"
   latest:
     release:
       architecture: amd64
@@ -95,6 +105,47 @@ tests:
   as: e2e-olm
   cluster_claim:
     architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.22"
+  optional: true
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        set -euo pipefail
+        NS=koku-service-operator-system
+        oc create namespace "${NS}" --dry-run=client -o yaml | oc apply -f -
+        operator-sdk run bundle "${OO_BUNDLE}" \
+          --namespace "${NS}" \
+          --install-mode AllNamespaces \
+          --timeout 10m \
+          --security-context-config restricted
+        oc wait csv/koku-service-operator.v0.0.1 -n "${NS}" \
+          --for=jsonpath='{.status.phase}'=Succeeded --timeout=10m
+        oc wait deployment/koku-service-operator-controller-manager -n "${NS}" \
+          --for=condition=Available --timeout=5m
+        cat > "${ARTIFACT_DIR}/junit_olm-install.xml" <<'EOF'
+        <testsuite name="olm-install" tests="1" failures="0">
+          <testcase classname="olm" name="csv-succeeded-controller-available"/>
+        </testsuite>
+        EOF
+      dependencies:
+      - env: OO_BUNDLE
+        name: koku-service-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- always_run: false
+  as: e2e-olm-arm64
+  cluster_claim:
+    architecture: arm64
     cloud: aws
     owner: openshift-ci
     product: ocp
