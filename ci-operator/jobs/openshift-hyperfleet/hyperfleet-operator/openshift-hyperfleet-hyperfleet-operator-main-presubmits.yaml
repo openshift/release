@@ -129,12 +129,12 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )presubmits-ci-bundle-hyperfleet-operator-bundle,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build04
-    context: ci/prow/presubmits-e2e-in-cluster-install
+    context: ci/prow/presubmits-e2e
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -146,8 +146,9 @@ presubmits:
       ci-operator.openshift.io/variant: presubmits
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-hyperfleet-hyperfleet-operator-main-presubmits-e2e-in-cluster-install
-    rerun_command: /test presubmits-e2e-in-cluster-install
+    name: pull-ci-openshift-hyperfleet-hyperfleet-operator-main-presubmits-e2e
+    rerun_command: /test presubmits-e2e
+    skip_if_only_changed: ^(\.|docs/|tools/|OWNERS$|OWNERS_ALIASES$|catalog/|catalog\.Dockerfile$|config/manifests/prod/kustomization\.yaml$)|\.md$
     spec:
       containers:
       - args:
@@ -162,7 +163,7 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-in-cluster-install
+        - --target=e2e
         - --variant=presubmits
         command:
         - ci-operator
@@ -243,7 +244,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )presubmits-e2e-in-cluster-install,?($|\s.*)
+    trigger: (?m)^/test( | .* )presubmits-e2e,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
