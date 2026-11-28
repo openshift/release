@@ -1,0 +1,44 @@
+ref:
+  as: hypershift-azure-standalone-velero-setup
+  from_image:
+    namespace: ocp
+    name: "4.19"
+    tag: upi-installer
+  commands: hypershift-azure-standalone-velero-setup-commands.sh
+  credentials:
+  - mount_path: /etc/ci-pull-credentials
+    bundle: ci-pull-credentials
+    namespace: test-credentials
+  - mount_path: /etc/hypershift-ci-jobs-azurecreds
+    group: ops/hypershift-ci-jobs-azurecreds
+    collection: hypershift-team
+  env:
+  - name: KUBECONFIG
+    default: ${SHARED_DIR}/management_cluster_kubeconfig
+    documentation: Management cluster kubeconfig.
+  - name: USE_HYPERSHIFT_AZURE_CREDS
+    default: "false"
+    documentation: Use the HyperShift Azure service principal instead of the cluster profile credentials.
+  - name: HYPERSHIFT_AZURE_LOCATION
+    default: eastus
+    documentation: Azure region of the management cluster and backup storage account.
+  - name: VELERO_VERSION
+    default: v1.16.2
+    documentation: Velero version to install. Must match the Velero version of the OADP release in the version matrix.
+  - name: AZURE_PLUGIN_VERSION
+    default: v1.12.2
+    documentation: Velero plugin for Microsoft Azure version compatible with VELERO_VERSION (v1.12.x pairs with Velero v1.16.x).
+  - name: OADP_HYPERSHIFT_PLUGIN_IMAGE
+    default: quay.io/konveyor/hypershift-oadp-plugin:latest
+    documentation: HyperShift plugin image to install into standalone Velero.
+  resources:
+    requests:
+      cpu: 500m
+      memory: 500Mi
+  timeout: 30m
+  grace_period: 5m
+  documentation: |-
+    Creates an Azure Blob backup location and installs standalone Velero
+    (VELERO_VERSION) with Azure Blob and disk snapshot support and the
+    HyperShift plugin on an AKS management cluster, which has no OLM and so
+    cannot run the OADP operator. The workflow deletes the resource group after use.

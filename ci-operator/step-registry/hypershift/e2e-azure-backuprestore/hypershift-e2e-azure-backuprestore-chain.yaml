@@ -1,0 +1,31 @@
+chain:
+  as: hypershift-e2e-azure-backuprestore
+  steps:
+  - as: tests
+    cli: latest
+    from: hypershift-tests
+    commands: |-
+      set -euo pipefail
+      export PATH="/hypershift/bin:${PATH}"
+      export E2E_HOSTED_CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
+      export E2E_HOSTED_CLUSTER_NAMESPACE=${E2E_HOSTED_CLUSTER_NAMESPACE:-clusters}
+      test-backuprestore --ginkgo.v --e2e.junit-report="${ARTIFACT_DIR}/junit_backuprestore_report.xml" --ginkgo.label-filter="${BACKUP_RESTORE_LABEL_FILTER}" --ginkgo.fail-on-empty=true --ginkgo.fail-fast=true --ginkgo.timeout=2h --ginkgo.no-color=true
+    env:
+    - name: KUBECONFIG
+      default: ${SHARED_DIR}/management_cluster_kubeconfig
+      documentation: Management cluster kubeconfig; ARO jobs override it.
+    - name: E2E_HOSTED_CLUSTER_NAMESPACE
+      default: clusters
+      documentation: Namespace of the hosted cluster under test.
+    - name: BACKUP_RESTORE_LABEL_FILTER
+      default: backup-restore
+      documentation: Ginkgo label filter. Use standalone-velero for AKS and backup-restore for OADP-operator clusters.
+    - name: E2E_EXPECTED_VELERO_VERSION
+      default: ""
+      documentation: Expected Velero server major.minor version from the OADP/Velero version matrix. Only the standalone-velero suite asserts it.
+    timeout: 2h30m
+    grace_period: 5m
+    resources:
+      requests:
+        cpu: "1"
+        memory: 200Mi
