@@ -5,6 +5,10 @@ set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
+if [[ -s "${SHARED_DIR}/proxy-conf.sh" ]]; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 DEFAULT_OPERATOR_SOURCE="redhat-operators"
 DEFAULT_OPERATOR_SOURCE_DISPLAY="Red Hat Operators"
 

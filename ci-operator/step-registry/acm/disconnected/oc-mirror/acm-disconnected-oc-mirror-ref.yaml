@@ -1,0 +1,42 @@
+ref:
+  as: acm-disconnected-oc-mirror
+  from: upi-installer
+  cli: latest
+  grace_period: 30m
+  commands: acm-disconnected-oc-mirror-commands.sh
+  credentials:
+  - collection: openshift-qe
+    group: mirror-registry
+    mount_path: /var/run/vault/mirror-registry
+  resources:
+    requests:
+      cpu: 100m
+      memory: 2Gi
+    limits:
+      memory: 4Gi
+  env:
+  - name: ACM_IIB_IMAGE
+    default: ""
+    documentation: |-
+      ACM IIB (Index Image Build) image to mirror. This is a pre-built
+      operator index image from the staging/CI pipeline.
+  - name: ACM_VERSION
+    default: ""
+    documentation: |-
+      ACM version string (e.g., "2.13"). Used for CatalogSource naming.
+  - name: MCE_IIB_IMAGE
+    default: ""
+    documentation: |-
+      MCE IIB (Index Image Build) image to mirror. This is a pre-built
+      operator index image from the staging/CI pipeline.
+  - name: MCE_VERSION
+    default: ""
+    documentation: |-
+      MCE version string (e.g., "2.8"). Used for CatalogSource naming.
+  documentation: |-
+    Mirrors ACM and MCE operator images from IIB (Index Image Build)
+    images to the disconnected cluster mirror registry using oc-mirror v2.
+    Creates an ImageSetConfiguration from the provided IIB images,
+    mirrors via two-pass (disk then push), applies IDMS, and creates
+    separate CatalogSources for ACM and MCE. Modeled after the
+    automation-acm mirror-acm-mce-stage Ansible playbook.
