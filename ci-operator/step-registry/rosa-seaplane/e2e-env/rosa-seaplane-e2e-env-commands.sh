@@ -217,6 +217,7 @@ for suite, cfg in sorted(registry.items()):
             print(f"E2E_PIN_ERROR_{suite}_{pin['name']}='unresolved: {exc}'")
             continue
         print(f"E2E_PIN_{suite}_{pin['name']}='{value}'")
+        print(f"E2E_REPO_{suite}='{cfg['repo']}'")
         # Preserve the pin type: ref pins (explicit branch refs) are resolved
         # differently from legacy image tags — a tag like 'zoa-2026.11' must
         # not be queried as a branch name.
@@ -309,9 +310,20 @@ suite_commit() { # <suite> <repo-url>
   git ls-remote "${repo}" HEAD | cut -f1
 }
 
-E2E_SRC_API="$(suite_commit api https://github.com/openshift-online/rosa-seaplane-api.git)"
-E2E_SRC_ZOA="$(suite_commit zoa https://github.com/openshift-online/rosa-seaplane-zoa.git)"
-E2E_SRC_ROSA_CLI="$(suite_commit rosa-cli https://github.com/openshift/rosa.git)"
+# Resolve every registered suite's commit from its registry repo URL — the
+# step itself names no suite repos; new suites in the registry flow through
+# automatically. Output form: E2E_SRC_<suite>=<url>@<sha>.
+# Env-var names cannot contain hyphens: normalize the suite name for the
+# E2E_SRC_ suffix (rosa-cli -> E2E_SRC_ROSA_CLI); the raw suite name is kept
+# for registry lookups. The runner reverses the mapping (underscores ->
+# hyphens), matching the suite names used in E2E_SUITES and ci/e2e folders.
+for _suite in $(sed -n "s/^E2E_REPO_\([a-z0-9-]*\)=.*/\1/p" "${WORK_DIR}/pins.env" | sort -u); do
+  _url="$(sed -n "s/^E2E_REPO_${_suite}='//p" "${WORK_DIR}/pins.env" | head -1 | sed "s/'$//")"
+  _sha="$(suite_commit "${_suite}" "${_url}")" || exit 1
+  _var_suite="${_suite//-/_}"
+  export "E2E_SRC_${_var_suite}=${_url}@${_sha}"
+  echo "E2E_SRC_${_var_suite}=${_url}@${_sha}"
+done
 
 # ---------------------------------------------------------------------------
 # 4. Readiness check — fail here so no suite starts.
@@ -367,9 +379,8 @@ fi
 # 5. Write e2e.env (plain KEY=value, no secrets).
 # ---------------------------------------------------------------------------
 cat > "${E2E_ENV}" <<EOF
-E2E_SRC_API=${E2E_SRC_API}
-E2E_SRC_ZOA=${E2E_SRC_ZOA}
-E2E_SRC_ROSA_CLI=${E2E_SRC_ROSA_CLI}
+# Suite repo pins, one E2E_SRC_<suite>=<url>@<sha> per registered suite.
+$(env | grep '^E2E_SRC_' | sort)
 BASE_URL=${BASE_URL}
 RHOBS_API_URL=${RHOBS_API_URL:-}
 ZOA_RC_API_URL=${ZOA_RC_API_URL:-}
