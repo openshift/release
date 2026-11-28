@@ -79,6 +79,33 @@ tests:
     - ref: install-operators
     - chain: openshift-e2e-test-logging-qe
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: aws-usgov-ipi-private-sts-f7-logging
+  cron: 0 0 31 2 *
+  reporter_config:
+    channel: '#aos-qe-logging'
+    job_states_to_report:
+    - aborted
+    - error
+    - failure
+    - pending
+    - success
+    report_template: Job {{.Spec.Job}} state is *{{.Status.State}}* <{{.Status.URL}}|View
+      logs>
+  steps:
+    cluster_profile: aws-usgov-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - as: sleep-xhours
+      commands: sleep 4h
+      from: cli
+      resources:
+        limits:
+          memory: 512Mi
+        requests:
+          cpu: 100m
+          memory: 512Mi
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private
 zz_generated_metadata:
   branch: release-4.20
   org: openshift
