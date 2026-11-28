@@ -9,6 +9,7 @@ workflow:
       RUNTIMECLASS: "kata-remote"
       WORKLOAD_TO_TEST: "peer-pods"
       COMPUTE_NODE_REPLICAS: "2"
+      SLEEP_DURATION: "6h"
     pre:
     - chain: sandboxed-containers-operator-ipi-azure-pre
     - ref: sandboxed-containers-operator-peerpods-param-cm
@@ -16,9 +17,14 @@ workflow:
     - ref: sandboxed-containers-operator-install-osc-operator
     - ref: agent-sandbox-install-operator
     test:
+    - ref: sandboxed-containers-operator-test-sanity
     - ref: agent-sandbox-e2e-test
     post:
     - ref: sandboxed-containers-operator-gather-must-gather
+      best_effort: true
+      optional_on_success: true
+    - ref: sandboxed-containers-operator-post-wait
+      timeout: 6h10m0s
       best_effort: true
       optional_on_success: true
     - chain: ipi-azure-post
