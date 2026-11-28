@@ -3166,6 +3166,120 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-stack-upi
+- as: metal-ds-ipi-ovn-cbo-webhook-137974-f999
+  capabilities:
+  - intranet
+  cron: 0 0 31 2 *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
+        OPENSHIFT_RELEASE_IMAGE=registry.ci.openshift.org/ocp/release:4.21.0-0.nightly-2026-11-24-093421
+    test:
+    - as: verify-cbo-webhook
+      commands: |
+        set -euo pipefail
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+        mkdir -p "${ARTIFACT_DIR}"
+        expected_version=4.21.0-0.nightly-2026-11-24-093421
+        expected_payload="registry.ci.openshift.org/ocp/release:${expected_version}"
+        namespace=openshift-machine-api
+        webhook_config=cluster-baremetal-validating-webhook-configuration
+        webhook_service=cluster-baremetal-webhook-service
+        cbo_pod=
+        oc() { command oc --request-timeout=60s "$@"; }
+        fail() { echo "FAIL: $*"; exit 1; }
+        collect() {
+          result=$?
+          trap - EXIT
+          set +e
+          oc get clusterversion version -o yaml > "${ARTIFACT_DIR}/clusterversion.yaml"
+          oc get infrastructure cluster -o yaml > "${ARTIFACT_DIR}/infrastructure.yaml"
+          oc get co baremetal kube-apiserver -o yaml > "${ARTIFACT_DIR}/clusteroperators.yaml"
+          oc get validatingwebhookconfiguration "${webhook_config}" -o yaml > "${ARTIFACT_DIR}/webhook.yaml"
+          oc -n "${namespace}" get svc "${webhook_service}" -o yaml > "${ARTIFACT_DIR}/service.yaml"
+          oc -n "${namespace}" get endpointslice -l "kubernetes.io/service-name=${webhook_service}" -o yaml > "${ARTIFACT_DIR}/endpointslices.yaml"
+          oc -n "${namespace}" get pods -l k8s-app=cluster-baremetal-operator -o yaml > "${ARTIFACT_DIR}/cbo-pods.yaml"
+          if [[ -n "${cbo_pod}" ]]; then
+            oc -n "${namespace}" logs "${cbo_pod}" -c cluster-baremetal-operator --timestamps > "${ARTIFACT_DIR}/cbo.log"
+          fi
+          if [[ "${result}" == 0 ]]; then
+            printf '<testsuite name="OCPBUGS-137974" tests="1" failures="0"><testcase name="CBO webhook reachable on BareMetal"/></testsuite>\n' > "${ARTIFACT_DIR}/junit-cbo-webhook.xml"
+          else
+            printf '<testsuite name="OCPBUGS-137974" tests="1" failures="1"><testcase name="CBO webhook reachable on BareMetal"><failure message="See verification step log and artifacts"/></testcase></testsuite>\n' > "${ARTIFACT_DIR}/junit-cbo-webhook.xml"
+          fi
+          exit "${result}"
+        }
+        trap collect EXIT
+        trap 'exit 143' TERM
+
+        version="$(oc get clusterversion version -o jsonpath='{.status.desired.version}')"
+        platform="$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')"
+        printf 'payload=%s\nplatform=%s\n' "${version}" "${platform}" | tee "${ARTIFACT_DIR}/verification.txt"
+        [[ "${version}" == "${expected_version}" ]] || fail "unexpected payload: ${version}"
+        [[ "${platform}" == BareMetal ]] || fail "expected the dev-scripts BareMetal platform"
+        oc -n "${namespace}" rollout status deployment/cluster-baremetal-operator --timeout=300s
+        expected_image="$(oc adm release info "${expected_payload}" --registry-config="${CLUSTER_PROFILE_DIR}/pull-secret" --image-for=cluster-baremetal-operator)"
+        oc -n "${namespace}" get pods -l k8s-app=cluster-baremetal-operator -o json > "${ARTIFACT_DIR}/cbo-pods.json"
+        cbo_pod="$(jq -er '[.items[] | select(.metadata.deletionTimestamp == null and .status.phase == "Running")] | if length == 1 then .[0].metadata.name else error("expected one running CBO pod") end' "${ARTIFACT_DIR}/cbo-pods.json")"
+        actual_image="$(oc -n "${namespace}" get pod "${cbo_pod}" -o jsonpath='{.spec.containers[?(@.name=="cluster-baremetal-operator")].image}')"
+        [[ "${expected_image}" == *@sha256:* && "${actual_image}" == *@sha256:* ]] || fail "expected digest-pinned CBO images"
+        [[ "${actual_image##*@}" == "${expected_image##*@}" ]] || fail "CBO image does not match the fixed payload"
+        printf 'expectedCBOImage=%s\nactualCBOImage=%s\n' "${expected_image}" "${actual_image}" >> "${ARTIFACT_DIR}/verification.txt"
+
+        oc get validatingwebhookconfiguration "${webhook_config}" -o json > "${ARTIFACT_DIR}/webhook.json"
+        jq -e '.webhooks[] | select(.name == "vprovisioning.kb.io") |
+          .clientConfig.service.namespace == "openshift-machine-api" and
+          .clientConfig.service.name == "cluster-baremetal-webhook-service" and
+          .clientConfig.service.path == "/validate-metal3-io-v1alpha1-provisioning" and
+          (.clientConfig.service.port // 443) == 443 and .sideEffects == "None"' "${ARTIFACT_DIR}/webhook.json" >/dev/null
+
+        start_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        printf 'observationStart=%s\n' "${start_time}" >> "${ARTIFACT_DIR}/verification.txt"
+        # A dry-run success is insufficient: failurePolicy=Ignore can hide an unreachable webhook.
+        # Require the named webhook to reject an invalid singleton name without persisting a CR.
+        for sample in {1..10}; do
+          oc -n "${namespace}" exec "${cbo_pod}" -c cluster-baremetal-operator -- \
+            cat /proc/net/tcp /proc/net/tcp6 > "${ARTIFACT_DIR}/listeners-${sample}.txt"
+          awk '$2 ~ /:24E3$/ && $4 == "0A" {found=1} END {exit !found}' "${ARTIFACT_DIR}/listeners-${sample}.txt" || fail "no TCP listener on port 9443"
+          if oc create --dry-run=server -f - > "${ARTIFACT_DIR}/admission-${sample}.txt" 2>&1 <<'EOF'
+        apiVersion: metal3.io/v1alpha1
+        kind: Provisioning
+        metadata:
+          name: ocpbugs-137974-invalid-name
+        spec:
+          provisioningNetwork: Disabled
+        EOF
+          then
+            fail "invalid singleton name was accepted; webhook reachability was not demonstrated"
+          fi
+          grep -Fq 'admission webhook "vprovisioning.kb.io" denied the request' "${ARTIFACT_DIR}/admission-${sample}.txt" || fail "request failed without the expected webhook denial"
+          grep -Fq 'Provisioning object is a singleton and must be named' "${ARTIFACT_DIR}/admission-${sample}.txt" || fail "unexpected validation error"
+          printf 'PASS sample=%s time=%s: port 9443 listening; webhook denied dry-run\n' "${sample}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "${ARTIFACT_DIR}/verification.txt"
+          sleep 30
+        done
+
+        oc -n openshift-kube-apiserver-operator get pods -o json > "${ARTIFACT_DIR}/api-operator-pods.json"
+        api_pods="$(jq -r '.items[] | select(any(.spec.containers[]; .name == "kube-apiserver-operator")) | .metadata.name' "${ARTIFACT_DIR}/api-operator-pods.json")"
+        [[ -n "${api_pods}" ]] || fail "no kube-apiserver-operator pods found"
+        while IFS= read -r api_pod; do
+          oc -n openshift-kube-apiserver-operator logs "${api_pod}" -c kube-apiserver-operator --since-time="${start_time}" --timestamps > "${ARTIFACT_DIR}/${api_pod}.log"
+          if grep -E 'failed to connect to webhook.*(vprovisioning\.kb\.io|cluster-baremetal-webhook-service)|(vprovisioning\.kb\.io|cluster-baremetal-webhook-service).*connection refused' "${ARTIFACT_DIR}/${api_pod}.log" > "${ARTIFACT_DIR}/${api_pod}-webhook-errors.txt"; then
+            fail "fresh CBO webhook connectivity errors in ${api_pod}"
+          fi
+        done <<< "${api_pods}"
+        printf 'observationEnd=%s\nPASS OCPBUGS-137974: CBO webhook reachable on BareMetal; vSphere verification remains separate.\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" | tee -a "${ARTIFACT_DIR}/verification.txt"
+      from: cli-jq
+      grace_period: 3m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 20m0s
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn
+  timeout: 6h0m0s
 - as: metal-ds-ipi-ovn-dualstack-kubevirt-hypershift-f14
   capabilities:
   - intranet
