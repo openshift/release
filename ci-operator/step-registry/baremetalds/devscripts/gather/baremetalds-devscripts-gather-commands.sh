@@ -80,9 +80,11 @@ done
 echo "Get libvirt logs..."
 tar -czC "/var/log/libvirt/qemu" -f "/tmp/artifacts/libvirt-logs.tar.gz" --transform "s?^\.?libvirt-logs?" .
 
+set +x
 . common.sh
 . network.sh
 . utils.sh
+set +x
 
 INTERNAL_SSH_OPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
@@ -94,7 +96,7 @@ echo "Get the bootstrap logs if it is around and we didn't already collect them.
 if ! compgen -G "/root/dev-scripts/ocp/ostest/log-bundle*.tar.gz" > /dev/null 2>&1
 then
   # Collect log bundle
-  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \$BOOTSTRAP_PROVISIONING_IP) TAR_FILE=/tmp/log-bundle-bootstrap.tar.gz sudo -E /usr/local/bin/installer-gather.sh --id bootstrap \${NODE_IPS[@]} &&
+  ssh -n "\${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \$BOOTSTRAP_PROVISIONING_IP) TAR_FILE=/tmp/log-bundle-bootstrap.tar.gz sudo -E /usr/local/bin/installer-gather.sh --id bootstrap \${NODE_IPS[@]} &&
   scp "\${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \$BOOTSTRAP_PROVISIONING_IP):/tmp/log-bundle-bootstrap.tar.gz /tmp/artifacts/log-bundle-bootstrap.tar.gz || true
 fi
 
@@ -123,19 +125,47 @@ do
 done
 
 NODE_IPS=()
-for node_name in "\${NODE_NAMES[@]}"
+for node_index in "\${!NODE_NAMES[@]}"
 do
-  node_ip=\$(sudo virsh net-dumpxml \$BAREMETAL_NETWORK_NAME | xmllint --xpath "string(//host[@name='\$node_name']/@ip)" -)
-    NODE_IPS+=("\$node_ip")
+  node_name=\${NODE_NAMES[\$node_index]}
+  node_ip=
+  if [[ -n "\${AGENT_E2E_TEST_SCENARIO:-}" ]]; then
+    if [[ -r "\${OCP_DIR}/hosts" && "\$node_name" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]*\$ ]]; then
+      node_ip=\$(awk -v name="\$node_name" '\$2 == name { if (NF != 2 || (ip != "" && ip != \$1)) bad=1; ip=\$1 } END { if (!bad) print ip }' "\${OCP_DIR}/hosts")
+    fi
+  else
+    node_ip=\$(sudo virsh net-dumpxml \$BAREMETAL_NETWORK_NAME | xmllint --xpath "string(//host[@name='\$node_name']/@ip)" -) || node_ip=
+  fi
+  if [[ ! "\$node_ip" =~ ^[0-9a-fA-F:.]+\$ ]] ||
+    ! python3 -c 'import ipaddress, sys; ipaddress.ip_address(sys.argv[1])' "\$node_ip" 2>/dev/null; then
+    echo "node_index=\$node_index address=unknown; skipping guest probes"
+    node_ip=
+  fi
+  NODE_IPS+=("\$node_ip")
 done
 
 echo "Checking for pacemaker and podman etcd logs on master nodes..."
 for (( n=0; n<\$NUM_MASTERS; n++ ))
 do
-  HAS_PACEMAKER=\$(ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} sudo test -f /var/log/pacemaker/pacemaker.log && echo true || echo false)
-  HAS_ETCD=\$(ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} sudo podman container exists etcd && echo true || echo false)
-  if \$HAS_PACEMAKER; then
-    ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} \
+  [[ -n "\${NODE_IPS[\$n]}" ]] || continue
+  probe_status=0
+  pacemaker_state=\$(timeout --kill-after=5 30 ssh -n "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} \
+    'sudo -n sh -c '\''if test -f /var/log/pacemaker/pacemaker.log; then echo present; elif test -d /var/log/pacemaker && test -r /var/log/pacemaker; then echo file_absent; else echo unknown; fi'\''') || probe_status=\$?
+  if ((probe_status != 0)) || [[ "\$pacemaker_state" != present && "\$pacemaker_state" != file_absent ]]; then pacemaker_state=unknown; fi
+  echo "host=master-\$n pacemaker_log=\$pacemaker_state probe_exit=\$probe_status"
+  probe_status=0
+  etcd_state=\$(timeout --kill-after=5 30 ssh -n "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} \
+    'sudo -n podman ps -a --format "{{.Names}}"') || probe_status=\$?
+  if ((probe_status != 0)); then
+    etcd_state=unknown
+  elif grep -qx etcd <<< "\$etcd_state"; then
+    etcd_state=present
+  else
+    etcd_state=container_absent
+  fi
+  echo "host=master-\$n podman_etcd=\$etcd_state probe_exit=\$probe_status"
+  if [[ "\$pacemaker_state" == present ]]; then
+    ssh -n "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} \
       sudo cat /var/log/pacemaker/pacemaker.log | \
       sed -E 's/(name="(password|passwd|username)" value=")[^"]*/\1REDACTED/g' \
       > /tmp/pacemaker_\${NODE_NAMES[\$n]//:/_}.log || true
@@ -143,8 +173,8 @@ do
       -C /tmp pacemaker_\${NODE_NAMES[\$n]//:/_}.log || true
     rm -f /tmp/pacemaker_\${NODE_NAMES[\$n]//:/_}.log
   fi
-  if \$HAS_ETCD; then
-    ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} \
+  if [[ "\$etcd_state" == present ]]; then
+    ssh -n "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IPS[\$n]} \
       sudo podman logs etcd > /tmp/podman-etcd_\${NODE_NAMES[\$n]//:/_}.log 2>&1 || true
     tar -czf /tmp/artifacts/podman-etcd_\${NODE_NAMES[\$n]//:/_}.tar.gz \
       -C /tmp podman-etcd_\${NODE_NAMES[\$n]//:/_}.log || true
@@ -158,13 +188,14 @@ if [ "\$(cat logs/installer-status.txt)" == "0" ] ; then exit 0 ; fi
 
 # Collect sos report from each known node
 for NODE_IP in \${NODE_IPS[@]}; do
+  [[ -n "\$NODE_IP" ]] || continue
   echo "Fetching SOS report from \${NODE_IP}"
-  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} sudo mkdir /run/artifacts &&
-  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} \
+  ssh -n "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} sudo mkdir /run/artifacts &&
+  ssh -n "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} \
     sudo journalctl \| sudo dd of=/var/log/journal.log || true
-  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} \
+  ssh -n "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} \
     sudo tar -czf /run/artifacts/journal_\${NODE_IP//:/_}.tar.gz --exclude='var/log/journal' /var/log || true
-  ssh "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} sudo chown -R core:core /run/artifacts
+  ssh -n "\${INTERNAL_SSH_OPTS[@]}" core@\${NODE_IP} sudo chown -R core:core /run/artifacts || true
   scp "\${INTERNAL_SSH_OPTS[@]}" core@\$(wrap_if_ipv6 \${NODE_IP}):/run/artifacts/*.tar* /tmp/artifacts/ || true
 done
 
