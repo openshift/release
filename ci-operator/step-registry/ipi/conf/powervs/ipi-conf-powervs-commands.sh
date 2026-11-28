@@ -298,6 +298,18 @@ case "${LEASED_RESOURCE}" in
       PERSISTENT_TG="tg-lon06-powervs-7-3"
       PERSISTENT_VPC="vpc-lon06-powervs-7-3"
    ;;
+   "lon06--powervs-ops-quota-slice-0")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "${CLUSTER_PROFILE_DIR}/POWERVS_SERVICE_INSTANCE_ID_LON06-0")
+      POWERVS_REGION=lon
+      POWERVS_ZONE=lon06
+      VPCREGION=eu-gb
+   ;;
+   "lon06--powervs-ops-quota-slice-1")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "${CLUSTER_PROFILE_DIR}/POWERVS_SERVICE_INSTANCE_ID_LON06-1")
+      POWERVS_REGION=lon
+      POWERVS_ZONE=lon06
+      VPCREGION=eu-gb
+   ;;
    "mad02-powervs-5-quota-slice-0")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MAD02-0")
       POWERVS_REGION=mad
