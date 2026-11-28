@@ -70,3 +70,5 @@ Diagnostics (availability only — no URLs or secret values): `${ARTIFACT_DIR}/c
 | `tests.log` | Pytest log |
 | `cnv-version-explorer-url-check.txt` | Which URL sources were checked (env / mount / Bitwarden) |
 | `cnv-version-explorer-url-source.txt` | Winning source (`environment`, `credentials-mount`, or `bitwarden:<name>`) |
+
+A missing `cnv-*-on-failure.json` file means that collection failed. The matching `.oc-err.txt` has the `oc` error. `[]` or `{}` means the query succeeded and returned no objects.
