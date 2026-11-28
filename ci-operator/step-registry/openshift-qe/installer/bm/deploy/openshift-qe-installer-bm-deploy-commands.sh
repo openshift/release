@@ -123,6 +123,55 @@ ocp_inventory_override: "${OCP_INVENTORY_PATH}"
 EOF
 fi
 
+# Override base_dns_name with a unique domain per job run
+if [[ -n "${BUILD_ID:-}" ]]; then
+  sed -i "s/^base_dns_name:.*/base_dns_name: pr${PULL_NUMBER:-910}-${BUILD_ID}.test/" /tmp/all.yml
+fi
+
+# Configure IP stack if specified
+if [[ -n "${IP_STACK}" && "${IP_STACK}" != "ipv4" ]]; then
+  case "${IP_STACK}" in
+    ipv6)
+      cat >> /tmp/all.yml <<EOF
+
+controlplane_network:
+- fd00:198:18:10::/64
+controlplane_network_prefix:
+- 64
+cluster_network_cidr:
+- fd01::/48
+cluster_network_host_prefix:
+- 64
+service_network_cidr:
+- fd02::/112
+EOF
+      ;;
+    dualstack)
+      cat >> /tmp/all.yml <<EOF
+
+controlplane_network:
+- 198.18.0.0/16
+- fd00:198:18:10::/64
+controlplane_network_prefix:
+- 16
+- 64
+cluster_network_cidr:
+- 10.128.0.0/14
+- fd01::/48
+cluster_network_host_prefix:
+- 23
+- 64
+service_network_cidr:
+- 172.30.0.0/16
+- fd02::/112
+EOF
+      ;;
+    *)
+      echo "Unknown IP_STACK value: ${IP_STACK}. Continuing with defaults (IPv4)."
+      ;;
+  esac
+fi
+
 if [[ $PUBLIC_VLAN == "false" ]]; then
   echo "Private network deployment"
   sed -i "s/^enable_bond: .*/enable_bond: $BOND/" /tmp/all.yml
