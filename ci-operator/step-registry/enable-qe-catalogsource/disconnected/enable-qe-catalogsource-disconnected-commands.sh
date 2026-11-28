@@ -670,4 +670,8 @@ if [ $mirror -eq 1 ]; then
     echo "Mirror operator images as cluster is C2S or SC2S"
     mirror_optional_images
 fi
-create_catalog_sources
+if [[ "${SKIP_MANAGEMENT_QE_CATALOGSOURCE:-false}" == "true" ]]; then
+    echo "Skipping management QE CatalogSource creation"
+else
+    create_catalog_sources
+fi
