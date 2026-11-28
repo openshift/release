@@ -1,0 +1,67 @@
+base_images:
+  cli:
+    name: "4.19"
+    namespace: ocp
+    tag: cli
+  tools:
+    name: "4.19"
+    namespace: ocp
+    tag: tools
+build_root:
+  project_image:
+    dockerfile_path: ci-builder/Dockerfile
+images:
+  items:
+  - build_args:
+    - name: TARGET_ARCH
+      value: s390x
+    dockerfile_path: Dockerfile
+    optional: true
+    to: ssp-operator-s390x
+  - build_args:
+    - name: TARGET_ARCH
+      value: s390x
+    dockerfile_path: validator.Dockerfile
+    optional: true
+    to: template-validator-s390x
+  skip_if_only_changed: .*
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- always_run: false
+  as: cluster-provision
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: libvirt-s390x-vpn-virt
+    node_architecture: amd64
+    pre:
+    - ref: kubevirt-ssp-cluster-provision
+    test:
+    - ref: kubevirt-ssp-cluster-verify
+  timeout: 4h0m0s
+- always_run: false
+  as: e2e-functests
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: libvirt-s390x-vpn-virt
+    node_architecture: amd64
+    pre:
+    - ref: ipi-install-rbac
+    - ref: kubevirt-ssp-images-check
+    - ref: kubevirt-ssp-cluster-provision
+    - ref: kubevirt-ssp-cluster-verify
+    test:
+    - ref: kubevirt-ssp-e2e
+  timeout: 7h0m0s
+zz_generated_metadata:
+  branch: main
+  org: kubevirt
+  repo: ssp-operator
+  variant: s390x
