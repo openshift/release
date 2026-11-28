@@ -345,9 +345,36 @@ MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
 if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
     source "${SHARED_DIR}/unset-proxy.sh"
 fi
-# Download the binary from mirror
-curl -sL "https://openshift-mirror-list.ci-systems.workers.dev/pub/ci/$(arch)/mco-sanitize/mco-sanitize" > /tmp/mco-sanitize
-chmod +x /tmp/mco-sanitize
+function downloadSanitizer() {
+    local attempt destination status
+    for attempt in 1 2 3; do
+        echo "Downloading required mco-sanitize (attempt ${attempt}/3)..."
+        destination=$(mktemp /tmp/mco-sanitize.XXXXXX)
+        if curl --silent --show-error --fail --location --connect-timeout 30 --max-time 60 \
+            --output "${destination}" "https://openshift-mirror-list.ci-systems.workers.dev/pub/ci/$(arch)/mco-sanitize/mco-sanitize"; then
+            if chmod +x "${destination}" && mv -T "${destination}" /tmp/mco-sanitize; then
+                echo "Required mco-sanitize download complete."
+                return 0
+            else
+                status=$?
+            fi
+            rm -f "${destination}"
+            echo "ERROR: required mco-sanitize installation failed (exit ${status}); must-gather will not run." >&2
+            return "${status}"
+        else
+            status=$?
+        fi
+        rm -f "${destination}"
+        echo "WARNING: mco-sanitize download attempt ${attempt}/3 failed (curl exit ${status})." >&2
+        if [ "${attempt}" -lt 3 ]; then
+            sleep $((5 * attempt))
+        fi
+    done
+    echo "ERROR: required mco-sanitize download failed after 3 attempts; must-gather will not run." >&2
+    return "${status}"
+}
+
+downloadSanitizer
 if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
