@@ -107,7 +107,400 @@ if [[ -n "${CLUSTER_API_INSTALLER_REF:-}" ]]; then
   EXTRA_VARS+=("-e" "cluster_api_installer_ref=${CLUSTER_API_INSTALLER_REF}")
 fi
 
-echo "Running rosa-hcp-e2e tests (name_prefix=${NAME_PREFIX})..."
-"${PYTHON}" run-test-suite.py ${TEST_SUITE} --ai-agent "${EXTRA_VARS[@]}" 2>&1 | tee "${ARTIFACT_DIR}/rosa-hcp-e2e-test.log"
+# Name of the structured result artifact.
+SUMMARY_NAME="rosa-hcp-e2e-test-summary.json"
 
-echo "Tests complete. Results at ${ARTIFACT_DIR}/rosa-hcp-e2e-test.log"
+# Summarise the test runner's own reports into a publishable artifact.
+#
+# run-test-suite.py writes JSON, HTML and JUnit reports under test-results/
+# whether the suite passed or failed, so the per-test outcomes already exist on
+# disk - they are simply discarded with the container. They cannot be copied
+# into ARTIFACT_DIR as they stand: every one of those reports embeds free-form
+# material produced by the ansible run (failure messages, captured playbook
+# stdout in <system-out>, playbook and feature names, local file paths), and
+# ARTIFACT_DIR is published publicly. So nothing is copied. The helper reads the
+# runner's JUnit report and republishes only integers and generated ordinals:
+# how many testcases ran, and for each one whether it passed, failed, errored
+# or was skipped. An ordinal is a position in the report and nothing more - it
+# is not a key into rosa-hcp-e2e-test.log, whose console output does not
+# enumerate testcases in the same granularity the JUnit report does.
+#
+# Run with -I: the working directory here is the test repository that was just
+# cloned and pip installed into, and isolated mode is what keeps a module there
+# - a json.py, an xml/ package - from shadowing a stdlib import of the helper.
+export_structured_results() {
+  local results_root=$1 summary_path=$2
+  "${PYTHON}" -I - "${results_root}" "${summary_path}" <<'PYTHON_HELPER'
+"""Summarise the rosa-hcp-e2e-test JUnit report into content-free results.
+
+Reads the single JUnit report the runner leaves under <checkout>/test-results/
+and writes a bounded JSON summary holding totals and one record per testcase,
+up to MAX_CASES_RECORDED of them. A record carries a generated ordinal - its
+position in the report, not a key into any other artifact - and an outcome
+drawn from a fixed set. It never carries a name, a classname, a message, a
+timestamp, a duration or a path, all of which are free-form text this step
+does not control.
+
+Every refusal is recorded as a fixed reason token in the summary itself and the
+process still exits 0: this is diagnostics, and it must not be able to turn a
+passing run into a failing one or the reverse.
+"""
+
+import json
+import os
+import re
+import stat
+import sys
+import tempfile
+import xml.etree.ElementTree as ET
+
+SCHEMA = 1
+DIR_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+# The runner writes exactly one dated JUnit report per run into a checkout that
+# this step created moments earlier, so these bounds are far above anything a
+# healthy run produces and exist only to cap a hostile or corrupted tree.
+MAX_REPORT_BYTES = 8 * 1024 * 1024
+MAX_SCAN_ENTRIES = 512
+MAX_CASES_PARSED = 5000
+MAX_CASES_RECORDED = 1000
+REPORT_PREFIX = "test-run"
+REPORT_SUFFIX = ".xml"
+# An XML declaration is only a declaration at the very start of the document,
+# so matching is anchored. The scan is bounded by the declaration's own ">"
+# rather than by a byte count: XML allows arbitrary whitespace inside the
+# declaration, so any fixed bound could simply be padded past.
+XML_DECLARED_ENCODING = re.compile(rb"""\A<\?xml[^>]*?encoding\s*=\s*["']([^"']{1,64})["']""")
+UTF8_NAMES = (b"utf-8", b"utf8")
+# JUnit child tag -> the outcome token published for the testcase, worst first:
+# this is also the precedence order, see case_outcome(). The token is singular
+# and is deliberately not the plural key the same outcome uses under "totals".
+OUTCOMES = (("error", "error"), ("failure", "failed"), ("skipped", "skipped"))
+# Outcome token -> its counter under "totals".
+TOTALS_KEY = {"passed": "passed", "failed": "failed", "error": "errors",
+              "skipped": "skipped"}
+
+
+class Unavailable(Exception):
+    """A refusal, carrying a fixed reason token and only integer fields.
+
+    The token travels on the exception rather than being recovered from its
+    message, because an OSError message carries a path and no exception text is
+    ever copied into the summary.
+    """
+
+    def __init__(self, reason, **fields):
+        super().__init__(reason)
+        self.reason = reason
+        self.fields = fields
+
+
+def collect_candidates(root_fd):
+    """List (dated directory, report) pairs without following any link."""
+    budget = MAX_SCAN_ENTRIES
+    candidates = []
+    with os.scandir(root_fd) as entries:
+        for entry in entries:
+            budget -= 1
+            if budget < 0:
+                raise Unavailable("scan-limit")
+            if not entry.is_dir(follow_symlinks=False):
+                continue
+            date_fd = os.open(entry.name, DIR_FLAGS, dir_fd=root_fd)
+            try:
+                with os.scandir(date_fd) as children:
+                    for child in children:
+                        budget -= 1
+                        if budget < 0:
+                            raise Unavailable("scan-limit")
+                        if not child.name.startswith(REPORT_PREFIX):
+                            continue
+                        if not child.name.endswith(REPORT_SUFFIX):
+                            continue
+                        if not child.is_file(follow_symlinks=False):
+                            continue
+                        candidates.append((entry.name, child.name))
+            finally:
+                os.close(date_fd)
+    return candidates
+
+
+def read_report(results_root, date_name, report_name):
+    """Read one report, opening every component relative to a directory.
+
+    Both names come from scandir, so neither can contain a separator or a
+    relative component, and O_NOFOLLOW on each open means no link anywhere in
+    the tree can redirect the read outside the results root.
+    """
+    root_fd = os.open(results_root, DIR_FLAGS)
+    try:
+        date_fd = os.open(date_name, DIR_FLAGS, dir_fd=root_fd)
+        try:
+            # O_NONBLOCK so a fifo that replaced the report between the scan
+            # and this open returns instead of parking the step on a read with
+            # no writer until the four hour step timeout. It is a no-op for the
+            # regular file this is meant to be, and the check below still runs.
+            descriptor = os.open(report_name,
+                                 os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK,
+                                 dir_fd=date_fd)
+        finally:
+            os.close(date_fd)
+    finally:
+        os.close(root_fd)
+    with os.fdopen(descriptor, "rb") as report:
+        if not stat.S_ISREG(os.fstat(report.fileno()).st_mode):
+            raise Unavailable("irregular-report")
+        data = report.read(MAX_REPORT_BYTES + 1)
+    if len(data) > MAX_REPORT_BYTES:
+        raise Unavailable("oversized-report")
+    return data
+
+
+def case_outcome(case):
+    """Classify one testcase from the tag names of its direct children.
+
+    Standard JUnit: an <error> outranks a <failure>, which outranks a
+    <skipped>, and a testcase carrying none of them passed. Only tag names are
+    read - never an attribute or element text, both of which hold free-form
+    detail - so an unrecognised child cannot smuggle anything into the summary.
+    """
+    present = set()
+    for child in case:
+        if isinstance(child.tag, str):
+            present.add(child.tag)
+    for tag, outcome in OUTCOMES:
+        if tag in present:
+            return outcome
+    return "passed"
+
+
+def summarise(data):
+    """Tally the report, refusing anything that is not plainly well formed."""
+    if data[:3] == b"\xef\xbb\xbf":
+        data = data[3:]
+    # The doctype check below is a byte scan, so it only holds for an
+    # ASCII compatible encoding; expat would otherwise honour a UTF-16 or
+    # UTF-32 declaration and parse right past it. The runner writes UTF-8, so
+    # anything whose first bytes are not a plain ASCII "<" is refused here
+    # rather than handed to a parser this check cannot cover.
+    if not data.startswith(b"<") or b"\x00" in data[:4]:
+        raise Unavailable("unsupported-encoding")
+    # The prefix check only rules out encodings that are not ASCII compatible.
+    # A report declaring, say, ISO-8859-1 still looks like ASCII at the prolog,
+    # and ElementTree honours that declaration - so without this the step would
+    # summarise a report it cannot claim to have understood. Decode to prove
+    # the bytes really are UTF-8; the decoder's message is dropped rather than
+    # recorded, because it quotes the offending bytes, which are report content.
+    try:
+        data.decode("utf-8")
+    except UnicodeDecodeError:
+        raise Unavailable("unsupported-encoding")
+    # Bytes that decode as UTF-8 can still carry a declaration naming another
+    # encoding. That contradiction is exactly the ambiguity this step refuses:
+    # the parser would follow the declaration, not the validation above.
+    prolog_end = data.find(b">") + 1
+    declared = XML_DECLARED_ENCODING.match(data[:prolog_end]) if prolog_end else None
+    if declared and declared.group(1).lower() not in UTF8_NAMES:
+        raise Unavailable("unsupported-encoding")
+    # ElementTree expands internally declared entities, which is an
+    # amplification vector on input this step does not control. The runner's
+    # output has no doctype, so a document carrying one is refused outright
+    # rather than parsed. XML keywords are case sensitive, so an exact match is
+    # the whole test, and a conforming serialiser escapes "<" everywhere it is
+    # not markup, so this cannot fire on captured output that quotes a doctype.
+    if b"<!DOCTYPE" in data or b"<!ENTITY" in data:
+        raise Unavailable("doctype-rejected")
+    try:
+        root = ET.fromstring(data)
+    except (ET.ParseError, ValueError):
+        raise Unavailable("malformed-report")
+    if root.tag not in ("testsuite", "testsuites"):
+        raise Unavailable("unexpected-root")
+    # Every <testsuite> at any depth, not only the root's own children: a suite
+    # nested one level deeper would otherwise be dropped silently, and dropping
+    # a suite loses its failures while still reporting success. Each suite then
+    # tallies only its direct <testcase> children, so a nested suite's cases are
+    # counted once, under the suite they belong to.
+    suites = list(root.iter("testsuite"))
+    if not suites:
+        raise Unavailable("no-testsuites")
+
+    # An ordinal is published as a position in the report, so it has to follow
+    # document order. Numbering suite by suite instead would place a nested
+    # suite's cases after cases that come later in the document, and at the
+    # record cap it would retain the wrong prefix - dropping a failure that
+    # belongs in it. Ownership is resolved first, in one pass over the direct
+    # children of each suite; the walk below then visits testcases in document
+    # order without recursing itself. A testcase with no owner is not the
+    # direct child of any suite and is not counted.
+    owners = {}
+    for index, suite in enumerate(suites, start=1):
+        suite_id = "suite-%04d" % index
+        for case in suite.iterfind("testcase"):
+            owners[case] = suite_id
+
+    totals = {"tests": 0, "passed": 0, "failed": 0, "errors": 0, "skipped": 0}
+    cases = []
+    for case in root.iter("testcase"):
+        suite_id = owners.get(case)
+        if suite_id is None:
+            continue
+        totals["tests"] += 1
+        if totals["tests"] > MAX_CASES_PARSED:
+            raise Unavailable("report-too-large")
+        outcome = case_outcome(case)
+        totals[TOTALS_KEY[outcome]] += 1
+        if len(cases) < MAX_CASES_RECORDED:
+            cases.append({"id": "case-%04d" % totals["tests"],
+                          "suite": suite_id,
+                          "outcome": outcome})
+    return {
+        "schema": SCHEMA,
+        "status": "summarized",
+        "suites": len(suites),
+        "totals": totals,
+        "cases": cases,
+        "cases_dropped": totals["tests"] - len(cases),
+    }
+
+
+def build(results_root):
+    """Produce the summary for the one report the runner should have left."""
+    try:
+        root_fd = os.open(results_root, DIR_FLAGS)
+    except FileNotFoundError:
+        raise Unavailable("no-results-directory")
+    try:
+        candidates = collect_candidates(root_fd)
+    finally:
+        os.close(root_fd)
+    if not candidates:
+        raise Unavailable("no-report")
+    if len(candidates) > 1:
+        # Guessing which of several reports describes this run would publish
+        # results that may belong to another one.
+        raise Unavailable("ambiguous-report", reports_seen=len(candidates))
+    return summarise(read_report(results_root, *candidates[0]))
+
+
+def write_summary(summary_path, summary):
+    """Publish the summary atomically, refusing to follow or replace a link.
+
+    The document is written to a staging file beside the destination and only
+    linked into place once it is complete on disk. Two failure modes motivate
+    that. A write that fails part way - the artifact directory filling up
+    behind the tee'd runner log is the realistic way - leaves bytes already
+    flushed; and a kill that skips Python's handlers entirely, which is how
+    the step ends when the job times out, leaves them with no chance to clean
+    up. Either way the final name must be a complete summary or absent, never
+    half a JSON document that a reader would take for the real thing.
+
+    os.link is the publication step rather than os.replace: link refuses a
+    destination that already exists, of any kind including a symlink, so the
+    no-clobber and no-follow guarantees of the previous direct O_EXCL creation
+    are kept. Staging is handled through its descriptor, and linked with
+    follow_symlinks=False, so no step here dereferences a name: otherwise a
+    name replaced underneath us between creation and publication would decide
+    what gets published. The staging file is removed either way; a kill
+    between the write and the link can leave one behind, bounded by the
+    summary's own size and under a name no consumer reads.
+    """
+    directory = os.path.dirname(summary_path) or "."
+    descriptor, staging = tempfile.mkstemp(prefix=".capa-summary-", dir=directory)
+    try:
+        with os.fdopen(descriptor, "w") as artifact:
+            json.dump(summary, artifact, sort_keys=True)
+            artifact.write("\n")
+            artifact.flush()
+            os.fchmod(artifact.fileno(), 0o644)
+            os.fsync(artifact.fileno())
+        os.link(staging, summary_path, follow_symlinks=False)
+    finally:
+        try:
+            os.unlink(staging)
+        except OSError:
+            pass
+
+
+def main(argv):
+    """Summarise, then report the outcome in integers and fixed tokens only."""
+    results_root, summary_path = argv[1], argv[2]
+    try:
+        summary = build(results_root)
+    except Unavailable as refusal:
+        summary = dict(refusal.fields, schema=SCHEMA, status="unavailable",
+                       reason=refusal.reason)
+    except OSError as error:
+        summary = {"schema": SCHEMA, "status": "unavailable", "reason": "io-error",
+                   "errno": error.errno}
+    except Exception:  # pylint: disable=broad-except
+        summary = {"schema": SCHEMA, "status": "unavailable", "reason": "internal-error"}
+
+    try:
+        write_summary(summary_path, summary)
+    except Exception:  # pylint: disable=broad-except
+        # The caller writes its own fallback when the artifact is absent, so
+        # this path stays silent about why - the reason could name a path.
+        print("WARNING: could not write the structured result summary")
+        return 0
+
+    if summary["status"] == "summarized":
+        totals = summary["totals"]
+        print("Structured results: %d tests, %d passed, %d failed, %d errors, %d skipped"
+              % (totals["tests"], totals["passed"], totals["failed"],
+                 totals["errors"], totals["skipped"]))
+    else:
+        # WARNING, because an upstream change to the runner's output layout
+        # would otherwise degrade every build to this line unnoticed.
+        print("WARNING: structured results unavailable (reason=%s)" % summary["reason"])
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
+PYTHON_HELPER
+}
+
+echo "Running rosa-hcp-e2e tests (name_prefix=${NAME_PREFIX})..."
+RESULTS_ROOT="${PWD}/test-results"
+# The step must exit with the runner's own status, but under pipefail a
+# pipeline reports the rightmost non-zero status - tee's, whenever tee is the
+# one that failed. A tee that cannot write the log would therefore fail an
+# otherwise passing run, and, worse, replace a real failure's status with its
+# own. Take the whole PIPESTATUS array in a single assignment: any command run
+# in between replaces it, so the two statuses cannot be read one at a time. The
+# default stands when the pipeline succeeds and the || branch is not taken.
+PIPE_STATUS=(0 0)
+"${PYTHON}" run-test-suite.py ${TEST_SUITE} --ai-agent "${EXTRA_VARS[@]}" 2>&1 | tee "${ARTIFACT_DIR}/rosa-hcp-e2e-test.log" || PIPE_STATUS=("${PIPESTATUS[@]}")
+RUN_STATUS=${PIPE_STATUS[0]}
+if [[ "${PIPE_STATUS[1]:-0}" -ne 0 ]]; then
+  # Not fatal - the runner's own status still decides the step - but the log
+  # is the artifact everything else refers to, so say that it is unreliable.
+  # Best effort, like the export below: under errexit a failed write to a
+  # closed or full stderr would otherwise end the step here, discarding the
+  # runner status this block exists to preserve. This covers ordinary write
+  # errors only; nothing here can promise the process survives a signal.
+  echo "WARNING: tee exited ${PIPE_STATUS[1]}; ${ARTIFACT_DIR}/rosa-hcp-e2e-test.log may be incomplete" >&2 || true
+fi
+
+# Best effort, and deliberately after RUN_STATUS has been captured: the step
+# still exits with the runner's own status below, whatever the export does.
+# The summariser is the only writer of the artifact. It creates its destination
+# with O_CREAT|O_EXCL|O_NOFOLLOW and records every refusal it can reach as a
+# reason token inside the file itself, so a shell-side placeholder would add
+# nothing except a second, weaker path to the same destination: a redirection
+# cannot be made to refuse a fifo or a device that appears underneath it, and
+# that path would be the one undoing the summariser's guarantee. There is
+# therefore no fallback, and a run whose summariser could not run at all simply
+# publishes no summary, which the step's documentation states.
+export_structured_results "${RESULTS_ROOT}" "${ARTIFACT_DIR}/${SUMMARY_NAME}" || true
+
+# Both messages are best effort for the same reason as the warning above: the
+# step's status is already decided, and a diagnostic that cannot be written
+# must not be what changes it.
+if [[ "${RUN_STATUS}" -eq 0 ]]; then
+  echo "Tests complete. Results at ${ARTIFACT_DIR}/rosa-hcp-e2e-test.log" || true
+else
+  echo "Tests failed with status ${RUN_STATUS}. Results at ${ARTIFACT_DIR}/rosa-hcp-e2e-test.log" >&2 || true
+fi
+
+exit "${RUN_STATUS}"
