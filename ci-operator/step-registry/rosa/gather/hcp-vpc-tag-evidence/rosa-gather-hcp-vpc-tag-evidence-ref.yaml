@@ -1,0 +1,56 @@
+ref:
+  as: rosa-gather-hcp-vpc-tag-evidence
+  best_effort: true
+  from: rosa-aws-cli
+  grace_period: 1m0s
+  timeout: 5m0s
+  commands: rosa-gather-hcp-vpc-tag-evidence-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: REGION
+    default: ""
+    documentation: |-
+      AWS region of the job-provisioned VPC, overriding the LEASED_RESOURCE
+      environment variable from the cluster profile.
+  documentation: |-
+    Records, while the cluster still exists, whether the guest cluster's
+    Infrastructure name matches the infrastructure identifier CI used to tag
+    the job-provisioned VPC, and whether the two expected
+    kubernetes.io/cluster/<name> tags are present on that VPC.
+
+    Conformance cases that assert on VPC tags expect the guest Infrastructure
+    name tagged "owned", while CI provisioning tags the VPC with the identifier
+    from ${SHARED_DIR}/infra_id as "shared". The runtime tag state is not
+    retained, because the VPC is deleted during teardown, so this step must run
+    before teardown to observe it at all.
+
+    Purely observational and best-effort:
+    - Always exits 0, so the conformance verdict and later cleanup steps are
+      unaffected.
+    - Runs at most one guest API read and one read-only AWS CLI invocation,
+      the latter a single describe-tags request scoped to the one VPC recorded
+      in ${SHARED_DIR}/vpc_id and to the two expected tag keys. describe-tags
+      is a paginated operation, so the invocation passes --no-paginate to hold
+      it to that one request and treats a truncated answer as undetermined.
+      The bound is therefore one scoped request per invocation rather than one
+      HTTP exchange: the client may still retry that same request up to
+      AWS_MAX_ATTEMPTS times, and each invocation is time-bounded regardless.
+      It performs no discovery, listing or fallback lookup of any other
+      resource, and adds no new credential or mount: it reads the same
+      cluster-profile credential the job already uses for that VPC.
+    - It does need the ec2:DescribeTags action. The job's existing
+      ec2:CreateTags use on this VPC does not by itself grant that action, so
+      if the cluster-profile policy omits it the call is denied, both tag
+      states stay "unavailable", and nothing else changes.
+    - Emits only fixed states, reporting "unavailable" (could not be
+      determined) distinctly from "absent" (determined to be missing). A
+      response is classified only after it is accepted as exactly one complete
+      JSON document whose Tags is an array of well-formed entries, so a valid
+      document of an unexpected shape, or a truncated one, is "unavailable"
+      rather than a false "absent"; an empty Tags array is well formed and is
+      a real absence.
+      Identifiers, tag keys, tag values, command stderr and raw API output are
+      never logged or written to artifacts.
