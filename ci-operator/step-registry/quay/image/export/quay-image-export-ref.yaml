@@ -1,0 +1,26 @@
+ref:
+  as: quay-image-export
+  from_image:
+    namespace: ocp
+    name: cli-jq
+    tag: latest
+  commands: quay-image-export-commands.sh
+  dependencies:
+  - env: QUAY_EXPORT_SOURCE
+    name: src
+  env:
+  - name: QUAY_EXPORT_DESTINATION
+    documentation: Explicit quay.io/organization/repository:tag to publish.
+  - name: QUAY_EXPORT_AUTH_FILE
+    default: /var/run/quay-export/config.json
+    documentation: Caller-mounted Docker auth JSON containing an auths["quay.io"].auth entry.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 1h
+  grace_period: 30s
+  documentation: |-
+    Export one image dependency to a tagged Quay repository. Bind QUAY_EXPORT_SOURCE
+    to the desired pipeline image. Credentials are deliberately not selected here:
+    see README.md for a caller-owned credential wrapper sharing these commands.
