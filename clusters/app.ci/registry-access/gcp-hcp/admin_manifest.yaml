@@ -1,0 +1,81 @@
+# this is the Namespace in which the image-puller and its token Secret live
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    ci.openshift.io/gitops-managed: "true"
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false,Delete=confirm
+    openshift.io/description: Image pull access credentials for GCP HCP CI environments
+    openshift.io/display-name: GCP HCP CI
+  name: gcp-hcp
+---
+# this is the ServiceAccount whose credentials are used to pull CI images
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: image-puller
+  namespace: gcp-hcp
+automountServiceAccountToken: false
+---
+# the token controller populates this Secret with a token for the image-puller
+# ServiceAccount; automountServiceAccountToken: false above does not prevent
+# this. GCP HCP extracts the token and owns it. The token has no built-in
+# expiration: to replace it, use a NEW, never-reused Secret name (e.g.
+# image-puller-token-v2) per the repo token-rotation SOP.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: image-puller-token-v1
+  namespace: gcp-hcp
+  annotations:
+    kubernetes.io/service-account.name: image-puller
+type: kubernetes.io/service-account-token
+---
+# this grants the ServiceAccount rights to pull images from the ocp namespace
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: gcp-hcp-image-puller-binding
+  namespace: ocp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+  - kind: ServiceAccount
+    namespace: gcp-hcp
+    name: image-puller
+---
+# this adds the admins to the project.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: gcp-hcp-viewer-binding
+  namespace: gcp-hcp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: view
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    # This is a group from Rover https://rover.redhat.com/groups/
+    name: gcp-hcp-eng
+---
+# this grants the right to read the ServiceAccount's credentials and pull
+# images to the admins.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: gcp-hcp-admins-binding
+  namespace: gcp-hcp
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    # This is a group from Rover https://rover.redhat.com/groups/
+    name: gcp-hcp-eng
