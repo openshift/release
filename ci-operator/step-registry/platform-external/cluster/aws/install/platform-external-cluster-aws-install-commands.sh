@@ -77,6 +77,39 @@ for TEMPLATE in "${TEMPLATES[@]}"; do
   curl -sL "${TEMPLATE_URL}/${TEMPLATE}" > "${TEMPLTE_DEST}/${TEMPLATE}"
 done
 
+# Patch control-plane template VolumeType when MASTER_VOLUME_TYPE is set.
+# The upstream 05_cluster_master_nodes.yaml template contains exactly three
+# VolumeType entries (one per control-plane node); all three must be present
+# for the replacement to proceed.  This is a safety gate: if the upstream
+# template layout changes, the step will fail loudly rather than silently
+# produce a partial patch.
+MASTER_VOLUME_TYPE="${MASTER_VOLUME_TYPE:-gp2}"
+MASTER_TEMPLATE="${TEMPLTE_DEST}/05_cluster_master_nodes.yaml"
+
+case "${MASTER_VOLUME_TYPE}" in
+  gp2|gp3) ;;
+  *) log "ERROR: MASTER_VOLUME_TYPE must be gp2 or gp3, got '${MASTER_VOLUME_TYPE}'" ; exit 1 ;;
+esac
+
+EXPECTED_COUNT=3
+ACTUAL_COUNT=$(grep -c 'VolumeType: "gp2"' "${MASTER_TEMPLATE}" || true)
+if [[ "${ACTUAL_COUNT}" -ne "${EXPECTED_COUNT}" ]]; then
+  log "ERROR: Expected ${EXPECTED_COUNT} VolumeType entries in ${MASTER_TEMPLATE}, found ${ACTUAL_COUNT}"
+  exit 1
+fi
+
+if [[ "${MASTER_VOLUME_TYPE}" != "gp2" ]]; then
+  sed -i 's/VolumeType: "gp2"/VolumeType: "'"${MASTER_VOLUME_TYPE}"'"/' "${MASTER_TEMPLATE}"
+  PATCHED_COUNT=$(grep -c "VolumeType: \"${MASTER_VOLUME_TYPE}\"" "${MASTER_TEMPLATE}")
+  if [[ "${PATCHED_COUNT}" -ne "${EXPECTED_COUNT}" ]]; then
+    log "ERROR: Post-patch count mismatch: expected ${EXPECTED_COUNT} '${MASTER_VOLUME_TYPE}', found ${PATCHED_COUNT}"
+    exit 1
+  fi
+  log "Patched control-plane VolumeType to ${MASTER_VOLUME_TYPE} (${PATCHED_COUNT} entries)"
+else
+  log "Control-plane VolumeType: gp2 (default, no patch needed)"
+fi
+
 echo "================================="
 echo "CREATING INFRASTRUCTURE RESOURCES"
 echo "================================="
