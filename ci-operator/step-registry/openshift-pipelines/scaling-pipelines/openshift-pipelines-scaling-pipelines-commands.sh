@@ -56,7 +56,13 @@ AWS_BUCKET_NAME="$( cat /usr/local/ci-secrets/openshift-pipelines-scaling-pipeli
 AWS_SECRET_KEY="$( cat /usr/local/ci-secrets/openshift-pipelines-scaling-pipelines/aws-secret-key )"
 
 cd "$(mktemp -d)"
-git clone --branch main https://github.com/openshift-pipelines/performance.git .
+# Point rehearse / citi fork jobs at the performance fork+branch that carries
+# Results API HA setup and Chains signing-secrets bootstrap fixes. Override with
+# PERFORMANCE_REPO / PERFORMANCE_BRANCH if needed. Upstream periodics can keep
+# openshift-pipelines/performance@main once those land.
+PERFORMANCE_REPO="${PERFORMANCE_REPO:-https://github.com/deekshith-24/performance.git}"
+PERFORMANCE_BRANCH="${PERFORMANCE_BRANCH:-citi-results-scale-tooling}"
+git clone --branch "$PERFORMANCE_BRANCH" "$PERFORMANCE_REPO" .
 
 # If this is a PR check of the performance repo (not rehearse job), switch to PR branch
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
