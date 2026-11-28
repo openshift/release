@@ -87,7 +87,22 @@ compute:
 - architecture: ${architecture}
   hyperthreading: Enabled
   name: worker
+  platform:
+    azure:
+      dataDisks:
+        - nameSuffix: etcddisk
+          cachingType: None
+          diskSizeGB: 20
+          lun: 0
+  diskSetup:
+    - type: etcd
+      etcd:
+        platformDiskID: etcddisk
   replicas: ${workers}
+networking:
+  ovnKubernetesConfig:
+    ipv4:
+      internalJoinSubnet: 100.89.0.0/16
 "
 
 echo "[INFO] Looking for patches to the install-config.yaml..."
