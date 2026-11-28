@@ -2,26 +2,114 @@ ref:
   as: interop-opp-deploy-acs
   commands: interop-opp-deploy-acs-commands.sh
   documentation: |-
-    Deploys the Red Hat Advanced Cluster Security (ACS/RHACS) operator via OLM
-    subscription. Creates the namespace, OperatorGroup, and Subscription, then
+    Deploys the Red Hat Advanced Cluster Security (ACS/RHACS) operator via a
+    direct OLM Subscription (namespace, OperatorGroup, Subscription), then
     waits for the CSV to reach Succeeded phase.
+
+    INTEROP-9525 workaround: on OCP 5.x, ACM 2.17's governance-policy-addon-
+    controller gates OperatorPolicy on openshiftVersion-major == "4", so the
+    policy path never installs the operator. This step restores the operator
+    precondition; ACM's ConfigurationPolicy (not gated) then creates the
+    Central/SecuredCluster CRs in a later step. Remove this step when an ACM
+    2.17.z carrying stolostron/governance-policy-addon-controller#1397 ships
+    in release-2.17: the step self-disables (workaround_removal_ready=true)
+    when the OperatorPolicy is Compliant with a matching channel and the CSV
+    named by the Subscription's status.currentCSV is Succeeded; an unnamed,
+    unreadable or non-Succeeded current CSV withholds the self-disable
+    (csv_self_disable_withheld) and leaves the outcome to the adopt path and
+    the CSV wait.
+
+    Contract: single JUnit testcase (acs-deploy / lp-interop--OPP--acs-deploy)
+    with classification in the failure type/message only; a default-failing
+    case is pre-seeded on disk before any work (a SIGKILL still leaves a
+    failing case; missing JUnit reads as unknown, never green). Failure
+    classes, in precedence order: acs-operatorpolicy-query-failed (fail
+    closed: neither a failed OperatorPolicy CRD lookup nor a failed
+    cluster-wide list is read as "no policy", so it can never install a
+    second Subscription),
+    acs-subscription-query-failed (3
+    consecutive query failures: an error is never classified as absence or
+    timeout), acs-catalog-missing, acs-catalog-query-failed (non-reverting),
+    acs-subscription-unsatisfiable, acs-installplan-missing/-failed,
+    acs-csv-failed, acs-csv-timeout, default acs-unclassified:* (JUnit
+    error). Existing objects are adopted, never modified (the Subscription
+    and the OperatorGroup are both created with oc create and adopted on
+    AlreadyExists; nothing this step did not create is ever written). A
+    second OperatorGroup appearing concurrently from another writer is
+    reconciled by removing only the group this step created (a second group
+    makes every CSV in the namespace TooManyOperatorGroups); a group only
+    another writer created is never removed. Channel mismatches are recorded
+    as properties. The packagemanifest precondition belongs to the create
+    path: the requested channel has to be listed by the current
+    packagemanifest only when this step creates the Subscription. An adopted
+    Subscription is never gated on catalog state, so a channel the listing no
+    longer offers is recorded instead (channel_delisted for the adopted
+    Subscription's own channel, channel_requested_unlisted for the requested
+    one), a missing packagemanifest or a failed catalog query is recorded as
+    catalog_precondition, and the CSV wait plus the Subscription conditions
+    classify the outcome. Provenance properties
+    (created|adopted, channel_requested/observed, channel_delisted,
+    channel_requested_unlisted, catalog_precondition, csv_name) are written to
+    acs-deploy-properties.txt. Durable authority: opp-interop-testing
+    docs/design/acs-deploy-evidence.md.
+
+    Timeout budget. Input validation enforces the wait SUM (fail-fast, exit
+    2): ACS_CSV_WAIT_TIMEOUT + ACS_INSTALL_TIMEOUT ≤ 1230s. A shared work
+    deadline of 1650s (timeout 30m − grace 150s) is the runtime authority:
+    elapsed setup and precondition charge against it, and each phase deadline
+    is capped at the deadline minus 145s (diagnostics ≤120s + one in-flight
+    oc request ≤25s). Classification (acs-csv-timeout) and JUnit therefore
+    complete without relying on setup staying under a fixed allowance or on
+    every oc request returning before its phase deadline. Every oc call
+    carries --request-timeout=20s. TERM path: JUnit emitted first.
   env:
     - default: stable
-      documentation: OLM channel for the ACS operator subscription
+      documentation: |-
+        OLM channel for the ACS operator subscription. The default `stable`
+        matches policy-acs-operator-central's enforced channel (one channel
+        owner by construction; resolved to rhacs-operator.v4.11.6 on the
+        OCP 5.0 catalog, rehearsal build 2115229706075770880). Must match
+        ^[A-Za-z0-9][A-Za-z0-9._-]*$ or the step fails fast (exit 2). The
+        value has to be listed by the current packagemanifest only when the
+        step creates the Subscription; an adopted Subscription keeps its own
+        channel and is never overwritten or re-channeled.
       name: ACS_CHANNEL
-    - default: 15m
-      documentation: Timeout for the ACS operator CSV to reach Succeeded
+    - default: "600"
+      documentation: |-
+        Timeout in integer seconds (1..900) for the CSV to reach Succeeded
+        phase. Integer seconds only: no duration strings. Leading zeros are
+        accepted and normalized to decimal (0600 means 600 seconds, never
+        octal 384); the normalized value is what the wait-sum check, the
+        phase deadline, and the log lines use.
       name: ACS_INSTALL_TIMEOUT
+    - default: "600"
+      documentation: |-
+        Timeout in integer seconds (1..900) for the Subscription to resolve
+        a currentCSV name. Integer seconds only. Leading zeros are accepted
+        and normalized to decimal (0600 means 600 seconds, never octal 384);
+        the normalized value is what the wait-sum check, the phase deadline,
+        and the log lines use.
+      name: ACS_CSV_WAIT_TIMEOUT
     - default: rhacs-operator
-      documentation: Namespace for the ACS operator
+      documentation: |-
+        Namespace for the ACS operator: the Subscription, the OperatorGroup,
+        the CSV wait, and the CSV label selector. Must be a DNS-1123 label
+        (lowercase alphanumerics and hyphens, an alphanumeric at each end, at
+        most 63 characters). A malformed value is rejected before any cluster
+        call with exit 2 (class acs-invalid-input), so it can never reach the
+        namespace create, the OperatorGroup manifest, or the label selector.
       name: ACS_NAMESPACE
-    - default: stackrox
-      documentation: Namespace for ACS Central
-      name: ACS_CENTRAL_NAMESPACE
+    - default: "0"
+      documentation: |-
+        Set to "1" for detection-only mode: report object states
+        (subscription present/absent, channel, CSV phase) as properties and
+        exit 0 without installing. Used when the workaround is retired but
+        the detection surface is retained.
+      name: ACS_REPORT_ONLY
   from: cli
-  grace_period: 1m
+  grace_period: 150s
   resources:
     requests:
       cpu: 100m
       memory: 100Mi
-  timeout: 20m
+  timeout: 30m
