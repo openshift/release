@@ -1,0 +1,74 @@
+ref:
+  as: sandboxed-containers-operator-hcp-conf-aws
+  from: upi-installer
+  cli: latest
+  dependencies:
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST
+  - name: hypershift-operator
+    env: HYPERSHIFT_RELEASE_LATEST
+  credentials:
+  - mount_path: /etc/ci-pull-credentials
+    bundle: ci-pull-credentials
+    namespace: test-credentials
+  commands: sandboxed-containers-operator-hcp-conf-aws-commands.sh
+  timeout: 10m0s
+  grace_period: 5m
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+  - name: AWS_REGION
+    default: ""
+    documentation: |-
+      AWS region for the management and hosted clusters. Defaults to the
+      region of the Boskos lease (LEASED_RESOURCE).
+  - name: BASE_DOMAIN
+    default: ""
+    documentation: |-
+      Base DNS domain (Route53 zone) of the cluster profile account. Defaults
+      to the profile's baseDomain file, like ipi-conf-aws.
+  - name: COMPUTE_NODE_REPLICAS
+    default: "2"
+    documentation: Worker node count of the hosted cluster.
+  - name: COMPUTE_NODE_TYPE
+    default: "m8i.large"
+    documentation: |-
+      Instance type for the hosted cluster worker nodes. m8i.large is the
+      default because the kata runtime needs KVM on the workers, which on AWS
+      requires nested virtualization - only c8i/m8i/r8i and metal types
+      provide it.
+  - name: MGMT_COMPUTE_NODE_TYPE
+    default: "m5.xlarge"
+    documentation: Instance type for the management cluster nodes.
+  - name: ENABLE_NESTED_VIRT
+    default: "yes"
+    documentation: |-
+      Whether to enable nested virtualization on the hosted cluster workers
+      (NodePool cpuOptions nestedVirtualizationPolicy). Required for the kata
+      runtime to be able to run pods - kata needs KVM. Leave "no" for peer
+      pods, whose workloads run in podvms instead of on the worker.
+  - name: MGMT_INSTALL_MAX_RETRIES
+    default: "2"
+    documentation: |-
+      Maximum management cluster install attempts (the script retries in a
+      different region when AWS capacity is exhausted).
+  - name: IMAGE_CONTENT_SOURCES
+    default: ""
+    documentation: |-
+      Optional path to an ImageContentSourcePolicy-style YAML passed through
+      to the hosted cluster (HostedCluster.spec.imageContentSources) - the
+      only mechanism by which a hosted cluster honours image mirroring.
+      Required for Pre-GA custom catalogs in mirrored environments.
+  documentation: |-
+    Cloud-specific configuration for HCP on AWS. Resolves the region and base
+    domain from the cluster profile, extracts ccoctl from the release payload
+    and the hypershift CLI from the hypershift-operator image into
+    ${SHARED_DIR}/hcp/bin, and writes ${SHARED_DIR}/hcp/env.sh with the OSC CI
+    vocabulary that the hypershift-cluster-setup script's --prow mode consumes.
+    The env file is written before any provisioning runs so the deprovision
+    step can source it even when provision fails halfway.
+
+    This is the only AWS-aware HCP step; everything after it is cloud-agnostic
+    (the script dispatches internally on HCP_CLOUD).

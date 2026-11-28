@@ -1,0 +1,87 @@
+workflow:
+  as: sandboxed-containers-operator-e2e-hcp-aws
+  documentation: |-
+    Runs the standard OSC test suites on a HyperShift (HCP) hosted cluster on
+    AWS, following the shared OSC workflow structure (get cluster ->
+    configure + install operator -> sanity -> suites -> gather -> wait ->
+    deprovision). Only the cluster bookends are HCP-specific; everything in
+    between is the same machinery as the other OSC e2e workflows:
+
+      pre:  hcp-conf-aws (region, base domain, ccoctl + hypershift CLI,
+            ${SHARED_DIR}/hcp/env.sh) ->
+            hcp-provision (management cluster + HyperShift operator + hosted
+            cluster with nested-virt workers via the hypershift-cluster-setup
+            script from src; ${SHARED_DIR}/kubeconfig -> hosted cluster) ->
+            hcp-catalog-sources (default GA catalogs copied from the
+            management cluster) ->
+            sandboxed-containers-operator-pre (OSC install via helm charts,
+            KataConfig in DaemonSet mode)
+      test: sandboxed-containers-operator-test (sanity workload, then the
+            testsuites gate)
+      post: sandboxed-containers-operator-testsuites (skipped when the gate
+            file is missing, i.e. something failed earlier) ->
+            must-gather -> post-wait linger (SLEEP_DURATION) ->
+            hcp-deprovision (hosted then management teardown; fails loudly
+            rather than leaking)
+
+    The interesting HCP question - does kata work when the control plane is
+    hosted and the operator runs in DaemonSet mode instead of via MCO - is
+    answered by running the existing suites against the hosted cluster, which
+    happens automatically once ${SHARED_DIR}/kubeconfig points at it.
+
+    The hypershift-cluster-setup script ships in the operator repository
+    (hack/hcp, consumed via from: src) and runs in its --prow mode:
+    non-interactive, state under ${SHARED_DIR}, per-job cluster names from
+    PROW_JOB_ID, cluster-profile AWS credentials/region/pull secret, and the
+    OSC CI variable vocabulary. There is no nested-virtualization support
+    anywhere in step-registry/hypershift/, which is why HCP provisioning is
+    script-driven; peer-pods does not need nested virt, so the shared
+    hypershift steps become a live option again for that workload.
+
+    Cluster profile: aws-sandboxed-containers-operator (set in the ci-operator
+    config test stanza, not here).
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    env:
+      # Workload (kata only for this workflow; peer-pods is follow-up work)
+      WORKLOAD_TO_TEST: "kata"
+      ENABLEPEERPODS: "false"
+      RUNTIMECLASS: "kata"
+      # Hosted cluster shape - m8i provides nested virtualization, required
+      # by plain kata on AWS. Relax when peer pods land.
+      ENABLE_NESTED_VIRT: "yes"
+      COMPUTE_NODE_TYPE: "m8i.large"
+      COMPUTE_NODE_REPLICAS: "2"
+      # OSC install
+      OSC_INSTALL: "true"
+      KATACONFIG_TIMEOUT: "1800"
+      # Diagnostics
+      ENABLE_MUST_GATHER: "true"
+      MUST_GATHER_ON_FAILURE_ONLY: "true"
+      MUST_GATHER_IMAGE: "quay.io/redhat-user-workloads/ose-osc-tenant/osc-must-gather:latest"
+      MUST_GATHER_TIMEOUT: "35m"
+      # Suites - enabled incrementally: sanity first, osc once green, then
+      # kata-upstream; caa waits for peer-pods. All are skip-by-default and
+      # best_effort, so each switch is independently revertible.
+      TESTS_SANITY_ENABLE: "true"
+      TESTS_OSC_ENABLE: "false"
+      TESTS_KATA_UPSTREAM_ENABLE: "false"
+      TESTS_CAA_ENABLE: "false"
+    pre:
+    - ref: sandboxed-containers-operator-hcp-conf-aws
+    - ref: sandboxed-containers-operator-hcp-provision
+    - ref: sandboxed-containers-operator-hcp-catalog-sources
+    - chain: sandboxed-containers-operator-pre
+    test:
+    - chain: sandboxed-containers-operator-test
+    post:
+    - chain: sandboxed-containers-operator-testsuites
+    - ref: sandboxed-containers-operator-gather-must-gather
+      best_effort: true
+      optional_on_success: true
+    - ref: sandboxed-containers-operator-post-wait
+      timeout: 12h10m0s
+      best_effort: true
+      optional_on_success: true
+    - ref: sandboxed-containers-operator-hcp-deprovision

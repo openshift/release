@@ -39,7 +39,8 @@ Key OSC components (testsuites/gate/workflow subsystem only — the full directo
 also contains install, gather, peerpods, IPI, and miscellaneous steps; run
 `/step-finder` before adding anything new to check for duplicates):
 ```
-e2e/{azure,aro,aws}/…-e2e-{azure,aro,aws}-workflow.yaml   # top-level e2e scenarios
+e2e/{azure,aro,aws,hcp-aws}/…-e2e-{azure,aro,aws,hcp-aws}-workflow.yaml  # top-level e2e scenarios
+hcp/{conf/aws,provision,catalog-sources,deprovision}/                    # HyperShift cluster bookends
 pre/sandboxed-containers-operator-pre-chain.yaml           # install/setup
 test/sandboxed-containers-operator-test-chain.yaml         # shared test-phase chain
 test/sanity/                                                # test-phase step; one workload must run before anything else is tested
@@ -47,6 +48,14 @@ testsuites-gate/                                            # test-phase step; c
 testsuites/                                                 # POST-phase test suites (see testsuites/AGENTS.md)
 post/wait/                                                  # hold cluster for manual debugging before cleanup
 ```
+
+`hcp/` owns everything HyperShift, keyed by the script's `HCP_CLOUD` value
+(`hcp/conf/aws` today; future clouds are `hcp/conf/azure`, `hcp/conf/aro` —
+do not create empty placeholder directories, registry validation rejects a
+directory without a matching ref). The top-level `aro/{provision,deprovision}`
+is standalone ARO without HyperShift and stays as-is; HCP-on-ARO would be
+`hcp/conf/aro`. The HCP steps consume the `hypershift-cluster-setup` script
+from the operator repository (`hack/hcp`) via `from: src`.
 
 ## OWNERS Files — Kept in Sync with Config OWNERS via sync-owners.sh
 
