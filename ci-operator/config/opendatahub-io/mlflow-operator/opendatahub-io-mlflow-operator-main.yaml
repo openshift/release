@@ -1,0 +1,188 @@
+base_images:
+  tls-scanner-tool:
+    name: "4.22"
+    namespace: ocp
+    tag: tls-scanner-tool
+  upi-installer:
+    name: "4.20"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.26-openshift-4.22
+images:
+  items:
+  - dockerfile_path: Dockerfile
+    to: mlflow-operator
+releases:
+  latest:
+    release:
+      architecture: multi
+      channel: stable
+      version: "4.20"
+resources:
+  '*':
+    requests:
+      cpu: 400m
+      memory: 200Mi
+tests:
+- as: mlflow-operator-rhoai-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: opendatahub
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.20"
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    env:
+      PQC_CHECK: "true"
+      SCAN_NAMESPACE: mlflow-tls-scan
+      SCANNER_POD_MODE: "true"
+      TLS_SCANNER_EXPORT_CSV: "true"
+    pre:
+    - ref: ipi-install-rbac
+    test:
+    - as: deploy
+      cli: latest
+      commands: |
+        set -euo pipefail
+        # steps.env is injected into ref steps such as tls-scanner-run, not into
+        # this literal command. Keep the namespace literal here and in SCAN_NAMESPACE.
+        NS="mlflow-tls-scan"
+
+        # Dedicated namespace. config/overlays/rhoai is hardcoded to
+        # redhat-ods-applications, so this job builds a one-off overlay on
+        # config/overlays/openshift and sets the namespace here.
+        # The module controller stays off. With that flag false the operator
+        # creates the tracking server in its own namespace.
+        oc create namespace "${NS}"
+        oc label ns "${NS}" security.openshift.io/scc.podSecurityLabelSync=true --overwrite
+
+        sed -i "s|^MLFLOW_OPERATOR_IMAGE=.*|MLFLOW_OPERATOR_IMAGE=${MLFLOW_OPERATOR_IMAGE}|" config/base/params.env
+
+        # Kustomize rejects an absolute resources path, so the overlay has to
+        # live inside this checkout.
+        mkdir -p config/overlays/tls-scan-ci
+        cat > config/overlays/tls-scan-ci/kustomization.yaml <<EOF
+        apiVersion: kustomize.config.k8s.io/v1beta1
+        kind: Kustomization
+        namespace: ${NS}
+        resources:
+        - ../openshift
+        EOF
+        oc apply --server-side -k config/overlays/tls-scan-ci
+        oc -n "${NS}" wait --for=condition=Available --timeout=10m deployment/mlflow-operator-controller-manager
+
+        # SCANNER_POD_MODE runs the scanner as a normal pod in tls-scanner.
+        # Allow that namespace to reach operator metrics on 8443.
+        oc -n "${NS}" patch networkpolicy/mlflow-operator-controller-manager --type=json \
+          -p='[{"op":"add","path":"/spec/ingress/-","value":{"from":[{"namespaceSelector":{"matchLabels":{"kubernetes.io/metadata.name":"tls-scanner"}}}],"ports":[{"protocol":"TCP","port":8443}]}}]'
+
+        # Minimal tracking server: sqlite + local PVC, no separate artifact server.
+        # The MLflow CR is cluster-scoped; operands land in the operator namespace.
+        # Operator default is 8 workers, which OOMs under the sample 512Mi limit.
+        mlflow_sample="$(mktemp)"
+        oc patch --local --type=merge \
+          -f config/samples/mlflow_v1_mlflow_minimal.yaml \
+          -p '{"spec":{"workers":1}}' \
+          -o yaml >"${mlflow_sample}"
+        oc apply -f "${mlflow_sample}"
+        rm -f "${mlflow_sample}"
+        # The controller creates this Deployment at 0 replicas while the
+        # database migration Job runs. Available is true at zero replicas, so
+        # that wait can return before any tracking pod exists.
+        oc -n "${NS}" wait --for=create --timeout=10m deployment/mlflow
+        oc -n "${NS}" wait --for=jsonpath='{.status.availableReplicas}'=1 --timeout=20m deployment/mlflow
+
+        # odh-stable moves. Record the pod that was scanned so the digest can be
+        # matched to a Konflux build afterwards.
+        tracking_pod="$(oc -n "${NS}" get pods -l app=mlflow --field-selector=status.phase=Running -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | grep -E '^mlflow-[0-9a-f]+-' | head -n 1)"
+        if [[ -z "${tracking_pod}" ]]; then
+          echo "No running tracking pod found"
+          exit 1
+        fi
+        tracking_image="$(oc -n "${NS}" get pod "${tracking_pod}" -o jsonpath='{.spec.containers[?(@.name=="mlflow")].image}')"
+        tracking_image_id="$(oc -n "${NS}" get pod "${tracking_pod}" -o jsonpath='{.status.containerStatuses[?(@.name=="mlflow")].imageID}')"
+        if [[ -z "${tracking_image}" || -z "${tracking_image_id}" ]]; then
+          echo "Tracking pod ${tracking_pod} is missing its image or imageID"
+          exit 1
+        fi
+        cat > "${ARTIFACT_DIR}/tracking-image.txt" <<EOF
+        pod=${tracking_pod}
+        image=${tracking_image}
+        imageID=${tracking_image_id}
+        EOF
+        cat "${ARTIFACT_DIR}/tracking-image.txt"
+      dependencies:
+      - env: MLFLOW_OPERATOR_IMAGE
+        name: mlflow-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 45m0s
+    - ref: tls-scanner-run
+    - as: verify-tls-coverage
+      cli: latest
+      commands: |
+        set -euo pipefail
+        csv="${SHARED_DIR}/tls-scanner-results.csv"
+        if [[ ! -f "${csv}" ]]; then
+          echo "Missing ${csv}. tls-scanner-run did not export results.csv."
+          exit 1
+        fi
+        echo "Checking TLS 1.3 and ML-KEM on port 8443 for mlflow and mlflow-operator"
+        awk '
+          BEGIN { FPAT = "([^,]*)|(\"[^\"]*\")" }
+          NR == 1 {
+            for (i = 1; i <= NF; i++) {
+              gsub(/^"|"$/, "", $i)
+              col[$i] = i
+            }
+            split("Namespace,Port,Component Name,Status,TLS Version,ML-KEM Supported", required, ",")
+            for (i = 1; i <= 6; i++) {
+              name = required[i]
+              if (!(name in col)) {
+                printf "results.csv is missing column %s\n", name > "/dev/stderr"
+                exit 2
+              }
+            }
+            next
+          }
+          {
+            for (i = 1; i <= NF; i++) gsub(/^"|"$/, "", $i)
+            port = $(col["Port"])
+            if (port != "8443") next
+            namespace = $(col["Namespace"])
+            component = $(col["Component Name"])
+            status = $(col["Status"])
+            tls_version = $(col["TLS Version"])
+            mlkem = $(col["ML-KEM Supported"])
+            printf "8443 %s %s status=%s tls=%s mlkem=%s\n", namespace, component, status, tls_version, mlkem
+            if (namespace == "mlflow-tls-scan" && status == "OK" && mlkem == "Yes" && tls_version ~ /TLSv1\.3/) {
+              if (component == "mlflow" || component == "mlflow-operator") seen[component] = 1
+            }
+          }
+          END {
+            if (seen["mlflow"] && seen["mlflow-operator"]) exit 0
+            print "Need an OK TLS 1.3 ML-KEM row on port 8443 for both mlflow and mlflow-operator in mlflow-tls-scan" > "/dev/stderr"
+            exit 1
+          }
+        ' "${csv}"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 10m0s
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: mlflow-operator
