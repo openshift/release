@@ -149,6 +149,12 @@ fi
 
 log "Template rendered to: ${RENDERED_DIR}"
 
+# Record that Terraform may create GAR IAM before apply so teardown can
+# preserve state if cleanup is unverified, including after a partial apply.
+if [[ -f "${RENDERED_DIR}/gar-upstream-secret-name" ]]; then
+  touch "${SHARED_DIR}/gcp-hcp-gar-expected"
+fi
+
 # --- Write predictable project IDs to SHARED_DIR early ---
 # Project IDs are deterministic from RUN_ID and REGION. Write them now so
 # the cleanup step can find and delete projects even if terraform apply fails

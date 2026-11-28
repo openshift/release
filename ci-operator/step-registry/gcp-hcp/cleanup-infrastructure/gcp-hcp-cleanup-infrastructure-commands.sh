@@ -4,6 +4,8 @@ set -euo pipefail
 LOG="${ARTIFACT_DIR}/cleanup.log"
 log() { echo "$(date -u '+%Y-%m-%d %H:%M:%S UTC') | $*" | tee -a "${LOG}"; }
 CLEANUP_FAILED=0
+readonly GAR_EXPECTED_PATH="${SHARED_DIR}/gcp-hcp-gar-expected"
+readonly GAR_CLEANUP_VERIFIED_PATH="${SHARED_DIR}/gcp-hcp-gar-cleanup-verified"
 
 # Validate required dependencies
 for cmd in jq gcloud curl; do
@@ -73,6 +75,22 @@ if [[ -n "${CUSTOMER_PROJECT}" ]]; then
 fi
 log "  Region:   ${REGION}"
 log ""
+
+# Record the candidate binding while the disposable project is still readable.
+# Only a cleanup step that verifies revocation should write the success marker.
+if [[ -e "${GAR_EXPECTED_PATH}" && ! -e "${GAR_CLEANUP_VERIFIED_PATH}" ]]; then
+  workspace_name=$(cat "${SHARED_DIR}/workspace-name" 2>/dev/null || true)
+  log "GAR secret IAM cleanup is not verified. Manual recovery metadata:"
+  log "  Terraform workspace: ${workspace_name:-unknown}"
+  # Platform E2E uses the integration global secret (platform-ci/@e2e/main.tf).
+  log "  Secret: projects/gcp-hcp-int-global/secrets/default-openshift-gar-quay-secret"
+  log "  Role: roles/secretmanager.secretAccessor"
+  if [[ "${REGION_PROJECT}" == e2e-reg-* && "${REGION_PROJECT_NUMBER}" =~ ^[1-9][0-9]*$ ]]; then
+    log "  Candidate member: serviceAccount:service-${REGION_PROJECT_NUMBER}@gcp-sa-artifactregistry.iam.gserviceaccount.com"
+  else
+    log "  Could not identify the run's service agent; recover the exact member from Terraform instead of guessing"
+  fi
+fi
 
 # Helper: build kubeconfig with fresh access token using Connect Gateway
 build_kubeconfig() {
@@ -712,7 +730,10 @@ fi
 
 # Phase 6: Clear TFC workspace state
 log ""
-if [[ "${folder_cleanup_succeeded}" == "true" ]]; then
+if [[ -e "${GAR_EXPECTED_PATH}" && ! -e "${GAR_CLEANUP_VERIFIED_PATH}" ]]; then
+  log "ERROR: Retaining TFC workspace and state because GAR secret IAM cleanup was not verified"
+  CLEANUP_FAILED=1
+elif [[ "${folder_cleanup_succeeded}" == "true" ]]; then
   clear_tfc_workspace || CLEANUP_FAILED=1
 else
   log "Skipping TFC workspace cleanup because folder cleanup did not complete"
