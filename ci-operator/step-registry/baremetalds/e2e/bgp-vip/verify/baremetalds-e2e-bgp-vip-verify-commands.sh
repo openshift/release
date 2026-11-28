@@ -278,14 +278,11 @@ if [[ -n "${BGP_VIP_ORIGIN_DISABLED_MONITORS}" ]]; then
     DISABLE_MONITOR_ARGS=(--disable-monitor "${BGP_VIP_ORIGIN_DISABLED_MONITORS}")
 fi
 
-available_suites="$(openshift-tests list suites 2>/dev/null || true)"
-
+# Every configured suite runs as is: openshift-tests itself rejects a suite
+# the payload does not ship ("suite ... does not exist") with a non-zero exit,
+# which counts as a failed suite like any other.
 origin_rc=0
 for suite in ${BGP_VIP_ORIGIN_SUITES}; do
-    if ! grep -Fxq "${suite}" <<<"${available_suites}"; then
-        echo "openshift-tests in this payload does not ship suite ${suite} (openshift/origin#31893 not in the payload yet); skipping it"
-        continue
-    fi
     out="${ARTIFACT_DIR}/$(tr '/' '_' <<<"${suite}")"
     mkdir -p "${out}"
     echo "$(date) - running ${suite}"
