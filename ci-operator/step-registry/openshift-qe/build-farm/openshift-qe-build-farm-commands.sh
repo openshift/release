@@ -3,6 +3,40 @@ set -o errexit
 set -o nounset
 set -o pipefail
 set -x
+
+if [[ "${CUSTOM_KB_BUILD:-}" == "true" ]]; then
+  echo "=== Building kube-burner-ocp from custom fork ==="
+  # Install Go (CI image has no go binary)
+  GO_VERSION="1.25.9"
+  curl -sL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tar.gz
+  mkdir -p /tmp/goroot
+  tar -C /tmp/goroot -xzf /tmp/go.tar.gz
+  rm /tmp/go.tar.gz
+  export GOROOT=/tmp/goroot/go
+  export PATH="/tmp/goroot/go/bin:${PATH}"
+  go version
+
+  # Download and build kube-burner-ocp from fork
+  KB_OCP_SRC=$(mktemp -d)
+  echo "Building kube-burner-ocp from ${CUSTOM_KB_FORK_URL} branch ${CUSTOM_KB_BRANCH}..."
+  curl -sL "${CUSTOM_KB_FORK_URL}/archive/refs/heads/${CUSTOM_KB_BRANCH}.tar.gz" -o /tmp/kb-ocp.tar.gz
+  tar -xzf /tmp/kb-ocp.tar.gz --strip-components=1 -C "$KB_OCP_SRC"
+  rm /tmp/kb-ocp.tar.gz
+  cd "$KB_OCP_SRC"
+  mkdir -p bin/amd64
+  GOARCH=amd64 CGO_ENABLED=0 go build -v -ldflags \
+    "-X github.com/cloud-bulldozer/go-commons/v2/version.Version=test" \
+    -o bin/amd64/kube-burner-ocp ./cmd/
+  echo "BUILD SUCCESS: $(ls -la bin/amd64/kube-burner-ocp)"
+  cd -
+
+  # Create tarball and override KUBE_BURNER_URL
+  KB_TARBALL="/tmp/kube-burner-ocp-custom.tar.gz"
+  tar -czf "$KB_TARBALL" -C "$KB_OCP_SRC/bin/amd64" kube-burner-ocp
+  export KUBE_BURNER_URL="file://${KB_TARBALL}"
+  echo "=== Custom kube-burner-ocp build complete, KUBE_BURNER_URL=${KUBE_BURNER_URL} ==="
+fi
+
 cat /etc/os-release
 oc config view
 oc projects
