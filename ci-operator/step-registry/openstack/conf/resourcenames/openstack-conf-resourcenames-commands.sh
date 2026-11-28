@@ -41,7 +41,7 @@ declare -A compute_flavor=(
 	['openstack-vh-mecha-central']='m1.xlarge'
 	['openstack-nfv']='m1.xlarge.nfv'
 	['openstack-hwoffload']='m1.xlarge'
-	['openstack-rackspace']='gp.0.4.8'
+	['openstack-rackspace']='gp.0.4.16'
 )
 
 declare -A compute_azs=(
