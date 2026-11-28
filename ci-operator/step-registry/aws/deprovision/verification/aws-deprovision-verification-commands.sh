@@ -134,6 +134,10 @@ function verify_arn_exists() {
                     aws ec2 describe-vpc-endpoints --region "$check_region" --vpc-endpoint-ids "$resource_id" &>/dev/null
                     return $?
                     ;;
+                vpc-endpoint-service)
+                    aws ec2 describe-vpc-endpoint-service-configurations --region "$check_region" --service-ids "$resource_id" &>/dev/null
+                    return $?
+                    ;;
                 *)
                     # For unknown EC2 resource types, assume it exists to be safe
                     echo "  Warning: Unknown EC2 resource type '$resource_type' for ARN: $arn" >&2
