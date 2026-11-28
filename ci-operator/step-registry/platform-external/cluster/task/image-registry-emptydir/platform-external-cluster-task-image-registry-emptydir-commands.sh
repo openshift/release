@@ -15,6 +15,12 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 source "${SHARED_DIR}/init-fn.sh" || true
 
+# In disconnected environments, route API requests through the bastion proxy.
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 function update_image_registry() {
   log "update_image_registry()"
   while true; do

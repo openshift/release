@@ -18,6 +18,12 @@ test -f "${SHARED_DIR}/deploy.env" && source "${SHARED_DIR}/deploy.env"
 
 source "${SHARED_DIR}/init-fn.sh" || true
 
+# In disconnected environments, route API requests through the bastion proxy.
+if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+  # shellcheck disable=SC1090
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 log "Starting CCM setup"
 
 log "Collecting current cluster state"
