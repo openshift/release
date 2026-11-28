@@ -1,0 +1,1 @@
+../../../ipi/install/hosted-loki/ipi-install-hosted-loki-commands.sh
