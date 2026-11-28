@@ -48,7 +48,12 @@ if [[ -z ${AGENT_NAMESPACE} ]] ; then
 fi
 oc get ns "${AGENT_NAMESPACE}" || oc create namespace "${AGENT_NAMESPACE}"
 echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
-BASEDOMAIN=$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")
+BASEDOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")}
+if [[ ! "$BASEDOMAIN" =~ ^[a-zA-Z0-9.-]+$ || "$BASEDOMAIN" == .* ||
+      "$BASEDOMAIN" == *. || "$BASEDOMAIN" == *..* ]]; then
+  echo "The HostedCluster base domain is invalid."
+  exit 1
+fi
 echo "extract secret/pull-secret"
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 echo "check HYPERSHIFT_HC_RELEASE_IMAGE, if not set, use mgmt-cluster playload image"
@@ -155,3 +160,48 @@ done
 echo "Cluster became available, creating kubeconfig"
 /tmp/${HYPERSHIFT_NAME} create kubeconfig --namespace=local-cluster --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+
+if [[ "${HYPERSHIFT_USE_PROXY:-false}" == "true" ]]; then
+  source "${SHARED_DIR}/packet-conf.sh"
+  if [[ -z "${IP:-}" || -z "${PROXYPORT:-}" ]]; then
+    echo "The baremetal Squid proxy endpoint is not available in the shared job configuration."
+    exit 1
+  fi
+
+  proxy_url="http://${IP}:${PROXYPORT}"
+  no_proxy=$(
+    {
+      printf '%s\n' localhost 127.0.0.1 ::1 .svc .cluster.local
+      if [[ -f "${SHARED_DIR}/nutanix_context.sh" ]]; then
+        if [[ ! -s "${SHARED_DIR}/nutanix_subnet_cidr" ]]; then
+          echo "The Nutanix worker subnet CIDR is unavailable for the proxy bypass." >&2
+          exit 1
+        fi
+        nutanix_subnet_cidr=$(<"${SHARED_DIR}/nutanix_subnet_cidr")
+        if [[ ! "${nutanix_subnet_cidr}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}/([1-9]|[12][0-9]|3[0-2])$ ]]; then
+          echo "The recorded Nutanix worker subnet CIDR is invalid." >&2
+          exit 1
+        fi
+        printf '%s\n' "${nutanix_subnet_cidr}"
+        oc get hostedcluster "${CLUSTER_NAME}" -n local-cluster \
+          -o go-template='{{range .spec.networking.machineNetwork}}{{if .cidr}}{{println .cidr}}{{end}}{{end}}'
+      else
+        oc get hostedcluster "${CLUSTER_NAME}" -n local-cluster \
+          -o go-template='{{range .spec.networking.clusterNetwork}}{{if .cidr}}{{println .cidr}}{{end}}{{end}}
+{{range .spec.networking.serviceNetwork}}{{if .cidr}}{{println .cidr}}{{end}}{{end}}
+{{range .spec.networking.machineNetwork}}{{if .cidr}}{{println .cidr}}{{end}}{{end}}'
+      fi
+    } | sed '/^$/d' | LC_ALL=C sort -u | paste -sd, -
+  )
+  cat > "${SHARED_DIR}/hostedcluster-proxy.yaml" <<EOF
+spec:
+  configuration:
+    proxy:
+      httpProxy: "${proxy_url}"
+      httpsProxy: "${proxy_url}"
+      noProxy: "${no_proxy}"
+EOF
+  oc patch hostedcluster "${CLUSTER_NAME}" -n local-cluster --type=merge \
+    --patch-file="${SHARED_DIR}/hostedcluster-proxy.yaml"
+  printf '%s\n' "${no_proxy}" > "${SHARED_DIR}/hostedcluster_no_proxy"
+fi

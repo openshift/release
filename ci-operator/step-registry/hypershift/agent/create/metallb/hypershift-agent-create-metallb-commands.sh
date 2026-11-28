@@ -91,6 +91,22 @@ EOF
 
 echo "Configure IPAddressPool in different network environments separately."
 if [[ $IP_STACK == "v4" ]]; then
+  # The Nutanix workflow has a quota-slice lease; require its context step's VIP.
+  if [[ -n "${NUTANIX_QUOTA_SLICE:-}" ]]; then
+    set +x
+    if [[ ! -s "${SHARED_DIR}/nutanix_ingress_vip" ]]; then
+      echo "The Nutanix ingress VIP file is missing."
+      exit 1
+    fi
+    METALLB_INGRESS_VIP=$(<"${SHARED_DIR}/nutanix_ingress_vip")
+    if [[ ! "$METALLB_INGRESS_VIP" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+      echo "The Nutanix ingress VIP is invalid."
+      exit 1
+    fi
+    set -x
+  else
+    METALLB_INGRESS_VIP=192.168.111.30
+  fi
   oc create -f - <<EOF
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
@@ -100,7 +116,7 @@ metadata:
 spec:
   autoAssign: false
   addresses:
-  - 192.168.111.30-192.168.111.30
+  - ${METALLB_INGRESS_VIP}-${METALLB_INGRESS_VIP}
 EOF
 elif [[ $IP_STACK == "v4v6" ]]; then
   oc create -f - <<EOF
@@ -166,6 +182,13 @@ spec:
     ingresscontroller.operator.openshift.io/deployment-ingresscontroller: default
   type: LoadBalancer
 EOF
+
+# The Nutanix flow verifies the VIP and the run-owned tunnel in the next step.
+# Waiting for the ClusterVersion here can deadlock while the ingress canary
+# cannot yet reach the newly allocated VIP.
+if [[ -f "${SHARED_DIR}/nutanix_ingress_tunnel_state.json" ]]; then
+  exit 0
+fi
 
 echo "Wait HostedCluster ready..."
 until \
