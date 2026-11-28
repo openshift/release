@@ -48,7 +48,7 @@ else
 fi
 
 cd "$(mktemp -d)"
-git clone --branch main https://github.com/openshift-pipelines/performance.git .
+git clone --branch main https://github.com/siddardh-ra/performance.git .
 
 # If this is a PR check of the performance repo (not rehearse job), switch to PR branch
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
