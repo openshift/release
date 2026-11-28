@@ -1,0 +1,40 @@
+workflow:
+  as: rosa-trusted-actions-e2e-workflow
+  steps:
+    env:
+      OCM_LOGIN_ENV: staging
+      CHANNEL_GROUP: stable
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      REPLICAS: "2"
+      MULTI_AZ: "false"
+      ETCD_ENCRYPTION: "false"
+    pre:
+    - chain: rosa-aws-sts-provision
+    - ref: rosa-cluster-wait-ready-nodes
+    - ref: rosa-trusted-actions-seed-fixtures
+    test:
+    - ref: rosa-trusted-actions-e2e
+    post:
+    - chain: rosa-aws-sts-deprovision
+  documentation: |-
+    Provisions an ephemeral ROSA Classic STS cluster in staging, runs the ROSA
+    Trusted Actions end-to-end suite against it, then deprovisions.
+
+    Ephemeral rather than leased on purpose: the suite covers error and
+    disruptive paths as well as reads, so it needs a cluster it may perturb and
+    discard. A leased cluster is returned to a shared pool and would carry the
+    damage forward. For read-only variants a lease would be cheaper.
+
+    OCM_LOGIN_ENV is pinned to staging. No part of this workflow may target
+    production.
+
+    The test step consumes ${SHARED_DIR}/cluster-id and the fixture names the
+    seeding step records. It deliberately discards the cluster-admin
+    kubeconfig that provisioning leaves behind, and configures RTA from its
+    own GSM-held service-account credentials, so that cluster access is
+    obtained the way production obtains it — from backplane, scoped and
+    time-limited.
+
+    Seeding runs as its own pre step for that reason: the objects the writing
+    actions act on have to exist before the suite starts, and creating them
+    needs an access RTA itself must not have.
