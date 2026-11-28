@@ -128,6 +128,14 @@ run_tests() {
   # Pre-flight check to ensure cluster is stable before running tests
   check_cluster_operators
 
+  # Branch-scoped tag: see IMAGE_TAG_SUFFIX in the step reference. The test suite
+  # builds its image tag as pr-${PR_NUMBER}-${COMMIT_HASH}-${TARGET_ARCH}, so the
+  # suffix is carried on PR_NUMBER to stay in sync with the build-image step.
+  local pr_number="${PULL_NUMBER:-}"
+  if [[ -n "${pr_number}" && -n "${IMAGE_TAG_SUFFIX:-}" ]]; then
+    pr_number="${pr_number}-${IMAGE_TAG_SUFFIX}"
+  fi
+
   oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
     sh -c "
     docker login -u=\"${QUAY_USERNAME}\" -p=\"${QUAY_PASSWORD}\" quay.io
@@ -136,7 +144,7 @@ run_tests() {
     export CI=\"${CI:-true}\"
     export HUB=\"${HUB:-quay.io/sail-dev}\"
     export USE_INTERNAL_REGISTRY=\"false\"
-    export PR_NUMBER=\"${PULL_NUMBER:-}\"
+    export PR_NUMBER=\"${pr_number}\"
     export OLM=\"${OLM:-true}\"
     export GINKGO_LABEL_FILTER=\"${GINKGO_LABEL_FILTER:-}\"
     export EXPECTED_REGISTRY=\"${EXPECTED_REGISTRY:-}\"
@@ -181,10 +189,24 @@ run_tests_local() {
   export TAG="${tag}"
   export SKIP_BUILD="true"
   export USE_INTERNAL_REGISTRY="false"
-  export PR_NUMBER="${PULL_NUMBER:-}"
+  # Branch-scoped tag: see IMAGE_TAG_SUFFIX in the step reference. The test suite
+  # derives its own tag as pr-${PR_NUMBER}-${COMMIT_HASH}-${TARGET_ARCH}, so the
+  # suffix must travel on PR_NUMBER to match the build-image step. Periodic jobs
+  # (no PULL_NUMBER) keep PR_NUMBER empty and use the suite's commit-based tag.
+  if [[ -n "${PULL_NUMBER:-}" && -n "${IMAGE_TAG_SUFFIX:-}" ]]; then
+    export PR_NUMBER="${PULL_NUMBER}-${IMAGE_TAG_SUFFIX}"
+  else
+    export PR_NUMBER="${PULL_NUMBER:-}"
+  fi
   export OLM="${OLM:-true}"
   export GINKGO_LABEL_FILTER="${GINKGO_LABEL_FILTER:-}"
   export EXPECTED_REGISTRY="${EXPECTED_REGISTRY:-}"
+  # For ARM jobs the step container runs on the amd64 CI build cluster, so
+  # setup_env.sh would derive TARGET_ARCH=amd64 from uname -m. Override it
+  # here so the test suite computes the correct image tag arch suffix.
+  if [[ -n "${OCP_ARCH:-}" ]]; then
+    export TARGET_ARCH="${OCP_ARCH}"
+  fi
 
   # VERSIONS_YAML_CONFIG, if set, must be an export assignment of the form
   # "export VERSIONS_YAML_FILE=<path>". Validate before evaluating to prevent
@@ -274,14 +296,15 @@ execute_local() {
   test_rc=$?
   echo "Test run (attempt ${attempt}) completed with exit code ${test_rc}"
 
-  # make test.e2e.ocp writes JUnit to out/report.xml (relative to source root).
-  # Copy all XMLs from out/ into ARTIFACT_DIR so has_junit_reports() can find them.
+  # Collect JUnit reports from all known locations the test suite may use:
+  #   - out/          (documented default, relative to source root)
+  #   - test_artifacts/
+  #   - /tmp/tmp.*/   (common-operator-integ-suite.sh mktemp dir, e.g. /tmp/tmp.xxx/report.xml)
   find out/ -name "*.xml" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
-
-  # Also check ./test_artifacts/ which some make targets use as the output directory.
   if [[ -d "./test_artifacts" ]]; then
     cp -r ./test_artifacts/. "${ARTIFACT_DIR}/" 2>/dev/null || true
   fi
+  find /tmp/ -maxdepth 2 -name "report.xml" -exec cp {} "${ARTIFACT_DIR}/" \; 2>/dev/null || true
 
   echo "Copying artifacts to SHARED_DIR after attempt ${attempt}..."
   cp "${ARTIFACT_DIR}/"*.xml "${SHARED_DIR}" 2>/dev/null || true
