@@ -18,12 +18,20 @@ cat > "${SHARED_DIR}/external_lb_append.patch_install_config.yaml" <<EOF
 networking:
   machineNetwork:
   # TODO: Remove when https://issues.redhat.com/browse/OCPBUGS-35811 is fixed
-  $([ "${ipv4_enabled:-false}" == "true" ] && echo "- cidr: $(yq ".api_vip" "${SHARED_DIR}/external_vips.yaml")/32")
-  $([ "${ipv6_enabled:-false}" == "true" ] && echo "- cidr: $(yq ".api_vip_v6" "${SHARED_DIR}/external_vips.yaml")/128")
+  $([ "${ipv4_enabled:-false}" == "true" ] && echo "- cidr: $(yq ".api_vip" "${SHARED_DIR}/vips.yaml")/32")
+  $([ "${ipv6_enabled:-false}" == "true" ] && echo "- cidr: $(yq ".api_vip_v6" "${SHARED_DIR}/vips.yaml")/128")
 platform:
   baremetal:
     loadBalancer:
       type: UserManaged
 EOF
 
-cp "$SHARED_DIR/external_vips.yaml" "$SHARED_DIR/vips.yaml"
+# Only overwrite vips.yaml in disconnected mode
+# In connected mode, keep original vips.yaml (with cluster VIPs) for install-config
+# external_vips.yaml has split-horizon DNS values (HAProxy eth1 for api, VIP for api-int)
+if [ "${DISCONNECTED:-false}" == "true" ]; then
+  echo "Disconnected mode: copying external_vips.yaml to vips.yaml"
+  cp "$SHARED_DIR/external_vips.yaml" "$SHARED_DIR/vips.yaml"
+else
+  echo "Connected mode: keeping original vips.yaml with cluster VIPs for install-config"
+fi
