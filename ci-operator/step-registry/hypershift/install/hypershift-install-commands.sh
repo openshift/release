@@ -189,6 +189,18 @@ if [ "${TEST_CPO_OVERRIDE}" == "1" ]; then
   EXTRA_ARGS="${EXTRA_ARGS} --enable-cpo-overrides"
 fi
 
+# Omni HyperShift: drive the CPO from the operator's own main build for the given
+# MAJOR.MINOR releases. Overrides any ENABLE_OMNI_HYPERSHIFT/OMNI_HYPERSHIFT_VERSIONS
+# baked into the operator image. A branch that does not set OMNI_HYPERSHIFT_VERSIONS is
+# unaffected; a job that sets it against a CLI without the flag fails loud rather than
+# skipping silently, which would leave the requested version untested.
+if [ -n "${OMNI_HYPERSHIFT_VERSIONS:-}" ] && echo "${INSTALL_HELP}" | grep -q -- '--omni-hypershift-versions'; then
+  EXTRA_ARGS="${EXTRA_ARGS} --omni-hypershift --omni-hypershift-versions=${OMNI_HYPERSHIFT_VERSIONS}"
+elif [ -n "${OMNI_HYPERSHIFT_VERSIONS:-}" ]; then
+  echo "OMNI_HYPERSHIFT_VERSIONS=${OMNI_HYPERSHIFT_VERSIONS} is set but the hypershift CLI does not support --omni-hypershift-versions" >&2
+  exit 1
+fi
+
 OCP_VERSION="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -a "${CLUSTER_PROFILE_DIR}/pull-secret" | grep -oP '(?<=^  Version:  ).*$' | grep -oE '^[0-9]+\.[0-9]+')"
 if echo "${INSTALL_HELP}" | grep -q -- '--additional-operator-env-vars'; then
   EXTRA_ARGS="${EXTRA_ARGS} --additional-operator-env-vars=IMAGE_KUBEVIRT_CAPI_PROVIDER=quay-proxy.ci.openshift.org/openshift/ci:ocp_${OCP_VERSION}_cluster-api-provider-kubevirt"
