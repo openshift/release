@@ -552,6 +552,115 @@ if [[ ! -s "${SHARED_DIR}/cluster-id" ]]; then
   fi
 fi
 
+# Publish the Classic IDP phase windows the suite recorded, for the post telemetry step.
+# Each line is "<phase> <start> <end>": an enum and two UTC timestamps, nothing else. Like
+# cluster-id above, the suite can only write under output/, so it is copied here.
+# ocmtest writes a per-phase output tree, so there can be more than one of these and find
+# order is not deterministic: take every one. Only well-formed lines are copied, so a damaged
+# file cannot put anything unexpected into SHARED_DIR for the post step to parse, and the
+# total is capped so a looping writer cannot fill the shared volume.
+# hack/classic-idp-telemetry/classic_idp_step_test.py locates this block by the comment
+# above and runs it on its own; keep them in step.
+classic_idp_windows="${SHARED_DIR}/classic-idp-phase-windows"
+# The accepted stamp is exactly the one the post step parses (%Y-%m-%dT%H:%M:%S.%fZ with
+# six fractional digits). Holding the producer to it keeps a line the consumer will drop
+# from taking a slot of the cap below, and makes the stamps fixed-width, which is what
+# lets them be ordered as text further down.
+classic_idp_stamp='[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z'
+classic_idp_cap=64
+# Cleared when the records cannot be validated, so nothing is published unchecked.
+classic_idp_publish=true
+# The closed set the post step's parser accepts (its PHASES). A name outside it is dropped
+# there, so accepting it here only lets it take a slot of the cap; keep the two in step.
+classic_idp_phases='htpasswd_user_import idp_create idp_delete'
+classic_idp_raw="$(mktemp)" || classic_idp_raw=""
+if [[ -z "${classic_idp_raw}" ]]; then
+  echo "WARNING: no scratch file; not publishing Classic IDP phase windows"
+else
+  # Keep anything an earlier invocation of this step already published, so a second pass
+  # merges with it instead of replacing it.
+  [[ -s "${classic_idp_windows}" ]] && cat "${classic_idp_windows}" >> "${classic_idp_raw}"
+  while IFS= read -r -d '' windows; do
+    grep -hE "^[a-z0-9_]{1,40} ${classic_idp_stamp} ${classic_idp_stamp}$" "${windows}" \
+      >> "${classic_idp_raw}" 2>/dev/null || true
+  done < <(find "${ocm_fvt_output}" -type f -name 'classic-idp-phase-windows' -print0 2>/dev/null)
+  if [[ -s "${classic_idp_raw}" ]]; then
+    # The cap keeps the newest windows, not the alphabetically first ones: the lines start
+    # with the phase name, so ordering by the whole line would let one phase crowd out every
+    # window of a later-sorting one and leave its events tagged outside_known_phase. The
+    # stamps are fixed-width UTC, so ordering them as text orders them in time.
+    classic_idp_unique="$(mktemp)" || classic_idp_unique=""
+    if [[ -z "${classic_idp_unique}" ]]; then
+      echo "WARNING: no scratch file; not publishing Classic IDP phase windows"
+    else
+      # Validate before capping, not after. The shape filter fixes the form of a stamp,
+      # not its meaning, and the handoff seeded above never passed even that - so a record
+      # the consumer will throw away still takes a slot of the cap, and because the cap
+      # keeps the newest, enough of them evict the window that was usable. The consumer
+      # would then find nothing it can parse and tag every event phase_unavailable.
+      # Hold a record to what the consumer actually accepts: a known phase name, two real
+      # calendar instants, and an end not before the start.
+      classic_idp_valid="$(mktemp)" || classic_idp_valid=""
+      if [[ -n "${classic_idp_valid}" ]]; then
+        LC_ALL=C awk -v names="${classic_idp_phases}" '
+          BEGIN { split(names, allowed, " "); for (i in allowed) known[allowed[i]] = 1 }
+          function calendar(stamp,    y, m, d, hh, mm, ss, days) {
+            if (stamp !~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z$/)
+              return 0
+            y = substr(stamp, 1, 4) + 0; m = substr(stamp, 6, 2) + 0
+            d = substr(stamp, 9, 2) + 0; hh = substr(stamp, 12, 2) + 0
+            mm = substr(stamp, 15, 2) + 0; ss = substr(stamp, 18, 2) + 0
+            if (y < 1 || m < 1 || m > 12 || d < 1) return 0
+            # Not 60. The %S pattern in strptime matches a leap second, but building the
+            # datetime from it raises, so the consumer drops the record. Accepting one
+            # here only lets it take a slot of the cap below.
+            if (hh > 23 || mm > 59 || ss > 59) return 0
+            days = 31
+            if (m == 4 || m == 6 || m == 9 || m == 11) days = 30
+            else if (m == 2) days = (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)) ? 29 : 28
+            return d <= days
+          }
+          NF != 3 || !($1 in known) || !calendar($2) || !calendar($3) { next }
+          # Both stamps are fixed-width now, so comparing them as text compares instants.
+          ($3 "") < ($2 "") { next }
+          { print }
+        ' "${classic_idp_raw}" > "${classic_idp_valid}" || true
+        classic_idp_before=$(wc -l < "${classic_idp_raw}" 2>/dev/null || echo 0)
+        classic_idp_after=$(wc -l < "${classic_idp_valid}" 2>/dev/null || echo 0)
+        if (( classic_idp_before > classic_idp_after )); then
+          echo "WARNING: rejected $(( classic_idp_before - classic_idp_after )) malformed Classic IDP phase window record(s)"
+        fi
+        mv -f "${classic_idp_valid}" "${classic_idp_raw}" || rm -f "${classic_idp_valid}"
+      else
+        # Without scratch the records cannot be validated. Publishing them unchecked is
+        # what this block exists to stop - and a handoff an earlier pass already published
+        # must not be discarded over a transient scratch failure either, because that
+        # would lose good windows for a reason that says nothing about them. Leave it be.
+        echo "WARNING: no scratch file; cannot validate Classic IDP phase windows, leaving the handoff unchanged"
+        classic_idp_publish=false
+      fi
+    fi
+    if [[ "${classic_idp_publish}" == "true" && ! -s "${classic_idp_raw}" ]]; then
+      # Nothing survived validation. Clear any handoff an earlier pass left behind rather
+      # than leaving records in SHARED_DIR that the post step would only reject again; an
+      # empty handoff reads as absent there, so it reports phase_windows unavailable.
+      echo "WARNING: no usable Classic IDP phase window records; not publishing"
+      [[ -e "${classic_idp_windows}" ]] && : > "${classic_idp_windows}"
+    elif [[ "${classic_idp_publish}" == "true" && -n "${classic_idp_unique}" ]]; then
+      LC_ALL=C sort -u "${classic_idp_raw}" > "${classic_idp_unique}" || true
+      classic_idp_seen=$(wc -l < "${classic_idp_unique}" 2>/dev/null || echo 0)
+      LC_ALL=C sort -k2,2 -k3,3 "${classic_idp_unique}" \
+        | tail -n "${classic_idp_cap}" > "${classic_idp_windows}" || true
+      if (( classic_idp_seen > classic_idp_cap )); then
+        echo "WARNING: ${classic_idp_seen} Classic IDP phase window(s) found, keeping the newest ${classic_idp_cap}"
+      fi
+      rm -f "${classic_idp_unique}"
+      echo "Wrote SHARED_DIR/classic-idp-phase-windows ($(wc -l < "${classic_idp_windows}") window(s))"
+    fi
+  fi
+  rm -f "${classic_idp_raw}"
+fi
+
 if [[ ! -s "${SHARED_DIR}/kubeconfig" ]]; then
   while IFS= read -r -d '' kc; do
     # Skip empty / scrubbed placeholders; real kubeconfigs are much larger.
