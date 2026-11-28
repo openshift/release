@@ -52,9 +52,8 @@ function leaseLookup () {
   echo "$lookup"
 }
 
-# Resolve the infra-owned VXLAN bridge on the additional hypervisor.
-# Prefer lease 'vxlan.additional-bridge'; then VXLAN_ADDITIONAL_BRIDGE; then
-# known lease→bridge mappings for VPN hetero slots.
+# Resolve the infra-owned VXLAN bridge on the additional hypervisor from lease.
+# Optional VXLAN_ADDITIONAL_BRIDGE is an emergency override only.
 resolve_additional_bridge() {
   local bridge
   bridge="$(yq-v4 -oy ".\"${LEASED_RESOURCE}\".vxlan.\"additional-bridge\"" "${LEASE_CONF}" 2>/dev/null || true)"
@@ -64,37 +63,13 @@ resolve_additional_bridge() {
   fi
 
   if [[ -n "${VXLAN_ADDITIONAL_BRIDGE:-}" ]]; then
-    echo "WARN: lease '${LEASED_RESOURCE}' missing 'vxlan.additional-bridge'; using environment variable VXLAN_ADDITIONAL_BRIDGE=${VXLAN_ADDITIONAL_BRIDGE}" >&2
+    echo "WARN: lease missing vxlan.additional-bridge; using VXLAN_ADDITIONAL_BRIDGE" >&2
     printf '%s\n' "${VXLAN_ADDITIONAL_BRIDGE}"
     return 0
   fi
 
-  # Last-resort infra VXLAN bridges when leases.yaml omits 'vxlan.additional-bridge'.
-  # Observed VPN wiring: amd64 ...-0-0 → ocp1-amd, ...-0-1 → ocp3-amd;
-  # arm64 (profile libvirt-s390x-vpn-arm64 leases as libvirt-s390x-arm64-0-0) → ocp2-arm.
-  case "${LEASED_RESOURCE}" in
-    libvirt-s390x-vpn-amd64-0-0)
-      bridge="ocp1-amd"
-      ;;
-    libvirt-s390x-vpn-amd64-0-1)
-      bridge="ocp3-amd"
-      ;;
-    libvirt-s390x-arm64-0-0|libvirt-s390x-vpn-arm64-0-0|*-arm64-0-0)
-      bridge="ocp2-arm"
-      ;;
-    *)
-      bridge=""
-      ;;
-  esac
-
-  if [[ -n "${bridge}" ]]; then
-    echo "WARN: lease '${LEASED_RESOURCE}' missing 'vxlan.additional-bridge'; using known mapping → ${bridge}" >&2
-    printf '%s\n' "${bridge}"
-    return 0
-  fi
-
   echo "ERROR: Couldn't resolve additional-host VXLAN bridge for '${LEASED_RESOURCE}'" >&2
-  echo "ERROR: Set 'vxlan.additional-bridge' in the cluster-profile lease secret, or set the environment variable VXLAN_ADDITIONAL_BRIDGE in the job definition." >&2
+  echo "ERROR: Set lease field 'vxlan.additional-bridge' (required)." >&2
   return 1
 }
 
@@ -123,9 +98,9 @@ fi
 
 # Publish for the heterogeneous installer / cleanup steps.
 printf '%s\n' "${ADDITIONAL_BRIDGE_NAME}" > "${SHARED_DIR}/additional-bridge-name"
-echo "Additional-host VXLAN bridge: ${ADDITIONAL_BRIDGE_NAME}"
+echo "Published additional-host VXLAN bridge name from lease"
 
-echo "Using libvirt connection ${REMOTE_LIBVIRT_URI}"
+echo "Using remote libvirt connection"
 echo "Defining and starting primary libvirt network ${CLUSTER_NAME}..."
 
 # Both lease slots on this host can share the same subnet/bridge (e.g. ocp1).
