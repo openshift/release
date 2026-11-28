@@ -7,30 +7,92 @@ set -o pipefail
 trap 'rm -f /tmp/ps-orig.json /tmp/ps-merged.json /tmp/icsp.yaml' EXIT
 
 ODF_INSTALL_NAMESPACE=openshift-storage
-ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-stable-${ODF_VERSION_MAJOR_MINOR}}"
 ODF_SUBSCRIPTION_NAME="${ODF_SUBSCRIPTION_NAME:-odf-operator}"
 ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-gp2-csi}"
 ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-50}Gi"
 ODF_STORAGE_CLUSTER_NAME="${ODF_STORAGE_CLUSTER_NAME:-ocs-storagecluster}"
 ODF_DEFAULT_SC="${ODF_STORAGE_CLUSTER_NAME}-ceph-rbd"
 
-CATALOG_IMAGE="${ODF_CATALOG_IMAGE:-quay.io/rhceph-dev/ocs-registry:latest-stable-${ODF_VERSION_MAJOR_MINOR}}"
-CATALOG_NAME=odf-catalogsource
-CREDS_FILE=/tmp/secrets/odf-quay-credentials/rhceph-dev
+# Determine which catalog to use:
+# - If ODF_VERSION_MAJOR_MINOR is set, construct dev catalog path (pre-GA testing)
+# - If ODF_VERSION_MAJOR_MINOR is empty/unset, use redhat-operators catalog (GA releases)
+if [[ -n "${ODF_VERSION_MAJOR_MINOR:-}" ]]; then
+  ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-stable-${ODF_VERSION_MAJOR_MINOR}}"
+  CATALOG_IMAGE="${ODF_CATALOG_IMAGE:-quay.io/rhceph-dev/ocs-registry:latest-stable-${ODF_VERSION_MAJOR_MINOR}}"
+  CATALOG_NAME=odf-catalogsource
+  CREDS_FILE=/tmp/secrets/odf-quay-credentials/rhceph-dev
+  echo "Using dev catalog: ${CATALOG_IMAGE}"
 
-if [[ ! -f "${CREDS_FILE}" ]]; then
-  echo "ERROR: ODF Quay credentials not found at ${CREDS_FILE}"
-  exit 1
+  if [[ ! -f "${CREDS_FILE}" ]]; then
+    echo "ERROR: ODF Quay credentials not found at ${CREDS_FILE}"
+    exit 1
+  fi
+
+  echo "Merging ODF Quay credentials into cluster pull secret"
+  oc get secret/pull-secret -n openshift-config --template='{{index .data ".dockerconfigjson" | base64decode}}' > /tmp/ps-orig.json
+  jq '. * input' /tmp/ps-orig.json "${CREDS_FILE}" > /tmp/ps-merged.json
+  oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/ps-merged.json
+
+  USE_DEV_CATALOG=true
+else
+  ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-stable}"
+  CATALOG_NAME=redhat-operators
+  USE_DEV_CATALOG=false
+  echo "Using GA catalog: ${CATALOG_NAME}"
 fi
-
-echo "Merging ODF Quay credentials into cluster pull secret"
-oc get secret/pull-secret -n openshift-config --template='{{index .data ".dockerconfigjson" | base64decode}}' > /tmp/ps-orig.json
-jq '. * input' /tmp/ps-orig.json "${CREDS_FILE}" > /tmp/ps-merged.json
-oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/ps-merged.json
 
 pushd /tmp
 
-echo "Installing ODF from ${ODF_OPERATOR_CHANNEL} into ${ODF_INSTALL_NAMESPACE}"
+# Resolve the ODF operator channel resiliently from the deployed catalog's PackageManifest.
+# The dev catalog may not always have the exact stable-X.Y channel matching OCP version
+# (e.g., OCP 5.0 pre-GA may only offer stable-4.23 or a different channel). Query the
+# catalog's odf-operator PackageManifest and pick: ${ODF_OPERATOR_CHANNEL} if available;
+# else the catalog's defaultChannel; else the newest stable-X.Y. Falls back to
+# ${ODF_OPERATOR_CHANNEL} if the PackageManifest is unavailable.
+_odf_resolve_channel() {
+  local desired="${ODF_OPERATOR_CHANNEL}" pm="" i default channels newest c av bv
+  echo "Querying odf-operator PackageManifest for available channels" >&2
+  for i in $(seq 1 12); do
+    pm="$(oc get packagemanifest odf-operator -n openshift-marketplace \
+          -o jsonpath='{.status.defaultChannel}|{range .status.channels[*]}{.name},{end}' 2>/dev/null || true)"
+    [[ -n "$pm" && "$pm" != "|" ]] && break
+    sleep 10
+  done
+  if [[ -z "$pm" || "$pm" == "|" ]]; then
+    echo "WARNING: odf-operator PackageManifest unavailable; using ${desired}" >&2
+    echo "$desired"; return
+  fi
+  default="${pm%%|*}"; channels="${pm#*|}"
+  echo "Available channels: ${channels%,}" >&2
+  if [[ ",${channels}" == *",${desired},"* ]]; then
+    echo "Desired channel ${desired} is available" >&2
+    echo "$desired"; return
+  fi
+  if [[ -n "$default" && ",${channels}" == *",${default},"* ]]; then
+    echo "Desired channel ${desired} not found; using catalog default: ${default}" >&2
+    echo "$default"; return
+  fi
+  # Find newest stable-X.Y channel
+  newest=""
+  for c in ${channels//,/ }; do
+    [[ "$c" == stable-*.* ]] || continue
+    if [[ -z "$newest" ]]; then
+      newest="$c"
+    else
+      av="${c#stable-}"; bv="${newest#stable-}"
+      if (( ${av%.*} > ${bv%.*} )) || { (( ${av%.*} == ${bv%.*} )) && (( ${av#*.} > ${bv#*.} )); }; then
+        newest="$c"
+      fi
+    fi
+  done
+  if [[ -n "$newest" ]]; then
+    echo "Desired channel ${desired} not found; using newest stable: ${newest}" >&2
+    echo "$newest"
+  else
+    echo "No stable-X.Y channels found; falling back to ${default:-$desired}" >&2
+    echo "${default:-$desired}"
+  fi
+}
 
 echo "Creating namespace ${ODF_INSTALL_NAMESPACE}"
 oc apply -f - <<EOF
@@ -52,29 +114,30 @@ spec:
   - "${ODF_INSTALL_NAMESPACE}"
 EOF
 
-echo "Extracting ICSP from catalog image"
-oc image extract "${CATALOG_IMAGE}" --file /icsp.yaml || true
-if [[ -f icsp.yaml ]]; then
-  echo "Applying ICSP"
-  oc apply --filename=icsp.yaml
-  sleep 30
-  echo "Waiting for MCP rollout"
-  for i in $(seq 1 60); do
-    echo "MCP wait attempt ${i}/60"
-    if oc wait mcp --all --for condition=updated --timeout=1m; then
-      echo "MCP is Updated"
-      break
-    fi
+if [[ "${USE_DEV_CATALOG}" == "true" ]]; then
+  echo "Extracting ICSP from catalog image"
+  oc image extract "${CATALOG_IMAGE}" --file /icsp.yaml || true
+  if [[ -f icsp.yaml ]]; then
+    echo "Applying ICSP"
+    oc apply --filename=icsp.yaml
     sleep 30
-    if [[ $i -eq 60 ]]; then
-      echo "ERROR: MCP did not stabilize"
-      exit 1
-    fi
-  done
-fi
+    echo "Waiting for MCP rollout"
+    for i in $(seq 1 60); do
+      echo "MCP wait attempt ${i}/60"
+      if oc wait mcp --all --for condition=updated --timeout=1m; then
+        echo "MCP is Updated"
+        break
+      fi
+      sleep 30
+      if [[ $i -eq 60 ]]; then
+        echo "ERROR: MCP did not stabilize"
+        exit 1
+      fi
+    done
+  fi
 
-echo "Creating CatalogSource (image: ${CATALOG_IMAGE})"
-oc apply -f - <<EOF
+  echo "Creating CatalogSource (image: ${CATALOG_IMAGE})"
+  oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -87,12 +150,17 @@ spec:
   sourceType: grpc
 EOF
 
-echo "Waiting for CatalogSource to be ready"
-sleep 30
-oc wait "catalogSource/${CATALOG_NAME}" -n openshift-marketplace \
-  --for=jsonpath='{.status.connectionState.lastObservedState}=READY' --timeout=5m
+  echo "Waiting for CatalogSource to be ready"
+  sleep 30
+  oc wait "catalogSource/${CATALOG_NAME}" -n openshift-marketplace \
+    --for=jsonpath='{.status.connectionState.lastObservedState}=READY' --timeout=5m
+fi
 
-echo "Creating Subscription"
+# Resolve channel after catalog is ready (either dev catalog deployed above, or GA redhat-operators)
+RESOLVED_CHANNEL="$(_odf_resolve_channel)"
+echo "Installing ODF from catalog ${CATALOG_NAME}, channel ${RESOLVED_CHANNEL} into ${ODF_INSTALL_NAMESPACE}"
+
+echo "Creating Subscription (channel: ${RESOLVED_CHANNEL})"
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -100,7 +168,7 @@ metadata:
   name: ${ODF_SUBSCRIPTION_NAME}
   namespace: ${ODF_INSTALL_NAMESPACE}
 spec:
-  channel: ${ODF_OPERATOR_CHANNEL}
+  channel: ${RESOLVED_CHANNEL}
   installPlanApproval: Automatic
   name: ${ODF_SUBSCRIPTION_NAME}
   source: ${CATALOG_NAME}

@@ -16,24 +16,35 @@ ref:
       group: interop-tests-deploy
       mount_path: /tmp/secrets/odf-quay-credentials
   documentation: |-
-    Deploy ODF from the dev catalog for pre-GA OCP versions.
-    Installs ODF from quay.io/rhceph-dev/ocs-registry using the
-    specified version and channel, creates a StorageCluster, and
-    sets ocs-storagecluster-ceph-rbd as the default storage class.
+    Deploy ODF with resilient channel resolution, supporting both GA and pre-GA versions.
+
+    By default (ODF_VERSION_MAJOR_MINOR set), constructs dev catalog path for pre-GA testing.
+    For GA releases, set ODF_VERSION_MAJOR_MINOR="" to use redhat-operators catalog.
+
+    Resiliently selects the operator channel by querying the catalog's PackageManifest,
+    falling back gracefully when the desired channel is unavailable (common during
+    pre-GA periods when the dev catalog may not yet have stable-X.Y channels).
+
+    Creates a StorageCluster and sets ocs-storagecluster-ceph-rbd as the default
+    storage class.
+
     GA channel availability: stable-4.22 ~Jul 9, 2026;
-    stable-4.23 ~Nov 11, 2026.
+    stable-4.23 ~Nov 11, 2026; stable-5.0 TBD.
   env:
   - name: ODF_CATALOG_IMAGE
     documentation: |-
-      The ODF catalog image to use. Defaults to the dev catalog
-      at quay.io/rhceph-dev/ocs-registry. Override to use a GA
-      catalog when the stable channel becomes available.
+      Override the dev catalog image. When empty (default), constructs path from
+      ODF_VERSION_MAJOR_MINOR (quay.io/rhceph-dev/ocs-registry:latest-stable-${VERSION}).
+      Only used when ODF_VERSION_MAJOR_MINOR is set.
     default: ""
   - name: ODF_VERSION_MAJOR_MINOR
-    documentation: The ODF major.minor version (used in catalog image tag when ODF_CATALOG_IMAGE is empty)
+    documentation: The ODF major.minor version (used to construct the default channel name)
     default: "4.23"
   - name: ODF_OPERATOR_CHANNEL
-    documentation: The ODF operator subscription channel
+    documentation: |-
+      The desired ODF operator subscription channel. Defaults to stable-${ODF_VERSION_MAJOR_MINOR}.
+      The resilient channel resolver will use this if available, or fall back to the catalog's
+      default channel or newest stable channel.
     default: "stable-4.23"
   - name: ODF_SUBSCRIPTION_NAME
     documentation: The ODF subscription name
