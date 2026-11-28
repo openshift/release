@@ -5,6 +5,25 @@ set -o errexit
 set -o pipefail
 export PS4='+ $(date "+%T.%N") \011'
 
+# shellcheck disable=SC2154
+trap 'rc=$?; if [ $rc -ne 0 ]; then echo "ERROR: Step failed at line $LINENO with exit code $rc"; fi' EXIT
+
+ssh_retry() {
+  local retries=3 delay=10
+  for ((i=1; i<=retries; i++)); do
+    if "$@"; then return 0; fi
+    if ((i < retries)); then
+      echo "Attempt $i/$retries failed, retrying in ${delay}s..."
+      sleep "$delay"
+      delay=$((delay * 2))
+    else
+      echo "Attempt $i/$retries failed"
+    fi
+  done
+  echo "All $retries attempts failed"
+  return 1
+}
+
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
@@ -25,36 +44,30 @@ fi
 
 remote_workdir=$(cat "${SHARED_DIR}/remote_workdir")
 
-ssh "${SSHOPTS[@]}" "${ssh_host_ip}" "mkdir -p ${remote_workdir}"
+ssh_retry ssh "${SSHOPTS[@]}" "${ssh_host_ip}" "mkdir -p ${remote_workdir}"
 
 cat <<EOF > ${SHARED_DIR}/install.sh
 #!/bin/bash
 set -euxo pipefail
 
 function dnf_install_retry {
-  packages=(\$@)
+  local packages=(\$@)
+  local delay=10
   echo "Installing packages with retry"
-
-  for _ in \$(seq 3) ; do
-    sudo dnf clean -y all # clean the cache
-
-    # shellcheck disable=SC2086
+  for attempt in \$(seq 3); do
+    if [ "\$attempt" -gt 1 ]; then
+      sudo dnf clean all
+    fi
     sudo dnf install -y \${packages[*]} && return 0
-     
-    rc=\$? # save the return code
-
-    if [ \$rc -ne 0 ]
-    then
-      echo "Failed to run dnf install, retrying"
+    if [ "\$attempt" -lt 3 ]; then
+      echo "Failed to run dnf install, retrying in \${delay}s..."
+      sleep "\$delay"
+      delay=\$((delay * 2))
+    else
+      echo "Failed to run dnf install after 3 attempts"
     fi
   done
-
-  if [ \$rc -ne 0 ]
-  then
-    echo "Failed to run dnf install after 3 attempts"
-  fi
-
-  return "\${rc}"
+  return 1
 }
 
 sudo subscription-manager config --rhsm.manage_repos=1 --rhsmcertd.disable=redhat-access-insights
@@ -86,7 +99,23 @@ then
     dnf_install_retry git
 fi
 
-sudo podman pull "${IB_ORCHESTRATE_VM_REF}"
+function podman_retry {
+  local retries=3 delay=15
+  for ((i=1; i<=retries; i++)); do
+    if "\$@"; then return 0; fi
+    if ((\$i < \$retries)); then
+      echo "podman attempt \$i/\$retries failed, retrying in \${delay}s..."
+      sleep "\$delay"
+      delay=\$((delay * 2))
+    else
+      echo "podman attempt \$i/\$retries failed"
+    fi
+  done
+  echo "All \$retries podman attempts failed"
+  return 1
+}
+
+podman_retry sudo podman pull "${IB_ORCHESTRATE_VM_REF}"
 IB_ORCHESTRATE_VM_SRC_PATH=\$(sudo podman inspect \
   --format '{{ .Config.WorkingDir }}' \
   "${IB_ORCHESTRATE_VM_REF}")
@@ -95,7 +124,7 @@ mkdir -p "${remote_workdir}/ib-orchestrate-vm"
 sudo podman cp "\${IB_CTR_ID}:\${IB_ORCHESTRATE_VM_SRC_PATH}/." "${remote_workdir}/ib-orchestrate-vm/"
 sudo podman rm -f "\${IB_CTR_ID}"
 
-sudo podman pull "${BIP_ORCHESTRATE_VM_REF}"
+podman_retry sudo podman pull "${BIP_ORCHESTRATE_VM_REF}"
 BIP_ORCHESTRATE_VM_SRC_PATH=\$(sudo podman inspect \
   --format '{{ .Config.WorkingDir }}' \
   "${BIP_ORCHESTRATE_VM_REF}")
@@ -125,18 +154,14 @@ fi
 EOF
 
 chmod +x ${SHARED_DIR}/install.sh
-scp "${SSHOPTS[@]}" ${SHARED_DIR}/install.sh $ssh_host_ip:$remote_workdir
+ssh_retry scp "${SSHOPTS[@]}" "${SHARED_DIR}/install.sh" "${ssh_host_ip}:${remote_workdir}"
 
-scp "${SSHOPTS[@]}" \
+ssh_retry scp "${SSHOPTS[@]}" \
     /var/run/rhsm/subscription-manager-org \
     /var/run/rhsm/subscription-manager-act-key \
     "${ssh_host_ip}:/tmp"
 
-ssh "${SSHOPTS[@]}" $ssh_host_ip "${remote_workdir}/install.sh"
-
-# Configure NSS to use libvirt guest names as hostnames
-# This is the default configuration with libvirt_guest added to the hosts line
-cat <<EOF > ${SHARED_DIR}/nsswitch.conf
+ssh "${SSHOPTS[@]}" "${ssh_host_ip}" "${remote_workdir}/install.sh"
 
 # Configure NSS to use libvirt guest names as hostnames
 # This is the default configuration with libvirt_guest added to the hosts line
@@ -235,9 +260,9 @@ publickey:  files
 rpc:        files
 EOF
 
-scp "${SSHOPTS[@]}" ${SHARED_DIR}/nsswitch.conf $ssh_host_ip:${remote_workdir}/nsswitch.conf
+ssh_retry scp "${SSHOPTS[@]}" "${SHARED_DIR}/nsswitch.conf" "${ssh_host_ip}:${remote_workdir}/nsswitch.conf"
 
-ssh "${SSHOPTS[@]}" $ssh_host_ip "sudo mv ${remote_workdir}/nsswitch.conf /etc/nsswitch.conf"
+ssh "${SSHOPTS[@]}" "${ssh_host_ip}" "sudo cp ${remote_workdir}/nsswitch.conf /etc/nsswitch.conf && rm ${remote_workdir}/nsswitch.conf"
 
 # Upload the pull secrets
 LCA_PULL_SECRET_FILE="/var/run/pull-secret/.dockerconfigjson"
@@ -251,8 +276,7 @@ echo -n "${PULL_SECRET}" > ${SHARED_DIR}/.pull_secret.json
 echo -n "${BACKUP_SECRET}" > ${SHARED_DIR}/.backup_secret.json
 
 echo "Transferring pull secrets..."
-scp "${SSHOPTS[@]}" ${SHARED_DIR}/.pull_secret.json $ssh_host_ip:$remote_workdir
-scp "${SSHOPTS[@]}" ${SHARED_DIR}/.backup_secret.json $ssh_host_ip:$remote_workdir
+ssh_retry scp "${SSHOPTS[@]}" "${SHARED_DIR}/.pull_secret.json" "${SHARED_DIR}/.backup_secret.json" "${ssh_host_ip}:${remote_workdir}"
 
 rm ${SHARED_DIR}/.pull_secret.json ${SHARED_DIR}/.backup_secret.json
 
