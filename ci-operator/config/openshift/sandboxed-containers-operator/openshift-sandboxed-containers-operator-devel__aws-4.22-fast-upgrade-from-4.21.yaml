@@ -1,0 +1,39 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.26-openshift-4.23
+prowgen:
+  disable_sparse_checkout: true
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.21"
+  target:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.22"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: osc-upgrade-hcp-aws
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CATALOG_SOURCE_NAME: redhat-operators
+      OSC_INSTALL: "true"
+      TESTS_OSC_ENABLE: "true"
+      WORKLOAD_TO_TEST: kata
+    workflow: sandboxed-containers-operator-upgrade-hcp-aws
+zz_generated_metadata:
+  branch: devel
+  org: openshift
+  repo: sandboxed-containers-operator
+  variant: aws-4.22-fast-upgrade-from-4.21
