@@ -69,6 +69,45 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-aws
+- always_run: false
+  as: odf-operator-e2e-ibmcloud
+  capabilities:
+  - intranet
+  optional: true
+  steps:
+    cluster_profile: odf-ibmcloud
+    env:
+      BASE_DOMAIN: ibmcloud.ocs.syseng.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: bx2-8x32
+      RESOURCE_GROUP: odf-openshift-ci
+      ZONES_COUNT: "3"
+    test:
+    - as: unit-tests
+      cli: latest
+      commands: |
+        GOFLAGS='' make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-tests
+      cli: latest
+      commands: |
+        unset VERSION
+        BUNDLE_IMG="$OO_BUNDLE" ODF_DEPS_CATALOG_IMG="$OO_CATALOG" make install-odf
+        GOFLAGS='' ODF_OPERATOR_INSTALL=false ODF_OPERATOR_UNINSTALL=false make e2e-test
+      dependencies:
+      - env: OO_BUNDLE
+        name: odf-operator-bundle
+      - env: OO_CATALOG
+        name: odf-dependencies-catalog
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: red-hat-storage-ipi-ibmcloud
 zz_generated_metadata:
   branch: main
   org: red-hat-storage
